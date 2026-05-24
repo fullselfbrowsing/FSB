@@ -174,6 +174,57 @@ These came up during scoping but belong outside Phase 1:
 
 </deferred>
 
+<reconciliation>
+## Research-Driven Reconciliation (2026-05-24, post-research)
+
+Phase 1 research (`01-RESEARCH.md`) uncovered two Chrome-platform facts that contradict D-06 / D-09 as originally written. User selected **Option B (defer in-extension load)** to keep Phase 1 inside its scope ceiling. This section AMENDS the locked decisions above; downstream agents follow the amendments. Original decision text is preserved verbatim for the audit trail.
+
+### The two facts (verified)
+
+- **F-01 SW classic/module mutual exclusion.** Chrome MV3 service workers are EITHER classic (`importScripts()`) OR module (`import`), never both. FSB's `extension/background.js` makes 100+ `importScripts()` calls in load-order-sensitive chains (`install-identity.js MUST load FIRST`, etc.). Adding `"type": "module"` to the manifest breaks SW registration. `[VERIFIED: Chrome MV3 docs + background.js head]`
+- **F-02 No bare-specifier resolution in extension contexts.** Chrome (and the Web Platform) does not resolve `import 'lattice'` at runtime in ANY extension context (SW, offscreen, sidepanel). Only relative URLs or `chrome-extension://` URLs resolve. Bare specifiers require a bundler to be rewritten to relative paths before load. FSB has no bundler in Phase 1 scope. `[VERIFIED: 01-RESEARCH.md Pitfall 3 + Chrome MV3 docs]`
+
+Together these mean D-06's literal text ("bridge file does `import { … } from 'lattice'` … loaded by background.js") is unachievable without a SW refactor + bundler — both of which violate D-13's "no FSB runtime behaviour changes" intent.
+
+### Amendments
+
+- **D-06 (AMENDED).** FSB does NOT add `"type": "module"` to `manifest.json` in Phase 1. FSB does NOT import Lattice from any extension context (SW, offscreen, sidepanel) in Phase 1. The new bridge file (`extension/lattice-bridge.js` per CD-02) is NOT introduced in Phase 1 — it would have nothing to do and would itself be unreachable from a classic SW. In-extension Lattice loading is deferred to a future phase that bundles Lattice into the extension's resource tree (or migrates the SW to module-type as its own scoped concern).
+
+- **D-09 (AMENDED).** Smoke contexts = Node-side test only (was: Node-side + manual MV3 SW load). The manual MV3 prong is downgraded — see D-12 amendment.
+
+- **D-12 #3 (AMENDED).** Manual MV3 check is downgraded from "developer reloads extension, opens SW console, confirms bridge file emits the smoke-test receipt" to: "developer reloads the unpacked extension after Phase 1's commits are applied; SW console shows no NEW errors caused by Phase 1's file additions; the extension's existing functionality (popup open, sidepanel open, an existing autopilot run) continues to work end-to-end." This is a sanity check that Phase 1's tree changes don't break the extension, NOT a proof that Lattice loads inside an extension context. Captured in PLAN's verification notes / phase SUMMARY as a checked manual step.
+
+- **D-12 #2 (CLARIFIED, unchanged in intent).** Node smoke (`node tests/lattice-smoke.test.js`) is now the SUBSTANTIVE proof of FSB ↔ Lattice round-trip. It mints one Capability Receipt via `await import('lattice')` from a CJS test file (Node 25.9 verified), calls `createReceipt(...)` with an ephemeral Ed25519 keypair from `generateEd25519KeyPairJwk` + `createInMemorySigner`, then `verifyReceipt(envelope, createMemoryKeySet([...]))` to round-trip-confirm the signature.
+
+- **D-13 (NARROWED — the "at most ONE Lattice-side tweak" specified).** The single allowed Lattice-side code change in Phase 1 is **adding `export { createReceipt, type CreateReceiptInput } from "./receipts/receipt.js";` to `lattice/packages/lattice/src/index.ts`** so the smoke can import `createReceipt` via the package's documented bare specifier. No other Lattice code change is permitted (per the original D-13).
+
+### Resolutions of Claude's Discretion
+
+Research empirically tested these — they're no longer "discretion":
+
+- **CD-01 (RESOLVED).** `"lattice": "file:./lattice/packages/lattice"`. `link:` silently produces no symlink on npm 11.12.1 (verified at `/tmp/npm-spec-probe`). `--no-save` is non-reproducible. `npm link` requires global state. `file:` is correct.
+- **CD-02 (DEFERRED).** No bridge file is added in Phase 1 (per amended D-06). When in-extension import lands in a future phase, that phase will pick the placement.
+- **CD-03 (RESOLVED).** No postinstall hook. The PLAN's Setup task / README addition is the documentation route per D-07. Adding a postinstall would couple FSB's `npm install` to Lattice's pnpm + would surprise CI.
+- **CD-04 (RESOLVED).** Smoke uses inline stubs — matches FSB's existing test convention (`tests/fixtures/` contains data fixtures, not test stubs).
+- **CD-05 (RESOLVED).** Flat path: `lattice/docs/fsb-integration-gaps.md` (not `lattice/docs/integrations/fsb-gaps.md`). `lattice/docs/` does not exist on the experiment branch yet — Phase 1 creates the directory + file in one step.
+- **CD-06 (RESOLVED).** LATTICE-PIN.md is a markdown table — consistent with `.planning/` style. Columns: `FSB Phase | Date | Lattice SHA | Branch | Lattice work touched | Notes`. Frontmatter holds the "current pin" (single SHA + branch); per-phase log is the table body.
+
+### What survives unchanged
+
+D-01 (6-area sweep), D-02 (Lattice-side doc), D-03 (severity tagging), D-04 (row format), D-05 (`file:` dep), D-07 (developer-driven pnpm), D-08 (`.planning/LATTICE-PIN.md`), D-10 (one receipt mint via existing v1.1 surface), D-11 (FSB-side `tests/lattice-smoke.test.js`), D-14 (conv commits + `Ref:`), D-15 (no mainline PR), D-16 (LATTICE-PIN.md as single index). Phase boundary (`<domain>`) is unchanged: still audit + scaffolding; nothing primitive added to FSB.
+
+### Net plan-shape impact
+
+- One FSB-side test file (`tests/lattice-smoke.test.js`).
+- One FSB-side `package.json` dependency line + one test-chain insertion in `scripts.test`.
+- One FSB-side new doc (`.planning/LATTICE-PIN.md`).
+- One Lattice-side doc (`lattice/docs/fsb-integration-gaps.md`).
+- One Lattice-side single-line code change (`lattice/packages/lattice/src/index.ts` re-export).
+- One developer ceremony (`cd lattice && pnpm install && pnpm build`) — documented in the PLAN's Setup task.
+- ZERO `extension/` file additions or `manifest.json` edits in Phase 1.
+
+</reconciliation>
+
 ---
 
 *Phase: 01-lattice-gap-survey-scaffold*
