@@ -43,8 +43,11 @@
 - [x] **Phase 1: Lattice SDK gap survey + integration scaffolding** -- Plans: 2/2 COMPLETE 2026-05-24. Audit Lattice v1.1 across 6 surfaces (receipts, tripwires/hooks, providers, delegation, MV3-survivability, observability/step-markers); land the audit doc on Lattice's `fsb-integration-experiments` branch; wire FSB to consume Lattice via `file:` npm dependency; prove round-trip via real-runtime Node smoke that mints + verifies one Capability Receipt. Per Option B reconciliation: no in-extension Lattice import in Phase 1 (deferred to a future bundler-aware phase). Phase verifier + milestone UAT pending. Plans:
   - [x] `01-01-PLAN.md` -- Lattice-side: verify branch, build dist/, add single-line `createReceipt` re-export to `src/index.ts`, author 6-surface audit doc, conventional-commit with `Ref: FSB v0.10.0-attempt-2 Phase 1` footer (D-14), no push (D-15). **COMPLETE 2026-05-24 -- Lattice commits ab6c1f6 + 195e5ae; SUMMARY at .planning/phases/01-lattice-gap-survey-scaffold/01-01-SUMMARY.md.**
   - [x] `01-02-PLAN.md` -- FSB-side: add `"lattice": "file:./lattice/packages/lattice"` dep + append smoke to `scripts.test`, run `npm install`, create `tests/lattice-smoke.test.js` (real-runtime mint + verify round-trip with ephemeral Ed25519 keypair), create `.planning/LATTICE-PIN.md` audit-trail, manual MV3 sanity reload checkpoint, single `feat(phase-1):` commit. **COMPLETE 2026-05-24 -- FSB commits 658ed87e + 1545c14c + be95d158 + e3cd7fb5 (pause record); Lattice catalog-fix commit 22bf986 (user-authorized D-13 expansion); SUMMARY at .planning/phases/01-lattice-gap-survey-scaffold/01-02-SUMMARY.md; Task 4 (manual MV3 reload) DEFERRED-PENDING-UAT per user directive "continue all phases with GSD autonomous; UAT will be at the end".**
-- [ ] **Phase 2: Lattice tripwire + receipt primitives extension** -- TBD. Extend Lattice's tripwire / receipt primitives with the priority-band + matcher + race-with-log + freeze contract FSB needs. Validate via Lattice's own 451-test suite (additive, no regressions).
-- [ ] **Phase 3+: TBD via discuss-phase** -- delegation primitive, provider adapters, step markers, MV3-eviction resumption all live in Lattice; FSB integration is incremental.
+- [ ] **Phase 2: Lattice tripwire + receipt primitives extension** -- Extend Lattice's tripwire / receipt primitives with the priority-band + matcher + race-with-log + freeze contract FSB needs, plus the receipt-shape extensions (stepName/stepIndex/parentStepName fields, schema versioning). Validate via Lattice's own 451-test suite + new additive tests. Lifecycle events as a typed union.
+- [ ] **Phase 3: Observability + step-markers extension** -- STEP_TRANSITION typed event, checkpoint-hook factory, per-step receipt mint. Builds on Phase 2's receipt-shape extensions.
+- [ ] **Phase 4: Provider adapter alignment** -- Native Lattice adapters for the 5 currently-missing providers (Anthropic, Gemini, LM Studio, OpenRouter, xAI); INV-03 provider-parity gate.
+- [ ] **Phase 5: MV3-survivability adapter contract** -- Lattice-side interface for runtimes whose execution context can be evicted mid-flow. First phase to legitimately load Lattice into an extension context (bundler / SW migration decisions land here).
+- [ ] **Phase 6: Delegation primitive (CONTINGENT)** -- Task-delegation primitive contingent on Lattice's multi-agent policy. May defer to v0.11.0+ if Lattice keeps multi-agent excluded.
 
 ## Phase Details
 
@@ -78,6 +81,54 @@
 
 **Lattice-side ceremony (CONTEXT.md D-14):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 1` in commit body.
 
+### Phase 2: Lattice tripwire + receipt primitives extension
+
+**Goal:** Close the highest-severity gaps identified by Phase 1's audit doc (`lattice/docs/fsb-integration-gaps.md`) by extending Lattice's tripwire/hook + Capability Receipt primitives. The work lands on Lattice's `fsb-integration-experiments` branch FIRST (per INV-06), validated by Lattice's existing 451-test vitest suite (additive, no regressions), then consumed from FSB via the existing `file:./lattice/packages/lattice` path: dependency. FSB-side integration adds new smoke tests that exercise the newly-shipped primitives end-to-end.
+
+**Why:** Phase 1's audit identified 13 Blocker gaps across receipts (5), tripwires/hooks (6 -- priority bands, matcher regex, race-with-log, lifecycle events, freeze, mid-session-registration), and observability/step-markers (3 -- STEP_TRANSITION + checkpoint hook + per-step mint). Phase 2 picks the tripwire + receipt subset (excluding observability/step-markers, which goes to its own dedicated phase) because those two surfaces tightly couple: receipt extensions (stepName/stepIndex/parentStepName fields, schema versioning, MV3-survivable encoding) are the data shape; tripwires/hooks are the runtime that emits into that shape. Shipping them together avoids design oscillation between phases.
+
+**Scope (in):**
+- Extend Lattice's Capability Receipt `CapabilityReceiptBody` with the step-marker fields FSB's autopilot emits: `stepName`, `stepIndex`, `parentStepName`, `previousStepName`, `sessionId`, `timestamp`. Schema versioned via either receipt-version bump (`lattice-receipt/v1.1`) OR an `extensions` field -- decision in discuss-phase.
+- Extend Lattice's tripwire / policy primitives with: priority bands (SAFETY > OBSERVABILITY > EXTENSION), matcher regex (selective per-event firing), race-with-log per-handler budget (kill slow hooks), frozen-context evaluation, and mid-session registration freeze. Lifecycle events as a typed union (BEFORE_PROVIDER, AFTER_PROVIDER, BEFORE_TOOL, AFTER_TOOL, plus a STEP_TRANSITION carve-out).
+- Add tests on Lattice's side for the new primitives (vitest, additive); Lattice's existing 451 tests must remain green.
+- Update `lattice/docs/fsb-integration-gaps.md`: mark the closed rows as `Covered` (with the new Lattice commit SHAs referenced), leave other rows untouched.
+- Update FSB's `.planning/LATTICE-PIN.md`: bump `current_lattice_sha` to the new Lattice HEAD; add Phase 2 row referencing the new Lattice commits.
+- Add a Node-side FSB smoke (`tests/lattice-tripwire-smoke.test.js` or extend `tests/lattice-smoke.test.js`) that exercises the new tripwire band + receipt-shape extension end-to-end (mint a receipt with stepName populated; install a tripwire with a matcher + priority; assert the band ordering).
+- Populate the corresponding LSDK REQ-IDs in `.planning/REQUIREMENTS.md` based on what landed.
+
+**Scope (out):**
+- Observability / step-markers surface (deferred to its own phase: STEP_TRANSITION event, checkpoint hook, per-step receipt mint).
+- Provider adapter alignment (FSB's 7-provider matrix) -- deferred to its own phase.
+- Delegation primitive -- deferred (Lattice's multi-agent policy still excludes it; surface in Phase 1 audit as Out-of-scope).
+- MV3-survivability adapter contract -- deferred to its own phase.
+- Any FSB extension/* file modification (per the Phase 1 Option B reconciliation legacy: FSB still does NOT import Lattice from any extension context).
+- Mainline PR back into Lattice (deferred to v0.11.0+).
+
+**Pass criteria (to be locked during discuss-phase):**
+1. Lattice's vitest suite still passes (existing 451 tests + new tests covering the priority-band / matcher / race-with-log / freeze / lifecycle events / receipt-shape extensions). No regressions.
+2. FSB's `npm test` chain (including a new or extended smoke test) exits 0 and exercises the newly-shipped primitives end-to-end.
+3. `lattice/docs/fsb-integration-gaps.md` rows that Phase 2 closed are updated from `Needs extension`/`Needs addition` to `Covered` (with commit SHAs in the Notes column).
+4. `.planning/LATTICE-PIN.md` reflects the new Lattice HEAD with a Phase 2 entry referencing the new commits.
+5. `.planning/REQUIREMENTS.md` LSDK category lines for tripwire-extensions and receipt-extensions are populated with concrete REQ-IDs.
+
+**Lattice-side ceremony (D-14 carryover):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 2` in commit body. No `git push` to Lattice's remote (D-15 carryover).
+
+### Phase 3: Observability + step-markers extension (TBD)
+
+Close the remaining 3 Blocker rows in the audit doc's Observability/step-markers domain: STEP_TRANSITION typed event + checkpoint hook factory + per-step receipt mint. Builds on Phase 2's receipt-shape extensions (Phase 2 ships the fields; Phase 3 ships the runtime that emits per-step receipts and the tracer event that subscribers consume). Phase 2's smoke covers the data shape; Phase 3's smoke covers the runtime emission.
+
+### Phase 4: Provider adapter alignment (TBD)
+
+FSB's 7-provider matrix (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible) vs Lattice's current `createOpenAIProvider` + `createOpenAICompatibleProvider` + `createAISdkProvider` + `createFakeProvider`. Add native adapters for the 5 currently-missing (Anthropic, Gemini, LM Studio, OpenRouter, xAI) on Lattice's side; FSB's `universal-provider.js` either delegates to Lattice's adapters or maintains signature parity. INV-03 (provider parity) is the hard gate.
+
+### Phase 5: MV3-survivability adapter contract (TBD)
+
+Documented Lattice-side interface for runtimes whose execution context can be evicted mid-flow (FSB MV3 SW is the first; future Lattice consumers may include other ephemeral runtimes). FSB-side: session-resume dispatcher with CONSERVATIVE recovery (per attempt-1's `_al_handleRestoredMode` pattern). Phase 5's smoke is the first that legitimately needs to load Lattice into an extension context -- this is also where the bundler / SW classic-to-module migration discussion happens.
+
+### Phase 6: Delegation primitive (CONTINGENT)
+
+Task-delegation primitive (parent-child loops + summary-return + cache-prefix sharing + rate-limit-group coordination). Contingent on Lattice's "Out of Scope" policy change for multi-agent. If Lattice keeps multi-agent excluded through this milestone, Phase 6 becomes either an FSB-only primitive that CONSUMES Lattice's receipt + tripwire surface, or it gets deferred to v0.11.0+.
+
 ---
 
 ## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
@@ -103,4 +154,4 @@
 
 ---
 
-*Last updated: 2026-05-24 -- v0.10.0-attempt-2 pivot.*
+*Last updated: 2026-05-24 -- Phase 1 complete; Phase 2 detail + Phases 3-6 sketched.*
