@@ -1,0 +1,3 @@
+40457ff2184589c8bc6525eb0b0668fe6ab8a0c3 feat(providers): add LM Studio provider adapter
+1cfc13c519890aa0b6ad1c0db78fd02098e20739 feat(providers): add OpenRouter provider adapter
+09a495eb7d6b927b1a31aaa9ed9d71fdcd255cb7 feat(providers): add xAI provider adapter

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 04-02-PLAN.md (Gemini full-custom adapter); auto-advancing to Plan 04-03 (thin wrappers)
-last_updated: "2026-05-24T23:10:07.437Z"
+stopped_at: Completed 04-03-PLAN.md (xAI + OpenRouter + LM Studio thin wrappers; 3 Lattice commits 09a495e/1cfc13c/40457ff; 24 vitest cases; 390 PASS); auto-advancing to Plan 04-04 (public-surface re-exports + INV-03 parity smoke + audit-doc closure)
+last_updated: "2026-05-24T23:20:45.204Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_plans: 13
+  percent: 87
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 ## Current Position
 
 Phase: 04 (Provider adapter alignment) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -109,6 +109,6 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 
 ## Session Continuity
 
-Last session: 2026-05-24T23:10:07.434Z
+Last session: 2026-05-24T23:20:45.202Z
 Resume file: None
-Stopped at: Completed 04-02-PLAN.md (Gemini full-custom adapter); auto-advancing to Plan 04-03 (thin wrappers)
+Stopped at: Completed 04-03-PLAN.md (xAI + OpenRouter + LM Studio thin wrappers; 3 Lattice commits 09a495e/1cfc13c/40457ff; 24 vitest cases; 390 PASS); auto-advancing to Plan 04-04 (public-surface re-exports + INV-03 parity smoke + audit-doc closure)
