@@ -7,7 +7,8 @@
     "research": true,
     "plan_check": true,
     "verifier": true,
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "use_worktrees": false
   },
   "granularity": "fine",
   "milestone_version": "v0.10.0",
