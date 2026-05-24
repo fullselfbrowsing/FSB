@@ -119,9 +119,39 @@
 
 **Lattice-side ceremony (D-14 carryover):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 2` in commit body. No `git push` to Lattice's remote (D-15 carryover).
 
-### Phase 3: Observability + step-markers extension (TBD)
+### Phase 3: Observability + step-markers extension
 
-Close the remaining 3 Blocker rows in the audit doc's Observability/step-markers domain: STEP_TRANSITION typed event + checkpoint hook factory + per-step receipt mint. Builds on Phase 2's receipt-shape extensions (Phase 2 ships the fields; Phase 3 ships the runtime that emits per-step receipts and the tracer event that subscribers consume). Phase 2's smoke covers the data shape; Phase 3's smoke covers the runtime emission.
+**Goal:** Close the remaining 3 Blocker rows in the audit doc's Observability/step-markers domain. Add `"step.transition"` typed event to Lattice's `RunEventKind` union (`lattice/packages/lattice/src/tracing/tracing.ts`). Add a new `createCheckpointHook` factory at `lattice/packages/lattice/src/contract/checkpoint.ts` (sibling to bands.ts) that produces a hook handler the caller registers via Phase 2's `HookPipeline.register('AFTER_TOOL'/'BEFORE_TOOL', handler, { band: BAND.OBSERVABILITY })`. Per step transition, the handler emits a `step.transition` tracer event via `tracer.event?.()` AND (when a signer is provided) mints a v1.1 Capability Receipt via `createReceipt(...)` with step-marker fields populated. Best-effort mint -- signer failures degrade gracefully. Receipts thread via Phase 2's `previousStepName` + `parentStepName` linked-list fields. FSB-side: new `tests/lattice-checkpoint-smoke.test.js` exercising a 3-step fake sequence with both linear and parent-child threading.
+
+**Why:** Phase 2 shipped the v1.1 receipt SHAPE (stepName, stepIndex, parentStepName, previousStepName, sessionId, timestamp). Phase 3 ships the RUNTIME that emits per-step receipts AND a typed tracer event that subscribers (sidepanel UI, future audit tools) can consume. This is the inspector-envelope vision from the audit doc ("envelope IS the receipt"). Phases 2 + 3 together close the receipts + tripwires + observability gap surface from the Phase 1 audit.
+
+**Scope (in):**
+- Add `"step.transition"` to `RunEventKind` literal union (one-line edit to `tracing.ts`).
+- Create `lattice/packages/lattice/src/contract/checkpoint.ts` (factory + types).
+- Create `lattice/packages/lattice/src/contract/checkpoint.test.ts` (vitest cases).
+- Re-export `createCheckpointHook` + `CheckpointHookOptions` from `lattice/packages/lattice/src/index.ts`.
+- Flip Phase 3 audit-doc rows to `Covered` with backlink SHAs.
+- Create FSB `tests/lattice-checkpoint-smoke.test.js`; append to `scripts.test`.
+- Bump `.planning/LATTICE-PIN.md` to new Lattice HEAD; add Phase 3 row.
+- Populate LSDK REQ-IDs (LSDK-09..N at audit-doc row granularity).
+
+**Scope (out):**
+- Sidepanel UI consumption (Inspector view) -- separate UI-consumption phase later.
+- `runtime/create-ai.ts` auto-wiring -- Phase 3 keeps the hook caller-controlled.
+- MV3-survivable encoding of the per-step receipt stream -- Phase 5.
+- Provider adapter alignment -- Phase 4.
+- Delegation primitive -- Phase 6.
+- ANY FSB `extension/*` modification (Option B reconciliation).
+- Mainline PR back into Lattice -- v0.11.0+.
+
+**Pass criteria (to be locked during planning):**
+1. Lattice's vitest suite still passes (existing 332 baseline + new checkpoint tests; no regressions).
+2. FSB's `npm test` chain (with new checkpoint smoke) exits 0; smoke asserts 3-step sequence with monotonically increasing stepIndex, 3 verified v1.1 receipts, and correct previousStepName + parentStepName threading.
+3. `lattice/docs/fsb-integration-gaps.md` Observability/step-markers Blocker rows flipped to `Covered` with backlink SHAs.
+4. `.planning/LATTICE-PIN.md` reflects new Lattice HEAD with a Phase 3 row referencing the new commits.
+5. `.planning/REQUIREMENTS.md` LSDK-09..N populated with concrete REQ-IDs.
+
+**Lattice-side ceremony (D-14 carryforward):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 3` in commit body. No `git push` to Lattice's remote (D-15 carryforward).
 
 ### Phase 4: Provider adapter alignment (TBD)
 
