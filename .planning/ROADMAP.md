@@ -46,7 +46,35 @@
 
 ## Phase Details
 
-(Populated by `/gsd-discuss-phase` + `/gsd-plan-phase` during planning.)
+### Phase 1: Lattice SDK gap survey + integration scaffolding
+
+**Goal:** Produce two outputs end-to-end. (1) A documented gap audit of Lattice v1.1 against FSB's runtime needs across all 6 surfaces (Capability Receipts, tripwires/hooks, providers, delegation, MV3-survivability, observability/step-markers), landing as `lattice/docs/fsb-integration-gaps.md` on the `fsb-integration-experiments` branch with gaps tagged by FSB-blocking severity (Blocker / Important / Nice-to-have). (2) A working FSB -> Lattice `path:` dependency wiring proven by a smoke test that mints exactly one Capability Receipt via Lattice's existing v1.1 surface, plus a manual MV3 SW reload check that confirms Lattice ES modules load inside the service worker. No FSB runtime behaviour changes, no Lattice primitive extensions yet -- only the audit + scaffold + receipt round-trip.
+
+**Why:** v0.10.0-attempt-1 invented primitives inside FSB and planned to port them later (LAT-05 anti-pattern -- identified but not executed). Attempt-2 inverts the order: audit Lattice first, then build extensions inside Lattice on `fsb-integration-experiments`, then consume from FSB. Phase 1 establishes the FSB <-> Lattice loop and the queue of gap-closing work for Phase 2+. The smoke test proves the integration model works before any SDK extensions land.
+
+**Scope (in):**
+- Audit Lattice v1.1 across all 6 surfaces (receipts, tripwires/hooks, providers, delegation, MV3-survivability, observability/step-markers); document each gap with FSB-blocking severity.
+- Write `lattice/docs/fsb-integration-gaps.md` on `fsb-integration-experiments` (single source of truth -- INV-06).
+- Set up FSB <-> Lattice integration via `path:` dependency from `./lattice/packages/lattice`.
+- Build Lattice locally (`pnpm install && pnpm build` inside `lattice/`) so `dist/` exists for FSB to consume.
+- Add bridge module on the FSB side (e.g., `extension/lattice-bridge.js`) that imports from the built Lattice ESM surface; wire MV3 SW to load it via native ES module imports.
+- Write `tests/lattice-smoke.test.js` exercising one Capability Receipt mint via Lattice's existing v1.1 API. Smoke must run under FSB's existing Node test harness (`npm test`).
+- Manual MV3 SW reload check: extension reloads in Chrome, bridge module imports successfully, browser console shows no module-load errors. Result captured in PLAN's verification notes / phase SUMMARY.
+- Create `.planning/LATTICE-PIN.md` recording the Lattice commit SHA used for this phase + per-phase log.
+
+**Scope (out):**
+- Any Lattice SDK extension or primitive addition beyond the audit doc + at most one `tsconfig` / `exports` packaging tweak if the smoke surfaces one (receipt-shape extensions, tripwire band system, provider matrix, delegation primitive, MV3-survivability adapter are all deferred to subsequent dedicated phases).
+- Any change to FSB runtime behaviour (no `runAgentLoop` modification, no replacement of the `setTimeout`-chained iterator pattern -- INV-04).
+- Sidepanel-side Lattice consumption (own phase later).
+- Mainline PR back into Lattice (deferred to v0.11.0+ per CONTEXT.md D-15).
+- Populating LSDK / FINT / MCP / PRV REQ-IDs in REQUIREMENTS.md (deferred to Phase 2 setup work).
+
+**Pass criteria (explicit, from CONTEXT.md D-12):**
+1. `lattice/docs/fsb-integration-gaps.md` exists on `fsb-integration-experiments` covering all 6 surfaces, with gaps severity-tagged.
+2. FSB's `npm test` includes the new `tests/lattice-smoke.test.js` and the smoke passes (one receipt minted via Lattice).
+3. Manual MV3 SW reload check passes: extension loads cleanly with Lattice bridge module imported; no console errors related to module loading.
+
+**Lattice-side ceremony (CONTEXT.md D-14):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 1` in commit body.
 
 ---
 
