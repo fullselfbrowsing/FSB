@@ -39,7 +39,7 @@ Detailed REQ-IDs are populated during phase planning (`/gsd-discuss-phase` + `/g
 
 Goal: extend Lattice's v1.1 Capability Receipts foundation with the primitives FSB's autopilot needs.
 
-- [ ] **LSDK-01..N (TBD):** Lattice SDK gap survey -- audit Lattice v1.1 against FSB's needs (receipt shapes, tripwire contracts, provider abstractions, multi-agent / delegation policy, MV3-survivability constraints, hook lifecycle vocabulary). Document gaps in `lattice/docs/fsb-integration-gaps.md` on the experiment branch. Identify which gaps are SDK-side (Lattice extensions) vs runtime-side (FSB adapters).
+- [x] **LSDK-01..N (audit) -- DONE 2026-05-24 (Phase 01 Plan 01-01):** Lattice SDK gap survey landed at `lattice/docs/fsb-integration-gaps.md` (91 lines, 6 domain headers, 21 severity-tagged rows: Receipts=2, Tripwires/hooks=4, Providers=5, Delegation=1, MV3-survivability=2, Observability/step-markers=4). Severity tags drive Phase 2+ ordering (Blocker > Important > Nice-to-have). Lattice commit `195e5ae`. Concrete LSDK-NN REQ-IDs for each row are populated in Phase 2 setup (deferred per CONTEXT.md `<deferred>` block). Phase 01 Plan 01-01 also re-exported `createReceipt` + `CreateReceiptInput` from Lattice's bare specifier (commit `ab6c1f6`), and Plan 01-02 added a packaging fix (catalog: -> literals) so npm 11 can install via `file:` (Lattice commit `22bf986`, user-authorized D-13 expansion).
 - [ ] **LSDK-NN..M (TBD):** Receipt-shaped state envelopes additions / extensions -- ensure Lattice can represent the step transitions FSB's autopilot emits (`stepName`, `stepIndex`, `timestamp`, `sessionId`, `parentStepName`, `previousStepName`, and any new fields surfaced by phase discussion).
 - [ ] **LSDK-MM..K (TBD):** Tripwire / hook primitive parity -- priority bands (SAFETY > OBSERVABILITY > EXTENSION), matcher regex, race-with-log per-handler budget, frozen contexts, mid-session registration freeze.
 - [ ] **LSDK-KK..L (TBD):** Provider adapter extensions -- bring Lattice's provider abstraction into parity with FSB's 7-provider matrix (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible).
@@ -50,7 +50,7 @@ Goal: extend Lattice's v1.1 Capability Receipts foundation with the primitives F
 
 Goal: wire FSB's autopilot engine to Lattice as a path: dependency.
 
-- [ ] **FINT-01..N (TBD):** Path: dependency wiring + npm install ./lattice + ensure Lattice's SDK loads in both MV3 SW + sidepanel contexts.
+- [x] **FINT-01 (path:dep wiring + Node smoke) -- DONE 2026-05-24 (Phase 01 Plan 01-02):** `"lattice": "file:./lattice/packages/lattice"` landed in `package.json` (line 81); `node_modules/lattice` resolves as a working symlink; `tests/lattice-smoke.test.js` appended to `scripts.test` chain and exercises the FSB <-> Lattice round-trip via dynamic `await import('lattice')` from a CJS test file (29 PASS / 0 FAIL). Real-runtime invocation of `lattice.createReceipt` + `lattice.verifyReceipt` with an ephemeral Ed25519 keypair per run (no committed key material). MV3 SW + sidepanel in-extension load DEFERRED to a future bundler-aware phase per Option B reconciliation (no `extension/*` modifications in Phase 1). Manual MV3 sanity reload (D-12 #3 AMENDED) DEFERRED-PENDING-UAT per user directive. FSB commits: `658ed87e`, `1545c14c`, `be95d158`. Cross-repo audit trail at `.planning/LATTICE-PIN.md`.
 - [ ] **FINT-NN..M (TBD):** Adapt FSB's `runAgentLoop` to emit step transitions through Lattice's receipt API (replacing the FSB-only `setStepMarker` helper from v0.10.0-attempt-1).
 - [ ] **FINT-MM..K (TBD):** Adapt FSB's safety / observability / extension hooks to Lattice's tripwire band system (replacing the FSB-only HookPipeline from v0.10.0-attempt-1).
 - [ ] **FINT-KK..L (TBD):** Adapt FSB's `universal-provider.js` to Lattice's provider abstraction OR keep FSB-side and align signatures.
@@ -61,8 +61,8 @@ Goal: wire FSB's autopilot engine to Lattice as a path: dependency.
 
 Goal: prove INV-01 (MCP wire contracts UNTOUCHED) and INV-02 (tool surface parity) hold across every Lattice-integration change.
 
-- [ ] **MCP-01:** `tests/tool-definitions-parity.test.js` passes byte-identically pre/post v0.10.0-attempt-2.
-- [ ] **MCP-02:** Lattice path: dependency introduction does not mutate `TOOL_REGISTRY` at any point.
+- [x] **MCP-01 -- HOLDING through Phase 01 (2026-05-24):** `tests/tool-definitions-parity.test.js` continues to pass byte-identically pre/post Phase 01 (142 PASS / 0 FAIL at SUMMARY-write time). Verified at every Plan 01-02 task gate. Re-verified at end of Phase 01 plans. Will be re-verified at every future v0.10.0-attempt-2 phase gate.
+- [x] **MCP-02 -- HOLDING through Phase 01 (2026-05-24):** Lattice `file:` dependency introduction did NOT mutate `TOOL_REGISTRY`. `git status --porcelain extension/ai/tool-definitions.js mcp/ai/tool-definitions.cjs` empty across the entire plan. Tool registry surface is byte-identical to the pre-Phase-1 baseline.
 - [ ] **MCP-03..N (TBD):** Additional MCP non-regression checks as Lattice integration phases land.
 
 ### PRV -- Provider Parity (Phase N + cross-cutting)

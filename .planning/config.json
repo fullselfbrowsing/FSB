@@ -7,8 +7,10 @@
     "research": true,
     "plan_check": true,
     "verifier": true,
-    "_auto_chain_active": false,
-    "use_worktrees": false
+    "_auto_chain_active": true,
+    "use_worktrees": false,
+    "auto_advance": true,
+    "discuss_mode": "assumptions"
   },
   "granularity": "fine",
   "milestone_version": "v0.10.0",
