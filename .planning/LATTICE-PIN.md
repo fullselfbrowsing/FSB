@@ -1,5 +1,5 @@
 ---
-current_lattice_sha: 22bf98627ae86b1576db5d34cf447ab2b321b3e1
+current_lattice_sha: 97836f2c7759470389294b0a03a122ec89780157
 current_branch: fsb-integration-experiments
 last_updated: 2026-05-24
 schema_version: 1
@@ -12,7 +12,7 @@ This file is the SINGLE FSB-side index of work FSB has produced on the Lattice r
 **Lattice repo location (local, gitignored):** `./lattice/`
 **Lattice branch in use:** `fsb-integration-experiments`
 **Lattice baseline:** v1.1 Capability Receipts (451 tests; cloned from https://github.com/LakshmanTurlapati/Lattice)
-**Current pinned SHA:** `22bf986` (full SHA in frontmatter)
+**Current pinned SHA:** `97836f2` (full SHA in frontmatter)
 **Mainline PR cadence:** Deferred to v0.11.0+ per CONTEXT.md D-15. All FSB-driven Lattice work stays on the experiment branch for this milestone.
 
 ## Per-FSB-Phase Log
@@ -22,6 +22,7 @@ Each row records one FSB phase's Lattice-side commits. The `Lattice SHA` column 
 | FSB Phase | Date       | Lattice SHA                                 | Branch                          | Lattice work touched                                                                                              | Notes                                                                                                                                                                              |
 |-----------|------------|---------------------------------------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Phase 1   | 2026-05-24 | `22bf98627ae86b1576db5d34cf447ab2b321b3e1` | `fsb-integration-experiments`   | (1) `packages/lattice/src/index.ts` -- one-line re-export of `createReceipt` + `type CreateReceiptInput` (Plan 01-01, commit `ab6c1f6`). (2) `docs/fsb-integration-gaps.md` -- new 6-surface audit doc (Plan 01-01, commit `195e5ae`). (3) `packages/lattice/package.json` + `pnpm-lock.yaml` -- resolve pnpm `catalog:` specifiers to concrete versions so npm 11 can install the package via `file:` (Plan 01-02 ceremony, commit `22bf986`). | Phase 1 = audit + scaffolding. The catalog-fix is the surfaced packaging tweak D-13 permits; npm 11 rejects `catalog:` at parse time, and FSB consumes via `file:./lattice/packages/lattice`. The audit doc is the queue driver for Phase 2+. |
+| Phase 2   | 2026-05-24 | `97836f2c7759470389294b0a03a122ec89780157` | `fsb-integration-experiments`   | (1) `packages/lattice/src/receipts/types.ts` + `receipt.ts` + `verify.ts` + receipt tests (`5c48134`) -- CapabilityReceiptBody.version literal-union "lattice-receipt/v1" or "lattice-receipt/v1.1"; six new optional step-marker fields (stepName, stepIndex, parentStepName, previousStepName, sessionId, timestamp); createReceipt hasStepMarker version-bump heuristic; verifier accepts both literals. (2) `packages/lattice/test/public-surface.test.ts` (`2110e19`) -- Phase 1 cleanup: flipped stale "createReceipt is NOT exported" assertion to its truth ("createReceipt IS exported") so Lattice's full suite returns to green before bands work compounds. (3) `packages/lattice/src/contract/bands.ts` + `bands.test.ts` (`ba6172c`) -- createHookPipeline factory; priority bands (SAFETY > OBSERVABILITY > EXTENSION); per-handler matcher regex; race-with-log per-handler budget (default 100ms; HOOK_TIMEOUT via TracerLike); structuredClone + Object.freeze context; irreversible freeze(); HookLifecycleEvent union (BEFORE_PROVIDER, AFTER_PROVIDER, BEFORE_TOOL, AFTER_TOOL). (4) `packages/lattice/src/index.ts` (`00fcfac`) -- re-export createHookPipeline + HookPipeline type + HookLifecycleEvent type; dist/ rebuilt via tsdown clean:true. (5) `docs/fsb-integration-gaps.md` (`97836f2`) -- six audit-doc rows flipped to Covered (Receipts 2-3 + Tripwires/hooks 2-5) + one new lifecycle-event-union row appended. | Phase 2 = receipt v1.1 schema extension + tripwire band pipeline primitive. Lattice's full vitest suite green at 332/332 PASS (was 311 PASS / 1 FAIL pre-Phase-2; cleanup commit closed the stale assertion, bands feat added +20 new tests). FSB consumes via the existing `file:` dep; `tests/lattice-tripwire-smoke.test.js` (Plan 02-04, 39 PASS) validates the surface end-to-end. |
 
 ## How this file gets used
 
