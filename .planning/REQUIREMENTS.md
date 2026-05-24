@@ -40,7 +40,8 @@ Detailed REQ-IDs are populated during phase planning (`/gsd-discuss-phase` + `/g
 Goal: extend Lattice's v1.1 Capability Receipts foundation with the primitives FSB's autopilot needs.
 
 - [x] **LSDK-01..N (audit) -- DONE 2026-05-24 (Phase 01 Plan 01-01):** Lattice SDK gap survey landed at `lattice/docs/fsb-integration-gaps.md` (91 lines, 6 domain headers, 21 severity-tagged rows: Receipts=2, Tripwires/hooks=4, Providers=5, Delegation=1, MV3-survivability=2, Observability/step-markers=4). Severity tags drive Phase 2+ ordering (Blocker > Important > Nice-to-have). Lattice commit `195e5ae`. Concrete LSDK-NN REQ-IDs for each row are populated in Phase 2 setup (deferred per CONTEXT.md `<deferred>` block). Phase 01 Plan 01-01 also re-exported `createReceipt` + `CreateReceiptInput` from Lattice's bare specifier (commit `ab6c1f6`), and Plan 01-02 added a packaging fix (catalog: -> literals) so npm 11 can install via `file:` (Lattice commit `22bf986`, user-authorized D-13 expansion).
-- [ ] **LSDK-NN..M (TBD):** Receipt-shaped state envelopes additions / extensions -- ensure Lattice can represent the step transitions FSB's autopilot emits (`stepName`, `stepIndex`, `timestamp`, `sessionId`, `parentStepName`, `previousStepName`, and any new fields surfaced by phase discussion).
+- [x] **LSDK-02 -- DONE 2026-05-24 (Phase 02 Plan 02-01):** CapabilityReceiptBody extended with 5 step-transition fields (`stepName`, `stepIndex`, `parentStepName`, `previousStepName`, `timestamp`) -- audit-doc Receipts row 2 covered. Fields are flat optional readonly top-level fields; v1 callers leave them undefined (backward compatible). Lattice commit `5c48134` on `fsb-integration-experiments` (NOT pushed -- D-15).
+- [x] **LSDK-03 -- DONE 2026-05-24 (Phase 02 Plan 02-01):** CapabilityReceiptBody extended with `sessionId` field + schema version literal bumped to discriminated union `"lattice-receipt/v1" | "lattice-receipt/v1.1"` -- audit-doc Receipts row 3 covered. `createReceipt` applies a version-bump heuristic (any of the 6 step-marker fields set -> v1.1; otherwise v1). `verify.ts:asReceiptBody` accepts both literals; unknown literals still return `version-mismatch`. JCS canonical (canonical.ts) and redaction manifest (redact.ts) both BYTE-FROZEN. Lattice commit `5c48134`.
 - [ ] **LSDK-MM..K (TBD):** Tripwire / hook primitive parity -- priority bands (SAFETY > OBSERVABILITY > EXTENSION), matcher regex, race-with-log per-handler budget, frozen contexts, mid-session registration freeze.
 - [ ] **LSDK-KK..L (TBD):** Provider adapter extensions -- bring Lattice's provider abstraction into parity with FSB's 7-provider matrix (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible).
 - [ ] **LSDK-LL..P (TBD):** Task-delegation primitive shape (if Lattice opens multi-agent policy; otherwise design as a Lattice-adjacent FSB-side primitive that consumes Lattice's receipt + tripwire surface).
@@ -105,6 +106,12 @@ To be populated during phase planning. Each REQ-ID will map to exactly one phase
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| (TBD) | (TBD) | Pending |
+| LSDK-01 | 01 | Complete (Phase 01 Plan 01-01: gap survey + createReceipt re-export) |
+| FINT-01 | 01 | Complete (Phase 01 Plan 01-02: file: dep wiring + 29 PASS smoke) |
+| MCP-01 | cross-cutting (Phase 01..N) | Holding (Phase 01 verified) |
+| MCP-02 | cross-cutting (Phase 01..N) | Holding (Phase 01 verified) |
+| LSDK-02 | 02 | Complete (Phase 02 Plan 02-01: step-transition fields on CapabilityReceiptBody; Lattice commit 5c48134) |
+| LSDK-03 | 02 | Complete (Phase 02 Plan 02-01: sessionId field + schema version bumped to v1.1 literal-union; Lattice commit 5c48134) |
+| (more) | (TBD) | Pending |
 
-**Total v1 requirements:** TBD
+**Total v1 requirements:** TBD (6 concrete so far; remaining LSDK/FINT/MCP/PRV IDs populated during downstream phase planning)
