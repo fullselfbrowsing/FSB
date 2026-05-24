@@ -157,9 +157,39 @@
 
 **Lattice-side ceremony (D-14 carryforward):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 3` in commit body. No `git push` to Lattice's remote (D-15 carryforward).
 
-### Phase 4: Provider adapter alignment (TBD)
+### Phase 4: Provider adapter alignment
 
-FSB's 7-provider matrix (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible) vs Lattice's current `createOpenAIProvider` + `createOpenAICompatibleProvider` + `createAISdkProvider` + `createFakeProvider`. Add native adapters for the 5 currently-missing (Anthropic, Gemini, LM Studio, OpenRouter, xAI) on Lattice's side; FSB's `universal-provider.js` either delegates to Lattice's adapters or maintains signature parity. INV-03 (provider parity) is the hard gate.
+**Goal:** Ship 5 net-new native provider adapters in Lattice (`fsb-integration-experiments` branch) to close the FSB 7-provider matrix: Anthropic, Gemini (FULL custom), and xAI, OpenRouter, LM Studio (THIN WRAPPERS around `createOpenAICompatibleProvider`). Each adapter implements `ProviderAdapter.execute()` as a single-shot Promise, mirrors `createOpenAIProvider`'s factory signature, preserves provider-specific quirks (xAI reasoning_tokens, Anthropic top-level system, Gemini contents[].parts[].text). Companion vitest tests per adapter (~7 cases) using `makeFakeFetch`. One Lattice-side INV-03 parity smoke (`parity.test.ts`) iterating all 7 logical providers. One FSB-side thin surface-presence smoke (`tests/lattice-providers-smoke.test.js`) for ceremony parity. FSB `extension/ai/universal-provider.js` UNTOUCHED.
+
+**Why:** Phase 1's audit doc flagged 5 missing provider adapters as Blocker (Anthropic, Gemini, xAI) + Important (LM Studio, OpenRouter). INV-03 ("every improvement works equally across all 7 universal-provider.js targets") is the hard gate. Phase 4 ships the SDK-side primitives in Lattice (per INV-06); FSB's autopilot continues using `universal-provider.js` as the runtime. A future phase (after Phase 5's MV3-survivability adapter contract) may rewire FSB autopilot to delegate to Lattice adapters; Phase 4 establishes the surface, validates parity.
+
+**Scope (in):**
+- 5 new Lattice adapter files (`anthropic.ts`, `gemini.ts`, `xai.ts`, `openrouter.ts`, `lm-studio.ts`).
+- 5 companion vitest test files.
+- 1 Lattice-side parity smoke + 1 FSB-side surface-presence smoke.
+- `lattice/packages/lattice/src/index.ts` re-exports for all 5 new factories.
+- `dist/` rebuild.
+- Audit-doc row flips for 5 Providers rows + JSDoc carryforward notes (LM Studio latency-tail, OpenRouter model-routing deferrals).
+- LATTICE-PIN.md bump + REQUIREMENTS.md LSDK-14..18 entries.
+
+**Scope (out):**
+- FSB `extension/ai/universal-provider.js` modifications (Option B carryforward).
+- Live API calls / env-var-keyed integration tests.
+- Streaming per provider.
+- Provider-specific extensions (Anthropic prompt caching, Gemini multimodal, xAI tool-streaming, OpenRouter model routing).
+- MV3-survivability adapter contract (Phase 5).
+- FSB autopilot rewiring to delegate to Lattice adapters (separate later phase).
+- Mainline PR back into Lattice (v0.11.0+).
+
+**Pass criteria (to be locked during planning):**
+1. Lattice's vitest suite passes (347 baseline + Phase 4 additive cases; no regressions).
+2. FSB's `npm test` exits 0; surface-presence smoke asserts all 5 new factories reachable + produce ProviderAdapter shapes.
+3. Lattice-side parity smoke exercises all 7 logical providers + proves INV-03 (each returns ProviderRunResponse with `rawOutputs[name]` populated, `normalizedUsage` shape, error handling).
+4. `lattice/docs/fsb-integration-gaps.md` Providers rows flipped to `Covered` with backlink SHAs.
+5. `.planning/LATTICE-PIN.md` reflects new Lattice HEAD with Phase 4 row referencing all Phase 4 commits.
+6. `.planning/REQUIREMENTS.md` LSDK-14..18 populated.
+
+**Lattice-side ceremony (D-14 carryforward):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 4` in commit body. No `git push` to Lattice's remote (D-15 carryforward).
 
 ### Phase 5: MV3-survivability adapter contract (TBD)
 
