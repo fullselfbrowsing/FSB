@@ -36,6 +36,10 @@ extension/config/secrets.json
 *_api_key.txt
 .planning/
 
+# Lattice SDK -- cloned as developer-side experimental sandbox (v0.10.0-attempt-2 pivot)
+# Lattice has its own .git/ inside; FSB consumes via npm path: dependency or npm link
+lattice/
+
 # Log files with potential secrets
 Logs/
 Extenive logs, multiple scenariaos.txt

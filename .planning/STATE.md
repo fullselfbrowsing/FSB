@@ -1,117 +1,86 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9.69
-milestone_name: Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix
-status: completed
-last_updated: "2026-05-14T19:11:00.000Z"
-last_activity: "2026-05-14 -- Phase 276 (dashboard DOM-streaming diagnostic + minimum patch) human_needed: 4 atomic commits + DIAGNOSTIC.md scaffold + 3 defensive hypothesis patches (#1 hashKey room-state logs, #2 readiness ping, #4 pending-intent re-arm) + STREAM-04 tooltip + Resync button + 2 STREAM-05/06 bonuses; 52/52 new test assertions PASS + 134/134 showcase-build-smoke PASS; FINAL phase of v0.9.69 milestone landed"
+milestone: v0.10.0
+milestone_name: Autopilot via Lattice SDK (attempt 2)
+status: pre-planning
+last_updated: "2026-05-24T06:00:00.000Z"
+last_activity: "2026-05-24 -- Pivoted from v0.10.0-attempt-1 (FSB-first) to v0.10.0-attempt-2 (Lattice-first). Reset automation branch to merge-base with main (51bdbb36). Pre-pivot work preserved on branch pre-pivot-archive/v0.10.0-fsb-first (30+ commits) and on disk under .planning/milestones/v0.10.0-attempt-1-pre-pivot/. Cloned Lattice into ./lattice/ (gitignored); created experiment branch fsb-integration-experiments. Awaiting milestone planning: /gsd-discuss-phase 1 to scope the Lattice SDK gap survey."
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-14 -- v0.9.69 started)
-See: .planning/MILESTONES.md (v0.9.63 entry; v0.9.69 in flight)
-See: .planning/ROADMAP.md (v0.9.69 phases 269-276 approved 2026-05-14)
-See: .planning/REQUIREMENTS.md (68 v0.9.69 requirements across 9 categories; traceability filled)
-See: .planning/research/ (SUMMARY, STACK, FEATURES, ARCHITECTURE, PITFALLS -- synthesized 2026-05-14)
+See: .planning/PROJECT.md (updated 2026-05-24 -- v0.10.0-attempt-2 Lattice-first pivot)
+See: .planning/MILESTONES.md (v0.9.63, v0.9.69 entries; v0.10.0-attempt-1 archived)
+See: .planning/ROADMAP.md (v0.10.0-attempt-2 scaffolded 2026-05-24, phases TBD)
+See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed REQs TBD via phase planning)
+See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix. Branch `Refinements`. Deploy target `https://full-selfbrowsing.com` (Fly.io).
+**Current focus:** v0.10.0-attempt-2 Autopilot via Lattice SDK. Branch `automation` (reset to merge-base with main 2026-05-24). Lattice cloned at `./lattice/` (gitignored) on branch `fsb-integration-experiments`. Deploy target unchanged: `https://full-selfbrowsing.com` (Fly.io).
 
 ## Current Position
 
-Phase: 276 of 276 (complete -- human_needed for browser repro confirmation)
-Plan: implicit-from-context
-Status: Phases 269+270+271+272+273+274+275+276 complete; ALL 3 RELEASE BLOCKERS RESOLVED; final milestone phase landed; awaiting user-gated repro pass per .planning/phases/276-.../276-VERIFICATION.md
-Last activity: 2026-05-16 -- Completed quick task 260516-7l5: Server-side GitHub stats cache + Angular client swap. New SQLite `github_cache` table + 5-min `github-poller.js` (mirrors housekeeper pattern, ETag/304 aware, GITHUB_TOKEN-aware) + `/api/public-stats/github/:endpoint_id` sub-route (mirrors public-stats memo + ETag, 503+Retry-After on cold cache, 400 on unknown endpoint_id). Angular `github-stats.service.ts` swapped from `https://api.github.com` to same-origin `/api/public-stats/github/<id>` -- API_BASE/MAX_PAGES/PER_PAGE/fetchPaginated/emitRateLimited/403-branch all deleted. CSP at `server.js:63` tightened to `connect-src 'self'`; `tests/showcase-csp-allows-github-api.test.js` deleted. New `tests/server-github-cache.test.js` (17/17 PASS) + `tests/server-github-poller.test.js` (31/31 PASS, includes T8 source-grep guard that MAX_PAGES_COMMITS >= 30). All three validation gates green: validate-extension OK, angular build exit 0, npm test exit 0. Verifier returned `human_needed` (13/15 code truths verified; 2 truths route to post-deploy DevTools inspection: visitor browser makes ZERO api.github.com requests + /stats charts render after first poll cycle). 4 atomic commits on `feat/server-side-github-stats-cache` -- HEAD `028c5141`. PR to be opened against main; do NOT merge automatically. Operational follow-up: `fly secrets set GITHUB_TOKEN=... -a fsb-server` for 5000 req/hr authenticated quota (works without, falls to 60/hr unauth).
+Phase: 1 of TBD (pre-planning)
+Plan: not yet planned
+Status: Awaiting `/gsd-discuss-phase 1` to scope the Lattice SDK gap survey. Pre-pivot v0.10.0-attempt-1 work fully preserved (backup branch + on-disk archive).
+Last activity: 2026-05-24 -- v0.10.0-attempt-2 pivot executed:
+  1. Backup branch `pre-pivot-archive/v0.10.0-fsb-first` created at HEAD `4d70facf` (30+ commits preserved).
+  2. Phase 1 + Phase 2 artifacts archived to `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARYs, VERIFICATION; plus snapshots of ROADMAP / REQUIREMENTS / PROJECT / STATE at attempt-1 final state; plus PIVOT-v0.10.0-PLAN.md decision audit trail).
+  3. `git reset --hard 51bdbb36` -- automation branch reset to merge-base with main. Extension/, tests/, package.json all reverted to v0.9.69 baseline.
+  4. Lattice cloned into `./lattice/` via `git clone https://github.com/LakshmanTurlapati/Lattice`. Created experiment branch `fsb-integration-experiments` inside Lattice.
+  5. `.gitignore` extended with `lattice/` -- Lattice's git stays separate from FSB's git.
+  6. ROADMAP.md / REQUIREMENTS.md / STATE.md / PROJECT.md restructured for the Lattice-first direction.
 
-Progress: [██████████] 100% (8/8 milestone phases complete after Phase 276)
+Progress: [          ] 0% (pre-planning -- no phases planned yet)
 
 ## Performance Metrics
 
-- Last milestone: v0.9.63 (7 phases, 15 plans, 14/14 requirements traced, audit passed).
-- Milestone before: v0.9.62 (7 phases, 15 plans, 27/27 requirements traced, audit passed).
-- Milestone before: v0.9.61 (6 phases, 14 plans, 29/29 requirements traced, audit passed).
-- Tag: `v0.9.63` created locally. Push remains user-gated.
+- Most recent shipped milestone: v0.9.69 (8 phases, 9 plans, 67/68 REQs Complete, audit `human_needed`).
+- v0.10.0-attempt-1 (abandoned): 2 phases completed (Phase 1 hooks-foundation + Phase 2 state-inspectability-carve-out), 10 plans, 617/617 test assertions green at time of pivot. Patterns intellectually correct but duplicated work that belongs in Lattice; see PIVOT-v0.10.0-PLAN.md.
 
-## Active Milestone Risk Register (v0.9.69)
+## Lattice Integration State
 
-Three release-gating BLOCKERs (see ROADMAP.md "Risks"):
+- Lattice version baseline: v1.1 Capability Receipts (shipped 2026-05-12; 451 tests). Cloned from https://github.com/LakshmanTurlapati/Lattice.
+- Lattice working branch: `fsb-integration-experiments` (created 2026-05-24 from `main`).
+- FSB integration model: `npm install ./lattice` path: dependency OR `npm link` during development. To be finalized in Phase 1.
 
-- **B1 (Phase 273) -- RESOLVED 2026-05-14:** `app.set('trust proxy', 1)` placed at showcase/server/server.js:33 (immediately after `const app = express()`); invariant tested by tests/server-trust-proxy.test.js (5/5 PASS).
-- **B2 (Phase 273) -- RESOLVED 2026-05-14:** `express-rate-limit ^8.3.0` (resolved 8.5.2) installed; custom `keyGenerator: (req) => hashIp(ipKeyGenerator(req.ip), db)` aligns rate-limit + storage identifiers and routes through the library's IPv6-subnet canonicaliser to fix CVE-2026-30827.
-- **B3 (Phase 275) -- RESOLVED 2026-05-14:** privacy page `#telemetry-disclosure` section landed with 6-locale i18n (25 trans-units × 6 locales); CWS `listing-copy.md` "Data Collection" section appended; `store-assets/chrome-web-store/privacy-practices-evidence.md` documents per-checkbox decisions + verbatim Limited Use clause + screenshots-to-capture list + publish-time workflow; `scripts/verify-store-listing.mjs` + 2 test files wired into root npm test chain after `showcase-build-smoke.test.js`. `homepage_url` added to extension/manifest.json (Rule 2). Final user-gated CWS Developer Dashboard click-through documented in `.planning/phases/275-…/275-VERIFICATION.md` `<human_verification>` block.
+## Active Milestone Risk Register (v0.10.0-attempt-2)
 
-## Deferred Items
+(To be populated during phase planning.)
 
-Items acknowledged and deferred at v0.9.63 milestone close on 2026-05-13. None are v0.9.63 work; all predate this milestone.
+Initial risks identified at pivot:
+- **R1 Lattice SDK gap depth unknown.** The gap survey in Phase 1 may reveal Lattice v1.1 needs more extensions than expected before FSB integration can begin. Mitigation: Phase 1 outputs a documented gap-list; subsequent phases prioritize gaps by FSB-blocking severity.
+- **R2 Lattice TypeScript vs FSB vanilla JS.** Lattice is TypeScript; FSB extension is vanilla JS in MV3 SW context. Integration requires a build / type-erasure path. Mitigation: Phase 1 prototypes the path: dependency wiring + MV3 SW import test before any SDK extensions land.
+- **R3 Lattice's multi-agent "Out of Scope" policy.** If Lattice continues to exclude multi-agent, the delegation primitive becomes FSB-only or requires Lattice-policy negotiation. Mitigation: surface in Phase 1 gap survey; route to Lattice maintainer discussion before designing delegation phases.
+- **R4 MV3-survivability adapter contract is novel.** Lattice has no existing concept of "execution context can be evicted mid-flow." FSB-driven extension may be the first runtime with this constraint. Mitigation: explicit MV3-survivability adapter contract phase; documented for future Lattice consumers.
 
-| Category | Slug | Status |
-|----------|------|--------|
-| debug_session | angular-showcase-empty-pages | awaiting_human_verify |
-| debug_session | auth-blocked-partial-outcome-lifecycle | diagnosed |
-| debug_session | content-script-injection-failure | verifying |
-| debug_session | e2e-career-session2 | diagnosed |
-| debug_session | fsb-core-not-executing | verifying |
-| debug_session | fsb-reliability | verifying |
-| debug_session | gdocs-editor-typing | verifying |
-| debug_session | gdocs-formatted-text | verifying |
-| debug_session | overlay-lifecycle-rehydration-gap | diagnosed |
-| debug_session | sheets-blindness-post-fix | diagnosed |
-| quick_task | 260508-gu8-add-agents-nav-page-to-showcase-fsb-skil | missing |
+## Pre-pivot Preservation (audit trail)
 
-Total: 11 items. Triage via `/gsd-debug` and `/gsd-cleanup` during a future milestone cycle.
-| Phase 273 P01 | 11min | 3 tasks | 18 files |
-| Phase 274 P01 | 11min | 2 tasks | 13 files |
-| Phase 274 P02 | 12min | 2 tasks | 18 files |
-| Phase 275 P01 | 13min | 4 tasks | 11 files |
-| Phase 276 P01 | 18min | 5 tasks | 11 files |
+Backup branch: `pre-pivot-archive/v0.10.0-fsb-first` -- HEAD `4d70facf` (all 30+ v0.10.0-attempt-1 commits)
+On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
+  - `01-hooks-foundation/` -- full Phase 1 artifact set (CONTEXT, DISCUSSION-LOG, RESEARCH, PLAN-01..06, SUMMARY-01..06)
+  - `02-state-inspectability-carve-out/` -- full Phase 2 artifact set (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARY-01..04, VERIFICATION)
+  - `ROADMAP.v0.10.0-attempt-1.md` -- final attempt-1 roadmap
+  - `REQUIREMENTS.v0.10.0-attempt-1.md` -- final attempt-1 requirements (41 v1 REQs)
+  - `PROJECT.v0.10.0-attempt-1-snapshot.md` -- PROJECT.md snapshot at attempt-1 final state
+  - `STATE.v0.10.0-attempt-1-snapshot.md` -- STATE.md snapshot
+  - `PIVOT-v0.10.0-PLAN.md` -- decision audit trail
 
-## Quick Tasks Completed
+## Next Actions
 
-| # | Description | Date | Commit | Status | Directory |
-|---|-------------|------|--------|--------|-----------|
-| 260514-1nv | Showcase /stats Easter-egg page with live GitHub graphs, footer-only entry, 5-min visibility-aware polling | 2026-05-14 | 7d9e449 |  | [260514-1nv-showcase-stats-page-footer-only-easter-e](./quick/260514-1nv-showcase-stats-page-footer-only-easter-e/) |
-| 260514-pu4 | Wire showcase/server + showcase/angular deps into ci.yml extension job for v0.9.69 PR checks | 2026-05-14 | fbbdae2 |  | [260514-pu4-wire-showcase-server-showcase-angular-de](./quick/260514-pu4-wire-showcase-server-showcase-angular-de/) |
-| 260514-r6i | Fix showcase CSP `connect-src` so /stats Easter-egg page can fetch from api.github.com (cumulative-stars + commits + forks + issues + PRs + maintenance charts were dark in prod) | 2026-05-15 | a70d550 |  | [260514-r6i-fix-csp-on-showcase-server-to-unblock-st](./quick/260514-r6i-fix-csp-on-showcase-server-to-unblock-st/) |
-| 260514-rm4 | Fix two Codex P1 telemetry bugs from PR #50 review: (1) serialize recordDispatch fsbUsageData rmw to stop concurrent-dispatch row loss; (2) strip `attempts` from POST body so server allowlist doesn't 400 retried events | 2026-05-15 | 2e514c1 |  | [260514-rm4-fix-two-p1-telemetry-bugs-from-codex-pr-](./quick/260514-rm4-fix-two-p1-telemetry-bugs-from-codex-pr-/) |
-| 260514-w34 | Add showcase/server + showcase/angular install steps to chrome-extension.yml (mirror of 260514-pu4 for the on-push-to-main auto-zip workflow; fixes MODULE_NOT_FOUND better-sqlite3 from run 25899440149) | 2026-05-15 | 5cb4869 |  | [260514-w34-fix-chrome-extension-yml-dep-gap-add-sho](./quick/260514-w34-fix-chrome-extension-yml-dep-gap-add-sho/) |
-| 260514-wdy | Add cumulative-commits all-time line chart to /stats; bump MAX_PAGES from 2 to 30 so commits pagination covers full ~2300-commit history (other endpoints early-exit on page 1 so unaffected) | 2026-05-15 | 5ac9aaf |  | [260514-wdy-add-cumulative-commits-all-time-line-cha](./quick/260514-wdy-add-cumulative-commits-all-time-line-cha/) |
-| 260514-x4s | Bump FSB version 0.9.65 → 0.9.66 across 8 manifest/README/CWS-listing surfaces; mcp/src/version.ts left at 0.9.0 (independent) | 2026-05-15 | 7758deb |  | [260514-x4s-bump-fsb-version-0-9-65-0-9-66-across-al](./quick/260514-x4s-bump-fsb-version-0-9-65-0-9-66-across-al/) |
-| 260515-i1j | Fix telemetry mcp_client recording as 'unknown' on 100% of rows (61/61 events live in prod). Extension WS dispatcher leaked the MCPBridgeClient OBJECT into recordDispatch where a STRING label was expected. Added extractMcpClientLabel(payload) helper pulling from payload.visualSession.client (already set by MCP server). Swap at 2 call sites in mcp-tool-dispatcher.js + 24-assert regression test wired into npm test chain | 2026-05-15 | (pending-pr) |  | [260515-i1j-fix-telemetry-mcp-client-recording-as-un](./quick/260515-i1j-fix-telemetry-mcp-client-recording-as-un/) |
-| 260515-kw1 | Replace 8 /stats chart views with richer visualizations -- lollipop (weekly stars), sankey (issues opened/closed), cumulative+monthly dual-axis (forks), streamgraph (PRs opened/merged), punchcard bubble matrix (commits over time), gantt timeline strip (maintenance), radial gauge (FSB active now), sparkline 24h ring buffer (agents running), big-number HTML tile (avg agents per user). New helpers commitPunchcard + monthlyForks + startOfUtcMonth in github-stats.service.ts. New regression test tests/stats-chart-overhaul.test.js (16/16 PASS) wired into npm test chain after showcase-csp test | 2026-05-15 | ea9f85c2 |  | [260515-kw1-replace-8-stats-chart-views-with-richer-](./quick/260515-kw1-replace-8-stats-chart-views-with-richer-/) |
-| 260515-mfs | Fix 3 Codex P1/P2 review findings on PR #58 follow-up to 260515-kw1: (P1) keep chart canvas mounted under [hidden] so ViewChild stays live when leaving the fsb-avg-agents-per-user HTML tile; (P2a) punchcard tick precision via `precision: 0` + `Math.round(v)` to stop blank tick labels at half-step values; (P2b) plumb raw bucket count `c` through PunchcardPoint and use it in the tooltip instead of the sqrt-scaled display radius. 5 new test assertions A7-A10 (21/21 PASS). PR #58 acknowledgement reply posted | 2026-05-15 | 773fc073 |  | [260515-mfs-fix-3-codex-p1-p2-findings-on-pr-58-canv](./quick/260515-mfs-fix-3-codex-p1-p2-findings-on-pr-58-canv/) |
-| 260516-7l5 | Server-side GitHub stats cache + Angular client swap (stop burning visitor rate limit). New `github_cache` SQLite table + 5-min `github-poller.js` (ETag/304 aware, GITHUB_TOKEN-aware, never throws) + `/api/public-stats/github/:endpoint_id` sub-route (503+Retry-After on cold cache, 400 on unknown id, ETag round-trip). Angular service swapped from api.github.com to same-origin; CSP tightened to `connect-src 'self'`. New tests: server-github-cache (17/17 PASS) + server-github-poller (31/31 PASS incl. MAX_PAGES_COMMITS >= 30 regression guard migrated from cumulative-commits-aggregator). All 3 gates green | 2026-05-16 | 028c5141 | Needs Review | [260516-7l5-server-side-github-stats-cache-angular-c](./quick/260516-7l5-server-side-github-stats-cache-angular-c/) |
-
-## Pending User-Gated Actions (carry-forward)
-
-- `git push origin Refinements && git push origin v0.9.69` -- branch + tag will land at v0.9.69 close.
-- `git push origin feat/showcase-i18n && git push origin v0.9.63` -- branch + tag NOT pushed (v0.9.63).
-- `git push origin refinements && git push origin v0.9.62` -- branch + tag NOT pushed (v0.9.62).
-- `npm publish fsb-mcp-server@0.9.0` -- in-tree at 0.9.0; final publish user-gated (carry-forward from v0.9.62).
-- `clawhub publish "skills/FSB Skill"` -- carry-forward from v0.9.61.
-- 4 live-OpenClaw runtime UAT items carried from v0.9.61.
-- CWS Developer Dashboard Privacy Practices tab click-through (user-gated per BLOCKER #3 / D-15; in-repo CI guard shipped in Phase 275, see `.planning/phases/275-…/275-VERIFICATION.md` `<human_verification>` for the 8-step checklist).
-
-## Next Milestone Candidates
-
-- **v0.9.70 (telemetry follow-up):** first-run banner, "View what we send" preview, "Reset anonymous ID" button, in-extension "Wipe my data" UI, region-gated opt-IN for EU/UK/CA, public versioned `/api/public-stats` documentation, per-day spark lines, geo heatmap (k>=100 floor).
-- **v0.9.70 (streaming):** full dashboard streaming rewrite if STREAM-07 5-attempt cap is hit during Phase 276.
-- **v0.9.64 (UX, carry-forward):** revisit WARNING-02 picker-cookie short-circuit on bare-`/` Accept-Language redirect.
-- **v0.9.65 (dashboard i18n, carry-forward):** translate `showcase/angular/src/app/pages/dashboard/**`.
+1. `/gsd-discuss-phase 1` -- scope Phase 1 (Lattice SDK gap survey + integration scaffolding). Decisions to capture: which Lattice primitives need extension first, what the FSB integration model looks like (path: dep vs npm link), what counts as "scaffolding complete" (single-roundtrip smoke test? Lattice-side build of fsb-integration-experiments? Both?).
+2. `/gsd-plan-phase 1` -- detailed phase plan with task breakdown.
+3. `/gsd-execute-phase 1` -- run the plan.
 
 ## Session Continuity
 
-Last session: 2026-05-14 -- Phase 273 plan executed atop commit 05bd0dc. 3 atomic commits (aa8a4f6 feat 273-01 trust-proxy + schema + WAL pragmas + hash/salt utils, 95082ac feat 273-02 rate-limit middleware + 3 routes + 9 route tests, 320d913 feat 273-03 housekeeper + no-IP-leak CI gate + test chain integration). 121 sub-asserts across 13 server-telemetry-* tests all PASS. 2/3 v0.9.69 BLOCKERs RESOLVED.
-Last session: 2026-05-14 -- Phase 274 plan executed atop commit fc87165. 4 atomic commits (5dfc6c1 feat 274-01 public-stats endpoint + active-tracker + recordSeen hook + 4 server tests, a4744bf feat 274-01 FSBTelemetryService Angular mirror + types + harness test, c3abe18 feat 274-02 stats-page 6 toggles + headline row + scss, 7908164 feat 274-02 i18n extract + AI-fill 5 locales + build smoke test). 294 sub-assertions across 6 new tests + full Angular build + 301 hreflang routes (unchanged). 24 new SHOWCASE_STATS_FSB_* trans-units translated across es/de/ja/zh-CN/zh-TW. /stats Easter-egg invariant preserved. AGG-01..09 + STATS-01..07 (16 requirements) complete.
-Last session: 2026-05-14 -- Phase 275 plan executed atop commit e89a5e3. 4 atomic commits (c9db4f0 feat 275-01 privacy-page Anonymous Usage Telemetry section + 25 i18n trans-units, 412195f feat 275-02 AI-fill 5 non-en locales, 94144ee feat 275-03 CWS listing-copy.md Data Collection section + privacy-practices-evidence.md, b3fc2ee test 275-04 verify-store-listing CI guard + 2 tests + npm test chain wiring + manifest homepage_url). 5/5 verifications green: verify-store-listing 5/5 PASS, verify-store-listing.test 3/3 PASS, showcase-privacy-page.test 53/53 PASS, ng build exit 0 + 30 prerendered routes, verify:hreflang 301/0 PASS. /stats Easter-egg-invisible posture preserved. 5 CONS-* requirements complete. Final BLOCKER B3 RESOLVED — v0.9.69 is now CWS-publishable pending the user-gated Dashboard click-through (D-15).
-Last session: 2026-05-14 -- Phase 276 plan executed atop commit 0a032e4. 4 atomic per-task commits (647df1c feat 276-01 DIAGNOSTIC scaffold + hashKey room-state logging, 7005823 feat 276-02 readiness ping replacing setTimeout(300) + pending-intent re-arm, 4b9d992 feat 276-03 stream-state tooltip + Resync button, 634c0e7 feat 276-04 watchdog auto-resnapshot + WS backpressure drop counter) + this metadata commit. 3 new tests (52 assertions, all PASS); full showcase-build-smoke 134/134 PASS (Angular production build green in 14s); regression sweep across 10 representative existing tests all green. STREAM-01..06 satisfied; STREAM-07 5-attempt cap honoured (this is attempt 1 of 5). Status routes to human_needed since the autonomous orchestrator cannot drive a real Chrome browser for fix-confirmation -- the 8-step repro is documented in .planning/phases/276-.../276-VERIFICATION.md <human_verification>. v0.9.69 milestone phases now ALL complete; pending the user-gated dashboard streaming repro pass + CWS Dashboard click-through.
-Resume file: None. Next step: human repro pass per `.planning/phases/276-.../276-VERIFICATION.md`, then begin v0.9.69 milestone audit.
+Last session: 2026-05-24 -- v0.10.0-attempt-2 pivot executed end-to-end. Working tree reset to merge-base with main + Lattice cloned + milestone docs restructured + backup branch + on-disk archive. Awaiting `/gsd-discuss-phase 1` start.
+Resume file: None. Next step: `/gsd-discuss-phase 1`.

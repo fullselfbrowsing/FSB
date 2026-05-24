@@ -28,15 +28,59 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone
+## Current Milestone: v0.10.0 Autopilot via Lattice SDK (attempt 2)
 
-None active. Most recent milestone (v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix) shipped 2026-05-14 on branch `Refinements`; tag `v0.9.69` created locally, push user-gated.
+**Status:** Pre-planning -- scaffolded 2026-05-24 after pivot from v0.10.0-attempt-1 (FSB-first). Branch `automation` reset to merge-base with `main` (51bdbb36). Lattice cloned at `./lattice/` (gitignored) on experiment branch `fsb-integration-experiments`. See `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the pivot rationale.
 
-**Next milestone candidates (carry-forward backlog):**
-- **v0.9.70 (telemetry follow-up)** — first-run banner, "View what we send" preview, "Reset anonymous ID" button, in-extension "Wipe my data" UI, region-gated opt-IN for EU/UK/CA, public versioned `/api/public-stats` documentation, per-day spark lines, geo heatmap.
-- **v0.9.70 (streaming)** — full dashboard streaming rewrite if STREAM-07 5-attempt cap is hit during Phase 276 browser repro.
-- v0.9.64 (UX, carry-forward) — picker-cookie short-circuit on bare-`/` Accept-Language redirect.
-- v0.9.65 (dashboard i18n, carry-forward) — translate `showcase/angular/src/app/pages/dashboard/**`.
+**Goal:** Improve FSB's task completion reliability by adopting [Lattice](https://github.com/LakshmanTurlapati/Lattice) as the autopilot engine's underlying SDK. Build the runtime primitives (state envelopes, tripwire safety contracts, observability primitives, delegation primitive, MV3-survivability adapters) inside Lattice on the `fsb-integration-experiments` branch FIRST, then have FSB's autopilot engine consume Lattice as a thin runtime adapter via `npm install ./lattice` (path: dependency). The Lattice round-trip validates continuously during development rather than being deferred to an end-of-milestone smoke test.
+
+**Why this matters (vs attempt-1):** v0.10.0-attempt-1 invented hook + receipt + step-marker + resumption primitives inside FSB and planned to port them to Lattice later via separate PRs (LAT-05 only IDENTIFIED port candidates). That created duplication risk (FSB's checkpoint-hook + Lattice's signed-receipt are conceptually the same shape but live in two repos) and deferred Lattice round-trip validation. Attempt-2 inverts: Lattice owns the primitives, FSB consumes; the Lattice round-trip happens continuously.
+
+**Lattice integration model:**
+- Lattice cloned at `./lattice/` inside FSB worktree (gitignored; Lattice has its own `.git/` directory)
+- Lattice working branch: `fsb-integration-experiments` (created 2026-05-24 from `main` at commit `8fa7b03`)
+- FSB consumes Lattice via `npm install ./lattice` (path: dependency) or `npm link` during development
+- Lattice's existing v1.1 Capability Receipts foundation (451 tests) is the baseline
+- SDK additions land as commits on Lattice's `fsb-integration-experiments` branch first; once validated by FSB integration, open PRs back to Lattice mainline as separate work
+
+**Lattice SDK extension candidates (to be scoped during phase discussion):**
+- Receipt-shaped state envelopes for any agent-loop runtime (not just Lattice's own server-side runtime); MV3-survivable encoding
+- Tripwire / hook primitive with priority bands (SAFETY > OBSERVABILITY > EXTENSION) + matcher regex + race-with-log per-handler budget + frozen contexts + mid-session registration freeze
+- Universal-provider adapters for the 7 FSB providers (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible)
+- Task-delegation primitive (parent-child loops with summary-return + cache-prefix sharing + rate-limit-group coordination) -- pending Lattice-policy discussion on multi-agent scope
+- MV3-survivability adapter contract (Lattice has no existing concept; FSB may be the first runtime with this constraint)
+- Observability / step-marker primitive
+
+**Hard invariants (non-negotiable, carried over from attempt-1):**
+- **INV-01 MCP wire contracts UNTOUCHED.** Tool schemas, semantics, request/response shapes of every existing MCP-exposed tool stay byte-identical.
+- **INV-02 Tool surface parity.** FSB's autopilot loop uses the SAME tool registry that MCP exposes. No parallel "autopilot-only" tool stack.
+- **INV-03 Provider parity.** Every improvement works equally across all 7 `universal-provider.js` targets.
+- **INV-04 MV3-survivability preserved.** The existing `setTimeout`-chained iterator pattern at `agent-loop.js:1824/2418/2487/2497` is load-bearing. Lattice integration is additive runtime adaptation, NOT iterator replacement.
+- **INV-05 No resurrection of deprecated modules.** `extension/agents/agent-executor.js` / `agent-manager.js` / `agent-scheduler.js` stay frozen.
+- **INV-06 (NEW) Lattice SDK primitives live in Lattice's repo, not in FSB's.** Any runtime primitive used by both FSB's autopilot and any potential future Lattice consumer goes into Lattice on `fsb-integration-experiments`. FSB-side code is integration glue (path: dependency wiring, MV3 runtime adapters, sidepanel UI) and never re-implements primitives that belong in Lattice.
+
+**Parallel work on `main` (this branch diverges):** v0.9.70 Showcase Dashboard Reliability (streaming fix, Sync-tab restore, 16:10 viewport) continues on `main` and is NOT this milestone's work. Merge reconciliation between branches deferred until both ship.
+
+**Reference frameworks (patterns only, not dependencies):** Lattice (the SDK FSB is integrating with); Claude Agent SDK hooks (vocabulary baseline); LangGraph (state-graph carve-out vocabulary).
+
+**Other deferred candidates (not in this milestone):**
+- Skills primitive (full domain-specific tool+prompt loading) -- moved to v0.11.0+ per PITFALLS (MCP wire-contract drift, site-matcher security, mid-session hook registration vs. freeze).
+- Receipt signing (Ed25519 + RFC 8785 JCS) -- already exists in Lattice's v1.1 Capability Receipts; FSB integration may unlock signing for free.
+- Lattice contribution PRs (FSB-driven SDK additions ported to Lattice mainline) -- happens AFTER FSB integration validates the additions; lands in Lattice repo as separate milestones.
+- Public benchmark publication (WebArena / WebVoyager / Mind2Web).
+- All carry-forward backlog from v0.9.69 (telemetry follow-up surface, v0.9.64 picker-cookie, v0.9.65 dashboard i18n).
+
+## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
+
+**Status:** Pivoted before milestone completion. Phases 1-2 shipped FSB-side code (hooks-foundation + state-inspectability-carve-out, 617/617 tests green) before the team re-evaluated and chose to pivot to the Lattice-first approach. All work preserved on `pre-pivot-archive/v0.10.0-fsb-first` branch and under `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` on disk.
+
+**Recoverable artifacts from attempt-1:** Phase 1 hook-pipeline extensions (priority bands, matcher, race-with-log, freeze, lockBand, 5 new lifecycle events, 4 hook factories including loop-detection + telemetry); Phase 2 LIFECYCLE_EVENTS.STEP_TRANSITION + checkpoint-hook.js + 12 step markers in runAgentIteration + additive persistSession schema + sidepanel Agent State Inspector UI + full MV3 SW eviction resumption with CONSERVATIVE recovery (ON_ERROR for mid-API-request, RECOVERY_AMBIGUOUS for mid-tool-dispatch, SAFE replay for boundary states). The patterns themselves are intellectually correct; in attempt-2 they live in Lattice instead of FSB.
+
+**Next milestone candidates (deferred to a future cycle):**
+- **v0.9.70 (telemetry follow-up)** -- first-run banner, "View what we send" preview, "Reset anonymous ID" button, in-extension "Wipe my data" UI, region-gated opt-IN for EU/UK/CA.
+- **v0.9.70 (streaming)** -- full dashboard streaming rewrite if STREAM-07 5-attempt cap is hit during Phase 276 browser repro.
+- **v0.9.64 (UX, carry-forward)** -- picker-cookie short-circuit on bare-`/` Accept-Language redirect.
+- **v0.9.65 (dashboard i18n, carry-forward)** -- translate `showcase/angular/src/app/pages/dashboard/**`.
 
 ## Previous Milestone: v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix (shipped 2026-05-14)
 
@@ -560,4 +604,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-14 -- milestone v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix SHIPPED on branch Refinements; tag v0.9.69 created locally (push user-gated)*
+*Last updated: 2026-05-24 -- v0.10.0-attempt-2 pivot. Branch `automation` reset to merge-base with main (51bdbb36). Cloned Lattice into ./lattice/ (gitignored) on experiment branch `fsb-integration-experiments`. Pre-pivot v0.10.0-attempt-1 work (Phase 1 hooks-foundation + Phase 2 state-inspectability-carve-out, 617/617 tests, 30+ commits) preserved on branch `pre-pivot-archive/v0.10.0-fsb-first` and on-disk under `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`. v0.10.0-attempt-2 (Lattice-SDK-first) in pre-planning -- detailed phases TBD via `/gsd-discuss-phase 1`.*
