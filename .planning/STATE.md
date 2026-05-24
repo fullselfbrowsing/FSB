@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.10.0
-milestone_name: Autopilot via Lattice SDK (attempt 2)
-status: pre-planning
-last_updated: "2026-05-24T06:00:00.000Z"
-last_activity: "2026-05-24 -- Pivoted from v0.10.0-attempt-1 (FSB-first) to v0.10.0-attempt-2 (Lattice-first). Reset automation branch to merge-base with main (51bdbb36). Pre-pivot work preserved on branch pre-pivot-archive/v0.10.0-fsb-first (30+ commits) and on disk under .planning/milestones/v0.10.0-attempt-1-pre-pivot/. Cloned Lattice into ./lattice/ (gitignored); created experiment branch fsb-integration-experiments. Awaiting milestone planning: /gsd-discuss-phase 1 to scope the Lattice SDK gap survey."
+milestone_name: Autopilot via Lattice SDK
+status: Awaiting `/gsd-discuss-phase 1` to scope the Lattice SDK gap survey. Pre-pivot v0.10.0-attempt-1 work fully preserved (backup branch + on-disk archive).
+last_updated: "2026-05-24T10:11:00.364Z"
+last_activity: "2026-05-24 -- v0.10.0-attempt-2 pivot executed:"
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 10
+  completed_phases: 6
+  total_plans: 7
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -32,6 +32,7 @@ Phase: 1 of TBD (pre-planning)
 Plan: not yet planned
 Status: Awaiting `/gsd-discuss-phase 1` to scope the Lattice SDK gap survey. Pre-pivot v0.10.0-attempt-1 work fully preserved (backup branch + on-disk archive).
 Last activity: 2026-05-24 -- v0.10.0-attempt-2 pivot executed:
+
   1. Backup branch `pre-pivot-archive/v0.10.0-fsb-first` created at HEAD `4d70facf` (30+ commits preserved).
   2. Phase 1 + Phase 2 artifacts archived to `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARYs, VERIFICATION; plus snapshots of ROADMAP / REQUIREMENTS / PROJECT / STATE at attempt-1 final state; plus PIVOT-v0.10.0-PLAN.md decision audit trail).
   3. `git reset --hard 51bdbb36` -- automation branch reset to merge-base with main. Extension/, tests/, package.json all reverted to v0.9.69 baseline.
@@ -57,6 +58,7 @@ Progress: [          ] 0% (pre-planning -- no phases planned yet)
 (To be populated during phase planning.)
 
 Initial risks identified at pivot:
+
 - **R1 Lattice SDK gap depth unknown.** The gap survey in Phase 1 may reveal Lattice v1.1 needs more extensions than expected before FSB integration can begin. Mitigation: Phase 1 outputs a documented gap-list; subsequent phases prioritize gaps by FSB-blocking severity.
 - **R2 Lattice TypeScript vs FSB vanilla JS.** Lattice is TypeScript; FSB extension is vanilla JS in MV3 SW context. Integration requires a build / type-erasure path. Mitigation: Phase 1 prototypes the path: dependency wiring + MV3 SW import test before any SDK extensions land.
 - **R3 Lattice's multi-agent "Out of Scope" policy.** If Lattice continues to exclude multi-agent, the delegation primitive becomes FSB-only or requires Lattice-policy negotiation. Mitigation: surface in Phase 1 gap survey; route to Lattice maintainer discussion before designing delegation phases.
@@ -66,6 +68,7 @@ Initial risks identified at pivot:
 
 Backup branch: `pre-pivot-archive/v0.10.0-fsb-first` -- HEAD `4d70facf` (all 30+ v0.10.0-attempt-1 commits)
 On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
+
   - `01-hooks-foundation/` -- full Phase 1 artifact set (CONTEXT, DISCUSSION-LOG, RESEARCH, PLAN-01..06, SUMMARY-01..06)
   - `02-state-inspectability-carve-out/` -- full Phase 2 artifact set (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARY-01..04, VERIFICATION)
   - `ROADMAP.v0.10.0-attempt-1.md` -- final attempt-1 roadmap
@@ -82,5 +85,5 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 
 ## Session Continuity
 
-Last session: 2026-05-24 -- v0.10.0-attempt-2 pivot executed end-to-end. Working tree reset to merge-base with main + Lattice cloned + milestone docs restructured + backup branch + on-disk archive. Awaiting `/gsd-discuss-phase 1` start.
-Resume file: None. Next step: `/gsd-discuss-phase 1`.
+Last session: 2026-05-24T10:11:00.361Z
+Resume file: .planning/phases/01-lattice-gap-survey-scaffold/01-CONTEXT.md
