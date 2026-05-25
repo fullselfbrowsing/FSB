@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: verifying
-stopped_at: Completed 04-05-PLAN.md (FSB-side surface-presence smoke 47 PASS + LATTICE-PIN bump 7afd62fc->f1c943b + REQUIREMENTS LSDK-14..18 cross-cutting SHA refresh + total v1 count 17->21; ONE FSB commit b3e52282 with Ref footer; Phase 4 audit-trail closed; ready for /gsd-verify-phase 4)
-last_updated: "2026-05-24T23:56:35.363Z"
+stopped_at: Phase 5 context captured (hybrid offscreen path; user-confirmed)
+last_updated: "2026-05-25T00:36:20.171Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
@@ -109,6 +109,6 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 
 ## Session Continuity
 
-Last session: 2026-05-24T23:45:08.198Z
-Resume file: None
-Stopped at: Completed 04-05-PLAN.md (FSB-side surface-presence smoke 47 PASS + LATTICE-PIN bump 7afd62fc->f1c943b + REQUIREMENTS LSDK-14..18 cross-cutting SHA refresh + total v1 count 17->21; ONE FSB commit b3e52282 with Ref footer; Phase 4 audit-trail closed; ready for /gsd-verify-phase 4)
+Last session: 2026-05-25T00:36:20.168Z
+Resume file: .planning/phases/05-mv3-survivability-bundler/05-CONTEXT.md
+Stopped at: Phase 5 context captured (hybrid offscreen path; user-confirmed)

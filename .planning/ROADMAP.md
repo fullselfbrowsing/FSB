@@ -197,9 +197,40 @@
 
 **Lattice-side ceremony (D-14 carryforward):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 4` in commit body. No `git push` to Lattice's remote (D-15 carryforward).
 
-### Phase 5: MV3-survivability adapter contract (TBD)
+### Phase 5: MV3-survivability adapter contract + bundler infra + hybrid offscreen Lattice host
 
-Documented Lattice-side interface for runtimes whose execution context can be evicted mid-flow (FSB MV3 SW is the first; future Lattice consumers may include other ephemeral runtimes). FSB-side: session-resume dispatcher with CONSERVATIVE recovery (per attempt-1's `_al_handleRestoredMode` pattern). Phase 5's smoke is the first that legitimately needs to load Lattice into an extension context -- this is also where the bundler / SW classic-to-module migration discussion happens.
+**Goal:** Ship 4 deliverables: (1) Lattice-side `SurvivabilityAdapter<TState>` interface + thin `createNoopSurvivabilityAdapter()` reference impl at `lattice/packages/lattice/src/runtime/survivability.ts` with companion vitest cases + audit-doc MV3-survivability rows flipped to Covered. (2) Bundler infrastructure for FSB extension build via esbuild + per-entrypoint bundles + `extension/dist/` output (behavior-free in this phase). (3) Hybrid offscreen Lattice host -- `background.js` STAYS CLASSIC (153 importScripts untouched), new offscreen page `extension/offscreen/lattice-host.html` + `.js` declares `<script type="module">`, bundler emits the offscreen bundle with Lattice bare-specifier rewritten, SW <-> offscreen message bus carries step-transition events to the offscreen Lattice host. (4) FSB-side standalone MV3-survivability adapter (`extension/ai/lattice-runtime-adapter.js`) implementing the Lattice contract over `chrome.storage.session`; feature flag `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` defaults `false`; Node-side smoke validates round-trip.
+
+**Why (user-confirmed Hybrid Offscreen path):** Phase 1's audit doc flagged MV3-survivability as a Blocker domain. INV-06 mandates the contract lives in Lattice. The deferred Phase 1 D-06 "in-extension Lattice consumption" intent is achieved here via offscreen-page hosting (not via SW classic-to-module migration, which carries 153 load-order-sensitive importScripts risks). Hybrid offscreen path preserves INV-04 (background.js + agent-loop.js byte-frozen) while delivering bundler infra + the contract + first real in-extension Lattice load.
+
+**Scope (in):**
+- Lattice `SurvivabilityAdapter` interface + noop ref impl + vitest cases (~12-15 cases) + public-surface re-exports + audit-doc closure.
+- esbuild config + `scripts.build` invocation + `extension/dist/` output + bundler-emits-expected-files smoke; behavior-free (zero existing consumers migrate).
+- Offscreen Lattice host (HTML + ESM JS bundle); minimal `manifest.json` offscreen page registration; SW <-> offscreen message bus.
+- FSB standalone `lattice-runtime-adapter.js` implementing Lattice's contract over `chrome.storage.session`; feature flag default-off.
+- Node smoke `tests/lattice-survivability-smoke.test.js` (~25 PASS).
+- LATTICE-PIN.md bump + Phase 5 row; REQUIREMENTS.md LSDK-19..N + FINT-NN entries.
+
+**Scope (out):**
+- SW classic-to-module migration (153 importScripts → ES imports). Deferred indefinitely; can revisit in v0.11.0+.
+- `agent-loop.js` modifications. INV-04 setTimeout iterator stays byte-frozen.
+- CONSERVATIVE recovery wiring (`_al_handleRestoredMode` pattern from attempt-1) into `runAgentLoop`. Deferred to follow-on milestone.
+- Feature flag default-on flip. Deferred to post-UAT.
+- In-SW Lattice import.
+- Delegation primitive (Phase 6 / CONTINGENT).
+- Mainline PR back into Lattice (v0.11.0+).
+
+**Pass criteria (to be locked during planning):**
+1. Lattice vitest 397 + new survivability cases PASS (no regressions).
+2. FSB `npm test` exits 0 with survivability smoke ~25 PASS appended.
+3. `extension/dist/` produced by `scripts.build`; all 5+ entrypoint bundles emitted.
+4. Offscreen `lattice-host.html` exists with module script tag; manifest.json declares the offscreen page.
+5. Feature flag default-off; agent-loop.js + background.js byte-frozen.
+6. `lattice/docs/fsb-integration-gaps.md` MV3-survivability rows flipped to Covered.
+7. `.planning/LATTICE-PIN.md` reflects new Lattice HEAD with Phase 5 row.
+8. `.planning/REQUIREMENTS.md` LSDK-19..N + FINT-NN populated.
+
+**Lattice-side ceremony (D-14 carryforward):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 5` in commit body. No `git push` to Lattice's remote (D-15 carryforward).
 
 ### Phase 6: Delegation primitive (CONTINGENT)
 
