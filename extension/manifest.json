@@ -42,7 +42,7 @@
   "options_page": "ui/control_panel.html",
   "web_accessible_resources": [
     {
-      "resources": ["assets/icon48.png", "site-maps/*.json", "test-data/**/*", "utils/redactForLog.js", "utils/diagnostics-ring-buffer.js"],
+      "resources": ["assets/icon48.png", "site-maps/*.json", "test-data/**/*", "utils/redactForLog.js", "utils/diagnostics-ring-buffer.js", "offscreen/lattice-host.html"],
       "matches": ["<all_urls>"]
     }
   ],

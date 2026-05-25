@@ -77,9 +77,6 @@ const ENTRIES = [
   },
   {
     name: 'offscreen-lattice-host',
-    // Plan 05-04 lands the source file. Plan 05-01 emits an EMPTY placeholder
-    // bundle so the dist tree is shape-complete; the bundle gets re-emitted
-    // with real content when Plan 05-04 lands extension/offscreen/lattice-host.js.
     entryPoints: [path.join(SRC_ROOT, 'offscreen', 'lattice-host.js')],
     outfile: path.join(OUT_ROOT, 'offscreen', 'lattice-host.js'),
     format: 'esm',
@@ -89,7 +86,13 @@ const ENTRIES = [
     bundle: true,
     legalComments: 'none',
     allowOverwrite: true,
-    optional: true, // skip if source file does not exist yet (Plan 05-01 phase)
+    // [Rule 3 - Blocker] Lattice dist/index.js top-level imports node:fs/promises,
+    // node:path, node:url for its artifact-storage submodule. Our offscreen import
+    // surface (checkpoint/signer/survivability) does NOT touch those code paths.
+    // Marking node:* as external lets the bundle compile; tree-shaking removes the
+    // unreachable artifact code at minify time. The empty external stubs will never
+    // execute at browser runtime because the calling paths are unreferenced.
+    external: ['node:fs/promises', 'node:path', 'node:url', 'node:fs', 'node:crypto'],
   },
   {
     name: 'content-canvas-interceptor',
