@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 05-01-PLAN.md (esbuild bundler infra)
-last_updated: "2026-05-25T01:16:49.046Z"
+stopped_at: "Completed 05-02-PLAN.md (Lattice MV3-survivability adapter contract; Lattice SHA a4609bc; 414 Lattice tests PASS); next: 05-03 public-surface re-export (W2)"
+last_updated: "2026-05-25T01:25:14.013Z"
 last_activity: 2026-05-25
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 21
-  completed_plans: 16
-  percent: 76
+  completed_plans: 17
+  percent: 81
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 ## Current Position
 
 Phase: 05 (MV3-survivability + bundler) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-05-25
 
@@ -109,6 +109,6 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 
 ## Session Continuity
 
-Last session: 2026-05-25T01:16:49.043Z
+Last session: 2026-05-25T01:25:14.009Z
 Resume file: None
-Stopped at: Completed 05-01-PLAN.md (esbuild bundler infra)
+Stopped at: Completed 05-02-PLAN.md (Lattice MV3-survivability adapter contract; Lattice SHA a4609bc; 414 Lattice tests PASS); next: 05-03 public-surface re-export (W2)
