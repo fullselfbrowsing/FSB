@@ -48,3 +48,8 @@ Research/
 .claude/worktrees/
 BUG-REPORT-*.md
 dist/skill/
+
+# Phase 5 -- esbuild output for the extension build (FSB v0.10.0-attempt-2)
+# Bundler-installed-not-wired in Plan 05-01; consumer (offscreen Lattice host)
+# lands in Plan 05-04. extension/dist/ is per-developer and never enters git.
+extension/dist/
