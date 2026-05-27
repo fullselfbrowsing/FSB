@@ -174,9 +174,19 @@ function _trim(s) { return typeof s === "string" ? s.trim() : ""; }
  * @returns {string} HTTPS URL
  */
 function computeUrl(providerKey, config) {
+  // Phase 6 WR-03 -- baseUrl is honored ONLY by 'lmstudio' and 'custom'
+  // branches; the first-party provider branches (xai, openai, anthropic,
+  // gemini, openrouter) hardcode their endpoints and intentionally ignore
+  // config.baseUrl. The agent-loop bridge call (extension/ai/agent-loop.js
+  // executeViaBridge invocation) correspondingly only sends a baseUrl for
+  // 'custom' and 'lmstudio'. Mirrors PROVIDER_CONFIGS.endpoint hardcoding
+  // in extension/ai/universal-provider.js (the legacy fallback). If
+  // openai/xai/anthropic/gemini/openrouter proxy support is needed
+  // (Azure shim, llm-proxy, internal deployment), it must be added here
+  // AND at the agent-loop call site in the same patch.
   switch (providerKey) {
     case "xai":        return "https://api.x.ai/v1/chat/completions";
-    case "openai":     return "https://api.openai.com/v1/chat/completions";
+    case "openai":     return "https://api.openai.com/v1/chat/completions";  // baseUrl ignored (see WR-03 note above)
     case "anthropic":  return "https://api.anthropic.com/v1/messages";
     case "gemini": {
       const apiKey = encodeURIComponent(_trim(config && config.apiKey));

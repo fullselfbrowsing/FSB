@@ -1045,6 +1045,14 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
   // Default-on per ROADMAP; flag=false falls back to legacy
   // universalProvider.sendRequest for runtime rollback safety.
   // Phase 7 strips the flag and archives universal-provider.js.
+  //
+  // Phase 6 WR-03 -- baseUrl is ONLY honored by the offscreen handler's
+  // computeUrl() for 'custom' and 'lmstudio'. For 'openai' (and the other
+  // first-party providers xai/anthropic/gemini/openrouter) computeUrl
+  // hardcodes the full URL and never reads config.baseUrl. Do not pass
+  // a baseUrl for those providers to avoid an unused-arg / silent-contract-
+  // mismatch footgun. If openai-proxy support is needed (Azure shim,
+  // llm-proxy, etc.), it must be added to computeUrl in a follow-on phase.
   if (typeof FSB_LATTICE_PROVIDER_BRIDGE_ENABLED === 'undefined' || FSB_LATTICE_PROVIDER_BRIDGE_ENABLED) {
     var _cfg = providerInstance.config || {};
     var _settings = providerInstance.settings || {};
@@ -1053,7 +1061,6 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
       model: providerInstance.model,
       baseUrl: providerKey === 'custom' ? _settings.customEndpoint
              : providerKey === 'lmstudio' ? ((_settings.lmstudioBaseUrl || 'http://localhost:1234').replace(/\/+$/, '') + '/v1')
-             : providerKey === 'openai' ? 'https://api.openai.com/v1'
              : undefined,
     }, requestBody, { mode: 'autopilot' });
   }
