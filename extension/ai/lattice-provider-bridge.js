@@ -114,9 +114,23 @@
         //   reads this shape unchanged.
         // Test-connection: response is Lattice's ProviderRunResponse; caller
         //   (options.js checkApiConnection) handles either by inspecting truthiness.
-        return (envelope.response && envelope.response.rawResponse)
-          ? envelope.response.rawResponse
-          : envelope.response;
+        //
+        // Phase 6 WR-02 -- defend against ok:true envelopes that omit response.
+        // The offscreen handler today always sets response (rawResponse for
+        // autopilot, ProviderRunResponse for test-connection) so this is
+        // forward-defensive. Without this guard a malformed success envelope
+        // would silently return undefined, surface as a "Connected" UI in
+        // checkApiConnection without an observed provider response, and crash
+        // deeper in tool-use-adapter for autopilot. Treat the asymmetry
+        // (missing envelope = host_unreachable throw; missing response =
+        // silent undefined) by throwing adapter_error here.
+        const r = envelope.response;
+        if (r === undefined || r === null) {
+          const err = new Error('Offscreen Lattice host returned empty response in success envelope');
+          err.code = 'adapter_error';
+          throw err;
+        }
+        return (r && r.rawResponse) ? r.rawResponse : r;
       }
 
       // ok: false -- typed error envelope
