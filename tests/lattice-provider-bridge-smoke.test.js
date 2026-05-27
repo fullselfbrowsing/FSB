@@ -470,20 +470,66 @@ async function loadOffscreenHandlerSource(chromeMock) {
   }
   passAssertEqual(threw4b, false, 'abort for unknown requestId is silent no-op');
 
-  // ---- Part 5: Flag/trim/options grep (placeholder) ----
-  console.log('\n--- Part 5: flag / trim / options-grep ---');
-  // Plan 06-02 + Plan 06-03 + Plan 06-04 will populate: 4 PASSes.
-  //   (a) Plan 06-02: grep extension/background.js after line 11 for
-  //       importScripts('ai/lattice-provider-bridge.js') insertion.
-  //   (b) Plan 06-03: grep extension/ai/agent-loop.js line ~1044 for
-  //       FSB_LATTICE_PROVIDER_BRIDGE_ENABLED uniform check OR
-  //       executeViaBridge invocation; verify flag default-on
-  //       (undefined -> bridge path).
-  //   (c) Plan 06-04: grep extension/ui/options.js saveSettings()
-  //       lines 977-1029 for .trim() on all 7 API key fields.
-  //   (d) Plan 06-04: grep extension/ui/options.js checkApiConnection()
-  //       reads from elements.apiKey?.value?.trim() (NOT chrome.storage).
-  passAssert(true, 'Plan 06-00 Wave 0 placeholder -- Plan 06-02 + Plan 06-03 + Plan 06-04 fill flag/trim/grep checks');
+  // ---- Part 5: SW startup wiring (background.js) + flag/trim/options grep (deferred to Plans 06-03/06-04) ----
+  console.log('\n--- Part 5: SW startup wiring (background.js) + flag/trim/options grep (deferred to Plans 06-03/06-04) ---');
+
+  // Plan 06-02 portion: background.js importScripts insertion + ensureLatticeOffscreen wiring
+  const fs = require('fs');
+  const bgSource = fs.readFileSync('extension/background.js', 'utf8');
+  const bgLines = bgSource.split('\n');
+
+  // Matches the plan's acceptance criterion `grep -c "importScripts" extension/background.js`
+  // which counts ALL importScripts token mentions (including comment references).
+  // Phase 5 baseline: 153 mentions. Phase 6 Plan 06-02: 154 mentions (+1 new line).
+  const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
+  passAssertEqual(importScriptsCount, 154, 'background.js importScripts count = 154 (Phase 5 baseline 153 + 1 new line for ai/lattice-provider-bridge.js)');
+  // Companion call-site-only count (regex requires open paren): Phase 5 baseline
+  // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151.
+  const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
+  passAssertEqual(importScriptsCallSites, 151, 'background.js importScripts() call sites = 151 (Phase 5 baseline 150 + 1 new call for ai/lattice-provider-bridge.js)');
+
+  const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
+  const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
+  const lineAiIntegration = bgLines.findIndex(l => /importScripts\(['"]ai\/ai-integration\.js['"]\)/.test(l));
+  passAssert(lineCli >= 0 && lineBridge >= 0 && lineAiIntegration >= 0, 'all 3 importScripts entries present (cli-parser + lattice-provider-bridge + ai-integration)');
+  passAssert(lineCli < lineBridge && lineBridge < lineAiIntegration, 'order: ai/cli-parser.js -> ai/lattice-provider-bridge.js -> ai/ai-integration.js (no intervening importScripts entries between cli-parser and bridge OR between bridge and ai-integration)');
+  // Bridge line MUST be IMMEDIATELY adjacent to cli-parser (NO comment line between; Warning 3 fix)
+  passAssertEqual(lineBridge - lineCli, 1, 'bridge importScripts line is IMMEDIATELY adjacent to cli-parser (no preceding comment line; Phase 5 D-17 byte-frozen ethos)');
+  // Bridge line MUST be IMMEDIATELY adjacent to ai-integration (NO comment line between)
+  passAssertEqual(lineAiIntegration - lineBridge, 1, 'bridge importScripts line is IMMEDIATELY adjacent to ai-integration (no following comment line)');
+  // Verify no OTHER importScripts entries between cli-parser and bridge (redundant given adjacency check, but kept for diagnostic clarity)
+  for (let i = lineCli + 1; i < lineBridge; i++) {
+    passAssert(!/importScripts\(/.test(bgLines[i]), 'no other importScripts between cli-parser and lattice-provider-bridge at line ' + (i+1));
+  }
+
+  const ensureCount = (bgSource.match(/ensureLatticeOffscreen/g) || []).length;
+  passAssert(ensureCount >= 3, 'ensureLatticeOffscreen appears >= 3 times in background.js (declaration + onInstalled + onStartup)');
+
+  passAssert(/async function ensureLatticeOffscreen\(\)/.test(bgSource), 'ensureLatticeOffscreen declared as async function');
+  passAssertEqual((bgSource.match(/chrome\.offscreen\.createDocument/g) || []).length, 1, 'chrome.offscreen.createDocument called exactly once (inside helper)');
+  passAssertEqual((bgSource.match(/reasons:\s*\['WORKERS'\]/g) || []).length, 1, 'WORKERS reason used (not IFRAME_SCRIPTING per CONTEXT.md amendment)');
+  passAssertEqual((bgSource.match(/IFRAME_SCRIPTING/g) || []).length, 0, 'IFRAME_SCRIPTING placeholder removed');
+  passAssertEqual((bgSource.match(/url:\s*['"]offscreen\/lattice-host\.html['"]/g) || []).length, 1, 'url: offscreen/lattice-host.html present in createDocument');
+  passAssert(/chrome\.offscreen\.hasDocument/.test(bgSource), 'hasDocument idempotency guard present');
+
+  // Dynamic chrome.offscreen idempotency exercise via the Plan 06-00 mock
+  const offscreenMock = createChromeOffscreenMock();
+  async function simulatedHelper() {
+    // Mirror the actual ensureLatticeOffscreen helper body for behavioural test
+    try {
+      if (!offscreenMock || typeof offscreenMock.hasDocument !== 'function') return;
+      const has = await offscreenMock.hasDocument();
+      if (has) return;
+      await offscreenMock.createDocument({ url: 'offscreen/lattice-host.html', reasons: ['WORKERS'], justification: 'test' });
+    } catch (_e) { /* swallow */ }
+  }
+  await simulatedHelper();
+  await simulatedHelper();
+  await simulatedHelper();
+  passAssertEqual(offscreenMock._createCount(), 1, 'hasDocument guard makes ensureLatticeOffscreen idempotent (3 calls -> 1 createDocument)');
+
+  // Placeholder for the FINT-08 portions of Part 5 (filled by Plan 06-03 and Plan 06-04)
+  passAssert(true, 'Plan 06-03 + 06-04 fill: agent-loop.js flag gating + options.js trim greps');
 
   // ---- Part 6: INV byte-freeze (placeholder) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');
