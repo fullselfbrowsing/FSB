@@ -642,19 +642,119 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // getStoredSettings declaration preserved elsewhere in options.js
   passAssert(/function\s+getStoredSettings/.test(optionsSrc) || /async\s+function\s+getStoredSettings/.test(optionsSrc), 'getStoredSettings declaration preserved (used by other call sites; not removed by Phase 6)');
 
-  // ---- Part 6: INV byte-freeze (placeholder) ----
+  // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');
-  // Plan 06-05 will populate: >= 4 PASSes.
-  //   (a) INV-04: grep -c setTimeout extension/ai/agent-loop.js -> 8
-  //       (Phase 5 baseline). The 4 setTimeout iterator lines (1841,
-  //       2439, 2508, 2518) contain runAgentIteration(sessionId, options).
-  //   (b) INV-01/02: chain node tests/tool-definitions-parity.test.js
-  //       still passing 142/142.
-  //   (c) INV-05: extension/_archive/ does not exist or is empty
-  //       (Phase 6 does NOT archive universal-provider.js; Phase 7 does).
-  //   (d) INV-06: cd lattice && git rev-parse fsb-integration-experiments
-  //       matches .planning/LATTICE-PIN.md frontmatter SHA (no drift).
-  passAssert(true, 'Plan 06-00 Wave 0 placeholder -- Plan 06-05 fills INV-04/01/02/05/06 byte-freeze PASSes');
+
+  // Plan 06-05 fill: INV byte-freeze regression assertions
+  // NOTE: `fs` is already required at Part 5 above; reused here.
+
+  // ---- INV-04: agent-loop.js setTimeout iterator PATTERN load-bearing ----
+  // (Pattern check, NOT line-number check: Plan 06-03 Task 2 inserts ~10 lines
+  //  at line 1044 which shifts the iterator line positions downward. The
+  //  INVARIANT is the pattern + count, not the specific lines.)
+  const agentLoopSrc = fs.readFileSync('extension/ai/agent-loop.js', 'utf8');
+  const agentLoopLines = agentLoopSrc.split('\n');
+  passAssertEqual(
+    (agentLoopSrc.match(/setTimeout/g) || []).length,
+    8,
+    'INV-04: extension/ai/agent-loop.js setTimeout count = 8 (Phase 5 baseline preserved by Phase 6; count invariant under line-1044 insertion)'
+  );
+
+  // Discover iterator lines via content match (NOT hardcoded line numbers).
+  const iteratorLines = agentLoopLines
+    .map(function (l, i) { return /session\._nextIterationTimer\s*=\s*setTimeout/.test(l) ? (i + 1) : null; })
+    .filter(function (n) { return n !== null; });
+  passAssertEqual(
+    iteratorLines.length,
+    4,
+    'INV-04: exactly 4 setTimeout-chained iterator hits discovered (pattern: session._nextIterationTimer = setTimeout)'
+  );
+
+  // For each discovered iterator line, verify the block contains
+  // runAgentIteration(sessionId, options) within the next 5 lines.
+  iteratorLines.forEach(function (lineNum, idx) {
+    var windowSrc = agentLoopLines.slice(lineNum - 1, lineNum + 5).join('\n');
+    passAssert(
+      /runAgentIteration\s*\(\s*sessionId\s*,\s*options\s*\)/.test(windowSrc),
+      'INV-04: iterator ' + (idx + 1) + ' at line ' + lineNum + ' calls runAgentIteration(sessionId, options) within next 5 lines'
+    );
+  });
+
+  // ---- INV-01/02: tool-definitions parity test still present ----
+  passAssert(
+    fs.existsSync('tests/tool-definitions-parity.test.js'),
+    'INV-01/02: tests/tool-definitions-parity.test.js exists; runs as a sibling in package.json scripts.test &&-chain'
+  );
+
+  // ---- INV-05: deprecated agent modules absent OR byte-frozen ----
+  const deprecatedAgentPaths = [
+    'extension/agents/agent-executor.js',
+    'extension/agents/agent-manager.js',
+    'extension/agents/agent-scheduler.js',
+  ];
+  let invFiveOk = true;
+  let invFiveDetail = '';
+  for (const p of deprecatedAgentPaths) {
+    if (!fs.existsSync(p)) {
+      invFiveDetail += p + '(absent) ';
+      continue;
+    }
+    const src = fs.readFileSync(p, 'utf8');
+    if (!/DEPRECATED/i.test(src)) {
+      invFiveOk = false;
+      invFiveDetail += p + '(no DEPRECATED banner!) ';
+    } else {
+      invFiveDetail += p + '(present + banner) ';
+    }
+  }
+  passAssert(
+    invFiveOk,
+    'INV-05: deprecated agent modules absent OR carry DEPRECATED banner: ' + invFiveDetail
+  );
+
+  // ---- INV-06: Lattice byte-frozen FSB-side (no Phase 6 Lattice commits) ----
+  const pinSrc = fs.readFileSync('.planning/LATTICE-PIN.md', 'utf8');
+  const shaMatch = pinSrc.match(/current_lattice_sha:\s*([0-9a-f]{40})/);
+  passAssert(
+    shaMatch !== null,
+    'INV-06: LATTICE-PIN.md frontmatter declares current_lattice_sha'
+  );
+  // Phase 6 Plan 06-05 runs BEFORE Plan 06-06's ceremony, so the SHA is still the Phase 5 value.
+  // Phase 6 ships ZERO Lattice-side commits per CONTEXT.md INV-06. Plan 06-06 may add a FSB-side
+  // audit row but the SHA itself MUST NOT change.
+  const PHASE_5_LATTICE_SHA = 'e95067bfa87ed1b75838fc3b3ef217a3b01acbd3';
+  passAssertEqual(
+    shaMatch && shaMatch[1],
+    PHASE_5_LATTICE_SHA,
+    'INV-06: LATTICE-PIN.md current_lattice_sha equals Phase 5 SHA (Phase 6 ships zero Lattice-side commits)'
+  );
+
+  // ---- Phase 7 readiness: universal-provider.js still on disk; _archive/ not yet ----
+  passAssert(
+    fs.existsSync('extension/ai/universal-provider.js'),
+    'Phase 6 keeps universal-provider.js as flag-false fallback (Phase 7 archives it)'
+  );
+  const archiveExists = fs.existsSync('extension/_archive');
+  const archiveEmpty = !archiveExists || fs.readdirSync('extension/_archive').length === 0;
+  passAssert(
+    archiveEmpty,
+    'Phase 6: extension/_archive/ does not exist or is empty (Phase 7 will create + populate it)'
+  );
+
+  // ---- Phase 6 file-presence ceremony: all Phase 6 deliverables on disk ----
+  passAssert(
+    fs.existsSync('extension/ai/lattice-provider-bridge.js'),
+    'Plan 06-03 deliverable: extension/ai/lattice-provider-bridge.js present'
+  );
+  passAssert(
+    fs.existsSync('extension/offscreen/lattice-host.js'),
+    'Plan 06-01 deliverable: extension/offscreen/lattice-host.js present (Phase 5 base + Phase 6 extensions)'
+  );
+  const lhSrc = fs.readFileSync('extension/offscreen/lattice-host.js', 'utf8');
+  passAssert(
+    /lattice-provider-execute/.test(lhSrc),
+    'Plan 06-01 deliverable: lattice-host.js contains lattice-provider-execute handler'
+  );
 
   // ---- Summary ----
   console.log('\n--- Summary ---');
