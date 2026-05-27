@@ -978,14 +978,14 @@ function saveSettings() {
   const settings = {
     modelProvider: elements.modelProvider?.value || 'xai',
     modelName: elements.modelName?.value || 'grok-4-1-fast',
-    apiKey: elements.apiKey?.value || '',
-    geminiApiKey: elements.geminiApiKey?.value || '',
-    openaiApiKey: document.getElementById('openaiApiKey')?.value || '',
-    anthropicApiKey: document.getElementById('anthropicApiKey')?.value || '',
-    customApiKey: document.getElementById('customApiKey')?.value || '',
-    customEndpoint: document.getElementById('customEndpoint')?.value || '',
-    openrouterApiKey: document.getElementById('openrouterApiKey')?.value || '',
-    lmstudioBaseUrl: document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234',
+    apiKey: (elements.apiKey?.value || '').trim(),
+    geminiApiKey: (elements.geminiApiKey?.value || '').trim(),
+    openaiApiKey: (document.getElementById('openaiApiKey')?.value || '').trim(),
+    anthropicApiKey: (document.getElementById('anthropicApiKey')?.value || '').trim(),
+    customApiKey: (document.getElementById('customApiKey')?.value || '').trim(),
+    customEndpoint: (document.getElementById('customEndpoint')?.value || '').trim(),
+    openrouterApiKey: (document.getElementById('openrouterApiKey')?.value || '').trim(),
+    lmstudioBaseUrl: (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim(),
     maxIterations: parseInt(elements.maxIterations?.value) || 20,
     debugMode: elements.debugMode?.checked ?? false,
     // DOM Optimization settings
@@ -997,7 +997,7 @@ function saveSettings() {
     showSidepanelProgress: elements.showSidepanelProgress?.checked ?? false,
     enableLogin: elements.enableLogin?.checked ?? false,
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
-    captchaApiKey: elements.captchaApiKey?.value || '',
+    captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
     autoRefineSiteMaps: elements.autoRefineSiteMaps?.checked ?? true,
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Defense-in-depth
     // layer 2 (input clamp = layer 1; SW setCap on storage.onChanged = layer 3).
