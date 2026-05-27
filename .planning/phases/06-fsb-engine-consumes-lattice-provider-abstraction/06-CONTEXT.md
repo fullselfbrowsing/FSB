@@ -47,12 +47,16 @@ Out of scope: hard delete of `universal-provider.js` (Phase 7), feature flag rem
 - `checkApiConnection()` in `options.js` reads from `elements.apiKey?.value?.trim()` (NOT from chrome.storage), delegates to `executeViaBridge('xai' | 'anthropic' | ...)`, displays the bridge result.
 - `saveSettings()` defense-in-depth: trim() applied uniformly to all 7 API key fields on save. Old un-trimmed stored values auto-heal on next user save.
 
-### Claude's Discretion
-- Bridge shim file location (`extension/ai/lattice-provider-bridge.js` per ROADMAP; planner verifies no naming conflict).
-- Error envelope wording per failure kind (planner finalizes).
-- Adapter factory dispatch map shape (planner picks: switch statement vs object literal vs ES module re-export).
-- `chrome.offscreen.hasDocument` polyfill / safety for older Chrome (planner verifies MV3 manifest min-version compatibility; FSB already targets Chrome >= 116 per existing manifest).
-- Request-ID generation: `crypto.randomUUID()` if available, monotonic counter fallback. Planner picks based on whether `crypto.randomUUID()` is available in the SW context.
+### Post-research amendments (locked 2026-05-27 after RESEARCH.md Section 16)
+- **Bridge strategy = A**: Offscreen handler does its own `fetch()` for the autopilot path, using FSB's pre-built `requestBody` (preserves multi-turn messages + tools + provider-specific cache_control / systemInstruction / generationConfig). Lattice provider factories are still imported + instantiated at the top of the offscreen module so the consumption pathway is wired and INV-03 holds at factory-dispatch level. Lattice `adapter.execute({task, artifacts, outputs})` is used for the **test-connection path only** (single-shot fits natively). Strategy B (refactor agent-loop + Lattice changes) rejected — violates INV-04 + INV-06. Strategy C (defer autopilot to v0.11.0+ passthrough adapter) rejected — defeats the xai-key-rejected-400 fix's reach.
+- **chrome.offscreen.createDocument({reasons: ['WORKERS']})**: per Chrome docs, WORKERS accurately describes the offscreen page's purpose (fetch + JS execution outside the SW); IFRAME_SCRIPTING placeholder in earlier draft is superseded.
+- **Request-ID generation = `crypto.randomUUID()`**: available since Chrome 92, FSB floor 116 — no polyfill needed.
+- **importScripts insertion point**: `extension/background.js` after line 11 (`importScripts('ai/cli-parser.js');`), before line 12 (`importScripts('ai/ai-integration.js');`) — keeps the alphabetical-by-category ordering Phase 5 established.
+
+### Claude's Discretion (post-research)
+- Bridge shim file location (`extension/ai/lattice-provider-bridge.js` per ROADMAP).
+- Error envelope wording per failure kind (`kind: 'aborted' | 'adapter_error' | 'host_unreachable' | 'invalid_provider' | 'fetch_error'`).
+- Adapter factory dispatch map shape (planner picks: switch statement vs object literal).
 
 </decisions>
 
