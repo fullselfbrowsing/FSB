@@ -1075,58 +1075,75 @@ function togglePasswordVisibility(fieldId) {
 }
 
 async function checkApiConnection() {
+  // Phase 6 Plan 06-04: rewritten to read from input fields directly (NOT from
+  // chrome.storage) and delegate to the Plan 06-03 bridge shim in test-connection
+  // mode. Closes the xai-key-rejected-400 P2 defect (stale storage read trap
+  // when user clicks Test before Save). Per-provider getter map trims input
+  // values defense-in-depth (also closes P1 even though Task 1 already trims at
+  // save time).
   dashboardState.connectionStatus = 'checking';
   updateConnectionStatus('checking', 'Checking connection...');
 
   try {
-    const settings = await getStoredSettings();
-    const provider = settings.modelProvider || 'xai';
+    const provider = elements.modelProvider?.value || 'xai';
+    const modelName = elements.modelName?.value || 'grok-4-1-fast';
 
-    // Check appropriate API key based on provider
-    const apiKeyMap = {
-      xai: settings.apiKey,
-      gemini: settings.geminiApiKey,
-      openai: settings.openaiApiKey,
-      anthropic: settings.anthropicApiKey,
-      custom: settings.customApiKey
+    const PROVIDER_KEY_GETTERS = {
+      xai:        function () { return (elements.apiKey?.value || '').trim(); },
+      gemini:     function () { return (elements.geminiApiKey?.value || '').trim(); },
+      openai:     function () { return (document.getElementById('openaiApiKey')?.value || '').trim(); },
+      anthropic:  function () { return (document.getElementById('anthropicApiKey')?.value || '').trim(); },
+      custom:     function () { return (document.getElementById('customApiKey')?.value || '').trim(); },
+      openrouter: function () { return (document.getElementById('openrouterApiKey')?.value || '').trim(); },
+      lmstudio:   function () { return ''; }
+    };
+    const PROVIDER_NAMES = {
+      xai: 'xAI',
+      gemini: 'Gemini',
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      custom: 'Custom',
+      openrouter: 'OpenRouter',
+      lmstudio: 'LM Studio'
     };
 
-    const apiKey = apiKeyMap[provider];
-
-    if (!apiKey) {
-      const providerNames = {
-        xai: 'xAI',
-        gemini: 'Gemini',
-        openai: 'OpenAI',
-        anthropic: 'Anthropic',
-        custom: 'Custom'
-      };
+    const apiKey = (PROVIDER_KEY_GETTERS[provider] || function () { return ''; })();
+    if (!apiKey && provider !== 'lmstudio') {
       updateConnectionStatus('disconnected', 'No API key configured');
-      updateApiStatusCard('disconnected', 'No API Key', `Configure your ${providerNames[provider]} API key to get started`);
+      updateApiStatusCard('disconnected', 'No API Key', 'Configure your ' + (PROVIDER_NAMES[provider] || provider) + ' API key to get started');
       return;
     }
 
-    // Use AI integration to test connection
-    const aiIntegration = new AIIntegration(settings);
+    const config = {
+      apiKey: apiKey,
+      model: modelName,
+      baseUrl: provider === 'custom' ? (document.getElementById('customEndpoint')?.value || '').trim()
+             : provider === 'lmstudio' ? ((document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim().replace(/\/+$/, '') + '/v1')
+             : provider === 'openai' ? 'https://api.openai.com/v1'
+             : undefined
+    };
 
-    const result = await aiIntegration.testConnection();
-
-    if (result.ok) {
+    const startTime = Date.now();
+    try {
+      await executeViaBridge(provider, config, { __testConnection: true }, { mode: 'test-connection' });
+      const responseTime = Date.now() - startTime;
       updateConnectionStatus('connected', 'Connected');
       // Hide status card on success - only show on errors
       if (elements.apiStatusCard) {
         elements.apiStatusCard.style.display = 'none';
       }
-      addLog('info', `API connection successful with model: ${result.model}`);
-    } else {
+      addLog('info', 'API connection successful (' + responseTime + 'ms) with model: ' + modelName);
+    } catch (err) {
+      const responseTime = Date.now() - startTime;
+      const errMsg = (err && err.message) ? err.message : 'Unknown error';
       updateConnectionStatus('disconnected', 'Connection failed');
-      updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Unknown error');
-      addLog('error', `API connection failed: ${result.error}`);
+      updateApiStatusCard('disconnected', 'Connection Failed', errMsg);
+      addLog('error', 'API connection failed (' + responseTime + 'ms): ' + errMsg);
     }
   } catch (error) {
     updateConnectionStatus('disconnected', 'Connection error');
     updateApiStatusCard('disconnected', 'Connection Error', error.message);
-    addLog('error', `API connection error: ${error.message}`);
+    addLog('error', 'API connection error: ' + error.message);
   }
 }
 
