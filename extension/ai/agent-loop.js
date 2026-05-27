@@ -1041,6 +1041,22 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
     }
   }
 
+  // Phase 6 Plan 06-03 (FINT-08b): feature-flag-gated bridge call.
+  // Default-on per ROADMAP; flag=false falls back to legacy
+  // universalProvider.sendRequest for runtime rollback safety.
+  // Phase 7 strips the flag and archives universal-provider.js.
+  if (typeof FSB_LATTICE_PROVIDER_BRIDGE_ENABLED === 'undefined' || FSB_LATTICE_PROVIDER_BRIDGE_ENABLED) {
+    var _cfg = providerInstance.config || {};
+    var _settings = providerInstance.settings || {};
+    return executeViaBridge(providerKey, {
+      apiKey: _settings[_cfg.keyField] || '',
+      model: providerInstance.model,
+      baseUrl: providerKey === 'custom' ? _settings.customEndpoint
+             : providerKey === 'lmstudio' ? ((_settings.lmstudioBaseUrl || 'http://localhost:1234').replace(/\/+$/, '') + '/v1')
+             : providerKey === 'openai' ? 'https://api.openai.com/v1'
+             : undefined,
+    }, requestBody, { mode: 'autopilot' });
+  }
   return providerInstance.sendRequest(requestBody);
 }
 
