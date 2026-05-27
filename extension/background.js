@@ -9,6 +9,7 @@ importScripts('config/config.js');
 importScripts('config/init-config.js');
 importScripts('config/secure-config.js');
 importScripts('ai/cli-parser.js');
+importScripts('ai/lattice-provider-bridge.js');
 importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
 importScripts('utils/mcp-visual-session.js');
@@ -13109,12 +13110,43 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 //   }
 });
 
+// Phase 6 Plan 06-02 (FINT-07): SW-side startup wiring for the offscreen
+// Lattice host (extension/offscreen/lattice-host.js Phase 5 + 06-01).
+// Closes audit gap G3 from v0.10.0-MILESTONE-AUDIT.md: SW never opened the
+// offscreen document; D-22 deferred that to Phase 6.
+// CONTEXT.md post-research amendment: the WORKERS reason value per Chrome
+// docs (offscreen page hosts fetch + JS execution -- worker semantics).
+// Idempotent on both onInstalled + onStartup -- mirrors the Phase 269
+// telemetry-alarm pattern at line 13136.
+async function ensureLatticeOffscreen() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.offscreen || typeof chrome.offscreen.hasDocument !== 'function') {
+      console.warn('[FSB Lattice] chrome.offscreen unavailable; bridge will be inert');
+      return;
+    }
+    const has = await chrome.offscreen.hasDocument();
+    if (has) return;
+    await chrome.offscreen.createDocument({
+      url: 'offscreen/lattice-host.html',
+      reasons: ['WORKERS'],
+      justification: 'Hosts the Lattice provider bus; calls fetch() to external AI APIs on behalf of the service worker.'
+    });
+    console.log('[FSB Lattice] offscreen lattice-host opened');
+  } catch (err) {
+    console.error('[FSB Lattice] offscreen createDocument failed:', err && err.message ? err.message : err);
+  }
+}
+
 // Set up side panel behavior
 chrome.runtime.onInstalled.addListener(async () => {
   automationLogger.logInit('extension', 'installed', { version: 'v0.9.50' });
 
   // Initialize analytics
   initializeAnalytics();
+
+  // Phase 6 Plan 06-02 (FINT-07): open offscreen Lattice host idempotently.
+  // Fire-and-forget; the helper's try/catch handles all errors.
+  ensureLatticeOffscreen();
 
   // Phase 269 / IDENT-01, IDENT-02: lazy-mint or reuse the install UUID.
   // Idempotent across both onInstalled and onStartup. Module guarantees no
@@ -13189,6 +13221,8 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(async () => {
   automationLogger.logServiceWorker('startup', {});
   initializeAnalytics();
+  // Phase 6 Plan 06-02 (FINT-07): re-open offscreen Lattice host idempotently on SW wake.
+  ensureLatticeOffscreen();
   // Phase 269 / IDENT-01, IDENT-02: idempotent get-or-create on every SW wake.
   // Returns the existing UUID after first install -- no re-mint.
   try {
