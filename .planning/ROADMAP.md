@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** v0.10.0 (attempt 2) -- Lattice-SDK-first approach in pre-planning. Pivot from v0.10.0-attempt-1 (FSB-first) committed 2026-05-24; see `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the rationale.
+**Status:** v0.10.0 (attempt 2) -- In progress. Phases 1-5 complete; Phases 6-7 inserted 2026-05-27 to close the FINT-KK..L Lattice-provider-consumption gap after the `xai-key-rejected-400` debug surfaced that FSB's custom `universal-provider.js` runtime path has defects (missing trim + stale storage read) that Lattice's adapters do not. Phase 8 (delegation primitive) remains deferred to v0.11.0+. UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end. Pivot from v0.10.0-attempt-1 (FSB-first) committed 2026-05-24; see `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the rationale.
 
 **Branch posture:** `automation` branch reset to `51bdbb36` (merge-base with `main`). Pre-pivot work preserved on `pre-pivot-archive/v0.10.0-fsb-first`. Lattice cloned into `./lattice/` (gitignored) on branch `fsb-integration-experiments`. FSB will consume Lattice via `npm install ./lattice` (path: dependency) or `npm link`.
 
@@ -70,9 +70,14 @@
   - [x] `05-04-PLAN.md` (W3) -- FSB hybrid offscreen Lattice host: new extension/offscreen/lattice-host.html (script type="module") + lattice-host.js (ESM bundle-input importing from 'lattice' bare specifier) per D-15; SW <-> offscreen message bus documented per D-16 (handler registered; SW-side wiring deferred per D-22); extension/manifest.json minimal WAR entry per D-18 + CD-C; esbuild config emits the offscreen bundle with bare specifier rewritten. background.js BYTE-FROZEN per D-17. ONE FSB commit. Depends on Plan 05-01 + Plan 05-03. Closes FINT-04.
   - [x] `05-05-PLAN.md` (W3) -- FSB standalone MV3-survivability adapter + Node smoke: new extension/ai/lattice-runtime-adapter.js (standalone per D-19; SurvivabilityAdapter implementation over chrome.storage.session; feature-flag FSB_LATTICE_RUNTIME_ADAPTER_ENABLED default-off per D-20 + CD-D; ResumePolicy dispatch over attempt-1 marker vocabulary); new tests/lattice-survivability-smoke.test.js (>= 25 PASS real-runtime per D-21; chrome.storage.session mocked; real Ed25519 + createReceipt + verifyReceipt); package.json scripts.test chain extended. Phase 1+2+3+4 smokes BYTE-FROZEN. ONE FSB commit. Depends on Plan 05-03. Closes FINT-05 + FINT-06.
   - [x] `05-06-PLAN.md` (W4) -- Final ceremony: .planning/LATTICE-PIN.md frontmatter SHA bumped to Phase 5 Lattice HEAD + Phase 5 row appended referencing all 3 Phase 5 Lattice commits; .planning/REQUIREMENTS.md LSDK-19..22 + FINT-03..06 entries populated + 8 traceability rows; total v1 count 21 -> 29. ONE atomic FSB commit `docs(05): bump LATTICE-PIN + finalize LSDK + FINT traceability` with Ref footer + plan-ID. Depends on Plans 05-03 + 05-04 + 05-05.
+- [ ] **Phase 6: FSB engine consumes Lattice provider abstraction** -- Plans: TBD via `/gsd-discuss-phase 6` + `/gsd-plan-phase 6`. Wire FSB's autopilot engine + settings test-connection path to consume Lattice's 7 provider adapters (shipped in Phase 4) via the offscreen Lattice host bus (shipped in Phase 5 FINT-04). Replaces FSB's `universal-provider.js` call sites with message-bus delegation to `lattice.create{Anthropic,Gemini,Xai,OpenRouter,LmStudio,OpenAI,OpenAICompatible}Provider().execute()`. Map FSB chrome.storage provider config → Lattice factory args (apiKey, baseUrl, headers). Keep `universal-provider.js` intact as feature-flag-gated fallback (`FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` default-on). Side-effect closes the `xai-key-rejected-400` bug (Lattice adapters trim internally; bridge bypasses the missing-trim defect in options.js save path). Closes integration gap G3 from v0.10.0 audit (SW opens offscreen host at startup). INV-04 preserved (setTimeout iterator still wraps an async call — just now to chrome.runtime.sendMessage instead of universal-provider). Populates FINT-07, FINT-08. Plans:
+  - TBD
+- [ ] **Phase 7: Archive FSB custom provider stack** -- Plans: TBD via `/gsd-discuss-phase 7` + `/gsd-plan-phase 7`. Verify zero in-extension importers of `extension/ai/universal-provider.js` remain (grep audit), then move to `extension/_archive/universal-provider.js` (preserve for git-blame archaeology, recoverable via git history). Strip feature flag `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` — bridge becomes unconditional. Strengthen INV-03 wording in REQUIREMENTS.md to "FSB consumes Lattice provider adapters exclusively for the 7-provider matrix". Final LATTICE-PIN bump. Consolidated UAT-1 (Phases 1+5+6+7 in one Chrome MV3 reload session) executed here as the milestone-end UAT gate. Populates FINT-09. Plans:
+  - TBD
+
 ## Deferred from this milestone
 
-- **Phase 6: Delegation primitive (DEFERRED, was CONTINGENT)** -- Carried forward to the next milestone per autonomous-mode decision 2026-05-25. Lattice's "Out of Scope" policy on multi-agent did not change during this milestone; Phase 6 is parked until either (a) Lattice unblocks multi-agent and the delegation primitive lands Lattice-side, OR (b) the work re-scopes as an FSB-only consumer of Lattice receipt + tripwire surface. See "Future Phase 6 sketch" section below for the original contingent goal text retained for re-scoping.
+- **Phase 8: Delegation primitive (DEFERRED, was CONTINGENT)** -- Carried forward to v0.11.0+ per autonomous-mode decision 2026-05-25 (originally numbered "Phase 6", renumbered 2026-05-27 after Phases 6 + 7 were inserted to close the FINT-KK..L Lattice-provider-consumption gap). Lattice's "Out of Scope" policy on multi-agent did not change during this milestone; this phase is parked until either (a) Lattice unblocks multi-agent and the delegation primitive lands Lattice-side, OR (b) the work re-scopes as an FSB-only consumer of Lattice receipt + tripwire surface. See "Future Phase 8 sketch" section below for the original contingent goal text retained for re-scoping.
 
 ## Phase Details
 
@@ -241,9 +246,84 @@
 
 **Lattice-side ceremony (D-14 carryforward):** Conventional commits + `Ref: FSB v0.10.0-attempt-2 Phase 5` in commit body. No `git push` to Lattice's remote (D-15 carryforward).
 
-### Future Phase 6 sketch (deferred from this milestone)
+### Phase 6: FSB engine consumes Lattice provider abstraction
 
-**Status:** Deferred 2026-05-25 via /gsd-autonomous decision. The contingent gate (Lattice's "Out of Scope" multi-agent policy) was not resolved during this milestone. Carries forward to the next milestone where it will be re-scoped as either: (a) a Lattice-side task-delegation primitive (parent-child loops + summary-return + cache-prefix sharing + rate-limit-group coordination), pending a Lattice multi-agent policy change; OR (b) an FSB-only consumer of Lattice's receipt + tripwire surface. Original sketch retained for future scoping.
+**Goal:** Wire FSB's autopilot engine (`extension/ai/agent-loop.js`) and settings test-connection path (`extension/ui/options.js`) to consume Lattice's 7 provider adapters (shipped Phase 4) through the offscreen Lattice host bus (shipped Phase 5 FINT-04), replacing FSB's own `extension/ai/universal-provider.js` runtime path. This is the FINT-KK..L work that v0.10.0 originally deferred as TBD — promoted here in scope after the `xai-key-rejected-400` debug session (debug file: `.planning/debug/xai-key-rejected-400.md`) identified that the FSB-side custom provider stack has a missing-trim + stale-storage-read defect that Lattice adapters do not have, making the consumption migration the highest-leverage fix.
+
+**Why:** Phase 4 shipped 7 Lattice provider adapters but FSB's runtime never consumed them — `universal-provider.js` stayed byte-frozen as the sole runtime path (audit-doc tagged this as integration gap; REQUIREMENTS.md FINT-KK..L was an explicit `[ ]` TBD row scoped to follow-on milestones). The `xai-key-rejected-400` debug session proved this carryforward has shipped costs in production: Lattice's adapter trims keys internally and reads from caller-supplied input; FSB's `options.js:981` writes ungtrimmed keys to chrome.storage AND `checkApiConnection()` at `options.js:1077-1131` reads from chrome.storage instead of the input field. Migrating to the Lattice bridge closes BOTH defects as a side effect (the bridge takes the input field's current value, calls trim() in the Lattice adapter, and never touches the stale chrome.storage path for test-connection). Additionally closes integration gap G3 from v0.10.0 audit (SW now opens the offscreen host at startup, which the audit flagged as missing).
+
+**Scope (in):**
+- Extend `extension/offscreen/lattice-host.js` with a `lattice-provider-execute` message handler that takes `{provider, config: {apiKey, baseUrl, model, headers}, request: {messages, ...}}`, builds the appropriate Lattice ProviderAdapter via the right `create*Provider(config)` factory, calls `.execute(request, {signal})`, and returns the ProviderRunResponse (or a structured error envelope on failure).
+- `extension/background.js` startup wiring: call `chrome.offscreen.createDocument({url: 'offscreen/lattice-host.html', reasons: ['IFRAME_SCRIPTING'], justification: 'Lattice provider host'})` once on extension boot. Guard with `chrome.offscreen.hasDocument` check to avoid duplicate creation. (Closes audit gap G3.)
+- New thin shim `extension/ai/lattice-provider-bridge.js`: a single async function `executeViaBridge(providerName, config, request, {signal})` that wraps `chrome.runtime.sendMessage` to the offscreen host and unwraps the response/error envelope. Preserves the exact return-shape contract that `universal-provider.js` callers expect (`{rawOutput, normalizedUsage, ...}`) so call sites change minimally.
+- `extension/ai/agent-loop.js`: replace direct `universalProvider.execute(...)` call sites with `executeViaBridge(...)`. Feature flag `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` defaults to `true`; flag=false falls back to the legacy `universal-provider.js` path so users can roll back at runtime if the bridge surfaces a regression. INV-04 setTimeout iterator BYTE-FROZEN (the bridge call is still an async function call; the iterator's setTimeout(callback, ms) → callback() → await provider pattern is structurally identical).
+- `extension/ui/options.js` `checkApiConnection()` (lines 1077-1131): rewrite to read the API key from the input field directly via `elements.apiKey?.value?.trim()` (NOT from chrome.storage), then delegate to the bridge. This closes the `xai-key-rejected-400` P1 (missing trim) and P2 (stale storage read) as side effects.
+- `extension/ui/options.js` `saveSettings()` (lines 977-1029): defense-in-depth trim on save for all API key fields (apiKey, geminiApiKey, openaiApiKey, anthropicApiKey, customApiKey, openrouterApiKey, captchaApiKey), even though the bridge no longer reads from storage for test-connection. Old stored values auto-heal on next save.
+- New smoke `tests/lattice-provider-bridge-smoke.test.js`: exercise the bridge end-to-end against all 7 logical providers with mock fetch + mock chrome.runtime / chrome.offscreen. >= 20 PASS assertions covering message-bus round-trip, error envelope shape, AbortSignal propagation, and per-provider response normalization.
+- `.planning/LATTICE-PIN.md` bump (no Lattice-side commits in Phase 6; bump is FSB-side audit-trail row only).
+- `.planning/REQUIREMENTS.md` populate FINT-07 (bridge handler + bg.js startup) + FINT-08 (agent-loop + options.js test-connection rewire); flip FINT-KK..L TBD row to point at FINT-07 / FINT-08.
+
+**Scope (out):**
+- Hard delete `universal-provider.js` (deferred to Phase 7; Phase 6 keeps it as feature-flag fallback for rollback safety).
+- Removing the feature flag (Phase 7).
+- Background.js classic-to-module migration (INV-04 / Phase 5 OOS carryforward).
+- Replacing the setTimeout iterator (INV-04).
+- Modifying `mcp/ai/tool-definitions.cjs` or `extension/ai/tool-definitions.js` (INV-01).
+- Modifying any Lattice-side code (Lattice already shipped the adapters in Phase 4; Phase 6 is FSB-side consumption only).
+- Streaming-aware provider responses (OOS-06; provider parity violation for Gemini single-shot).
+- Re-implementing the offscreen-host SW-side message bus from scratch (Phase 5 FINT-04 already shipped it; Phase 6 extends it).
+- Mainline PR back into Lattice (v0.11.0+).
+
+**Pass criteria (to be locked during planning):**
+1. Lattice vitest still passes (additive Phase 6 work is FSB-side only; no Lattice changes).
+2. FSB `npm test` passes: new `tests/lattice-provider-bridge-smoke.test.js` (>= 20 PASS exercising all 7 providers through the bridge with mock fetch).
+3. Manual: paste a fresh xAI API key, click Test → connection succeeds end-to-end (P1 + P2 from xai-key-rejected-400 debug closed by side-effect).
+4. Manual: one autopilot iteration completes >= 1 step using xAI through the bridge.
+5. `extension/ai/universal-provider.js` byte-frozen (still on disk; flag-gated fallback active when `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED=false`).
+6. `extension/background.js`: only diff is the `chrome.offscreen.createDocument` startup wiring + `chrome.offscreen.hasDocument` guard; 153 importScripts chain BYTE-UNCHANGED.
+7. INV-01 (MCP wire) + INV-02 (tool surface) + INV-03 (7-provider parity, now via Lattice) + INV-04 (setTimeout iterator) + INV-05 (no deprecated module resurrection) + INV-06 (Lattice-first) all HOLDING.
+8. `.planning/LATTICE-PIN.md` + `.planning/REQUIREMENTS.md` updated per scope rows above.
+
+**Lattice-side ceremony:** None. Phase 6 is FSB-side wiring; Lattice's Phase 4 adapter shipments are the inputs.
+
+### Phase 7: Archive FSB custom provider stack
+
+**Goal:** With the Lattice bridge proven in Phase 6, archive FSB's custom `extension/ai/universal-provider.js`. Verify zero in-extension importers remain, move file to `extension/_archive/`, strip the `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` feature flag (bridge becomes unconditional), strengthen INV-03 wording, then run the consolidated UAT-1 procedure (single Chrome MV3 reload session covering Phases 1 + 5 + 6 + 7 — see v0.10.0-MILESTONE-AUDIT.md UAT-1) as the milestone-end UAT gate.
+
+**Why:** Once Phase 6 has been live for at least one full integration cycle (FSB smoke chain green, manual xAI test-connection green, one autopilot iteration green), the legacy `universal-provider.js` path is a maintenance liability — it duplicates Lattice's adapter contracts, has the missing-trim defect that the bridge sidesteps, and creates ambiguity ("which path are we actually on?"). Phase 7 finalizes the migration: archive (not delete) for git-blame archaeology, flip the bridge unconditional, and tighten the invariant. This is the natural milestone-end UAT gate — one single Chrome reload session validates Phase 1 (MV3 SW boot), Phase 5 (offscreen host loads), Phase 6 (provider bridge resolves an xAI test request), and Phase 7 (no regressions after the legacy path is removed).
+
+**Scope (in):**
+- Grep audit: confirm zero `require\('.*universal-provider'\)` / `import.*universal-provider` references in `extension/*` outside `_archive/`. Captured as audit-table row in `.planning/phases/07-*/07-VERIFICATION.md`.
+- Move `extension/ai/universal-provider.js` → `extension/_archive/universal-provider.js`. Update any test fixtures that referenced the old path. The legacy file is preserved on disk (recoverable via git history regardless; the archive directory is for fast-grep archaeology).
+- Strip the `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` feature flag from `extension/ai/agent-loop.js`, `extension/ui/options.js`, and `extension/ai/lattice-provider-bridge.js`. Bridge call sites become unconditional. The fallback branch is deleted.
+- Update `.planning/REQUIREMENTS.md` INV-03 wording from "Every improvement works equally across all 7 universal-provider.js targets" → "FSB consumes Lattice provider adapters exclusively for the 7-provider matrix. Verified by `tests/lattice-provider-bridge-smoke.test.js` across all 7 logical providers. Legacy `universal-provider.js` archived to `extension/_archive/` for historical reference."
+- Populate FINT-09 (archive + flag removal) in REQUIREMENTS.md; close out FINT-KK..L final cell in traceability table.
+- `.planning/LATTICE-PIN.md` final Phase 7 row.
+- Update `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT section: mark UAT-1 as executed (or schedule UAT-1 execution here as the explicit milestone-end gate).
+- Execute consolidated UAT-1 procedure (single Chrome MV3 reload + open offscreen host + xAI test-connection round-trip + 1 autopilot iteration). Capture evidence in 07-VERIFICATION.md.
+
+**Scope (out):**
+- Hard delete `universal-provider.js` (still recoverable via git, but `_archive/` is the on-disk home for now; future cleanup phase can delete if archive directory becomes liability).
+- Any new Lattice primitive.
+- Restructuring chrome.storage schema (settings UI shape stays byte-identical for user data continuity).
+- Background.js classic-to-module migration (still OOS).
+- Mainline PR back into Lattice (v0.11.0+).
+
+**Pass criteria (to be locked during planning):**
+1. Lattice vitest still passes (Phase 7 is FSB-side cleanup; no Lattice changes).
+2. FSB `npm test` passes (all chained smokes from Phases 1-6 still green; no test fixture refers to the old `extension/ai/universal-provider.js` path).
+3. Grep audit: zero `extension/*` references to `universal-provider.js` outside `_archive/`.
+4. Code-search audit: zero references to `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` anywhere in the repo (flag fully removed).
+5. UAT-1 (consolidated) executed: single Chrome MV3 reload session passes all 6 sub-assertions (SW clean reload, no new lattice import errors, popup opens, sidepanel opens, one autopilot iteration completes, offscreen page loads with lattice-host.js boot log clean).
+6. `.planning/REQUIREMENTS.md` INV-03 wording strengthened; FINT-09 populated; FINT-KK..L closed.
+7. `.planning/LATTICE-PIN.md` Phase 7 row appended.
+8. `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 marked executed; milestone status flipped from `in_progress` → `passed`.
+
+**Lattice-side ceremony:** None. Phase 7 is FSB-side cleanup.
+
+### Future Phase 8 sketch (deferred to v0.11.0+ — delegation primitive)
+
+**Status:** Originally numbered Phase 6 (deferred 2026-05-25 via /gsd-autonomous decision); renumbered to Phase 8 on 2026-05-27 when the new Phases 6 + 7 (FSB consumes Lattice providers + archive custom stack) were inserted to close the FINT-KK..L gap. The contingent gate (Lattice's "Out of Scope" multi-agent policy) was not resolved during this milestone. Carries forward to the next milestone where it will be re-scoped as either: (a) a Lattice-side task-delegation primitive (parent-child loops + summary-return + cache-prefix sharing + rate-limit-group coordination), pending a Lattice multi-agent policy change; OR (b) an FSB-only consumer of Lattice's receipt + tripwire surface. Original sketch retained for future scoping.
 
 ---
 
@@ -270,4 +350,4 @@
 
 ---
 
-*Last updated: 2026-05-25 -- Phases 1-5 complete (5/5 phases, 21/21 plans shipped); Phase 6 deferred to v0.11.0+ pending Lattice multi-agent policy decision. Roadmap checkboxes reconciled with on-disk SUMMARY artifacts via /gsd-autonomous.*
+*Last updated: 2026-05-27 -- Milestone scope extended via /gsd-autonomous discussion: Phases 6 + 7 inserted to close the FINT-KK..L (FSB consumes Lattice provider abstraction + archive custom universal-provider.js stack) gap surfaced by the `xai-key-rejected-400` debug session. Previously-deferred delegation primitive renumbered to Phase 8 (still parked for v0.11.0+ pending Lattice multi-agent policy decision). UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end as the milestone-end UAT gate. Phases 1-5 complete (21/21 plans shipped); Phases 6-7 = 0/2 plan-discussion-pending. Audit status reverted from `tech_debt` → `in_progress`.*
