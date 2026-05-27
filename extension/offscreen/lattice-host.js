@@ -425,6 +425,22 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
     const requestBody = message.requestBody || {};
     const mode = message.mode || "autopilot";
 
+    // Phase 6 WR-01 -- empty requestId rejection (trust-boundary defense).
+    // Production traffic always synthesizes a UUID via crypto.randomUUID()
+    // SW-side, but if two concurrent execute calls both arrive without a
+    // requestId (programmer bug at a future call site), the second
+    // _inflightAborts.set("", controller) would clobber the first, and
+    // either finally{} _inflightAborts.delete("") would drop the other
+    // call's entry. The offscreen handler is the trust boundary, so reject
+    // empty requestId the same way unknown providers are rejected.
+    if (!requestId) {
+      sendResponse({
+        ok: false,
+        error: { kind: "invalid_provider", message: "Missing requestId" },
+      });
+      return false;
+    }
+
     // Synchronous unknown-provider check -- envelope returned before any
     // factory call. Pitfall 5 mitigation (RESEARCH Section 8).
     const factory = PROVIDER_FACTORIES[providerKey];
