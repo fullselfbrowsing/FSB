@@ -590,8 +590,57 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssert(/globalScope\.executeViaBridge\s*=\s*executeViaBridge/.test(bridgeSource), 'bridge globalScope.executeViaBridge assigned (classic SW)');
   passAssert(/removeEventListener\(['"]abort['"]/.test(bridgeSource), 'bridge cleans up abort listener in finally (Pitfall 3)');
 
-  // Placeholder for the Plan 06-04 fill (options.js trim + checkApiConnection)
-  passAssert(true, 'Plan 06-04 fill: options.js saveSettings trim + checkApiConnection rewrite greps');
+  // Plan 06-04 fill: options.js saveSettings trim + checkApiConnection rewrite
+  const optionsSrc = require('fs').readFileSync('extension/ui/options.js', 'utf8');
+  const optionsLines = optionsSrc.split('\n');
+
+  // Extract saveSettings body (lines 977-1030 region by content match -- robust
+  // to small line drifts). Brace-depth walker scans the function body.
+  const saveStart = optionsLines.findIndex(function (l) { return /function\s+saveSettings\s*\(\s*\)/.test(l); });
+  passAssert(saveStart >= 0, 'saveSettings function found');
+  let saveEnd = saveStart + 1;
+  let saveDepth = 0;
+  let saveOpened = false;
+  while (saveEnd < optionsLines.length) {
+    const lineS = optionsLines[saveEnd];
+    for (const ch of lineS) {
+      if (ch === '{') { saveDepth++; saveOpened = true; }
+      else if (ch === '}') { saveDepth--; if (saveOpened && saveDepth === 0) { break; } }
+    }
+    if (saveOpened && saveDepth === 0) break;
+    saveEnd++;
+  }
+  const saveBody = optionsLines.slice(saveStart, saveEnd + 1).join('\n');
+  const saveTrimCount = (saveBody.match(/\.trim\(\)/g) || []).length;
+  passAssert(saveTrimCount >= 9, 'saveSettings body has >= 9 .trim() calls (got ' + saveTrimCount + ' for all 9 input-derived string fields: 8 LLM-side + 1 CAPTCHA)');
+
+  // Extract checkApiConnection body
+  const checkStart = optionsLines.findIndex(function (l) { return /async\s+function\s+checkApiConnection\s*\(\s*\)/.test(l); });
+  passAssert(checkStart >= 0, 'checkApiConnection function found');
+  let checkEnd = checkStart + 1;
+  let checkDepth = 0;
+  let checkOpened = false;
+  while (checkEnd < optionsLines.length) {
+    const lineC = optionsLines[checkEnd];
+    for (const ch of lineC) {
+      if (ch === '{') { checkDepth++; checkOpened = true; }
+      else if (ch === '}') { checkDepth--; if (checkOpened && checkDepth === 0) { break; } }
+    }
+    if (checkOpened && checkDepth === 0) break;
+    checkEnd++;
+  }
+  const checkBody = optionsLines.slice(checkStart, checkEnd + 1).join('\n');
+
+  passAssertEqual((checkBody.match(/getStoredSettings\(\)/g) || []).length, 0, 'checkApiConnection body does NOT call getStoredSettings (P2 stale-storage closed)');
+  passAssertEqual((checkBody.match(/new\s+AIIntegration/g) || []).length, 0, 'checkApiConnection body does NOT instantiate AIIntegration');
+  passAssertEqual((checkBody.match(/executeViaBridge\(/g) || []).length, 1, 'checkApiConnection body calls executeViaBridge exactly once');
+  passAssert(/mode:\s*['"]test-connection['"]/.test(checkBody), "checkApiConnection passes {mode: 'test-connection'}");
+  passAssert(/__testConnection:\s*true/.test(checkBody), 'checkApiConnection passes {__testConnection: true} as requestBody marker');
+  passAssert(/elements\.apiKey\?\.value/.test(checkBody) || /document\.getElementById\(['"]apiKey['"]\)\?\.value/.test(checkBody), 'checkApiConnection reads xai apiKey from input field (not chrome.storage)');
+  passAssert(/\.value.*\.trim\(\)/.test(checkBody), 'checkApiConnection trims input values (defense-in-depth + P1 closure)');
+
+  // getStoredSettings declaration preserved elsewhere in options.js
+  passAssert(/function\s+getStoredSettings/.test(optionsSrc) || /async\s+function\s+getStoredSettings/.test(optionsSrc), 'getStoredSettings declaration preserved (used by other call sites; not removed by Phase 6)');
 
   // ---- Part 6: INV byte-freeze (placeholder) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');
