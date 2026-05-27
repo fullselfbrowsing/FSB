@@ -516,11 +516,22 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
         }
       } catch (err) {
         const isAbort = err && (err.name === "AbortError" || /abort/i.test(String(err && err.message || "")));
+        // Phase 6 WR-04 -- surface the underlying HTTP status (401/403/400/
+        // 429/etc.) into the error envelope so the bridge can propagate it
+        // onto the thrown Error.status. The agent-loop catch (extension/ai/
+        // agent-loop.js handleProviderError) branches on error.status to
+        // choose terminal (401/403/400) vs retry-once-after-5s (429) vs
+        // retry-once-after-2s (network/timeout). Without status the
+        // provider-returned auth-failure would always take the network
+        // path and the user would see a generic 'API call failed' on the
+        // second iteration instead of the immediate 'API key invalid or
+        // expired' UX of pre-Phase-6.
         sendResponse({
           ok: false,
           error: {
             kind: isAbort ? "aborted" : (mode === "autopilot" ? "fetch_error" : "adapter_error"),
             message: String(err && err.message ? err.message : err),
+            status: (err && typeof err.status === "number") ? err.status : undefined,
             providerError: err && err.providerError ? err.providerError : undefined,
           },
         });

@@ -134,9 +134,18 @@
       }
 
       // ok: false -- typed error envelope
+      //
+      // Phase 6 WR-04 -- propagate error.status from the envelope onto the
+      // thrown Error so the agent-loop catch (extension/ai/agent-loop.js
+      // handleProviderError) can branch on .status === 401|403|400|429 for
+      // immediate terminal classification. Without this propagation every
+      // provider-returned auth/bad-request failure would fall through to
+      // the generic network-retry path and surface a worse error than
+      // pre-Phase-6.
       const errObj = envelope.error || {};
       const err = new Error(errObj.message || 'bridge call failed');
       err.code = errObj.kind || 'adapter_error';
+      err.status = errObj.status;
       err.providerError = errObj.providerError;
       throw err;
     } finally {
