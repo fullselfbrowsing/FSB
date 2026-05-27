@@ -282,6 +282,15 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssertEqual(typeof lattice.createLmStudioProvider, 'function', 'lattice.createLmStudioProvider reachable');
   passAssertEqual(typeof lattice.createOpenAICompatibleProvider, 'function', 'lattice.createOpenAICompatibleProvider reachable');
 
+  // Plan 06-03 fill: executeViaBridge present (CJS + globalThis)
+  // Load the bridge module; it uses globalThis pattern for the SW + CJS for tests.
+  if (typeof globalThis.crypto === 'undefined' || typeof globalThis.crypto.randomUUID !== 'function') {
+    try { globalThis.crypto = require('crypto').webcrypto; } catch (_e) { /* node < 18 */ }
+  }
+  const bridgeMod = require('../extension/ai/lattice-provider-bridge.js');
+  passAssertEqual(typeof bridgeMod.executeViaBridge, 'function', 'executeViaBridge exported via CJS (require)');
+  passAssertEqual(typeof globalThis.executeViaBridge, 'function', 'executeViaBridge exported via globalThis (classic SW)');
+
   // ---- Part 1 (extended): offscreen handler surface presence ----
   // Plan 06-01 Task 2 fill: load extension/offscreen/lattice-host.js
   // through the chrome.runtime mock; assert the Phase 6 handler is
@@ -420,6 +429,39 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssertEqual(env3c && env3c.ok, false, '400 status -> ok:false');
   passAssert(env3c && env3c.error && /400/.test(String(env3c.error.message)), 'fetch failure surfaces status in error.message');
 
+  // Plan 06-03 fill: host_unreachable cases (SW-side bridge throws)
+  // (a) sendMessage rejects (no listener / channel closed)
+  const noListenerChrome = { runtime: createChromeRuntimeMock() /* no handler registered */ };
+  noListenerChrome.runtime.id = 'fsb-test-extension-id';
+  globalThis.chrome = noListenerChrome;
+  let thrown3d = null;
+  try {
+    await bridgeMod.executeViaBridge('xai', { apiKey: 'k', model: 'm' }, {}, { mode: 'autopilot' });
+  } catch (e) { thrown3d = e; }
+  passAssertEqual(thrown3d && thrown3d.code, 'host_unreachable', 'sendMessage reject -> err.code:host_unreachable');
+
+  // (b) sendMessage resolves to undefined (listener returned false / didn't sendResponse)
+  const undefinedChrome = { runtime: createChromeRuntimeMock((msg, sender, sendResponse) => false) };
+  undefinedChrome.runtime.id = 'fsb-test-extension-id';
+  globalThis.chrome = undefinedChrome;
+  let thrown3e = null;
+  try {
+    await bridgeMod.executeViaBridge('xai', { apiKey: 'k', model: 'm' }, {}, { mode: 'autopilot' });
+  } catch (e) { thrown3e = e; }
+  passAssertEqual(thrown3e && thrown3e.code, 'host_unreachable', 'sendMessage resolves undefined -> err.code:host_unreachable');
+
+  // (c) pre-aborted signal throws synchronously
+  const ac = new AbortController();
+  ac.abort();
+  let thrown3f = null;
+  try {
+    await bridgeMod.executeViaBridge('xai', { apiKey: 'k', model: 'm' }, {}, { mode: 'autopilot', signal: ac.signal });
+  } catch (e) { thrown3f = e; }
+  passAssertEqual(thrown3f && thrown3f.code, 'aborted', 'pre-aborted signal throws synchronously with code:aborted');
+
+  // Restore the original chrome mock with the offscreen handler so Part 4 abort tests continue to work.
+  globalThis.chrome = part1Chrome;
+
   // ---- Part 4: AbortController propagation (Plan 06-01 fill) ----
   // 2 PASSes:
   //   (a) mid-flight abort: fetch hangs; abort message fires; envelope.error.kind === 'aborted'
@@ -528,8 +570,28 @@ async function loadOffscreenHandlerSource(chromeMock) {
   await simulatedHelper();
   passAssertEqual(offscreenMock._createCount(), 1, 'hasDocument guard makes ensureLatticeOffscreen idempotent (3 calls -> 1 createDocument)');
 
-  // Placeholder for the FINT-08 portions of Part 5 (filled by Plan 06-03 and Plan 06-04)
-  passAssert(true, 'Plan 06-03 + 06-04 fill: agent-loop.js flag gating + options.js trim greps');
+  // Plan 06-03 fill: agent-loop.js flag gating + bridge file shape
+  const alSource = require('fs').readFileSync('extension/ai/agent-loop.js', 'utf8');
+  // The default-on idiom is `typeof FSB_LATTICE_PROVIDER_BRIDGE_ENABLED === 'undefined' || FSB_LATTICE_PROVIDER_BRIDGE_ENABLED`
+  // which naturally produces 2 token occurrences on a SINGLE LINE. The plan-text acceptance criterion
+  // uses `grep -c` semantics (line-count = 1); assert both the line-count (single check site)
+  // AND the token-count (2 mentions in the default-on idiom) for full diagnostic clarity.
+  const alLinesWithFlag = alSource.split('\n').filter(l => /FSB_LATTICE_PROVIDER_BRIDGE_ENABLED/.test(l));
+  passAssertEqual(alLinesWithFlag.length, 1, 'agent-loop.js has exactly 1 LINE referencing FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (single call-site swap; grep -c semantics)');
+  passAssertEqual((alSource.match(/FSB_LATTICE_PROVIDER_BRIDGE_ENABLED/g) || []).length, 2, 'agent-loop.js has exactly 2 token occurrences of FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (default-on idiom: typeof X === undefined || X)');
+  passAssertEqual((alSource.match(/executeViaBridge\(/g) || []).length, 1, 'agent-loop.js has exactly 1 executeViaBridge invocation');
+  passAssertEqual((alSource.match(/providerInstance\.sendRequest\(requestBody\)/g) || []).length, 1, 'agent-loop.js retains the legacy providerInstance.sendRequest(requestBody) call as flag-false fallback');
+  passAssertEqual((alSource.match(/setTimeout/g) || []).length, 8, 'agent-loop.js setTimeout count = 8 (INV-04 count invariant under the line-1044 insertion)');
+
+  const bridgeSource = require('fs').readFileSync('extension/ai/lattice-provider-bridge.js', 'utf8');
+  passAssert(/crypto\.randomUUID/.test(bridgeSource), 'bridge uses crypto.randomUUID for requestId');
+  passAssert((bridgeSource.match(/host_unreachable/g) || []).length >= 2, 'bridge handles host_unreachable in >= 2 paths (sendMessage reject + undefined envelope)');
+  passAssert(/module\.exports\s*=\s*\{\s*executeViaBridge/.test(bridgeSource), 'bridge module.exports executeViaBridge');
+  passAssert(/globalScope\.executeViaBridge\s*=\s*executeViaBridge/.test(bridgeSource), 'bridge globalScope.executeViaBridge assigned (classic SW)');
+  passAssert(/removeEventListener\(['"]abort['"]/.test(bridgeSource), 'bridge cleans up abort listener in finally (Pitfall 3)');
+
+  // Placeholder for the Plan 06-04 fill (options.js trim + checkApiConnection)
+  passAssert(true, 'Plan 06-04 fill: options.js saveSettings trim + checkApiConnection rewrite greps');
 
   // ---- Part 6: INV byte-freeze (placeholder) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');

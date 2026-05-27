@@ -6,6 +6,14 @@
 // is filtered out for Gemini's `contents` array (or Anthropic's `messages`),
 // the API rejects the request. callProviderWithTools must seed a starter
 // user turn so the request body is valid.
+//
+// Phase 6 Plan 06-03 (FINT-08b): callProviderWithTools now has a feature-flag-
+// gated bridge call at its tail. This test exercises the switch + requestBody
+// construction (byte-frozen by Plan 06-03) and asserts on the makeProviderStub's
+// lastRequest field, which is only populated when the legacy path (flag-false)
+// is taken. Set FSB_LATTICE_PROVIDER_BRIDGE_ENABLED = false BEFORE requiring
+// agent-loop.js so the legacy providerInstance.sendRequest call path runs.
+globalThis.FSB_LATTICE_PROVIDER_BRIDGE_ENABLED = false;
 
 const { callProviderWithTools } = require('../extension/ai/agent-loop.js');
 
