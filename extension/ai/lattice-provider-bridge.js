@@ -14,8 +14,10 @@
  *   Q2: per-call crypto.randomUUID requestId; AbortSignal -> companion
  *       {type:'lattice-provider-abort', requestId} message.
  *   Q3: handler instantiates adapter per call (no caching).
- *   Feature flag FSB_LATTICE_PROVIDER_BRIDGE_ENABLED defaults true; Phase 7
- *   strips it and archives universal-provider.js.
+ *   Phase 7 (FINT-09): the feature flag was removed; the bridge is
+ *       unconditional. universal-provider.js stays on disk for
+ *       providerInstance metadata (Strategy B per Phase 7 CONTEXT.md);
+ *       physical archive deferred to v0.11.0+.
  *
  * Error envelope shape (RESEARCH Section 6 + 7):
  *   success: {ok: true, response: ProviderRunResponse}
@@ -164,6 +166,6 @@
   // Boot log so an MV3 reload visibly confirms the bridge global is registered.
   // Logged exactly once at module evaluation time.
   try {
-    console.log(BRIDGE_TAG, 'boot: Phase 6 Plan 06-03 bridge shim registered (default-on; flag = FSB_LATTICE_PROVIDER_BRIDGE_ENABLED)');
+    console.log(BRIDGE_TAG, 'boot: Phase 7 bridge shim registered (unconditional; legacy fallback removed)');
   } catch (_e) { /* swallow if console unavailable in test env */ }
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
