@@ -2,14 +2,82 @@
 phase: 07
 phase_name: archive-fsb-custom-provider-stack
 verdict: human_needed
+status: human_needed
 verifier_type: human_uat
+automated_checks_status: passed
+score: 8/8 automated ROADMAP pass criteria verified; 1 human-gated (UAT-1) pending_execution
 created_date: 2026-05-27
+verified: 2026-05-27T00:00:00Z
 gated_on: "UAT-1 user execution + verdict report (DEFERRED by user 2026-05-28; awaiting user-led follow-on Chrome session)"
 post_uat_plan: 07-04-PLAN.md
 gaps_found: []
+gaps: []
+human_verification:
+  - test: "Run UAT-1 milestone-end gate procedure (single Chrome MV3 reload session; 6 sub-assertions + xAI Test-Connection sub-test + autopilot iteration sub-test)"
+    expected: "All 6 sub-assertions PASS + both sub-tests PASS; report verdict UAT-1 PASS / PARTIAL / FAIL"
+    why_human: "Requires interactive Chrome MV3 reload, popup/sidepanel UI inspection, fresh xAI API key entry in Options page (must not be committed to repo), live DevTools console observation across SW + offscreen + popup + sidepanel surfaces, and one full autopilot session run on a live web page. Procedure source-of-truth: ## Human Verification (UAT-1 - milestone-end gate) section below. Status: pending_execution (user DEFER 2026-05-28)."
+    status: pending_execution
+    procedure_reference: ".planning/phases/07-archive-fsb-custom-provider-stack/07-VERIFICATION.md (## Human Verification section, 139 lines, 6 sub-assertions + 2 sub-tests + 3-verdict reporting protocol)"
 ---
 
 > **UAT-1 deferred per user choice 2026-05-28.** User opted to run UAT-1 in a separate Chrome session rather than synchronously during Plan 07-04 execution. Run the procedure in the `## Human Verification (UAT-1 - milestone-end gate)` section below; on green, re-invoke `/gsd-execute-phase 7 --wave 4` OR manually update `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 status to `executed` + milestone `status` frontmatter to `passed`. Verdict for this file STAYS `human_needed` until that re-execution.
+
+## Verifier Verdict (gsd-verifier agent, 2026-05-27)
+
+**Verdict:** `human_needed` — All 8 automated ROADMAP pass criteria PASS; 1 human-gated criterion (UAT-1 milestone-end gate) remains `pending_execution` per user DEFER 2026-05-28. This is NOT `gaps_found`; the UAT-1 deferral is an expected human-handoff branch contemplated by Plan 07-04, mirroring the Phase 6 `human_needed` pattern.
+
+**Re-verification context:** Initial verifier run after Plan 07-03 generated the UAT-1 procedure body and Plan 07-04 annotated the DEFER outcome. The UAT-1 procedure body authored by Plan 07-03 and the Plan 07-04 DEFER annotation in the `## UAT-1 Execution Record` section are preserved verbatim below.
+
+### Phase 7 ROADMAP pass-criteria check (8 of 8 automated PASS; 1 human-gated PENDING_EXECUTION)
+
+| # | ROADMAP pass criterion | Check | Expected | Actual | Status |
+|---|------------------------|-------|----------|--------|--------|
+| 1 | Lattice vitest still passes (Phase 7 is FSB-side only) | N/A — Phase 7 ships ZERO Lattice-side commits per INV-06; Lattice repo not touched | `current_lattice_sha` UNCHANGED at `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` | `current_lattice_sha: e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` confirmed in `.planning/LATTICE-PIN.md` frontmatter + Phase 7 row | PASS |
+| 2 | FSB `npm test` passes; smoke 85 PASS / 0 FAIL; empty-contents 8 PASS / 0 FAIL | `npm test` && `node tests/lattice-provider-bridge-smoke.test.js` && `node tests/agent-loop-empty-contents.test.js` | exit 0 across all three; smoke `passed: 85 failed: 0`; empty-contents `Passed: 8 / Failed: 0` | `npm test` ran the full chain; smoke `passed: 85 failed: 0`; empty-contents `Passed: 8 / Failed: 0` | PASS |
+| 3 | Zero `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` refs in `extension/` | `grep -rn "FSB_LATTICE_PROVIDER_BRIDGE_ENABLED" extension/` | 0 hits | 0 hits (grep exit code 1 = no matches) | PASS |
+| 4 | Flag refs outside tests/ assertion literals = 0 | `grep -rn "FSB_LATTICE_PROVIDER_BRIDGE_ENABLED" tests/ \| wc -l` | 4 (intentional assertion literals in `tests/lattice-provider-bridge-smoke.test.js` Part 3 + 5 verifying the flag is GONE) | 4 | PASS (intentional) |
+| 5 | UAT-1 executed (milestone-end gate) | User runs procedure in Chrome and reports verdict | DEFER acceptable per Plan 07-04 PENDING_EXECUTION branch | DEFER reported 2026-05-28; UAT-1 procedure body preserved in `## Human Verification` section; user will run in separate Chrome session | PENDING_EXECUTION (human-gated) |
+| 6 | REQUIREMENTS.md INV-03 wording strengthened (3-era Strategy B form); FINT-09 status Complete; FINT-KK..L unchanged PROMOTED | grep INV-03 / FINT-09 / FINT-KK..L in REQUIREMENTS.md | INV-03 contains "Through Phase 5" + "From Phase 6 onward" + "From Phase 7 end onward" + "Strategy B" 3-era narrative; FINT-09 row shows `Complete`; FINT-KK..L `[x] PROMOTED` preserved | INV-03 3-era Strategy B wording confirmed at REQUIREMENTS.md line 27; FINT-09 status flipped Pending -> Complete at line 163; FINT-KK..L PROMOTED preserved at line 80 | PASS |
+| 7 | LATTICE-PIN.md Phase 7 row appended; `current_lattice_sha` UNCHANGED | grep Phase 7 row + frontmatter | Phase 7 row present with FSB commits embedded; SHA = `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` | Phase 7 row appended with Plan 07-01..07-04 commit SHAs (`8d075fb9` + `5588d20f` + `5ad8f987` + `79366400` + `a96a8dc9` + `b69a6df9` + `f748ec02` + `aa8c6164` + `471d3fb8` + `8a93bf99` + `25448a59` + `2ce35e37`); SHA UNCHANGED | PASS |
+| 8 | v0.10.0-MILESTONE-AUDIT.md UAT-1 status = pending_execution; milestone overall status STAYS in_progress | grep `uat_1.status` + top-level `status:` | `uat_1.status: pending_execution`; top-level `status: in_progress` | Confirmed: line 6 `status: in_progress`; line 26 `uat_1.status: pending_execution`; line 16 note documents DEFER | PASS |
+
+### Cross-Phase Invariants (all HOLDING)
+
+| INV | Status | Evidence |
+|-----|--------|----------|
+| INV-01 MCP wire contracts | HOLDING | `tests/tool-definitions-parity.test.js` chain in `npm test` exits 0 |
+| INV-02 Tool surface parity | HOLDING | `extension/ai/tool-definitions.js` + `mcp/ai/tool-definitions.cjs` BYTE-FROZEN; smoke Part 6 INV-01/02 assertions PASS |
+| INV-03 Provider parity (Strategy B-aware) | HOLDING | All 7 providers route via offscreen bridge UNCONDITIONALLY; REQUIREMENTS.md INV-03 wording updated to 3-era Strategy B form |
+| INV-04 MV3-survivability iterator BYTE-FROZEN | HOLDING | `grep -c "setTimeout" extension/ai/agent-loop.js` returns 8; smoke Part 6 4-iterator pattern at lines 1864 / 2462 / 2531 / 2541 PASS |
+| INV-05 No resurrection of deprecated modules | HOLDING | `extension/agents/{agent-executor,agent-manager,agent-scheduler}.js` carry DEPRECATED banners; smoke Part 6 PASS |
+| INV-06 Lattice primitives live in Lattice's repo | HOLDING | Phase 7 ships ZERO Lattice-side commits; `current_lattice_sha` UNCHANGED at `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` |
+
+### Byte-freeze spot-checks (Strategy B file-level invariants)
+
+| File | Status | Check |
+|------|--------|-------|
+| `extension/ai/universal-provider.js` | BYTE-FROZEN | `git status --porcelain` empty + `test -f` = OK; Strategy B keeps file in place |
+| `extension/ai/ai-providers.js` | BYTE-FROZEN | `git status --porcelain` empty |
+| `extension/ui/control_panel.html` | BYTE-FROZEN | `git status --porcelain` empty |
+| `extension/ui/options.js` | BYTE-FROZEN | `git status --porcelain` empty (Phase 6 FINT-08 closure preserved) |
+| `extension/background.js` | BYTE-FROZEN | `git status --porcelain` empty |
+| `extension/offscreen/lattice-host.js` | BYTE-FROZEN | `git status --porcelain` empty (Phase 6 baseline preserved) |
+| `extension/_archive/` | DOES NOT EXIST | `test ! -d extension/_archive` = OK; physical archive DEFERRED to v0.11.0+ per Strategy B |
+
+### Code-review acknowledgment
+
+`07-REVIEW.md` (2026-05-28) reports 0 critical / 0 warning / 3 info findings across the 4 files modified by Plan 07-01. No blockers; Phase 7 production code is clean.
+
+### Verdict reasoning
+
+All 8 ROADMAP pass criteria are GREEN on the automated side. The single human-gated criterion (UAT-1) has a documented DEFER verdict and is captured as a `human_verification` entry with `status: pending_execution`. Per the verifier decision tree (Step 9 of the verification process): when human verification items are non-empty, the verdict MUST be `human_needed`, not `passed`. This matches the Phase 6 precedent (similar deferred-UAT pattern).
+
+This is NOT `gaps_found` because:
+1. No must-have FAILED — all automated must-haves PASS.
+2. No artifact is MISSING / STUB / NOT_WIRED.
+3. The UAT-1 PENDING_EXECUTION state is an expected branch of Plan 07-04 (PENDING_EXECUTION branch is explicitly contemplated; milestone status stays `in_progress`; verification verdict stays `human_needed`).
+
+Phase 7 production code + documentation are GREEN end-to-end; only the milestone-end gate remains open pending the user-led Chrome session.
 
 # Phase 7 Verification Report
 
@@ -163,3 +231,9 @@ See `.planning/phases/07-archive-fsb-custom-provider-stack/07-04-PLAN.md` for th
 - `UAT-1 FAIL <details>`: Re-execute Plan 07-04 with FAIL verdict (records blocker gaps, keeps `status: in_progress`, flips this file's `verdict` to `failed`). Recommend either (1) rollback Plan 07-01 via `git revert 8d075fb9 5588d20f 5ad8f987` restoring the flag wrapper + legacy fallback, OR (2) escalate to a debug session investigating the failure root cause. Milestone status remains `in_progress` until resolution.
 
 **Why deferral is acceptable:** Plan 07-04 explicitly contemplates a PARTIAL/PENDING_EXECUTION branch where the milestone status stays `in_progress` and the UAT-1 verdict is recorded as `pending_execution` until the user reports back. The deferral is the strict no-flip case of the PARTIAL branch and preserves all guardrails: milestone status does NOT flip prematurely; `current_lattice_sha` in `.planning/LATTICE-PIN.md` stays at `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (INV-06 holds); Phase 7 production code + documentation remain GREEN end-to-end; only the milestone-end gate is held open pending the user-led Chrome session.
+
+---
+
+_Verifier verdict added: 2026-05-27_
+_Verifier: Claude (gsd-verifier agent)_
+_Note: Plan 07-03's UAT-1 procedure body + Plan 07-04's DEFER annotation are preserved verbatim above._
