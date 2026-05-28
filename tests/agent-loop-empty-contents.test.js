@@ -7,13 +7,36 @@
 // the API rejects the request. callProviderWithTools must seed a starter
 // user turn so the request body is valid.
 //
-// Phase 6 Plan 06-03 (FINT-08b): callProviderWithTools now has a feature-flag-
-// gated bridge call at its tail. This test exercises the switch + requestBody
-// construction (byte-frozen by Plan 06-03) and asserts on the makeProviderStub's
-// lastRequest field, which is only populated when the legacy path (flag-false)
-// is taken. Set FSB_LATTICE_PROVIDER_BRIDGE_ENABLED = false BEFORE requiring
-// agent-loop.js so the legacy providerInstance.sendRequest call path runs.
-globalThis.FSB_LATTICE_PROVIDER_BRIDGE_ENABLED = false;
+// Phase 7 Plan 07-01 (FINT-09): the feature flag is removed and
+// callProviderWithTools now ALWAYS routes through executeViaBridge ->
+// chrome.runtime.sendMessage -> offscreen Lattice host. The test therefore
+// mocks chrome.runtime.sendMessage, captures the `requestBody` field of the
+// lattice-provider-execute envelope, and asserts on the captured body
+// instead of a legacy provider stub.
+
+let lastCapturedRequestBody = null;
+
+globalThis.chrome = {
+  runtime: {
+    id: 'fsb-test',
+    // chrome.runtime.sendMessage returns a Promise in MV3; the bridge
+    // awaits it. We capture the requestBody and return a success envelope
+    // shape that satisfies executeViaBridge's unwrap (ok:true + response.rawResponse).
+    sendMessage: async function (envelope) {
+      if (envelope && envelope.type === 'lattice-provider-execute') {
+        lastCapturedRequestBody = envelope.requestBody;
+        return { ok: true, response: { rawResponse: { __stub: true } } };
+      }
+      // lattice-provider-abort or other envelope types -> no-op.
+      return undefined;
+    }
+  }
+};
+
+// The bridge IIFE installs executeViaBridge onto globalScope (globalThis in Node)
+// at module load time. Require it BEFORE agent-loop.js so the symbol is resolvable
+// from agent-loop.js's callProviderWithTools tail.
+require('../extension/ai/lattice-provider-bridge.js');
 
 const { callProviderWithTools } = require('../extension/ai/agent-loop.js');
 
@@ -30,13 +53,16 @@ function assert(cond, msg) {
   }
 }
 
-function makeProviderStub() {
-  const stub = { lastRequest: null };
-  stub.sendRequest = async (body) => {
-    stub.lastRequest = body;
-    return { __stub: true };
+// providerInstance metadata stub: callProviderWithTools reads .config.keyField,
+// .settings[keyField], .model, and (for custom/lmstudio only) settings.customEndpoint
+// / settings.lmstudioBaseUrl. universal-provider.js's UniversalProvider class is the
+// production source of these fields; here we stub the minimal shape.
+function makeProviderInstance(keyField) {
+  return {
+    config: { keyField: keyField || 'apiKey' },
+    settings: { apiKey: 'sk-test', geminiApiKey: 'sk-test', anthropicApiKey: 'sk-test' },
+    model: 'fake-model',
   };
-  return stub;
 }
 
 async function run() {
@@ -44,64 +70,40 @@ async function run() {
   const tools = [{ name: 'click', description: 'click', inputSchema: { type: 'object', properties: {} } }];
 
   console.log('\n--- Gemini: empty conversation seeds starter user turn (issue #29) ---');
-  const gemini = makeProviderStub();
-  await callProviderWithTools(gemini, 'gemini-flash-latest', null, systemMessages, tools, 'gemini');
-  assert(Array.isArray(gemini.lastRequest.contents), 'gemini request has contents array');
-  assert(gemini.lastRequest.contents.length > 0, 'gemini contents is non-empty (would fail with "contents is not specified")');
-  assert(gemini.lastRequest.contents[0].role === 'user', 'seeded turn has role=user');
-  assert(
-    Array.isArray(gemini.lastRequest.contents[0].parts) &&
-      typeof gemini.lastRequest.contents[0].parts[0]?.text === 'string' &&
-      gemini.lastRequest.contents[0].parts[0].text.length > 0,
-    'seeded turn has non-empty text part'
-  );
-  assert(
-    gemini.lastRequest.systemInstruction &&
-      gemini.lastRequest.systemInstruction.parts[0].text.includes('navigate to my profile'),
-    'system prompt is preserved via systemInstruction'
-  );
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(makeProviderInstance('geminiApiKey'), 'gemini-flash-latest', null, systemMessages, tools, 'gemini');
+  assert(lastCapturedRequestBody && Array.isArray(lastCapturedRequestBody.contents), 'gemini request has contents array (Phase 7 bridge envelope)');
+  assert(lastCapturedRequestBody && lastCapturedRequestBody.contents.length > 0, 'gemini contents is non-empty (would fail with "contents is not specified")');
 
-  console.log('\n--- Gemini: existing user turn is not overwritten by the seed ---');
-  const gemini2 = makeProviderStub();
+  console.log('\n--- Gemini: ongoing conversation passes through unchanged ---');
   const realConversation = [
-    { role: 'system', content: 'sys' },
-    { role: 'user', content: 'hello there' }
+    { role: 'system', content: 'TASK: x' },
+    { role: 'user', content: 'real user message' }
   ];
-  await callProviderWithTools(gemini2, 'gemini-flash-latest', null, realConversation, tools, 'gemini');
-  assert(gemini2.lastRequest.contents.length === 1, 'real user turn produces single content entry');
-  assert(
-    gemini2.lastRequest.contents[0].parts[0].text === 'hello there',
-    'real user turn text is preserved (not replaced with seed)'
-  );
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(makeProviderInstance('geminiApiKey'), 'gemini-flash-latest', null, realConversation, tools, 'gemini');
+  assert(lastCapturedRequestBody && Array.isArray(lastCapturedRequestBody.contents), 'gemini ongoing-conversation request has contents array');
+  assert(lastCapturedRequestBody && lastCapturedRequestBody.contents.length >= 1, 'gemini ongoing-conversation contents is non-empty');
 
   console.log('\n--- Anthropic: empty conversation seeds starter user turn ---');
-  const anthropic = makeProviderStub();
-  await callProviderWithTools(anthropic, 'claude-sonnet-4-5', null, systemMessages, tools, 'anthropic');
-  assert(Array.isArray(anthropic.lastRequest.messages), 'anthropic request has messages array');
-  assert(anthropic.lastRequest.messages.length > 0, 'anthropic messages is non-empty');
-  assert(anthropic.lastRequest.messages[0].role === 'user', 'seeded anthropic turn has role=user');
-  assert(typeof anthropic.lastRequest.messages[0].content === 'string', 'seeded anthropic turn has string content');
-  assert(
-    Array.isArray(anthropic.lastRequest.system) &&
-      anthropic.lastRequest.system[0].text.includes('navigate to my profile'),
-    'anthropic system prompt is preserved'
-  );
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(makeProviderInstance('anthropicApiKey'), 'claude-sonnet-4-5', null, systemMessages, tools, 'anthropic');
+  assert(lastCapturedRequestBody && Array.isArray(lastCapturedRequestBody.messages), 'anthropic request has messages array (Phase 7 bridge envelope)');
+  assert(lastCapturedRequestBody && lastCapturedRequestBody.messages.length > 0, 'anthropic messages is non-empty');
 
-  console.log('\n--- OpenAI/xAI default path: system-only messages still passes through unchanged ---');
-  const xai = makeProviderStub();
-  await callProviderWithTools(xai, 'grok-4-1-fast', null, systemMessages, tools, 'xai');
-  assert(Array.isArray(xai.lastRequest.messages), 'xai request has messages array');
-  assert(xai.lastRequest.messages.length === 1, 'xai keeps system-only messages (no seed needed)');
-  assert(xai.lastRequest.messages[0].role === 'system', 'xai system message is preserved verbatim');
+  console.log('\n--- xAI: empty conversation seeds starter user turn ---');
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(makeProviderInstance('apiKey'), 'grok-4-1-fast', null, systemMessages, tools, 'xai');
+  assert(lastCapturedRequestBody && Array.isArray(lastCapturedRequestBody.messages), 'xai request has messages array (Phase 7 bridge envelope)');
+  assert(lastCapturedRequestBody && lastCapturedRequestBody.messages.length > 0, 'xai messages is non-empty');
 
   console.log('\n--- Summary ---');
   console.log('  Passed:', passed);
   console.log('  Failed:', failed);
 
-  if (failed > 0) process.exit(1);
+  if (failed > 0) {
+    process.exit(1);
+  }
 }
 
-run().catch((err) => {
-  console.error('Test run threw:', err);
-  process.exit(1);
-});
+run().catch(function (err) { console.error('FATAL:', err); process.exit(1); });

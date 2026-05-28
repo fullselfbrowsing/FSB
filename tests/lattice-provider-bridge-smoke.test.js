@@ -570,18 +570,17 @@ async function loadOffscreenHandlerSource(chromeMock) {
   await simulatedHelper();
   passAssertEqual(offscreenMock._createCount(), 1, 'hasDocument guard makes ensureLatticeOffscreen idempotent (3 calls -> 1 createDocument)');
 
-  // Plan 06-03 fill: agent-loop.js flag gating + bridge file shape
+  // Plan 07-01 fill (Phase 7 FINT-09): the FSB_LATTICE_PROVIDER_BRIDGE_ENABLED
+  // feature flag is REMOVED from agent-loop.js. The bridge call site at the
+  // tail of callProviderWithTools is unconditional. The legacy
+  // providerInstance.sendRequest(requestBody) fallback is deleted.
   const alSource = require('fs').readFileSync('extension/ai/agent-loop.js', 'utf8');
-  // The default-on idiom is `typeof FSB_LATTICE_PROVIDER_BRIDGE_ENABLED === 'undefined' || FSB_LATTICE_PROVIDER_BRIDGE_ENABLED`
-  // which naturally produces 2 token occurrences on a SINGLE LINE. The plan-text acceptance criterion
-  // uses `grep -c` semantics (line-count = 1); assert both the line-count (single check site)
-  // AND the token-count (2 mentions in the default-on idiom) for full diagnostic clarity.
   const alLinesWithFlag = alSource.split('\n').filter(l => /FSB_LATTICE_PROVIDER_BRIDGE_ENABLED/.test(l));
-  passAssertEqual(alLinesWithFlag.length, 1, 'agent-loop.js has exactly 1 LINE referencing FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (single call-site swap; grep -c semantics)');
-  passAssertEqual((alSource.match(/FSB_LATTICE_PROVIDER_BRIDGE_ENABLED/g) || []).length, 2, 'agent-loop.js has exactly 2 token occurrences of FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (default-on idiom: typeof X === undefined || X)');
-  passAssertEqual((alSource.match(/executeViaBridge\(/g) || []).length, 1, 'agent-loop.js has exactly 1 executeViaBridge invocation');
-  passAssertEqual((alSource.match(/providerInstance\.sendRequest\(requestBody\)/g) || []).length, 1, 'agent-loop.js retains the legacy providerInstance.sendRequest(requestBody) call as flag-false fallback');
-  passAssertEqual((alSource.match(/setTimeout/g) || []).length, 8, 'agent-loop.js setTimeout count = 8 (INV-04 count invariant under the line-1044 insertion)');
+  passAssertEqual(alLinesWithFlag.length, 0, 'agent-loop.js has ZERO LINES referencing FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (Phase 7 FINT-09: flag fully stripped)');
+  passAssertEqual((alSource.match(/FSB_LATTICE_PROVIDER_BRIDGE_ENABLED/g) || []).length, 0, 'agent-loop.js has ZERO token occurrences of FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (Phase 7 FINT-09: flag fully stripped)');
+  passAssertEqual((alSource.match(/executeViaBridge\(/g) || []).length, 1, 'agent-loop.js has exactly 1 executeViaBridge invocation (Phase 7 FINT-09: unconditional call site)');
+  passAssertEqual((alSource.match(/providerInstance\.sendRequest\(requestBody\)/g) || []).length, 0, 'agent-loop.js has ZERO providerInstance.sendRequest(requestBody) calls (Phase 7 FINT-09: legacy fallback deleted)');
+  passAssertEqual((alSource.match(/setTimeout/g) || []).length, 8, 'agent-loop.js setTimeout count = 8 (Phase 7 FINT-09: INV-04 count invariant preserved across flag-strip)');
 
   const bridgeSource = require('fs').readFileSync('extension/ai/lattice-provider-bridge.js', 'utf8');
   passAssert(/crypto\.randomUUID/.test(bridgeSource), 'bridge uses crypto.randomUUID for requestId');
