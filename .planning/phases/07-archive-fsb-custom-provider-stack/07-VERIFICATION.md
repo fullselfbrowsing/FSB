@@ -4,10 +4,12 @@ phase_name: archive-fsb-custom-provider-stack
 verdict: human_needed
 verifier_type: human_uat
 created_date: 2026-05-27
-gated_on: "UAT-1 user execution + verdict report"
+gated_on: "UAT-1 user execution + verdict report (DEFERRED by user 2026-05-28; awaiting user-led follow-on Chrome session)"
 post_uat_plan: 07-04-PLAN.md
 gaps_found: []
 ---
+
+> **UAT-1 deferred per user choice 2026-05-28.** User opted to run UAT-1 in a separate Chrome session rather than synchronously during Plan 07-04 execution. Run the procedure in the `## Human Verification (UAT-1 - milestone-end gate)` section below; on green, re-invoke `/gsd-execute-phase 7 --wave 4` OR manually update `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 status to `executed` + milestone `status` frontmatter to `passed`. Verdict for this file STAYS `human_needed` until that re-execution.
 
 # Phase 7 Verification Report
 
@@ -137,3 +139,27 @@ See `.planning/phases/07-archive-fsb-custom-provider-stack/07-04-PLAN.md` for th
 
 - If `UAT-1 PASS`: flip `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 status to `executed` + milestone status `in_progress` -> `passed`; backfill Plan 07-02 + 07-03 + 07-04 SHAs into the `.planning/LATTICE-PIN.md` Phase 7 row notes cell (replacing the `<07-02-sha>`, `<07-03-sha>`, `<07-04-sha>` placeholders left by Plan 07-02).
 - If `UAT-1 PARTIAL` or `UAT-1 FAIL`: record the verdict in `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 `status_history`; mark UAT-1 status as `pending_execution` or `failed` per the user's verdict; DO NOT flip milestone status.
+
+## UAT-1 Execution Record
+
+**Date executed:** Not yet executed — DEFERRED by user 2026-05-28
+
+**Verdict:** UAT-1 PENDING_EXECUTION (user chose to Defer the synchronous UAT-1 verdict capture during Plan 07-04 execution; will run UAT-1 in a separate Chrome session)
+
+**User observations (verbatim from user reply 2026-05-28):**
+
+> "Defer UAT-1 — run it later in a separate session"
+
+(Captured via AskUserQuestion during Plan 07-04 Task 1 checkpoint resolution. The user did not execute the UAT-1 procedure in Chrome at this time; they elected to run it asynchronously in a follow-on session of their choice.)
+
+**Screenshots:** none captured (UAT-1 not yet executed).
+
+**Per-assertion results:** N/A — UAT-1 not yet executed in Chrome. The full 6-sub-assertion table + xAI Test-Connection sub-test + autopilot iteration sub-test remain in the `## Human Verification (UAT-1 - milestone-end gate)` section above as the source-of-truth procedure for the user's follow-on session.
+
+**Next action:** When the user runs the UAT-1 procedure in a separate Chrome session and reports the verdict (`UAT-1 PASS`, `UAT-1 PARTIAL <details>`, or `UAT-1 FAIL <details>`), the verdict-handling branches apply:
+
+- `UAT-1 PASS`: Re-invoke `/gsd-execute-phase 7 --wave 4` to re-execute Plan 07-04 with the PASS verdict (which will flip `.planning/v0.10.0-MILESTONE-AUDIT.md` `status` frontmatter `in_progress` -> `passed`, flip this file's frontmatter `verdict` to `passed`, and replace this UAT-1 Execution Record section with the PASS-branch contents). OR manually edit `.planning/v0.10.0-MILESTONE-AUDIT.md` `uat_1.status` to `executed` + `status` frontmatter to `passed` + append a 2026-05-?? `verdict: passed` entry to `status_history`, and edit this file's frontmatter `verdict` to `passed`.
+- `UAT-1 PARTIAL <details>`: Re-execute Plan 07-04 with PARTIAL verdict (records failing sub-assertions to `gaps.uat`, keeps `status: in_progress`, flips this file's `verdict` to `gaps_found`). Recommend a follow-on gap-closure plan via `/gsd-plan-phase --gaps 7`.
+- `UAT-1 FAIL <details>`: Re-execute Plan 07-04 with FAIL verdict (records blocker gaps, keeps `status: in_progress`, flips this file's `verdict` to `failed`). Recommend either (1) rollback Plan 07-01 via `git revert 8d075fb9 5588d20f 5ad8f987` restoring the flag wrapper + legacy fallback, OR (2) escalate to a debug session investigating the failure root cause. Milestone status remains `in_progress` until resolution.
+
+**Why deferral is acceptable:** Plan 07-04 explicitly contemplates a PARTIAL/PENDING_EXECUTION branch where the milestone status stays `in_progress` and the UAT-1 verdict is recorded as `pending_execution` until the user reports back. The deferral is the strict no-flip case of the PARTIAL branch and preserves all guardrails: milestone status does NOT flip prematurely; `current_lattice_sha` in `.planning/LATTICE-PIN.md` stays at `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (INV-06 holds); Phase 7 production code + documentation remain GREEN end-to-end; only the milestone-end gate is held open pending the user-led Chrome session.
