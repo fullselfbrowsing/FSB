@@ -531,7 +531,7 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.9.0`) because it is published independently from the extension release (`0.9.67`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
+The MCP package has its own version (`0.9.0`) because it is published independently from the extension release (`0.9.90`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
