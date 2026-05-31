@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 05-06-PLAN.md (Phase 5 ceremony closure)
-last_updated: "2026-05-31T11:05:29.763Z"
-last_activity: 2026-05-31 -- Phase 8 planning complete
+stopped_at: Completed 08-01-PLAN.md (SW-side lattice-step-emitter producer; FINT-10)
+last_updated: "2026-05-31T11:14:58Z"
+last_activity: 2026-05-31 -- Phase 8 Plan 08-01 complete; producer half of audit gap G1 closed
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 35
-  completed_plans: 32
-  percent: 91
+  completed_plans: 33
+  percent: 94
 ---
 
 # Project State
@@ -25,14 +25,22 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 8 (Lattice runtime wiring) — context locked; ready for /gsd-plan-phase 8
+**Current focus:** Phase 8 (Lattice runtime wiring) — Plan 08-01 SHIPPED; Plan 08-02 (agent-loop call sites) next.
 
 ## Current Position
 
-Phase: 8 (context gathered; not yet planned)
-Plan: Not started
+Phase: 8 (Lattice runtime wiring; 1/3 plans complete)
+Plan: 08-02 (next -- agent-loop.js LLM_TURN + TOOL_DISPATCH emission sites)
 Status: Ready to execute
-Last activity: 2026-05-31 -- Phase 8 planning complete
+Last activity: 2026-05-31 -- Phase 8 Plan 08-01 complete; SW-side producer module shipped; audit gap G1 producer half closed
+
+### Phase 8 Plan 08-01 outputs (FSB-side; 3 commits on `automation` branch):
+
+- `c6897e15` feat(08-01): add SW-side lattice-step-emitter producer module (FINT-10) -- new extension/ai/lattice-step-emitter.js (64 lines, dual-export, fire-and-forget)
+- `69dddd72` feat(08-01): wire lattice-step-emitter via background.js importScripts (FINT-10) -- alphabetical line 13 insertion
+- `557b2fa2` chore(08-01): append step-emitter Wave 0 smoke to scripts.test chain -- new tests/lattice-step-emitter-smoke.test.js (17 PASS / 0 FAIL); package.json scripts.test FINAL entry; Phase 6 provider-bridge smoke carryforward updates (importScripts count 154->155, call sites 151->152, adjacency relaxed gap=1 -> gap in {1,2})
+
+INV-04 = 8 setTimeout in agent-loop.js (BYTE-FROZEN); INV-06 = lattice SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged). Full npm test green; npm run build green.
 
   1. Backup branch `pre-pivot-archive/v0.10.0-fsb-first` created at HEAD `4d70facf` (30+ commits preserved).
   2. Phase 1 + Phase 2 artifacts archived to `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARYs, VERIFICATION; plus snapshots of ROADMAP / REQUIREMENTS / PROJECT / STATE at attempt-1 final state; plus PIVOT-v0.10.0-PLAN.md decision audit trail).
