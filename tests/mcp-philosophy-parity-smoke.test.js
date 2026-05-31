@@ -358,10 +358,80 @@ const REC = require(REC_PATH);
   ok(snap8b.last.drivingModel === undefined,
     'Part 8.2 -- drivingModel: null coerced to undefined (non-object guard)');
 
-  // --- Parts 9-10 PLACEHOLDER (1 PASS each) -----------------------
-  console.log('\n--- Parts 9-10: PLACEHOLDERS (filled in 10-03) ---');
-  ok(true, 'placeholder Part 9 -- INV byte-freeze regression (filled in Plan 10-03)');
-  ok(true, 'placeholder Part 10 -- provider switch precedence (filled in Plan 10-03)');
+  // --- Part 9 -- INV byte-freeze regression (FINT-16/17/18 + INV-04 + INV-06; 7 PASS) ---
+  console.log('\n--- Part 9: INV byte-freeze regression (FINT-16/17/18 + INV-04 + INV-06) ---');
+  var fs = require('fs');
+  var agentLoopSrc = fs.readFileSync('extension/ai/agent-loop.js', 'utf8');
+  var setTimeoutCount = (agentLoopSrc.match(/setTimeout/g) || []).length;
+  ok(setTimeoutCount === 8,
+     'Part 9.1 -- INV-04 grep -c "setTimeout" extension/ai/agent-loop.js === 8 (actual: ' + setTimeoutCount + ')');
+
+  var iterCount = (agentLoopSrc.match(/session\._nextIterationTimer\s*=\s*setTimeout/g) || []).length;
+  ok(iterCount === 4,
+     'Part 9.2 -- INV-04 4 deferred-iterator schedule patterns intact (actual: ' + iterCount + ')');
+
+  // Awk-scan equivalent: walk source line-by-line; find each setTimeout(function...) lambda;
+  // scan its body until matching `}, N)` close; assert NO recordVisualSessionTick or recordDispatch
+  // token within any lambda body.
+  var agentLoopLines = agentLoopSrc.split('\n');
+  var visualTickInLambda = false;
+  var dispatchInLambda = false;
+  for (var li = 0; li < agentLoopLines.length; li++) {
+    if (/setTimeout\(function/.test(agentLoopLines[li])) {
+      for (var lj = li; lj < Math.min(li + 80, agentLoopLines.length); lj++) {
+        if (agentLoopLines[lj].indexOf('recordVisualSessionTick') !== -1) {
+          visualTickInLambda = true; break;
+        }
+        if (agentLoopLines[lj].indexOf('recordDispatch') !== -1) {
+          dispatchInLambda = true; break;
+        }
+        if (/^\s*}, \d+\)/.test(agentLoopLines[lj])) break;
+      }
+    }
+  }
+  ok(visualTickInLambda === false,
+     'Part 9.3 -- awk-scan: ZERO recordVisualSessionTick inside any setTimeout lambda body');
+  ok(dispatchInLambda === false,
+     'Part 9.4 -- awk-scan: ZERO recordDispatch inside any setTimeout lambda body');
+
+  var latticePinSrc = fs.readFileSync('.planning/LATTICE-PIN.md', 'utf8');
+  var shaMatch = latticePinSrc.match(/current_lattice_sha:\s*(\S+)/);
+  ok(shaMatch && shaMatch[1] === 'e95067bfa87ed1b75838fc3b3ef217a3b01acbd3',
+     'Part 9.5 -- INV-06 LATTICE-PIN current_lattice_sha frozen at Phase 5 SHA');
+
+  var reqSrc = fs.readFileSync('.planning/REQUIREMENTS.md', 'utf8');
+  ok(reqSrc.indexOf('LIFECYCLE + TELEMETRY + DRIVING-MODEL ATTRIBUTION') !== -1,
+     'Part 9.6 -- REQUIREMENTS.md INV-02 wording extension landed (Phase 10 ceremony Plan 10-03 Task 1)');
+
+  ok(/\|\s*Phase 10\s*\|/.test(latticePinSrc),
+     'Part 9.7 -- LATTICE-PIN.md Phase 10 row present (Plan 10-03 Task 2 ceremony)');
+
+  // --- Part 10 -- mid-session provider switch (FINT-18 edge case; 2 PASS) ---
+  console.log('\n--- Part 10: mid-session provider switch (FINT-18 edge case) ---');
+  // Simulates two sequential recordDispatch calls with the drivingModel payload
+  // that the agent-loop would construct under two distinct session.providerConfig
+  // states (pre-switch and post-switch).
+  chromeMock.storage.local._replace({});
+
+  // 10.1: pre-switch state (providerKey === 'xai')
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: { step: 1 },
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: 5 }
+  });
+  var snap10a = await _latestRow();
+  ok(snap10a.last.drivingModel && snap10a.last.drivingModel.provider === 'xai',
+     'Part 10.1 -- pre-switch row.drivingModel.provider === xai');
+
+  // 10.2: post-switch state (providerKey === 'openai')
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: { step: 2 },
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'openai', model_id: 'gpt-4', reasoning_tokens: undefined }
+  });
+  var snap10b = await _latestRow();
+  ok(snap10b.last.drivingModel && snap10b.last.drivingModel.provider === 'openai',
+     'Part 10.2 -- post-switch row.drivingModel.provider === openai (per-tool-call cadence captures switch)');
 
   // --- Tail ------------------------------------------------------
   console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');
