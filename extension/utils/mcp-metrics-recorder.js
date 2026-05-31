@@ -272,7 +272,11 @@ async function recordDispatch(input) {
 
     var clientLabel = (typeof input.client === 'string' && input.client.length > 0) ? input.client : 'unknown';
     var toolLabel = (typeof input.tool === 'string' && input.tool.length > 0) ? input.tool : 'unknown';
-    var routeLabel = (input.dispatcher_route === 'tool' || input.dispatcher_route === 'message')
+    // Phase 10 FINT-17 -- 'autopilot' route literal added for FSB autopilot
+    // driver attribution. MCP-side routes 'tool' + 'message' preserved.
+    var routeLabel = (input.dispatcher_route === 'tool' ||
+                      input.dispatcher_route === 'message' ||
+                      input.dispatcher_route === 'autopilot')
       ? input.dispatcher_route
       : null;
 
@@ -337,6 +341,14 @@ async function recordDispatch(input) {
       pricing_confidence: pricingConfidence,
       ts: now,
       dispatcher_route: routeLabel,
+
+      // Phase 10 FINT-18 -- driving-model attribution pass-through.
+      // Autopilot rows carry { provider, model_id, reasoning_tokens? };
+      // MCP rows omit -> coerced to undefined here so dashboards that
+      // don't consume the field don't regress.
+      drivingModel: (input.drivingModel && typeof input.drivingModel === 'object')
+        ? input.drivingModel
+        : undefined,
 
       // Legacy camelCase aliases for hero compatibility (reconciliation #2)
       inputTokens: tokenEstimate.tokens_in,

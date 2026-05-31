@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-05-31T13:15:36.000Z"
-last_activity: 2026-05-31 -- Phase 9 Plan 09-03 SHIPPED (Phase 9 COMPLETE; documentation ceremony closed; G2 closed_in_phase_9)
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-05-31T13:30:14.544Z"
+last_activity: 2026-05-31 -- Phase 10 planning complete
 progress:
   total_phases: 10
   completed_phases: 9
@@ -25,14 +25,23 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 9 (SurvivabilityAdapter activation; G2 closure) COMPLETE — Plan 09-01 + 09-02 + 09-03 SHIPPED (FINT-13 flag flip + FINT-14 marker writes + serialize sidecars + FINT-15 restore wiring + LRU cap enforcement + Part 6 fill 72 PASS + REQUIREMENTS.md FINT-13/14/15 narrative + LATTICE-PIN.md Phase 9 row + v0.10.0-MILESTONE-AUDIT.md G2 closed_in_phase_9). Ready for Phase 10 (MCP-philosophy parity for autopilot driver).
+**Current focus:** Phase 10 (MCP-philosophy parity for autopilot driver) IN PROGRESS — Plan 10-01 SHIPPED (allowlist 'FSB Autopilot' + nextEntry driver discriminator + agent-loop recordVisualSessionTick at TOOL_DISPATCH boundary + Wave 0 smoke 20 PASS). Plans 10-02 (metrics recorder + drivingModel + xAI reasoning_tokens) and 10-03 (ceremony) remain. INV-04 BYTE-FROZEN (setTimeout=8, iterator=4); INV-06 BYTE-FROZEN (Lattice SHA e95067bfa87ed1b75838fc3b3ef217a3b01acbd3).
 
 ## Current Position
 
-Phase: 9 (SurvivabilityAdapter activation; 3/3 plans complete; Phase 9 COMPLETE)
-Plan: 09-03 COMPLETE (REQUIREMENTS.md FINT-13/14/15 narrative + traceability + footer bumps + LATTICE-PIN.md Phase 9 row + v0.10.0-MILESTONE-AUDIT.md G2 closure + status_history phase_9_shipped; INV-06 byte-frozen; milestone status STAYS in_progress per D-07)
-Status: Phase 9 COMPLETE; ready for /gsd-discuss-phase 10 or /gsd-verify-phase 9
-Last activity: 2026-05-31 -- Phase 9 Plan 09-03 SHIPPED (Phase 9 ceremony closure)
+Phase: 10 (MCP-philosophy parity for autopilot driver; 1/3 plans complete; IN PROGRESS)
+Plan: 10-01 COMPLETE (MCP_VISUAL_CLIENT_LABELS allowlist 14th entry 'FSB Autopilot' + nextEntry driver discriminator on UPDATE + CREATE branches + agent-loop autopilot recordVisualSessionTick at TOOL_DISPATCH boundary + Wave 0 smoke 20 PASS / 0 FAIL; INV-04 + INV-06 BYTE-FROZEN)
+Status: Ready to execute
+Last activity: 2026-05-31 -- Phase 10 Plan 10-01 shipped
+
+### Phase 10 Plan 10-01 outputs (FSB-side; 4 commits on `automation` branch):
+
+- `a3e83c52` feat(10-01): extend MCP_VISUAL_CLIENT_LABELS allowlist with FSB Autopilot -- 14th entry appended at end-of-array (D-02); CLIENT_LABEL_MAP regen picks up new entry; toClientLabelKey produces 'fsbautopilot' zero-collision normalized key
+- `957b2dcb` feat(10-01): extend nextEntry shape with driver discriminator field -- 9th key on both UPDATE branch (preserves existingEntry.driver, falls back to fields.driver === 'autopilot' ? 'autopilot' : 'mcp') and CREATE branch (fields.driver === 'autopilot' ? 'autopilot' : 'mcp'); restore path lines 557-621 UNCHANGED (downstream consumers handle undefined driver transparently as 'mcp')
+- `341a6b44` feat(10-01): insert recordVisualSessionTick at TOOL_DISPATCH boundary -- 24-line block between Phase 8 TOOL_DISPATCH emission (lines 2052-2063) and `// --- Local tool interception` comment (line 2065 pre-insert); defensive guard + try/catch fire-and-forget; INV-04 BYTE-FROZEN (setTimeout=8, iterator=4, awk-scan empty); no literal `setTimeout` token in new comments (Pitfall 1 honored)
+- `c4325550` test(10-01): Wave 0 smoke harness for MCP-philosophy parity -- new tests/mcp-philosophy-parity-smoke.test.js (233 lines) with Parts 1-4 filled (14 real PASS: allowlist accept + driver field roundtrip + restore backward-compat + allowlist gate intact) + Parts 5-10 placeholder (6 PASS for Plans 10-02 + 10-03 to fill); package.json scripts.test &&-chain extended with new smoke as FINAL entry; npm test exits 0 end-to-end; Phase 8 sibling lattice-step-emitter-smoke still 38 PASS
+
+INV-04 = 8 setTimeout in agent-loop.js (BYTE-FROZEN through Phase 10 Plan 10-01; iterator pattern = 4; awk-equivalent regex finds 0 recordVisualSessionTick inside any setTimeout lambda body); INV-06 = lattice SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged through Phase 10 Plan 10-01; zero Lattice-side commits; lattice/ git status clean). Full npm test green; npm run build green (esbuild 3 entries built clean).
 
 ### Phase 9 Plan 09-03 outputs (FSB-side; 3 commits on `automation` branch):
 
@@ -143,6 +152,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | 260531-6n5 | Stub node:* in offscreen lattice-host bundle via esbuild plugin (UAT-1 CSP fix) | 2026-05-31 | f29b4292 | [260531-6n5-stub-node-in-offscreen-lattice-host-bund](./quick/260531-6n5-stub-node-in-offscreen-lattice-host-bund/) |
 | Phase 08 P03 | 14min | 3 tasks | 3 files |
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
+| Phase 10 P01 | 18min | 4 tasks | 5 files |
 
 ## Next Actions
 
@@ -152,6 +162,6 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 
 ## Session Continuity
 
-Last session: 2026-05-31T13:15:36.000Z
+Last session: 2026-05-31T13:30:14.541Z
 Resume file: None
-Stopped at: Completed 09-03-PLAN.md
+Stopped at: Completed 10-01-PLAN.md
