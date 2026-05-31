@@ -4,8 +4,8 @@ milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
 stopped_at: Completed 05-06-PLAN.md (Phase 5 ceremony closure)
-last_updated: "2026-05-28T09:45:29.083Z"
-last_activity: 2026-05-28
+last_updated: "2026-05-31T09:11:52.879Z"
+last_activity: 2026-05-31
 progress:
   total_phases: 7
   completed_phases: 7
@@ -32,7 +32,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 Phase: 7
 Plan: Not started
 Status: Executing Phase 7
-Last activity: 2026-05-28
+Last activity: 2026-05-31 - Completed quick task 260531-5tw: bump extension version to 0.9.90
 
   1. Backup branch `pre-pivot-archive/v0.10.0-fsb-first` created at HEAD `4d70facf` (30+ commits preserved).
   2. Phase 1 + Phase 2 artifacts archived to `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARYs, VERIFICATION; plus snapshots of ROADMAP / REQUIREMENTS / PROJECT / STATE at attempt-1 final state; plus PIVOT-v0.10.0-PLAN.md decision audit trail).
@@ -100,6 +100,12 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
   - `PROJECT.v0.10.0-attempt-1-snapshot.md` -- PROJECT.md snapshot at attempt-1 final state
   - `STATE.v0.10.0-attempt-1-snapshot.md` -- STATE.md snapshot
   - `PIVOT-v0.10.0-PLAN.md` -- decision audit trail
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260531-5tw | Update extension version to 0.9.90 across all occurrences | 2026-05-31 | 6007eaf7 | [260531-5tw-update-extension-version-to-0-9-90-acros](./quick/260531-5tw-update-extension-version-to-0-9-90-acros/) |
 
 ## Next Actions
 
