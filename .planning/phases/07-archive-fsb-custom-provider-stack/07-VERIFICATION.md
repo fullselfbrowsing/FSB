@@ -1,26 +1,35 @@
 ---
 phase: 07
 phase_name: archive-fsb-custom-provider-stack
-verdict: human_needed
-status: human_needed
+verdict: passed
+status: passed
 verifier_type: human_uat
 automated_checks_status: passed
-score: 8/8 automated ROADMAP pass criteria verified; 1 human-gated (UAT-1) pending_execution
+score: 8/8 automated ROADMAP pass criteria verified; UAT-1 PASSED 2026-05-31
 created_date: 2026-05-27
-verified: 2026-05-27T00:00:00Z
-gated_on: "UAT-1 user execution + verdict report (DEFERRED by user 2026-05-28; awaiting user-led follow-on Chrome session)"
+verified: 2026-05-31T00:00:00Z
+gated_on: null
 post_uat_plan: 07-04-PLAN.md
 gaps_found: []
 gaps: []
 human_verification:
   - test: "Run UAT-1 milestone-end gate procedure (single Chrome MV3 reload session; 6 sub-assertions + xAI Test-Connection sub-test + autopilot iteration sub-test)"
     expected: "All 6 sub-assertions PASS + both sub-tests PASS; report verdict UAT-1 PASS / PARTIAL / FAIL"
-    why_human: "Requires interactive Chrome MV3 reload, popup/sidepanel UI inspection, fresh xAI API key entry in Options page (must not be committed to repo), live DevTools console observation across SW + offscreen + popup + sidepanel surfaces, and one full autopilot session run on a live web page. Procedure source-of-truth: ## Human Verification (UAT-1 - milestone-end gate) section below. Status: pending_execution (user DEFER 2026-05-28)."
-    status: pending_execution
+    why_human: "Requires interactive Chrome MV3 reload, popup/sidepanel UI inspection, fresh xAI API key entry in Options page (must not be committed to repo), live DevTools console observation across SW + offscreen + popup + sidepanel surfaces, and one full autopilot session run on a live web page. Procedure source-of-truth: ## Human Verification (UAT-1 - milestone-end gate) section below."
+    status: executed
+    verdict: passed
+    executed_date: 2026-05-31
+    inflight_fixes:
+      - quick_task: 260531-63l
+        commit: 65b00d75
+        summary: "Repointed extension/offscreen/lattice-host.html script src from unbundled source to ../dist/offscreen/lattice-host.js (latent Phase 5 Plan 05-04 deferred-task bug)"
+      - quick_task: 260531-6n5
+        commit: f29b4292
+        summary: "Replaced offscreen-lattice-host esbuild entry's node:* external array with inline stub-node-builtins plugin so Chrome CSP script-src 'self' no longer blocks node:fs/promises|node:path|node:url imports (latent Phase 5 Plan 05-01 deferred-task bug)"
     procedure_reference: ".planning/phases/07-archive-fsb-custom-provider-stack/07-VERIFICATION.md (## Human Verification section, 139 lines, 6 sub-assertions + 2 sub-tests + 3-verdict reporting protocol)"
 ---
 
-> **UAT-1 deferred per user choice 2026-05-28.** User opted to run UAT-1 in a separate Chrome session rather than synchronously during Plan 07-04 execution. Run the procedure in the `## Human Verification (UAT-1 - milestone-end gate)` section below; on green, re-invoke `/gsd-execute-phase 7 --wave 4` OR manually update `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 status to `executed` + milestone `status` frontmatter to `passed`. Verdict for this file STAYS `human_needed` until that re-execution.
+> **UAT-1 PASSED 2026-05-31.** User executed the procedure in a Chrome MV3 reload session: all 6 sub-assertions + xAI Test-Connection sub-test + autopilot iteration sub-test PASS. Two latent Phase 5 deferred-task bugs were surfaced and fixed in flight (quick tasks 260531-63l and 260531-6n5) before the verdict could be called. INV-06 holds throughout (current_lattice_sha frozen at e95067bfa87ed1b75838fc3b3ef217a3b01acbd3). Milestone v0.10.0 status flipped in_progress -> passed.
 
 ## Verifier Verdict (gsd-verifier agent, 2026-05-27)
 
@@ -210,27 +219,56 @@ See `.planning/phases/07-archive-fsb-custom-provider-stack/07-04-PLAN.md` for th
 
 ## UAT-1 Execution Record
 
-**Date executed:** Not yet executed — DEFERRED by user 2026-05-28
+**Date executed:** 2026-05-31 (Chrome MV3 reload session on user workstation)
 
-**Verdict:** UAT-1 PENDING_EXECUTION (user chose to Defer the synchronous UAT-1 verdict capture during Plan 07-04 execution; will run UAT-1 in a separate Chrome session)
+**Verdict:** **UAT-1 PASS** — all 6 sub-assertions + xAI Test-Connection sub-test + autopilot iteration sub-test green.
 
-**User observations (verbatim from user reply 2026-05-28):**
+**Provider used:** xAI / `grok-build-0.1` (discovered model from xAI `/v1/models`; per user memory "trust discovered model IDs"; not in hardcoded catalog but accepted by Lattice's `createXaiProvider` factory and routed via the offscreen bridge).
 
-> "Defer UAT-1 — run it later in a separate session"
+### Per-assertion results
 
-(Captured via AskUserQuestion during Plan 07-04 Task 1 checkpoint resolution. The user did not execute the UAT-1 procedure in Chrome at this time; they elected to run it asynchronously in a follow-on session of their choice.)
+| # | Sub-assertion | Result | Evidence |
+|---|---|--------|---|
+| a | SW reloads clean; no new `lattice/import/ERR_MODULE_NOT_FOUND` | PASS | SW console: `[FSB lattice-provider-bridge] boot: Phase 7 bridge shim registered (unconditional; legacy fallback removed)` |
+| b | Popup opens normally | PASS | No console errors during session |
+| c | Sidepanel opens normally | PASS | Autopilot session launched from sidepanel UI |
+| d | One autopilot iteration completes at least one step | PASS | User-given task ran end-to-end as expected |
+| e | `chrome.offscreen.createDocument` resolves; offscreen page loads | PASS | `[FSB Lattice] offscreen lattice-host opened` in SW console |
+| f | Offscreen page console shows boot logs; no `import('lattice')` resolution errors | PASS (after fixes) | `[FSB lattice-host] boot: Plan 05-04 offscreen Lattice host loaded`; zero `Uncaught TypeError: Failed to resolve module specifier "lattice"`; zero `Loading the script 'node:fs/promises' violates the following Content Security Policy directive` |
 
-**Screenshots:** none captured (UAT-1 not yet executed).
+### Sub-tests
 
-**Per-assertion results:** N/A — UAT-1 not yet executed in Chrome. The full 6-sub-assertion table + xAI Test-Connection sub-test + autopilot iteration sub-test remain in the `## Human Verification (UAT-1 - milestone-end gate)` section above as the source-of-truth procedure for the user's follow-on session.
+| Sub-test | Result | Evidence |
+|---|--------|---|
+| xAI Test-Connection (Options page) | PASS | Bridge envelope round-trip ok:true within ~5s; UI success state; no `xa***cy` 400 echo (FINT-08 P1+P2 closure non-regression confirmed) |
+| Autopilot iteration on live page | PASS | Sidepanel iteration history grew >= 1 step; user reported "doing it as expected" |
 
-**Next action:** When the user runs the UAT-1 procedure in a separate Chrome session and reports the verdict (`UAT-1 PASS`, `UAT-1 PARTIAL <details>`, or `UAT-1 FAIL <details>`), the verdict-handling branches apply:
+### In-flight fixes applied during this session
 
-- `UAT-1 PASS`: Re-invoke `/gsd-execute-phase 7 --wave 4` to re-execute Plan 07-04 with the PASS verdict (which will flip `.planning/v0.10.0-MILESTONE-AUDIT.md` `status` frontmatter `in_progress` -> `passed`, flip this file's frontmatter `verdict` to `passed`, and replace this UAT-1 Execution Record section with the PASS-branch contents). OR manually edit `.planning/v0.10.0-MILESTONE-AUDIT.md` `uat_1.status` to `executed` + `status` frontmatter to `passed` + append a 2026-05-?? `verdict: passed` entry to `status_history`, and edit this file's frontmatter `verdict` to `passed`.
-- `UAT-1 PARTIAL <details>`: Re-execute Plan 07-04 with PARTIAL verdict (records failing sub-assertions to `gaps.uat`, keeps `status: in_progress`, flips this file's `verdict` to `gaps_found`). Recommend a follow-on gap-closure plan via `/gsd-plan-phase --gaps 7`.
-- `UAT-1 FAIL <details>`: Re-execute Plan 07-04 with FAIL verdict (records blocker gaps, keeps `status: in_progress`, flips this file's `verdict` to `failed`). Recommend either (1) rollback Plan 07-01 via `git revert 8d075fb9 5588d20f 5ad8f987` restoring the flag wrapper + legacy fallback, OR (2) escalate to a debug session investigating the failure root cause. Milestone status remains `in_progress` until resolution.
+Two latent Phase 5 deferred-task bugs surfaced when UAT-1 ran for the first time. Both were fixed via `/gsd-quick` and re-tested before the verdict was called:
 
-**Why deferral is acceptable:** Plan 07-04 explicitly contemplates a PARTIAL/PENDING_EXECUTION branch where the milestone status stays `in_progress` and the UAT-1 verdict is recorded as `pending_execution` until the user reports back. The deferral is the strict no-flip case of the PARTIAL branch and preserves all guardrails: milestone status does NOT flip prematurely; `current_lattice_sha` in `.planning/LATTICE-PIN.md` stays at `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (INV-06 holds); Phase 7 production code + documentation remain GREEN end-to-end; only the milestone-end gate is held open pending the user-led Chrome session.
+| Quick task | Commit | What broke | Fix |
+|---|---|---|---|
+| 260531-63l | `65b00d75` | `extension/offscreen/lattice-host.html` `<script src="lattice-host.js">` pointed at the unbundled source which still carried bare `import "lattice"` (Phase 5 Plan 05-04 explicitly deferred the "production manifest flip" to a future phase; never executed). Surfaced as `Uncaught TypeError: Failed to resolve module specifier "lattice"`. | Repointed the script src to `../dist/offscreen/lattice-host.js`. |
+| 260531-6n5 | `f29b4292` | `esbuild.config.js` marked `node:fs/promises`, `node:path`, `node:url`, `node:fs`, `node:crypto` as `external` based on the incorrect assumption that tree-shaking would remove unreached artifact-storage paths. ESM top-level externals stay as live `import` declarations and triggered Chrome CSP `script-src 'self'` violations in the offscreen page. | Replaced the `external` array with an inline `stub-node-builtins` esbuild plugin that resolves any `node:*` specifier to an empty stub module at build time; rebuilt; verified zero `node:*` strings in the regenerated `extension/dist/offscreen/lattice-host.js`. |
+
+**Attribution:** Neither bug was a Phase 6 or 7 regression — both were Phase 5 deferred-task gaps that only surfaced at the first real Chrome reload session. Because UAT-1 was deferred at every preceding milestone gate, the latent defect set could not be observed until the user actually ran the procedure.
+
+### Invariants verified at PASS time
+
+- INV-06 (Lattice-first): `current_lattice_sha` UNCHANGED at `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3`; zero Lattice-side commits required to ship the in-flight fixes.
+- INV-03 (provider parity, Strategy B): all 7 logical providers continue to route via the offscreen bridge UNCONDITIONALLY; flag-strip from Plan 07-01 preserved.
+- INV-04 (setTimeout iterator BYTE-FROZEN): no touches to `extension/ai/agent-loop.js` during the in-flight fixes.
+
+### Screenshots
+
+None captured (session was console-driven; user reports + console paste constitute the evidence record).
+
+### Status updates applied via this verdict
+
+- `.planning/v0.10.0-MILESTONE-AUDIT.md`: top-level `status: in_progress` -> `status: passed`; `uat_1.status: pending_execution` -> `uat_1.status: executed` (+ `verdict: passed`); 2026-05-31 entries appended to both `status_history` and `uat_1.status_history`.
+- This file (`07-VERIFICATION.md`): frontmatter `verdict: human_needed` -> `verdict: passed`; `status: human_needed` -> `status: passed`; `gated_on` cleared.
+- `.planning/LATTICE-PIN.md`: frontmatter `last_updated: 2026-05-31`; Phase 7 row trailing UAT-1 narrative updated from PENDING_EXECUTION 2026-05-28 to PASSED 2026-05-31 with the two in-flight quick-task commits cited.
 
 ---
 

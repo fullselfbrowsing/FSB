@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
-status: executing
-stopped_at: Completed 05-06-PLAN.md (Phase 5 ceremony closure)
-last_updated: "2026-05-31T09:11:52.879Z"
+status: milestone_passed
+stopped_at: UAT-1 PASS 2026-05-31 — milestone v0.10.0 ready to archive
+last_updated: "2026-05-31T10:00:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 7
@@ -25,14 +25,14 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 7 — Archive FSB custom provider stack
+**Current focus:** Milestone v0.10.0 COMPLETE — UAT-1 PASSED 2026-05-31; ready for `/gsd-complete-milestone`
 
 ## Current Position
 
-Phase: 7
-Plan: Not started
-Status: Executing Phase 7
-Last activity: 2026-05-31 - Completed quick task 260531-6n5: stub node:* in offscreen lattice-host bundle (UAT-1 CSP fix)
+Phase: 7 (complete)
+Plan: All 4 plans complete + UAT-1 PASS
+Status: Milestone v0.10.0 passed end-to-end
+Last activity: 2026-05-31 - UAT-1 PASS verdict applied; milestone audit + 07-VERIFICATION.md + LATTICE-PIN.md flipped to passed
 
   1. Backup branch `pre-pivot-archive/v0.10.0-fsb-first` created at HEAD `4d70facf` (30+ commits preserved).
   2. Phase 1 + Phase 2 artifacts archived to `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARYs, VERIFICATION; plus snapshots of ROADMAP / REQUIREMENTS / PROJECT / STATE at attempt-1 final state; plus PIVOT-v0.10.0-PLAN.md decision audit trail).
