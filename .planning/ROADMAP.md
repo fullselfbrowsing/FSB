@@ -336,27 +336,6 @@
 
 ---
 
-## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
-
-**Status:** Pivoted before milestone completion. Phases 1-2 shipped FSB-side code (hooks-foundation + state-inspectability-carve-out, 617/617 tests green) before the team re-evaluated and chose to pivot to the Lattice-first approach. All work preserved.
-
-**Why abandoned:** Pattern duplication risk between FSB and Lattice; deferred Lattice round-trip validation; LAT-05 only IDENTIFIED port candidates rather than executing them. See `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md`.
-
-**Preservation:**
-- Branch: `pre-pivot-archive/v0.10.0-fsb-first` (30+ commits at HEAD `4d70facf`)
-- On-disk: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (Phase 1 + Phase 2 full artifact sets: CONTEXT, DISCUSSION-LOG, RESEARCH, UI-SPEC, VALIDATION, PLANs, SUMMARYs, VERIFICATION)
-- Snapshots: `ROADMAP.v0.10.0-attempt-1.md`, `REQUIREMENTS.v0.10.0-attempt-1.md`, `PROJECT.v0.10.0-attempt-1-snapshot.md`
-
-**Recoverable artifacts (from backup branch):** Phase 1 hook-pipeline extensions (priority bands, matcher, race-with-log, freeze, lockBand); Phase 2 LIFECYCLE_EVENTS.STEP_TRANSITION + checkpoint-hook.js + 12 step markers + sidepanel Agent State Inspector UI + full SW eviction resumption with CONSERVATIVE recovery. The patterns themselves are intellectually correct; in attempt-2 they live in Lattice instead.
-
----
-
-## Previous Milestone: v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix (shipped 2026-05-14)
-
-(Full v0.9.69 history preserved in `.planning/milestones/v0.9.69-ROADMAP.md`.)
-
-8 phases (269-276), 9 plans, 67/68 v0.9.69 REQs Complete. Anonymous UUIDv4 install identity + opt-out kill-switch; MCP pricing module + cost-surfacing chokepoint; TelemetryCollector 5-min alarm beat surviving MV3 SW eviction; SQLite ingest with 8-layer abuse defenses + HMAC-SHA256 daily-rotated IP hashing + k>=2 anonymity floor; `/api/public-stats/*` aggregates rendered as 6 chart toggles on `/stats`; privacy disclosure section + CWS listing copy + `verify-store-listing.mjs` gate; server-side GitHub stats cache; MCP transport `z.coerce.number()` numeric-param fix. All 3 release-gating BLOCKERs RESOLVED. Released artifacts: extension v0.9.67 zip on GitHub, mcp-v0.9.2 auto-published to npm, Fly auto-deployed.
-
 ### Phase 8: FSB agent brain on Lattice runtime — step.transition emit + per-step receipt mint (closes G1, flips Flow 4 to complete)
 
 **Goal:** Wire FSB's autopilot agent loop to emit `step.transition` events into Lattice's tracer and mint per-step Capability Receipts via `createCheckpointHook` in the production code path. Close audit gap G1 (SW-side `lattice-step-transition` sender missing); flip integration Flow 4 from partial-by-design to complete. Phase 8 is the first of three sibling phases (8 + 9 + 10) splitting the v0.10.0 half-step closure work per Phase 8 CONTEXT.md D-06.
@@ -413,6 +392,29 @@ Plans:
 
 Plans:
 - [ ] TBD
+
+---
+
+## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
+
+**Status:** Pivoted before milestone completion. Phases 1-2 shipped FSB-side code (hooks-foundation + state-inspectability-carve-out, 617/617 tests green) before the team re-evaluated and chose to pivot to the Lattice-first approach. All work preserved.
+
+**Why abandoned:** Pattern duplication risk between FSB and Lattice; deferred Lattice round-trip validation; LAT-05 only IDENTIFIED port candidates rather than executing them. See `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md`.
+
+**Preservation:**
+- Branch: `pre-pivot-archive/v0.10.0-fsb-first` (30+ commits at HEAD `4d70facf`)
+- On-disk: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (Phase 1 + Phase 2 full artifact sets: CONTEXT, DISCUSSION-LOG, RESEARCH, UI-SPEC, VALIDATION, PLANs, SUMMARYs, VERIFICATION)
+- Snapshots: `ROADMAP.v0.10.0-attempt-1.md`, `REQUIREMENTS.v0.10.0-attempt-1.md`, `PROJECT.v0.10.0-attempt-1-snapshot.md`
+
+**Recoverable artifacts (from backup branch):** Phase 1 hook-pipeline extensions (priority bands, matcher, race-with-log, freeze, lockBand); Phase 2 LIFECYCLE_EVENTS.STEP_TRANSITION + checkpoint-hook.js + 12 step markers + sidepanel Agent State Inspector UI + full SW eviction resumption with CONSERVATIVE recovery. The patterns themselves are intellectually correct; in attempt-2 they live in Lattice instead.
+
+---
+
+## Previous Milestone: v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix (shipped 2026-05-14)
+
+(Full v0.9.69 history preserved in `.planning/milestones/v0.9.69-ROADMAP.md`.)
+
+8 phases (269-276), 9 plans, 67/68 v0.9.69 REQs Complete. Anonymous UUIDv4 install identity + opt-out kill-switch; MCP pricing module + cost-surfacing chokepoint; TelemetryCollector 5-min alarm beat surviving MV3 SW eviction; SQLite ingest with 8-layer abuse defenses + HMAC-SHA256 daily-rotated IP hashing + k>=2 anonymity floor; `/api/public-stats/*` aggregates rendered as 6 chart toggles on `/stats`; privacy disclosure section + CWS listing copy + `verify-store-listing.mjs` gate; server-side GitHub stats cache; MCP transport `z.coerce.number()` numeric-param fix. All 3 release-gating BLOCKERs RESOLVED. Released artifacts: extension v0.9.67 zip on GitHub, mcp-v0.9.2 auto-published to npm, Fly auto-deployed.
 
 ---
 
