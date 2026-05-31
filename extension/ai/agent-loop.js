@@ -1965,6 +1965,25 @@ async function runAgentIteration(sessionId, options) {
         }
       }
 
+      // Phase 8 FINT-11 -- emit step.transition at TOOL_DISPATCH boundary.
+      // One event per tool call per D-01. Placed AFTER the permission/hook check
+      // so denied tools also emit a step.transition (observable in metadata via
+      // Phase 10 metrics consumer; Phase 8 keeps wire payload byte-frozen to
+      // Phase 5 D-16 shape). previousStepName threads back to the LLM_TURN that
+      // produced this tool call (linked-list per CheckpointHookContext semantics).
+      if (typeof sendLatticeStepTransition === 'function') {
+        try {
+          sendLatticeStepTransition({
+            runId: sessionId,
+            sessionId: sessionId,
+            stepName: 'TOOL_DISPATCH',
+            stepIndex: iterNum,
+            previousStepName: 'LLM_TURN',
+            timestamp: new Date().toISOString()
+          });
+        } catch (_e) { /* swallow - producer is fire-and-forget */ }
+      }
+
       // --- Local tool interception (Phase 138 on-demand context) ---
       if (call.name === 'get_page_snapshot') {
         // CTX-01: Fetch markdown snapshot from content script
