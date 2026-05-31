@@ -86,13 +86,42 @@ const ENTRIES = [
     bundle: true,
     legalComments: 'none',
     allowOverwrite: true,
-    // [Rule 3 - Blocker] Lattice dist/index.js top-level imports node:fs/promises,
-    // node:path, node:url for its artifact-storage submodule. Our offscreen import
-    // surface (checkpoint/signer/survivability) does NOT touch those code paths.
-    // Marking node:* as external lets the bundle compile; tree-shaking removes the
-    // unreachable artifact code at minify time. The empty external stubs will never
-    // execute at browser runtime because the calling paths are unreferenced.
-    external: ['node:fs/promises', 'node:path', 'node:url', 'node:fs', 'node:crypto'],
+    // UAT-1 fix (2026-05-31): Lattice's dist/index.js top-level imports node:fs/promises,
+    // node:path, node:url, etc. for its artifact-storage submodule. Our offscreen import
+    // surface (checkpoint/signer/survivability) does NOT exercise those code paths at
+    // runtime, but ESM top-level imports cannot be tree-shaken merely by marking them
+    // external -- esbuild preserves the import specifier verbatim, and Chrome MV3 CSP
+    // (script-src 'self') rejects any surviving `node:*` import in the offscreen bundle.
+    //
+    // Fix: resolve every node:* specifier to a local stub module at build time via an
+    // inline esbuild plugin. The stub exports no-op shims for the fs / path / url surface
+    // Lattice's artifact-storage references. Dead code paths from artifact-storage stay
+    // in the bundle but call into local no-ops; no CSP-blocked imports survive in output.
+    plugins: [
+      {
+        name: 'stub-node-builtins',
+        setup(build) {
+          build.onResolve({ filter: /^node:/ }, () => ({
+            path: 'node-stub',
+            namespace: 'node-stub-ns',
+          }));
+          build.onLoad({ filter: /.*/, namespace: 'node-stub-ns' }, () => ({
+            contents: [
+              'export default {};',
+              'export const join = (...p) => p.filter(Boolean).join("/");',
+              'export const fileURLToPath = (u) => String(u);',
+              'export const mkdir = async () => undefined;',
+              'export const readFile = async () => "";',
+              'export const readdir = async () => [];',
+              'export const rm = async () => undefined;',
+              'export const stat = async () => ({});',
+              'export const writeFile = async () => undefined;',
+            ].join('\n'),
+            loader: 'js',
+          }));
+        },
+      },
+    ],
   },
   {
     name: 'content-canvas-interceptor',
