@@ -311,6 +311,31 @@ function createChromeStorageSessionMock() {
     var agentLoopSrc = fs.readFileSync(path.join(__dirname, '../extension/ai/agent-loop.js'), 'utf8');
     var deferredIteratorCount = (agentLoopSrc.match(/setTimeout/g) || []).length;
     passAssertEqual(deferredIteratorCount, 8, 'Part 6.0.3 - INV-04 deferred-iterator schedule count = 8 (byte-frozen)');
+
+    // 6.0.4 - agent-loop.js defines _findLatestSnapshot helper.
+    passAssert(/function\s+_findLatestSnapshot\s*\(\s*sessionId\s*\)/.test(agentLoopSrc),
+      'Part 6.0.4 - agent-loop.js defines _findLatestSnapshot(sessionId) helper');
+
+    // 6.0.5 - agent-loop.js restore site stashes adapter on session._latticeAdapter.
+    passAssert(/session\._latticeAdapter\s*=\s*adapter/.test(agentLoopSrc),
+      'Part 6.0.5 - restore site stashes adapter on session._latticeAdapter (reused by Plan 09-02 sidecars)');
+
+    // 6.0.6 - agent-loop.js invokes createFsbLatticeRuntimeAdapter at restore site.
+    passAssert(/FsbLatticeRuntimeAdapter\.createFsbLatticeRuntimeAdapter\s*\(/.test(agentLoopSrc),
+      'Part 6.0.6 - restore site invokes globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter');
+
+    // 6.0.7 - agent-loop.js invokes adapter.resume at restore site.
+    passAssert(/adapter\.resume\s*\(\s*snapshot\s*\)/.test(agentLoopSrc),
+      'Part 6.0.7 - restore site invokes adapter.resume(snapshot)');
+
+    // 6.0.8 - INV-06 guardrail: no SAFE_REPLAY literal anywhere in agent-loop.js
+    // (Lattice ResumePolicy is 4-member union; 5th literal would trigger INV-06 carve-out).
+    passAssert(!/SAFE_REPLAY/.test(agentLoopSrc),
+      'Part 6.0.8 - INV-06 guardrail: no SAFE_REPLAY literal in agent-loop.js (4-member Lattice ResumePolicy frozen)');
+
+    // 6.0.9 - INV-04 iterator pattern preserved (4 matches; absolute lines may shift).
+    var iteratorMatches = (agentLoopSrc.match(/session\._nextIterationTimer\s*=\s*setTimeout/g) || []).length;
+    passAssertEqual(iteratorMatches, 4, 'Part 6.0.9 - INV-04 iterator pattern intact (4 matches)');
   })();
 
   console.log('\n--- Summary ---');

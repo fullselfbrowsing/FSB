@@ -1097,6 +1097,30 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
 // using sessionData.agentId + sessionData.ownershipToken, and abort with a
 // typed tab_owned_by_other_agent error when the gate would have blocked.
 
+// Phase 9 FINT-15 -- module-level helper for runAgentLoop entry restore lookup.
+// Lists chrome.storage.session keys matching prefix fsb_lattice_snapshot_<sessionId>_,
+// sorts (ISO-8601 capturedAt suffix is chronological), returns latest value or null.
+// Safe against missing chrome / runtime.lastError. See 09-RESEARCH Section 5.
+async function _findLatestSnapshot(sessionId) {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.session) return null;
+  var prefix = 'fsb_lattice_snapshot_' + sessionId + '_';
+  return new Promise(function (resolve) {
+    try {
+      chrome.storage.session.get(null, function (all) {
+        if (chrome.runtime && chrome.runtime.lastError) return resolve(null);
+        var matches = Object.keys(all || {})
+          .filter(function (k) { return k.indexOf(prefix) === 0; })
+          .sort();
+        if (matches.length === 0) return resolve(null);
+        var latestKey = matches[matches.length - 1];
+        resolve(all[latestKey]);
+      });
+    } catch (_e) {
+      resolve(null);
+    }
+  });
+}
+
 /**
  * Entry point for the agent loop. Called from handleStartAutomation.
  * Initializes session state and kicks off the first iteration.
@@ -1210,6 +1234,37 @@ async function runAgentLoop(sessionId, options) {
       tabUrl: tabUrl.substring(0, 80),
       endpoint: providerInstance.getEndpoint()
     });
+
+    // Phase 9 FINT-15 -- check for prior SurvivabilityAdapter snapshot + invoke resume()
+    // classifier; ResumePolicy is logged only. Full per-policy CONSERVATIVE recovery
+    // dispatch is EXPLICITLY OUT OF SCOPE per Phase 5 D-22. The adapter instance is
+    // stashed on session._latticeAdapter so Plan 09-02's serialize sidecars at the
+    // 2 in-flight persist callsites reuse the single construction.
+    if (typeof FSB_LATTICE_RUNTIME_ADAPTER_ENABLED !== 'undefined'
+        && FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+        && typeof globalThis.FsbLatticeRuntimeAdapter !== 'undefined'
+        && typeof globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter === 'function') {
+      try {
+        var adapter = globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter({ sessionId: sessionId });
+        session._latticeAdapter = adapter;
+        var snapshot = await _findLatestSnapshot(sessionId);
+        if (snapshot) {
+          var deserialized = adapter.deserialize(snapshot);
+          var policy = await adapter.resume(snapshot);
+          // Branch behavior per CONTEXT.md D-03 (log + proceed for ALL 4 Lattice ResumePolicy
+          // literals: SAFE / RECOVERY_AMBIGUOUS / ON_ERROR_SW_EVICTION_MID_REQUEST /
+          // ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH). No 5th literal -- see RESEARCH Section 6.
+          console.log('[AgentLoop] lattice-runtime-adapter resume verdict:', {
+            sessionId: sessionId,
+            ResumePolicy: policy,
+            marker: deserialized && deserialized._currentStepName,
+            capturedAt: snapshot && snapshot.capturedAt
+          });
+        }
+      } catch (err) {
+        console.warn('[AgentLoop] lattice-runtime-adapter restore threw (non-fatal):', err && err.message);
+      }
+    }
 
     // Kick off the first iteration
     runAgentIteration(sessionId, options);
