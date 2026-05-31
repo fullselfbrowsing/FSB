@@ -350,11 +350,11 @@
 **Requirements:** [FINT-10, FINT-11, FINT-12] — promoted from the FINT-NN..M TBD placeholder at REQUIREMENTS.md line 78. FINT-10 = SW-side lattice-step-transition sender module; FINT-11 = agent-loop step.transition emission at LLM_TURN + TOOL_DISPATCH boundaries; FINT-12 = per-step Capability Receipt mint integration via Phase 5 offscreen pipeline.
 
 **Depends on:** Phase 7 (provider bridge unconditional + flag stripped).
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 08-01-PLAN.md (W0) — SW-side extension/ai/lattice-step-emitter.js producer (~80 lines dual-export idiom) + extension/background.js importScripts wire at line 13 (alphabetical between lattice-provider-bridge.js and ai-integration.js) + tests/lattice-step-emitter-smoke.test.js Wave 0 scaffold (Parts 1+2 filled; >= 12 PASS) + package.json scripts.test chain append. Closes audit gap G1 producer side. FINT-10.
-- [ ] 08-02-PLAN.md (W1) — extension/ai/agent-loop.js step.transition emission at TWO boundaries per D-01 (LLM_TURN after session.messages.push(assistantMsg) at line ~1855; TOOL_DISPATCH inside for(var ci...) loop AFTER BEFORE_TOOL_EXECUTION permission check) + smoke Parts 3+4+5+6 filled to >= 25 total PASS with INV-04 byte-freeze regression (Pitfall 1 awk-scan + setTimeout count = 8 + 4 iterator patterns + content-based discovery). FINT-11 + FINT-12.
+- [x] 08-02-PLAN.md (W1) — extension/ai/agent-loop.js step.transition emission at TWO boundaries per D-01 (LLM_TURN after session.messages.push(assistantMsg) at line ~1855; TOOL_DISPATCH inside for(var ci...) loop AFTER BEFORE_TOOL_EXECUTION permission check) + smoke Parts 3+4+5+6 filled to >= 25 total PASS with INV-04 byte-freeze regression (Pitfall 1 awk-scan + setTimeout count = 8 + 4 iterator patterns + content-based discovery). FINT-11 + FINT-12.
 - [ ] 08-03-PLAN.md (W1) — Ceremony closure: .planning/REQUIREMENTS.md FINT-10/11/12 narrative + traceability rows + FINT-04 partial -> complete + FINT-NN..M placeholder retired + Total v1 32 -> 35 + Last updated bumped + .planning/LATTICE-PIN.md Phase 8 row (SHA UNCHANGED per D-04 verdict) + .planning/v0.10.0-MILESTONE-AUDIT.md G1 documented_carryforward_low -> closed_in_phase_8 + Flow 4 partial_by_design_per_D-22 -> complete + status_history appended + last_revised bumped. ZERO production code touched.
 
 ### Phase 9: FSB SurvivabilityAdapter activated for MV3 SW eviction resumption (closes G2)
