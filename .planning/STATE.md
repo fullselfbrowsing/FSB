@@ -4,14 +4,14 @@ milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-05-31T13:30:14.544Z"
-last_activity: 2026-05-31 -- Phase 10 planning complete
+last_updated: "2026-05-31T13:43:09.964Z"
+last_activity: 2026-05-31 -- Phase 10 Plan 10-01 shipped
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 41
-  completed_plans: 39
-  percent: 95
+  completed_plans: 40
+  percent: 98
 ---
 
 # Project State
@@ -25,14 +25,22 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 10 (MCP-philosophy parity for autopilot driver) IN PROGRESS — Plan 10-01 SHIPPED (allowlist 'FSB Autopilot' + nextEntry driver discriminator + agent-loop recordVisualSessionTick at TOOL_DISPATCH boundary + Wave 0 smoke 20 PASS). Plans 10-02 (metrics recorder + drivingModel + xAI reasoning_tokens) and 10-03 (ceremony) remain. INV-04 BYTE-FROZEN (setTimeout=8, iterator=4); INV-06 BYTE-FROZEN (Lattice SHA e95067bfa87ed1b75838fc3b3ef217a3b01acbd3).
+**Current focus:** Phase 10 (MCP-philosophy parity for autopilot driver) IN PROGRESS — Plans 10-01 + 10-02 SHIPPED (allowlist 'FSB Autopilot' + nextEntry driver discriminator + agent-loop recordVisualSessionTick at TOOL_DISPATCH boundary + recorder route allowlist 'autopilot' + drivingModel pass-through field + agent-loop recordDispatch post-toolResults.push with provider/model + xAI reasoning_tokens attribution + smoke 30 PASS). Plan 10-03 (ceremony) remains. INV-04 BYTE-FROZEN (setTimeout=8, iterator=4); INV-06 BYTE-FROZEN (Lattice SHA e95067bfa87ed1b75838fc3b3ef217a3b01acbd3).
 
 ## Current Position
 
-Phase: 10 (MCP-philosophy parity for autopilot driver; 1/3 plans complete; IN PROGRESS)
-Plan: 10-01 COMPLETE (MCP_VISUAL_CLIENT_LABELS allowlist 14th entry 'FSB Autopilot' + nextEntry driver discriminator on UPDATE + CREATE branches + agent-loop autopilot recordVisualSessionTick at TOOL_DISPATCH boundary + Wave 0 smoke 20 PASS / 0 FAIL; INV-04 + INV-06 BYTE-FROZEN)
+Phase: 10 (MCP-philosophy parity for autopilot driver; 2/3 plans complete; IN PROGRESS)
+Plan: 10-02 COMPLETE (mcp-metrics-recorder.js route allowlist 'autopilot' + drivingModel pass-through field; agent-loop.js autopilot recordDispatch call site post-toolResults.push with session.providerConfig identity + xAI reasoning_tokens edge case; tests/mcp-philosophy-parity-smoke.test.js Parts 5-8 filled at 30 PASS / 0 FAIL; INV-04 + INV-06 BYTE-FROZEN)
 Status: Ready to execute
-Last activity: 2026-05-31 -- Phase 10 Plan 10-01 shipped
+Last activity: 2026-05-31 -- Phase 10 Plan 10-02 shipped
+
+### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
+
+- `eaacd4ba` feat(10-02): extend recorder route allowlist + drivingModel row field -- mcp-metrics-recorder.js route allowlist accepts 'autopilot' literal (FINT-17 D-04); new optional top-level drivingModel pass-through field on row schema (FINT-18 D-04); coerced to undefined when absent or non-object so MCP rows unchanged
+- `225cfa55` feat(10-02): insert autopilot recordDispatch call site post-toolResults.push -- 37-line block between toolResults.push (line 2381) and // ADOPT-04 comment; defensive guard on globalThis.fsbMcpMetricsRecorder + try/catch fire-and-forget; payload sourced from session.providerConfig.providerKey/.model + xAI reasoning_tokens from response.usage.completion_tokens_details when providerKey === 'xai'; INV-04 BYTE-FROZEN (setTimeout=8, iterator=4, awk-scan empty for recordDispatch AND recordVisualSessionTick inside lambdas)
+- `8eaec031` test(10-02): fill smoke Parts 5-8 covering recorder + drivingModel + xAI -- Part 5 (6 PASS) recordDispatch row schema; Part 6 (2 PASS) dispatcher_route allowlist; Part 7 (4 PASS) xAI reasoning_tokens edge cases (42 + missing + non-xAI + 0-preserved); Part 8 (2 PASS) drivingModel absent on MCP rows; total smoke 30 PASS / 0 FAIL (was 20); Parts 9-10 placeholders preserved for Plan 10-03
+
+INV-04 = 8 setTimeout in agent-loop.js (BYTE-FROZEN through Phase 10 Plan 10-02; iterator pattern = 4; awk-equivalent regex finds 0 recordDispatch AND 0 recordVisualSessionTick inside any setTimeout lambda body); INV-06 = lattice SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged through Phase 10 Plan 10-02; zero Lattice-side commits; lattice/ git status clean). Full npm test green (exit 0; Phase 8 sibling 38 PASS preserved); npm run build green (esbuild 3 entries built clean).
 
 ### Phase 10 Plan 10-01 outputs (FSB-side; 4 commits on `automation` branch):
 
