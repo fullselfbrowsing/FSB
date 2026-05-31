@@ -523,12 +523,13 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Matches the plan's acceptance criterion `grep -c "importScripts" extension/background.js`
   // which counts ALL importScripts token mentions (including comment references).
   // Phase 5 baseline: 153 mentions. Phase 6 Plan 06-02: 154 mentions (+1 new line).
+  // Phase 8 Plan 08-01: 155 mentions (+1 new line for ai/lattice-step-emitter.js).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 154, 'background.js importScripts count = 154 (Phase 5 baseline 153 + 1 new line for ai/lattice-provider-bridge.js)');
+  passAssertEqual(importScriptsCount, 155, 'background.js importScripts count = 155 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 for ai/lattice-step-emitter.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
-  // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151.
+  // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 151, 'background.js importScripts() call sites = 151 (Phase 5 baseline 150 + 1 new call for ai/lattice-provider-bridge.js)');
+  passAssertEqual(importScriptsCallSites, 152, 'background.js importScripts() call sites = 152 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 for ai/lattice-step-emitter.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
@@ -537,8 +538,17 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssert(lineCli < lineBridge && lineBridge < lineAiIntegration, 'order: ai/cli-parser.js -> ai/lattice-provider-bridge.js -> ai/ai-integration.js (no intervening importScripts entries between cli-parser and bridge OR between bridge and ai-integration)');
   // Bridge line MUST be IMMEDIATELY adjacent to cli-parser (NO comment line between; Warning 3 fix)
   passAssertEqual(lineBridge - lineCli, 1, 'bridge importScripts line is IMMEDIATELY adjacent to cli-parser (no preceding comment line; Phase 5 D-17 byte-frozen ethos)');
-  // Bridge line MUST be IMMEDIATELY adjacent to ai-integration (NO comment line between)
-  passAssertEqual(lineAiIntegration - lineBridge, 1, 'bridge importScripts line is IMMEDIATELY adjacent to ai-integration (no following comment line)');
+  // Phase 8 Plan 08-01 update: lattice-step-emitter.js now sits between
+  // lattice-provider-bridge.js and ai-integration.js (alphabetical cluster
+  // lattice-p < lattice-s). The Phase 6 Warning 3 "no comment line between"
+  // ethos is preserved -- both intervening line(s) MUST be importScripts() calls
+  // (no comments). Replace the strict adjacency=1 check with: gap is 1 or 2,
+  // and every line in the gap is an importScripts() call.
+  const gap = lineAiIntegration - lineBridge;
+  passAssert(gap >= 1 && gap <= 2, 'gap between bridge and ai-integration is 1 (pre-Phase-8) or 2 (post-Phase-8 with lattice-step-emitter inserted)');
+  for (let i = lineBridge + 1; i < lineAiIntegration; i++) {
+    passAssert(/^\s*importScripts\(/.test(bgLines[i]), 'intervening line ' + (i+1) + ' between bridge and ai-integration is an importScripts() call (no comment line; Phase 5 D-17 byte-frozen ethos preserved)');
+  }
   // Verify no OTHER importScripts entries between cli-parser and bridge (redundant given adjacency check, but kept for diagnostic clarity)
   for (let i = lineCli + 1; i < lineBridge; i++) {
     passAssert(!/importScripts\(/.test(bgLines[i]), 'no other importScripts between cli-parser and lattice-provider-bridge at line ' + (i+1));
