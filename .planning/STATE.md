@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-05-31T12:48:17Z"
-last_activity: 2026-05-31 -- Phase 9 Plan 09-01 SHIPPED (FINT-13 flag flip + FINT-15 restore wiring + Part 6 scaffold; smoke 49 PASS / 0 FAIL)
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-05-31T13:08:00.000Z"
+last_activity: 2026-05-31 -- Phase 9 Plan 09-02 SHIPPED
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 41
-  completed_plans: 37
-  percent: 90
+  completed_plans: 38
+  percent: 93
 ---
 
 # Project State
@@ -25,21 +25,27 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 9 (SurvivabilityAdapter activation; G2 closure) IN PROGRESS — Plan 09-01 SHIPPED (FINT-13 flag flip + FINT-15 restore wiring + Wave 0 smoke scaffold). Plans 09-02 (marker writes + serialize sidecars + LRU) and 09-03 (documentation ceremony) pending.
+**Current focus:** Phase 9 (SurvivabilityAdapter activation; G2 closure) IN PROGRESS — Plan 09-01 + 09-02 SHIPPED (FINT-13 flag flip + FINT-14 marker writes + serialize sidecars + FINT-15 restore wiring + LRU cap enforcement + Part 6 fill 72 PASS). Plan 09-03 (documentation ceremony: REQUIREMENTS.md FINT-14/15 narratives + LATTICE-PIN.md Phase 9 row + audit gap G2 closure) pending.
 
 ## Current Position
 
-Phase: 9 (SurvivabilityAdapter activation; 1/3 plans complete)
-Plan: 09-01 COMPLETE (flag flip FINT-13 + runAgentLoop entry restore wiring FINT-15 + Part 6 scaffold; smoke 49 PASS / 0 FAIL)
-Status: Ready to execute Plan 09-02
-Last activity: 2026-05-31 -- Phase 9 Plan 09-01 SHIPPED
+Phase: 9 (SurvivabilityAdapter activation; 2/3 plans complete)
+Plan: 09-02 COMPLETE (3 marker writes + 2 serialize sidecars + LRU cap enforcement + smoke Part 6 fill; smoke 72 PASS / 0 FAIL)
+Status: Ready to execute Plan 09-03 (documentation ceremony)
+Last activity: 2026-05-31 -- Phase 9 Plan 09-02 SHIPPED
+
+### Phase 9 Plan 09-02 outputs (FSB-side; 3 commits on `automation` branch):
+
+- `fffe1eb7` feat(09-02): 3 marker writes + 2 serialize sidecars in runAgentIteration -- BEFORE_API_REQUEST before callProviderWithTools; BEFORE_TOOL_EXECUTION inside per-tool for-loop OUTSIDE Phase 8 TOOL_DISPATCH if-guard; BEFORE_NEXT_ITERATION_SCHEDULE before deferred-iterator schedule OUTSIDE callback body; Site A sidecar after end_turn-tail persist; Site B sidecar after normal-iteration-tail persist; 14 terminal persist callsites UNTOUCHED per D-02
+- `ea917810` feat(09-02): LRU cap enforcement inside persistInternal (FINT-15) -- enforceLruCap helper inside createFsbLatticeRuntimeAdapter closure; keep-latest-N with eviction on write; default cap = 50/sessionId per Phase 5 JSDoc contract; best-effort error handling per Phase 5 D-07
+- `2bf26880` test(09-02): smoke Part 6 fill -- 5 sub-assertion clusters (FINT-14 + FINT-15) -- Part 6.1 flag-on activation + Part 6.2 round-trip + Part 6.3 4-policy ResumePolicy classification + Part 6.4 INV-04 byte-freeze + Part 6.5 LRU eviction (write 51 retain 50) + Part 6.6 Phase 8 carry-forward gate; mock storage extended for get(null, cb) listing; 23 new PASS; smoke total 72 PASS / 0 FAIL
 
 ### Phase 9 Plan 09-01 outputs (FSB-side; 2 commits on `automation` branch):
 
 - `3117bd50` feat(09-01): flag flip FINT-13 + Part 6 scaffold -- background.js globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true at line 19 (immediately after lattice-step-emitter line 13); Part 6 baseline 3 PASS; provider-bridge smoke carryforward (gap 2 -> <=8 with FINT-13 comment + flag-assignment intervening-line acceptance)
 - `80bb9dea` feat(09-01): runAgentLoop entry restore wiring + _findLatestSnapshot helper -- module-level helper above runAgentLoop; defensive guard + try/catch restore block before runAgentIteration kickoff; session._latticeAdapter stashed for Plan 09-02; Part 6 expansion +6 PASS (6.0.4-6.0.9); smoke 49 PASS / 0 FAIL
 
-INV-04 = 8 setTimeout in agent-loop.js (BYTE-FROZEN through Phase 9 Plan 09-01); INV-06 = lattice SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged). Full npm test green; npm run build green.
+INV-04 = 8 setTimeout in agent-loop.js (BYTE-FROZEN through Phase 9 Plan 09-02; iterator pattern = 4; awk-equivalent regex finds 0 _currentStepName inside any setTimeout lambda body); INV-06 = lattice SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged; no SAFE_REPLAY literal in agent-loop.js OR lattice-runtime-adapter.js). Full npm test green; npm run build green.
 
 ### Phase 8 Plan 08-02 outputs (FSB-side; 3 commits on `automation` branch):
 
