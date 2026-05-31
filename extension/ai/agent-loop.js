@@ -2380,6 +2380,43 @@ async function runAgentIteration(sessionId, options) {
 
       toolResults.push({ callId: call.id, name: call.name, result: result });
 
+      // Phase 10 FINT-17/FINT-18 -- record autopilot dispatch row with
+      // driving-model attribution (CONTEXT D-04). Fires AFTER toolResults.push
+      // so result.success reflects the actual execution outcome.
+      // dispatcher_route literal 'autopilot' relies on the route allowlist
+      // extension landed in this plan's Task 1 (recorder lines 275-277).
+      // drivingModel is a NEW top-level row field (recorder pass-through).
+      // xAI reasoning_tokens edge case per FINT-08 / LSDK-16; non-xAI
+      // providers leave the field undefined (D-04 strict reading; OpenAI
+      // o1 extension is forward-compat for v0.11.0+ per RESEARCH Pitfall 4).
+      // INV-04 preserved: call lives INSIDE iteration body BEFORE any
+      // deferred-iterator schedule; comment text avoids the literal token.
+      if (typeof globalThis !== 'undefined' &&
+          globalThis.fsbMcpMetricsRecorder &&
+          typeof globalThis.fsbMcpMetricsRecorder.recordDispatch === 'function') {
+        try {
+          var _phase10ProviderKey = (session.providerConfig && session.providerConfig.providerKey) || null;
+          var _phase10ModelId = (session.providerConfig && session.providerConfig.model) || null;
+          var _phase10ReasoningTokens = undefined;
+          if (_phase10ProviderKey === 'xai' && typeof response !== 'undefined' &&
+              response && response.usage && response.usage.completion_tokens_details) {
+            _phase10ReasoningTokens = response.usage.completion_tokens_details.reasoning_tokens;
+          }
+          globalThis.fsbMcpMetricsRecorder.recordDispatch({
+            client: 'FSB Autopilot',
+            tool: call.name,
+            requestPayload: call.args,
+            success: result.success,
+            dispatcher_route: 'autopilot',
+            drivingModel: {
+              provider: _phase10ProviderKey,
+              model_id: _phase10ModelId,
+              reasoning_tokens: _phase10ReasoningTokens
+            }
+          });
+        } catch (_e) { /* swallow - recorder is fire-and-forget */ }
+      }
+
       // ADOPT-04: Use ActionHistory instance or fallback to raw array
       if (session._actionHistory) {
         session._actionHistory.push({
