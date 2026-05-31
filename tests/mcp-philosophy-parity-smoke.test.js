@@ -127,11 +127,17 @@ global.sendSessionStatus = async () => { /* swallow */ };
 // ------------------------------------------------------------------
 const VS_PATH = require.resolve('../extension/utils/mcp-visual-session.js');
 const LC_PATH = require.resolve('../extension/utils/mcp-visual-session-lifecycle.js');
+const REC_PATH = require.resolve('../extension/utils/mcp-metrics-recorder.js');
 delete require.cache[VS_PATH];
 delete require.cache[LC_PATH];
+delete require.cache[REC_PATH];
 const VS = require(VS_PATH);
 global.MCPVisualSessionUtils = VS;
 const LC = require(LC_PATH);
+const REC = require(REC_PATH);
+// The recorder module registers globalThis.fsbMcpMetricsRecorder on load
+// AND exposes a CommonJS surface. Use the CommonJS surface for assertions
+// since both share the same recordDispatch function reference.
 
 // ------------------------------------------------------------------
 // Main async IIFE wrapping all Parts.
@@ -215,12 +221,145 @@ const LC = require(LC_PATH);
   ok(result4 && result4.reason === 'client_not_allowed',
     'Part 4.2 -- rejection reason is client_not_allowed (gate intact)');
 
-  // --- Parts 5-10 PLACEHOLDER (1 PASS each) -----------------------
-  console.log('\n--- Parts 5-10: PLACEHOLDERS (filled in 10-02 + 10-03) ---');
-  ok(true, 'placeholder Part 5 -- recordDispatch row schema (filled in Plan 10-02)');
-  ok(true, 'placeholder Part 6 -- dispatcher_route autopilot accepted (filled in Plan 10-02)');
-  ok(true, 'placeholder Part 7 -- xAI reasoning_tokens captured (filled in Plan 10-02)');
-  ok(true, 'placeholder Part 8 -- drivingModel absent on MCP rows (filled in Plan 10-02)');
+  // ------------------------------------------------------------------
+  // Helper: extract the latest fsbUsageData row. The recorder writes the
+  // array directly under the key (no wrapper object); the flatten guard
+  // tolerates a future wrapper shape so the assertions are robust.
+  // ------------------------------------------------------------------
+  async function _latestRow() {
+    var raw = await chromeMock.storage.local.get('fsbUsageData');
+    var rows = (raw && raw.fsbUsageData) || [];
+    if (!Array.isArray(rows)) rows = (rows && rows.rows) ? rows.rows : [];
+    return { rows: rows, last: rows[rows.length - 1] || {} };
+  }
+
+  // --- Part 5: recordDispatch row schema (FINT-17/18; 6 PASS) -----
+  console.log('\n--- Part 5: recordDispatch row schema (FINT-17/18) ---');
+  chromeMock.storage.local._replace({});
+  var _broadcasts5 = [];
+  var _origSendMsg5 = chromeMock.runtime.sendMessage;
+  chromeMock.runtime.sendMessage = async function(msg) { _broadcasts5.push(msg); };
+  await REC.recordDispatch({
+    client: 'FSB Autopilot',
+    tool: 'fsb_action',
+    requestPayload: { action: 'click', selector: '#btn' },
+    success: true,
+    dispatcher_route: 'autopilot',
+    drivingModel: {
+      provider: 'xai',
+      model_id: 'grok-build-0.1',
+      reasoning_tokens: 42
+    }
+  });
+  var snap5 = await _latestRow();
+  ok(snap5.rows.length >= 1,
+    'Part 5.1 -- fsbUsageData has at least 1 row');
+  ok(snap5.last.client === 'FSB Autopilot',
+    'Part 5.2 -- row.client === FSB Autopilot');
+  ok(snap5.last.dispatcher_route === 'autopilot',
+    'Part 5.3 -- row.dispatcher_route === autopilot');
+  ok(snap5.last.drivingModel && snap5.last.drivingModel.provider === 'xai',
+    'Part 5.4 -- row.drivingModel.provider === xai');
+  ok(snap5.last.drivingModel && snap5.last.drivingModel.model_id === 'grok-build-0.1',
+    'Part 5.5 -- row.drivingModel.model_id === grok-build-0.1');
+  ok(_broadcasts5.find(function(b) { return b && b.type === 'ANALYTICS_UPDATE'; }) !== undefined,
+    'Part 5.6 -- ANALYTICS_UPDATE broadcast fired');
+  chromeMock.runtime.sendMessage = _origSendMsg5;
+
+  // --- Part 6: dispatcher_route allowlist (FINT-17; 2 PASS) -------
+  console.log('\n--- Part 6: dispatcher_route allowlist (FINT-17) ---');
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'xai', model_id: 'grok-build-0.1' }
+  });
+  var snap6a = await _latestRow();
+  ok(snap6a.last.dispatcher_route === 'autopilot',
+    'Part 6.1 -- new autopilot literal accepted');
+
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'garbage',
+    drivingModel: { provider: 'xai', model_id: 'grok-build-0.1' }
+  });
+  var snap6b = await _latestRow();
+  ok(snap6b.last.dispatcher_route === null,
+    'Part 6.2 -- garbage route coerced to null (allowlist gate intact)');
+
+  // --- Part 7: xAI reasoning_tokens edge cases (FINT-18; 4 PASS) --
+  console.log('\n--- Part 7: xAI reasoning_tokens (FINT-18) ---');
+
+  // 7.1: xAI + value 42
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: 42 }
+  });
+  var snap7a = await _latestRow();
+  ok(snap7a.last.drivingModel && snap7a.last.drivingModel.reasoning_tokens === 42,
+    'Part 7.1 -- xAI reasoning_tokens 42 captured');
+
+  // 7.2: xAI + undefined (missing completion_tokens_details upstream)
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: undefined }
+  });
+  var snap7b = await _latestRow();
+  ok(snap7b.last.drivingModel && snap7b.last.drivingModel.reasoning_tokens === undefined,
+    'Part 7.2 -- xAI with missing completion_tokens_details -> undefined');
+
+  // 7.3: non-xAI (openai) -- agent-loop strips reasoning_tokens; recorder passes through
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'openai', model_id: 'gpt-4', reasoning_tokens: undefined }
+  });
+  var snap7c = await _latestRow();
+  ok(snap7c.last.drivingModel && snap7c.last.drivingModel.provider === 'openai' &&
+     snap7c.last.drivingModel.reasoning_tokens === undefined,
+    'Part 7.3 -- non-xAI provider -> reasoning_tokens undefined regardless of input');
+
+  // 7.4: xAI + reasoning_tokens=0 -- preserved as 0 (not coerced to undefined)
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'autopilot',
+    drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: 0 }
+  });
+  var snap7d = await _latestRow();
+  ok(snap7d.last.drivingModel && snap7d.last.drivingModel.reasoning_tokens === 0,
+    'Part 7.4 -- xAI reasoning_tokens=0 preserved as 0 (not undefined)');
+
+  // --- Part 8: drivingModel absent on MCP rows (FINT-17; 2 PASS) --
+  console.log('\n--- Part 8: drivingModel absent on MCP rows (FINT-17) ---');
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'Claude', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'tool'
+    // NOTE: no drivingModel field
+  });
+  var snap8a = await _latestRow();
+  ok(snap8a.last.drivingModel === undefined,
+    'Part 8.1 -- MCP-shape caller (no drivingModel field) -> row.drivingModel === undefined');
+
+  chromeMock.storage.local._replace({});
+  await REC.recordDispatch({
+    client: 'Claude', tool: 'fsb_action', requestPayload: {},
+    success: true, dispatcher_route: 'tool',
+    drivingModel: null
+  });
+  var snap8b = await _latestRow();
+  ok(snap8b.last.drivingModel === undefined,
+    'Part 8.2 -- drivingModel: null coerced to undefined (non-object guard)');
+
+  // --- Parts 9-10 PLACEHOLDER (1 PASS each) -----------------------
+  console.log('\n--- Parts 9-10: PLACEHOLDERS (filled in 10-03) ---');
   ok(true, 'placeholder Part 9 -- INV byte-freeze regression (filled in Plan 10-03)');
   ok(true, 'placeholder Part 10 -- provider switch precedence (filled in Plan 10-03)');
 
