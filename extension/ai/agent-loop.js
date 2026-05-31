@@ -1853,6 +1853,23 @@ async function runAgentIteration(sessionId, options) {
     var assistantMsg = _formatAssistantMessage(response, providerKey);
     session.messages.push(assistantMsg);
 
+    // Phase 8 FINT-11 -- emit step.transition at LLM_TURN boundary.
+    // Fire-and-forget per D-03; tracer call goes INSIDE iteration body BEFORE any
+    // deferred-iterator schedule per INV-04 + D-07 (08-RESEARCH Section 6 Pitfall 1).
+    // Payload follows Phase 5 D-16 wire shape exactly; runId equals sessionId per
+    // 08-RESEARCH Section 4 + Pitfall 3 (no new session._lattice* fields).
+    if (typeof sendLatticeStepTransition === 'function') {
+      try {
+        sendLatticeStepTransition({
+          runId: sessionId,
+          sessionId: sessionId,
+          stepName: 'LLM_TURN',
+          stepIndex: iterNum,
+          timestamp: new Date().toISOString()
+        });
+      } catch (_e) { /* swallow - producer is fire-and-forget */ }
+    }
+
     // k. Parse tool calls
     var toolCalls = _parseToolCalls(response, providerKey);
 
