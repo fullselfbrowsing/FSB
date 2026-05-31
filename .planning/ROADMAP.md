@@ -371,7 +371,7 @@ Plans:
 **Requirements:** TBD — anticipated FINT-13 (flag flip), FINT-14 (serialize sidecar at persist), FINT-15 (deserialize/resume at runAgentLoop entry).
 
 **Depends on:** Phase 8 (step.transition events are the survivability boundary markers; `_currentStepName` set by Phase 8 is read by Phase 9's ResumePolicy classifier).
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] TBD
