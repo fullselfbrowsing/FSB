@@ -14,7 +14,9 @@
     'OpenClaw 🦀',
     'Grok',
     'Gemini',
-    'Hermes'
+    'Hermes',
+    // Phase 10 FINT-16 -- autopilot driver discriminator (D-02)
+    'FSB Autopilot'
   ];
 
   var CLIENT_LABEL_MAP = Object.create(null);
