@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 08-03-PLAN.md
-last_updated: "2026-05-31T12:39:49.784Z"
-last_activity: 2026-05-31 -- Phase 9 planning complete
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-05-31T12:48:17Z"
+last_activity: 2026-05-31 -- Phase 9 Plan 09-01 SHIPPED (FINT-13 flag flip + FINT-15 restore wiring + Part 6 scaffold; smoke 49 PASS / 0 FAIL)
 progress:
   total_phases: 10
   completed_phases: 8
-  total_plans: 38
-  completed_plans: 35
-  percent: 92
+  total_plans: 41
+  completed_plans: 37
+  percent: 90
 ---
 
 # Project State
@@ -25,14 +25,21 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 8 (Lattice runtime wiring) COMPLETE — Plans 08-01 + 08-02 + 08-03 all SHIPPED; per-axis UAT-08 deferred to user-driven Chrome MV3 reload session. Phase 9 (SurvivabilityAdapter activation; G2 closure) next.
+**Current focus:** Phase 9 (SurvivabilityAdapter activation; G2 closure) IN PROGRESS — Plan 09-01 SHIPPED (FINT-13 flag flip + FINT-15 restore wiring + Wave 0 smoke scaffold). Plans 09-02 (marker writes + serialize sidecars + LRU) and 09-03 (documentation ceremony) pending.
 
 ## Current Position
 
-Phase: 8 (Lattice runtime wiring; 3/3 plans complete; per-axis UAT-08 pending user execution)
-Plan: 08-03 COMPLETE (ceremony closure: REQUIREMENTS FINT-10/11/12 + LATTICE-PIN Phase 8 row + audit G1 closed_in_phase_8 + Flow 4 complete)
-Status: Ready to execute
-Last activity: 2026-05-31 -- Phase 9 planning complete
+Phase: 9 (SurvivabilityAdapter activation; 1/3 plans complete)
+Plan: 09-01 COMPLETE (flag flip FINT-13 + runAgentLoop entry restore wiring FINT-15 + Part 6 scaffold; smoke 49 PASS / 0 FAIL)
+Status: Ready to execute Plan 09-02
+Last activity: 2026-05-31 -- Phase 9 Plan 09-01 SHIPPED
+
+### Phase 9 Plan 09-01 outputs (FSB-side; 2 commits on `automation` branch):
+
+- `3117bd50` feat(09-01): flag flip FINT-13 + Part 6 scaffold -- background.js globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true at line 19 (immediately after lattice-step-emitter line 13); Part 6 baseline 3 PASS; provider-bridge smoke carryforward (gap 2 -> <=8 with FINT-13 comment + flag-assignment intervening-line acceptance)
+- `80bb9dea` feat(09-01): runAgentLoop entry restore wiring + _findLatestSnapshot helper -- module-level helper above runAgentLoop; defensive guard + try/catch restore block before runAgentIteration kickoff; session._latticeAdapter stashed for Plan 09-02; Part 6 expansion +6 PASS (6.0.4-6.0.9); smoke 49 PASS / 0 FAIL
+
+INV-04 = 8 setTimeout in agent-loop.js (BYTE-FROZEN through Phase 9 Plan 09-01); INV-06 = lattice SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged). Full npm test green; npm run build green.
 
 ### Phase 8 Plan 08-02 outputs (FSB-side; 3 commits on `automation` branch):
 

@@ -1751,6 +1751,13 @@ async function runAgentIteration(sessionId, options) {
     }
     var response;
     try {
+      // Phase 9 FINT-14 -- mark in-flight API request boundary for SurvivabilityAdapter.
+      // Adapter resume() at lattice-runtime-adapter.js:244-256 maps this marker to
+      // ResumePolicy 'ON_ERROR_SW_EVICTION_MID_REQUEST'. Property write on session;
+      // FSB_LATTICE_RUNTIME_ADAPTER_ENABLED flag gates the DOWNSTREAM serialize sidecar
+      // at the end_turn + normal-iteration persist tails, not this property assignment
+      // (which is cheap + always-on).
+      session._currentStepName = 'BEFORE_API_REQUEST';
       response = await callProviderWithTools(
         providerInstance, model, null, turnMessages, session.tools, providerKey
       );
@@ -1893,6 +1900,18 @@ async function runAgentIteration(sessionId, options) {
       }
 
       await persist(sessionId, session);
+      // Phase 9 FINT-14 -- additive sidecar: SurvivabilityAdapter.serialize() at end_turn
+      // in-flight tail (Site A per 09-CONTEXT.md D-02). Reuses session._latticeAdapter
+      // stashed by Plan 09-01 at runAgentLoop entry. Defensive guard + try/catch
+      // fire-and-forget mirrors the Phase 8 sendLatticeStepTransition pattern.
+      if (typeof FSB_LATTICE_RUNTIME_ADAPTER_ENABLED !== 'undefined'
+          && FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+          && session._latticeAdapter
+          && typeof session._latticeAdapter.serialize === 'function') {
+        try {
+          session._latticeAdapter.serialize(session);
+        } catch (_e) { /* swallow - fire-and-forget per D-02 */ }
+      }
       await finalizeSession(sessionId, session, terminalOutcome);
 
       // Broadcast completion
@@ -2020,6 +2039,10 @@ async function runAgentIteration(sessionId, options) {
         }
       }
 
+      // Phase 9 FINT-14 -- mark in-flight tool dispatch boundary. Adapter resume() maps
+      // this marker to ResumePolicy 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH'. Marker set
+      // OUTSIDE the Phase 8 TOOL_DISPATCH emission if-guard so denied tools also set it.
+      session._currentStepName = 'BEFORE_TOOL_EXECUTION';
       // Phase 8 FINT-11 -- emit step.transition at TOOL_DISPATCH boundary.
       // One event per tool call per D-01. Placed AFTER the permission/hook check
       // so denied tools also emit a step.transition (observable in metadata via
@@ -2527,6 +2550,17 @@ async function runAgentIteration(sessionId, options) {
 
     // o. Persist session state after every iteration (per SAFE-04, D-09)
     await persist(sessionId, session);
+    // Phase 9 FINT-14 -- additive sidecar: SurvivabilityAdapter.serialize() at normal-iteration
+    // in-flight tail (Site B per 09-CONTEXT.md D-02). Reuses session._latticeAdapter stashed
+    // by Plan 09-01. Defensive guard + try/catch fire-and-forget.
+    if (typeof FSB_LATTICE_RUNTIME_ADAPTER_ENABLED !== 'undefined'
+        && FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+        && session._latticeAdapter
+        && typeof session._latticeAdapter.serialize === 'function') {
+      try {
+        session._latticeAdapter.serialize(session);
+      } catch (_e) { /* swallow - fire-and-forget per D-02 */ }
+    }
 
     // ADOPT-03: Construct structured turn result for tool_calls iteration
     session.lastTurnResult = _al_createTurnResult({
@@ -2547,6 +2581,12 @@ async function runAgentIteration(sessionId, options) {
       durationMs: Date.now() - (session.agentState.startTime || Date.now())
     });
 
+    // Phase 9 FINT-14 -- mark boundary state just before iteration scheduling.
+    // Adapter resume() maps this marker to ResumePolicy 'SAFE' (no in-flight work;
+    // iteration completed cleanly). MUST be OUTSIDE the deferred-iterator schedule
+    // lambda body for INV-04 byte-freeze; awk-scan verifies zero _currentStepName
+    // tokens inside any deferred-iterator schedule callback body.
+    session._currentStepName = 'BEFORE_NEXT_ITERATION_SCHEDULE';
     // p. Schedule next iteration via setTimeout (per D-08, P4)
     // 100ms delay: fast enough for responsive automation,
     // long enough to yield the event loop and reset Chrome's execution timer
