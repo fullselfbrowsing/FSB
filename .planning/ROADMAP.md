@@ -357,6 +357,16 @@
 
 8 phases (269-276), 9 plans, 67/68 v0.9.69 REQs Complete. Anonymous UUIDv4 install identity + opt-out kill-switch; MCP pricing module + cost-surfacing chokepoint; TelemetryCollector 5-min alarm beat surviving MV3 SW eviction; SQLite ingest with 8-layer abuse defenses + HMAC-SHA256 daily-rotated IP hashing + k>=2 anonymity floor; `/api/public-stats/*` aggregates rendered as 6 chart toggles on `/stats`; privacy disclosure section + CWS listing copy + `verify-store-listing.mjs` gate; server-side GitHub stats cache; MCP transport `z.coerce.number()` numeric-param fix. All 3 release-gating BLOCKERs RESOLVED. Released artifacts: extension v0.9.67 zip on GitHub, mcp-v0.9.2 auto-published to npm, Fly auto-deployed.
 
+### Phase 8: FSB agent loop runs on Lattice runtime - emit step.transition + mint per-step receipts + activate SurvivabilityAdapter to close audit gaps G1+G2 and flip Flow 4 to complete
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 8 to break down)
+
 ---
 
 *Last updated: 2026-05-27 -- Milestone scope extended via /gsd-autonomous discussion: Phases 6 + 7 inserted to close the FINT-KK..L (FSB consumes Lattice provider abstraction + archive custom universal-provider.js stack) gap surfaced by the `xai-key-rejected-400` debug session. Previously-deferred delegation primitive renumbered to Phase 8 (still parked for v0.11.0+ pending Lattice multi-agent policy decision). UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end as the milestone-end UAT gate. Phases 1-5 complete (21/21 plans shipped); Phases 6-7 = 0/2 plan-discussion-pending. Audit status reverted from `tech_debt` → `in_progress`.*
