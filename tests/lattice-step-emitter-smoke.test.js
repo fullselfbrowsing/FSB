@@ -145,28 +145,213 @@ ok('Part 2.8 synchronous throw from chrome.runtime.sendMessage is swallowed (no 
   assert.equal(upstreamThrew, false);
 });
 
-// ---------- Part 3: agent-loop.js integration (Plan 08-02 will fill) ----------
-console.log('--- Part 3: agent-loop.js integration (Plan 08-02 placeholder) ---');
-ok('Part 3.0 placeholder -- Plan 08-02 will populate Part 3', () => {
+// ---------- Part 3: agent-loop.js integration (5 PASSes) ----------
+console.log('--- Part 3: agent-loop.js integration ---');
+
+const fs = require('node:fs');
+const AGENT_LOOP_PATH = path.join(__dirname, '..', 'extension', 'ai', 'agent-loop.js');
+const agentLoopSrc = fs.readFileSync(AGENT_LOOP_PATH, 'utf8');
+
+ok('Part 3.1 agent-loop.js contains exactly one LLM_TURN emission', () => {
+  const m = agentLoopSrc.match(/stepName: 'LLM_TURN'/g) || [];
+  assert.equal(m.length, 1);
+});
+
+ok('Part 3.2 agent-loop.js contains exactly one TOOL_DISPATCH emission', () => {
+  const m = agentLoopSrc.match(/stepName: 'TOOL_DISPATCH'/g) || [];
+  assert.equal(m.length, 1);
+});
+
+ok('Part 3.3 both call sites use the typeof guard (>= 2 occurrences)', () => {
+  const guardCount = (agentLoopSrc.match(/typeof sendLatticeStepTransition === 'function'/g) || []).length;
+  assert.ok(guardCount >= 2, 'expected >= 2 typeof guards, found ' + guardCount);
+});
+
+ok('Part 3.4 real-runtime LLM_TURN call structure works (simulates the inserted snippet)', () => {
+  resetChromeMock();
+  const sessionId = 'sess-abc';
+  const iterNum = 1;
+  if (typeof emitter.sendLatticeStepTransition === 'function') {
+    emitter.sendLatticeStepTransition({
+      runId: sessionId,
+      sessionId: sessionId,
+      stepName: 'LLM_TURN',
+      stepIndex: iterNum,
+      timestamp: new Date().toISOString()
+    });
+  }
+  assert.equal(sendMessageCalls.length, 1);
+  assert.equal(sendMessageCalls[0].payload.stepName, 'LLM_TURN');
+  assert.equal(sendMessageCalls[0].payload.runId, sessionId);
+});
+
+ok('Part 3.5 real-runtime TOOL_DISPATCH call structure works (simulates the inserted snippet)', () => {
+  resetChromeMock();
+  const sessionId = 'sess-abc';
+  const iterNum = 1;
+  if (typeof emitter.sendLatticeStepTransition === 'function') {
+    emitter.sendLatticeStepTransition({
+      runId: sessionId,
+      sessionId: sessionId,
+      stepName: 'TOOL_DISPATCH',
+      stepIndex: iterNum,
+      previousStepName: 'LLM_TURN',
+      timestamp: new Date().toISOString()
+    });
+  }
+  assert.equal(sendMessageCalls.length, 1);
+  assert.equal(sendMessageCalls[0].payload.stepName, 'TOOL_DISPATCH');
+  assert.equal(sendMessageCalls[0].payload.previousStepName, 'LLM_TURN');
+});
+
+// ---------- Part 4: LLM_TURN + TOOL_DISPATCH semantic (6 PASSes) ----------
+console.log('--- Part 4: LLM_TURN + TOOL_DISPATCH semantic ---');
+
+ok('Part 4.1 LLM_TURN envelope contains exactly 5 keys', () => {
+  resetChromeMock();
+  emitter.sendLatticeStepTransition({runId: 'r', sessionId: 's', stepName: 'LLM_TURN', stepIndex: 1, timestamp: 't'});
+  const keys = Object.keys(sendMessageCalls[0].payload).sort();
+  assert.deepEqual(keys, ['runId', 'sessionId', 'stepIndex', 'stepName', 'timestamp']);
+});
+
+ok('Part 4.2 TOOL_DISPATCH envelope contains exactly 6 keys including previousStepName', () => {
+  resetChromeMock();
+  emitter.sendLatticeStepTransition({runId: 'r', sessionId: 's', stepName: 'TOOL_DISPATCH', stepIndex: 1, previousStepName: 'LLM_TURN', timestamp: 't'});
+  const keys = Object.keys(sendMessageCalls[0].payload).sort();
+  assert.deepEqual(keys, ['previousStepName', 'runId', 'sessionId', 'stepIndex', 'stepName', 'timestamp']);
+});
+
+ok('Part 4.3 stepIndex round-trips as finite number', () => {
+  resetChromeMock();
+  emitter.sendLatticeStepTransition({runId: 'r', sessionId: 's', stepName: 'LLM_TURN', stepIndex: 42, timestamp: 't'});
+  assert.equal(typeof sendMessageCalls[0].payload.stepIndex, 'number');
+  assert.ok(Number.isFinite(sendMessageCalls[0].payload.stepIndex));
+  assert.equal(sendMessageCalls[0].payload.stepIndex, 42);
+});
+
+ok('Part 4.4 timestamp matches ISO-8601 RFC 3339 format', () => {
+  resetChromeMock();
+  emitter.sendLatticeStepTransition({runId: 'r', sessionId: 's', stepName: 'LLM_TURN', stepIndex: 1, timestamp: new Date().toISOString()});
+  const ts = sendMessageCalls[0].payload.timestamp;
+  assert.match(ts, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+});
+
+ok('Part 4.5 runId equals sessionId convention preserved (Pitfall 3 guardrail)', () => {
+  resetChromeMock();
+  emitter.sendLatticeStepTransition({runId: 's-abc', sessionId: 's-abc', stepName: 'LLM_TURN', stepIndex: 1, timestamp: 't'});
+  assert.equal(sendMessageCalls[0].payload.runId, sendMessageCalls[0].payload.sessionId);
+});
+
+ok('Part 4.6 stepName accepts only LLM_TURN and TOOL_DISPATCH variants in agent-loop.js source', () => {
+  const allStepNames = (agentLoopSrc.match(/stepName:\s*'[^']+'/g) || []);
+  const unique = [...new Set(allStepNames)].sort();
+  assert.deepEqual(unique, ["stepName: 'LLM_TURN'", "stepName: 'TOOL_DISPATCH'"]);
+});
+
+// ---------- Part 5: Multi-iteration envelope capture (6 PASSes) ----------
+console.log('--- Part 5: Multi-iteration envelope capture ---');
+
+// Simulate 3 iterations * 2 tool calls each. Expected: 3 LLM_TURN + 6 TOOL_DISPATCH = 9 envelopes.
+resetChromeMock();
+(function simulateMultiIter() {
+  const sessionId = 'sess-multi';
+  for (let iterNum = 1; iterNum <= 3; iterNum++) {
+    emitter.sendLatticeStepTransition({runId: sessionId, sessionId: sessionId, stepName: 'LLM_TURN', stepIndex: iterNum, timestamp: new Date().toISOString()});
+    for (let ci = 0; ci < 2; ci++) {
+      emitter.sendLatticeStepTransition({runId: sessionId, sessionId: sessionId, stepName: 'TOOL_DISPATCH', stepIndex: iterNum, previousStepName: 'LLM_TURN', timestamp: new Date().toISOString()});
+    }
+  }
+})();
+
+ok('Part 5.1 multi-iteration capture yields exactly 9 envelopes (3 iters x 2 tool calls)', () => {
+  assert.equal(sendMessageCalls.length, 9);
+});
+
+ok('Part 5.2 envelope #1 is LLM_TURN with stepIndex=1', () => {
+  assert.equal(sendMessageCalls[0].payload.stepName, 'LLM_TURN');
+  assert.equal(sendMessageCalls[0].payload.stepIndex, 1);
+});
+
+ok('Part 5.3 envelope #2 is TOOL_DISPATCH stepIndex=1 with previousStepName LLM_TURN', () => {
+  assert.equal(sendMessageCalls[1].payload.stepName, 'TOOL_DISPATCH');
+  assert.equal(sendMessageCalls[1].payload.stepIndex, 1);
+  assert.equal(sendMessageCalls[1].payload.previousStepName, 'LLM_TURN');
+});
+
+ok('Part 5.4 stepIndex monotonically increases across iterations (1,1,1,2,2,2,3,3,3)', () => {
+  const indices = sendMessageCalls.map(c => c.payload.stepIndex);
+  assert.deepEqual(indices, [1, 1, 1, 2, 2, 2, 3, 3, 3]);
+});
+
+ok('Part 5.5 all envelopes use type lattice-step-transition', () => {
+  for (const c of sendMessageCalls) assert.equal(c.type, 'lattice-step-transition');
+});
+
+ok('Part 5.6 LLM_TURN to TOOL_DISPATCH ratio is 1:2 (3 LLM + 6 TOOL = 9 envelopes)', () => {
+  const llm = sendMessageCalls.filter(c => c.payload.stepName === 'LLM_TURN').length;
+  const td = sendMessageCalls.filter(c => c.payload.stepName === 'TOOL_DISPATCH').length;
+  assert.equal(llm, 3);
+  assert.equal(td, 6);
+});
+
+// ---------- Part 6: INV byte-freeze regression (8 PASSes) ----------
+console.log('--- Part 6: INV byte-freeze regression ---');
+
+ok('Part 6.1 INV-04 setTimeout count in agent-loop.js is exactly 8', () => {
+  const m = agentLoopSrc.match(/setTimeout/g) || [];
+  assert.equal(m.length, 8);
+});
+
+ok('Part 6.2 INV-04 iterator pattern session._nextIterationTimer = setTimeout appears exactly 4 times', () => {
+  const m = agentLoopSrc.match(/session\._nextIterationTimer\s*=\s*setTimeout/g) || [];
+  assert.equal(m.length, 4);
+});
+
+ok('Part 6.3 Pitfall 1: no sendLatticeStepTransition token inside any setTimeout lambda body', () => {
+  const lines = agentLoopSrc.split('\n');
+  let insideLambda = false;
+  for (const line of lines) {
+    if (/setTimeout\(function/.test(line)) insideLambda = true;
+    if (insideLambda && /sendLatticeStepTransition/.test(line)) {
+      throw new Error('sendLatticeStepTransition found inside setTimeout lambda body');
+    }
+    if (insideLambda && /\},\s*\d+\s*\)/.test(line)) insideLambda = false;
+  }
   assert.equal(true, true);
 });
 
-// ---------- Part 4: LLM_TURN + TOOL_DISPATCH semantic (Plan 08-02 will fill) ----------
-console.log('--- Part 4: LLM_TURN + TOOL_DISPATCH semantic (Plan 08-02 placeholder) ---');
-ok('Part 4.0 placeholder -- Plan 08-02 will populate Part 4', () => {
+ok('Part 6.4 INV-05 deprecated agent modules absent OR carry DEPRECATED banner', () => {
+  const targets = ['extension/agents/agent-executor.js', 'extension/agents/agent-manager.js', 'extension/agents/agent-scheduler.js'];
+  for (const f of targets) {
+    const p = path.join(__dirname, '..', f);
+    if (fs.existsSync(p)) {
+      const src = fs.readFileSync(p, 'utf8');
+      assert.match(src, /DEPRECATED/, f + ' missing DEPRECATED banner');
+    }
+  }
   assert.equal(true, true);
 });
 
-// ---------- Part 5: SendMessage envelope count + payload structure (Plan 08-02 will fill) ----------
-console.log('--- Part 5: Envelope count + structure under multi-iteration (Plan 08-02 placeholder) ---');
-ok('Part 5.0 placeholder -- Plan 08-02 will populate Part 5', () => {
-  assert.equal(true, true);
+ok('Part 6.5 INV-06 LATTICE-PIN.md current_lattice_sha equals e95067bfa87ed1b75838fc3b3ef217a3b01acbd3', () => {
+  const pin = fs.readFileSync(path.join(__dirname, '..', '.planning', 'LATTICE-PIN.md'), 'utf8');
+  assert.match(pin, /current_lattice_sha:\s*e95067bfa87ed1b75838fc3b3ef217a3b01acbd3/);
 });
 
-// ---------- Part 6: INV byte-freeze regression (Plan 08-02 will fill) ----------
-console.log('--- Part 6: INV byte-freeze regression (Plan 08-02 placeholder) ---');
-ok('Part 6.0 placeholder -- Plan 08-02 will populate Part 6', () => {
-  assert.equal(true, true);
+ok('Part 6.6 lattice-step-emitter.js contains zero setTimeout (Pitfall 1 module-level)', () => {
+  const src = fs.readFileSync(EMITTER_PATH, 'utf8');
+  const m = src.match(/setTimeout/g);
+  assert.equal(m, null);
+});
+
+ok('Part 6.7 background.js contains exactly one importScripts of the new emitter', () => {
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const m = bg.match(/importScripts\('ai\/lattice-step-emitter\.js'\)/g) || [];
+  assert.equal(m.length, 1);
+});
+
+ok('Part 6.8 INV-01 tool-definitions parity test exists and is in the test chain', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  assert.match(pkg.scripts.test, /tool-definitions-parity\.test\.js/);
 });
 
 // ---------- Final tally ----------
@@ -176,8 +361,8 @@ if (fail > 0) {
   failures.forEach(f => console.error('  - ' + f));
   process.exit(1);
 }
-if (pass < 12) {
-  console.error('Wave 0 floor violated: pass count ' + pass + ' < 12');
+if (pass < 25) {
+  console.error('Plan 08-02 floor violated: pass count ' + pass + ' < 25');
   process.exit(1);
 }
 process.exit(0);
