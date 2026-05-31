@@ -357,16 +357,33 @@
 
 8 phases (269-276), 9 plans, 67/68 v0.9.69 REQs Complete. Anonymous UUIDv4 install identity + opt-out kill-switch; MCP pricing module + cost-surfacing chokepoint; TelemetryCollector 5-min alarm beat surviving MV3 SW eviction; SQLite ingest with 8-layer abuse defenses + HMAC-SHA256 daily-rotated IP hashing + k>=2 anonymity floor; `/api/public-stats/*` aggregates rendered as 6 chart toggles on `/stats`; privacy disclosure section + CWS listing copy + `verify-store-listing.mjs` gate; server-side GitHub stats cache; MCP transport `z.coerce.number()` numeric-param fix. All 3 release-gating BLOCKERs RESOLVED. Released artifacts: extension v0.9.67 zip on GitHub, mcp-v0.9.2 auto-published to npm, Fly auto-deployed.
 
-### Phase 8: FSB agent loop runs on Lattice runtime - emit step.transition + mint per-step receipts + activate SurvivabilityAdapter to close audit gaps G1+G2 and flip Flow 4 to complete
+### Phase 8: FSB agent brain on Lattice runtime + MCP-philosophy parity for autopilot driver
 
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 7
-**Plans:** 0 plans
+**Goal (working brief — finalize via /gsd-discuss-phase 8):** Close the v0.10.0 half-step surfaced post-UAT-1 (2026-05-31). The milestone shipped Lattice-as-framework + FSB provider-layer migration, but FSB's agent BRAIN (runAgentIteration iterator, tool dispatch, multi-turn history, visual session UX, metrics + driving-model attribution) still runs on FSB-owned code paths that bypass both (a) Lattice's tracer / checkpoint / survivability primitives and (b) the MCP-driven session lifecycle that already populates the visual panel + metrics recorder + storage. Phase 8 brings these into philosophical parity — autopilot becomes "an MCP client in spirit, a Lattice consumer in substance" — while keeping INV-04 (setTimeout iterator BYTE-FROZEN, additive calls only) and INV-06 (current_lattice_sha frozen unless gap-closure reveals a needed Lattice-side extension).
+
+Two concrete scope axes (discuss-phase decides whether one phase or splits into Phase 8 + 9 + 10):
+
+1. **Lattice runtime wiring (closes audit gaps G1 + G2; flips Flow 4 partial -> complete):**
+  - runAgentIteration emits `step.transition` events into `lattice.tracer.event?.()` per step boundary.
+  - createCheckpointHook integrated so each step mints a Lattice Capability Receipt (signed when signer present; degrade gracefully otherwise) in production code path (not just standalone smoke).
+  - `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` flag flipped on; `lattice-runtime-adapter.js` consumed by runAgentLoop's serialize/deserialize/resume entry points for MV3 SW eviction resumption.
+  - SW-side `lattice-step-transition` sender wired (closes G1); offscreen lattice-host listener already exists.
+
+2. **MCP-philosophy parity for autopilot (closes the autopilot vs MCP UX/telemetry divergence):**
+  - autopilot driver opens + drives the visual session panel via `mcp-visual-session-lifecycle.js` the same way MCP does (visual ticks per tool call, end-of-session clear).
+  - autopilot tool calls populate `mcp-metrics-recorder.js` so the dashboard shows per-tool counts + pricing + driving-model attribution regardless of whether the session was MCP-driven or autopilot-driven.
+  - driving-model identity (provider + model id + reasoning_tokens for xAI) captured in the visual-session record + the metrics record so retrospective inspection shows which model drove which session.
+  - storage schema parity: autopilot sessions land in the same `fsbMcpVisualSessions` (or sibling) store with compatible shape so existing UI surfaces the autopilot history without forking.
+  - tool dispatch surface ALREADY at parity per INV-02 (`extension/ai/tool-definitions.js` byte-frozen mirror of `mcp/ai/tool-definitions.cjs`) — this is the proof-point that parity is technically achievable; Phase 8 extends that proof from tool DEFINITIONS to tool LIFECYCLE + TELEMETRY + ATTRIBUTION.
+
+**Requirements:** TBD — populate via /gsd-discuss-phase 8 then /gsd-plan-phase 8. Discuss-phase should surface gray areas including: (i) where exactly step.transition fires (per tool call? per LLM turn? both?); (ii) receipt-mint cadence (per step, per turn, aggregated, with sidecar?); (iii) MV3 resumption semantics (does the iterator restart at the same setTimeout slot? does it re-emit step.transition?); (iv) visual-session storage schema unification (extend MCP schema or shared envelope?); (v) metrics attribution for the offscreen bridge (request count belongs to autopilot or to MCP origin?).
+
+**Depends on:** Phase 7 (provider bridge unconditional + flag stripped).
+**Plans:** 0 plans — discuss-phase first per user choice 2026-05-31.
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 8 to break down)
+- [ ] TBD (run /gsd-discuss-phase 8 first; then /gsd-plan-phase 8 — may split into Phase 8 + 9 + 10)
 
 ---
 
-*Last updated: 2026-05-27 -- Milestone scope extended via /gsd-autonomous discussion: Phases 6 + 7 inserted to close the FINT-KK..L (FSB consumes Lattice provider abstraction + archive custom universal-provider.js stack) gap surfaced by the `xai-key-rejected-400` debug session. Previously-deferred delegation primitive renumbered to Phase 8 (still parked for v0.11.0+ pending Lattice multi-agent policy decision). UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end as the milestone-end UAT gate. Phases 1-5 complete (21/21 plans shipped); Phases 6-7 = 0/2 plan-discussion-pending. Audit status reverted from `tech_debt` → `in_progress`.*
+*Last updated: 2026-05-31 -- Milestone v0.10.0 re-opened (2nd time) after UAT-1 PASS. Phase 8 added to close the half-step: FSB's agent BRAIN (iterator + tool dispatch + visual-session UX + metrics + driving-model attribution) still runs on FSB-owned code paths bypassing both Lattice's runtime primitives (G1 + G2 + Flow 4) and the MCP-driven session lifecycle. Phase 8 brings autopilot into philosophical parity with MCP-driven sessions (same tools per INV-02 already; same lifecycle + telemetry + attribution as new scope) while consuming Lattice's tracer/checkpoint/survivability primitives. Discuss-phase to decide whether this is one phase or splits into 2-3. The original Phase 8 "delegation primitive" sketch from 2026-05-27 (see section above) remains separately deferred to v0.11.0+ as before. Phases 1-7 + UAT-1 stand individually passed.*
