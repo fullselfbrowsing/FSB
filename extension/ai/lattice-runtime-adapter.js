@@ -50,9 +50,9 @@
  *     this adapter accumulates per-step snapshots without cleanup. The
  *     JSDoc on createFsbLatticeRuntimeAdapter below documents an
  *     LRU-bound contract (default cap = 50 snapshots per sessionId);
- *     enforcement is a follow-on. Plan 05-05 ships the documented
- *     contract; the smoke does NOT assert size-cap (Phase 5 is
- *     contract-shipping; LRU is post-milestone).
+ *     enforced in Phase 9 (FINT-15) via enforceLruCap() inside
+ *     persistInternal. The Phase 9 smoke (Part 6.5) asserts the cap
+ *     holds: writing 51 snapshots leaves exactly 50 retained.
  *   - PII via serialized state (row 5 of CONTEXT.md threat model):
  *     callers MUST ensure state contains only stable identifiers per
  *     Phase 2 D-04 + Phase 3 conventions; documented + not enforced.
@@ -73,7 +73,7 @@
 (function (globalScope) {
   const ADAPTER_TAG = '[FSB lattice-runtime-adapter]';
   const STORAGE_KEY_PREFIX = 'fsb_lattice_snapshot_';
-  const DEFAULT_LRU_CAP = 50; // JSDoc-documented contract; enforcement is follow-on
+  const DEFAULT_LRU_CAP = 50; // JSDoc-documented contract; enforced in Phase 9 (FINT-15)
 
   /**
    * Build an FSB MV3-survivability adapter backed by chrome.storage.session.
@@ -91,7 +91,9 @@
    *     expose get/set/remove); default = globalScope.chrome.storage.session.
    *     The Node smoke supplies an in-memory mock.
    *   - lruCap: optional. Documented bound on snapshot count per
-   *     sessionId; default = 50. NOT ENFORCED in Phase 5 (follow-on).
+   *     sessionId; default = 50. ENFORCED in Phase 9 (FINT-15) via
+   *     enforceLruCap() invoked from persistInternal after each write
+   *     commits (keep-latest-N; oldest evicted, newest retained).
    *
    * Returns: SurvivabilityAdapter-shaped object.
    */
@@ -119,9 +121,55 @@
     const hooks = new Set();
 
     /**
+     * Phase 9 FINT-15 -- keep-latest-N LRU enforcement per JSDoc line 76
+     * contract (default cap = 50 per sessionId). Fire-and-forget per Phase 9
+     * RESEARCH Section 7 sync/async resolution: brief excursions to cap+1 are
+     * harmless (chrome.storage.session 10MB quota gives ~2000-4000 typical
+     * snapshot headroom above cap=50). Lists all keys matching the sessionId
+     * prefix, sorts (ISO-8601 capturedAt suffix is lexicographically
+     * chronological), and removes the oldest entries beyond the cap.
+     *
+     * Errors are logged + swallowed: a single failed eviction does not throw
+     * upstream because the next serialize call re-attempts eviction
+     * idempotently (mirrors Phase 5 D-07 best-effort design).
+     */
+    function enforceLruCap(sessionIdArg, storageArg, cap) {
+      try {
+        const prefix = STORAGE_KEY_PREFIX + sessionIdArg + '_';
+        storageArg.get(null, function (all) {
+          if (typeof globalScope.chrome !== 'undefined'
+              && globalScope.chrome.runtime
+              && globalScope.chrome.runtime.lastError) {
+            return;
+          }
+          const matches = Object.keys(all || {})
+            .filter(function (k) { return k.indexOf(prefix) === 0; })
+            .sort();
+          if (matches.length <= cap) return;
+          const toDelete = matches.slice(0, matches.length - cap);
+          storageArg.remove(toDelete, function () {
+            if (typeof globalScope.chrome !== 'undefined'
+                && globalScope.chrome.runtime
+                && globalScope.chrome.runtime.lastError) {
+              console.warn(ADAPTER_TAG, 'enforceLruCap remove lastError:',
+                globalScope.chrome.runtime.lastError);
+            }
+          });
+        });
+      } catch (err) {
+        console.warn(ADAPTER_TAG, 'enforceLruCap threw:', err && err.message);
+      }
+    }
+
+    /**
      * Persist a SerializedSnapshot to chrome.storage.session keyed by
      * sessionId + snapshot.capturedAt. Wrapped in the feature-flag check
      * (D-20 uniform pattern). Best-effort: storage failures log + return.
+     *
+     * Phase 9 FINT-15: invokes enforceLruCap(sessionId, storage, lruCap) from
+     * inside the storage.set callback so the new snapshot commits before
+     * eviction sweep (keep-latest-N semantics; oldest evicted, newest
+     * retained per JSDoc line 76 contract).
      */
     function persistInternal(snapshot) {
       if (typeof globalScope.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED === 'undefined'
@@ -134,6 +182,8 @@
         storage.set({ [key]: snapshot }, () => {
           // chrome.storage.session.set MAY emit a runtime.lastError; the
           // adapter does not surface this beyond logging (best-effort).
+          // Phase 9 FINT-15 -- enforce LRU cap after write commits.
+          enforceLruCap(sessionId, storage, lruCap);
         });
       } catch (err) {
         console.warn(ADAPTER_TAG, 'persistInternal threw:', err && err.message);
