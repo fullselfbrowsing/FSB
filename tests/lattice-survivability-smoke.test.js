@@ -282,6 +282,37 @@ function createChromeStorageSessionMock() {
   passAssertEqual(typeof lattice.createAnthropicProvider, 'function', 'Phase 4 createAnthropicProvider still reachable');
   passAssertEqual(lattice.STEP_TRANSITION_EVENT_NAME, 'step.transition', 'Phase 3 STEP_TRANSITION_EVENT_NAME constant preserved');
 
+  // ---- Part 6: Phase 9 activation scaffold (Plan 09-01 baseline; Plan 09-02 fills) ----
+  // Wave 0 placeholder per RESEARCH Section 10 Wave 0 Gaps. Part 6 fills incrementally
+  // across Plans 09-01 (this plan: flag flip + restore wiring presence) and 09-02
+  // (marker writes + serialize sidecars + LRU enforcement + ResumePolicy classification).
+  console.log('\n--- Part 6: Phase 9 activation scaffold (Plan 09-01 baseline) ---');
+
+  (function part6Scaffold() {
+    var fs = require('fs');
+    var path = require('path');
+
+    // 6.0.1 - background.js contains the Phase 9 flag flip (FINT-13).
+    var bgSrc = fs.readFileSync(path.join(__dirname, '../extension/background.js'), 'utf8');
+    passAssert(
+      /globalThis\.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED\s*=\s*true/.test(bgSrc),
+      'Part 6.0.1 - background.js declares globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true (FINT-13)'
+    );
+
+    // 6.0.2 - Flag flip positioned AFTER the lattice-step-emitter importScripts.
+    var emitterIdx = bgSrc.indexOf("importScripts('ai/lattice-step-emitter.js')");
+    var flagIdx = bgSrc.indexOf('globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED');
+    passAssert(
+      emitterIdx > -1 && flagIdx > -1 && flagIdx > emitterIdx,
+      'Part 6.0.2 - flag flip positioned AFTER lattice-step-emitter importScripts (Phase 8 carryforward order)'
+    );
+
+    // 6.0.3 - INV-04 byte-freeze (deferred-iterator schedule count = 8 in agent-loop.js).
+    var agentLoopSrc = fs.readFileSync(path.join(__dirname, '../extension/ai/agent-loop.js'), 'utf8');
+    var deferredIteratorCount = (agentLoopSrc.match(/setTimeout/g) || []).length;
+    passAssertEqual(deferredIteratorCount, 8, 'Part 6.0.3 - INV-04 deferred-iterator schedule count = 8 (byte-frozen)');
+  })();
+
   console.log('\n--- Summary ---');
   console.log('passed:', passed);
   console.log('failed:', failed);

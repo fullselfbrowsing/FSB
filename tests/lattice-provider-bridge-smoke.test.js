@@ -540,14 +540,23 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssertEqual(lineBridge - lineCli, 1, 'bridge importScripts line is IMMEDIATELY adjacent to cli-parser (no preceding comment line; Phase 5 D-17 byte-frozen ethos)');
   // Phase 8 Plan 08-01 update: lattice-step-emitter.js now sits between
   // lattice-provider-bridge.js and ai-integration.js (alphabetical cluster
-  // lattice-p < lattice-s). The Phase 6 Warning 3 "no comment line between"
-  // ethos is preserved -- both intervening line(s) MUST be importScripts() calls
-  // (no comments). Replace the strict adjacency=1 check with: gap is 1 or 2,
-  // and every line in the gap is an importScripts() call.
+  // lattice-p < lattice-s).
+  // Phase 9 Plan 09-01 update (FINT-13): the lattice-runtime-adapter activation
+  // flag flip lands as a `globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;`
+  // assignment immediately after lattice-step-emitter (with a FINT-13 comment
+  // block). This grows the bridge -> ai-integration gap from 2 -> up to 8
+  // (1 emitter importScripts + N comment lines + 1 flag assignment + ai-integration).
+  // The Phase 5 D-17 ethos becomes: every line in the gap MUST be one of
+  // (a) importScripts() call, (b) Phase 9 FINT-13 comment line, or
+  // (c) the FSB_LATTICE_RUNTIME_ADAPTER_ENABLED flag assignment.
   const gap = lineAiIntegration - lineBridge;
-  passAssert(gap >= 1 && gap <= 2, 'gap between bridge and ai-integration is 1 (pre-Phase-8) or 2 (post-Phase-8 with lattice-step-emitter inserted)');
+  passAssert(gap >= 1 && gap <= 8, 'gap between bridge and ai-integration is 1..8 (pre-Phase-8 = 1; Phase 8 = 2; Phase 9 grows to <= 8 with FINT-13 flag flip + comment block)');
   for (let i = lineBridge + 1; i < lineAiIntegration; i++) {
-    passAssert(/^\s*importScripts\(/.test(bgLines[i]), 'intervening line ' + (i+1) + ' between bridge and ai-integration is an importScripts() call (no comment line; Phase 5 D-17 byte-frozen ethos preserved)');
+    var ln = bgLines[i];
+    var isImport = /^\s*importScripts\(/.test(ln);
+    var isPhase9Comment = /^\s*\/\//.test(ln);
+    var isPhase9Flag = /^\s*globalThis\.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED\s*=\s*true/.test(ln);
+    passAssert(isImport || isPhase9Comment || isPhase9Flag, 'intervening line ' + (i+1) + ' between bridge and ai-integration is importScripts() OR Phase 9 FINT-13 comment OR FSB_LATTICE_RUNTIME_ADAPTER_ENABLED assignment (Phase 5 D-17 byte-frozen ethos preserved with Phase 9 carryforward)');
   }
   // Verify no OTHER importScripts entries between cli-parser and bridge (redundant given adjacency check, but kept for diagnostic clarity)
   for (let i = lineCli + 1; i < lineBridge; i++) {

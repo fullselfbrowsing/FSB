@@ -11,6 +11,12 @@ importScripts('config/secure-config.js');
 importScripts('ai/cli-parser.js');
 importScripts('ai/lattice-provider-bridge.js');
 importScripts('ai/lattice-step-emitter.js');
+// Phase 9 FINT-13 -- activate FSB SurvivabilityAdapter (closes audit gap G2).
+// Mirrors Phase 6 flag-flip-in-background.js precedent (FSB_LATTICE_PROVIDER_BRIDGE_ENABLED
+// pre-Phase-7). Code-only activation; options-page exposure deferred per 09-CONTEXT.md
+// deferred ideas. Set BEFORE chrome.runtime.onInstalled at line 13142+ so the flag is
+// observable from the first runAgentLoop invocation.
+globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;
 importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
 importScripts('utils/mcp-visual-session.js');
