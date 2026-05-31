@@ -2062,6 +2062,30 @@ async function runAgentIteration(sessionId, options) {
         } catch (_e) { /* swallow - producer is fire-and-forget */ }
       }
 
+      // Phase 10 FINT-16 -- emit visual-session tick at TOOL_DISPATCH boundary
+      // (CONTEXT D-03). One tick per tool call; fires immediately after the
+      // Phase 8 step.transition emission so Lattice telemetry + overlay
+      // telemetry land side-by-side for debugging. Driver discriminator
+      // distinguishes autopilot ticks from MCP-bridge ticks downstream.
+      // Fire-and-forget; defensive guard mirrors Phase 8 pattern.
+      // INV-04 preserved: call lives INSIDE the iteration body BEFORE any
+      // deferred-iterator schedule; comment text avoids the literal token.
+      if (typeof MCPVisualSessionLifecycleUtils !== 'undefined' &&
+          typeof MCPVisualSessionLifecycleUtils.recordVisualSessionTick === 'function') {
+        try {
+          MCPVisualSessionLifecycleUtils.recordVisualSessionTick(
+            session.tabId,
+            session.agentId,
+            {
+              client: 'FSB Autopilot',
+              visualReason: 'autopilot-tool-dispatch:' + call.name,
+              driver: 'autopilot',
+              isFinal: false
+            }
+          );
+        } catch (_e) { /* swallow - fire-and-forget */ }
+      }
+
       // --- Local tool interception (Phase 138 on-demand context) ---
       if (call.name === 'get_page_snapshot') {
         // CTX-01: Fetch markdown snapshot from content script
