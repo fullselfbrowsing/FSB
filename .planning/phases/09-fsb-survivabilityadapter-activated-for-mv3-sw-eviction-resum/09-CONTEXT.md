@@ -68,14 +68,18 @@ Close audit gap G2 (lattice-runtime-adapter has zero importers in extension/* ou
 
 ### ResumePolicy classification mapping
 
-- **D-04:** Phase 9 uses the FULL Phase 1 attempt-1 CONSERVATIVE mapping (mirroring `lattice-runtime-adapter.js:244-256` switch) without simplification:
+- **D-04:** Phase 9 uses the FULL Phase 1 attempt-1 CONSERVATIVE mapping (mirroring `lattice-runtime-adapter.js:244-256` switch) without simplification. **CORRECTION 2026-05-31** per Phase 9 RESEARCH Section 2: Lattice's `ResumePolicy` at `lattice/packages/lattice/src/runtime/survivability.ts:148-152` is a 4-member literal union (`SAFE | RECOVERY_AMBIGUOUS | ON_ERROR_SW_EVICTION_MID_REQUEST | ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH`). `SAFE_REPLAY` does NOT exist. Introducing a 5th literal would trigger INV-06 carve-out + SHA bump.
+
+  Final 4-marker → 4-policy mapping (collapses `BEFORE_NEXT_ITERATION_SCHEDULE` → `'SAFE'`):
   - `_currentStepName === 'BEFORE_API_REQUEST'` → `ON_ERROR_SW_EVICTION_MID_REQUEST`
   - `_currentStepName === 'BEFORE_TOOL_EXECUTION'` → `ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH`
   - `_currentStepName === 'BEFORE_ITERATION'` → `RECOVERY_AMBIGUOUS`
-  - `_currentStepName === 'BEFORE_NEXT_ITERATION_SCHEDULE'` → `SAFE_REPLAY`
-  - `marker === undefined` → `SAFE` (no snapshot or pre-Phase-9 session)
+  - `_currentStepName === 'BEFORE_NEXT_ITERATION_SCHEDULE'` → `'SAFE'` (boundary state; iteration completed cleanly; SW can resume from same iterator slot)
+  - `marker === undefined` → `'SAFE'` (no snapshot or pre-Phase-9 session)
 
-  Coarser mapping (any restored state → `SAFE_REPLAY`) defeats the audit framing — G2 needs ResumePolicy to discriminate. Per-session flag-gating defeats the milestone goal (FSB agent brain runs on Lattice runtime in production).
+  Rationale: the `BEFORE_NEXT_ITERATION_SCHEDULE` marker captures state AFTER one iteration's full cycle completes (no in-flight work). That's semantically `SAFE` per Lattice's existing definition — resumption from this snapshot is equivalent to starting the next iteration fresh.
+
+  Coarser mapping (any restored state → `SAFE`) defeats the audit framing — G2 needs ResumePolicy to discriminate IN-FLIGHT vs BOUNDARY states. The 3 non-SAFE markers preserve that discrimination.
 
 ### Snapshot retention policy + LRU enforcement
 
