@@ -357,32 +357,62 @@
 
 8 phases (269-276), 9 plans, 67/68 v0.9.69 REQs Complete. Anonymous UUIDv4 install identity + opt-out kill-switch; MCP pricing module + cost-surfacing chokepoint; TelemetryCollector 5-min alarm beat surviving MV3 SW eviction; SQLite ingest with 8-layer abuse defenses + HMAC-SHA256 daily-rotated IP hashing + k>=2 anonymity floor; `/api/public-stats/*` aggregates rendered as 6 chart toggles on `/stats`; privacy disclosure section + CWS listing copy + `verify-store-listing.mjs` gate; server-side GitHub stats cache; MCP transport `z.coerce.number()` numeric-param fix. All 3 release-gating BLOCKERs RESOLVED. Released artifacts: extension v0.9.67 zip on GitHub, mcp-v0.9.2 auto-published to npm, Fly auto-deployed.
 
-### Phase 8: FSB agent brain on Lattice runtime + MCP-philosophy parity for autopilot driver
+### Phase 8: FSB agent brain on Lattice runtime — step.transition emit + per-step receipt mint (closes G1, flips Flow 4 to complete)
 
-**Goal (working brief — finalize via /gsd-discuss-phase 8):** Close the v0.10.0 half-step surfaced post-UAT-1 (2026-05-31). The milestone shipped Lattice-as-framework + FSB provider-layer migration, but FSB's agent BRAIN (runAgentIteration iterator, tool dispatch, multi-turn history, visual session UX, metrics + driving-model attribution) still runs on FSB-owned code paths that bypass both (a) Lattice's tracer / checkpoint / survivability primitives and (b) the MCP-driven session lifecycle that already populates the visual panel + metrics recorder + storage. Phase 8 brings these into philosophical parity — autopilot becomes "an MCP client in spirit, a Lattice consumer in substance" — while keeping INV-04 (setTimeout iterator BYTE-FROZEN, additive calls only) and INV-06 (current_lattice_sha frozen unless gap-closure reveals a needed Lattice-side extension).
+**Goal:** Wire FSB's autopilot agent loop to emit `step.transition` events into Lattice's tracer and mint per-step Capability Receipts via `createCheckpointHook` in the production code path. Close audit gap G1 (SW-side `lattice-step-transition` sender missing); flip integration Flow 4 from partial-by-design to complete. Phase 8 is the first of three sibling phases (8 + 9 + 10) splitting the v0.10.0 half-step closure work per Phase 8 CONTEXT.md D-06.
 
-Two concrete scope axes (discuss-phase decides whether one phase or splits into Phase 8 + 9 + 10):
+**Scope (locked in 08-CONTEXT.md):**
+- `step.transition` fires at TWO boundaries per `runAgentIteration`: `LLM_TURN` (after API round-trip at `agent-loop.js:~1853`) AND `TOOL_DISPATCH` (per tool call at `agent-loop.js:~1906`); distinguished via `metadata.stepName` not new `RunEventKind` literals (D-01).
+- Receipt-mint cadence is per `step.transition`, gated by signer presence; uses ephemeral Ed25519 signer at offscreen boot (D-02).
+- New SW-side `sendLatticeStepTransition` function in `extension/background.js` (or sibling module) posts `lattice-step-transition` to offscreen via existing `chrome.runtime.sendMessage` channel; offscreen listener at `lattice-host.js:~295-371` already exists (D-03).
+- INV-04 setTimeout iterator pattern stays byte-frozen (additive tracer/hook calls only; never inside lambdas; `grep -c "setTimeout" extension/ai/agent-loop.js` returns 8 post-phase) (D-07).
+- INV-06 default frozen at `current_lattice_sha e95067bfa87ed1b75838fc3b3ef217a3b01acbd3`; carve-out only if planner research reveals `CreateReceiptInput` extension is needed for FSB's tool-result envelope shape (D-04).
 
-1. **Lattice runtime wiring (closes audit gaps G1 + G2; flips Flow 4 partial -> complete):**
-  - runAgentIteration emits `step.transition` events into `lattice.tracer.event?.()` per step boundary.
-  - createCheckpointHook integrated so each step mints a Lattice Capability Receipt (signed when signer present; degrade gracefully otherwise) in production code path (not just standalone smoke).
-  - `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` flag flipped on; `lattice-runtime-adapter.js` consumed by runAgentLoop's serialize/deserialize/resume entry points for MV3 SW eviction resumption.
-  - SW-side `lattice-step-transition` sender wired (closes G1); offscreen lattice-host listener already exists.
-
-2. **MCP-philosophy parity for autopilot (closes the autopilot vs MCP UX/telemetry divergence):**
-  - autopilot driver opens + drives the visual session panel via `mcp-visual-session-lifecycle.js` the same way MCP does (visual ticks per tool call, end-of-session clear).
-  - autopilot tool calls populate `mcp-metrics-recorder.js` so the dashboard shows per-tool counts + pricing + driving-model attribution regardless of whether the session was MCP-driven or autopilot-driven.
-  - driving-model identity (provider + model id + reasoning_tokens for xAI) captured in the visual-session record + the metrics record so retrospective inspection shows which model drove which session.
-  - storage schema parity: autopilot sessions land in the same `fsbMcpVisualSessions` (or sibling) store with compatible shape so existing UI surfaces the autopilot history without forking.
-  - tool dispatch surface ALREADY at parity per INV-02 (`extension/ai/tool-definitions.js` byte-frozen mirror of `mcp/ai/tool-definitions.cjs`) — this is the proof-point that parity is technically achievable; Phase 8 extends that proof from tool DEFINITIONS to tool LIFECYCLE + TELEMETRY + ATTRIBUTION.
-
-**Requirements:** TBD — populate via /gsd-discuss-phase 8 then /gsd-plan-phase 8. Discuss-phase should surface gray areas including: (i) where exactly step.transition fires (per tool call? per LLM turn? both?); (ii) receipt-mint cadence (per step, per turn, aggregated, with sidecar?); (iii) MV3 resumption semantics (does the iterator restart at the same setTimeout slot? does it re-emit step.transition?); (iv) visual-session storage schema unification (extend MCP schema or shared envelope?); (v) metrics attribution for the offscreen bridge (request count belongs to autopilot or to MCP origin?).
+**Requirements:** TBD — populated via /gsd-plan-phase 8. Anticipated new IDs: FINT-10 (SW lattice-step-transition sender), FINT-11 (agent-loop step.transition emission), FINT-12 (per-step receipt mint integration).
 
 **Depends on:** Phase 7 (provider bridge unconditional + flag stripped).
-**Plans:** 0 plans — discuss-phase first per user choice 2026-05-31.
+**Plans:** 0 plans — run /gsd-plan-phase 8 next.
 
 Plans:
-- [ ] TBD (run /gsd-discuss-phase 8 first; then /gsd-plan-phase 8 — may split into Phase 8 + 9 + 10)
+- [ ] TBD (run /gsd-plan-phase 8 to break down)
+
+### Phase 9: FSB SurvivabilityAdapter activated for MV3 SW eviction resumption (closes G2)
+
+**Goal:** Flip `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` on at SW boot; wire `lattice-runtime-adapter.js` `serialize`/`deserialize`/`resume` into FSB's existing `persist()` callsites (`agent-loop.js:1840`, `2438`) as additive sidecars, plus a restore site at `runAgentLoop` entry (`agent-loop.js:1215`). Close audit gap G2 (lattice-runtime-adapter has zero importers in extension/* outside its own file; flag never set in production).
+
+**Scope (anticipated; finalized in 09-CONTEXT.md after discuss):**
+- Flag flip: `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` default-true global at SW boot (mirroring Phase 6's bridge flag pattern before Phase 7 stripped it).
+- `serialize(state)` runs as additive sidecar at the existing 3 persist callsites — `persist()` keeps current behavior; lattice.serialize is parallel.
+- `deserialize`/`resume` invoked at `runAgentLoop` entry when SW cold-boot detects a pre-existing snapshot under storage prefix `fsb_lattice_snapshot_<sessionId>_<capturedAt>` (per `lattice-runtime-adapter.js:75`).
+- ResumePolicy classification (per `lattice/packages/lattice/src/runtime/survivability.ts:60-68`) depends on `_currentStepName` marker set by Phase 8's step.transition emissions — hence Phase 9 depends on Phase 8.
+- INV-04 strictly additive — no setTimeout iterator changes. Verified post-phase via grep.
+
+**Requirements:** TBD — anticipated FINT-13 (flag flip), FINT-14 (serialize sidecar at persist), FINT-15 (deserialize/resume at runAgentLoop entry).
+
+**Depends on:** Phase 8 (step.transition events are the survivability boundary markers; `_currentStepName` set by Phase 8 is read by Phase 9's ResumePolicy classifier).
+**Plans:** 0 plans — run /gsd-discuss-phase 9 then /gsd-plan-phase 9.
+
+Plans:
+- [ ] TBD
+
+### Phase 10: MCP-philosophy parity for autopilot driver — visual session + metrics + driving-model attribution
+
+**Goal:** Extend the existing tool-parity (INV-02) from tool DEFINITIONS to tool LIFECYCLE + TELEMETRY + DRIVING-MODEL ATTRIBUTION. Make FSB autopilot behave as an "MCP client in spirit" so the visual session panel + metrics dashboard show autopilot activity the same way they show MCP activity today. Independent of Phases 8 + 9 — purely additive UI/telemetry sidecar.
+
+**Scope (anticipated; finalized in 10-CONTEXT.md after discuss):**
+- Autopilot calls `recordVisualSessionTick(tabId, agentId, { client: 'FSB Autopilot', visualReason, isFinal })` from the tool-dispatch loop in `agent-loop.js:~1906`, mirroring the MCP bridge pattern at `mcp-bridge-client.js:734, 759, 782`.
+- Unified `fsbMcpVisualSessions` store with new `driver: 'autopilot' | 'mcp'` discriminator on per-tab lifecycle entry (one-field schema extension; existing UI dashboard reads without forking).
+- Allowlist gets new client label `'FSB Autopilot'` at `mcp-visual-session.js:4-18` (FSB-internal UI state; not an INV-01 wire change).
+- Autopilot tool calls populate `mcp-metrics-recorder.js` via caller-side `recordDispatch(...)` with `client: 'FSB Autopilot'` + `driver: 'autopilot'` + `driving_model: { provider, model_id, reasoning_tokens }`. Offscreen bridge stays neutral (no tool-name knowledge; D-05 in 08-CONTEXT.md).
+- Phase 10 is lowest-risk of the three — purely additive sidecar; if it breaks, autopilot still works, dashboard rows just don't appear.
+
+**Requirements:** TBD — anticipated FINT-16 (autopilot visual session driver), FINT-17 (autopilot metrics recorder integration), FINT-18 (driving-model attribution capture + storage).
+
+**Depends on:** Phase 7 (Phase 10 is INDEPENDENT of Phases 8 + 9 — can run in parallel with Phase 9 after Phase 8 ships, OR start before Phase 8 if parallel-track desired).
+**Plans:** 0 plans — run /gsd-discuss-phase 10 then /gsd-plan-phase 10.
+
+Plans:
+- [ ] TBD
 
 ---
 

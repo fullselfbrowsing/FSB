@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Milestone v0.10.0 re-opened 2026-05-31 — Phase 8 added to close half-step (FSB agent brain still on FSB code paths; Lattice runtime primitives shipped but not wired into iterator)
-last_updated: "2026-05-31T10:30:00.000Z"
+stopped_at: Phase 8 context gathered (assumptions mode); Phases 9 + 10 added per D-06 split decision
+last_updated: "2026-05-31T11:00:00.000Z"
 last_activity: 2026-05-31
 progress:
-  total_phases: 8
+  total_phases: 10
   completed_phases: 7
   total_plans: 32
   completed_plans: 32
-  percent: 87
+  percent: 70
 ---
 
 # Project State
@@ -25,14 +25,14 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 8 — FSB agent brain on Lattice runtime (close half-step from UAT-1)
+**Current focus:** Phase 8 (Lattice runtime wiring) — context locked; ready for /gsd-plan-phase 8
 
 ## Current Position
 
-Phase: 8 (not planned)
+Phase: 8 (context gathered; not yet planned)
 Plan: Not started
-Status: Milestone v0.10.0 RE-OPENED 2026-05-31 for half-step closure (Phases 1-7 + UAT-1 stand passed; Phase 8 added to wire FSB iterator into Lattice tracer/checkpoint/survivability surface)
-Last activity: 2026-05-31 - Phase 8 added to roadmap; awaiting /gsd-discuss-phase 8
+Status: Milestone v0.10.0 re-opened 2026-05-31; Phase 8 CONTEXT.md captured 8 assumptions across 4 areas (assumptions mode); Phases 9 + 10 added per D-06 split decision (8 = Lattice runtime, 9 = SurvivabilityAdapter activation, 10 = MCP-philosophy parity). Per-axis UAT shape locked per D-06.
+Last activity: 2026-05-31 - Phase 8 CONTEXT.md + DISCUSSION-LOG.md written; Phases 9 + 10 added to roadmap; awaiting /gsd-plan-phase 8
 
   1. Backup branch `pre-pivot-archive/v0.10.0-fsb-first` created at HEAD `4d70facf` (30+ commits preserved).
   2. Phase 1 + Phase 2 artifacts archived to `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (CONTEXT, DISCUSSION-LOG, RESEARCH 981 lines, UI-SPEC 694 lines, VALIDATION, PLAN-01..04, SUMMARYs, VERIFICATION; plus snapshots of ROADMAP / REQUIREMENTS / PROJECT / STATE at attempt-1 final state; plus PIVOT-v0.10.0-PLAN.md decision audit trail).
