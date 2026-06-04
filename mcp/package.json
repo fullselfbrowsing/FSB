@@ -1,6 +1,6 @@
 {
   "name": "fsb-mcp-server",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "FSB Browser Automation MCP Server",
   "license": "BUSL-1.1",
   "author": "Lakshman Turlapati",
@@ -9,10 +9,10 @@
       "name": "OpenAI Codex"
     }
   ],
-  "mcpName": "io.github.lakshmanturlapati/fsb-mcp-server",
+  "mcpName": "io.github.fullselfbrowsing/fsb-mcp-server",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lakshmanturlapati/FSB.git",
+    "url": "https://github.com/fullselfbrowsing/FSB.git",
     "directory": "mcp"
   },
   "keywords": [

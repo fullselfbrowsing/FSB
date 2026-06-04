@@ -35,7 +35,7 @@
 const Queries = require('../db/queries');
 
 const GITHUB_POLL_INTERVAL_MS = 5 * 60 * 1000;
-const OWNER = 'LakshmanTurlapati';
+const OWNER = 'fullselfbrowsing';
 const REPO = 'FSB';
 const PER_PAGE = 100;
 const MAX_PAGES_COMMITS = 30; // commits walks all pages; everything else early-exits.

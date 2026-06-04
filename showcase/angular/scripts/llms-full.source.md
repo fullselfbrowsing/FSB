@@ -54,7 +54,7 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 
 ## 3. Install Instructions
 
-1. Clone the repository: `git clone https://github.com/lakshmanturlapati/FSB.git`
+1. Clone the repository: `git clone https://github.com/fullselfbrowsing/FSB.git`
 2. Open `chrome://extensions/` in Chrome.
 3. Enable Developer Mode (top-right toggle).
 4. Click "Load unpacked" and select the cloned FSB directory.
@@ -85,7 +85,7 @@ The MCP surface is the best way to use FSB with coding agents and external auton
 FSB ships a dedicated OpenClaw + Hermes skill at `skills/fsb/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: fsb`, `version: 0.9.62`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (skill features, MCP power story, 3-step install, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`. Hermes users get the same skill: `node skills/fsb/scripts/print-hermes-yaml.mjs` prints the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, and FSB v0.9.69 (PR #49) added `Hermes` to the v0.9.36 shared MCP client allowlist so action calls passing `client: "Hermes"` work without schema changes.
 
 ### ClawHub install path
-The /agents page exposes a one-click install on ClawHub at `https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`. ClawHub is the recommended distribution surface for OpenClaw users who want the FSB skill registered without manually pasting stdio config. The skill source remains browsable at `https://github.com/lakshmanturlapati/FSB/tree/main/skills/fsb` for users who prefer reading before installing.
+The /agents page exposes a one-click install on ClawHub at `https://clawhub.ai/fullselfbrowsing/full-selfbrowsing`. ClawHub is the recommended distribution surface for OpenClaw users who want the FSB skill registered without manually pasting stdio config. The skill source remains browsable at `https://github.com/fullselfbrowsing/FSB/tree/main/skills/fsb` for users who prefer reading before installing.
 
 ### Where FSB earns its keep (grounded use cases)
 The /agents page calls out the recurring browser work that vision-only agents tend to fail on inside logged-in sites. Because FSB drives the user's real Chrome (cookies, sessions, MFA state, saved logins are already there), it is the practical surface for these patterns:
@@ -120,7 +120,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - Agents: https://full-selfbrowsing.com/agents
 - Support: https://full-selfbrowsing.com/support
 - Privacy: https://full-selfbrowsing.com/privacy
-- GitHub: https://github.com/lakshmanturlapati/FSB
+- GitHub: https://github.com/fullselfbrowsing/FSB
 - YouTube channel: https://www.youtube.com/@parzival5707
 - Demo: FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
 - Demo: Flight Booking: Powered by Codex MCP: https://www.youtube.com/watch?v=WbpOrFwgGME

@@ -385,7 +385,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'OpenClaw',
             lines: [
-                'Canonical install: load the FSB skill from skills/FSB Skill/ in this repo.',
+                'Canonical install: load the FSB skill from skills/fsb/ in this repo.',
                 '  The skill runs the doctor flow, prints the OpenClaw stdio config block,',
                 '  and offers consent-gated install for other detected MCP hosts.',
                 'Status of the --openclaw install flag: still manual / unsupported.',

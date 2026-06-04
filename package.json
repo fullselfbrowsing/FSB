@@ -3,13 +3,13 @@
   "version": "0.9.72",
   "description": "FSB - Full Self-Browsing: An intelligent, open-source Chrome extension for AI-powered browser automation using natural language instructions",
   "main": "background.js",
-  "homepage": "https://github.com/lakshmanturlapati/FSB",
+  "homepage": "https://github.com/fullselfbrowsing/FSB",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lakshmanturlapati/FSB.git"
+    "url": "https://github.com/fullselfbrowsing/FSB.git"
   },
   "bugs": {
-    "url": "https://github.com/lakshmanturlapati/FSB/issues"
+    "url": "https://github.com/fullselfbrowsing/FSB/issues"
   },
   "scripts": {
     "build": "echo \"Chrome extension - no build required\"",
@@ -113,7 +113,7 @@
   "badges": [
     {
       "description": "Version",
-      "href": "https://github.com/lakshmanturlapati/FSB/releases",
+      "href": "https://github.com/fullselfbrowsing/FSB/releases",
       "url": "https://img.shields.io/badge/version-0.9.67-blue.svg"
     },
     {

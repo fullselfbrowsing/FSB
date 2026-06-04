@@ -85,15 +85,15 @@ function buildSevenEndpointCanned() {
   // /repos/.../FSB (no trailing slash) prefix would otherwise match /FSB/stargazers,
   // so we list the slash-suffixed prefixes first.
   return {
-    'https://api.github.com/repos/LakshmanTurlapati/FSB/stargazers': { status: 200, body: [{ starred_at: '2026-01-01T00:00:00Z' }], etag: '"stars-1"', rlRemaining: '5000', rlReset: '0' },
-    'https://api.github.com/repos/LakshmanTurlapati/FSB/issues':     { status: 200, body: [{ created_at: '2026-01-01T00:00:00Z' }], etag: '"issues-1"', rlRemaining: '5000', rlReset: '0' },
-    'https://api.github.com/repos/LakshmanTurlapati/FSB/forks':      { status: 200, body: [{ created_at: '2026-01-01T00:00:00Z' }], etag: '"forks-1"', rlRemaining: '5000', rlReset: '0' },
-    'https://api.github.com/repos/LakshmanTurlapati/FSB/pulls':      { status: 200, body: [{ created_at: '2026-01-01T00:00:00Z' }], etag: '"pulls-1"', rlRemaining: '5000', rlReset: '0' },
-    'https://api.github.com/repos/LakshmanTurlapati/FSB/commits':    { status: 200, body: [{ sha: 'abc123' }], etag: '"commits-1"', rlRemaining: '5000', rlReset: '0' },
-    'https://api.github.com/repos/LakshmanTurlapati/FSB/releases':   { status: 200, body: [{ published_at: '2026-01-01T00:00:00Z' }], etag: '"releases-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB/stargazers': { status: 200, body: [{ starred_at: '2026-01-01T00:00:00Z' }], etag: '"stars-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB/issues':     { status: 200, body: [{ created_at: '2026-01-01T00:00:00Z' }], etag: '"issues-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB/forks':      { status: 200, body: [{ created_at: '2026-01-01T00:00:00Z' }], etag: '"forks-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB/pulls':      { status: 200, body: [{ created_at: '2026-01-01T00:00:00Z' }], etag: '"pulls-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB/commits':    { status: 200, body: [{ sha: 'abc123' }], etag: '"commits-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB/releases':   { status: 200, body: [{ published_at: '2026-01-01T00:00:00Z' }], etag: '"releases-1"', rlRemaining: '5000', rlReset: '0' },
     // repo-summary single endpoint: shortest prefix, listed last so the more
     // specific /FSB/<path> prefixes above win when applicable.
-    'https://api.github.com/repos/LakshmanTurlapati/FSB':            { status: 200, body: { stargazers_count: 66 }, etag: '"repo-summary-1"', rlRemaining: '5000', rlReset: '0' },
+    'https://api.github.com/repos/fullselfbrowsing/FSB':            { status: 200, body: { stargazers_count: 66 }, etag: '"repo-summary-1"', rlRemaining: '5000', rlReset: '0' },
   };
 }
 
@@ -144,7 +144,7 @@ function freshPoller() {
 
   // --- T2: re-run tick; canned response for repo-summary is now 304 ---
   const cannedT2 = buildSevenEndpointCanned();
-  cannedT2['https://api.github.com/repos/LakshmanTurlapati/FSB'] = { status: 304, body: undefined, etag: '"repo-summary-1"', rlRemaining: '4999', rlReset: '1' };
+  cannedT2['https://api.github.com/repos/fullselfbrowsing/FSB'] = { status: 304, body: undefined, etag: '"repo-summary-1"', rlRemaining: '4999', rlReset: '1' };
   const beforePayload = repoRow1.payload;
   const NOW_T2 = NOW_T1 + 60000;
   const { fakeFetch: ff2 } = makeFakeFetch(cannedT2);
@@ -167,7 +167,7 @@ function freshPoller() {
   initializeDatabase(db3);
   const q3 = new Queries(db3);
   const cannedT3 = buildSevenEndpointCanned();
-  cannedT3['https://api.github.com/repos/LakshmanTurlapati/FSB/issues'] = { __reject: 'simulated network failure' };
+  cannedT3['https://api.github.com/repos/fullselfbrowsing/FSB/issues'] = { __reject: 'simulated network failure' };
   const { fakeFetch: ff3 } = makeFakeFetch(cannedT3);
   let threwT3 = false;
   try {
@@ -219,7 +219,7 @@ function freshPoller() {
   const page3 = Array.from({ length: 50 }, (_, i) => ({ sha: `p3-${i}` }));
   const cannedT6 = buildSevenEndpointCanned();
   // commits: dynamic per-page handler. Page query string is `?page=N&per_page=100`.
-  cannedT6['https://api.github.com/repos/LakshmanTurlapati/FSB/commits'] = (url) => {
+  cannedT6['https://api.github.com/repos/fullselfbrowsing/FSB/commits'] = (url) => {
     // Match `page=N` exactly via a boundary regex so `page=10` does NOT also match `page=1`.
     const m = url.match(/[?&]page=(\d+)(?:&|$)/);
     const page = m ? Number(m[1]) : 0;

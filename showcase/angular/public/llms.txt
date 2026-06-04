@@ -21,10 +21,10 @@ Unlike cloud browser agents that run in a headless container without your cookie
 ## Docs
 
 - [About](https://full-selfbrowsing.com/about): Watch FSB drive Google, search Amazon, and book travel autonomously.
-- [Agents](https://full-selfbrowsing.com/agents): OpenClaw skill onboarding, ClawHub one-click install (`https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`), FSB MCP power story (50+ tools, multi-agent identity, vault boundary, real Chrome session), 3-step install, and grounded use cases (inbox triage, support replies, logged-in dashboards, lead monitoring, small-business ops). Autopilot (`run_task`) only fires on explicit user delegation; manual tool calls are default.
+- [Agents](https://full-selfbrowsing.com/agents): OpenClaw skill onboarding, ClawHub one-click install (`https://clawhub.ai/fullselfbrowsing/full-selfbrowsing`), FSB MCP power story (50+ tools, multi-agent identity, vault boundary, real Chrome session), 3-step install, and grounded use cases (inbox triage, support replies, logged-in dashboards, lead monitoring, small-business ops). Autopilot (`run_task`) only fires on explicit user delegation; manual tool calls are default.
 - [Support](https://full-selfbrowsing.com/support): Setup guides, troubleshooting, GitHub issues, and direct contact.
 - [Privacy](https://full-selfbrowsing.com/privacy): How FSB handles your data -- API keys encrypted in Chrome local storage, no telemetry.
-- [GitHub repository](https://github.com/lakshmanturlapati/FSB): BSL 1.1 source code, install instructions, issue tracker.
+- [GitHub repository](https://github.com/fullselfbrowsing/FSB): BSL 1.1 source code, install instructions, issue tracker.
 - [llms-full.txt](https://full-selfbrowsing.com/llms-full.txt): Long-form project dump for LLM ingestion -- capabilities, install, comparison framing.
 
 ## Demo Videos
