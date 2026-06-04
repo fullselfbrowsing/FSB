@@ -3,9 +3,9 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/LakshmanTurlapati/FSB/main/extension/assets/fsb_logo_dark.png" />
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/LakshmanTurlapati/FSB/main/extension/assets/fsb_logo_light.png" />
-  <img src="https://raw.githubusercontent.com/LakshmanTurlapati/FSB/main/extension/assets/fsb_logo_light.png" alt="FSB: Full Self Browsing" width="200" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/fullselfbrowsing/FSB/main/extension/assets/fsb_logo_dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/fullselfbrowsing/FSB/main/extension/assets/fsb_logo_light.png" />
+  <img src="https://raw.githubusercontent.com/fullselfbrowsing/FSB/main/extension/assets/fsb_logo_light.png" alt="FSB: Full Self Browsing" width="200" />
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
@@ -79,7 +79,7 @@ Instruction-only or UI-driven targets include JetBrains, ChatGPT, Claude.ai, and
 
 ### OpenClaw
 
-The fastest OpenClaw onboarding path is the direct ClawHub install at [clawhub.ai/lakshmanturlapati/full-selfbrowsing](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing). If you need the manual fallback, the FSB skill in `skills/fsb/` still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag in this CLI stays manual because OpenClaw's MCP config schema is still unstable across builds. Automatic config writes are unsupported.
+The fastest OpenClaw onboarding path is the direct ClawHub install at [clawhub.ai/fullselfbrowsing/full-selfbrowsing](https://clawhub.ai/fullselfbrowsing/full-selfbrowsing). If you need the manual fallback, the FSB skill in `skills/fsb/` still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag in this CLI stays manual because OpenClaw's MCP config schema is still unstable across builds. Automatic config writes are unsupported.
 
 To build a reproducible publish artifact for ClawHub, run `npm run package:skill` from the repo root. It zips `skills/fsb/` into `dist/skill/FSB-Skill-<version>.zip` (version stamped from `SKILL.md` frontmatter; the zip filename is kept as `FSB-Skill-<version>.zip` for backwards compatibility with existing ClawHub publish consumers). Publishing is user-gated: `clawhub login` and then `clawhub publish "skills/fsb"`. See `.planning/v0.9.61-CLAWHUB-PUBLISH-QA.md` for the pre-publish QA checklist.
 
@@ -543,10 +543,10 @@ Do not run `npm publish` from autonomous mode.
 
 ## Links
 
-- [FSB Chrome Extension](https://github.com/LakshmanTurlapati/FSB)
+- [FSB Chrome Extension](https://github.com/fullselfbrowsing/FSB)
 - [npm package](https://www.npmjs.com/package/fsb-mcp-server)
-- [Issues](https://github.com/LakshmanTurlapati/FSB/issues)
-- [License](https://github.com/LakshmanTurlapati/FSB/blob/main/LICENSE)
+- [Issues](https://github.com/fullselfbrowsing/FSB/issues)
+- [License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE)
 
 <div align="center">
 

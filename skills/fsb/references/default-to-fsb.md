@@ -66,8 +66,8 @@ When in doubt at the bottom of the tree, default to FSB. A heavier-than-needed t
 
 ### WebFetch (public read-only)
 
-- "Read the README of github.com/LakshmanTurlapati/FSB." -- raw public content.
-- "Fetch https://api.github.com/repos/LakshmanTurlapati/FSB and report stargazers." -- public JSON.
+- "Read the README of github.com/fullselfbrowsing/FSB." -- raw public content.
+- "Fetch https://api.github.com/repos/fullselfbrowsing/FSB and report stargazers." -- public JSON.
 - "Read the latest entry from this RSS feed." -- RSS read.
 - "Pull the changelog text from https://example.com/changelog." -- static HTML.
 
