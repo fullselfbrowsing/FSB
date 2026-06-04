@@ -2,6 +2,22 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+<a id="v0.9.3"></a>
+
+## 0.9.3 (2026-06-04)
+
+Milestone: org-rebrand. Repository transferred from LakshmanTurlapati/FSB to fullselfbrowsing/FSB; reverse-DNS mcpName updated accordingly.
+
+### Breaking changes
+
+- **`mcpName` rebrand.** The MCP reverse-DNS identifier rename from `io.github.lakshmanturlapati/fsb-mcp-server` → `io.github.fullselfbrowsing/fsb-mcp-server` reflects the GitHub org transfer. The npm package name `fsb-mcp-server` is **unchanged**, so any client invoking the server via `npx -y fsb-mcp-server` (or the bundled `fsb-mcp-server` / `fsb-mcp` bin) continues to work without modification. MCP clients that pin the reverse-DNS name in their config (e.g., `mcpServers["io.github.lakshmanturlapati/fsb-mcp-server"]` blocks in Claude Desktop / Claude Code config) MUST update the key to `io.github.fullselfbrowsing/fsb-mcp-server`. Re-run the installer or update the client config manually.
+
+### Anti-scope (NOT in 0.9.3)
+
+- No protocol changes; the implicit visual-session contract (v0.9.0) is byte-identical.
+- No dependency bumps; `@modelcontextprotocol/sdk`, `ws`, `zod`, `strip-json-comments`, `smol-toml`, and `yaml` are unchanged from 0.9.2.
+- No new tools or schema-source edits (`mcp/ai/tool-definitions.cjs` untouched).
+
 <a id="v0.9.2"></a>
 
 ## 0.9.2 (2026-05-16)

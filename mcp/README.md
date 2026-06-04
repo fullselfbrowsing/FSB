@@ -38,7 +38,7 @@ Use this package when you want your AI client to drive the browser directly whil
 
 ### Current Release Notes
 
-`fsb-mcp-server@0.9.2` is the current in repo MCP package for FSB v0.9.72.
+`fsb-mcp-server@0.9.3` is the current in repo MCP package for FSB v0.9.72.
 
 * Action tools use the implicit visual session contract. Callers include `visual_reason` and `client` on every action call, then set `is_final: true` on the last action when they want the overlay cleared immediately.
 * The older `start_visual_session` and `end_visual_session` names remain registered only as compatibility stubs. They return `TOOL_REMOVED` with migration guidance.
