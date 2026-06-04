@@ -82,7 +82,7 @@ function rawGet(path_, extraHeaders = {}) {
     `got ${bad.statusCode}`);
 
   // --- Seed cache rows now ---
-  const seededSummary = { stargazers_count: 66, forks_count: 4, full_name: 'LakshmanTurlapati/FSB' };
+  const seededSummary = { stargazers_count: 66, forks_count: 4, full_name: 'fullselfbrowsing/FSB' };
   queries.upsertGithubCacheRow('repo-summary', JSON.stringify(seededSummary), '"seed-etag-1"', Date.now(), 200, 5000, Math.floor(Date.now() / 1000) + 3600);
 
   const seededStars = [
@@ -137,7 +137,7 @@ function rawGet(path_, extraHeaders = {}) {
     `got ${JSON.stringify(t5.headers['set-cookie'])}`);
 
   // --- T6: memo rebuild after _resetMemoForTest reflects updated DB row ---
-  const updatedSummary = { stargazers_count: 99, forks_count: 7, full_name: 'LakshmanTurlapati/FSB' };
+  const updatedSummary = { stargazers_count: 99, forks_count: 7, full_name: 'fullselfbrowsing/FSB' };
   queries.upsertGithubCacheRow('repo-summary', JSON.stringify(updatedSummary), '"updated-etag-2"', Date.now(), 200, 5000, Math.floor(Date.now() / 1000) + 3600);
   // Without reset, memo still serves T1 etag/payload.
   publicStatsRouter._resetMemoForTest();
