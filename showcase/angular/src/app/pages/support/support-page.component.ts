@@ -37,7 +37,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: 'What is MCP and how do I use it?',
-    a: 'MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as `npx -y fsb-mcp-server` and pairs with the running extension over a local WebSocket bridge -- FSB exposes 50+ browser actions as MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/fullselfbrowsing/full-selfbrowsing, or load the FSB skill at `skills/fsb/` which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.',
+    a: 'MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as `npx -y fsb-mcp-server` and pairs with the running extension over a local WebSocket bridge -- FSB exposes 50+ browser actions as MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at `skills/fsb/` which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.',
   },
   {
     q: 'How does FSB help Claude Code or Codex test apps?',
@@ -61,7 +61,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: 'How do I install FSB on OpenClaw?',
-    a: 'Three options, fastest first. One-click on ClawHub: install from https://clawhub.ai/fullselfbrowsing/full-selfbrowsing. FSB skill: load the skill from `skills/fsb/` in the FSB repo -- it prints the canonical OpenClaw stdio block for you to paste into OpenClaw\u2019s MCP config and offers consent-gated install for any other MCP hosts on your machine. The full 3-step walkthrough (Chrome extension, MCP server config, doctor verification) lives at https://full-selfbrowsing.com/agents.',
+    a: 'Three options, fastest first. One-click on ClawHub: install from https://clawhub.ai/lakshmanturlapati/full-selfbrowsing. FSB skill: load the skill from `skills/fsb/` in the FSB repo -- it prints the canonical OpenClaw stdio block for you to paste into OpenClaw\u2019s MCP config and offers consent-gated install for any other MCP hosts on your machine. The full 3-step walkthrough (Chrome extension, MCP server config, doctor verification) lives at https://full-selfbrowsing.com/agents.',
   },
   {
     q: 'How do I verify the FSB MCP server is healthy?',

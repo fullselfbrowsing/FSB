@@ -68,7 +68,7 @@ Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-se
 
 Want to run FSB standalone from the extension side panel? Open settings, paste an API key for xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, or a custom endpoint, then start there. MCP is optional.
 
-**On OpenClaw?** Install FSB directly from [ClawHub](https://clawhub.ai/fullselfbrowsing/full-selfbrowsing). That is the fastest onboarding route. If you need the manual fallback, the FSB skill in [`skills/fsb/`](./skills/fsb/SKILL.md) still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds.
+**On OpenClaw?** Install FSB directly from [ClawHub](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing). That is the fastest onboarding route. If you need the manual fallback, the FSB skill in [`skills/fsb/`](./skills/fsb/SKILL.md) still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds.
 
 **On Hermes?** Use the same skill at [`skills/fsb/`](./skills/fsb/SKILL.md). Run `node skills/fsb/scripts/print-hermes-yaml.mjs` to print the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, or run `node skills/fsb/scripts/install-host.mjs` to detect a local Hermes config and gate the install on consent.
 
@@ -374,7 +374,7 @@ npx -y fsb-mcp-server wait-for-extension
 
 See [mcp/README.md](mcp/README.md) for the full tool reference and client-specific setup notes.
 
-OpenCode uses a manual setup path. OpenClaw users should start with the direct [ClawHub install](https://clawhub.ai/fullselfbrowsing/full-selfbrowsing), then use the manual stdio fallback only when needed.
+OpenCode uses a manual setup path. OpenClaw users should start with the direct [ClawHub install](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing), then use the manual stdio fallback only when needed.
 
 ### MCP Usage Guidance
 
