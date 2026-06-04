@@ -30,7 +30,7 @@ See: .planning/REQUIREMENTS.md (v0.9.70 active supplement added above archived v
 Phase: 279 -- Sync Tab Remote-Control Restoration
 Plan: 279-01 -- diagnose pairing + remote-command dispatch, then minimum patch
 Status: Investigating
-Last activity: 2026-05-18 -- Streaming and viewport fixes closed; moving to Sync remote control
+Last activity: 2026-06-04 -- Quick task 260604-jw8: repo transfer LakshmanTurlapati/FSB -> fullselfbrowsing/FSB complete; PR #88 open + CI all-green
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Total: 11 items. Triage via `/gsd-debug` and `/gsd-cleanup` during a future mile
 | 260516-pr62 | Lower telemetry K_ANONYMITY_FLOOR 5 -> 2 so /stats surfaces real client labels at single-digit total installs | 2026-05-16 | (PR #62 merged) | merged | -- |
 | 260516-pr63 | MCP transport `z.coerce.number()` at jsonSchemaToZod translator + 7 hand-rolled sites so MCP clients can pass tabId/tab_id as either string or number | 2026-05-16 | (PR #63 merged) | merged | -- |
 | 260516-pr64 | Bump fsb-mcp-server 0.9.1 -> 0.9.2 to pick up the numeric coercion fix; auto-published to npm via mcp-v0.9.2 tag + chrome extension v0.9.67 zip released | 2026-05-16 | (PR #64 merged) | merged | -- |
+| 260604-jw8 | Transfer FSB repo LakshmanTurlapati/FSB -> fullselfbrowsing/FSB via gh CLI; sweep all hardcoded URL refs (42 files), bump MCP to v0.9.3 with renamed mcpName, preserve all personal-credit fields | 2026-06-04 | (PR #88) | in-review | [260604-jw8-transfer-fsb-repo-to-fullselfbrowsing-or](./quick/260604-jw8-transfer-fsb-repo-to-fullselfbrowsing-or/) |
 
 ## Pending User-Gated Actions (carry-forward)
 
