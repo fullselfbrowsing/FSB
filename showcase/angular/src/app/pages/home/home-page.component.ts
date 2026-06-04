@@ -84,8 +84,8 @@ export class HomePageComponent implements OnInit {
       applicationSubCategory: 'AI browser automation and MCP tools',
       operatingSystem: 'Chrome',
       softwareVersion: APP_VERSION,
-      downloadUrl: 'https://github.com/lakshmanturlapati/FSB',
-      sameAs: ['https://github.com/lakshmanturlapati/FSB', YOUTUBE_CHANNEL],
+      downloadUrl: 'https://github.com/fullselfbrowsing/FSB',
+      sameAs: ['https://github.com/fullselfbrowsing/FSB', YOUTUBE_CHANNEL],
       featureList: [
         'MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw',
         'Real browser automation through a local Chrome extension',
