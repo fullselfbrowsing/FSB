@@ -13,7 +13,7 @@ const defaultSettings = {
   openrouterApiKey: '',
   lmstudioBaseUrl: 'http://localhost:1234',
   speedMode: 'normal', // Legacy support
-  maxIterations: 20,
+  maxIterations: 100,
   debugMode: false,
   // DOM Optimization settings
   domOptimization: true,
@@ -824,7 +824,7 @@ function loadSettings() {
     if (lmstudioBaseUrl) lmstudioBaseUrl.value = settings.lmstudioBaseUrl || 'http://localhost:1234';
 
     // Max iterations
-    const maxIter = settings.maxIterations || 20;
+    const maxIter = settings.maxIterations || 100;
     if (elements.maxIterations) elements.maxIterations.value = maxIter;
     if (elements.maxIterationsSlider) elements.maxIterationsSlider.value = maxIter;
     if (elements.maxIterationsDisplay) elements.maxIterationsDisplay.textContent = maxIter;

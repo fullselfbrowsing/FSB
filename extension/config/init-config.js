@@ -11,7 +11,7 @@ const defaultConfig = {
   customApiEndpoint: '',
 
   // Automation Settings
-  maxIterations: 20,
+  maxIterations: 100,
   debugMode: false,
 
   // DOM Optimization Settings

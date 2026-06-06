@@ -624,7 +624,7 @@ function updateStatusMessage(text, progressData) {
       if (container && fill && label) {
         container.classList.remove('hidden');
         fill.style.width = (progressData.progressPercent || 0) + '%';
-        label.textContent = `Step ${progressData.iteration}/${progressData.maxIterations || 20}`;
+        label.textContent = `Step ${progressData.iteration}/${progressData.maxIterations || 100}`;
       }
     }
   }

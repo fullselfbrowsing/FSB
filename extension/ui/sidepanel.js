@@ -1407,7 +1407,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (currentStatusMessage && isRunning) {
             updateStatusMessage('Step ' + request.iteration + ' complete', {
               iteration: request.iteration,
-              maxIterations: 20,
+              maxIterations: 100,
               progressPercent: Math.min(100, Math.round((request.iteration / 20) * 100))
             });
           }

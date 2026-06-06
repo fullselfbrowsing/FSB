@@ -1868,7 +1868,7 @@ async function handleGetStatusRoute({ payload } = {}) {
     currentTask: firstSession?.task || null,
     currentStartTime: firstSession?.startTime || null,
     currentIterationCount: firstSession?.iterationCount || 0,
-    currentMaxIterations: firstSession?.maxIterations || 20,
+    currentMaxIterations: firstSession?.maxIterations || 100,
     currentActionCount: firstSession?.actionHistory?.length || 0
   };
 }

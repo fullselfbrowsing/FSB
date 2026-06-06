@@ -1378,7 +1378,7 @@ function formatDuration(ms) {
  * @returns {{ progressPercent: number, estimatedTimeRemaining: string|null }}
  */
 function calculateProgress(session) {
-  const maxIter = session.maxIterations || 20;
+  const maxIter = session.maxIterations || 100;
   const current = session.iterationCount || 0;
   const progressPercent = Math.min(99, Math.round((current / maxIter) * 100));
 
@@ -1441,7 +1441,7 @@ function broadcastDashboardProgress(session) {
     elapsed: Date.now() - (session.startTime || Date.now()),
     action: session._lastActionSummary || session.lastAiReasoning || 'Working...',
     iteration: session.iterationCount || 0,
-    maxIterations: session.maxIterations || 20,
+    maxIterations: session.maxIterations || 100,
     taskRunId: session._dashboardTaskRunId || '',
     task: session.task || '',
     taskSource: 'live',
@@ -5342,7 +5342,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         currentTask: firstSession?.task || null,
         currentStartTime: firstSession?.startTime || null,
         currentIterationCount: firstSession?.iterationCount || 0,
-        currentMaxIterations: firstSession?.maxIterations || 20,
+        currentMaxIterations: firstSession?.maxIterations || 100,
         currentActionCount: firstSession?.actionHistory?.length || 0
       });
       break;
@@ -6574,9 +6574,9 @@ async function handleStartAutomation(request, sender, sendResponse) {
     const storedSettings = await getStorageWithTimeout(
       ['maxIterations', 'animatedActionHighlights', 'domOptimization', 'maxDOMElements', 'prioritizeViewport'],
       3000,
-      { maxIterations: 20, animatedActionHighlights: true, domOptimization: true, maxDOMElements: 2000, prioritizeViewport: true }
+      { maxIterations: 100, animatedActionHighlights: true, domOptimization: true, maxDOMElements: 2000, prioritizeViewport: true }
     );
-    const userMaxIterations = parseInt(storedSettings.maxIterations) || 20;
+    const userMaxIterations = parseInt(storedSettings.maxIterations) || 100;
 
     // Pre-populate allowedTabs with all non-restricted tabs in the current window
     // so the AI can switch to any tab the user already has open
@@ -6660,7 +6660,7 @@ async function handleStartAutomation(request, sender, sendResponse) {
         sessionData.task = buildSingleCompanyTask(sessionData.multiSite.originalTask, companies[0]);
         sessionData.taskSummary = `Job search: 1/${companies.length} companies`;
         // Cap iterations per company for multi-site sessions
-        sessionData.maxIterations = Math.min(sessionData.maxIterations || 20, 15);
+        sessionData.maxIterations = Math.min(sessionData.maxIterations || 100, 15);
 
         automationLogger.info('Multi-site orchestration initialized', {
           sessionId,
@@ -8175,7 +8175,7 @@ async function handleMultiTabAction(action, currentTabId) {
               phase: 'acting',
               taskName: session.task,
               iteration: session.iterationCount,
-              maxIterations: session.maxIterations || 20,
+              maxIterations: session.maxIterations || 100,
               statusText: 'Switched tab -- preparing next step...',
               animatedHighlights: session.animatedActionHighlights,
               taskSummary: session.taskSummary || null
@@ -8594,7 +8594,7 @@ async function launchNextCompanySearch(sessionId, session, companyName) {
   session.status = 'running';
 
   // Cap iterations per company to prevent one company consuming all iterations
-  session.maxIterations = Math.min(session.maxIterations || 20, 15);
+  session.maxIterations = Math.min(session.maxIterations || 100, 15);
 
   session.taskSummary = `Job search: ${ms.currentIndex + 1}/${totalCompanies} companies`;
 
@@ -9310,7 +9310,7 @@ async function startAutomationLoop(sessionId) {
     phase: 'analyzing',
     taskName: session.task,
     iteration: session.iterationCount,
-    maxIterations: session.maxIterations || 20,
+    maxIterations: session.maxIterations || 100,
     animatedHighlights: session.animatedActionHighlights,
     statusText: null,  // Don't carry over previous action text; let content script show "Analyzing page..."
     ...calculateProgress(session),
@@ -9327,7 +9327,7 @@ async function startAutomationLoop(sessionId) {
   }
 
   // === SAFETY NET: Absolute iteration cap and session time limit ===
-  const ABSOLUTE_MAX_ITERATIONS = session.maxIterations || 20;
+  const ABSOLUTE_MAX_ITERATIONS = session.maxIterations || 100;
   const MAX_SESSION_DURATION = 5 * 60 * 1000; // 5 minutes
   const sessionAge = Date.now() - (session.startTime || Date.now());
 
@@ -9956,7 +9956,7 @@ async function startAutomationLoop(sessionId) {
           phase: 'acting',
           taskName: session.task,
           iteration: session.iterationCount,
-          maxIterations: session.maxIterations || 20,
+          maxIterations: session.maxIterations || 100,
           statusText: 'Signing in...',
           animatedHighlights: session.animatedActionHighlights
         });
@@ -9967,7 +9967,7 @@ async function startAutomationLoop(sessionId) {
           sessionId,
           message: 'Signing in...',
           iteration: session.iterationCount,
-          maxIterations: session.maxIterations || 20,
+          maxIterations: session.maxIterations || 100,
           progressPercent: signinProgress.progressPercent,
           estimatedTimeRemaining: signinProgress.estimatedTimeRemaining
         }).catch((err) => {
@@ -10117,7 +10117,7 @@ async function startAutomationLoop(sessionId) {
     }
     
     // Calculate progress metrics for AI context
-    const maxIterations = session.maxIterations || 20;
+    const maxIterations = session.maxIterations || 100;
     const actionsSucceeded = session.actionHistory?.filter(a => a.result?.success).length || 0;
     const actionsFailed = session.actionHistory?.filter(a => !a.result?.success).length || 0;
     const uniquePagesVisited = new Set(session.urlHistory?.map(u => u.url) || []).size;
@@ -10294,7 +10294,7 @@ async function startAutomationLoop(sessionId) {
       phase: 'thinking',
       taskName: session.task,
       iteration: session.iterationCount,
-      maxIterations: session.maxIterations || 20,
+      maxIterations: session.maxIterations || 100,
       animatedHighlights: session.animatedActionHighlights,
       statusText: null,  // Don't carry over previous action text; let content script show "Planning next step..."
       ...calculateProgress(session),
@@ -10418,7 +10418,7 @@ async function startAutomationLoop(sessionId) {
         phase: 'acting',
         taskName: session.task,
         iteration: session.iterationCount,
-        maxIterations: session.maxIterations || 20,
+        maxIterations: session.maxIterations || 100,
         actionCount: aiResponse.actions.length,
         animatedHighlights: session.animatedActionHighlights,
         statusText: getActionStatus(aiResponse.actions[0].tool, aiResponse.actions[0].params),
@@ -10526,7 +10526,7 @@ async function startAutomationLoop(sessionId) {
           sessionId,
           message: getActionStatus(action.tool, action.params),
           iteration: session.iterationCount,
-          maxIterations: session.maxIterations || 20,
+          maxIterations: session.maxIterations || 100,
           progressPercent: actionProgress.progressPercent,
           estimatedTimeRemaining: actionProgress.estimatedTimeRemaining
         }).catch(() => {
@@ -10553,7 +10553,7 @@ async function startAutomationLoop(sessionId) {
             phase: 'acting',
             taskName: session.task,
             iteration: session.iterationCount,
-            maxIterations: session.maxIterations || 20,
+            maxIterations: session.maxIterations || 100,
             statusText: getActionStatus(action.tool, action.params),
             animatedHighlights: session.animatedActionHighlights,
             ...calculateProgress(session),

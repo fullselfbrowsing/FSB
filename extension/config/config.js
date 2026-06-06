@@ -32,7 +32,7 @@ class Config {
       speedMode: 'normal', // Deprecated - use modelName instead
 
       // Automation settings
-      maxIterations: 20,
+      maxIterations: 100,
       debugMode: false,
 
       // DOM Optimization settings

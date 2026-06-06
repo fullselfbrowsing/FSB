@@ -1629,7 +1629,7 @@ async function runAgentIteration(sessionId, options) {
   session.iterationCount = iterNum;
 
   function buildOverlayStepDetail(detailText, fallbackPhase) {
-    var maxIter = session.maxIterations || 20;
+    var maxIter = session.maxIterations || 100;
     var prefix = 'Step ' + iterNum + '/' + maxIter;
     var detail = detailText ? String(detailText).trim() : '';
 
@@ -1659,7 +1659,7 @@ async function runAgentIteration(sessionId, options) {
       taskName: session.task,
       taskSummary: session.taskSummary || null,
       iteration: iterNum,
-      maxIterations: session.maxIterations || 20,
+      maxIterations: session.maxIterations || 100,
       statusText: buildOverlayStepDetail(detailText, phase),
       animatedHighlights: session.animatedActionHighlights
     };
