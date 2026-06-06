@@ -1127,7 +1127,7 @@ async function checkApiConnection() {
     try {
       await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage(
-          { type: 'lattice-test-connection', provider: provider, config: config },
+          { action: 'lattice-test-connection', provider: provider, config: config },
           function (response) {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message));

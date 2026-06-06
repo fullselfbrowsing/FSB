@@ -6249,6 +6249,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case 'lattice-test-connection': {
+      // UAT-08 prep: SW-bounce for options.js Test Connection.
+      // executeViaBridge is SW-only (lattice-provider-bridge.js global);
+      // control_panel.html does not script-load that file.
+      if (typeof executeViaBridge !== 'function') {
+        sendResponse({ ok: false, error: 'executeViaBridge unavailable in SW global' });
+        return true;
+      }
+      (async function () {
+        try {
+          await executeViaBridge(request.provider, request.config, { __testConnection: true }, { mode: 'test-connection' });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: (err && err.message) ? err.message : 'Unknown bridge error' });
+        }
+      })();
+      return true;
+    }
+
     default:
       sendResponse({ error: 'Unknown action' });
   }
@@ -7128,27 +7147,6 @@ async function handleTestAPI(request, sender, sendResponse) {
     });
   }
 }
-
-// UAT-08 prep: SW-bounce for options.js Test Connection ('lattice-test-connection')
-// -- executeViaBridge is SW-only (lattice-provider-bridge.js global); control_panel.html does not load that script.
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-  if (!request || request.type !== 'lattice-test-connection') {
-    return false;
-  }
-  if (typeof executeViaBridge !== 'function') {
-    sendResponse({ ok: false, error: 'executeViaBridge unavailable in SW global' });
-    return true;
-  }
-  (async function () {
-    try {
-      await executeViaBridge(request.provider, request.config, { __testConnection: true }, { mode: 'test-connection' });
-      sendResponse({ ok: true });
-    } catch (err) {
-      sendResponse({ ok: false, error: (err && err.message) ? err.message : 'Unknown bridge error' });
-    }
-  })();
-  return true;
-});
 
 // Handle AI API calls
 async function handleAICall(request, sender, sendResponse) {

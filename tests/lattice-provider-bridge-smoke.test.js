@@ -653,9 +653,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssertEqual((checkBody.match(/new\s+AIIntegration/g) || []).length, 0, 'checkApiConnection body does NOT instantiate AIIntegration');
   // UAT-08 prep (quick 260606-4si): checkApiConnection no longer calls executeViaBridge
   // directly. The bridge global is SW-only (lattice-provider-bridge.js); options.js
-  // now SW-bounces via chrome.runtime.sendMessage({type:'lattice-test-connection'})
-  // and background.js handles it in SW context. The mode + __testConnection markers
-  // are now passed by the SW-side listener, not by options.js.
+  // now SW-bounces via chrome.runtime.sendMessage({action:'lattice-test-connection'})
+  // routed through background.js master switch case (action field per FSB convention,
+  // not the type field that the standalone listener variant briefly used). The mode +
+  // __testConnection markers are passed by the SW-side handler, not by options.js.
   passAssertEqual((checkBody.match(/executeViaBridge\(/g) || []).length, 0, 'checkApiConnection body does NOT call executeViaBridge directly (SW-bounce contract per UAT-08 prep)');
   passAssert(/lattice-test-connection/.test(checkBody), "checkApiConnection sends 'lattice-test-connection' SW-bounce message");
   passAssert(/chrome\.runtime\.sendMessage/.test(checkBody), 'checkApiConnection uses chrome.runtime.sendMessage for SW-bounce');
