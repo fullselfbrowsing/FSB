@@ -72,7 +72,11 @@ const statusText = document.querySelector('.status-text');
 
 // Apply theme based on settings
 function applyTheme() {
-  const savedTheme = localStorage.getItem('fsb-theme') || 'light';
+  let savedTheme = localStorage.getItem('fsb-theme');
+  if (!savedTheme) {
+    savedTheme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    localStorage.setItem('fsb-theme', savedTheme);
+  }
   document.documentElement.setAttribute('data-theme', savedTheme);
 }
 

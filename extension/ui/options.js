@@ -1317,7 +1317,11 @@ function exportSettings() {
 }
 
 function setupTheme() {
-  const savedTheme = localStorage.getItem('fsb-theme') || 'light';
+  let savedTheme = localStorage.getItem('fsb-theme');
+  if (!savedTheme) {
+    savedTheme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    localStorage.setItem('fsb-theme', savedTheme);
+  }
   applyTheme(savedTheme);
 }
 
