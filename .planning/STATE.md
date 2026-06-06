@@ -32,7 +32,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 Phase: 10 (MCP-philosophy parity for autopilot driver; 2/3 plans complete; IN PROGRESS)
 Plan: 10-02 COMPLETE (mcp-metrics-recorder.js route allowlist 'autopilot' + drivingModel pass-through field; agent-loop.js autopilot recordDispatch call site post-toolResults.push with session.providerConfig identity + xAI reasoning_tokens edge case; tests/mcp-philosophy-parity-smoke.test.js Parts 5-8 filled at 30 PASS / 0 FAIL; INV-04 + INV-06 BYTE-FROZEN)
 Status: Ready to execute
-Last activity: 2026-06-06 -- Completed quick task 260606-b46: Buffer polyfill for offscreen lattice-host bundle (UAT-08.e fix)
+Last activity: 2026-06-06 -- Completed quick task 260606-bh1: Fix runFullApiTest apiKeyMap missing openrouter and lmstudio
 
 ### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
 
@@ -163,6 +163,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | 260606-962 | Raise default maxIterations 20 to 100 + slider min 5 to 50 (Scope B sweep + sidepanel divisor fix) | 2026-06-06 | 6fb381cd | [260606-962-raise-default-maxiterations-20-to-100-sl](./quick/260606-962-raise-default-maxiterations-20-to-100-sl/) |
 | 260606-9ji | Auto-detect system theme on first install via prefers-color-scheme | 2026-06-06 | 41079c59 | [260606-9ji-auto-detect-system-theme-on-first-instal](./quick/260606-9ji-auto-detect-system-theme-on-first-instal/) |
 | 260606-b46 | Buffer polyfill for offscreen lattice-host bundle (UAT-08.e fix) | 2026-06-06 | 66adfbe2 | [260606-b46-buffer-polyfill-for-offscreen-lattice-ho](./quick/260606-b46-buffer-polyfill-for-offscreen-lattice-ho/) |
+| 260606-bh1 | Fix runFullApiTest apiKeyMap missing openrouter + lmstudio | 2026-06-06 | 6945bdb9 | [260606-bh1-fix-runfullapitest-apikeymap-missing-ope](./quick/260606-bh1-fix-runfullapitest-apikeymap-missing-ope/) |
 | Phase 08 P03 | 14min | 3 tasks | 3 files |
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
 | Phase 10 P01 | 18min | 4 tasks | 5 files |
