@@ -97,6 +97,39 @@ const ENTRIES = [
     // inline esbuild plugin. The stub exports no-op shims for the fs / path / url surface
     // Lattice's artifact-storage references. Dead code paths from artifact-storage stay
     // in the bundle but call into local no-ops; no CSP-blocked imports survive in output.
+    banner: {
+      js: [
+        '// Buffer polyfill for receipts/envelope.ts base64 encoding (UAT-08 fix; lattice-side',
+        '// uses Buffer.from(bytes).toString("base64") which Node provides but the offscreen',
+        '// browser context does not. INV-06 byte-freeze stays intact -- fix is build-side, not Lattice-side.',
+        'if (typeof globalThis.Buffer === "undefined") {',
+        '  globalThis.Buffer = {',
+        '    from: function (input, encoding) {',
+        '      if (typeof input === "string" && encoding === "base64") {',
+        '        var bin = atob(input);',
+        '        var bytes = new Uint8Array(bin.length);',
+        '        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);',
+        '        return bytes;',
+        '      }',
+        '      if (input instanceof Uint8Array || (input && typeof input.length === "number" && typeof input !== "string")) {',
+        '        var bytes = input;',
+        '        return {',
+        '          toString: function (enc) {',
+        '            if (enc === "base64") {',
+        '              var s = "";',
+        '              for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i] & 0xFF);',
+        '              return btoa(s);',
+        '            }',
+        '            throw new Error("Buffer polyfill: unsupported toString encoding: " + enc);',
+        '          }',
+        '        };',
+        '      }',
+        '      throw new Error("Buffer polyfill: unsupported Buffer.from() input");',
+        '    }',
+        '  };',
+        '}'
+      ].join("\n"),
+    },
     plugins: [
       {
         name: 'stub-node-builtins',
