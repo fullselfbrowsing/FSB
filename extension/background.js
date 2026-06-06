@@ -7129,6 +7129,27 @@ async function handleTestAPI(request, sender, sendResponse) {
   }
 }
 
+// UAT-08 prep: SW-bounce for options.js Test Connection ('lattice-test-connection')
+// -- executeViaBridge is SW-only (lattice-provider-bridge.js global); control_panel.html does not load that script.
+chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+  if (!request || request.type !== 'lattice-test-connection') {
+    return false;
+  }
+  if (typeof executeViaBridge !== 'function') {
+    sendResponse({ ok: false, error: 'executeViaBridge unavailable in SW global' });
+    return true;
+  }
+  (async function () {
+    try {
+      await executeViaBridge(request.provider, request.config, { __testConnection: true }, { mode: 'test-connection' });
+      sendResponse({ ok: true });
+    } catch (err) {
+      sendResponse({ ok: false, error: (err && err.message) ? err.message : 'Unknown bridge error' });
+    }
+  })();
+  return true;
+});
+
 // Handle AI API calls
 async function handleAICall(request, sender, sendResponse) {
   const { prompt, structuredDOM, apiKey } = request;

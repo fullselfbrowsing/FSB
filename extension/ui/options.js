@@ -1125,7 +1125,22 @@ async function checkApiConnection() {
 
     const startTime = Date.now();
     try {
-      await executeViaBridge(provider, config, { __testConnection: true }, { mode: 'test-connection' });
+      await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { type: 'lattice-test-connection', provider: provider, config: config },
+          function (response) {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            if (!response || !response.ok) {
+              reject(new Error((response && response.error) || 'Unknown bridge error'));
+              return;
+            }
+            resolve();
+          }
+        );
+      });
       const responseTime = Date.now() - startTime;
       updateConnectionStatus('connected', 'Connected');
       // Hide status card on success - only show on errors
