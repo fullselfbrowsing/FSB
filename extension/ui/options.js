@@ -5055,7 +5055,7 @@ async function copyHashKey() {
 async function testServerConnection() {
   const serverUrl = document.getElementById('serverUrl')?.value?.trim();
   const hashKey = document.getElementById('serverHashKey')?.value?.trim();
-  const statusEl = document.getElementById('connectionStatus');
+  const statusEl = document.getElementById('syncConnectionStatus');
 
   if (!serverUrl || !hashKey) {
     showToast('Please enter server URL and hash key', 'error');
