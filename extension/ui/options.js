@@ -1230,11 +1230,16 @@ async function runFullApiTest() {
       gemini: { key: settings.geminiApiKey, name: 'Gemini' },
       openai: { key: settings.openaiApiKey, name: 'OpenAI' },
       anthropic: { key: settings.anthropicApiKey, name: 'Anthropic' },
-      custom: { key: settings.customApiKey, name: 'Custom' }
+      custom: { key: settings.customApiKey, name: 'Custom' },
+      openrouter: { key: settings.openrouterApiKey, name: 'OpenRouter' },
+      lmstudio: { key: 'local', name: 'LM Studio' }
     };
 
     const providerInfo = apiKeyMap[provider];
-    if (!providerInfo.key) {
+    if (!providerInfo) {
+      throw new Error(`Unknown provider: ${provider}`);
+    }
+    if (provider !== 'lmstudio' && !providerInfo.key) {
       throw new Error(`${providerInfo.name} API key is required for testing`);
     }
 
