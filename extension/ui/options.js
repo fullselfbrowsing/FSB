@@ -1263,6 +1263,11 @@ async function runFullApiTest() {
     `;
 
     elements.testResults.classList.add('show');
+    if (result.ok) {
+      if (elements.apiStatusCard) elements.apiStatusCard.style.display = 'none';
+    } else {
+      updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Test failed');
+    }
     addLog(result.ok ? 'info' : 'error', `Full API test ${result.ok ? 'passed' : 'failed'}: ${result.error || 'Success'}`);
 
   } catch (error) {
@@ -1274,6 +1279,7 @@ async function runFullApiTest() {
     `;
     elements.testResults.classList.add('show');
     addLog('error', `Full API test error: ${error.message}`);
+    updateApiStatusCard('disconnected', 'Connection Error', error.message);
   } finally {
     elements.fullApiTest.disabled = false;
     elements.fullApiTest.innerHTML = '<i class="fas fa-flask"></i> Run Full API Test';
