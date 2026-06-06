@@ -651,9 +651,19 @@ async function loadOffscreenHandlerSource(chromeMock) {
 
   passAssertEqual((checkBody.match(/getStoredSettings\(\)/g) || []).length, 0, 'checkApiConnection body does NOT call getStoredSettings (P2 stale-storage closed)');
   passAssertEqual((checkBody.match(/new\s+AIIntegration/g) || []).length, 0, 'checkApiConnection body does NOT instantiate AIIntegration');
-  passAssertEqual((checkBody.match(/executeViaBridge\(/g) || []).length, 1, 'checkApiConnection body calls executeViaBridge exactly once');
-  passAssert(/mode:\s*['"]test-connection['"]/.test(checkBody), "checkApiConnection passes {mode: 'test-connection'}");
-  passAssert(/__testConnection:\s*true/.test(checkBody), 'checkApiConnection passes {__testConnection: true} as requestBody marker');
+  // UAT-08 prep (quick 260606-4si): checkApiConnection no longer calls executeViaBridge
+  // directly. The bridge global is SW-only (lattice-provider-bridge.js); options.js
+  // now SW-bounces via chrome.runtime.sendMessage({type:'lattice-test-connection'})
+  // and background.js handles it in SW context. The mode + __testConnection markers
+  // are now passed by the SW-side listener, not by options.js.
+  passAssertEqual((checkBody.match(/executeViaBridge\(/g) || []).length, 0, 'checkApiConnection body does NOT call executeViaBridge directly (SW-bounce contract per UAT-08 prep)');
+  passAssert(/lattice-test-connection/.test(checkBody), "checkApiConnection sends 'lattice-test-connection' SW-bounce message");
+  passAssert(/chrome\.runtime\.sendMessage/.test(checkBody), 'checkApiConnection uses chrome.runtime.sendMessage for SW-bounce');
+  // Verify SW-side listener in background.js carries the bridge call markers.
+  const backgroundSrc = fs.readFileSync('extension/background.js', 'utf8');
+  passAssert(/lattice-test-connection/.test(backgroundSrc), "background.js handles 'lattice-test-connection' SW-bounce");
+  passAssert(/mode:\s*['"]test-connection['"]/.test(backgroundSrc), "background.js SW handler passes {mode: 'test-connection'} to executeViaBridge");
+  passAssert(/__testConnection:\s*true/.test(backgroundSrc), 'background.js SW handler passes {__testConnection: true} as requestBody marker');
   passAssert(/elements\.apiKey\?\.value/.test(checkBody) || /document\.getElementById\(['"]apiKey['"]\)\?\.value/.test(checkBody), 'checkApiConnection reads xai apiKey from input field (not chrome.storage)');
   passAssert(/\.value.*\.trim\(\)/.test(checkBody), 'checkApiConnection trims input values (defense-in-depth + P1 closure)');
 

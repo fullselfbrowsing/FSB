@@ -1295,6 +1295,28 @@ async function runAgentLoop(sessionId, options) {
  * @param {string} sessionId - Session identifier
  * @param {Object} options - Background.js callbacks (same as runAgentLoop)
  */
+// UAT-08 prep: resolve overlay detail text. Prefers caller-provided custom message,
+// then session.lastAiReasoning, then a human-readable mapping of the FINT-14
+// step marker (session._currentStepName written at extension/ai/agent-loop.js
+// BEFORE_API_REQUEST + BEFORE_TOOL_EXECUTION + BEFORE_NEXT_ITERATION_SCHEDULE sites
+// per Phase 9 Plan 09-02). Module-level placement keeps INV-04 BYTE-FROZEN
+// (no deferred-iteration token added; helper NOT inside any lambda body).
+var _al_STEP_MARKER_LABELS = {
+  'BEFORE_API_REQUEST': 'Calling model',
+  'BEFORE_TOOL_EXECUTION': 'Dispatching tool',
+  'BEFORE_NEXT_ITERATION_SCHEDULE': 'Scheduling next step'
+};
+function resolveOverlayDetail(session, customMsg) {
+  if (typeof customMsg === 'string' && customMsg.length > 0) return customMsg;
+  if (session && typeof session.lastAiReasoning === 'string' && session.lastAiReasoning.length > 0) {
+    return session.lastAiReasoning;
+  }
+  var marker = session && session._currentStepName;
+  if (marker && Object.prototype.hasOwnProperty.call(_al_STEP_MARKER_LABELS, marker)) {
+    return _al_STEP_MARKER_LABELS[marker];
+  }
+  return '…';
+}
 async function runAgentIteration(sessionId, options) {
   var activeSessions = options.activeSessions;
   var persist = options.persistSession;
@@ -1734,7 +1756,7 @@ async function runAgentIteration(sessionId, options) {
 
     await refreshCanonicalOverlay(
       'thinking',
-      session.lastAiReasoning || 'Thinking through the next browser step',
+      resolveOverlayDetail(session, null),
       { indeterminate: true, progressLabel: 'Planning' }
     );
 
@@ -2347,7 +2369,7 @@ async function runAgentIteration(sessionId, options) {
         session.lastAiReasoning = msg;
         await refreshCanonicalOverlay(
           'thinking',
-          msg || 'Thinking through the next browser step',
+          resolveOverlayDetail(session, msg),
           { indeterminate: true, progressLabel: 'Planning' }
         );
         result = { success: true, hadEffect: false, error: null, navigationTriggered: false, result: { displayed: true } };
