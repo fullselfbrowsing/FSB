@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Phase 11 added (tab-aware side panel surface); discuss/plan/execute pending
-last_updated: "2026-06-07T04:50:00.000Z"
-last_activity: 2026-06-06 -- Phase 11 added (tab-aware side panel surface) post-Phase-10 to address three UX gaps surfaced during OpenRouter session: friendly owner-chip label, foreign-owned input lockout, per-tab chat history isolation
+stopped_at: Completed 10-03-PLAN.md
+last_updated: "2026-06-07T08:10:37.479Z"
+last_activity: 2026-06-07 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
-  total_plans: 41
+  total_plans: 46
   completed_plans: 41
-  percent: 91
+  percent: 89
 ---
 
 # Project State
@@ -25,14 +25,14 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 10 (MCP-philosophy parity for autopilot driver) IN PROGRESS — Plans 10-01 + 10-02 SHIPPED (allowlist 'FSB Autopilot' + nextEntry driver discriminator + agent-loop recordVisualSessionTick at TOOL_DISPATCH boundary + recorder route allowlist 'autopilot' + drivingModel pass-through field + agent-loop recordDispatch post-toolResults.push with provider/model + xAI reasoning_tokens attribution + smoke 30 PASS). Plan 10-03 (ceremony) remains. INV-04 BYTE-FROZEN (setTimeout=8, iterator=4); INV-06 BYTE-FROZEN (Lattice SHA e95067bfa87ed1b75838fc3b3ef217a3b01acbd3).
+**Current focus:** Phase 11 — Tab-aware side panel surface
 
 ## Current Position
 
-Phase: 10 (MCP-philosophy parity for autopilot driver; 2/3 plans complete; IN PROGRESS)
-Plan: 10-02 COMPLETE (mcp-metrics-recorder.js route allowlist 'autopilot' + drivingModel pass-through field; agent-loop.js autopilot recordDispatch call site post-toolResults.push with session.providerConfig identity + xAI reasoning_tokens edge case; tests/mcp-philosophy-parity-smoke.test.js Parts 5-8 filled at 30 PASS / 0 FAIL; INV-04 + INV-06 BYTE-FROZEN)
-Status: Ready to execute
-Last activity: 2026-06-06 -- Completed quick task 260606-bh1: Fix runFullApiTest apiKeyMap missing openrouter and lmstudio
+Phase: 11 (Tab-aware side panel surface) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 11
+Last activity: 2026-06-07 -- Phase 11 execution started
 
 ### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
 
