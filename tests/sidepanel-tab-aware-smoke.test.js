@@ -471,7 +471,51 @@ function installDomStub(idMap) {
   }
 
   console.log('\n--- Part 7: INV-04 + INV-06 byte-freeze regression (FILLED in Plan 11-04) ---');
-  ok(true, 'placeholder Part 7 -- filled in Plan 11-04 (INV-04 + INV-06)');
+
+  // Part 7.1-7.4: INV byte-freeze regression assertions
+  const agentLoopPath = path.resolve(__dirname, '../extension/ai/agent-loop.js');
+  const agentLoopSrc = fs.readFileSync(agentLoopPath, 'utf8');
+
+  // 7.1 setTimeout total count = 8
+  const setTimeoutMatches = agentLoopSrc.match(/setTimeout/g) || [];
+  ok(setTimeoutMatches.length === 8,
+     'Part 7.1 -- INV-04 setTimeout count = 8 in agent-loop.js (got ' + setTimeoutMatches.length + ')');
+
+  // 7.2 4 iterator patterns intact
+  const iteratorMatches = agentLoopSrc.match(/session\._nextIterationTimer\s*=\s*setTimeout/g) || [];
+  ok(iteratorMatches.length === 4,
+     'Part 7.2 -- INV-04 4 iterator patterns intact (got ' + iteratorMatches.length + ')');
+
+  // 7.3 awk-equivalent scan: NO Phase 11 token inside setTimeout lambda body
+  const forbiddenTokens = /lookupClientLabel|applyInputLockout|ensureTabConversation|swapToTabConversation|dropTabConversation|initTabConversationStore|_isActiveTabForeignOwned/;
+  const lines = agentLoopSrc.split('\n');
+  let phase11InsideLambda = false;
+  let foundLambdaWithToken = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (/setTimeout\s*\(\s*function/.test(lines[i])) {
+      // Scan ahead until the closing `}, N)` pattern
+      for (let j = i; j < Math.min(i + 50, lines.length); j++) {
+        if (forbiddenTokens.test(lines[j])) {
+          phase11InsideLambda = true;
+          foundLambdaWithToken = 'line ' + (j + 1) + ': ' + lines[j].trim();
+          break;
+        }
+        if (/^\s*\}\s*,\s*\d+\s*\)/.test(lines[j])) break; // end of lambda
+      }
+    }
+    if (phase11InsideLambda) break;
+  }
+  ok(!phase11InsideLambda,
+     'Part 7.3 -- INV-04 awk-scan: NO Phase 11 token inside any setTimeout lambda body'
+     + (foundLambdaWithToken ? ' (violation at ' + foundLambdaWithToken + ')' : ''));
+
+  // 7.4 LATTICE-PIN.md frontmatter SHA byte-freeze (INV-06)
+  const latticePinPath = path.resolve(__dirname, '../.planning/LATTICE-PIN.md');
+  const latticePinSrc = fs.readFileSync(latticePinPath, 'utf8');
+  const shaMatch = latticePinSrc.match(/^current_lattice_sha:\s*([a-f0-9]+)/m);
+  ok(shaMatch && shaMatch[1] === 'e95067bfa87ed1b75838fc3b3ef217a3b01acbd3',
+     'Part 7.4 -- INV-06 LATTICE-PIN current_lattice_sha frozen at e95067bf...'
+     + (shaMatch ? ' (got ' + shaMatch[1] + ')' : ' (frontmatter not found)'));
 
   // Module references used to keep require side-effect alive across the
   // smoke and demonstrate downstream availability for Plan 11-01+ fills.
