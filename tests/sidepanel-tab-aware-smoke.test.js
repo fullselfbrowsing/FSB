@@ -246,10 +246,96 @@ function installDomStub(idMap) {
      'Part 2.7 -- globalThis.FSBOwnerChip.lookupClientLabel function (dual-export)');
 
   console.log('\n--- Part 3: applyInputLockout DOM mutation on 4 controls (FILLED in Plan 11-02) ---');
-  ok(true, 'placeholder Part 3 -- filled in Plan 11-02 (FINT-20)');
+
+  // Part 3.1-3.4: applyInputLockout DOM mutation via in-sandbox eval.
+  // applyInputLockout is a function defined inside sidepanel.js classic-
+  // script body (NOT exported). The smoke cannot require sidepanel.js as
+  // a module (it depends on chrome APIs being installed AND on DOM globals
+  // being set up beforehand). Instead, extract the function body via regex,
+  // eval it inside this Node scope with a DOM stub + no-op
+  // updateSendButtonState stub, and exercise it directly.
+  const sidepanelSrcForP3 = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
+  const applyMatch = sidepanelSrcForP3.match(/function applyInputLockout\(foreignOwned\)\s*\{[\s\S]*?^\}/m);
+  ok(applyMatch !== null, 'Part 3.0 -- applyInputLockout function body extractable');
+
+  if (applyMatch) {
+    // Build DOM stub + sandbox + eval the function body
+    const chatInputStub = createDivStub();
+    const sendBtnStub = createButtonStub();
+    const stopBtnStub = createButtonStub();
+    const micBtnStub = createButtonStub();
+    installDomStub({
+      chatInput: chatInputStub,
+      sendBtn: sendBtnStub,
+      stopBtn: stopBtnStub,
+      micBtn: micBtnStub
+    });
+    globalThis.updateSendButtonState = function () {}; // no-op stub
+
+    // Eval the function definition into the global scope. Use indirect
+    // eval ((0, eval)(...)) so the function declaration creates a global
+    // binding even though this file runs in strict mode (the eval'd code
+    // executes in non-strict global scope).
+    (0, eval)(applyMatch[0]);
+    const applyInputLockoutFn = globalThis.applyInputLockout;
+
+    // 3.1 lockout state: BUTTON elements have disabled=true
+    applyInputLockoutFn(true);
+    ok(sendBtnStub.disabled === true && stopBtnStub.disabled === true && micBtnStub.disabled === true,
+       'Part 3.1 -- applyInputLockout(true) sets disabled on 3 BUTTON controls');
+
+    // 3.2 lockout state: chatInput DIV has contenteditable='false'
+    ok(chatInputStub._attrs()['contenteditable'] === 'false',
+       'Part 3.2 -- applyInputLockout(true) sets contenteditable=false on chatInput DIV');
+
+    // 3.3 lockout state: all 4 controls get aria-disabled + aria-describedby + class
+    const allFour = [chatInputStub, sendBtnStub, stopBtnStub, micBtnStub];
+    const allHaveAria = allFour.every(el => el._attrs()['aria-disabled'] === 'true');
+    const allHaveDesc = allFour.every(el => el._attrs()['aria-describedby'] === 'fsb-lockout-aria-description');
+    const allHaveClass = allFour.every(el => el._classes().indexOf('fsb-foreign-owned-disabled') !== -1);
+    ok(allHaveAria && allHaveDesc && allHaveClass,
+       'Part 3.3 -- applyInputLockout(true) sets aria-disabled + aria-describedby + .fsb-foreign-owned-disabled on all 4 controls');
+
+    // 3.4 unlock state: aria-disabled + aria-describedby + class cleared
+    applyInputLockoutFn(false);
+    const noneHaveAria = allFour.every(el => el._attrs()['aria-disabled'] === undefined);
+    const noneHaveDesc = allFour.every(el => el._attrs()['aria-describedby'] === undefined);
+    const noneHaveClass = allFour.every(el => el._classes().indexOf('fsb-foreign-owned-disabled') === -1);
+    const chatRestored = chatInputStub._attrs()['contenteditable'] === 'true';
+    ok(noneHaveAria && noneHaveDesc && noneHaveClass && chatRestored,
+       'Part 3.4 -- applyInputLockout(false) clears aria-* + class + restores chatInput contenteditable');
+  } else {
+    ok(false, 'Part 3.0 -- could not extract applyInputLockout function body; skipping 3.1-3.4');
+  }
 
   console.log('\n--- Part 4: handleSendMessage runtime gate + .fsb-foreign-owned-disabled CSS class (FILLED in Plan 11-02) ---');
-  ok(true, 'placeholder Part 4 -- filled in Plan 11-02 (FINT-20)');
+
+  // Part 4.1-4.5: source-level wiring verification
+  const sidepanelSrcForP4 = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
+  const sidepanelCssSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.css'), 'utf8');
+  const sidepanelHtmlSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.html'), 'utf8');
+
+  // 4.1 sidepanel.js carries applyInputLockout(true) inside refreshOwnerChip
+  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshOwnerChip\(\)\s*\{[\s\S]*?^\}/m);
+  ok(refreshChipBodyMatch && refreshChipBodyMatch[0].indexOf('applyInputLockout(true)') !== -1,
+     'Part 4.1 -- refreshOwnerChip body contains applyInputLockout(true)');
+
+  // 4.2 sidepanel.js carries applyInputLockout(false) inside refreshOwnerChip
+  ok(refreshChipBodyMatch && refreshChipBodyMatch[0].indexOf('applyInputLockout(false)') !== -1,
+     'Part 4.2 -- refreshOwnerChip body contains applyInputLockout(false)');
+
+  // 4.3 sidepanel.js carries the runtime gate inside handleSendMessage
+  const handleSendBodyMatch = sidepanelSrcForP4.match(/async function handleSendMessage\(\)\s*\{[\s\S]*?^\}/m);
+  ok(handleSendBodyMatch && /if \(await _isActiveTabForeignOwned\(\)\) return;/.test(handleSendBodyMatch[0]),
+     'Part 4.3 -- handleSendMessage body contains _isActiveTabForeignOwned runtime gate');
+
+  // 4.4 sidepanel.css carries .fsb-foreign-owned-disabled rule
+  ok(/\.fsb-foreign-owned-disabled\s*\{[^}]*opacity:\s*0\.45[^}]*pointer-events:\s*none/s.test(sidepanelCssSrc),
+     'Part 4.4 -- sidepanel.css carries .fsb-foreign-owned-disabled rule with opacity 0.45 + pointer-events none');
+
+  // 4.5 sidepanel.html carries the aria-describedby description span
+  ok(/<span\s+id=\"fsb-lockout-aria-description\"\s+class=\"sr-only\">/.test(sidepanelHtmlSrc),
+     'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
 
   console.log('\n--- Part 5: envelope CRUD + LRU eviction (FILLED in Plan 11-03) ---');
   ok(true, 'placeholder Part 5 -- filled in Plan 11-03 (FINT-21)');
