@@ -42,19 +42,142 @@ async function ensureLegacySidepanelAgent() {
   return _legacySidepanelAgent;
 }
 
-// Initialize or restore conversation ID for session continuity
-async function initConversationId() {
+// Phase 11 FINT-21 -- per-tab conversation state envelope.
+//
+// Module-scope cache + hydration gate. Event handlers MUST
+// `await _envelopeReadyPromise` before touching the envelope so an
+// onActivated firing during DOMContentLoaded async boot waits for
+// migration to complete (RESEARCH Section 5 race-free pattern).
+let tabConvEnvelope = null;
+let _envelopeReadyResolve = null;
+const _envelopeReadyPromise = new Promise(function (resolve) {
+  _envelopeReadyResolve = resolve;
+});
+
+function _mintConversationId() {
+  return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+}
+
+async function _persistEnvelope() {
   try {
-    const stored = await chrome.storage.session.get(['fsbSidepanelConversationId']);
-    if (stored.fsbSidepanelConversationId) {
-      conversationId = stored.fsbSidepanelConversationId;
-    } else {
-      conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      await chrome.storage.session.set({ fsbSidepanelConversationId: conversationId });
+    var payload = {};
+    payload[FSBSidepanelTabConvStore.STORAGE_KEY] = tabConvEnvelope;
+    await chrome.storage.session.set(payload);
+  } catch (_e) {
+    // Best-effort: storage failures do NOT block UI flow.
+  }
+}
+
+// Phase 11 FINT-21 -- one-shot boot migration + envelope hydration.
+// Idempotent: subsequent boots find legacy key absent + envelope present
+// and short-circuit through the sidecar's migration helper.
+async function initTabConversationStore() {
+  try {
+    if (typeof FSBSidepanelTabConvStore === 'undefined'
+        || typeof FSBSidepanelTabConvStore.migrateLegacyConversationKey !== 'function') {
+      tabConvEnvelope = { v: 1, byTab: {}, lru: [] };
+      conversationId = _mintConversationId();
+      if (typeof _envelopeReadyResolve === 'function') _envelopeReadyResolve();
+      return;
     }
-  } catch (e) {
-    // Fallback: generate without persistence
-    conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    var activeTabId = null;
+    try {
+      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
+    } catch (_e) { /* swallow */ }
+
+    tabConvEnvelope = await FSBSidepanelTabConvStore.migrateLegacyConversationKey(
+      function (keys) { return chrome.storage.session.get(keys); },
+      function (payload) { return chrome.storage.session.set(payload); },
+      function (key) { return chrome.storage.session.remove(key); },
+      activeTabId
+    );
+
+    if (activeTabId !== null) {
+      var existing = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, activeTabId);
+      if (existing) {
+        conversationId = existing;
+      } else {
+        // D-17 lazy mint: no entry on this tab yet; conversationId remains
+        // null until first user message in this tab.
+        conversationId = null;
+      }
+    } else {
+      conversationId = null;
+    }
+  } catch (_e) {
+    // Fallback: ensure module continues to boot even if migration fails.
+    tabConvEnvelope = { v: 1, byTab: {}, lru: [] };
+    conversationId = _mintConversationId();
+  } finally {
+    if (typeof _envelopeReadyResolve === 'function') _envelopeReadyResolve();
+  }
+}
+
+// Phase 11 FINT-21 -- swap chat surface to the new tab's conversation
+// when chrome.tabs.onActivated fires. Peek-only: does NOT mint (D-17).
+// If no entry exists, conversationId is set to null and chatMessages is
+// cleared; first send triggers ensureTabConversationForActiveTab().
+async function swapToTabConversation(tabId) {
+  try {
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined') return;
+    if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return;
+    var nextConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
+    if (nextConvId === conversationId) return; // same conversation; no-op
+    conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
+    if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
+      chatMessages.innerHTML = '';
+    }
+  } catch (_e) { /* swallow: swap is best-effort */ }
+}
+
+// Phase 11 FINT-21 -- drop tab's entry on chrome.tabs.onRemoved (D-14).
+// No-op if entry never existed. Persists envelope after drop.
+async function dropTabConversation(tabId) {
+  try {
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined') return;
+    if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return;
+    FSBSidepanelTabConvStore.dropTabConversation(tabConvEnvelope, tabId);
+    await _persistEnvelope();
+  } catch (_e) { /* swallow */ }
+}
+
+// Phase 11 FINT-21 -- lazy mint OR touch the active tab's
+// conversationId. Persists envelope. Returns the conversationId string.
+// When `overwrite` is true, drops the existing entry first (used by
+// startNewChat to force a fresh conversation in the current tab).
+async function ensureTabConversationForActiveTab(overwrite) {
+  try {
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined'
+        || !FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) {
+      var fallback = _mintConversationId();
+      conversationId = fallback;
+      return fallback;
+    }
+    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tab = tabs && tabs[0];
+    if (!tab || typeof tab.id !== 'number') {
+      // No active tab; fall back to direct mint (preserves Phase 243 fail-open).
+      var noTabFallback = _mintConversationId();
+      conversationId = noTabFallback;
+      return noTabFallback;
+    }
+    if (overwrite === true) {
+      FSBSidepanelTabConvStore.dropTabConversation(tabConvEnvelope, tab.id);
+    }
+    var newConvId = FSBSidepanelTabConvStore.ensureTabConversation(
+      tabConvEnvelope, tab.id, _mintConversationId
+    );
+    conversationId = newConvId;
+    await _persistEnvelope();
+    return newConvId;
+  } catch (_e) {
+    var errFallback = _mintConversationId();
+    conversationId = errFallback;
+    return errFallback;
   }
 }
 
@@ -390,13 +513,31 @@ async function refreshOwnerChip() {
 try {
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onActivated
       && typeof chrome.tabs.onActivated.addListener === 'function') {
-    chrome.tabs.onActivated.addListener(() => {
-      refreshOwnerChip();
+    // Phase 11 FINT-21 -- extended: also swap conversation history on tab
+    // switch (D-14 / D-17 lazy mint). The chip refresh + history swap run
+    // sequentially; both are best-effort, so a failure in one does not
+    // poison the other.
+    chrome.tabs.onActivated.addListener(async (activeInfo) => {
+      try { await refreshOwnerChip(); } catch (_e) { /* swallow */ }
+      try { await swapToTabConversation(activeInfo && activeInfo.tabId); } catch (_e) { /* swallow */ }
     });
   }
 } catch (_e) {
   // swallow: chip auto-refresh is non-critical
 }
+
+// Phase 11 FINT-21 -- chrome.tabs.onRemoved listener: drop the tab's
+// entry from the per-tab envelope (CONTEXT D-14). NO discard-event
+// listener registered -- discarded tabs preserve their entry intact
+// (D-15) so the tab can re-restore with its conversation.
+try {
+  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onRemoved
+      && typeof chrome.tabs.onRemoved.addListener === 'function') {
+    chrome.tabs.onRemoved.addListener(async (tabId) => {
+      try { await dropTabConversation(tabId); } catch (_e) { /* swallow */ }
+    });
+  }
+} catch (_e) { /* swallow */ }
 
 // Initialize side panel
 document.addEventListener('DOMContentLoaded', async () => {
@@ -413,8 +554,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     showSidepanelProgressEnabled = false;
   }
 
-  // Initialize conversation ID for session continuity
-  await initConversationId();
+  // Phase 11 FINT-21 -- per-tab envelope hydration + legacy migration
+  // (replaces previous single-key conversation init flow).
+  await initTabConversationStore();
 
   // Initialize analytics
   initializeSidepanelAnalytics();
@@ -599,6 +741,12 @@ async function handleSendMessage() {
   // activation. Fail-open: storage errors do NOT block sends.
   if (await _isActiveTabForeignOwned()) return;
 
+  // Phase 11 FINT-21 -- lazy-mint OR touch the active tab's conversationId.
+  // D-17 lazy mint: this is the first persistence point for a tab the
+  // user is chatting in. Failure to mint falls back to direct mint inside
+  // the helper; never blocks the send path.
+  try { conversationId = await ensureTabConversationForActiveTab(false); } catch (_e) { /* swallow */ }
+
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
   // Handle /agent slash commands
   // if (message.startsWith('/agent')) {
@@ -728,9 +876,11 @@ function startNewChat() {
   currentSessionId = null;
   stopRequested = false;
 
-  // Generate new conversationId for new chat
-  conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  chrome.storage.session.set({ fsbSidepanelConversationId: conversationId }).catch(() => {});
+  // Phase 11 FINT-21 -- mint a fresh conversation in the current tab by
+  // overwriting the existing entry. Fire-and-forget per existing
+  // semantics; sidepanel-side UI clearing (chatMessages.innerHTML = '')
+  // happens immediately below.
+  ensureTabConversationForActiveTab(true).catch(function () { /* swallow */ });
 
   // Clear chat messages
   chatMessages.innerHTML = '';
