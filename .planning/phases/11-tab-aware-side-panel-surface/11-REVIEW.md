@@ -231,3 +231,60 @@ This is consistent with the pattern already used at line 472 (recon suggestion c
 _Reviewed: 2026-06-07_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Fixes Applied
+
+**Applied:** 2026-06-07
+**Scope:** Warnings only (WR-01, WR-02, WR-03). Info findings (IN-01..04) deferred per default policy.
+**Applier:** Claude (gsd-code-fixer)
+**Test gate:** `node tests/sidepanel-tab-aware-smoke.test.js` -> 39 PASS / 0 FAIL after every fix. `npm test` exit 0 end-to-end.
+**Invariants verified:** INV-04 `grep -c "setTimeout" extension/ai/agent-loop.js` = 8 (unchanged). INV-06 `cd lattice && git rev-parse HEAD` = `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (unchanged).
+
+### WR-01: Concurrent _persistEnvelope() race -- FIXED
+
+**Commit:** `482d68d7`
+**File:** `extension/ui/sidepanel.js`
+**Fix shape:** Added module-scope `_envelopeWriteChain` + `_serializeEnvelopeWrite(fn)` mirroring `withRegistryLock` at `extension/utils/agent-registry.js:180-185`. Wrapped `_persistEnvelope`'s storage write inside the serializer so every existing call site (`dropTabConversation` + `ensureTabConversationForActiveTab`) linearizes at the storage boundary without API changes. The `.then(fn, fn)` shape keeps the chain alive across rejections; the `.catch` on the assignment prevents `UnhandledRejection` leakage. Race window closed: drop-on-tab-close + ensure-on-user-send now serialize even when they fire within the same millisecond.
+
+### WR-02: ensureTabConversationForActiveTab silently preserves stale entry -- FIXED
+
+**Commit:** `5ec4cb26`
+**File:** `extension/ui/sidepanel.js`
+**Fix shape:** Per WR-02 recommended minimal-change patch, added a `console.warn` breadcrumb inside the `!tab` branch when `overwrite === true`. Message: `[sidepanel] ensureTabConversationForActiveTab(force=true) skipped -- no active tab in current window`. Behavior NOT changed: still falls through to `noTabFallback` mint with no auto-recovery; the pre-existing entry remains untouched. The breadcrumb surfaces the rare edge case (side panel open in inactive window context, or brief no-focused-tab window after a window close) for telemetry / DevTools so it is no longer silent. No EMOJI per CLAUDE.md.
+
+### WR-03: Retry buttons bypass FINT-20 visual lockout -- FIXED
+
+**Commit:** `2d410eb6`
+**File:** `extension/ui/sidepanel.js`
+**Fix shape:** Per WR-03 recommended option (b), wrapped each retry click handler in `await _isActiveTabForeignOwned()` and early-return with a `console.warn` breadcrumb. Option (b) is the correct choice here because retry buttons can be created AFTER a lockout state is established (they would miss `applyInputLockout`'s control snapshot). Three sites updated:
+
+1. `handleReconComplete` retry button (`Retry with Site Map`)
+2. `automationError` retry button (`Retry`)
+3. History list delegated click handler (`.history-replay-btn` -> `startReplay`) -- replay dispatches a `replaySession` message that targets the active tab, so it needs the same gate as the direct retry buttons
+
+Without this fix the click silently dropped the user's intent because `handleSendMessage`'s existing runtime gate fail-closed at line ~801 without surfacing the cause. Now the breadcrumb is emitted and the UX is consistent with D-11 (chip + dimmed controls are the user-visible explanation; the underlying gate honors the same contract). No EMOJI per CLAUDE.md.
+
+### Hard Invariant Re-verification
+
+| Invariant | Pre-fix baseline | Post-fix value | Status |
+|-----------|------------------|----------------|--------|
+| INV-04 setTimeout count in agent-loop.js | 8 | 8 | UNCHANGED |
+| INV-06 lattice HEAD SHA | `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` | `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` | UNCHANGED |
+| INV-01/02 tool-definitions.js / deprecated agent modules | untouched | untouched | UNCHANGED |
+| Smoke test `tests/sidepanel-tab-aware-smoke.test.js` | 39 PASS / 0 FAIL | 39 PASS / 0 FAIL | UNCHANGED |
+| Full `npm test` | exit 0 | exit 0 | UNCHANGED |
+
+### Info findings -- NOT applied (deferred per default policy)
+
+| ID | Title | Reason |
+|----|-------|--------|
+| IN-01 | ENVELOPE_VERSION upgrade path not addressed | Info severity; future-phase footgun. Defer to Phase 12+ if schema bump is needed. |
+| IN-02 | DEFAULT_CAP = 50 magic-number dead code path | Info severity; current callers all pass DEFAULT_CAP. Hardening can land alongside the next sidepanel-tab-conv-store change. |
+| IN-03 | swapToTabConversation discards in-memory chat messages | Info severity; per CONTEXT D-17 lazy-mint contract this is intentional. Documentation-only fix can land in any Phase 11 follow-up. |
+| IN-04 | Defensive try/catch swallows errors with no telemetry breadcrumb | Info severity; consistent pattern across ~10 sites. Whole-codebase pattern-fix scope; out of scope for warning-only fix pass. |
+
+_Fixes applied: 2026-06-07_
+_Applier: Claude (gsd-code-fixer)_
+_Iteration: 1_
