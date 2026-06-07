@@ -265,11 +265,32 @@ async function refreshOwnerChip() {
       return;
     }
 
-    const formatter = (typeof FsbAgentRegistry !== 'undefined'
-      && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
-      ? FsbAgentRegistry.formatAgentIdForDisplay
-      : null;
-    const label = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
+    // Phase 11 FINT-19 -- three-tier resolution (CONTEXT D-07).
+    // Tier 1: legacy:* literal (e.g., legacy:popup, legacy:autopilot).
+    // Tier 2: friendly client name from visual-session lifecycle entry
+    //         (Phase 10 D-01 14-entry allowlist; e.g., OpenClaw, Claude,
+    //         FSB Autopilot).
+    // Tier 3: fall back to formatAgentIdForDisplay short-prefix (Phase 243
+    //         baseline preserved for raw-FSB-tool agents that never tick
+    //         the visual-session pipeline).
+    let label;
+    if (ownerAgentId.indexOf('legacy:') === 0) {
+      label = ownerAgentId;
+    } else {
+      const friendly = await FSBOwnerChip.lookupClientLabel(
+        tab.id,
+        (key) => chrome.storage.session.get(key)
+      );
+      if (friendly) {
+        label = friendly;
+      } else {
+        const formatter = (typeof FsbAgentRegistry !== 'undefined'
+          && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
+          ? FsbAgentRegistry.formatAgentIdForDisplay
+          : null;
+        label = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
+      }
+    }
     chipEl.textContent = FSBOwnerChip.buildChipText(label);
     chipEl.style.display = 'inline-flex';
   } catch (_e) {
