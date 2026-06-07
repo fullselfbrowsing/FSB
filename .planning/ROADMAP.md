@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** v0.10.0 (attempt 2) -- In progress. Phases 1-5 complete; Phases 6-7 inserted 2026-05-27 to close the FINT-KK..L Lattice-provider-consumption gap after the `xai-key-rejected-400` debug surfaced that FSB's custom `universal-provider.js` runtime path has defects (missing trim + stale storage read) that Lattice's adapters do not. Phase 8 (delegation primitive) remains deferred to v0.11.0+. UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end. Pivot from v0.10.0-attempt-1 (FSB-first) committed 2026-05-24; see `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the rationale.
+**Status:** v0.10.0 (attempt 2) -- In progress. Phases 1-5 complete; Phases 6-7 inserted 2026-05-27 to close the FINT-KK..L Lattice-provider-consumption gap after the `xai-key-rejected-400` debug surfaced that FSB's custom `universal-provider.js` runtime path has defects (missing trim + stale storage read) that Lattice's adapters do not. Phase 8 (delegation primitive) remains deferred to v0.11.0+. UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end. Phases 8 + 9 + 10 added 2026-05-31 to close the v0.10.0 half-step (FSB agent brain on Lattice runtime + SurvivabilityAdapter activation + MCP-philosophy parity for autopilot driver); all three shipped, consolidated UAT-08+09+10 deferred to a Chrome MV3 reload session. Phase 11 added 2026-06-06 (tab-aware side panel surface: friendly owner-chip + foreign-owned input lockout + per-tab chat history); ships before the consolidated UAT, which then expands to UAT-08+09+10+11. Pivot from v0.10.0-attempt-1 (FSB-first) committed 2026-05-24; see `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the rationale.
 
 **Branch posture:** `automation` branch reset to `51bdbb36` (merge-base with `main`). Pre-pivot work preserved on `pre-pivot-archive/v0.10.0-fsb-first`. Lattice cloned into `./lattice/` (gitignored) on branch `fsb-integration-experiments`. FSB will consume Lattice via `npm install ./lattice` (path: dependency) or `npm link`.
 
@@ -395,6 +395,39 @@ Plans:
 Plans:
 - [ ] TBD
 
+### Phase 11: Tab-aware side panel surface — friendly owner-chip + foreign-owned input lockout + per-tab chat history
+
+**Goal:** Make the side panel tab-aware across three coupled UX surfaces so the user always sees the correct conversation, the correct ownership context, and the correct affordances for the currently-active tab. Today the side panel carries a single global `fsbSidepanelConversationId` (chrome.storage.session), the owner chip shows the raw `agent_<uuid>` 6-char short prefix even when a human-friendly client label is known via the MCP visual-session lifecycle map, and there is no input gating when a foreign agent owns the active tab. Phase 11 closes these three gaps as one coherent delivery.
+
+**Scope (anticipated; finalized in 11-CONTEXT.md after discuss):**
+- **Surface 1 — Friendly owner-chip label.** When the active tab has a visual-session lifecycle entry (`extension/utils/mcp-visual-session-lifecycle.js` storage key per tabId), `ownerLabelFor` reads `entry.client` from the allowlisted 14-entry CLIENT_LABEL_MAP (`mcp-visual-session.js:4-18`: Claude / OpenClaw / Cursor / Codex / Grok / Gemini / Hermes / FSB Autopilot / etc.) and renders `owned by OpenClaw` instead of `owned by agent_a3f8b1`. Falls back to current short-prefix display when no lifecycle entry exists (non-MCP-aware agent driving the tab via raw FSB tools). Popup gets the same fix for consistency.
+- **Surface 2 — Foreign-owned input lockout.** When the active tab is foreign-owned per the existing `shouldShowOwnerChip` contract (Phase 243 D-05; ownerAgentId !== 'legacy:sidepanel'), the side panel disables the chat input, send button, run-task button, voice-input button, and stop-task button. Re-enables on tab switch to a free tab (or to a tab owned by 'legacy:sidepanel' itself). Owner chip becomes the visible UX cue for why controls are gated; an accessible tooltip / aria-disabled state explains.
+- **Surface 3 — Per-tab chat history.** Side panel chat history becomes tab-aware: switching from tab A to tab B swaps the visible conversation in the DOM, switching back to tab A retains tab A's prior conversation in full. State model migrates from the existing single `fsbSidepanelConversationId` chrome.storage.session key to a `Map<tabId, conversationId>` envelope (e.g. `fsbSidepanelTabConversations: { v: 1, byTab: { '<tabId>': '<conversationId>', ... } }`). Eviction policy on `chrome.tabs.onRemoved` drops the entry; on `chrome.tabs.onDiscarded` preserves so a discarded-tab restore re-attaches the prior conversation. SW restart survival via storage.session persistence + hydration on side panel open.
+
+**Hard invariants (carry from v0.10.0):**
+- INV-01 MCP wire contracts UNTOUCHED (no tool definition or schema change).
+- INV-02 tool surface parity preserved (no autopilot vs MCP divergence in tool registry).
+- INV-04 `extension/ai/agent-loop.js` setTimeout iterator BYTE-FROZEN (`grep -c "setTimeout" extension/ai/agent-loop.js` = 8); Phase 11 touches `extension/ui/sidepanel.js` + `extension/ui/owner-chip.js` + `extension/ui/popup.js` only.
+- INV-05 deprecated agent modules frozen.
+- INV-06 ZERO Lattice-side commits expected. `current_lattice_sha` stays `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` per existing freeze. Phase 11 consumes existing Lattice primitives indirectly (via the visual-session lifecycle + agent-registry surfaces shipped earlier this milestone). No Lattice primitive extension is needed; if discuss-phase research reveals one IS needed, that's a discuss-phase blocker for human review.
+
+**Requirements:** TBD — anticipated FINT-19 (friendly owner-chip label resolver wiring), FINT-20 (foreign-owned input lockout gate), FINT-21 (per-tab conversation state model + storage migration + hydration).
+
+**Depends on:** Phase 10 (Phase 11 reads from the visual-session lifecycle store extended in Phase 10; safer to layer on Phase 10's confirmed entry shape than re-do the merge). Phase 11 is INDEPENDENT of the consolidated UAT-08+09+10 verdict — production code can ship even with the existing UAT pending; the UAT just expands to UAT-08+09+10+11 in one Chrome MV3 reload session.
+
+**Plans:** TBD (anticipated 3-5 plans across 3-4 waves: Wave 0 Node-side smoke harness for sidepanel.js helpers + storage envelope shape; Waves 1-3 owner-chip + lockout + per-tab history surfaces; Wave 4 ceremony closure / REQUIREMENTS.md / LATTICE-PIN.md row).
+
+**Out of scope:**
+- Popup.js input-lockout / per-tab history changes (popup is single-shot; gets the friendly owner-chip fix but not the other two surfaces).
+- Cross-window side panel state unification (each Chrome window has its own side panel surface today; per-window state isolation is preserved as-is).
+- Re-architecting chrome.storage.session shape beyond the per-tab conversation map envelope.
+- Conversation history search / cross-tab merging UI (history view stays the existing aggregate-by-sessionId behavior; only the active-chat surface is tab-aware).
+- Incognito mode special-casing (side panel availability in incognito follows existing extension manifest; tab-aware state behaves the same in incognito tabs as in regular tabs, subject to extension permission).
+- Deferring the existing UAT-08+09+10 consolidated UAT verdict — Phase 11 ships, then the user runs UAT-08+09+10+11 in one consolidated Chrome MV3 reload session.
+
+Plans:
+- [ ] TBD
+
 ---
 
 ## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
@@ -420,4 +453,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-05-31 -- Milestone v0.10.0 re-opened (2nd time) after UAT-1 PASS. Phase 8 added to close the half-step: FSB's agent BRAIN (iterator + tool dispatch + visual-session UX + metrics + driving-model attribution) still runs on FSB-owned code paths bypassing both Lattice's runtime primitives (G1 + G2 + Flow 4) and the MCP-driven session lifecycle. Phase 8 brings autopilot into philosophical parity with MCP-driven sessions (same tools per INV-02 already; same lifecycle + telemetry + attribution as new scope) while consuming Lattice's tracer/checkpoint/survivability primitives. Discuss-phase to decide whether this is one phase or splits into 2-3. The original Phase 8 "delegation primitive" sketch from 2026-05-27 (see section above) remains separately deferred to v0.11.0+ as before. Phases 1-7 + UAT-1 stand individually passed.*
+*Last updated: 2026-06-06 -- Phase 11 added (tab-aware side panel surface). Three coupled UX gaps observed during the OpenRouter integration session: (1) owner chip displays raw `agent_<uuid>` short prefix when the human-friendly client label is already known via the MCP visual-session lifecycle map; (2) no input gating when a foreign agent owns the active tab, so the user can fire chat-input requests into a tab the sidepanel does not own; (3) single global `fsbSidepanelConversationId` means switching tabs drops the prior conversation. Phase 11 ships all three as one coherent UX delivery using existing Phase 10 visual-session lifecycle + Phase 243 owner-chip primitives. Consolidated UAT expands from UAT-08+09+10 to UAT-08+09+10+11 in one Chrome MV3 reload session post-Phase-11 ship. INV-01/02/04/05/06 carry forward unchanged; INV-06 ZERO Lattice-side commits expected. 2026-05-31 entry: Milestone v0.10.0 re-opened (2nd time) after UAT-1 PASS. Phase 8 added to close the half-step: FSB's agent BRAIN (iterator + tool dispatch + visual-session UX + metrics + driving-model attribution) ran on FSB-owned code paths bypassing both Lattice's runtime primitives (G1 + G2 + Flow 4) and the MCP-driven session lifecycle. Phase 8 brought autopilot into philosophical parity with MCP-driven sessions (same tools per INV-02 already; same lifecycle + telemetry + attribution as new scope) while consuming Lattice's tracer/checkpoint/survivability primitives. The original Phase 8 "delegation primitive" sketch from 2026-05-27 (see section above) remains separately deferred to v0.11.0+ as before. Phases 1-10 + UAT-1 stand individually passed; consolidated UAT-08+09+10+11 outstanding.*

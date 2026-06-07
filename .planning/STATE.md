@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-05-31T13:53:23.145Z"
-last_activity: 2026-05-31 -- Phase 10 Plan 10-02 shipped
+stopped_at: Phase 11 added (tab-aware side panel surface); discuss/plan/execute pending
+last_updated: "2026-06-07T04:50:00.000Z"
+last_activity: 2026-06-06 -- Phase 11 added (tab-aware side panel surface) post-Phase-10 to address three UX gaps surfaced during OpenRouter session: friendly owner-chip label, foreign-owned input lockout, per-tab chat history isolation
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 10
   total_plans: 41
   completed_plans: 41
-  percent: 100
+  percent: 91
 ---
 
 # Project State
