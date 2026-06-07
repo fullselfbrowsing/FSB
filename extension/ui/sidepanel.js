@@ -182,6 +182,19 @@ async function ensureTabConversationForActiveTab(overwrite) {
     var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     var tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
+      // Phase 11 FINT-21 WR-02 fix -- surface the no-active-tab edge
+      // case in force/overwrite mode so the existing stale entry
+      // (e.g., from the previous active tab) becomes visible to
+      // telemetry / DevTools. Behavior unchanged: still falls through
+      // to noTabFallback mint (no auto-recovery); only adds a console
+      // breadcrumb so the rare race (side panel open in inactive
+      // window context, brief no-focused-tab window after window
+      // close) is no longer silent. The pre-existing entry remains
+      // untouched; on next activation swapToTabConversation will
+      // restore that conversationId per D-17 lazy-mint semantics.
+      if (overwrite === true) {
+        console.warn('[sidepanel] ensureTabConversationForActiveTab(force=true) skipped -- no active tab in current window');
+      }
       // No active tab; fall back to direct mint (preserves Phase 243 fail-open).
       var noTabFallback = _mintConversationId();
       conversationId = noTabFallback;
