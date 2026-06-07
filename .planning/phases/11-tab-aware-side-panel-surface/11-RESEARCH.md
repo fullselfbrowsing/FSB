@@ -1092,22 +1092,18 @@ See Section 8 table — 14 distinct behaviors mapped to 7 Parts.
 
 **No CRITICAL assumptions:** All claims tagged are either verified (A2-A4) or low-risk timing (A1, A5).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `chatMessages` history swap render persisted message history from FSB sessions store, or maintain an in-memory cache?**
-   - What we know: The existing FSB session-history surface uses `chrome.runtime.sendMessage({action: 'loadSession', sessionId})` per sidepanel.js handlers. The conversationId minted by the side panel maps to a sessionId in handleStartAutomation.
-   - What's unclear: Whether tab-aware swap should fetch fresh from sessions store OR cache the last-rendered DOM per tabId in module scope.
-   - Recommendation: Fetch from sessions store on swap (simpler; SSOT). If performance becomes an issue, add a small in-memory cache as a follow-on.
+> All three questions resolved in favor of the SIMPLEST viable implementation per Phase 11 scope. Plans 11-01 through 11-04 implement these resolutions; no further design iteration required.
 
-2. **Should the chip + lockout also fire on `chrome.storage.onChanged` for `mcpVisualSession:<tabId>` keys (so the chip updates when a foreign agent starts/stops driving the visible tab without a tab switch)?**
-   - What we know: The existing chrome.storage.onChanged listener at sidepanel.js:220-232 already handles `fsbAgentRegistry` changes for the chip. The lifecycle entry's `client` field would change less often than the registry.
-   - What's unclear: Whether the chip should re-resolve friendly label on every lifecycle entry change (potentially noisy) or only on tab switch.
-   - Recommendation: Add chrome.storage.onChanged for `mcpVisualSession:` prefix keys → trigger `refreshTabOwnership()` only when the change is for the currently-active tab. Avoids noise + keeps chip current.
+1. **RESOLVED — No chatMessages history auto-render on tab swap.** `chatMessages` clears on swap; the user starts a fresh-view conversation per tab; first send re-builds via the existing `addMessage` path. Rationale: the FSB session-history view (`historyBtn` + `historyListEl`) remains the cross-tab aggregation surface; replicating that into the active-chat surface on every swap doubles the storage round-trip and the DOM mutation cost without adding a use case the user requested. The chosen pattern matches the user's verbatim phrasing ("retain history" — interpreted as "per-tab conversation state is retained in storage so it can be replayed on demand", not "auto-render on every tab switch"). If the user later wants auto-render on swap, that becomes a v0.11+ enhancement keyed on user feedback.
+   - Implementation: Plan 11-03 Task 1 `swapToTabConversation(tabId)` updates the module-scope `conversationId` only; does NOT touch `chatMessages` DOM. The next user send mints (or uses existing) conversationId for that tab.
 
-3. **Should the per-tab envelope migration preserve LEGACY conversation history (chatMessages content) under the bound tab, or just the conversationId?**
-   - What we know: Migration binds the legacy `conversationId` to the active tab. The chat messages for that conversation live in FSB sessions store keyed by sessionId.
-   - What's unclear: Whether the migration boot path should ALSO trigger an immediate render of the legacy conversation's message history.
-   - Recommendation: Yes — after migration, treat the active tab as having the migrated conversation and trigger one initial history render so the user sees their last conversation on the active tab post-upgrade. This makes the migration UX seamless.
+2. **RESOLVED — No `chrome.storage.onChanged` listener for `mcpVisualSession:<tabId>` keys.** Phase 11 chip + lockout fires on `chrome.tabs.onActivated` only (existing handler at sidepanel.js:288). The existing `chrome.storage.onChanged` listener at sidepanel.js:220-232 covers `fsbAgentRegistry` changes (which trigger chip refresh on agent registration/release). Adding a second prefix listener for `mcpVisualSession:` is out of Phase 11 scope per the surface-lockout contract (Phase 11 touches sidepanel.js + owner-chip.js + popup.js + sidepanel.html + sidepanel.css + new sidecar; the listener-prefix change would expand the surface). Rationale: the live-update of friendly-label-during-active-foreign-agent is a polish; the chip already updates correctly on tab switch and on owner change via the registry watcher.
+   - Implementation: Plans 11-01 + 11-02 wire chip resolution + lockout into the existing `chrome.tabs.onActivated` + `chrome.storage.onChanged` listeners; no NEW prefix watcher added.
+
+3. **RESOLVED — Migration binds conversationId only; no auto-render of legacy history on boot.** The boot-time migration in Plan 11-03's `initTabConversationStore` reads the legacy `fsbSidepanelConversationId` key, writes the conversationId into the per-tab envelope under the active tabId, deletes the legacy key, and sets the module-scope `conversationId` to that value. It does NOT trigger an extra `chatMessages` render — the existing post-migration boot path already restores the chat surface from the session store via the existing handler chain. Rationale: the migration is idempotent and behavior-preserving; users who had a conversation in the pre-Phase-11 single-conversation world see it bound to their currently-active tab on first Phase-11 boot. No additional render is needed; the user's existing first-action restoration covers the UX.
+   - Implementation: Plan 11-03 Task 1 migration helper writes envelope + deletes legacy key + returns the bound conversationId; sidepanel.js boot sequence consumes the return value to set `conversationId`; no extra DOM render is triggered (preserves existing restoration semantics).
 
 ## Standard Stack
 
