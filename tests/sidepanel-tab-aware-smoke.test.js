@@ -142,10 +142,108 @@ function installDomStub(idMap) {
   console.log('\n--- Phase 11 Wave 0 smoke (placeholder scaffold) ---');
 
   console.log('\n--- Part 1: lookupClientLabel happy + null paths (FILLED in Plan 11-01) ---');
-  ok(true, 'placeholder Part 1 -- filled in Plan 11-01 (FINT-19)');
+
+  // Part 1.1-1.8: lookupClientLabel unit tests (Plan 11-01 FINT-19)
+  const ownerChipMod = require('../extension/ui/owner-chip.js');
+  const lcl1 = ownerChipMod.lookupClientLabel;
+
+  // 1.1 happy path
+  {
+    const fakeRead = async (k) => {
+      const bag = {};
+      bag[k] = { tabId: 42, agentId: 'a', client: 'OpenClaw', isFinal: false };
+      return bag;
+    };
+    const result = await lcl1(42, fakeRead);
+    ok(result === 'OpenClaw', 'Part 1.1 -- happy path returns entry.client');
+  }
+
+  // 1.2 trim semantics
+  {
+    const fakeRead = async (k) => ({ [k]: { client: '  FSB Autopilot  ' } });
+    const result = await lcl1(42, fakeRead);
+    ok(result === 'FSB Autopilot', 'Part 1.2 -- trim semantics on entry.client');
+  }
+
+  // 1.3 missing entry
+  {
+    const result = await lcl1(42, async () => ({}));
+    ok(result === null, 'Part 1.3 -- missing entry returns null');
+  }
+
+  // 1.4 malformed entry (non-object)
+  {
+    const fakeRead = async (k) => ({ [k]: 42 });
+    const result = await lcl1(42, fakeRead);
+    ok(result === null, 'Part 1.4 -- malformed entry (non-object) returns null');
+  }
+
+  // 1.5 missing client field
+  {
+    const fakeRead = async (k) => ({ [k]: { agentId: 'x', tabId: 42 } });
+    const result = await lcl1(42, fakeRead);
+    ok(result === null, 'Part 1.5 -- missing client field returns null');
+  }
+
+  // 1.6 invalid tabId (negative)
+  {
+    let readCalled = false;
+    const fakeRead = async () => { readCalled = true; return {}; };
+    const result = await lcl1(-1, fakeRead);
+    ok(result === null && readCalled === false,
+       'Part 1.6 -- negative tabId returns null without storage read');
+  }
+
+  // 1.7 non-function storageReadFn
+  {
+    const result = await lcl1(42, null);
+    ok(result === null, 'Part 1.7 -- null storageReadFn returns null');
+  }
+
+  // 1.8 thrown storage read
+  {
+    const result = await lcl1(42, async () => { throw new Error('boom'); });
+    ok(result === null, 'Part 1.8 -- thrown storage read returns null (best-effort)');
+  }
 
   console.log('\n--- Part 2: refreshOwnerChip three-tier resolution + sidepanel/popup wiring (FILLED in Plan 11-01) ---');
-  ok(true, 'placeholder Part 2 -- filled in Plan 11-01 (FINT-19)');
+
+  // Part 2.1-2.7: source-level three-tier wiring + export contracts
+  const sidepanelSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
+  const popupSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/popup.js'), 'utf8');
+
+  // 2.1 sidepanel.js wires lookupClientLabel
+  const sidepanelLookupCount = (sidepanelSrc.match(/FSBOwnerChip\.lookupClientLabel/g) || []).length;
+  ok(sidepanelLookupCount === 1,
+     'Part 2.1 -- sidepanel.js references FSBOwnerChip.lookupClientLabel exactly once');
+
+  // 2.2 sidepanel.js carries Phase 11 FINT-19 marker
+  ok(/Phase 11 FINT-19/.test(sidepanelSrc),
+     'Part 2.2 -- sidepanel.js carries Phase 11 FINT-19 marker');
+
+  // 2.3 popup.js wires lookupClientLabel
+  const popupLookupCount = (popupSrc.match(/FSBOwnerChip\.lookupClientLabel/g) || []).length;
+  ok(popupLookupCount === 1,
+     'Part 2.3 -- popup.js references FSBOwnerChip.lookupClientLabel exactly once');
+
+  // 2.4 popup.js carries Phase 11 FINT-19 marker
+  ok(/Phase 11 FINT-19/.test(popupSrc),
+     'Part 2.4 -- popup.js carries Phase 11 FINT-19 marker');
+
+  // 2.5 Tier 1 short-circuit comes BEFORE Tier 2 (sidepanel.js)
+  const sidepanelTier1Idx = sidepanelSrc.search(/ownerAgentId\.indexOf\(['"]legacy:['"]\)\s*===\s*0/);
+  const sidepanelTier2Idx = sidepanelSrc.indexOf('FSBOwnerChip.lookupClientLabel');
+  ok(sidepanelTier1Idx > 0 && sidepanelTier2Idx > sidepanelTier1Idx,
+     'Part 2.5 -- sidepanel.js Tier 1 conditional appears before Tier 2 call');
+
+  // 2.6 module.exports.lookupClientLabel is a function
+  ok(typeof ownerChipMod.lookupClientLabel === 'function',
+     'Part 2.6 -- module.exports.lookupClientLabel is a function');
+
+  // 2.7 globalThis.FSBOwnerChip.lookupClientLabel is also a function (dual-export)
+  ok(typeof globalThis.FSBOwnerChip === 'object'
+     && typeof globalThis.FSBOwnerChip.lookupClientLabel === 'function',
+     'Part 2.7 -- globalThis.FSBOwnerChip.lookupClientLabel function (dual-export)');
 
   console.log('\n--- Part 3: applyInputLockout DOM mutation on 4 controls (FILLED in Plan 11-02) ---');
   ok(true, 'placeholder Part 3 -- filled in Plan 11-02 (FINT-20)');
