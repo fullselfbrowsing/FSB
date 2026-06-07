@@ -58,14 +58,36 @@ function _mintConversationId() {
   return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 }
 
+// Phase 11 FINT-21 WR-01 fix -- serialize envelope writes so concurrent
+// drop/ensure paths cannot race on the read-mutate-write cycle.
+// dropTabConversation (on chrome.tabs.onRemoved) and
+// ensureTabConversationForActiveTab (on user send / startNewChat) both
+// mutate tabConvEnvelope in place then write the entire envelope back
+// to storage. Without serialization a last-writer-wins race can drop
+// a just-minted conversationId or resurrect a just-dropped entry.
+// Pattern mirrors withRegistryLock in extension/utils/agent-registry.js
+// (the .then(fn, fn) shape keeps the chain alive across rejections;
+// .catch on the assignment prevents UnhandledRejection leakage).
+var _envelopeWriteChain = Promise.resolve();
+function _serializeEnvelopeWrite(fn) {
+  var next = _envelopeWriteChain.then(fn, fn);
+  _envelopeWriteChain = next.catch(function () { /* swallow so chain continues */ });
+  return next;
+}
+
 async function _persistEnvelope() {
-  try {
-    var payload = {};
-    payload[FSBSidepanelTabConvStore.STORAGE_KEY] = tabConvEnvelope;
-    await chrome.storage.session.set(payload);
-  } catch (_e) {
-    // Best-effort: storage failures do NOT block UI flow.
-  }
+  // Wrap the storage write in the in-flight promise chain so concurrent
+  // callers linearize at the storage boundary. Existing call sites keep
+  // working unchanged (still fire-and-forget compatible via await).
+  return _serializeEnvelopeWrite(async function () {
+    try {
+      var payload = {};
+      payload[FSBSidepanelTabConvStore.STORAGE_KEY] = tabConvEnvelope;
+      await chrome.storage.session.set(payload);
+    } catch (_e) {
+      // Best-effort: storage failures do NOT block UI flow.
+    }
+  });
 }
 
 // Phase 11 FINT-21 -- one-shot boot migration + envelope hydration.
