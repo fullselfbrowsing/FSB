@@ -231,6 +231,85 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+// Phase 11 FINT-20 -- foreign-owned input lockout helpers.
+//
+// applyInputLockout(foreignOwned) toggles the disabled state on the 4 input
+// controls (chatInput contenteditable div + sendBtn + stopBtn + micBtn).
+// CONTEXT D-10 lists 5 controls, but the existing sidepanel UI uses
+// sendBtn for both 'send message' and 'run task' (RESEARCH Section 1.B);
+// the 4-control set covers all user-input affordances.
+//
+// D-11: visual treatment is dimmed/disabled CSS + aria-disabled='true'; NO
+// separate banner -- the existing owner chip is the explanation cue and
+// the aria-describedby span at sidepanel.html line ~27 supplies
+// screen-reader semantics.
+//
+// D-13: stopBtn is included in the lockout because stopBtn is
+// FSB-Autopilot-local; surfacing it as enabled while a foreign agent owns
+// the tab creates a false affordance.
+function applyInputLockout(foreignOwned) {
+  var ariaDescribedById = 'fsb-lockout-aria-description';
+  var controls = [
+    { id: 'chatInput', kind: 'contenteditable' },
+    { id: 'sendBtn', kind: 'button' },
+    { id: 'stopBtn', kind: 'button' },
+    { id: 'micBtn', kind: 'button' }
+  ];
+  for (var i = 0; i < controls.length; i++) {
+    var spec = controls[i];
+    var el = document.getElementById(spec.id);
+    if (!el) continue;
+    if (foreignOwned) {
+      if (spec.kind === 'button') {
+        el.disabled = true;
+      } else {
+        el.setAttribute('contenteditable', 'false');
+      }
+      el.setAttribute('aria-disabled', 'true');
+      el.setAttribute('aria-describedby', ariaDescribedById);
+      el.classList.add('fsb-foreign-owned-disabled');
+    } else {
+      if (spec.kind === 'button') {
+        // Do NOT undo isRunning-driven disable; updateSendButtonState() at
+        // line ~498 restores the correct sendBtn state below.
+        el.removeAttribute('aria-disabled');
+      } else {
+        el.setAttribute('contenteditable', 'true');
+        el.removeAttribute('aria-disabled');
+      }
+      el.removeAttribute('aria-describedby');
+      el.classList.remove('fsb-foreign-owned-disabled');
+    }
+  }
+  // Restore the correct sendBtn state so isRunning-driven disabled flag is
+  // preserved on the unlock path (the existing helper handles both
+  // hasContent + isRunning gating). Defensive: helper may not be defined
+  // yet in some boot orderings.
+  if (typeof updateSendButtonState === 'function') {
+    try { updateSendButtonState(); } catch (_e) { /* swallow */ }
+  }
+}
+
+// Phase 11 FINT-20 -- defense-in-depth runtime gate for handleSendMessage.
+// Re-reads active tab + agent registry envelope + shouldShowOwnerChip per
+// the same contract refreshOwnerChip uses. Fail-open on any error: storage
+// failures do NOT block user sends (the primary defense is the sendBtn
+// disabled attribute set by applyInputLockout).
+async function _isActiveTabForeignOwned() {
+  try {
+    if (typeof FSBOwnerChip === 'undefined') return false;
+    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tab = tabs && tabs[0];
+    if (!tab || typeof tab.id !== 'number') return false;
+    var stored = await chrome.storage.session.get('fsbAgentRegistry');
+    var envelope = stored && stored.fsbAgentRegistry;
+    var ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
+    return FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE);
+  } catch (_e) {
+    return false;
+  }
+}
+
 // Phase 243 plan 03 (UI-02): refresh the read-only "owned by Agent X" chip.
 // Reads the persisted registry envelope from chrome.storage.session (Phase 237
 // D-03 write-through) and the active tab; uses FSBOwnerChip pure helpers to
@@ -262,6 +341,9 @@ async function refreshOwnerChip() {
     if (!FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE)) {
       chipEl.textContent = '';
       chipEl.style.display = 'none';
+      // Phase 11 FINT-20 -- unlock controls when the chip is hidden
+      // (either no owner or this surface owns the tab).
+      applyInputLockout(false);
       return;
     }
 
@@ -293,6 +375,8 @@ async function refreshOwnerChip() {
     }
     chipEl.textContent = FSBOwnerChip.buildChipText(label);
     chipEl.style.display = 'inline-flex';
+    // Phase 11 FINT-20 -- lock controls when chip renders (foreign-owned).
+    applyInputLockout(true);
   } catch (_e) {
     // Chip is best-effort -- never poison sidepanel boot.
   }
@@ -507,6 +591,13 @@ async function handleSendMessage() {
   if (!message || isRunning) {
     return;
   }
+
+  // Phase 11 FINT-20 -- defense-in-depth runtime gate. The sendBtn
+  // disabled attribute (set by applyInputLockout via refreshOwnerChip) is
+  // the primary defense; this gate guards against a stale UI state where
+  // the button was cleared by a sibling refresh racing with tab
+  // activation. Fail-open: storage errors do NOT block sends.
+  if (await _isActiveTabForeignOwned()) return;
 
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
   // Handle /agent slash commands
