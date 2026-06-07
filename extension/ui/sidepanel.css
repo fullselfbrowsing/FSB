@@ -1624,3 +1624,22 @@ body[data-sidepanel-view="history"] .author-footer {
   color: var(--text-secondary, #888);
   border: 1px solid var(--border-color, #333);
 }
+
+/* Phase 11 FINT-19 -- owner-chip baseline styling.
+   RESEARCH Section 6 discovered the `.fsb-owner-chip` class is referenced
+   in sidepanel.html line 26 but has zero CSS definition project-wide
+   pre-Phase-11. This rule establishes the baseline; the inline
+   `style="display:none"` on the span keeps the chip hidden at boot until
+   refreshOwnerChip toggles `chipEl.style.display = 'inline-flex'`. */
+.fsb-owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
+}
