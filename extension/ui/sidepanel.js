@@ -352,7 +352,19 @@ function handleReconComplete(data) {
     const retryBtn = document.createElement('button');
     retryBtn.className = 'retry-btn';
     retryBtn.textContent = 'Retry with Site Map';
-    retryBtn.addEventListener('click', () => {
+    retryBtn.addEventListener('click', async () => {
+      // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
+      // check. applyInputLockout dims chatInput/sendBtn/stopBtn/micBtn when
+      // the active tab is foreign-owned, but retry buttons are created
+      // AFTER the snapshot so they cannot be dimmed via the lockout class.
+      // The handleSendMessage entry already fail-closes on foreign-owned
+      // (defense-in-depth), but without this guard the click silently
+      // drops the user's intent. Early-return + console.warn surfaces the
+      // edge case while honoring D-11 (chip is the visible explanation).
+      if (await _isActiveTabForeignOwned()) {
+        console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
+        return;
+      }
       retryDiv.remove();
       chatInput.textContent = pendingReconTask;
       pendingReconTask = null;
@@ -649,6 +661,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       const replayBtn = e.target.closest('.history-replay-btn');
       if (replayBtn) {
         e.stopPropagation();
+        // Phase 11 FINT-20 WR-03 fix -- gate history replay on the
+        // foreign-owned check. The history-replay-btn is dynamically
+        // rendered into the history list AFTER applyInputLockout's
+        // snapshot, so it cannot be dimmed via the lockout class.
+        // Without this guard, clicking replay while another agent owns
+        // the active tab would silently fail downstream (startReplay
+        // dispatches a replaySession message that targets the active
+        // tab). Early-return + console.warn surfaces the edge case.
+        if (await _isActiveTabForeignOwned()) {
+          console.warn('[sidepanel] history replay blocked -- active tab is foreign-owned');
+          return;
+        }
         const sessionId = replayBtn.dataset.sessionId;
         if (sessionId) {
           startReplay(sessionId);
@@ -1669,7 +1693,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           const retryBtn = document.createElement('button');
           retryBtn.className = 'retry-btn';
           retryBtn.textContent = 'Retry';
-          retryBtn.addEventListener('click', () => {
+          retryBtn.addEventListener('click', async () => {
+            // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
+            // check. See WR-03 rationale at the handleReconComplete retry
+            // handler. Without this guard the click silently drops the user's
+            // intent because handleSendMessage's runtime gate fail-closes
+            // without surfacing the cause.
+            if (await _isActiveTabForeignOwned()) {
+              console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
+              return;
+            }
             retryDiv.remove();
             chatInput.textContent = request.task;
             handleSendMessage();
