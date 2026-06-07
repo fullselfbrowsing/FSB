@@ -1643,3 +1643,32 @@ body[data-sidepanel-view="history"] .author-footer {
   border: 1px solid var(--border-color);
   white-space: nowrap;
 }
+
+/* Phase 11 FINT-20 -- foreign-owned input lockout visual treatment.
+   Applied by applyInputLockout(true) on chatInput/sendBtn/stopBtn/micBtn
+   when the active tab is foreign-owned per shouldShowOwnerChip(ownerAgentId,
+   'legacy:sidepanel'). Cleared by applyInputLockout(false) on free-tab
+   activation or when the foreign agent releases the tab. Visual parity
+   with existing .send-btn:disabled rule (CONTEXT D-11). */
+.fsb-foreign-owned-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Phase 11 FINT-20 -- visually-hidden screen-reader-only utility.
+   Used by the aria-describedby description span near the owner chip
+   (sidepanel.html line ~27 post-Plan-11-02). Pattern from standard
+   WAI-ARIA convention. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
