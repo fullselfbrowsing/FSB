@@ -338,10 +338,137 @@ function installDomStub(idMap) {
      'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
 
   console.log('\n--- Part 5: envelope CRUD + LRU eviction (FILLED in Plan 11-03) ---');
-  ok(true, 'placeholder Part 5 -- filled in Plan 11-03 (FINT-21)');
+
+  // Part 5.1-5.6: envelope CRUD + LRU eviction unit tests
+  // 5.1 emptyEnvelope shape
+  {
+    const env = TabConvStore.emptyEnvelope();
+    ok(env.v === 1 && typeof env.byTab === 'object' && Array.isArray(env.lru)
+       && env.lru.length === 0 && Object.keys(env.byTab).length === 0,
+       'Part 5.1 -- emptyEnvelope() returns {v:1, byTab:{}, lru:[]}');
+  }
+
+  // 5.2 ensureTabConversation mints + populates
+  {
+    const env = TabConvStore.emptyEnvelope();
+    const convId = TabConvStore.ensureTabConversation(env, 42);
+    ok(typeof convId === 'string' && convId.indexOf('conv_') === 0
+       && env.byTab['42'] && env.byTab['42'].conversationId === convId
+       && env.lru[0] === '42',
+       'Part 5.2 -- ensureTabConversation mints + populates byTab + lru head');
+  }
+
+  // 5.3 ensureTabConversation idempotent (same id on repeat)
+  {
+    const env = TabConvStore.emptyEnvelope();
+    const c1 = TabConvStore.ensureTabConversation(env, 42);
+    const c2 = TabConvStore.ensureTabConversation(env, 42);
+    ok(c1 === c2 && Object.keys(env.byTab).length === 1,
+       'Part 5.3 -- ensureTabConversation second call returns SAME id (touch only)');
+  }
+
+  // 5.4 getTabConversation peek-only
+  {
+    const env = TabConvStore.emptyEnvelope();
+    const convId = TabConvStore.ensureTabConversation(env, 42);
+    TabConvStore.ensureTabConversation(env, 99); // make 99 the MRU
+    const peeked = TabConvStore.getTabConversation(env, 42);
+    ok(peeked === convId && env.lru[0] === '99',
+       'Part 5.4 -- getTabConversation peek does not touch LRU (99 stays MRU)');
+  }
+
+  // 5.5 LRU eviction at cap=50: write 51 entries, 50 retained, oldest evicted
+  {
+    const env = TabConvStore.emptyEnvelope();
+    const ids = [];
+    for (let i = 0; i < 51; i++) {
+      ids.push(TabConvStore.ensureTabConversation(env, i + 1)); // tabIds 1..51
+    }
+    const byTabSize = Object.keys(env.byTab).length;
+    const lruSize = env.lru.length;
+    const firstWrittenGone = env.byTab['1'] === undefined;
+    const lastWrittenPresent = env.byTab['51'] !== undefined;
+    ok(byTabSize === 50 && lruSize === 50 && firstWrittenGone && lastWrittenPresent,
+       'Part 5.5 -- LRU eviction: 51 writes produce 50 retained; first-written (tab 1) gone; 51st present');
+  }
+
+  // 5.6 dropTabConversation idempotent
+  {
+    const env = TabConvStore.emptyEnvelope();
+    TabConvStore.ensureTabConversation(env, 42);
+    TabConvStore.dropTabConversation(env, 42);
+    const goneOnce = env.byTab['42'] === undefined && env.lru.indexOf('42') === -1;
+    TabConvStore.dropTabConversation(env, 42); // second call must be no-op
+    const goneTwice = env.byTab['42'] === undefined && env.lru.indexOf('42') === -1;
+    ok(goneOnce && goneTwice,
+       'Part 5.6 -- dropTabConversation idempotent (no throw on missing entry)');
+  }
 
   console.log('\n--- Part 6: migrateLegacyConversationKey + sidepanel boot wiring (FILLED in Plan 11-03) ---');
-  ok(true, 'placeholder Part 6 -- filled in Plan 11-03 (FINT-21)');
+
+  // Part 6.1-6.4: migration + source-level wiring verification
+  // 6.1 migrateLegacyConversationKey happy path
+  {
+    // Reset session store for clean test surface
+    _sessionStore = {};
+    _sessionStore['fsbSidepanelConversationId'] = 'conv_legacy_abcd';
+    const readFn = async (keys) => {
+      const bag = {};
+      if (Array.isArray(keys)) {
+        for (const k of keys) if (_sessionStore[k] !== undefined) bag[k] = _sessionStore[k];
+      } else if (typeof keys === 'string') {
+        if (_sessionStore[keys] !== undefined) bag[keys] = _sessionStore[keys];
+      }
+      return bag;
+    };
+    const writeFn = async (payload) => { Object.assign(_sessionStore, payload); };
+    const removeFn = async (key) => { delete _sessionStore[key]; };
+    const env = await TabConvStore.migrateLegacyConversationKey(readFn, writeFn, removeFn, 42);
+    const entry = env.byTab['42'];
+    ok(entry && entry.conversationId === 'conv_legacy_abcd'
+       && _sessionStore['fsbSidepanelConversationId'] === undefined
+       && _sessionStore['fsbSidepanelTabConversations'] !== undefined,
+       'Part 6.1 -- migrateLegacyConversationKey binds legacy convId to active tab + deletes legacy key');
+  }
+
+  // 6.2 migrateLegacyConversationKey idempotent on second boot
+  {
+    // _sessionStore still carries the migrated envelope from 6.1; legacy key absent
+    const readFn = async (keys) => {
+      const bag = {};
+      if (Array.isArray(keys)) for (const k of keys) if (_sessionStore[k] !== undefined) bag[k] = _sessionStore[k];
+      return bag;
+    };
+    const writeFn = async (payload) => { Object.assign(_sessionStore, payload); };
+    const removeFn = async (key) => { delete _sessionStore[key]; };
+    const beforeKeys = JSON.stringify(_sessionStore['fsbSidepanelTabConversations']);
+    const env = await TabConvStore.migrateLegacyConversationKey(readFn, writeFn, removeFn, 42);
+    const afterKeys = JSON.stringify(_sessionStore['fsbSidepanelTabConversations']);
+    ok(env.byTab['42'] && env.byTab['42'].conversationId === 'conv_legacy_abcd'
+       && beforeKeys === afterKeys,
+       'Part 6.2 -- migrateLegacyConversationKey idempotent (legacy absent + envelope preserved)');
+  }
+
+  // 6.3 sidepanel.js source-level wiring grep
+  {
+    const sidepanelSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
+    const hasInit = /async function initTabConversationStore\(\)/.test(sidepanelSrc);
+    const hasSwap = /async function swapToTabConversation\(tabId\)/.test(sidepanelSrc);
+    const hasDrop = /async function dropTabConversation\(tabId\)/.test(sidepanelSrc);
+    const hasEnsure = /async function ensureTabConversationForActiveTab\(overwrite\)/.test(sidepanelSrc);
+    const hasOnRemoved = /chrome\.tabs\.onRemoved\.addListener/.test(sidepanelSrc);
+    const initCalled = /await initTabConversationStore\(\)/.test(sidepanelSrc);
+    ok(hasInit && hasSwap && hasDrop && hasEnsure && hasOnRemoved && initCalled,
+       'Part 6.3 -- sidepanel.js wires all 4 helpers + onRemoved listener + DOMContentLoaded init call');
+  }
+
+  // 6.4 sidepanel.js does NOT register onDiscarded listener (D-15 compliance)
+  {
+    const sidepanelSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
+    const onDiscardedAbsent = !/chrome\.tabs\.onDiscarded\.addListener/.test(sidepanelSrc);
+    ok(onDiscardedAbsent,
+       'Part 6.4 -- sidepanel.js does NOT register chrome.tabs.onDiscarded (D-15 preserve)');
+  }
 
   console.log('\n--- Part 7: INV-04 + INV-06 byte-freeze regression (FILLED in Plan 11-04) ---');
   ok(true, 'placeholder Part 7 -- filled in Plan 11-04 (INV-04 + INV-06)');
