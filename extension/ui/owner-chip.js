@@ -104,11 +104,54 @@
     return null;
   }
 
+  /**
+   * Phase 11 FINT-19 -- look up the friendly client label for a tab from
+   * the visual-session lifecycle storage.
+   *
+   * Reads chrome.storage.session at key 'mcpVisualSession:' + tabId
+   * (matches MCP_VISUAL_LIFECYCLE_STORAGE_KEY_PREFIX from
+   * mcp-visual-session-lifecycle.js:58). Returns the trimmed
+   * entry.client value (Phase 10 D-01 lifecycle shape) when present,
+   * otherwise null. Phase 10 FINT-16 + RESEARCH Section 1.A guarantee
+   * that entry.client is pre-normalized to the 14-entry allowlist
+   * (verified at mcp-visual-session-lifecycle.js:325-333 write-side
+   * gate); this consumer does NOT re-validate against the allowlist.
+   *
+   * Storage read is injected via the storageReadFn parameter for
+   * testability (D-06): production callers pass
+   * (key) => chrome.storage.session.get(key); Node tests pass a
+   * mock function.
+   *
+   * Best-effort: any error (invalid input, throw inside storage read,
+   * missing entry, malformed shape) returns null. Never throws.
+   *
+   * @param {number} tabId
+   * @param {function} storageReadFn  Async fn (key: string) -> bag
+   * @returns {Promise<string|null>}
+   */
+  async function lookupClientLabel(tabId, storageReadFn) {
+    if (typeof tabId !== 'number' || !Number.isFinite(tabId) || tabId <= 0) return null;
+    if (typeof storageReadFn !== 'function') return null;
+    var key = 'mcpVisualSession:' + tabId;
+    try {
+      var bag = await storageReadFn(key);
+      var entry = bag && bag[key];
+      if (!entry || typeof entry !== 'object') return null;
+      if (typeof entry.client !== 'string') return null;
+      var trimmed = entry.client.trim();
+      if (trimmed.length === 0) return null;
+      return trimmed;
+    } catch (_e) {
+      return null;
+    }
+  }
+
   var exportsObj = {
     shouldShowOwnerChip: shouldShowOwnerChip,
     buildChipText: buildChipText,
     ownerLabelFor: ownerLabelFor,
-    findOwnerInEnvelope: findOwnerInEnvelope
+    findOwnerInEnvelope: findOwnerInEnvelope,
+    lookupClientLabel: lookupClientLabel
   };
 
   global.FSBOwnerChip = exportsObj;
