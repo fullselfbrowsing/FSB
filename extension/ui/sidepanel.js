@@ -16,6 +16,59 @@ let livenessFailCount = 0;
 let isHistoryViewActive = false;
 let showSidepanelProgressEnabled = true;
 
+// QT-93i-02 (per-tab isRunning) -- replace module-scope global `isRunning`
+// + `currentSessionId` with a per-tab Map<tabId, { isRunning, sessionId }>.
+//
+// Background: today the module-scope flag is GLOBAL across tabs. Dispatching
+// a task in tab A then swapping to tab B leaves sendBtn DISABLED on B even
+// though B has no in-flight work. After this change, the send button reflects
+// THE ACTIVE TAB'S running state; per-tab state for all other working tabs
+// is preserved so swapping back to tab A restores its "Working" UI.
+//
+// Design:
+//  - `_tabRunningMap`: keyed by tabId (number). Value: { isRunning: bool,
+//    sessionId: string|null }. Entries created lazily on first
+//    setRunningState/setIdleState/setErrorState call.
+//  - `_activeTabIdSnapshot`: cached active tab id; updated by the
+//    chrome.tabs.onActivated handler at line ~786 (Issue B Edit 4 below).
+//    Boot-time value resolved by the existing chrome.tabs.query inside
+//    DOMContentLoaded.
+//  - `getCurrentTabRunningState()`: returns the active tab's entry, or
+//    a default {isRunning:false, sessionId:null} if no entry exists yet.
+//  - The module-scope `isRunning` + `currentSessionId` are MIRRORS of the
+//    active tab's entry, kept in sync by the setters. Existing read sites
+//    (updateSendButtonState, keydown handler, stopAutomation, etc.)
+//    continue to work without modification.
+var _tabRunningMap = new Map();
+var _activeTabIdSnapshot = null;
+
+function _getTabRunningEntry(tabId) {
+  if (typeof tabId !== 'number') return { isRunning: false, sessionId: null };
+  var entry = _tabRunningMap.get(tabId);
+  if (!entry) {
+    entry = { isRunning: false, sessionId: null };
+    _tabRunningMap.set(tabId, entry);
+  }
+  return entry;
+}
+
+function getCurrentTabRunningState() {
+  if (typeof _activeTabIdSnapshot !== 'number') {
+    return { isRunning: false, sessionId: null };
+  }
+  return _getTabRunningEntry(_activeTabIdSnapshot);
+}
+
+// Internal helper: sync the module-scope `isRunning` + `currentSessionId`
+// to whatever the active tab's per-tab entry says. Called by the
+// chrome.tabs.onActivated re-sync block (Edit 4) and after every
+// setter that mutates the active tab's entry (Edits 2 + 3).
+function _syncModuleScopeFromActiveTab() {
+  var snap = getCurrentTabRunningState();
+  isRunning = !!snap.isRunning;
+  currentSessionId = snap.sessionId || null;
+}
+
 // Phase 12 FINT-23 write-through state.
 // _messageLogDebouncer: per-convId 200ms debouncer (Plan 12-00 sidecar factory).
 //                      Initialized at boot inside DOMContentLoaded.
@@ -135,6 +188,13 @@ async function initTabConversationStore() {
       var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
     } catch (_e) { /* swallow */ }
+
+    // QT-93i-02 -- cache active tab id at boot so the per-tab map and
+    // setRunningState/setIdleState/setErrorState can resolve "active tab"
+    // BEFORE chrome.tabs.onActivated fires for the first time.
+    if (activeTabId !== null) {
+      _activeTabIdSnapshot = activeTabId;
+    }
 
     tabConvEnvelope = await FSBSidepanelTabConvStore.migrateLegacyConversationKey(
       function (keys) { return chrome.storage.session.get(keys); },
@@ -786,6 +846,24 @@ try {
     chrome.tabs.onActivated.addListener(async (activeInfo) => {
       try { await refreshOwnerChip(); } catch (_e) { /* swallow */ }
       try { await swapToTabConversation(activeInfo && activeInfo.tabId); } catch (_e) { /* swallow */ }
+
+      // QT-93i-02 -- after the conversation swap, re-sync the running-state
+      // UI to reflect the newly-active tab's per-tab state. Without this,
+      // the sendBtn / statusDot / statusText reflect whatever tab was
+      // previously active. Tab swaps must surface the active tab's
+      // running state immediately so the send button enable/disable is
+      // correct on every keystroke after the swap.
+      try {
+        if (activeInfo && typeof activeInfo.tabId === 'number') {
+          _activeTabIdSnapshot = activeInfo.tabId;
+          var snap = _getTabRunningEntry(activeInfo.tabId);
+          if (snap.isRunning) {
+            setRunningState(activeInfo.tabId, snap.sessionId || null);
+          } else {
+            setIdleState(activeInfo.tabId);
+          }
+        }
+      } catch (_e) { /* swallow: re-sync is best-effort */ }
     });
   }
 } catch (_e) {
@@ -868,6 +946,7 @@ try {
         await refreshOwnerChip();
         var tabs = await chrome.tabs.query({ active: true, windowId: windowId });
         if (tabs && tabs[0] && typeof tabs[0].id === 'number') {
+          _activeTabIdSnapshot = tabs[0].id;  // QT-93i-02
           await swapToTabConversation(tabs[0].id);
         }
       } catch (_e) { /* swallow */ }
@@ -943,7 +1022,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (response && response.activeSessions > 0) {
-      setRunningState();
+      // QT-93i-02 -- wire boot-restore running state to the cached active tab.
+      setRunningState(_activeTabIdSnapshot, response.currentSessionId || null);
       // Recover sessionId from background if UI lost it (e.g., after service worker restart)
       if (!currentSessionId && response.currentSessionId) {
         currentSessionId = response.currentSessionId;
@@ -1171,8 +1251,11 @@ async function handleSendMessage() {
       }
 
       if (response && response.success) {
+        // QT-93i-02 -- thread the originating tab.id so the per-tab map
+        // records THIS tab's running state (not the active tab's, which
+        // is normally the same here but is the wrong assumption to bake in).
         currentSessionId = response.sessionId;
-        setRunningState();
+        setRunningState(tab && tab.id, response.sessionId);
         addStatusMessage(response.continued ? 'Continuing...' : 'Starting automation...');
       } else {
         const errorMsg = response ? response.error : 'Unknown error';
@@ -1273,8 +1356,8 @@ async function startNewChat() {
   // Clear chat messages
   chatMessages.innerHTML = '';
 
-  // Reset UI state
-  setIdleState();
+  // Reset UI state -- QT-93i-02 explicit current tab for safety.
+  setIdleState(_activeTabIdSnapshot);
 
   // Clear any saved task
   chrome.storage.local.set({ lastTask: '' });
@@ -1320,52 +1403,96 @@ function checkSessionLiveness() {
   );
 }
 
-// Update UI for running state
-function setRunningState() {
-  isRunning = true;
-  sendBtn.disabled = true;
-  stopBtn.classList.remove('hidden');
-  statusDot.classList.add('running');
-  statusText.textContent = 'Working';
-  updateSendButtonState();
-  livenessFailCount = 0;
-  if (livenessInterval) clearInterval(livenessInterval);
-  livenessInterval = setInterval(checkSessionLiveness, 10000);
-}
+// QT-93i-02 -- per-tab running state. Optional explicit tabId; defaults
+// to the cached active tab. Writes to the per-tab map, then mirrors to
+// module-scope `isRunning` + `currentSessionId` when the target tabId
+// IS the active tab (so the existing readers like updateSendButtonState
+// see the correct snapshot). Other tabs' state is preserved on the map
+// so swapping back to them restores their UI on chrome.tabs.onActivated.
+function setRunningState(tabId, sessionId) {
+  var targetTabId = (typeof tabId === 'number') ? tabId : _activeTabIdSnapshot;
+  var resolvedSessionId = (typeof sessionId === 'string' && sessionId.length > 0)
+    ? sessionId
+    : (currentSessionId || null);
 
-// Update UI for idle state
-function setIdleState() {
-  if (livenessInterval) { clearInterval(livenessInterval); livenessInterval = null; }
-  livenessFailCount = 0;
-  isRunning = false;
-  sendBtn.disabled = false;
-  stopBtn.classList.add('hidden');
-  statusDot.classList.remove('running', 'error');
-  statusText.textContent = 'Ready';
-  
-  // Clean up any remaining status message with loader
-  if (currentStatusMessage) {
-    const loaderDots = currentStatusMessage.querySelector('.typing-dots');
-    if (loaderDots) {
-      loaderDots.remove();
-    }
-    currentStatusMessage = null;
+  if (typeof targetTabId === 'number') {
+    var entry = _getTabRunningEntry(targetTabId);
+    entry.isRunning = true;
+    entry.sessionId = resolvedSessionId;
   }
 
-  // Reset action debug group reference
-  currentActionGroup = null;
-
-  updateSendButtonState();
+  var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
+  if (isActiveTab) {
+    isRunning = true;
+    if (resolvedSessionId) currentSessionId = resolvedSessionId;
+    sendBtn.disabled = true;
+    stopBtn.classList.remove('hidden');
+    statusDot.classList.add('running');
+    statusText.textContent = 'Working';
+    updateSendButtonState();
+    livenessFailCount = 0;
+    if (livenessInterval) clearInterval(livenessInterval);
+    livenessInterval = setInterval(checkSessionLiveness, 10000);
+  }
 }
 
-// Update UI for error state
-function setErrorState() {
-  isRunning = false;
-  sendBtn.disabled = false;
-  stopBtn.classList.add('hidden');
-  statusDot.classList.add('error');
-  statusText.textContent = 'Error';
-  updateSendButtonState();
+// QT-93i-02 -- per-tab idle state. Optional explicit tabId; defaults to
+// the cached active tab. The existing cleanup (livenessInterval, action
+// group reset, status message cleanup) only fires for the active tab so
+// background-tab completions do NOT clobber the active tab's currentStatusMessage.
+function setIdleState(tabId) {
+  var targetTabId = (typeof tabId === 'number') ? tabId : _activeTabIdSnapshot;
+
+  if (typeof targetTabId === 'number') {
+    var entry = _getTabRunningEntry(targetTabId);
+    entry.isRunning = false;
+    entry.sessionId = null;
+  }
+
+  var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
+  if (isActiveTab) {
+    if (livenessInterval) { clearInterval(livenessInterval); livenessInterval = null; }
+    livenessFailCount = 0;
+    isRunning = false;
+    currentSessionId = null;
+    sendBtn.disabled = false;
+    stopBtn.classList.add('hidden');
+    statusDot.classList.remove('running', 'error');
+    statusText.textContent = 'Ready';
+
+    // Clean up any remaining status message with loader (active-tab only).
+    if (currentStatusMessage) {
+      var loaderDots = currentStatusMessage.querySelector('.typing-dots');
+      if (loaderDots) loaderDots.remove();
+      currentStatusMessage = null;
+    }
+    currentActionGroup = null;
+    updateSendButtonState();
+  }
+}
+
+// QT-93i-02 -- per-tab error state. Same pattern as setIdleState; only
+// the active tab's UI is mutated. Background-tab errors update the per-tab
+// entry so swapping back to that tab can show an error indicator if we
+// later wire one (out of scope for this task).
+function setErrorState(tabId) {
+  var targetTabId = (typeof tabId === 'number') ? tabId : _activeTabIdSnapshot;
+
+  if (typeof targetTabId === 'number') {
+    var entry = _getTabRunningEntry(targetTabId);
+    entry.isRunning = false;
+    // sessionId left as-is so error reporting can still resolve it.
+  }
+
+  var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
+  if (isActiveTab) {
+    isRunning = false;
+    sendBtn.disabled = false;
+    stopBtn.classList.add('hidden');
+    statusDot.classList.add('error');
+    statusText.textContent = 'Error';
+    updateSendButtonState();
+  }
 }
 
 // Global reference to current status message
@@ -2223,7 +2350,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
 
-        setIdleState();
+        // QT-93i-02 -- resolve the originating tab from the broadcast
+        // payload. background.js fsbBroadcastAutomationLifecycle includes
+        // tabId on every automationComplete payload (verified -- session.tabId
+        // is persisted at session creation). Fall back to the active tab
+        // when tabId is missing (defensive; pre-93i baseline).
+        var originatingTabId = (typeof request.tabId === 'number')
+          ? request.tabId
+          : _activeTabIdSnapshot;
+        setIdleState(originatingTabId);
         // Refresh history list if history view is active
         if (isHistoryViewActive) {
           loadHistoryList();
@@ -2387,9 +2522,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           break;
         case 'session_ended':
-          if (request.sessionId !== currentSessionId) break;
-          if (!isRunning) break;
-          setIdleState();
+          // QT-93i-02 -- route by originating tab so non-active sessions
+          // can flip their per-tab idle without affecting the active tab.
+          var sessionEndedTabId = (typeof request.tabId === 'number')
+            ? request.tabId
+            : _activeTabIdSnapshot;
+          var sessionEndedEntry = _getTabRunningEntry(sessionEndedTabId);
+          if (!sessionEndedEntry.isRunning) break;
+          if (request.sessionId !== sessionEndedEntry.sessionId
+              && request.sessionId !== currentSessionId) break;
+          setIdleState(sessionEndedTabId);
           if (isHistoryViewActive) {
             loadHistoryList();
           }
