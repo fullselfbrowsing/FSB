@@ -449,11 +449,11 @@ Plans:
 
 **Surfaces in scope:** `extension/ui/sidepanel.js`, `extension/ui/sidepanel.html`, `extension/background.js` (additive event registration for auto-open binding), new sidecar `extension/ui/sidepanel-message-log.js`. `extension/manifest.json` only if research surfaces a missing permission (`sidePanel` permission already present).
 
-**Requirements:** TBD — anticipated FINT-22 (live progress wiring), FINT-23 (per-conversation message log + hydrate repoint), FINT-24 (per-tab sidepanel auto-open/close).
+**Requirements:** FINT-22 (live progress wiring), FINT-23 (per-conversation message log + hydrate repoint), FINT-24 (per-tab sidepanel auto-open/close).
 
 **Depends on:** Phase 11 (consumes per-tab conversationId envelope + repoints Phase 11 hydrate scaffold). INDEPENDENT of consolidated UAT-08+09+10+11 verdict — UAT-12 joins them in a single Chrome MV3 reload session.
 
-**Plans:** TBD (anticipated 3-5 plans across 3-4 waves; Wave 0 smoke + message-log sidecar; Waves 1-3 the three surfaces; Wave 4 ceremony + Part N byte-freeze regression).
+**Plans:** 5 plans across 5 waves
 
 **Out of scope:**
 - Cross-tab conversation merging or unified chat surface.
@@ -463,7 +463,11 @@ Plans:
 - Deferring existing UAT-08+09+10+11 — Phase 12 ships, UAT becomes UAT-08+09+10+11+12 in one consolidated Chrome MV3 reload session.
 
 Plans:
-- [ ] TBD (3-5 plans across 3-4 waves)
+- [ ] `12-00-PLAN.md` (Wave 0) — Sidecar scaffold + smoke harness. New `extension/ui/sidepanel-message-log.js` exports 7 pure helpers (`emptyEnvelope`, `isValidEnvelope`, `appendMessage`, `getMessages`, `dropConversationMessages`, `_touchLru`, `_enforceLruCap`) + `createDebouncer({debounceMs, setTimeoutFn, clearTimeoutFn})` factory + 4 constants (`STORAGE_KEY = 'fsbConversationMessages'`, `DEFAULT_CAP = 50`, `DEFAULT_DEBOUNCE_MS = 200`, `ENVELOPE_VERSION = 1`); new smoke `tests/sidepanel-message-log-smoke.test.js` with 8 Part placeholders + chrome.runtime + chrome.tabs + chrome.storage.local + chrome.storage.session + chrome.sidePanel mocks + DOM stub helpers; sidepanel.html script-tag chain extended; package.json scripts.test &&-chain extended. Zero behavioral change. 8 PASS Wave 0 baseline.
+- [ ] `12-01-PLAN.md` (Wave 1) — FINT-23 hydrate Tier 1 repoint. `extension/ui/sidepanel.js` `hydrateChatFromConversationId(convId)` body restructured 3-tier per CONTEXT D-05..D-08 (Tier 1 new `fsbConversationMessages` store, Tier 2 b8b761e8 fsbSessionLogs preserved verbatim, Tier 3 empty); new `renderPersistedMessage(content, role, kind)` helper added as Pitfall 3 defense. Function name + arity preserved per D-05. Smoke Parts 1+2 filled at >= 10 real PASS. Cumulative >= 18. Depends on 12-00.
+- [ ] `12-02-PLAN.md` (Wave 2) — FINT-23 addMessage write-through. Module-scope `_messageLogDebouncer` + `_messageLogPendingBuffer` Map; boot init via `FSBSidepanelMessageLog.createDebouncer({ debounceMs: 200 })`; `window.addEventListener('beforeunload', flushAll)` per CONTEXT D-03; `_persistMessage` + `_flushMessageLog` helpers; `addMessage` signature backward-compatibly extended with optional 3rd `kind` param + persistence hook after DOM render; `addCompletionMessage` + `addActionMessage` hook `_persistMessage`; `addActionMessage` persistence fires BEFORE the showSidepanelProgressEnabled guard per CONTEXT D-10; chrome.tabs.onRemoved extended with `_messageLogDebouncer.cancel(convId)` + `dropConversationMessages` per RESEARCH EC-05 defense. Smoke Parts 3+4 filled at >= 10 real PASS. Cumulative >= 28. Depends on 12-01.
+- [ ] `12-03-PLAN.md` (Wave 3) — FINT-22 live progress wiring. Flip `showSidepanelProgress` default `false` -> `true` in 3 sites (`extension/ui/options.js` DEFAULT_SETTINGS + `extension/ui/sidepanel.js` module-scope + boot read default + catch fallback) per RESEARCH Section 6.4 Smallest-Fix option 1. Add unconditional `_persistMessage('assistant', 'Step ' + request.iteration + ' complete', 'progress')` call in `case 'iteration_complete':` body BEFORE the existing updateStatusMessage gate per CONTEXT D-10. Smoke Part 5 filled at >= 5 real PASS. Cumulative >= 33. Depends on 12-02.
+- [ ] `12-04-PLAN.md` (Wave 4) — FINT-24 per-tab sidepanel auto-open + ceremony. `extension/background.js` `handleStartAutomation` carries new best-effort try/catch block with `chrome.sidePanel.setOptions({tabId, enabled, path})` + `chrome.sidePanel.open({tabId})` as the FIRST 2 awaits in the handler (per RESEARCH Section 7.6 user-gesture recipe). Ceremony: REQUIREMENTS.md FINT-22/23/24 narrative + 3 traceability rows + Total v1 footer bump 44 -> 47 + Last updated 2026-06-08; LATTICE-PIN.md Phase 12 row appended with `current_lattice_sha` UNCHANGED; v0.10.0-MILESTONE-AUDIT.md status_history `phase_12_shipped` + last_revised 2026-06-08; new `12-VERIFICATION.md` Human Verification section with UAT-12 6-sub-assertion procedure joining consolidated UAT-08+09+10+11+12 single Chrome MV3 reload session per CONTEXT D-26. Smoke Parts 6+7+8 filled (Part 6 sidePanel API call assertions; Part 7 graceful degradation; Part 8 INV byte-freeze regression: setTimeout=8 + 4 iterator patterns + Phase-12 token awk-scan empty + LATTICE-PIN SHA literal byte-frozen). Cumulative >= 45 PASS / 0 FAIL final. Depends on 12-03.
 
 ---
 
