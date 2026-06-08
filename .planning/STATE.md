@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-06-07T08:10:37.479Z"
-last_activity: 2026-06-07 -- Phase 11 execution started
+stopped_at: Phase 12 added (side panel follows automation); discuss/plan/execute pending
+last_updated: "2026-06-08T07:00:00.000Z"
+last_activity: 2026-06-08 -- Phase 11 shipped + 2 debug fixes (ba107c87 lockout/chip; b8b761e8 hydrate scaffold); UAT-FINAL surfaced 3 UX gaps -> Phase 12 added covering live progress + per-conversation message log + per-tab sidepanel auto-open/close
 progress:
-  total_phases: 11
-  completed_phases: 10
-  total_plans: 46
-  completed_plans: 41
-  percent: 89
+  total_phases: 12
+  completed_phases: 11
+  total_plans: 51
+  completed_plans: 46
+  percent: 90
 ---
 
 # Project State
