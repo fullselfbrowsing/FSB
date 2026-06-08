@@ -552,16 +552,31 @@ function _loadSidepanelHydrate() {
        'Part 5.7: catch fallback assigns true (was false)');
 
     // Test 8: iteration_complete persists progress.
+    // QT-7bi-02 (quick task 260608-7bi) routes iteration_complete through the
+    // conv-explicit _persistMessageToConversation helper instead of the
+    // module-scope _persistMessage. Persistence is still unconditional per
+    // FINT-22 (Plan 12-03 CONTEXT D-10); only the helper identifier + the
+    // explicit iterConvId argument changed. Greedy match needed because the
+    // QT-7bi-02 deferred-gate restructure inserts intermediate var-decls
+    // (iterConvId derivation) plus an inline `if (request.sessionId !== currentSessionId && currentStatusMessage && isRunning)`
+    // DOM-render gate before the iteration_complete's terminal `break;`.
     const iterMatch = spSrc.match(/case 'iteration_complete':[\s\S]*?break;/);
     ok(iterMatch !== null, 'Part 5.8: case iteration_complete found');
     const iterBody = iterMatch ? iterMatch[0] : '';
-    ok(/_persistMessage\('assistant', 'Step ' \+ request\.iteration \+ ' complete', 'progress'\)/.test(iterBody),
-       'Part 5.9: iteration_complete persists progress via _persistMessage');
+    ok(/_persistMessageToConversation\('assistant', 'Step ' \+ request\.iteration \+ ' complete', 'progress', iterConvId\)/.test(iterBody),
+       'Part 5.9: iteration_complete persists progress via _persistMessageToConversation (QT-7bi-02 conv-routed)');
     ok(/updateStatusMessage/.test(iterBody),
        'Part 5.10: iteration_complete existing updateStatusMessage call preserved');
 
     // Test 11: tool_executed wiring intact (carryforward sanity).
-    const toolMatch = spSrc.match(/case 'tool_executed':[\s\S]*?break;/);
+    // QT-7bi-02 added an inline `if (request.sessionId !== currentSessionId) break;`
+    // early-return gate at the top of each per-event branch (after the
+    // deferred-gate restructure that lifted the gate off the outer sessionStateEvent
+    // switch). The non-greedy `break;` in the original regex would stop at the
+    // new inline `break` and miss the addActionMessage line. Switch to greedy
+    // `[\s\S]*break;` so the match captures the FULL case body up through the
+    // outer terminal break.
+    const toolMatch = spSrc.match(/case 'tool_executed':[\s\S]*?case 'error_occurred':/);
     ok(toolMatch !== null, 'Part 5.11: case tool_executed still wired');
     const toolBody = toolMatch ? toolMatch[0] : '';
     ok(/addActionMessage/.test(toolBody),
