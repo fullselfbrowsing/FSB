@@ -285,6 +285,38 @@ async function ensureTabConversationForActiveTab(overwrite) {
 async function hydrateChatFromConversationId(convId) {
   if (!convId || typeof convId !== 'string') return 0;
   if (!chatMessages) return 0;
+
+  // ============================================================
+  // Tier 1 (Phase 12 FINT-23): new fsbConversationMessages store.
+  // ============================================================
+  try {
+    if (typeof FSBSidepanelMessageLog !== 'undefined'
+        && typeof FSBSidepanelMessageLog.getMessages === 'function'
+        && typeof FSBSidepanelMessageLog.STORAGE_KEY === 'string') {
+      const bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+      const envelope = bag[FSBSidepanelMessageLog.STORAGE_KEY];
+      const messages = FSBSidepanelMessageLog.getMessages(envelope, convId);
+      if (Array.isArray(messages) && messages.length > 0) {
+        chatMessages.innerHTML = '';
+        const sorted = messages.slice().sort(function (a, b) {
+          return (a.timestamp || 0) - (b.timestamp || 0);
+        });
+        for (var i = 0; i < sorted.length; i++) {
+          var m = sorted[i];
+          renderPersistedMessage(m.content, m.role, m.kind);
+        }
+        activeConversationId = convId;
+        return sorted.length;
+      }
+    }
+  } catch (_e) {
+    // fall through to Tier 2
+  }
+
+  // ============================================================
+  // Tier 2 (b8b761e8 body preserved; addMessage replaced with
+  // renderPersistedMessage per Pitfall 3 defense): fsbSessionLogs fallback.
+  // ============================================================
   try {
     const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
     const sessionStorage = stored.fsbSessionLogs || {};
@@ -301,7 +333,7 @@ async function hydrateChatFromConversationId(convId) {
     }
     if (matching.length === 0) return 0;
 
-    matching.sort(function(a, b) {
+    matching.sort(function (a, b) {
       var aTime = a?.startTime || 0;
       var bTime = b?.startTime || 0;
       return aTime - bTime;
@@ -313,38 +345,29 @@ async function hydrateChatFromConversationId(convId) {
     for (var s = 0; s < matching.length; s++) {
       var session = matching[s] || {};
       var commands = Array.isArray(session.commands) ? session.commands : [];
-      // Fallback: if commands[] is empty but lastTask is present, use it
-      // as the single user message (covers older session rows written
-      // before commands[] tracking).
       if (commands.length === 0 && session.lastTask) commands = [session.lastTask];
 
       for (var c = 0; c < commands.length; c++) {
         var cmd = commands[c];
         if (typeof cmd === 'string' && cmd.trim().length > 0) {
-          addMessage(cmd, 'user');
+          renderPersistedMessage(cmd, 'user', 'text');
         }
       }
 
-      // Replay the completion as a single ai message. Prefer
-      // completionMessage > result > nothing. Skip silent completions.
       var completion = session.completionMessage || session.result || '';
       if (typeof completion === 'string' && completion.trim().length > 0) {
         var outcomeStr = typeof session.outcome === 'string' ? session.outcome.toLowerCase() : '';
-        var isPartial = outcomeStr === 'partial';
         var isError = outcomeStr === 'failure' || (session.error && !completion);
         if (isError) {
-          addMessage(completion, 'error');
+          renderPersistedMessage(completion, 'assistant', 'error');
         } else {
-          addCompletionMessage(completion, 'ai', isPartial);
+          renderPersistedMessage(completion, 'assistant', 'text');
         }
       } else if (session.error && typeof session.error === 'string' && session.error.trim().length > 0) {
-        addMessage(session.error, 'error');
+        renderPersistedMessage(session.error, 'assistant', 'error');
       }
     }
 
-    // Track the most recent hydrated session so the existing
-    // recoverLatestThreadTerminalOutcome scaffolding does not re-render
-    // a duplicate terminal outcome for the same row.
     var latest = matching[matching.length - 1];
     if (latest && latest.id) {
       lastRenderedTerminalSessionId = latest.id;
@@ -354,7 +377,9 @@ async function hydrateChatFromConversationId(convId) {
 
     return matching.length;
   } catch (_e) {
-    // Best-effort: storage failures degrade to caller-side fallback.
+    // ============================================================
+    // Tier 3: empty render (caller fires welcome message).
+    // ============================================================
     return 0;
   }
 }
@@ -1463,6 +1488,36 @@ function showChromepageError(text) {
   const messagesContainer = document.getElementById('messages');
   messagesContainer.appendChild(messageDiv);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+/**
+ * Phase 12 FINT-23 (Plan 12-01) -- DOM-only render path for replay.
+ *
+ * Identical visual treatment to addMessage but bypasses addMessage entirely
+ * so the future Plan 12-02 addMessage write-through hook does NOT loop a
+ * hydrate replay back into chrome.storage.local (Pitfall 3 defense from
+ * 12-RESEARCH Section 10).
+ *
+ * (role, kind) -> CSS type mapping:
+ *   ('user',      'text')     -> .message.user
+ *   ('assistant', 'text')     -> .message.system  (default assistant style)
+ *   ('assistant', 'progress') -> .message.action  (D-12 styling reuses existing action treatment)
+ *   ('assistant', 'tool')     -> .message.action  (D-12 styling)
+ *   ('assistant', 'error')    -> .message.error
+ *
+ * No .new class. No animation setTimeout. Scrollback is not "new".
+ */
+function renderPersistedMessage(content, role, kind) {
+  if (typeof content !== 'string' || content.length === 0) return;
+  if (!chatMessages) return;
+  var cssType = 'system';
+  if (role === 'user') cssType = 'user';
+  else if (kind === 'error') cssType = 'error';
+  else if (kind === 'progress' || kind === 'tool') cssType = 'action';
+  var messageDiv = document.createElement('div');
+  messageDiv.className = 'message ' + cssType;
+  messageDiv.textContent = content;
+  chatMessages.appendChild(messageDiv);
 }
 
 // Add message to chat with modern bubble styling
