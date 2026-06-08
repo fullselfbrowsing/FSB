@@ -13078,49 +13078,6 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
-// QT-93i-01 (redo: panel-visibility per-tab) -- chrome.tabs.onActivated.
-// Toggles chrome.sidePanel.setOptions({ tabId, enabled }) so the panel
-// collapses on non-working tabs and re-enables on working tabs. Working
-// means findActiveAutomationSessionForTab(tabId) is truthy (the tab has
-// an in-flight FSB automation session).
-//
-// Per CONTEXT D-01 (260608-7bi): all working tabs stay enabled
-// simultaneously -- this listener ONLY mutates state for the activated
-// tab; sibling working tabs are NOT touched. The activated tab being
-// non-working does NOT cascade into other tabs' enabled state.
-//
-// SAFE TO AWAIT: chrome.tabs.onActivated is NOT a user-gesture event
-// (Chrome fires it from tab-management machinery without a gesture
-// token). The 779bbae2 bug only applied to chrome.action.onClicked.
-//
-// Defensive: typeof guards for Chrome <114; best-effort try/catch so a
-// sidePanel API failure does NOT break tab switching for the user.
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  try {
-    if (!activeInfo || typeof activeInfo.tabId !== 'number') return;
-    if (typeof chrome.sidePanel === 'undefined'
-        || typeof chrome.sidePanel.setOptions !== 'function') return;
-    var isWorking = !!findActiveAutomationSessionForTab(activeInfo.tabId);
-    if (isWorking) {
-      await chrome.sidePanel.setOptions({
-        tabId: activeInfo.tabId,
-        enabled: true,
-        path: 'ui/sidepanel.html'
-      });
-    } else {
-      await chrome.sidePanel.setOptions({
-        tabId: activeInfo.tabId,
-        enabled: false
-      });
-    }
-  } catch (err) {
-    console.warn('[FSB] QT-93i-01 sidePanel setOptions failed', {
-      tabId: activeInfo && activeInfo.tabId,
-      error: err && err.message
-    });
-  }
-});
-
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   // Phase 256 Plan 03 -- visual-session sliding-window death-timer alarm.
