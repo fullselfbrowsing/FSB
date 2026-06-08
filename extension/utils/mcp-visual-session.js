@@ -16,7 +16,20 @@
     'Gemini',
     'Hermes',
     // Phase 10 FINT-16 -- autopilot driver discriminator (D-02)
-    'FSB Autopilot'
+    'FSB Autopilot',
+    // Quick task 260608-6nm -- Tier-1 MCP clients (modelcontextprotocol.io clients + awesome-mcp-clients + Nimbalyst 2026)
+    'Cline',
+    'Continue',
+    'Zed',
+    'VS Code',
+    'Copilot',
+    'JetBrains',
+    'Xcode',
+    'Eclipse',
+    'Cody',
+    'Roo Code',
+    'Kiro',
+    'Goose'
   ];
 
   var CLIENT_LABEL_MAP = Object.create(null);
