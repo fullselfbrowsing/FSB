@@ -14,7 +14,7 @@ let stopRequested = false;
 let livenessInterval = null;
 let livenessFailCount = 0;
 let isHistoryViewActive = false;
-let showSidepanelProgressEnabled = false;
+let showSidepanelProgressEnabled = true;
 
 // Phase 12 FINT-23 write-through state.
 // _messageLogDebouncer: per-convId 200ms debouncer (Plan 12-00 sidecar factory).
@@ -565,9 +565,11 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 // Keep sidepanel progress setting in sync when changed from options
+// (Phase 12 FINT-22 (Plan 12-03): default fallback flipped true to match
+// boot read semantics per RESEARCH Section 6.4.)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.showSidepanelProgress != null) {
-    showSidepanelProgressEnabled = changes.showSidepanelProgress.newValue ?? false;
+    showSidepanelProgressEnabled = changes.showSidepanelProgress.newValue ?? true;
   }
   // Phase 243 plan 03 (UI-02) follow-up: refresh chip when registry mutates
   // for the active tab (ownership claimed/released/transferred). The
@@ -858,12 +860,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Apply theme first
   applyTheme();
 
-  // Load sidepanel progress setting
+  // Load sidepanel progress setting (Phase 12 FINT-22 (Plan 12-03): default flipped true per RESEARCH Section 6.4).
   try {
     const stored = await chrome.storage.local.get(['showSidepanelProgress']);
-    showSidepanelProgressEnabled = stored.showSidepanelProgress ?? false;
+    showSidepanelProgressEnabled = stored.showSidepanelProgress ?? true;
   } catch (e) {
-    showSidepanelProgressEnabled = false;
+    showSidepanelProgressEnabled = true;
   }
 
   // Phase 11 FINT-21 -- per-tab envelope hydration + legacy migration

@@ -21,7 +21,7 @@ const defaultSettings = {
   elementCacheSize: 200,
   prioritizeViewport: true,
   animatedActionHighlights: true,
-  showSidepanelProgress: false,
+  showSidepanelProgress: true,
   // Credential Manager (Beta)
   enableLogin: false,
   // CAPTCHA Solver
