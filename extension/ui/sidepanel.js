@@ -69,6 +69,27 @@ function _syncModuleScopeFromActiveTab() {
   currentSessionId = snap.sessionId || null;
 }
 
+// QT-93i-regression (Strategy B) -- resolve a tabId by scanning _tabRunningMap
+// for an entry whose .sessionId matches. Returns the matching tabId, or
+// _activeTabIdSnapshot when no entry is found (defensive fallback so callers
+// always get a valid number). Used by session-driven setter call sites
+// (stopAutomation reply, liveness orphan, renderAutomationCompletionPayload,
+// automationError) to route setIdleState / setErrorState to the OWNING tab
+// instead of the currently-active tab. See .planning/debug/qt93i-regression.md.
+function _resolveTabIdForSession(sessionId) {
+  if (typeof sessionId === 'string' && sessionId.length > 0) {
+    var iter = _tabRunningMap.entries();
+    var next = iter.next();
+    while (!next.done) {
+      var tabId = next.value[0];
+      var entry = next.value[1];
+      if (entry && entry.sessionId === sessionId) return tabId;
+      next = iter.next();
+    }
+  }
+  return _activeTabIdSnapshot;
+}
+
 // Phase 12 FINT-23 write-through state.
 // _messageLogDebouncer: per-convId 200ms debouncer (Plan 12-00 sidecar factory).
 //                      Initialized at boot inside DOMContentLoaded.
@@ -1265,13 +1286,13 @@ async function handleSendMessage() {
         } else {
           addMessage(`I encountered an error: ${errorMsg}`, 'error');
         }
-        setIdleState();
+        setIdleState(_activeTabIdSnapshot);
       }
     });
     
   } catch (error) {
     addMessage(`Something went wrong: ${error.message}`, 'error');
-    setIdleState();
+    setIdleState(_activeTabIdSnapshot);
   }
 }
 
@@ -1307,7 +1328,7 @@ function stopAutomation() {
       if (currentStatusMessage) {
         completeStatusMessage('Automation stopped', 'system');
       }
-      setIdleState();
+      setIdleState(_resolveTabIdForSession(currentSessionId));
       currentSessionId = null;
       stopRequested = false;
       console.log('Side panel: Automation stopped successfully');
@@ -1394,7 +1415,7 @@ function checkSessionLiveness() {
         if (livenessFailCount >= 2) {
           console.warn('[FSB sidepanel] Orphan detected after 2 consecutive failures, recovering');
           addMessage('Session ended unexpectedly. Ready for your next task.', 'error');
-          setIdleState();
+          setIdleState(_resolveTabIdForSession(currentSessionId));
         }
       } else {
         livenessFailCount = 0;
@@ -2189,7 +2210,7 @@ function renderAutomationCompletionPayload(payload) {
 
   if (outcome === 'failure') {
     var errorMessage = payload.error || payload.outcomeDetails?.error || completionMessage || 'Automation error';
-    setErrorState();
+    setErrorState(_resolveTabIdForSession(payload.sessionId));
     if (currentStatusMessage) {
       completeStatusMessage('Error: ' + errorMessage, 'error');
     } else {
@@ -2206,7 +2227,7 @@ function renderAutomationCompletionPayload(payload) {
     addCompletionMessage(completionMessage, 'ai', outcome === 'partial');
   }
 
-  setIdleState();
+  setIdleState(_resolveTabIdForSession(payload.sessionId));
   currentSessionId = null;
   lastRenderedTerminalSessionId = payload.sessionId || historySessionId || null;
 
@@ -2432,7 +2453,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'automationError':
       if (!isRunning) return; // Already idle, ignore duplicate
       if (request.sessionId === currentSessionId) {
-        setErrorState();
+        // QT-93i-regression (Strategy B) -- route by originating tab; mirror
+        // the automationComplete routing pattern at line ~2358. Falls back to
+        // _resolveTabIdForSession when request.tabId is missing.
+        var errorTabId = (typeof request.tabId === 'number')
+          ? request.tabId
+          : _resolveTabIdForSession(request.sessionId);
+        setErrorState(errorTabId);
         completeStatusMessage(`Error: ${request.error}`, 'error');
 
         // Provide specific guidance for stuck scenarios
@@ -3041,7 +3068,7 @@ async function startReplay(sessionId) {
 
     if (response && response.success) {
       currentSessionId = response.sessionId;
-      setRunningState();
+      setRunningState(_activeTabIdSnapshot, response.sessionId);
       updateStatusMessage('Replaying...');
     } else {
       completeStatusMessage(response?.error || 'Failed to start replay', 'error');
