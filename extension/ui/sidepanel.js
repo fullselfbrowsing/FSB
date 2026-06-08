@@ -16,6 +16,16 @@ let livenessFailCount = 0;
 let isHistoryViewActive = false;
 let showSidepanelProgressEnabled = false;
 
+// Phase 12 FINT-23 write-through state.
+// _messageLogDebouncer: per-convId 200ms debouncer (Plan 12-00 sidecar factory).
+//                      Initialized at boot inside DOMContentLoaded.
+// _messageLogPendingBuffer: in-memory buffer Map<convId, Array<msg>>.
+//                           Accumulates messages between debounced flushes
+//                           so a burst of N messages results in 1 storage
+//                           write at 200ms after the last call.
+var _messageLogDebouncer = null;
+var _messageLogPendingBuffer = new Map();
+
 // Phase 11 debug-phase-11-sidepanel-reopen-empty -- declare module-scope
 // thread state that pre-existing renderAutomationCompletionPayload /
 // recoverLatestThreadTerminalOutcome scaffolding referenced without ever
@@ -819,6 +829,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   // (replaces previous single-key conversation init flow).
   await initTabConversationStore();
 
+  // Phase 12 FINT-23 -- init message-log debouncer + beforeunload force flush.
+  if (typeof FSBSidepanelMessageLog !== 'undefined'
+      && typeof FSBSidepanelMessageLog.createDebouncer === 'function') {
+    _messageLogDebouncer = FSBSidepanelMessageLog.createDebouncer({
+      debounceMs: FSBSidepanelMessageLog.DEFAULT_DEBOUNCE_MS
+    });
+    try {
+      window.addEventListener('beforeunload', function () {
+        if (_messageLogDebouncer && typeof _messageLogDebouncer.flushAll === 'function') {
+          _messageLogDebouncer.flushAll().catch(function () {});
+        }
+      });
+    } catch (_e) {
+      // Sidepanel context may lack window in unusual edge cases.
+    }
+  }
+
   // Initialize analytics
   initializeSidepanelAnalytics();
   
@@ -1488,6 +1515,88 @@ function showChromepageError(text) {
   const messagesContainer = document.getElementById('messages');
   messagesContainer.appendChild(messageDiv);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+/**
+ * Phase 12 FINT-23 (Plan 12-02) -- write-through hook.
+ *
+ * Called from addMessage + addCompletionMessage + addActionMessage AFTER
+ * the existing DOM render path. Schedules a 200ms-debounced flush per
+ * conversationId via the module-scope _messageLogDebouncer.
+ *
+ * Guards:
+ *  - lazy-mint window: conversationId may be null in early-boot or
+ *    foreign-owned-tab flows (Phase 11 D-17); skip persistence then.
+ *  - empty content: skip.
+ *  - sidecar absent: skip (script-tag load order failure).
+ *  - debouncer absent: skip (boot init failed; storage write unsafe).
+ *
+ * Storage failures swallow silently -- DOM render must never block on
+ * persistence per CONTEXT D-03.
+ */
+function _persistMessage(role, content, kind) {
+  if (typeof FSBSidepanelMessageLog === 'undefined') return;
+  if (!conversationId || typeof conversationId !== 'string') return;
+  if (typeof content !== 'string' || content.length === 0) return;
+  if (!_messageLogDebouncer) return;
+
+  var resolvedRole = (role === 'user') ? 'user' : 'assistant';
+  var resolvedKind = (typeof kind === 'string' && kind.length > 0) ? kind : 'text';
+
+  // Append to in-memory buffer immediately for read consistency.
+  var convId = conversationId;
+  var buffer = _messageLogPendingBuffer.get(convId);
+  if (!buffer) {
+    buffer = [];
+    _messageLogPendingBuffer.set(convId, buffer);
+  }
+  buffer.push({
+    role: resolvedRole,
+    content: content,
+    timestamp: Date.now(),
+    kind: resolvedKind
+  });
+
+  // Clear-and-replace 200ms debounce per CONTEXT D-03.
+  _messageLogDebouncer.schedule(convId, function () {
+    return _flushMessageLog(convId);
+  });
+}
+
+/**
+ * Plan 12-02 FINT-23 flush helper.
+ *
+ * Reads the envelope from chrome.storage.local, appends the buffered
+ * messages via the sidecar's appendMessage (which enforces LRU cap = 50),
+ * persists. On failure, resurrects the snapshot into the buffer so the
+ * next flush retries.
+ */
+async function _flushMessageLog(convId) {
+  var buffer = _messageLogPendingBuffer.get(convId);
+  if (!buffer || buffer.length === 0) return;
+  var snapshot = buffer.slice();
+  buffer.length = 0;
+  try {
+    var bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+    var envelope = bag[FSBSidepanelMessageLog.STORAGE_KEY];
+    if (!FSBSidepanelMessageLog.isValidEnvelope(envelope)) {
+      envelope = FSBSidepanelMessageLog.emptyEnvelope();
+    }
+    for (var i = 0; i < snapshot.length; i++) {
+      FSBSidepanelMessageLog.appendMessage(envelope, convId, snapshot[i]);
+    }
+    var payload = {};
+    payload[FSBSidepanelMessageLog.STORAGE_KEY] = envelope;
+    await chrome.storage.local.set(payload);
+  } catch (_e) {
+    // Best-effort: failure resurrects the buffer so next flush retries.
+    var current = _messageLogPendingBuffer.get(convId);
+    if (current && current.length > 0) {
+      _messageLogPendingBuffer.set(convId, snapshot.concat(current));
+    } else {
+      _messageLogPendingBuffer.set(convId, snapshot);
+    }
+  }
 }
 
 /**
