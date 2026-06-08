@@ -1531,6 +1531,58 @@ function completeStatusMessage(text, type = 'ai') {
   }
 }
 
+// QT-7bi-02 (completion-routing fix) -- DOM-only render variant of
+// addCompletionMessage. Used by the automationComplete case where
+// _persistMessageToConversation has ALREADY persisted the message
+// against request.conversationId; calling addCompletionMessage would
+// trigger a second _persistMessage write into the same conv via its
+// internal write-through (line ~1575 in the original helper).
+//
+// Visual treatment is identical to addCompletionMessage. The DOM render
+// path is the only thing that must remain symmetric so the bubble looks
+// the same regardless of whether the completion was for the active tab
+// (this helper) or a non-active tab (persist-only; replayed via
+// hydrateChatFromConversationId on next swap).
+function _renderCompletionDomOnly(text, type, isPartial) {
+  if (type === undefined) type = 'ai';
+  if (isPartial === undefined) isPartial = false;
+  var messageDiv = document.createElement('div');
+  messageDiv.className = 'message ai-completion new';
+
+  if (isPartial) {
+    messageDiv.classList.add('partial-result');
+    var label = document.createElement('div');
+    label.className = 'partial-result-label';
+    label.textContent = 'Partial result';
+    messageDiv.appendChild(label);
+  }
+
+  if (type === 'error') {
+    messageDiv.className = 'message error new';
+    messageDiv.textContent = text;
+  } else {
+    var contentDiv = document.createElement('div');
+    if (typeof FSBMarkdown !== 'undefined') {
+      FSBMarkdown.applyToElement(contentDiv, text);
+    } else {
+      contentDiv.textContent = text;
+    }
+    messageDiv.appendChild(contentDiv);
+  }
+
+  chatMessages.appendChild(messageDiv);
+
+  setTimeout(function () {
+    messageDiv.classList.remove('new');
+  }, 400);
+
+  while (chatMessages.children.length > 100) {
+    chatMessages.removeChild(chatMessages.firstChild);
+  }
+
+  scrollToBottom();
+}
+
 // Add a separate completion message bubble with markdown support
 function addCompletionMessage(text, type = 'ai', isPartial = false) {
   const messageDiv = document.createElement('div');
@@ -1640,6 +1692,56 @@ function _persistMessage(role, content, kind) {
   });
 
   // Clear-and-replace 200ms debounce per CONTEXT D-03.
+  _messageLogDebouncer.schedule(convId, function () {
+    return _flushMessageLog(convId);
+  });
+}
+
+/**
+ * QT-7bi-02 (completion-routing fix) -- explicit-convId variant of
+ * _persistMessage.
+ *
+ * The original _persistMessage closes over the module-scope `conversationId`
+ * variable, which is mutated by swapToTabConversation on every tab switch.
+ * When automationComplete fires for a session dispatched from tab A while
+ * the sidepanel currently displays tab B's conversation, _persistMessage
+ * would write the completion bubble into tab B's persisted log (the
+ * currently-displayed conv), not tab A's (the originating conv).
+ *
+ * This sibling helper takes an explicit `convId` so completion-routing
+ * call sites can persist into the originating conversation regardless of
+ * which tab is currently displayed. Identical guards + buffer + debouncer
+ * semantics as _persistMessage.
+ *
+ * Guards:
+ *  - convId must be a non-empty string (lazy-mint windows pass null; skip).
+ *  - sidecar absent: skip (script-tag load order failure).
+ *  - debouncer absent: skip (boot init failed; storage write unsafe).
+ *
+ * Storage failures swallow silently -- DOM render must never block on
+ * persistence (mirrors _persistMessage contract).
+ */
+function _persistMessageToConversation(role, content, kind, convId) {
+  if (typeof FSBSidepanelMessageLog === 'undefined') return;
+  if (!convId || typeof convId !== 'string') return;
+  if (typeof content !== 'string' || content.length === 0) return;
+  if (!_messageLogDebouncer) return;
+
+  var resolvedRole = (role === 'user') ? 'user' : 'assistant';
+  var resolvedKind = (typeof kind === 'string' && kind.length > 0) ? kind : 'text';
+
+  var buffer = _messageLogPendingBuffer.get(convId);
+  if (!buffer) {
+    buffer = [];
+    _messageLogPendingBuffer.set(convId, buffer);
+  }
+  buffer.push({
+    role: resolvedRole,
+    content: content,
+    timestamp: Date.now(),
+    kind: resolvedKind
+  });
+
   _messageLogDebouncer.schedule(convId, function () {
     return _flushMessageLog(convId);
   });
@@ -2080,17 +2182,45 @@ async function recoverLatestThreadTerminalOutcome(options = {}) {
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
-    case 'automationComplete':
-      if (!isRunning) return; // Already idle, ignore duplicate
+    case 'automationComplete': {
+      if (!isRunning && request.sessionId !== currentSessionId) {
+        // QT-7bi-02 -- if the completion is for OUR currentSessionId we
+        // must still process it (clear running state). If isRunning is
+        // already false AND the session is not ours, drop the duplicate.
+        return;
+      }
       if (request.sessionId === currentSessionId) {
         // AI must always provide a meaningful completion message
-        const completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
-        const isPartial = request.partial === true;
+        var completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
+        var isPartial = request.partial === true;
 
-        if (currentStatusMessage) {
-          completeStatusMessage(completionMessage, isPartial ? 'partial' : undefined);
-        } else {
-          addCompletionMessage(completionMessage, 'ai', isPartial);
+        // QT-7bi-02 -- persist FIRST against request.conversationId so the
+        // originating conversation's log captures the completion regardless
+        // of which tab is currently displayed. Falls back to module-scope
+        // conversationId only when the broadcast did not supply one
+        // (defensive; all 15+ background.js call sites do supply it).
+        var originatingConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
+          ? request.conversationId
+          : conversationId;
+        _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId);
+
+        // QT-7bi-02 -- DOM render only when the originating conv matches the
+        // currently-displayed conv. Otherwise the message is persisted
+        // silently and replays via hydrateChatFromConversationId when the
+        // user switches to the originating tab.
+        var isOriginatingActive = (originatingConvId === conversationId);
+        if (isOriginatingActive) {
+          if (currentStatusMessage) {
+            completeStatusMessage(completionMessage, isPartial ? 'partial' : undefined);
+          } else {
+            // addCompletionMessage internally calls _persistMessage which uses
+            // the module-scope conversationId. Since isOriginatingActive===true
+            // here, the module-scope conversationId already equals
+            // originatingConvId, so the double-write would persist the same
+            // message twice into the same conv. Inline a DOM-only render to
+            // avoid the duplicate.
+            _renderCompletionDomOnly(completionMessage, 'ai', isPartial);
+          }
         }
 
         setIdleState();
@@ -2099,8 +2229,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           loadHistoryList();
         }
 
-        // Check if reconnaissance could help (partial/stuck completions on unmapped sites)
-        if (isPartial) {
+        // Check if reconnaissance could help (partial/stuck completions on unmapped sites).
+        // Only fire on the originating tab so the recon prompt lands on the right surface.
+        if (isPartial && isOriginatingActive) {
           (async () => {
             try {
               const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2140,6 +2271,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       }
       break;
+    }
 
     case 'statusUpdate':
       if (request.sessionId === currentSessionId) {
@@ -2225,16 +2357,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       showPaymentFillConfirmation(request);
       break;
 
-    case 'sessionStateEvent':
-      if (request.sessionId !== currentSessionId) break;
-      switch (request.eventType) {
+    case 'sessionStateEvent': {
+      // QT-7bi-02 -- defer the currentSessionId gate to the individual
+      // event branches so iteration_complete persistence fires for
+      // background-tab sessions (their iter milestones must land in the
+      // originating conv's log so the user sees the full progress trail
+      // when they return to that tab).
+      var sevent = request.eventType;
+      switch (sevent) {
         case 'iteration_complete':
-          // Phase 12 FINT-22 (Plan 12-03): persist iteration milestone to
-          // log unconditionally per CONTEXT D-10. DOM render below stays
-          // via the typing-dots status helper -- no per-iteration chat
-          // bubble per CONTEXT D-11 streaming OOS.
-          _persistMessage('assistant', 'Step ' + request.iteration + ' complete', 'progress');
-          if (currentStatusMessage && isRunning) {
+          // QT-7bi-02 -- persist iteration progress to the ORIGINATING conv
+          // (request.conversationId). Without this, mid-flight progress
+          // milestones from session A persist into the currently-displayed
+          // tab B's log when the user switches tabs. The DOM render
+          // (updateStatusMessage below) stays gated by currentSessionId
+          // match + isRunning, which is fine because the running indicator
+          // is currentSessionId-shaped, not conv-shaped.
+          var iterConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
+            ? request.conversationId
+            : conversationId;
+          _persistMessageToConversation('assistant', 'Step ' + request.iteration + ' complete', 'progress', iterConvId);
+          // DOM render: only for the active session AND only when running.
+          if (request.sessionId === currentSessionId && currentStatusMessage && isRunning) {
             updateStatusMessage('Step ' + request.iteration + ' complete', {
               iteration: request.iteration,
               maxIterations: 100,
@@ -2243,6 +2387,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           break;
         case 'session_ended':
+          if (request.sessionId !== currentSessionId) break;
           if (!isRunning) break;
           setIdleState();
           if (isHistoryViewActive) {
@@ -2250,15 +2395,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
           break;
         case 'tool_executed':
+          if (request.sessionId !== currentSessionId) break;
           if (showSidepanelProgressEnabled && isRunning) {
             addActionMessage(request.toolName + (request.success ? '' : ' [failed]'));
           }
           break;
         case 'error_occurred':
+          if (request.sessionId !== currentSessionId) break;
           console.warn('[FSB] emitter error:', request.error);
           break;
       }
       break;
+    }
   }
 });
 
