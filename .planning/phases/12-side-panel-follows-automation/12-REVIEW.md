@@ -238,3 +238,41 @@ Per the CLAUDE.md project guidance ("Real-runtime tests, not static-text") and t
 _Reviewed: 2026-06-08_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Fixes Applied
+
+**Fixed at:** 2026-06-08
+**Fixer:** Claude (gsd-code-fixer)
+**Scope:** Critical + Warning (2 of 2 in-scope findings addressed)
+
+| Finding | Status | Commit | Files Modified |
+|---------|--------|--------|----------------|
+| WR-01 | Fixed | `1f2ceb73` | `extension/ui/sidepanel.js` |
+| WR-02 | Fixed | `78483056` | `extension/ui/sidepanel.js` |
+
+### WR-01: addMessage write-through fires during early-boot welcome message with null conversationId -- silently drops persistence
+
+**Commit:** `1f2ceb73` -- `fix(12-fix): WR-01 await ensureTabConversationForActiveTab before welcome addMessage`
+
+Applied REVIEW option (a). `startNewChat` is now `async`; `ensureTabConversationForActiveTab(true)` is `await`-ed inside a try/catch BEFORE the chat-clear + `addMessage('Welcome to FSB. How can I help?', 'system')` call site. This guarantees the fresh `conversationId` is bound before the welcome message's `_persistMessage` write-through hook fires, so the welcome lands in the correct fresh conversation's persisted log and hydrates consistently on next reopen. The only call site is the `newChatBtn` click event listener (line 1048) which accepts async handlers natively. Try/catch swallow preserves the prior fire-and-forget `.catch(function () {})` semantics so UI clearing still proceeds on mint failure.
+
+### WR-02: `_flushMessageLog` resurrection race -- items appended DURING the storage `await` are not auto-flushed on success
+
+**Commit:** `78483056` -- `fix(12-fix): WR-02 re-schedule debouncer if buffer has residual items after flush`
+
+Applied REVIEW recommended fix verbatim shape. After the `await chrome.storage.local.set(payload)` resolves, `_flushMessageLog` now checks `_messageLogPendingBuffer.get(convId)` for residual items appended during the await window. If residuals exist AND the debouncer is still mounted, it re-schedules another 200ms flush cycle. The catch-block also re-schedules on storage failure so the resurrected buffer is retried bounded-time later rather than waiting for the next `_persistMessage` call. Both re-schedule sites gate on `_messageLogDebouncer && typeof _messageLogDebouncer.schedule === 'function'` so beforeunload teardown ordering degrades silently. Restores the documented D-03 200ms lost-on-crash bound.
+
+**Post-fix verification:**
+
+- `node tests/sidepanel-message-log-smoke.test.js` -> 61 PASS / 0 FAIL.
+- `npm test` -> exit 0; cumulative 61 PASS / 0 FAIL.
+- `node -c extension/ui/sidepanel.js` -> clean.
+- INV-04: `grep -c "setTimeout" extension/ai/agent-loop.js` == 8 (UPHELD).
+- INV-06: `cd lattice && git rev-parse HEAD` == `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (UPHELD; SHA frozen).
+- INV-01 / INV-02 / INV-05: protected paths untouched (only `extension/ui/sidepanel.js` modified across both fix commits).
+
+**Info findings (IN-01 through IN-06):** Out of scope for this fix pass. Documented in REVIEW above for future enhancement consideration; no Phase 12 ship-blocker carry-forward.
+
+_Fixed: 2026-06-08_
+_Fixer: Claude (gsd-code-fixer)_
+_Iteration: 1_
