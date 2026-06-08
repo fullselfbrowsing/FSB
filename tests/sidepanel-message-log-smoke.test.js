@@ -140,9 +140,9 @@ function createDivStub() {
   const attrs = {};
   const classes = new Set();
   const children = [];
+  let _innerHTML = '';
   const stub = {
     tagName: 'DIV',
-    innerHTML: '',
     textContent: '',
     setAttribute: function (k, v) { attrs[k] = v; },
     removeAttribute: function (k) { delete attrs[k]; },
@@ -157,6 +157,18 @@ function createDivStub() {
     _classes: function () { return Array.from(classes); },
     _children: function () { return children.slice(); }
   };
+  // Faithful DOM innerHTML semantics: setting to '' (or any string) clears
+  // the children array. Plan 12-01 hydrate Tier 1 + Tier 2 rely on this
+  // chatMessages.innerHTML = '' clearing behavior for idempotency.
+  Object.defineProperty(stub, 'innerHTML', {
+    get: function () { return _innerHTML; },
+    set: function (v) {
+      _innerHTML = v;
+      if (typeof v === 'string') children.length = 0;
+    },
+    enumerable: true,
+    configurable: true
+  });
   return stub;
 }
 function createButtonStub() {
@@ -256,14 +268,141 @@ function seedMessageLogEnvelope(convId, msgSeq) {
   return env;
 }
 
+// --- sidepanel.js function extraction (vm-style) ---
+//
+// sidepanel.js is a classic-script document-bound module (2600+ lines,
+// depends on document.* + chrome.* listeners). We cannot `require` it in
+// Node; instead extract the specific functions Plan 12-01 added or
+// modified and instantiate them as fresh closures with injected deps.
+function _loadSidepanelHydrate() {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'extension/ui/sidepanel.js'), 'utf8');
+  const hydrateMatch = src.match(/async function hydrateChatFromConversationId\(convId\) \{[\s\S]*?\n\}/);
+  const renderMatch = src.match(/function renderPersistedMessage\(content, role, kind\) \{[\s\S]*?\n\}/);
+  if (!hydrateMatch) throw new Error('hydrateChatFromConversationId not found in sidepanel.js');
+  if (!renderMatch) throw new Error('renderPersistedMessage not found in sidepanel.js');
+  const hydrateSrc = hydrateMatch[0];
+  const renderSrc = renderMatch[0];
+
+  // The extracted body references bare identifiers (`activeConversationId`,
+  // `lastRenderedTerminalSessionId`, `historySessionId`). Declare them as
+  // closure-scoped vars by prepending var declarations.
+  const wrapped = new Function(
+    'chrome',
+    'FSBSidepanelMessageLog',
+    'chatMessages',
+    'document',
+    'state',
+    'var activeConversationId = null;' +
+    'var lastRenderedTerminalSessionId = null;' +
+    'var historySessionId = null;' +
+    renderSrc + '\n\n' +
+    hydrateSrc + '\n\n' +
+    'return {' +
+    '  hydrate: hydrateChatFromConversationId,' +
+    '  render: renderPersistedMessage,' +
+    '  getState: function () { return { activeConversationId: activeConversationId, lastRenderedTerminalSessionId: lastRenderedTerminalSessionId, historySessionId: historySessionId }; }' +
+    '};'
+  );
+
+  return function instantiate(chatMessagesStub) {
+    return wrapped(globalThis.chrome, MessageLog, chatMessagesStub, globalThis.document, {});
+  };
+}
+
 (async function main() {
   console.log('\n--- Phase 12 Wave 0 smoke (placeholder scaffold) ---');
 
-  console.log('\n--- Part 1: hydrateChatFromConversationId Tier 1 reads fsbConversationMessages (FILLED in Plan 12-01) ---');
-  ok(true, 'placeholder Part 1 -- filled in Plan 12-01 (FINT-23 hydrate Tier 1)');
+  console.log('\n--- Part 1: hydrateChatFromConversationId Tier 1 reads fsbConversationMessages (FINT-23) ---');
+  {
+    _resetMockState();
+    const instantiate = _loadSidepanelHydrate();
+    const chatMessages = createDivStub();
+    installDomStub({ chatMessages: chatMessages });
+    const inst = instantiate(chatMessages);
 
-  console.log('\n--- Part 2: hydrateChatFromConversationId Tier 2 fsbSessionLogs fallback + Tier 3 empty (FILLED in Plan 12-01) ---');
-  ok(true, 'placeholder Part 2 -- filled in Plan 12-01 (FINT-23 hydrate Tier 2)');
+    // Seed the envelope with 3 messages for conv_a in OUT-OF-ORDER timestamps.
+    const env = MessageLog.emptyEnvelope();
+    MessageLog.appendMessage(env, 'conv_a', { role: 'user',      content: 'first',  timestamp: 100, kind: 'text' });
+    MessageLog.appendMessage(env, 'conv_a', { role: 'assistant', content: 'third',  timestamp: 300, kind: 'tool' });
+    MessageLog.appendMessage(env, 'conv_a', { role: 'assistant', content: 'second', timestamp: 200, kind: 'progress' });
+    _localStore[MessageLog.STORAGE_KEY] = env;
+    // Also seed fsbSessionLogs to verify Tier 1 short-circuits Tier 2.
+    _localStore.fsbSessionLogs = { sid1: { conversationId: 'conv_a', commands: ['SHOULD-NOT-RENDER'], result: 'SHOULD-NOT-RENDER' } };
+    _localStore.fsbSessionIndex = [{ id: 'sid1', conversationId: 'conv_a', startTime: 0 }];
+
+    const count = await inst.hydrate('conv_a');
+    ok(count === 3, 'Part 1.1: Tier 1 returns message count (got ' + count + ', want 3)');
+    ok(chatMessages._children().length === 3, 'Part 1.2: Tier 1 rendered 3 DOM children');
+
+    // Chronological order: first=100ms, second=200ms, third=300ms.
+    const rendered = chatMessages._children().map(function (c) { return c.textContent; });
+    ok(rendered[0] === 'first' && rendered[1] === 'second' && rendered[2] === 'third',
+       'Part 1.3: Tier 1 sorted by timestamp ascending (got [' + rendered.join(',') + '])');
+
+    // Tier 1 short-circuits Tier 2: the 'SHOULD-NOT-RENDER' text from fsbSessionLogs MUST NOT appear.
+    const hasShortCircuit = rendered.every(function (t) { return t.indexOf('SHOULD-NOT-RENDER') === -1; });
+    ok(hasShortCircuit, 'Part 1.4: Tier 1 short-circuited Tier 2 (no fsbSessionLogs content rendered)');
+
+    // Idempotency: re-call should clear + rerender same count.
+    const count2 = await inst.hydrate('conv_a');
+    ok(count2 === 3 && chatMessages._children().length === 3,
+       'Part 1.5: Tier 1 idempotent on re-call (count2 ' + count2 + ', children ' + chatMessages._children().length + ')');
+
+    // activeConversationId mutation observed.
+    ok(inst.getState().activeConversationId === 'conv_a',
+       'Part 1.6: Tier 1 sets activeConversationId = convId');
+  }
+
+  console.log('\n--- Part 2: hydrateChatFromConversationId Tier 2 fsbSessionLogs fallback + Tier 3 empty (FINT-23) ---');
+  {
+    _resetMockState();
+    const instantiate = _loadSidepanelHydrate();
+    const chatMessages = createDivStub();
+    installDomStub({ chatMessages: chatMessages });
+    const inst = instantiate(chatMessages);
+
+    // No Tier 1 envelope. Tier 2 should fire with fsbSessionLogs.
+    _localStore.fsbSessionLogs = {
+      sid1: {
+        id: 'sid1',
+        conversationId: 'conv_b',
+        startTime: 1000,
+        commands: ['Hello world'],
+        completionMessage: 'Done!',
+        outcome: 'success'
+      }
+    };
+    _localStore.fsbSessionIndex = [{ id: 'sid1', conversationId: 'conv_b', startTime: 1000 }];
+
+    const count = await inst.hydrate('conv_b');
+    ok(count === 1, 'Part 2.1: Tier 2 returns matching.length (got ' + count + ', want 1)');
+    const rendered = chatMessages._children();
+    ok(rendered.length === 2, 'Part 2.2: Tier 2 rendered 2 DOM children (user cmd + assistant completion)');
+    ok(rendered[0].textContent === 'Hello world', 'Part 2.3: Tier 2 user command rendered first');
+    ok(rendered[1].textContent === 'Done!', 'Part 2.4: Tier 2 completion rendered second');
+
+    // Tier 2 uses renderPersistedMessage (Pitfall 3 defense) -- CSS class should
+    // be 'message user' on first child and 'message system' on second.
+    ok(rendered[0].className.indexOf('user') !== -1, 'Part 2.5: Tier 2 user CSS class set');
+    ok(rendered[1].className.indexOf('system') !== -1, 'Part 2.6: Tier 2 assistant CSS class set');
+
+    // activeConversationId mutation observed in Tier 2 path.
+    ok(inst.getState().activeConversationId === 'conv_b', 'Part 2.7: Tier 2 sets activeConversationId');
+
+    // Tier 3 empty: both stores empty, return 0.
+    _resetMockState();
+    const chatMessages2 = createDivStub();
+    installDomStub({ chatMessages: chatMessages2 });
+    const inst2 = instantiate(chatMessages2);
+    const count3 = await inst2.hydrate('conv_nonexistent');
+    ok(count3 === 0, 'Part 2.8: Tier 3 returns 0 when both stores empty');
+    ok(chatMessages2._children().length === 0, 'Part 2.9: Tier 3 renders zero DOM children');
+
+    // convId guard: null/non-string returns 0.
+    const countNull = await inst2.hydrate(null);
+    const countEmpty = await inst2.hydrate('');
+    ok(countNull === 0 && countEmpty === 0, 'Part 2.10: convId guard returns 0 for null/empty');
+  }
 
   console.log('\n--- Part 3: addMessage write-through via debouncer + LRU cap enforcement (FILLED in Plan 12-02) ---');
   ok(true, 'placeholder Part 3 -- filled in Plan 12-02 (FINT-23 write-through)');
