@@ -1216,7 +1216,7 @@ function stopAutomation() {
 }
 
 // Start new chat session
-function startNewChat() {
+async function startNewChat() {
   // Switch back to chat view if history is showing
   if (isHistoryViewActive) {
     showChatView();
@@ -1235,30 +1235,38 @@ function startNewChat() {
   stopRequested = false;
 
   // Phase 11 FINT-21 -- mint a fresh conversation in the current tab by
-  // overwriting the existing entry. Fire-and-forget per existing
-  // semantics; sidepanel-side UI clearing (chatMessages.innerHTML = '')
-  // happens immediately below.
-  ensureTabConversationForActiveTab(true).catch(function () { /* swallow */ });
+  // overwriting the existing entry.
+  //
+  // Phase 12 WR-01 fix: AWAIT the fresh-mint before addMessage('Welcome...')
+  // so the new conversationId is bound BEFORE the welcome message's
+  // write-through fires via addMessage -> _persistMessage. Without await,
+  // the welcome was either persisted under the OLD convId or dropped when
+  // _persistMessage saw a stale/null conversationId. The await guarantees
+  // the welcome lands in the FRESH conversation's persisted log so the
+  // next reopen hydrate replays it consistently.
+  try {
+    await ensureTabConversationForActiveTab(true);
+  } catch (_e) { /* swallow -- UI clearing still proceeds below */ }
 
   // Clear chat messages
   chatMessages.innerHTML = '';
-  
+
   // Reset UI state
   setIdleState();
-  
+
   // Clear any saved task
   chrome.storage.local.set({ lastTask: '' });
-  
+
   // Clear input field
   chatInput.textContent = '';
   updateSendButtonState();
-  
+
   // Add fresh welcome message
   addMessage('Welcome to FSB. How can I help?', 'system');
-  
+
   // Focus the input
   chatInput.focus();
-  
+
   console.log('New chat session started');
 }
 
