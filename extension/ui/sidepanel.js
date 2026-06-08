@@ -1648,6 +1648,23 @@ async function _flushMessageLog(convId) {
     var payload = {};
     payload[FSBSidepanelMessageLog.STORAGE_KEY] = envelope;
     await chrome.storage.local.set(payload);
+
+    // Phase 12 WR-02 fix: items appended to _messageLogPendingBuffer DURING
+    // the chrome.storage.local.get + chrome.storage.local.set awaits stay
+    // in the in-memory buffer (they were not part of `snapshot`). The
+    // debouncer timer for this convId has already fired, so without an
+    // explicit re-schedule the residual items would languish until the
+    // NEXT _persistMessage call (which could be minutes). That stretches
+    // the documented 200ms lost-on-crash bound (D-03) beyond contract.
+    // Re-schedule another 200ms flush cycle so residuals land bounded-time
+    // later, per the documented D-03 invariant.
+    var residual = _messageLogPendingBuffer.get(convId);
+    if (residual && residual.length > 0 && _messageLogDebouncer
+        && typeof _messageLogDebouncer.schedule === 'function') {
+      _messageLogDebouncer.schedule(convId, function () {
+        return _flushMessageLog(convId);
+      });
+    }
   } catch (_e) {
     // Best-effort: failure resurrects the buffer so next flush retries.
     var current = _messageLogPendingBuffer.get(convId);
@@ -1655,6 +1672,16 @@ async function _flushMessageLog(convId) {
       _messageLogPendingBuffer.set(convId, snapshot.concat(current));
     } else {
       _messageLogPendingBuffer.set(convId, snapshot);
+    }
+    // Phase 12 WR-02 fix: on storage failure, also re-schedule so the
+    // retry fires bounded-time later (same D-03 contract). Without this,
+    // a transient storage write failure could strand the resurrected
+    // buffer until the next _persistMessage call.
+    if (_messageLogDebouncer
+        && typeof _messageLogDebouncer.schedule === 'function') {
+      _messageLogDebouncer.schedule(convId, function () {
+        return _flushMessageLog(convId);
+      });
     }
   }
 }
