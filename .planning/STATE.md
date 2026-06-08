@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
 status: executing
-stopped_at: Phase 12 added (side panel follows automation); discuss/plan/execute pending
-last_updated: "2026-06-08T07:00:00.000Z"
-last_activity: 2026-06-08 -- Phase 11 shipped + 2 debug fixes (ba107c87 lockout/chip; b8b761e8 hydrate scaffold); UAT-FINAL surfaced 3 UX gaps -> Phase 12 added covering live progress + per-conversation message log + per-tab sidepanel auto-open/close
+stopped_at: Completed 12-03-PLAN.md (FINT-22 live progress wiring shipped)
+last_updated: "2026-06-08T08:19:39.644Z"
+last_activity: 2026-06-08
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 51
-  completed_plans: 46
-  percent: 90
+  completed_plans: 50
+  percent: 92
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 ## Current Position
 
 Phase: 11 (Tab-aware side panel surface) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 11
-Last activity: 2026-06-07 -- Phase 11 execution started
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-06-08
 
 ### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
 
@@ -168,6 +168,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
 | Phase 10 P01 | 18min | 4 tasks | 5 files |
 | Phase 10 P03 | 14 min | 4 tasks | 4 files |
+| Phase 12 P03 | 6min | 3 tasks | 3 files |
 
 ## Next Actions
 
@@ -177,6 +178,10 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 
 ## Session Continuity
 
-Last session: 2026-05-31T13:53:23.142Z
+Last session: 2026-06-08T08:19:39.639Z
 Resume file: None
-Stopped at: Completed 10-03-PLAN.md
+Stopped at: Completed 12-03-PLAN.md (FINT-22 live progress wiring shipped)
+
+## Decisions
+
+- [Phase 12]: Plan 12-03 (Wave 3 FINT-22): flipped showSidepanelProgress default false->true at 4 sites (options.js + sidepanel.js module-scope + boot read + storage.onChanged listener); added unconditional _persistMessage in case 'iteration_complete' BEFORE typing-dots gate; smoke 51 PASS / 0 FAIL.

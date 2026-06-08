@@ -15,6 +15,7 @@
 **Why this matters:** v0.10.0-attempt-1 invented the same patterns inside FSB and planned to port them to Lattice later via separate PRs. That created duplication risk (FSB's checkpoint-hook + Lattice's signed-receipt are conceptually the same shape but live in two repos) and deferred the Lattice round-trip validation. Attempt-2 inverts: Lattice owns the primitives, FSB consumes; the Lattice round-trip happens continuously during development.
 
 **Lattice integration model:**
+
 - Lattice repo cloned at `./lattice/` (developer-side experimental sandbox; not tracked by FSB git)
 - Lattice's `fsb-integration-experiments` branch carries the SDK extensions FSB needs
 - FSB depends on `./lattice` via `package.json` `path:` dependency or `npm link` during development
@@ -22,6 +23,7 @@
 - SDK additions land as commits on Lattice's `fsb-integration-experiments` branch first; once validated by FSB integration, open PRs to Lattice mainline as separate work
 
 **Lattice SDK extension candidates (to be scoped during phase discussion):**
+
 - Receipt-shaped state envelopes for any agent-loop runtime (not just Lattice's own server-side runtime); MV3-survivable encoding
 - Tripwire safety contracts with priority bands (SAFETY > OBSERVABILITY > EXTENSION) + matcher regex + race-with-log budget + frozen contexts
 - Universal-provider adapters for the 7 FSB providers (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible) -- Lattice currently has its own provider abstraction; needs gap analysis
@@ -29,6 +31,7 @@
 - Step-marker / observability primitive -- inspector envelope shape Lattice can sign as a Capability Receipt directly
 
 **Hard invariants (non-negotiable, carried over from v0.10.0-attempt-1):**
+
 - **INV-01 MCP wire contracts UNTOUCHED.** Tool schemas, semantics, request/response shapes of every existing MCP-exposed tool stay byte-identical. Net-new tools (if any) land byte-identically to `extension/ai/tool-definitions.js` AND `mcp/ai/tool-definitions.cjs` in the SAME commit.
 - **INV-02 Tool surface parity.** FSB's autopilot loop uses the SAME tool registry that MCP exposes (`TOOL_REGISTRY` in `extension/ai/tool-definitions.js`). No parallel "autopilot-only" tool stack.
 - **INV-03 Provider parity.** Every improvement works equally across all 7 `universal-provider.js` targets. No single-provider regression. LM Studio is the canary for latency tail regressions.
@@ -45,6 +48,7 @@
   - [x] `01-02-PLAN.md` -- FSB-side: add `"lattice": "file:./lattice/packages/lattice"` dep + append smoke to `scripts.test`, run `npm install`, create `tests/lattice-smoke.test.js` (real-runtime mint + verify round-trip with ephemeral Ed25519 keypair), create `.planning/LATTICE-PIN.md` audit-trail, manual MV3 sanity reload checkpoint, single `feat(phase-1):` commit. **COMPLETE 2026-05-24 -- FSB commits 658ed87e + 1545c14c + be95d158 + e3cd7fb5 (pause record); Lattice catalog-fix commit 22bf986 (user-authorized D-13 expansion); SUMMARY at .planning/phases/01-lattice-gap-survey-scaffold/01-02-SUMMARY.md; Task 4 (manual MV3 reload) DEFERRED-PENDING-UAT per user directive "continue all phases with GSD autonomous; UAT will be at the end".**
 - [x] **Phase 2: Lattice tripwire + receipt primitives extension** -- Plans: 5/5 COMPLETE 2026-05-24. Receipt v1.1 schema (6 optional step-marker fields + literal-union version + verifier accepts both); bands.ts pipeline (priority bands SAFETY/OBSERVABILITY/EXTENSION + matcher regex + race-with-log per-handler budget + frozen-context + irreversible freeze + HookLifecycleEvent union); 6 audit-doc rows closed + 1 new lifecycle row; FSB smoke `tests/lattice-tripwire-smoke.test.js` 39 PASS. Lattice HEAD `97836f2c` (5 commits: 5c48134 receipts + 2110e19 public-surface test fix + ba6172c bands.ts + 00fcfac re-export + 97836f2 audit-doc). LSDK-02..08 populated.
   Plans:
+
   - [x] `02-01-PLAN.md` (W1) -- Lattice-side receipts extension: CapabilityReceiptBody.version literal-union to v1.1; six new optional step-marker fields; verify.ts accepts both literals; vitest cases for mint + verify backward-compat; one Lattice commit `feat(receipts):`. Closes LSDK-02, LSDK-03.
   - [x] `02-02-PLAN.md` (W2) -- Lattice-side bands.ts + bands.test.ts: createHookPipeline factory (priority bands, matcher regex, race-with-log budget, frozen context, irreversible freeze, HookLifecycleEvent union). One Lattice commit `feat(contract):`. Closes LSDK-04 through LSDK-08.
   - [x] `02-03-PLAN.md` (W3) -- Lattice-side public-surface re-export bump + audit-doc row flips: src/index.ts re-exports createHookPipeline + types; dist/ rebuilt; lattice/docs/fsb-integration-gaps.md 6 closed rows + 1 new lifecycle row. Two Lattice commits.
@@ -52,11 +56,13 @@
   - [x] `02-05-PLAN.md` (W5) -- FSB-side audit-trail closure: .planning/LATTICE-PIN.md current_lattice_sha bumped + Phase 2 row appended; .planning/REQUIREMENTS.md LSDK-02 through LSDK-08 populated.
 - [x] **Phase 3: Observability + step-markers extension** -- Plans: 3 plans across 3 waves. STEP_TRANSITION typed event, checkpoint-hook factory, per-step receipt mint. Builds on Phase 2 receipt-shape extensions.
   Plans:
+
   - [x] `03-01-PLAN.md` (W1) -- Lattice-side tracing + checkpoint factory: one-line addition of `"step.transition"` to RunEventKind in tracing.ts; new sibling module checkpoint.ts shipping createCheckpointHook factory + checkpoint.test.ts (~12 vitest cases). Two Lattice commits. Closes LSDK-09, LSDK-10, LSDK-11, LSDK-12, LSDK-13 (Lattice-side). **COMPLETE 2026-05-24 -- Lattice commits fd254c4 (tracing.ts) + a67f476 (checkpoint.ts+test.ts) on fsb-integration-experiments (not pushed); Lattice 332->347 PASS; SUMMARY at .planning/phases/03-observability-step-markers-extension/03-01-SUMMARY.md.**
   - [x] `03-02-PLAN.md` (W2) -- Lattice-side public-surface re-export + audit-doc flips: src/index.ts re-exports createCheckpointHook + CheckpointHookOptions + CheckpointHookContext + STEP_TRANSITION_EVENT_NAME + DEFAULT_CHECKPOINT_BAND; dist/ rebuilt; 2 Observability/step-markers Blocker rows flipped to Covered with backlink SHAs. Two Lattice commits. Depends on Plan 03-01. **COMPLETE 2026-05-24 -- Lattice commits acdbb8a (src/index.ts re-export) + 7afd62f (audit-doc closure) on fsb-integration-experiments (not pushed; Lattice HEAD 7afd62f); Lattice 347 PASS preserved; SUMMARY at .planning/phases/03-observability-step-markers-extension/03-02-SUMMARY.md.**
   - [x] `03-03-PLAN.md` (W3) -- FSB-side real-runtime smoke + ceremony: tests/lattice-checkpoint-smoke.test.js (>=20 PASS exercising 3-step fake sequence with linear + nested-child threading); package.json scripts.test chain extended; LATTICE-PIN.md frontmatter SHA bumped + Phase 3 row appended; REQUIREMENTS.md LSDK-09..LSDK-13 populated. One atomic FSB commit. Depends on Plan 03-02.
 - [x] **Phase 4: Provider adapter alignment** -- Plans: 5 plans across 3 waves. 5 native Lattice provider adapters (Anthropic + Gemini full custom; xAI + OpenRouter + LM Studio thin wrappers around createOpenAICompatibleProvider); INV-03 provider-parity proof via Lattice-side parity.test.ts iterating all 7 logical providers; FSB-side surface-presence smoke for ceremony parity. Closes 5 Providers audit-doc rows; populates LSDK-14..18.
   Plans:
+
   - [x] `04-01-PLAN.md` (W1) -- Lattice-side Anthropic adapter + tests: anthropic.ts (full custom; /v1/messages with top-level system field + content[0].text response shape; x-api-key + anthropic-version headers) + anthropic.test.ts (9 vitest cases covering D-09 7-case contract + 2 Anthropic-specific cases). One Lattice commit `feat(providers): add Anthropic provider adapter`. Closes LSDK-14 (Lattice-side). **COMPLETE 2026-05-24 -- Lattice commit cf31d82; SUMMARY at .planning/phases/04-provider-adapter-alignment/04-01-SUMMARY.md.**
   - [x] `04-02-PLAN.md` (W1) -- Lattice-side Gemini adapter + tests: gemini.ts (full custom; /v1beta/models/{model}:generateContent with contents[].parts[].text request shape + candidates[0].content.parts[0].text response + 4 HARM_CATEGORY safetySettings at BLOCK_NONE + ?key= query-string auth + role user/model preserved per D-07) + gemini.test.ts (10 vitest cases). One Lattice commit `feat(providers): add Gemini provider adapter`. Closes LSDK-15 (Lattice-side). **COMPLETE 2026-05-24 -- Lattice commit 7a32b00; SUMMARY at .planning/phases/04-provider-adapter-alignment/04-02-SUMMARY.md.**
   - [x] `04-03-PLAN.md` (W1) -- Lattice-side xAI + OpenRouter + LM Studio thin wrappers + tests: 3 new .ts + 3 .test.ts files. xAI preserves completion_tokens_details.reasoning_tokens quirk per D-07; OpenRouter model-routing array DEFERRED per D-17; LM Studio noAuth default per CD-03 + latency-tail diagnostics DEFERRED per D-16. Three Lattice commits (one per adapter). Closes LSDK-16/17/18 (Lattice-side). **COMPLETE 2026-05-24 -- Lattice commits 09a495e (xAI) + 1cfc13c (OpenRouter) + 40457ff (LM Studio); 24 vitest cases (9/7/8); Lattice 366 -> 390 PASS / 37 test files; SUMMARY at .planning/phases/04-provider-adapter-alignment/04-03-SUMMARY.md.**
@@ -64,6 +70,7 @@
   - [x] `04-05-PLAN.md` (W3) -- FSB-side real-runtime smoke + ceremony: tests/lattice-providers-smoke.test.js (>=20 PASS; ~38 actual; 5 factories invoked with stub options + fake fetch); package.json scripts.test chain extended; LATTICE-PIN.md frontmatter SHA bumped to post-Plan-04-04 Lattice HEAD + Phase 4 row appended referencing all 8 Phase 4 Lattice commits; REQUIREMENTS.md LSDK-14..18 populated + 5 traceability rows. One atomic FSB commit `feat(04): ship Phase 4 provider-adapter alignment (surface-presence smoke + audit-trail closure)`. Depends on Plan 04-04.
 - [x] **Phase 5: MV3-survivability adapter contract + bundler infra + hybrid offscreen Lattice host** -- Plans: 6 plans across 4 waves. Lattice-side SurvivabilityAdapter<TState> contract + createNoopSurvivabilityAdapter ref impl + 12+ vitest cases; FSB-side esbuild bundler infra (behavior-free per D-06); hybrid offscreen Lattice host (first in-extension Lattice consumption surface; background.js BYTE-FROZEN per D-17); FSB standalone runtime adapter over chrome.storage.session (feature-flag gated default-off per D-20; CONSERVATIVE recovery wiring OUT OF SCOPE per D-22); Node-side survivability smoke (>= 25 PASS); LATTICE-PIN bump + REQUIREMENTS.md LSDK-19..22 + FINT-03..06 traceability. Closes 2 MV3-survivability audit-doc Blocker rows.
   Plans:
+
   - [x] `05-01-PLAN.md` (W1) -- FSB-side esbuild bundler infrastructure (behavior-free per D-06): package.json devDeps + scripts.build; new esbuild.config.js (per-entrypoint bundles per D-02; extension/dist/ output per D-03 + CD-A; sourcemap strategy per D-04); .gitignore extension/dist/. ZERO manifest.json change; ZERO behavior diff. ONE FSB commit. Closes FINT-03.
   - [x] `05-02-PLAN.md` (W1) -- Lattice-side SurvivabilityAdapter contract: lattice/packages/lattice/src/runtime/survivability.ts (interface + 4 supporting types + createNoopSurvivabilityAdapter ref impl per D-07..D-11) + survivability.test.ts (12+ vitest cases per D-12; real createReceipt + verifyReceipt integration in Tests 11-12). ResumePolicy literal-union per CD-E: SAFE | RECOVERY_AMBIGUOUS | ON_ERROR_SW_EVICTION_MID_REQUEST | ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH (carries forward attempt-1 02-04-PLAN.md taxonomy). ONE Lattice commit on fsb-integration-experiments with Ref footer; no push. Closes LSDK-19 + LSDK-20.
   - [x] `05-03-PLAN.md` (W2) -- Lattice public-surface re-export + audit-doc closure: src/index.ts re-exports createNoopSurvivabilityAdapter + 5 types per D-13; dist/ rebuilt via tsdown; lattice/docs/fsb-integration-gaps.md 2 MV3-survivability Blocker rows flipped to Covered with backlink SHAs per D-14. TWO Lattice commits with Ref footers; no push. Depends on Plan 05-02. Closes LSDK-21 + LSDK-22.
@@ -97,6 +104,7 @@
 **Why:** v0.10.0-attempt-1 invented primitives inside FSB and planned to port them later (LAT-05 anti-pattern -- identified but not executed). Attempt-2 inverts the order: audit Lattice first, then build extensions inside Lattice on `fsb-integration-experiments`, then consume from FSB. Phase 1 establishes the FSB <-> Lattice loop and the queue of gap-closing work for Phase 2+. The smoke test proves the integration model works before any SDK extensions land.
 
 **Scope (in):**
+
 - Audit Lattice v1.1 across all 6 surfaces (receipts, tripwires/hooks, providers, delegation, MV3-survivability, observability/step-markers); document each gap with FSB-blocking severity.
 - Write `lattice/docs/fsb-integration-gaps.md` on `fsb-integration-experiments` (single source of truth -- INV-06).
 - Set up FSB <-> Lattice integration via `path:` dependency from `./lattice/packages/lattice`.
@@ -107,6 +115,7 @@
 - Create `.planning/LATTICE-PIN.md` recording the Lattice commit SHA used for this phase + per-phase log.
 
 **Scope (out):**
+
 - Any Lattice SDK extension or primitive addition beyond the audit doc + at most one `tsconfig` / `exports` packaging tweak if the smoke surfaces one (receipt-shape extensions, tripwire band system, provider matrix, delegation primitive, MV3-survivability adapter are all deferred to subsequent dedicated phases).
 - Any change to FSB runtime behaviour (no `runAgentLoop` modification, no replacement of the `setTimeout`-chained iterator pattern -- INV-04).
 - Sidepanel-side Lattice consumption (own phase later).
@@ -114,6 +123,7 @@
 - Populating LSDK / FINT / MCP / PRV REQ-IDs in REQUIREMENTS.md (deferred to Phase 2 setup work).
 
 **Pass criteria (explicit, from CONTEXT.md D-12):**
+
 1. `lattice/docs/fsb-integration-gaps.md` exists on `fsb-integration-experiments` covering all 6 surfaces, with gaps severity-tagged.
 2. FSB's `npm test` includes the new `tests/lattice-smoke.test.js` and the smoke passes (one receipt minted via Lattice).
 3. Manual MV3 SW reload check passes: extension loads cleanly with Lattice bridge module imported; no console errors related to module loading.
@@ -127,6 +137,7 @@
 **Why:** Phase 1's audit identified 13 Blocker gaps across receipts (5), tripwires/hooks (6 -- priority bands, matcher regex, race-with-log, lifecycle events, freeze, mid-session-registration), and observability/step-markers (3 -- STEP_TRANSITION + checkpoint hook + per-step mint). Phase 2 picks the tripwire + receipt subset (excluding observability/step-markers, which goes to its own dedicated phase) because those two surfaces tightly couple: receipt extensions (stepName/stepIndex/parentStepName fields, schema versioning, MV3-survivable encoding) are the data shape; tripwires/hooks are the runtime that emits into that shape. Shipping them together avoids design oscillation between phases.
 
 **Scope (in):**
+
 - Extend Lattice's Capability Receipt `CapabilityReceiptBody` with the step-marker fields FSB's autopilot emits: `stepName`, `stepIndex`, `parentStepName`, `previousStepName`, `sessionId`, `timestamp`. Schema versioned via either receipt-version bump (`lattice-receipt/v1.1`) OR an `extensions` field -- decision in discuss-phase.
 - Extend Lattice's tripwire / policy primitives with: priority bands (SAFETY > OBSERVABILITY > EXTENSION), matcher regex (selective per-event firing), race-with-log per-handler budget (kill slow hooks), frozen-context evaluation, and mid-session registration freeze. Lifecycle events as a typed union (BEFORE_PROVIDER, AFTER_PROVIDER, BEFORE_TOOL, AFTER_TOOL, plus a STEP_TRANSITION carve-out).
 - Add tests on Lattice's side for the new primitives (vitest, additive); Lattice's existing 451 tests must remain green.
@@ -136,6 +147,7 @@
 - Populate the corresponding LSDK REQ-IDs in `.planning/REQUIREMENTS.md` based on what landed.
 
 **Scope (out):**
+
 - Observability / step-markers surface (deferred to its own phase: STEP_TRANSITION event, checkpoint hook, per-step receipt mint).
 - Provider adapter alignment (FSB's 7-provider matrix) -- deferred to its own phase.
 - Delegation primitive -- deferred (Lattice's multi-agent policy still excludes it; surface in Phase 1 audit as Out-of-scope).
@@ -144,6 +156,7 @@
 - Mainline PR back into Lattice (deferred to v0.11.0+).
 
 **Pass criteria (to be locked during discuss-phase):**
+
 1. Lattice's vitest suite still passes (existing 451 tests + new tests covering the priority-band / matcher / race-with-log / freeze / lifecycle events / receipt-shape extensions). No regressions.
 2. FSB's `npm test` chain (including a new or extended smoke test) exits 0 and exercises the newly-shipped primitives end-to-end.
 3. `lattice/docs/fsb-integration-gaps.md` rows that Phase 2 closed are updated from `Needs extension`/`Needs addition` to `Covered` (with commit SHAs in the Notes column).
@@ -159,6 +172,7 @@
 **Why:** Phase 2 shipped the v1.1 receipt SHAPE (stepName, stepIndex, parentStepName, previousStepName, sessionId, timestamp). Phase 3 ships the RUNTIME that emits per-step receipts AND a typed tracer event that subscribers (sidepanel UI, future audit tools) can consume. This is the inspector-envelope vision from the audit doc ("envelope IS the receipt"). Phases 2 + 3 together close the receipts + tripwires + observability gap surface from the Phase 1 audit.
 
 **Scope (in):**
+
 - Add `"step.transition"` to `RunEventKind` literal union (one-line edit to `tracing.ts`).
 - Create `lattice/packages/lattice/src/contract/checkpoint.ts` (factory + types).
 - Create `lattice/packages/lattice/src/contract/checkpoint.test.ts` (vitest cases).
@@ -169,6 +183,7 @@
 - Populate LSDK REQ-IDs (LSDK-09..N at audit-doc row granularity).
 
 **Scope (out):**
+
 - Sidepanel UI consumption (Inspector view) -- separate UI-consumption phase later.
 - `runtime/create-ai.ts` auto-wiring -- Phase 3 keeps the hook caller-controlled.
 - MV3-survivable encoding of the per-step receipt stream -- Phase 5.
@@ -178,6 +193,7 @@
 - Mainline PR back into Lattice -- v0.11.0+.
 
 **Pass criteria (to be locked during planning):**
+
 1. Lattice's vitest suite still passes (existing 332 baseline + new checkpoint tests; no regressions).
 2. FSB's `npm test` chain (with new checkpoint smoke) exits 0; smoke asserts 3-step sequence with monotonically increasing stepIndex, 3 verified v1.1 receipts, and correct previousStepName + parentStepName threading.
 3. `lattice/docs/fsb-integration-gaps.md` Observability/step-markers Blocker rows flipped to `Covered` with backlink SHAs.
@@ -193,6 +209,7 @@
 **Why:** Phase 1's audit doc flagged 5 missing provider adapters as Blocker (Anthropic, Gemini, xAI) + Important (LM Studio, OpenRouter). INV-03 ("every improvement works equally across all 7 universal-provider.js targets") is the hard gate. Phase 4 ships the SDK-side primitives in Lattice (per INV-06); FSB's autopilot continues using `universal-provider.js` as the runtime. A future phase (after Phase 5's MV3-survivability adapter contract) may rewire FSB autopilot to delegate to Lattice adapters; Phase 4 establishes the surface, validates parity.
 
 **Scope (in):**
+
 - 5 new Lattice adapter files (`anthropic.ts`, `gemini.ts`, `xai.ts`, `openrouter.ts`, `lm-studio.ts`).
 - 5 companion vitest test files.
 - 1 Lattice-side parity smoke + 1 FSB-side surface-presence smoke.
@@ -202,6 +219,7 @@
 - LATTICE-PIN.md bump + REQUIREMENTS.md LSDK-14..18 entries.
 
 **Scope (out):**
+
 - FSB `extension/ai/universal-provider.js` modifications (Option B carryforward).
 - Live API calls / env-var-keyed integration tests.
 - Streaming per provider.
@@ -211,6 +229,7 @@
 - Mainline PR back into Lattice (v0.11.0+).
 
 **Pass criteria (to be locked during planning):**
+
 1. Lattice's vitest suite passes (347 baseline + Phase 4 additive cases; no regressions).
 2. FSB's `npm test` exits 0; surface-presence smoke asserts all 5 new factories reachable + produce ProviderAdapter shapes.
 3. Lattice-side parity smoke exercises all 7 logical providers + proves INV-03 (each returns ProviderRunResponse with `rawOutputs[name]` populated, `normalizedUsage` shape, error handling).
@@ -227,6 +246,7 @@
 **Why (user-confirmed Hybrid Offscreen path):** Phase 1's audit doc flagged MV3-survivability as a Blocker domain. INV-06 mandates the contract lives in Lattice. The deferred Phase 1 D-06 "in-extension Lattice consumption" intent is achieved here via offscreen-page hosting (not via SW classic-to-module migration, which carries 153 load-order-sensitive importScripts risks). Hybrid offscreen path preserves INV-04 (background.js + agent-loop.js byte-frozen) while delivering bundler infra + the contract + first real in-extension Lattice load.
 
 **Scope (in):**
+
 - Lattice `SurvivabilityAdapter` interface + noop ref impl + vitest cases (~12-15 cases) + public-surface re-exports + audit-doc closure.
 - esbuild config + `scripts.build` invocation + `extension/dist/` output + bundler-emits-expected-files smoke; behavior-free (zero existing consumers migrate).
 - Offscreen Lattice host (HTML + ESM JS bundle); minimal `manifest.json` offscreen page registration; SW <-> offscreen message bus.
@@ -235,6 +255,7 @@
 - LATTICE-PIN.md bump + Phase 5 row; REQUIREMENTS.md LSDK-19..N + FINT-NN entries.
 
 **Scope (out):**
+
 - SW classic-to-module migration (153 importScripts → ES imports). Deferred indefinitely; can revisit in v0.11.0+.
 - `agent-loop.js` modifications. INV-04 setTimeout iterator stays byte-frozen.
 - CONSERVATIVE recovery wiring (`_al_handleRestoredMode` pattern from attempt-1) into `runAgentLoop`. Deferred to follow-on milestone.
@@ -244,6 +265,7 @@
 - Mainline PR back into Lattice (v0.11.0+).
 
 **Pass criteria (to be locked during planning):**
+
 1. Lattice vitest 397 + new survivability cases PASS (no regressions).
 2. FSB `npm test` exits 0 with survivability smoke ~25 PASS appended.
 3. `extension/dist/` produced by `scripts.build`; all 5+ entrypoint bundles emitted.
@@ -262,6 +284,7 @@
 **Why:** Phase 4 shipped 7 Lattice provider adapters but FSB's runtime never consumed them — `universal-provider.js` stayed byte-frozen as the sole runtime path (audit-doc tagged this as integration gap; REQUIREMENTS.md FINT-KK..L was an explicit `[ ]` TBD row scoped to follow-on milestones). The `xai-key-rejected-400` debug session proved this carryforward has shipped costs in production: Lattice's adapter trims keys internally and reads from caller-supplied input; FSB's `options.js:981` writes ungtrimmed keys to chrome.storage AND `checkApiConnection()` at `options.js:1077-1131` reads from chrome.storage instead of the input field. Migrating to the Lattice bridge closes BOTH defects as a side effect (the bridge takes the input field's current value, calls trim() in the Lattice adapter, and never touches the stale chrome.storage path for test-connection). Additionally closes integration gap G3 from v0.10.0 audit (SW now opens the offscreen host at startup, which the audit flagged as missing).
 
 **Scope (in):**
+
 - Extend `extension/offscreen/lattice-host.js` with a `lattice-provider-execute` message handler that takes `{provider, config: {apiKey, baseUrl, model, headers}, request: {messages, ...}}`, builds the appropriate Lattice ProviderAdapter via the right `create*Provider(config)` factory, calls `.execute(request, {signal})`, and returns the ProviderRunResponse (or a structured error envelope on failure).
 - `extension/background.js` startup wiring: call `chrome.offscreen.createDocument({url: 'offscreen/lattice-host.html', reasons: ['IFRAME_SCRIPTING'], justification: 'Lattice provider host'})` once on extension boot. Guard with `chrome.offscreen.hasDocument` check to avoid duplicate creation. (Closes audit gap G3.)
 - New thin shim `extension/ai/lattice-provider-bridge.js`: a single async function `executeViaBridge(providerName, config, request, {signal})` that wraps `chrome.runtime.sendMessage` to the offscreen host and unwraps the response/error envelope. Preserves the exact return-shape contract that `universal-provider.js` callers expect (`{rawOutput, normalizedUsage, ...}`) so call sites change minimally.
@@ -273,6 +296,7 @@
 - `.planning/REQUIREMENTS.md` populate FINT-07 (bridge handler + bg.js startup) + FINT-08 (agent-loop + options.js test-connection rewire); flip FINT-KK..L TBD row to point at FINT-07 / FINT-08.
 
 **Scope (out):**
+
 - Hard delete `universal-provider.js` (deferred to Phase 7; Phase 6 keeps it as feature-flag fallback for rollback safety).
 - Removing the feature flag (Phase 7).
 - Background.js classic-to-module migration (INV-04 / Phase 5 OOS carryforward).
@@ -284,6 +308,7 @@
 - Mainline PR back into Lattice (v0.11.0+).
 
 **Pass criteria (to be locked during planning):**
+
 1. Lattice vitest still passes (additive Phase 6 work is FSB-side only; no Lattice changes).
 2. FSB `npm test` passes: new `tests/lattice-provider-bridge-smoke.test.js` (>= 20 PASS exercising all 7 providers through the bridge with mock fetch).
 3. Manual: paste a fresh xAI API key, click Test → connection succeeds end-to-end (P1 + P2 from xai-key-rejected-400 debug closed by side-effect).
@@ -302,6 +327,7 @@
 **Why:** Once Phase 6 has been live for at least one full integration cycle (FSB smoke chain green, manual xAI test-connection green, one autopilot iteration green), the legacy `universal-provider.js` path is a maintenance liability — it duplicates Lattice's adapter contracts, has the missing-trim defect that the bridge sidesteps, and creates ambiguity ("which path are we actually on?"). Phase 7 finalizes the migration: archive (not delete) for git-blame archaeology, flip the bridge unconditional, and tighten the invariant. This is the natural milestone-end UAT gate — one single Chrome reload session validates Phase 1 (MV3 SW boot), Phase 5 (offscreen host loads), Phase 6 (provider bridge resolves an xAI test request), and Phase 7 (no regressions after the legacy path is removed).
 
 **Scope (in):**
+
 - Grep audit: confirm zero `require\('.*universal-provider'\)` / `import.*universal-provider` references in `extension/*` outside `_archive/`. Captured as audit-table row in `.planning/phases/07-*/07-VERIFICATION.md`.
 - Move `extension/ai/universal-provider.js` → `extension/_archive/universal-provider.js`. Update any test fixtures that referenced the old path. The legacy file is preserved on disk (recoverable via git history regardless; the archive directory is for fast-grep archaeology).
 - Strip the `FSB_LATTICE_PROVIDER_BRIDGE_ENABLED` feature flag from `extension/ai/agent-loop.js`, `extension/ui/options.js`, and `extension/ai/lattice-provider-bridge.js`. Bridge call sites become unconditional. The fallback branch is deleted.
@@ -312,6 +338,7 @@
 - Execute consolidated UAT-1 procedure (single Chrome MV3 reload + open offscreen host + xAI test-connection round-trip + 1 autopilot iteration). Capture evidence in 07-VERIFICATION.md.
 
 **Scope (out):**
+
 - Hard delete `universal-provider.js` (still recoverable via git, but `_archive/` is the on-disk home for now; future cleanup phase can delete if archive directory becomes liability).
 - Any new Lattice primitive.
 - Restructuring chrome.storage schema (settings UI shape stays byte-identical for user data continuity).
@@ -319,6 +346,7 @@
 - Mainline PR back into Lattice (v0.11.0+).
 
 **Pass criteria (to be locked during planning):**
+
 1. Lattice vitest still passes (Phase 7 is FSB-side cleanup; no Lattice changes).
 2. FSB `npm test` passes (all chained smokes from Phases 1-6 still green; no test fixture refers to the old `extension/ai/universal-provider.js` path).
 3. Grep audit: zero `extension/*` references to `universal-provider.js` outside `_archive/`.
@@ -341,6 +369,7 @@
 **Goal:** Wire FSB's autopilot agent loop to emit `step.transition` events into Lattice's tracer and mint per-step Capability Receipts via `createCheckpointHook` in the production code path. Close audit gap G1 (SW-side `lattice-step-transition` sender missing); flip integration Flow 4 from partial-by-design to complete. Phase 8 is the first of three sibling phases (8 + 9 + 10) splitting the v0.10.0 half-step closure work per Phase 8 CONTEXT.md D-06.
 
 **Scope (locked in 08-CONTEXT.md):**
+
 - `step.transition` fires at TWO boundaries per `runAgentIteration`: `LLM_TURN` (after API round-trip at `agent-loop.js:~1853`) AND `TOOL_DISPATCH` (per tool call at `agent-loop.js:~1906`); distinguished via `metadata.stepName` not new `RunEventKind` literals (D-01).
 - Receipt-mint cadence is per `step.transition`, gated by signer presence; uses ephemeral Ed25519 signer at offscreen boot (D-02).
 - New SW-side `sendLatticeStepTransition` function in `extension/background.js` (or sibling module) posts `lattice-step-transition` to offscreen via existing `chrome.runtime.sendMessage` channel; offscreen listener at `lattice-host.js:~295-371` already exists (D-03).
@@ -353,6 +382,7 @@
 **Plans:** 3/3 plans complete
 
 Plans:
+
 - [x] 08-01-PLAN.md (W0) — SW-side extension/ai/lattice-step-emitter.js producer (~80 lines dual-export idiom) + extension/background.js importScripts wire at line 13 (alphabetical between lattice-provider-bridge.js and ai-integration.js) + tests/lattice-step-emitter-smoke.test.js Wave 0 scaffold (Parts 1+2 filled; >= 12 PASS) + package.json scripts.test chain append. Closes audit gap G1 producer side. FINT-10.
 - [x] 08-02-PLAN.md (W1) — extension/ai/agent-loop.js step.transition emission at TWO boundaries per D-01 (LLM_TURN after session.messages.push(assistantMsg) at line ~1855; TOOL_DISPATCH inside for(var ci...) loop AFTER BEFORE_TOOL_EXECUTION permission check) + smoke Parts 3+4+5+6 filled to >= 25 total PASS with INV-04 byte-freeze regression (Pitfall 1 awk-scan + setTimeout count = 8 + 4 iterator patterns + content-based discovery). FINT-11 + FINT-12.
 - [x] 08-03-PLAN.md (W1) — Ceremony closure: .planning/REQUIREMENTS.md FINT-10/11/12 narrative + traceability rows + FINT-04 partial -> complete + FINT-NN..M placeholder retired + Total v1 32 -> 35 + Last updated bumped + .planning/LATTICE-PIN.md Phase 8 row (SHA UNCHANGED per D-04 verdict) + .planning/v0.10.0-MILESTONE-AUDIT.md G1 documented_carryforward_low -> closed_in_phase_8 + Flow 4 partial_by_design_per_D-22 -> complete + status_history appended + last_revised bumped. ZERO production code touched. (completed 2026-05-31)
@@ -362,6 +392,7 @@ Plans:
 **Goal:** Flip `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` on at SW boot; wire `lattice-runtime-adapter.js` `serialize`/`deserialize`/`resume` into FSB's existing `persist()` callsites (`agent-loop.js:1840`, `2438`) as additive sidecars, plus a restore site at `runAgentLoop` entry (`agent-loop.js:1215`). Close audit gap G2 (lattice-runtime-adapter has zero importers in extension/* outside its own file; flag never set in production).
 
 **Scope (anticipated; finalized in 09-CONTEXT.md after discuss):**
+
 - Flag flip: `FSB_LATTICE_RUNTIME_ADAPTER_ENABLED` default-true global at SW boot (mirroring Phase 6's bridge flag pattern before Phase 7 stripped it).
 - `serialize(state)` runs as additive sidecar at the existing 3 persist callsites — `persist()` keeps current behavior; lattice.serialize is parallel.
 - `deserialize`/`resume` invoked at `runAgentLoop` entry when SW cold-boot detects a pre-existing snapshot under storage prefix `fsb_lattice_snapshot_<sessionId>_<capturedAt>` (per `lattice-runtime-adapter.js:75`).
@@ -374,6 +405,7 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
+
 - [ ] TBD
 
 ### Phase 10: MCP-philosophy parity for autopilot driver — visual session + metrics + driving-model attribution
@@ -381,6 +413,7 @@ Plans:
 **Goal:** Extend the existing tool-parity (INV-02) from tool DEFINITIONS to tool LIFECYCLE + TELEMETRY + DRIVING-MODEL ATTRIBUTION. Make FSB autopilot behave as an "MCP client in spirit" so the visual session panel + metrics dashboard show autopilot activity the same way they show MCP activity today. Independent of Phases 8 + 9 — purely additive UI/telemetry sidecar.
 
 **Scope (anticipated; finalized in 10-CONTEXT.md after discuss):**
+
 - Autopilot calls `recordVisualSessionTick(tabId, agentId, { client: 'FSB Autopilot', visualReason, isFinal })` from the tool-dispatch loop in `agent-loop.js:~1906`, mirroring the MCP bridge pattern at `mcp-bridge-client.js:734, 759, 782`.
 - Unified `fsbMcpVisualSessions` store with new `driver: 'autopilot' | 'mcp'` discriminator on per-tab lifecycle entry (one-field schema extension; existing UI dashboard reads without forking).
 - Allowlist gets new client label `'FSB Autopilot'` at `mcp-visual-session.js:4-18` (FSB-internal UI state; not an INV-01 wire change).
@@ -393,6 +426,7 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
+
 - [ ] TBD
 
 ### Phase 11: Tab-aware side panel surface — friendly owner-chip + foreign-owned input lockout + per-tab chat history
@@ -400,11 +434,13 @@ Plans:
 **Goal:** Make the side panel tab-aware across three coupled UX surfaces so the user always sees the correct conversation, the correct ownership context, and the correct affordances for the currently-active tab. Today the side panel carries a single global `fsbSidepanelConversationId` (chrome.storage.session), the owner chip shows the raw `agent_<uuid>` 6-char short prefix even when a human-friendly client label is known via the MCP visual-session lifecycle map, and there is no input gating when a foreign agent owns the active tab. Phase 11 closes these three gaps as one coherent delivery.
 
 **Scope (anticipated; finalized in 11-CONTEXT.md after discuss):**
+
 - **Surface 1 — Friendly owner-chip label.** When the active tab has a visual-session lifecycle entry (`extension/utils/mcp-visual-session-lifecycle.js` storage key per tabId), `ownerLabelFor` reads `entry.client` from the allowlisted 14-entry CLIENT_LABEL_MAP (`mcp-visual-session.js:4-18`: Claude / OpenClaw / Cursor / Codex / Grok / Gemini / Hermes / FSB Autopilot / etc.) and renders `owned by OpenClaw` instead of `owned by agent_a3f8b1`. Falls back to current short-prefix display when no lifecycle entry exists (non-MCP-aware agent driving the tab via raw FSB tools). Popup gets the same fix for consistency.
 - **Surface 2 — Foreign-owned input lockout.** When the active tab is foreign-owned per the existing `shouldShowOwnerChip` contract (Phase 243 D-05; ownerAgentId !== 'legacy:sidepanel'), the side panel disables the chat input, send button, run-task button, voice-input button, and stop-task button. Re-enables on tab switch to a free tab (or to a tab owned by 'legacy:sidepanel' itself). Owner chip becomes the visible UX cue for why controls are gated; an accessible tooltip / aria-disabled state explains.
 - **Surface 3 — Per-tab chat history.** Side panel chat history becomes tab-aware: switching from tab A to tab B swaps the visible conversation in the DOM, switching back to tab A retains tab A's prior conversation in full. State model migrates from the existing single `fsbSidepanelConversationId` chrome.storage.session key to a `Map<tabId, conversationId>` envelope (e.g. `fsbSidepanelTabConversations: { v: 1, byTab: { '<tabId>': '<conversationId>', ... } }`). Eviction policy on `chrome.tabs.onRemoved` drops the entry; on `chrome.tabs.onDiscarded` preserves so a discarded-tab restore re-attaches the prior conversation. SW restart survival via storage.session persistence + hydration on side panel open.
 
 **Hard invariants (carry from v0.10.0):**
+
 - INV-01 MCP wire contracts UNTOUCHED (no tool definition or schema change).
 - INV-02 tool surface parity preserved (no autopilot vs MCP divergence in tool registry).
 - INV-04 `extension/ai/agent-loop.js` setTimeout iterator BYTE-FROZEN (`grep -c "setTimeout" extension/ai/agent-loop.js` = 8); Phase 11 touches `extension/ui/sidepanel.js` + `extension/ui/owner-chip.js` + `extension/ui/popup.js` only.
@@ -418,6 +454,7 @@ Plans:
 **Plans:** 5/5 plans complete
 
 **Out of scope:**
+
 - Popup.js input-lockout / per-tab history changes (popup is single-shot; gets the friendly owner-chip fix but not the other two surfaces).
 - Cross-window side panel state unification (each Chrome window has its own side panel surface today; per-window state isolation is preserved as-is).
 - Re-architecting chrome.storage.session shape beyond the per-tab conversation map envelope.
@@ -426,6 +463,7 @@ Plans:
 - Deferring the existing UAT-08+09+10 consolidated UAT verdict — Phase 11 ships, then the user runs UAT-08+09+10+11 in one consolidated Chrome MV3 reload session.
 
 Plans:
+
 - [ ] `11-00-PLAN.md` (Wave 0) — Sidecar module + smoke harness scaffold. New `extension/ui/sidepanel-tab-conv-store.js` exports 6 pure helpers (emptyEnvelope + isValidEnvelope + ensureTabConversation + getTabConversation + dropTabConversation + _touchLru + _enforceLruCap + migrateLegacyConversationKey) + 4 constants (STORAGE_KEY `fsbSidepanelTabConversations` + LEGACY_KEY `fsbSidepanelConversationId` + DEFAULT_CAP=50 + ENVELOPE_VERSION=1); new `tests/sidepanel-tab-aware-smoke.test.js` with 7 Part placeholders + chrome mocks + DOM stub helpers; sidepanel.html script-tag chain extended; sidepanel.css gains `.fsb-owner-chip` baseline rule (RESEARCH Section 6 missing-CSS gap closed). Zero behavioral change.
 - [ ] `11-01-PLAN.md` (Wave 1) — FINT-19 owner-chip friendly-label resolver. `extension/ui/owner-chip.js` gains async `lookupClientLabel(tabId, storageReadFn)` helper; `extension/ui/sidepanel.js` + `extension/ui/popup.js` `refreshOwnerChip` rewired with three-tier resolution (legacy:* literal → friendly entry.client → short-prefix fallback). Smoke Parts 1+2 filled at >= 13 PASS. Depends on 11-00.
 - [ ] `11-02-PLAN.md` (Wave 2) — FINT-20 foreign-owned input lockout. `extension/ui/sidepanel.js` defines `applyInputLockout` + `_isActiveTabForeignOwned` helpers; refreshOwnerChip wires applyInputLockout on render branches; handleSendMessage receives defense-in-depth runtime gate; `extension/ui/sidepanel.css` gains `.fsb-foreign-owned-disabled` + `.sr-only` rules; `extension/ui/sidepanel.html` gains `fsb-lockout-aria-description` hidden span. Smoke Parts 3+4 filled at >= 8 PASS. Depends on 11-01 (shared sidepanel.js editing region).
@@ -437,11 +475,13 @@ Plans:
 **Goal:** Phase 11 shipped the per-tab state model. UAT-FINAL on 2026-06-08 surfaced three UX gaps Phase 11 did not address: (1) live progress messages do not render in the sidepanel during a running autopilot task; (2) sidepanel close + reopen loses chat history because `fsbSessionLogs` is session-level metadata only (commands + final outcome) and does not carry intermediate assistant / progress / tool messages; (3) the sidepanel is globally available on every tab regardless of whether automation is bound to that tab, contradicting the per-tab UX. Phase 12 closes all three: streams progress live, persists every message keyed by conversationId so hydrate is faithful, and binds the sidepanel surface itself to the automating tab via `chrome.sidePanel.setOptions` + `chrome.sidePanel.open`. Side effect: closes the Phase 11 hydrate scaffold's data-source gap (Bug 2 partial fix at `b8b761e8` lands on a real per-conversation message store instead of fsbSessionLogs).
 
 **Scope (anticipated; finalized in 12-CONTEXT.md after discuss):**
+
 - **Surface 1 — Live progress wiring.** Audit current background.js → sidepanel.js runtime message channel for autopilot progress events. Wire missing handlers so every iteration's output reaches DOM + persistent log.
 - **Surface 2 — Persistent per-conversation message log.** New chrome.storage.local store keyed by conversationId (e.g. `fsbConversationMessages: { '<convId>': [{role, content, timestamp, ...}, ...] }`). Write-through every `addMessage` call. New `loadConversationMessages(convId)` consumed by Phase 11 hydrate path. Size budget + LRU + batched writes.
 - **Surface 3 — Per-tab sidepanel auto-open/close.** On autopilot bind to Tab A: `chrome.sidePanel.setOptions({tabId, enabled, path})` + `chrome.sidePanel.open({tabId})` (subject to user-gesture constraint research). On tab switch behavior: grey area decision in discuss (close vs disable vs leave open).
 
 **Hard invariants (carry from v0.10.0):**
+
 - INV-01 / INV-02 MCP wire contracts UNTOUCHED.
 - INV-04 `extension/ai/agent-loop.js` setTimeout iterator BYTE-FROZEN. Phase 12 reads agent-loop signals via existing message channel; does NOT modify agent-loop.js.
 - INV-05 deprecated agent modules frozen.
@@ -453,9 +493,10 @@ Plans:
 
 **Depends on:** Phase 11 (consumes per-tab conversationId envelope + repoints Phase 11 hydrate scaffold). INDEPENDENT of consolidated UAT-08+09+10+11 verdict — UAT-12 joins them in a single Chrome MV3 reload session.
 
-**Plans:** 5 plans across 5 waves
+**Plans:** 4/5 plans executed
 
 **Out of scope:**
+
 - Cross-tab conversation merging or unified chat surface.
 - Showcase / dashboard rendering of per-conversation transcripts.
 - Migration of pre-Phase-12 fsbSessionLogs into the new store (fresh-only; pre-existing sessions remain reachable via historyBtn aggregate view).
@@ -463,6 +504,7 @@ Plans:
 - Deferring existing UAT-08+09+10+11 — Phase 12 ships, UAT becomes UAT-08+09+10+11+12 in one consolidated Chrome MV3 reload session.
 
 Plans:
+
 - [ ] `12-00-PLAN.md` (Wave 0) — Sidecar scaffold + smoke harness. New `extension/ui/sidepanel-message-log.js` exports 7 pure helpers (`emptyEnvelope`, `isValidEnvelope`, `appendMessage`, `getMessages`, `dropConversationMessages`, `_touchLru`, `_enforceLruCap`) + `createDebouncer({debounceMs, setTimeoutFn, clearTimeoutFn})` factory + 4 constants (`STORAGE_KEY = 'fsbConversationMessages'`, `DEFAULT_CAP = 50`, `DEFAULT_DEBOUNCE_MS = 200`, `ENVELOPE_VERSION = 1`); new smoke `tests/sidepanel-message-log-smoke.test.js` with 8 Part placeholders + chrome.runtime + chrome.tabs + chrome.storage.local + chrome.storage.session + chrome.sidePanel mocks + DOM stub helpers; sidepanel.html script-tag chain extended; package.json scripts.test &&-chain extended. Zero behavioral change. 8 PASS Wave 0 baseline.
 - [ ] `12-01-PLAN.md` (Wave 1) — FINT-23 hydrate Tier 1 repoint. `extension/ui/sidepanel.js` `hydrateChatFromConversationId(convId)` body restructured 3-tier per CONTEXT D-05..D-08 (Tier 1 new `fsbConversationMessages` store, Tier 2 b8b761e8 fsbSessionLogs preserved verbatim, Tier 3 empty); new `renderPersistedMessage(content, role, kind)` helper added as Pitfall 3 defense. Function name + arity preserved per D-05. Smoke Parts 1+2 filled at >= 10 real PASS. Cumulative >= 18. Depends on 12-00.
 - [ ] `12-02-PLAN.md` (Wave 2) — FINT-23 addMessage write-through. Module-scope `_messageLogDebouncer` + `_messageLogPendingBuffer` Map; boot init via `FSBSidepanelMessageLog.createDebouncer({ debounceMs: 200 })`; `window.addEventListener('beforeunload', flushAll)` per CONTEXT D-03; `_persistMessage` + `_flushMessageLog` helpers; `addMessage` signature backward-compatibly extended with optional 3rd `kind` param + persistence hook after DOM render; `addCompletionMessage` + `addActionMessage` hook `_persistMessage`; `addActionMessage` persistence fires BEFORE the showSidepanelProgressEnabled guard per CONTEXT D-10; chrome.tabs.onRemoved extended with `_messageLogDebouncer.cancel(convId)` + `dropConversationMessages` per RESEARCH EC-05 defense. Smoke Parts 3+4 filled at >= 10 real PASS. Cumulative >= 28. Depends on 12-01.
@@ -478,6 +520,7 @@ Plans:
 **Why abandoned:** Pattern duplication risk between FSB and Lattice; deferred Lattice round-trip validation; LAT-05 only IDENTIFIED port candidates rather than executing them. See `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md`.
 
 **Preservation:**
+
 - Branch: `pre-pivot-archive/v0.10.0-fsb-first` (30+ commits at HEAD `4d70facf`)
 - On-disk: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` (Phase 1 + Phase 2 full artifact sets: CONTEXT, DISCUSSION-LOG, RESEARCH, UI-SPEC, VALIDATION, PLANs, SUMMARYs, VERIFICATION)
 - Snapshots: `ROADMAP.v0.10.0-attempt-1.md`, `REQUIREMENTS.v0.10.0-attempt-1.md`, `PROJECT.v0.10.0-attempt-1-snapshot.md`
