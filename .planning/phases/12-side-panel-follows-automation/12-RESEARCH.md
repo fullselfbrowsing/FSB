@@ -1041,13 +1041,17 @@ Plus carryforward `tests/sidepanel-tab-aware-smoke.test.js` BYTE-FROZEN at 41 PA
 
 Plus full `npm test` chain green (Phase 1-11 smokes + new Phase 12 smoke).
 
-## Section 12: Open Questions
+## Section 12: Open Questions (RESOLVED)
+
+> All three OQs resolved in favor of the SIMPLEST viable implementation per Phase 12 scope. Plans 12-00 through 12-04 implement these resolutions; no further design iteration required.
 
 ### OQ-1 -- showSidepanelProgress default flip vs unconditional render
 
 Section 6.4 RECOMMENDS option 1 (flip the default). The planner may pick option 2 (unconditional render) instead, OR a hybrid that flips the default AND repurposes the setting as a render-style toggle. Plan 12-03 must lock the choice.
 
 **Recommendation:** option 1. Lowest LOC. Preserves user control.
+
+**RESOLVED:** Plan 12-03 locks option 1 (flip showSidepanelProgress default false -> true in extension/ui/options.js + extension/ui/sidepanel.js, 3 sites total). User retains override via Settings -> Sidepanel toggle.
 
 ### OQ-2 -- Tool message kind styling (D-12 Claude's Discretion)
 
@@ -1058,6 +1062,8 @@ Section 6.4 RECOMMENDS option 1 (flip the default). The planner may pick option 
 
 **Recommendation:** option (a) -- existing action styling is already in production for similar use. Lowest visual disruption.
 
+**RESOLVED:** Plans 12-01 + 12-02 lock option (a). Plan 12-01 `renderPersistedMessage` maps `kind: 'progress' | 'tool'` -> CSS class `.message.action` via the existing addActionMessage path. Plan 12-02 Hook C persists via addActionMessage, which already renders with `.message.action` styling. Zero new CSS rules required.
+
 ### OQ-3 -- Debounce reset strategy (clear-and-replace vs trailing-edge-only)
 
 Section 4 sketches clear-and-replace (every addMessage resets the 200ms window). Alternative: trailing-edge-only (the first addMessage starts the timer; subsequent calls within 200ms append to buffer but do NOT reset). Tradeoff:
@@ -1065,6 +1071,8 @@ Section 4 sketches clear-and-replace (every addMessage resets the 200ms window).
 - Trailing-edge-only: same burst gets flushed at 200ms after the FIRST call. More predictable max latency; may cause a second flush if calls span the boundary.
 
 **Recommendation:** clear-and-replace. Predictable for bursty progress streams (which is the common case). The 200ms-bounded loss window is fine per D-03.
+
+**RESOLVED:** Plan 12-00 `createDebouncer` factory locks clear-and-replace (every schedule call clears the pending timer via clearTimeout, then replaces it with a new 200ms timer). Predictable batching of bursty progress streams; 200ms-bounded loss window matches D-03 contract; forced flush on `beforeunload` (D-03 defense-in-depth) covers the long-burst delay edge case.
 
 ## Section 13: Assumptions Log
 
