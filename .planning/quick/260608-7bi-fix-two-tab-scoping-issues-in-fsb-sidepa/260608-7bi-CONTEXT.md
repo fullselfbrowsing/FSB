@@ -39,6 +39,7 @@ roadmap-level changes.
   tabId has an active agent record in `fsbAgentRegistry` (or equivalent
   per-tab "is working" signal). On `chrome.tabs.onActivated` we don't disable
   other working tabs; only non-working tabs get `enabled: false`.
+- **API limitation discovered in debug session qt93i-regression (2026-06-08; APPENDED).** chrome.sidePanel.setOptions({tabId, enabled:false}) does NOT hide an already-open side panel when the manifest declares `side_panel.default_path` plus `setPanelBehavior({openPanelOnActionClick:true})`. Chrome treats the default panel as a global fallback that overrides the per-tab enabled:false flag. No programmatic close exists pre-Chrome-141 (chrome.sidePanel.close was introduced in Chrome 141). The auto-collapse expectation in this decision was based on an incorrect reading of the chrome.sidePanel API. Future tasks must NOT re-attempt panel auto-collapse via chrome.sidePanel.setOptions enabled:false. The load-bearing fix that delivers the user-visible "per-tab scoping" outcome is the per-tab CONTENT scoping (swapToTabConversation + _tabRunningMap + _persistMessageToConversation); the panel stays visible on every tab but its content reflects the active tab's conversation and running state. See https://developer.chrome.com/docs/extensions/reference/api/sidePanel and .planning/debug/qt93i-regression.md for the full root-cause analysis.
 
 ### Idle-tab manual open
 - **Force-open with welcome state on action-icon click.** If the user clicks

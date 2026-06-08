@@ -75,80 +75,27 @@ function extractAfterAnchor(src, anchor) {
 }
 
 // =====================================================================
-// PART 1 -- chrome.tabs.onActivated per-tab visibility
+// PART 1 -- REMOVED per Strategy B (debug session qt93i-regression, 2026-06-08)
 // =====================================================================
+//
+// The chrome.tabs.onActivated listener in background.js was reverted because
+// chrome.sidePanel.setOptions({tabId, enabled:false}) does NOT hide an
+// already-open side panel when the manifest declares side_panel.default_path
+// (Chrome architectural limitation, pre-Chrome-141). The per-tab CONTENT
+// scoping (swapToTabConversation + _tabRunningMap) delivers the actual
+// user-visible per-tab behavior; the panel itself stays visible on every tab.
+//
+// See .planning/debug/qt93i-regression.md for the full root-cause analysis.
+// See .planning/quick/260608-bu4-qt93i-regression-strategy-b-revert-auto-/260608-bu4-PLAN.md for the closure plan.
+//
+// Defensive assertion: confirm the listener stays REMOVED. If a future plan
+// re-introduces chrome.tabs.onActivated in background.js, this assertion
+// fires loudly so the author re-reads the debug doc before shipping.
+console.log('\nPart 1 -- chrome.tabs.onActivated listener REMOVED per Strategy B:');
+ok(bgSrc.indexOf('chrome.tabs.onActivated.addListener') === -1,
+   'Part 1 -- chrome.tabs.onActivated listener REMOVED from background.js per Strategy B');
 
-(async function runPart1() {
-  console.log('\nPart 1 -- chrome.tabs.onActivated:');
-
-  var onActivatedAnchor = 'chrome.tabs.onActivated.addListener(async (activeInfo) => {';
-  var onActivatedBody = extractAfterAnchor(bgSrc, onActivatedAnchor);
-  ok(onActivatedBody !== null && /findActiveAutomationSessionForTab/.test(onActivatedBody),
-     'Part 1.0 -- chrome.tabs.onActivated body extractable + references findActiveAutomationSessionForTab');
-
-  if (!onActivatedBody) {
-    runPart2();
-    return;
-  }
-
-  var setOptionsCalls = [];
-  function makeSidePanelStub() {
-    setOptionsCalls.length = 0;
-    return {
-      setOptions: function (opts) {
-        setOptionsCalls.push(opts);
-        return Promise.resolve();
-      }
-    };
-  }
-
-  async function invokeOnActivated(activeInfo, fakeFind, chromeOverride) {
-    var sidePanelStub = makeSidePanelStub();
-    var chromeMock = chromeOverride !== undefined
-      ? chromeOverride
-      : { sidePanel: sidePanelStub };
-    var fn = new Function(
-      'activeInfo', 'chrome', 'findActiveAutomationSessionForTab', 'console',
-      'return (async () => { ' + onActivatedBody + ' })();'
-    );
-    await fn(activeInfo, chromeMock, fakeFind, { warn: function () {} });
-    return setOptionsCalls.slice();
-  }
-
-  // 1.1 non-working tab -> setOptions(enabled:false)
-  var calls11 = await invokeOnActivated({ tabId: 99 }, function () { return null; });
-  ok(calls11.length === 1
-     && calls11[0].tabId === 99
-     && calls11[0].enabled === false,
-     'Part 1.1 -- non-working tab triggers setOptions({ tabId:99, enabled:false })');
-
-  // 1.2 working tab -> setOptions(enabled:true, path)
-  var calls12 = await invokeOnActivated({ tabId: 42 }, function (id) { return { tabId: id }; });
-  ok(calls12.length === 1
-     && calls12[0].tabId === 42
-     && calls12[0].enabled === true
-     && calls12[0].path === 'ui/sidepanel.html',
-     'Part 1.2 -- working tab triggers setOptions({ tabId:42, enabled:true, path })');
-
-  // 1.3 no tabId -> early return
-  var calls13 = await invokeOnActivated({}, function () { return null; });
-  ok(calls13.length === 0,
-     'Part 1.3 -- activeInfo without tabId returns early; no setOptions call');
-
-  // 1.4 chrome.sidePanel undefined -> graceful
-  var threw = false;
-  try {
-    await invokeOnActivated({ tabId: 7 }, function () { return null; }, { /* no sidePanel */ });
-  } catch (_e) { threw = true; }
-  ok(!threw,
-     'Part 1.4 -- chrome.sidePanel undefined returns early without throwing');
-
-  runPart2();
-})().catch(function (err) {
-  console.error('Part 1 setup threw:', err && err.message);
-  failed++;
-  runPart2();
-});
+runPart2();
 
 // =====================================================================
 // PART 2 -- chrome.action.onClicked safe-gesture pattern (no await before open)
