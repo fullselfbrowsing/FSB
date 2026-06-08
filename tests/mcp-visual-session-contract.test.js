@@ -132,6 +132,56 @@ async function runAllowlistAndManagerCase() {
   assertEqual(isAllowedMcpVisualClientLabel('NotARealClient'), false, 'isAllowedMcpVisualClientLabel returns false for unknown label');
   assertEqual(isAllowedMcpVisualClientLabel(''), false, 'isAllowedMcpVisualClientLabel returns false for empty string');
 
+  // Quick task 260608-6nm: Tier-1 MCP client allowlist expansion (12 new entries).
+  // Locks presence + normalization + no-collision for the 12 new canonical labels.
+  const NEW_TIER_1_LABELS_260608_6NM = [
+    'Cline', 'Continue', 'Zed', 'VS Code', 'Copilot', 'JetBrains',
+    'Xcode', 'Eclipse', 'Cody', 'Roo Code', 'Kiro', 'Goose',
+  ];
+  NEW_TIER_1_LABELS_260608_6NM.forEach((label) => {
+    assert(
+      MCP_VISUAL_CLIENT_LABELS.includes(label),
+      `allowlist contains canonical Tier-1 label ${label} (quick task 260608-6nm)`
+    );
+  });
+
+  assert(
+    MCP_VISUAL_CLIENT_LABELS.length >= 26,
+    'MCP_VISUAL_CLIENT_LABELS length >= 26 after Tier-1 expansion (14 pre-existing + 12 new)'
+  );
+
+  // Multi-token cases -- separator folding under [\s_-]+ regex.
+  assertEqual(normalizeMcpVisualClientLabel('vs code'), 'VS Code', 'normalize spaced "vs code" to "VS Code"');
+  assertEqual(normalizeMcpVisualClientLabel('VSCode'), 'VS Code', 'normalize concatenated "VSCode" to "VS Code"');
+  assertEqual(normalizeMcpVisualClientLabel('vs-code'), 'VS Code', 'normalize hyphenated "vs-code" to "VS Code"');
+  assertEqual(normalizeMcpVisualClientLabel('vs_code'), 'VS Code', 'normalize underscored "vs_code" to "VS Code"');
+  assertEqual(normalizeMcpVisualClientLabel('roo code'), 'Roo Code', 'normalize spaced "roo code" to "Roo Code"');
+  assertEqual(normalizeMcpVisualClientLabel('RooCode'), 'Roo Code', 'normalize concatenated "RooCode" to "Roo Code"');
+  assertEqual(normalizeMcpVisualClientLabel('roo-code'), 'Roo Code', 'normalize hyphenated "roo-code" to "Roo Code"');
+
+  // Single-token cases -- case folding sample.
+  assertEqual(normalizeMcpVisualClientLabel('cline'), 'Cline', 'normalize lowercase "cline" to "Cline"');
+  assertEqual(normalizeMcpVisualClientLabel('CONTINUE'), 'Continue', 'normalize uppercase "CONTINUE" to "Continue"');
+  assertEqual(normalizeMcpVisualClientLabel('zed'), 'Zed', 'normalize lowercase "zed" to "Zed"');
+  assertEqual(normalizeMcpVisualClientLabel('Copilot'), 'Copilot', 'normalize exact "Copilot" to "Copilot"');
+  assertEqual(normalizeMcpVisualClientLabel('jetbrains'), 'JetBrains', 'normalize lowercase "jetbrains" to "JetBrains"');
+  assertEqual(normalizeMcpVisualClientLabel('XCODE'), 'Xcode', 'normalize uppercase "XCODE" to "Xcode"');
+  assertEqual(normalizeMcpVisualClientLabel('Eclipse'), 'Eclipse', 'normalize exact "Eclipse" to "Eclipse"');
+  assertEqual(normalizeMcpVisualClientLabel('cody'), 'Cody', 'normalize lowercase "cody" to "Cody"');
+  assertEqual(normalizeMcpVisualClientLabel('KIRO'), 'Kiro', 'normalize uppercase "KIRO" to "Kiro"');
+  assertEqual(normalizeMcpVisualClientLabel('goose'), 'Goose', 'normalize lowercase "goose" to "Goose"');
+
+  // No-collision: each canonical entry produces a unique normalize key.
+  const allKeys = MCP_VISUAL_CLIENT_LABELS.map(
+    (label) => String(label).trim().toLowerCase().replace(/[\s_-]+/g, '')
+  );
+  const uniqueKeys = new Set(allKeys);
+  assertEqual(
+    uniqueKeys.size,
+    allKeys.length,
+    'every canonical allowlist entry produces a unique normalize key (no collisions)'
+  );
+
   // getAllowedMcpVisualClientLabels returns a defensive copy.
   const copyA = getAllowedMcpVisualClientLabels();
   const copyB = getAllowedMcpVisualClientLabels();
