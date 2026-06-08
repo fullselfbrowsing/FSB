@@ -32,7 +32,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 Phase: 11 (Tab-aware side panel surface) — EXECUTING
 Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-06-08 - Completed quick task 260608-93i: panel auto-collapse redo (safe gesture pattern) + per-tab isRunning input-lock fix
+Last activity: 2026-06-08 - Completed quick task 260608-bu4: qt93i-regression Strategy B (revert auto-collapse + thread tabId through 8 leaky setter sites)
 
 ### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
 
@@ -167,6 +167,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | 260608-6nm | Expand MCP_VISUAL_CLIENT_LABELS allowlist with 12 Tier-1 MCP clients (Cline, Continue, Zed, VS Code, Copilot, JetBrains, Xcode, Eclipse, Cody, Roo Code, Kiro, Goose) | 2026-06-08 | fa5a2e9b | [260608-6nm-expand-mcp-visual-client-labels-allowlis](./quick/260608-6nm-expand-mcp-visual-client-labels-allowlis/) |
 | 260608-7bi | Tab-scoped sidepanel visibility (chrome.tabs.onActivated disable/enable) + completion routing via request.conversationId | 2026-06-08 | 779bbae2 | [260608-7bi-fix-two-tab-scoping-issues-in-fsb-sidepa](./quick/260608-7bi-fix-two-tab-scoping-issues-in-fsb-sidepa/) |
 | 260608-93i | Re-do panel auto-collapse safely (sync gesture pattern for setOptions+open) + per-tab isRunning/currentSessionId map to fix global input lockout across tabs | 2026-06-08 | 8bb40a9b | [260608-93i-re-do-panel-auto-collapse-safely-fix-per](./quick/260608-93i-re-do-panel-auto-collapse-safely-fix-per/) |
+| 260608-bu4 | qt93i-regression Strategy B: revert auto-collapse listener (Chrome API limitation, no programmatic close pre-141) + thread tabId through 8 leaky setter call sites + new real-runtime progress-tick routing test | 2026-06-08 | 09576615 | [260608-bu4-qt93i-regression-strategy-b-revert-auto-](./quick/260608-bu4-qt93i-regression-strategy-b-revert-auto-/) |
 | Phase 08 P03 | 14min | 3 tasks | 3 files |
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
 | Phase 10 P01 | 18min | 4 tasks | 5 files |
