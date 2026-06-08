@@ -524,8 +524,49 @@ function _loadSidepanelHydrate() {
     ok(firesF === 1, 'Part 4.10: callback throw swallowed; flush completes without raising');
   }
 
-  console.log('\n--- Part 5: showSidepanelProgress default flip + unconditional persistence write-through for tool_executed / iteration_complete (FILLED in Plan 12-03) ---');
-  ok(true, 'placeholder Part 5 -- filled in Plan 12-03 (FINT-22)');
+  console.log('\n--- Part 5: showSidepanelProgress default flip + iteration_complete persistence (FINT-22) ---');
+  {
+    const optsSrc = fs.readFileSync(path.join(__dirname, '..', 'extension/ui/options.js'), 'utf8');
+    const spSrc = fs.readFileSync(path.join(__dirname, '..', 'extension/ui/sidepanel.js'), 'utf8');
+
+    // Test 1: options.js default flipped true.
+    ok(/showSidepanelProgress:\s*true/.test(optsSrc),
+       'Part 5.1: options.js DEFAULT_SETTINGS contains showSidepanelProgress: true');
+    ok(!/showSidepanelProgress:\s*false/.test(optsSrc),
+       'Part 5.2: options.js no longer contains showSidepanelProgress: false');
+
+    // Test 3: sidepanel.js module-scope flipped true.
+    ok(/let showSidepanelProgressEnabled = true;/.test(spSrc),
+       'Part 5.3: sidepanel.js module-scope showSidepanelProgressEnabled = true');
+    ok(!/let showSidepanelProgressEnabled = false;/.test(spSrc),
+       'Part 5.4: sidepanel.js no longer declares showSidepanelProgressEnabled = false');
+
+    // Test 5: boot read default + catch fallback both flipped true.
+    const bootMatch = spSrc.match(/Load sidepanel progress setting[\s\S]*?catch[\s\S]*?\}/);
+    ok(bootMatch !== null, 'Part 5.5: boot read block found by content match');
+    const bootBody = bootMatch ? bootMatch[0] : '';
+    ok(/\?\?\s*true/.test(bootBody),
+       'Part 5.6: boot read uses ?? true (default flipped from false)');
+    const catchAssign = bootBody.match(/catch[\s\S]*?showSidepanelProgressEnabled\s*=\s*(true|false)/);
+    ok(catchAssign !== null && catchAssign[1] === 'true',
+       'Part 5.7: catch fallback assigns true (was false)');
+
+    // Test 8: iteration_complete persists progress.
+    const iterMatch = spSrc.match(/case 'iteration_complete':[\s\S]*?break;/);
+    ok(iterMatch !== null, 'Part 5.8: case iteration_complete found');
+    const iterBody = iterMatch ? iterMatch[0] : '';
+    ok(/_persistMessage\('assistant', 'Step ' \+ request\.iteration \+ ' complete', 'progress'\)/.test(iterBody),
+       'Part 5.9: iteration_complete persists progress via _persistMessage');
+    ok(/updateStatusMessage/.test(iterBody),
+       'Part 5.10: iteration_complete existing updateStatusMessage call preserved');
+
+    // Test 11: tool_executed wiring intact (carryforward sanity).
+    const toolMatch = spSrc.match(/case 'tool_executed':[\s\S]*?break;/);
+    ok(toolMatch !== null, 'Part 5.11: case tool_executed still wired');
+    const toolBody = toolMatch ? toolMatch[0] : '';
+    ok(/addActionMessage/.test(toolBody),
+       'Part 5.12: tool_executed body still invokes addActionMessage (Plan 12-02 hook C persists via this chokepoint)');
+  }
 
   console.log('\n--- Part 6: chrome.sidePanel.setOptions + open called in Run handler with target tabId (FILLED in Plan 12-04) ---');
   ok(true, 'placeholder Part 6 -- filled in Plan 12-04 (FINT-24)');
