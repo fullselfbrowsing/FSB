@@ -2172,6 +2172,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.sessionId !== currentSessionId) break;
       switch (request.eventType) {
         case 'iteration_complete':
+          // Phase 12 FINT-22 (Plan 12-03): persist iteration milestone to
+          // log unconditionally per CONTEXT D-10. DOM render below stays
+          // via the typing-dots status helper -- no per-iteration chat
+          // bubble per CONTEXT D-11 streaming OOS.
+          _persistMessage('assistant', 'Step ' + request.iteration + ' complete', 'progress');
           if (currentStatusMessage && isRunning) {
             updateStatusMessage('Step ' + request.iteration + ' complete', {
               iteration: request.iteration,
