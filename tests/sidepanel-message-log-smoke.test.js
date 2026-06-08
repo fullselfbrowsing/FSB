@@ -568,14 +568,98 @@ function _loadSidepanelHydrate() {
        'Part 5.12: tool_executed body still invokes addActionMessage (Plan 12-02 hook C persists via this chokepoint)');
   }
 
-  console.log('\n--- Part 6: chrome.sidePanel.setOptions + open called in Run handler with target tabId (FILLED in Plan 12-04) ---');
-  ok(true, 'placeholder Part 6 -- filled in Plan 12-04 (FINT-24)');
+  console.log('\n--- Part 6: chrome.sidePanel.setOptions + open called in Run handler with target tabId (FINT-24) ---');
+  {
+    _resetMockState();
+    // Read background.js source and grep the handleStartAutomation body for
+    // the Plan 12-04 patch site. Static-text grep is the simplest reliable
+    // verification since handleStartAutomation has too many dependencies for
+    // functional invocation.
+    const bgSrc = fs.readFileSync(path.join(__dirname, '..', 'extension/background.js'), 'utf8');
+    const handlerMatch = bgSrc.match(/async function handleStartAutomation\(request, sender, sendResponse\) \{[\s\S]*?\n\}/);
+    ok(handlerMatch !== null, 'Part 6.1: handleStartAutomation found in background.js');
+    const handlerBody = handlerMatch ? handlerMatch[0] : '';
+    ok(/await chrome\.sidePanel\.setOptions\(\{[\s\S]*?tabId: targetTabId[\s\S]*?enabled: true[\s\S]*?path: 'ui\/sidepanel\.html'/.test(handlerBody),
+       'Part 6.2: chrome.sidePanel.setOptions called with tabId + enabled true + path');
+    ok(/await chrome\.sidePanel\.open\(\{ tabId: targetTabId \}\)/.test(handlerBody),
+       'Part 6.3: chrome.sidePanel.open called with tabId');
+    // Find the *call* index (not the comment), which is the index of the
+    // literal "await chrome.sidePanel.setOptions" (open's call follows it).
+    const setOptIdx = handlerBody.indexOf('await chrome.sidePanel.setOptions');
+    const openIdx = handlerBody.indexOf('await chrome.sidePanel.open(');
+    ok(setOptIdx !== -1 && openIdx !== -1 && setOptIdx < openIdx,
+       'Part 6.4: setOptions called BEFORE open (gesture-window order)');
+    // Verify the new block sits AFTER targetTabId declaration + BEFORE conversationSessions reactivation.
+    const targetIdx = handlerBody.indexOf('let targetTabId');
+    const reactivateIdx = handlerBody.indexOf('conversationSessions.has');
+    ok(targetIdx !== -1 && setOptIdx > targetIdx && (reactivateIdx === -1 || setOptIdx < reactivateIdx),
+       'Part 6.5: sidePanel block sits AFTER targetTabId + BEFORE reactivation (gesture preservation)');
+  }
 
-  console.log('\n--- Part 7: chrome.sidePanel API failure is best-effort (try/catch swallows; automation continues) (FILLED in Plan 12-04) ---');
-  ok(true, 'placeholder Part 7 -- filled in Plan 12-04 (FINT-24 graceful degradation)');
+  console.log('\n--- Part 7: chrome.sidePanel API failure is best-effort (try/catch swallows; automation continues) (FINT-24) ---');
+  {
+    const bgSrc = fs.readFileSync(path.join(__dirname, '..', 'extension/background.js'), 'utf8');
+    const handlerMatch = bgSrc.match(/async function handleStartAutomation\(request, sender, sendResponse\) \{[\s\S]*?\n\}/);
+    const handlerBody = handlerMatch ? handlerMatch[0] : '';
+    ok(/try \{[\s\S]*?chrome\.sidePanel\.setOptions[\s\S]*?chrome\.sidePanel\.open[\s\S]*?\} catch \(sidePanelErr\)/.test(handlerBody),
+       'Part 7.1: setOptions + open wrapped in try/catch with sidePanelErr identifier');
+    ok(/console\.warn\('\[FSB\] Phase 12 FINT-24 sidePanel auto-open failed'/.test(handlerBody),
+       'Part 7.2: catch logs structured warning (not error throw)');
+    // Verify the new block is gated on typeof chrome.sidePanel !== 'undefined' (Chrome <114 graceful degradation per RESEARCH Section 14).
+    ok(/typeof chrome\.sidePanel !== 'undefined'/.test(handlerBody),
+       'Part 7.3: sidePanel block gated on API presence (Chrome <114 graceful degradation)');
+    // Verify the new block is ALSO gated on targetTabId truthy (do not call setOptions with null tabId).
+    ok(/if \(targetTabId && typeof chrome\.sidePanel/.test(handlerBody),
+       'Part 7.4: sidePanel block gated on targetTabId truthy');
+  }
 
-  console.log('\n--- Part 8: INV-04 setTimeout=8 + 4 iterator patterns + Phase-12 token awk-scan empty + INV-06 SHA byte-frozen (FILLED in Plan 12-04) ---');
-  ok(true, 'placeholder Part 8 -- filled in Plan 12-04 (INV-04 + INV-06 byte-freeze)');
+  console.log('\n--- Part 8: INV-04 setTimeout=8 + 4 iterator patterns + Phase-12 token awk-scan empty + INV-06 SHA byte-frozen (regression) ---');
+  {
+    const agentLoopSrc = fs.readFileSync(path.join(__dirname, '..', 'extension/ai/agent-loop.js'), 'utf8');
+
+    // Test 1: setTimeout count exactly 8.
+    const setTimeoutMatches = agentLoopSrc.match(/setTimeout/g) || [];
+    ok(setTimeoutMatches.length === 8,
+       'Part 8.1: INV-04 grep -c "setTimeout" extension/ai/agent-loop.js === 8 (got ' + setTimeoutMatches.length + ')');
+
+    // Test 2: 4 iterator patterns intact (content-based discovery per Phase 6 / 11 precedent).
+    const iteratorMatches = agentLoopSrc.match(/session\._nextIterationTimer\s*=\s*setTimeout/g) || [];
+    ok(iteratorMatches.length === 4,
+       'Part 8.2: INV-04 4 session._nextIterationTimer = setTimeout iterator patterns intact (got ' + iteratorMatches.length + ')');
+
+    // Test 3: Phase-12 token awk-scan empty.
+    // Pattern: any Phase-12-only identifier (FSBSidepanelMessageLog | _persistMessage |
+    // _flushMessageLog | _messageLogDebouncer | fsbConversationMessages |
+    // chrome\.sidePanel\.open | chrome\.sidePanel\.setOptions) inside ANY setTimeout
+    // lambda body MUST be ZERO. Simulate awk via JS: scan setTimeout( segments, check
+    // until matching ).
+    const phase12Tokens = /FSBSidepanelMessageLog|_persistMessage|_flushMessageLog|_messageLogDebouncer|fsbConversationMessages|chrome\.sidePanel\.open|chrome\.sidePanel\.setOptions/;
+    let violation = false;
+    const setTimeoutRe = /setTimeout\s*\(/g;
+    let m;
+    while ((m = setTimeoutRe.exec(agentLoopSrc)) !== null) {
+      // Find matching close paren (simplistic depth tracking, sufficient for agent-loop body).
+      let depth = 1;
+      let i = m.index + m[0].length;
+      while (i < agentLoopSrc.length && depth > 0) {
+        const ch = agentLoopSrc[i];
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+        i++;
+      }
+      const lambdaBody = agentLoopSrc.slice(m.index, i);
+      if (phase12Tokens.test(lambdaBody)) {
+        violation = true;
+        break;
+      }
+    }
+    ok(!violation, 'Part 8.3: INV-04 Phase-12 token awk-scan empty inside all setTimeout lambdas');
+
+    // Test 4: LATTICE-PIN.md SHA literal byte-frozen.
+    const pinSrc = fs.readFileSync(path.join(__dirname, '..', '.planning/LATTICE-PIN.md'), 'utf8');
+    ok(/current_lattice_sha:\s*e95067bfa87ed1b75838fc3b3ef217a3b01acbd3/.test(pinSrc),
+       'Part 8.4: INV-06 LATTICE-PIN.md frontmatter current_lattice_sha literal === e95067bfa87ed1b75838fc3b3ef217a3b01acbd3');
+  }
 
   console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');
   process.exit(failed === 0 ? 0 : 1);
