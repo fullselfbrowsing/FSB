@@ -404,11 +404,125 @@ function _loadSidepanelHydrate() {
     ok(countNull === 0 && countEmpty === 0, 'Part 2.10: convId guard returns 0 for null/empty');
   }
 
-  console.log('\n--- Part 3: addMessage write-through via debouncer + LRU cap enforcement (FILLED in Plan 12-02) ---');
-  ok(true, 'placeholder Part 3 -- filled in Plan 12-02 (FINT-23 write-through)');
+  console.log('\n--- Part 3: addMessage write-through via debouncer + LRU cap enforcement (FINT-23) ---');
+  {
+    // Fake-timer harness: setTimeoutFn returns a numeric id; advance() runs
+    // any callbacks whose ms has elapsed. Mirrors the Plan 12-00 verify
+    // pattern.
+    const fakeNow = { time: 0 };
+    const queue = [];
+    const setT = function (fn, ms) {
+      const entry = { fn: fn, ms: fakeNow.time + ms, id: queue.length + 1, cancelled: false };
+      queue.push(entry);
+      return entry.id;
+    };
+    const clearT = function (id) { for (const e of queue) if (e.id === id) e.cancelled = true; };
+    const advance = function (ms) {
+      fakeNow.time += ms;
+      for (const e of queue.slice()) {
+        if (!e.cancelled && e.ms <= fakeNow.time) {
+          e.cancelled = true;
+          e.fn();
+        }
+      }
+    };
 
-  console.log('\n--- Part 4: flushAll on beforeunload + cancel on drop (FILLED in Plan 12-02) ---');
-  ok(true, 'placeholder Part 4 -- filled in Plan 12-02 (FINT-23 flush + cancel)');
+    // Test 1: defer 200ms
+    let fires = 0;
+    const deb = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    deb.schedule('conv_x', function () { fires++; });
+    advance(199);
+    ok(fires === 0, 'Part 3.1: debouncer defers callback before 200ms');
+    advance(1);
+    ok(fires === 1, 'Part 3.2: debouncer fires at 200ms exactly');
+
+    // Test 3: clear-and-replace within window
+    let fires2 = 0;
+    const deb2 = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    deb2.schedule('conv_y', function () { fires2++; });
+    advance(100);
+    deb2.schedule('conv_y', function () { fires2 += 10; });
+    advance(199);
+    ok(fires2 === 0, 'Part 3.3: clear-and-replace defers fires until 200ms after LAST schedule');
+    advance(2);
+    ok(fires2 === 10, 'Part 3.4: clear-and-replace fires only the latest callback (fires2 ' + fires2 + ', want 10)');
+
+    // Test 5: LRU cap = 50 -- insert 51, observe oldest evicted
+    const env = MessageLog.emptyEnvelope();
+    for (let i = 0; i < 51; i++) {
+      MessageLog.appendMessage(env, 'lru_' + i, { role: 'user', content: 'm' + i, timestamp: Date.now() + i, kind: 'text' });
+    }
+    ok(env.lru.length === 50, 'Part 3.5: LRU cap=50 enforced (got ' + env.lru.length + ')');
+    ok(env.byConv['lru_0'] === undefined, 'Part 3.6: oldest conversation lru_0 evicted from byConv');
+    ok(env.byConv['lru_50'] !== undefined, 'Part 3.7: newest conversation lru_50 retained');
+    ok(env.lru[0] === 'lru_50', 'Part 3.8: LRU head is the most-recently-written convId');
+
+    // Test 9: buffered burst -- 5 schedules in ~80ms (loop body: schedule
+    // then advance(20), 5 iters; last schedule at fakeNow=80; after loop
+    // fakeNow=100). Last timer fires at 80+200=280.
+    let fires3 = 0;
+    const deb3 = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    for (let i = 0; i < 5; i++) {
+      deb3.schedule('conv_burst', function () { fires3++; });
+      advance(20);
+    }
+    // fakeNow=100 here. Advance by 179 (total 279) -- still 1ms before fire.
+    advance(179);
+    ok(fires3 === 0, 'Part 3.9: burst of 5 schedules in ~80ms still pending at 199ms-after-last-schedule');
+    advance(2);
+    ok(fires3 === 1, 'Part 3.10: burst of 5 fires exactly once after 200ms-after-last-schedule (fires3 ' + fires3 + ')');
+  }
+
+  console.log('\n--- Part 4: flushAll on beforeunload + cancel on drop + EC-05 resurrection defense (FINT-23) ---');
+  {
+    const fakeNow = { time: 0 };
+    const queue = [];
+    const setT = function (fn, ms) { const e = { fn: fn, ms: fakeNow.time + ms, id: queue.length + 1, cancelled: false }; queue.push(e); return e.id; };
+    const clearT = function (id) { for (const e of queue) if (e.id === id) e.cancelled = true; };
+
+    // Test 1: flushAll forces immediate fire
+    let firesA = 0, firesB = 0;
+    const deb = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    deb.schedule('a', function () { firesA++; });
+    deb.schedule('b', function () { firesB++; });
+    ok(deb._hasPending('a') === true && deb._hasPending('b') === true, 'Part 4.1: _hasPending true for scheduled convIds');
+    await deb.flushAll();
+    ok(firesA === 1 && firesB === 1, 'Part 4.2: flushAll fires all pending callbacks (firesA ' + firesA + ', firesB ' + firesB + ')');
+    ok(deb._hasPending('a') === false && deb._hasPending('b') === false, 'Part 4.3: _hasPending false after flushAll');
+
+    // Test 4: cancel defeats firing
+    let firesC = 0;
+    const deb2 = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    deb2.schedule('c', function () { firesC++; });
+    deb2.cancel('c');
+    ok(firesC === 0, 'Part 4.4: cancel pre-emptive (no fire yet)');
+    ok(deb2._hasPending('c') === false, 'Part 4.5: cancel clears _hasPending');
+
+    // Test 6: drop + cancel together -- envelope drop + debouncer cancel
+    const env = MessageLog.emptyEnvelope();
+    MessageLog.appendMessage(env, 'conv_drop', { role: 'user', content: 'hi', timestamp: Date.now(), kind: 'text' });
+    const deb3 = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    let firesD = 0;
+    deb3.schedule('conv_drop', function () { firesD++; });
+    deb3.cancel('conv_drop');
+    MessageLog.dropConversationMessages(env, 'conv_drop');
+    ok(env.byConv['conv_drop'] === undefined, 'Part 4.6: dropConversationMessages removed byConv entry');
+    ok(env.lru.indexOf('conv_drop') === -1, 'Part 4.7: dropConversationMessages removed lru entry');
+    ok(firesD === 0, 'Part 4.8: cancel before drop prevented resurrection-after-drop write');
+
+    // Test 9: flushAll on empty pending is a no-op
+    const deb4 = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    let firesE = 0;
+    await deb4.flushAll();
+    ok(firesE === 0, 'Part 4.9: flushAll on empty pending is no-op');
+
+    // Test 10: error in callback swallowed (per CONTEXT D-03 best-effort)
+    const deb5 = MessageLog.createDebouncer({ debounceMs: 200, setTimeoutFn: setT, clearTimeoutFn: clearT });
+    let firesF = 0;
+    deb5.schedule('err', function () { firesF++; throw new Error('boom'); });
+    await deb5.flush('err');
+    ok(firesF === 1, 'Part 4.10: callback throw swallowed; flush completes without raising');
+  }
 
   console.log('\n--- Part 5: showSidepanelProgress default flip + unconditional persistence write-through for tool_executed / iteration_complete (FILLED in Plan 12-03) ---');
   ok(true, 'placeholder Part 5 -- filled in Plan 12-03 (FINT-22)');
