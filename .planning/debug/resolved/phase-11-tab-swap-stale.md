@@ -1,6 +1,7 @@
 ---
 slug: phase-11-tab-swap-stale
-status: investigating
+status: resolved
+fix_commit: ba107c87df20726b8c9f0d432554bacd0a003edc
 trigger: |
   UAT-11 reveal: while autopilot is running on Tab A, opening a brand new Tab B does NOT reset the sidepanel.
   Sidepanel chip stays "owned by FSB Autopilot" and input stays locked, as if Tab B were also bound to the
