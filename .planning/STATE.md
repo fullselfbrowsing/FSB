@@ -32,7 +32,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 Phase: 11 (Tab-aware side panel surface) — EXECUTING
 Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-06-08
+Last activity: 2026-06-08 - Completed quick task 260608-6nm: Expand MCP_VISUAL_CLIENT_LABELS allowlist with 12 Tier-1 MCP clients
 
 ### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
 
@@ -164,6 +164,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | 260606-9ji | Auto-detect system theme on first install via prefers-color-scheme | 2026-06-06 | 41079c59 | [260606-9ji-auto-detect-system-theme-on-first-instal](./quick/260606-9ji-auto-detect-system-theme-on-first-instal/) |
 | 260606-b46 | Buffer polyfill for offscreen lattice-host bundle (UAT-08.e fix) | 2026-06-06 | 66adfbe2 | [260606-b46-buffer-polyfill-for-offscreen-lattice-ho](./quick/260606-b46-buffer-polyfill-for-offscreen-lattice-ho/) |
 | 260606-bh1 | Fix runFullApiTest apiKeyMap missing openrouter + lmstudio | 2026-06-06 | 6945bdb9 | [260606-bh1-fix-runfullapitest-apikeymap-missing-ope](./quick/260606-bh1-fix-runfullapitest-apikeymap-missing-ope/) |
+| 260608-6nm | Expand MCP_VISUAL_CLIENT_LABELS allowlist with 12 Tier-1 MCP clients (Cline, Continue, Zed, VS Code, Copilot, JetBrains, Xcode, Eclipse, Cody, Roo Code, Kiro, Goose) | 2026-06-08 | fa5a2e9b | [260608-6nm-expand-mcp-visual-client-labels-allowlis](./quick/260608-6nm-expand-mcp-visual-client-labels-allowlis/) |
 | Phase 08 P03 | 14min | 3 tasks | 3 files |
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
 | Phase 10 P01 | 18min | 4 tasks | 5 files |
