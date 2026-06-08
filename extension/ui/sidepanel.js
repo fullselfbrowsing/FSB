@@ -579,6 +579,28 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'session' && changes && changes.fsbAgentRegistry) {
     refreshOwnerChip();
   }
+  // debug-sidepanel-agent-name fix: also refresh the chip when any
+  // mcpVisualSession:<tabId> key mutates. The MCP visual-session lifecycle
+  // entry is written by recordVisualSessionTick (extension/utils/
+  // mcp-visual-session-lifecycle.js) AFTER ownership has been claimed in
+  // fsbAgentRegistry, i.e. AFTER the first storage-change branch above has
+  // already fired and resolved Tier 2 (friendly client label) as null. By
+  // the time entry.client lands in storage, no listener observes the write
+  // and the chip stays stuck on the Tier 3 formatAgentIdForDisplay
+  // short-prefix (e.g., 'agent_95ef8b'). Re-firing refreshOwnerChip on the
+  // visual-session key family causes the chip to re-resolve through Tier 2
+  // and pick up the friendly label (e.g., 'Claude', 'OpenClaw'). Best-effort
+  // key scan (Object.keys + indexOf) -- bounded by at most one entry per
+  // owned tab so this is O(1) on typical input.
+  if (area === 'session' && changes && typeof changes === 'object') {
+    var keys = Object.keys(changes);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].indexOf('mcpVisualSession:') === 0) {
+        refreshOwnerChip();
+        break;
+      }
+    }
+  }
 });
 
 // Phase 11 FINT-20 -- foreign-owned input lockout helpers.
