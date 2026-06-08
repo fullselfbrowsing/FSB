@@ -147,10 +147,17 @@ const REC = require(REC_PATH);
   // --- Part 1: Allowlist accept (FINT-16; 4 PASS) -----------------
   console.log('\n--- Part 1: Allowlist accept (FINT-16) ---');
   var labels = VS.MCP_VISUAL_CLIENT_LABELS;
-  ok(Array.isArray(labels) && labels.length === 14,
-    'Part 1.1 -- MCP_VISUAL_CLIENT_LABELS has 14 entries post-Phase-10');
+  // Phase 10 added FSB Autopilot at index 13 (14th entry). Quick task
+  // 260608-6nm appended 12 more Tier-1 MCP clients (Cline ... Goose)
+  // after FSB Autopilot. The structural invariants this Part locks are:
+  // (a) the array is non-empty, (b) FSB Autopilot remains at index 13,
+  // (c) downstream Parts (allowlist accept, normalization) still hold.
+  // The exact array length is intentionally not pinned so future
+  // additive expansions do not silently regress this smoke test.
+  ok(Array.isArray(labels) && labels.length >= 14,
+    'Part 1.1 -- MCP_VISUAL_CLIENT_LABELS has >= 14 entries post-Phase-10');
   ok(labels[13] === 'FSB Autopilot',
-    'Part 1.2 -- last entry is FSB Autopilot');
+    'Part 1.2 -- index 13 entry is FSB Autopilot');
   ok(VS.isAllowedMcpVisualClientLabel('FSB Autopilot') === true,
     'Part 1.3 -- allowlist accepts canonical FSB Autopilot');
   ok(VS.isAllowedMcpVisualClientLabel('fsb-autopilot') === true,
