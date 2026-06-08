@@ -776,7 +776,48 @@ try {
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onRemoved
       && typeof chrome.tabs.onRemoved.addListener === 'function') {
     chrome.tabs.onRemoved.addListener(async (tabId) => {
+      // Phase 12 FINT-23 (Plan 12-02) EC-05 defense: resolve the bound
+      // convId BEFORE the Phase 11 drop nulls the byTab entry, then cancel
+      // any pending debouncer write + drop the message-log entry. Order:
+      // cancel -> drop in-memory buffer -> drop envelope -> persist. This
+      // ensures the would-have-fired 200ms timer cannot resurrect the
+      // dropped entry (the would-be-fired write reads the just-emptied
+      // buffer + returns immediately, AND the timer is cleared anyway).
+      var droppedConvId = null;
+      try {
+        if (typeof FSBSidepanelTabConvStore !== 'undefined'
+            && typeof FSBSidepanelTabConvStore.getTabConversation === 'function'
+            && FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) {
+          droppedConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
+        }
+      } catch (_e) { /* swallow */ }
+
       try { await dropTabConversation(tabId); } catch (_e) { /* swallow */ }
+
+      // Phase 12 FINT-23 (Plan 12-02): drop message-log entry + cancel pending
+      // debouncer write so EC-05 resurrection-after-drop does not occur.
+      if (droppedConvId
+          && typeof FSBSidepanelMessageLog !== 'undefined'
+          && typeof FSBSidepanelMessageLog.dropConversationMessages === 'function') {
+        if (_messageLogDebouncer && typeof _messageLogDebouncer.cancel === 'function') {
+          _messageLogDebouncer.cancel(droppedConvId);
+        }
+        if (_messageLogPendingBuffer && typeof _messageLogPendingBuffer.delete === 'function') {
+          _messageLogPendingBuffer.delete(droppedConvId);
+        }
+        try {
+          var msgBag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+          var msgEnvelope = msgBag[FSBSidepanelMessageLog.STORAGE_KEY];
+          if (FSBSidepanelMessageLog.isValidEnvelope(msgEnvelope)) {
+            FSBSidepanelMessageLog.dropConversationMessages(msgEnvelope, droppedConvId);
+            var msgPayload = {};
+            msgPayload[FSBSidepanelMessageLog.STORAGE_KEY] = msgEnvelope;
+            await chrome.storage.local.set(msgPayload);
+          }
+        } catch (_e) {
+          // Best-effort: failure leaves orphan entry; LRU eviction reaps eventually.
+        }
+      }
     });
   }
 } catch (_e) { /* swallow */ }
@@ -1334,6 +1375,11 @@ function ensureActionGroup() {
 }
 
 function addActionMessage(text) {
+  // Phase 12 FINT-23 (Plan 12-02): persistence ALWAYS fires (CONTEXT D-10);
+  // DOM render below stays gated by showSidepanelProgressEnabled until
+  // Plan 12-03 flips the default to true (FINT-22).
+  _persistMessage('assistant', text, 'tool');
+
   if (!showSidepanelProgressEnabled) return;
 
   const group = ensureActionGroup();
@@ -1491,6 +1537,10 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
   }
 
   scrollToBottom();
+
+  // Phase 12 FINT-23 write-through (Plan 12-02): completion bubbles persist
+  // as assistant text. isPartial flag NOT recorded per CONTEXT D-07 + D-26.
+  _persistMessage('assistant', text, 'text');
 }
 
 // Show Chrome page error as plain text without bubble
@@ -1630,7 +1680,7 @@ function renderPersistedMessage(content, role, kind) {
 }
 
 // Add message to chat with modern bubble styling
-function addMessage(text, type = 'system') {
+function addMessage(text, type = 'system', kind) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${type} new`;
 
@@ -1684,6 +1734,20 @@ function addMessage(text, type = 'system') {
   }
 
   scrollToBottom();
+
+  // Phase 12 FINT-23 write-through hook (Plan 12-02). Fires AFTER DOM render
+  // so persistence failures never block UI. Role + kind derive from the
+  // existing `type` parameter for backward compat with 60+ call sites; the
+  // optional 3rd arg `kind` overrides when the caller knows the kind (e.g.
+  // the Plan 12-03 autopilot listener emits kind='tool' for tool_executed).
+  var _role = (type === 'user') ? 'user' : 'assistant';
+  var _kind = kind;
+  if (!_kind) {
+    if (type === 'error') _kind = 'error';
+    else if (type === 'action') _kind = 'tool';
+    else _kind = 'text';
+  }
+  _persistMessage(_role, text, _kind);
 }
 
 // Smooth scroll to bottom
