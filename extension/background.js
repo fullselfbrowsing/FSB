@@ -13000,18 +13000,123 @@ chrome.action.onClicked.addListener(async (tab) => {
   armMcpBridge('action.onClicked');
   automationLogger.logInit('sidepanel', 'opening', { windowId: tab.windowId });
 
-  // Open global side panel for the entire browser window
+  // QT-93i-01 (redo: force-open with welcome state WITHOUT consuming the
+  // user-gesture token). The prior attempt (779bbae2 reverted in b7cb5283)
+  // awaited chrome.sidePanel.setOptions BEFORE chrome.sidePanel.open, which
+  // consumed the gesture and forced open() to reject -> popup-fallback.
+  //
+  // Fix: create BOTH Promises synchronously (inside the gesture window),
+  // then await later. open() is gesture-critical; setOptions() is not, so
+  // we await open() first and surface its failure into the popup fallback,
+  // then await setOptions() and log only. Per CONTEXT D-02: never block
+  // manual open. Defensive typeof guards for Chrome <114 graceful path.
+  var setOptionsPromise = null;
+  var openPromise = null;
+
   try {
-    await chrome.sidePanel.open({ windowId: tab.windowId });
-    automationLogger.logInit('sidepanel', 'ready', { windowId: tab.windowId });
+    if (tab && typeof tab.id === 'number'
+        && typeof chrome.sidePanel !== 'undefined'
+        && typeof chrome.sidePanel.setOptions === 'function') {
+      setOptionsPromise = chrome.sidePanel.setOptions({
+        tabId: tab.id,
+        enabled: true,
+        path: 'ui/sidepanel.html'
+      });
+    }
+  } catch (setErrSync) {
+    console.warn('[FSB] QT-93i-01 force-open setOptions threw sync', {
+      tabId: tab && tab.id,
+      error: setErrSync && setErrSync.message
+    });
+  }
+
+  try {
+    if (typeof chrome.sidePanel !== 'undefined'
+        && typeof chrome.sidePanel.open === 'function') {
+      openPromise = chrome.sidePanel.open({ windowId: tab.windowId });
+    }
+  } catch (openErrSync) {
+    console.warn('[FSB] QT-93i-01 sidePanel.open threw sync', {
+      windowId: tab && tab.windowId,
+      error: openErrSync && openErrSync.message
+    });
+  }
+
+  // Await OPEN first -- gesture-critical. Fail mode is the existing popup
+  // fallback. Note: open() was already CREATED synchronously above, so
+  // the gesture window is closed by Chrome's open() call site BEFORE any
+  // await touches it.
+  try {
+    if (openPromise) {
+      await openPromise;
+      automationLogger.logInit('sidepanel', 'ready', { windowId: tab.windowId });
+    } else {
+      throw new Error('chrome.sidePanel.open unavailable');
+    }
   } catch (error) {
-    automationLogger.logInit('sidepanel', 'failed', { error: error.message, fallback: 'popup' });
+    automationLogger.logInit('sidepanel', 'failed', {
+      error: error && error.message,
+      fallback: 'popup'
+    });
     // Fallback to popup window if side panel fails
     chrome.windows.create({
       url: chrome.runtime.getURL('ui/popup.html'),
       type: 'popup',
       width: 400,
       height: 600
+    });
+  }
+
+  // Await setOptions LAST -- non-gesture-critical, log only.
+  try {
+    if (setOptionsPromise) await setOptionsPromise;
+  } catch (setErr) {
+    console.warn('[FSB] QT-93i-01 force-open setOptions failed', {
+      tabId: tab && tab.id,
+      error: setErr && setErr.message
+    });
+  }
+});
+
+// QT-93i-01 (redo: panel-visibility per-tab) -- chrome.tabs.onActivated.
+// Toggles chrome.sidePanel.setOptions({ tabId, enabled }) so the panel
+// collapses on non-working tabs and re-enables on working tabs. Working
+// means findActiveAutomationSessionForTab(tabId) is truthy (the tab has
+// an in-flight FSB automation session).
+//
+// Per CONTEXT D-01 (260608-7bi): all working tabs stay enabled
+// simultaneously -- this listener ONLY mutates state for the activated
+// tab; sibling working tabs are NOT touched. The activated tab being
+// non-working does NOT cascade into other tabs' enabled state.
+//
+// SAFE TO AWAIT: chrome.tabs.onActivated is NOT a user-gesture event
+// (Chrome fires it from tab-management machinery without a gesture
+// token). The 779bbae2 bug only applied to chrome.action.onClicked.
+//
+// Defensive: typeof guards for Chrome <114; best-effort try/catch so a
+// sidePanel API failure does NOT break tab switching for the user.
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    if (!activeInfo || typeof activeInfo.tabId !== 'number') return;
+    if (typeof chrome.sidePanel === 'undefined'
+        || typeof chrome.sidePanel.setOptions !== 'function') return;
+    var isWorking = !!findActiveAutomationSessionForTab(activeInfo.tabId);
+    if (isWorking) {
+      await chrome.sidePanel.setOptions({
+        tabId: activeInfo.tabId,
+        enabled: true,
+        path: 'ui/sidepanel.html'
+      });
+    } else {
+      await chrome.sidePanel.setOptions({
+        tabId: activeInfo.tabId,
+        enabled: false
+      });
+    }
+  } catch (err) {
+    console.warn('[FSB] QT-93i-01 sidePanel setOptions failed', {
+      tabId: activeInfo && activeInfo.tabId,
+      error: err && err.message
     });
   }
 });
