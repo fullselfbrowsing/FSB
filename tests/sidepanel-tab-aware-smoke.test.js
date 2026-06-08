@@ -304,8 +304,20 @@ function installDomStub(idMap) {
     const chatRestored = chatInputStub._attrs()['contenteditable'] === 'true';
     ok(noneHaveAria && noneHaveDesc && noneHaveClass && chatRestored,
        'Part 3.4 -- applyInputLockout(false) clears aria-* + class + restores chatInput contenteditable');
+
+    // 3.5 (debug-phase-11-tab-swap-stale regression pin) -- unlock state must
+    // restore disabled=false on stopBtn + micBtn. sendBtn is governed by
+    // isRunning via updateSendButtonState (the no-op stub at line ~273
+    // leaves sendBtn.disabled untouched on this test path, which is fine --
+    // sendBtn's disabled-on-isRunning contract is asserted indirectly by
+    // the lockout NOT clobbering it). Pre-fix the unlock branch only
+    // removed aria-disabled, leaving el.disabled=true forever for stopBtn
+    // and micBtn -- the visible UAT-11 "input controls stay disabled after
+    // tab swap" symptom.
+    ok(stopBtnStub.disabled === false && micBtnStub.disabled === false,
+       'Part 3.5 -- applyInputLockout(false) restores disabled=false on stopBtn + micBtn (regression pin for debug-phase-11-tab-swap-stale)');
   } else {
-    ok(false, 'Part 3.0 -- could not extract applyInputLockout function body; skipping 3.1-3.4');
+    ok(false, 'Part 3.0 -- could not extract applyInputLockout function body; skipping 3.1-3.5');
   }
 
   console.log('\n--- Part 4: handleSendMessage runtime gate + .fsb-foreign-owned-disabled CSS class (FILLED in Plan 11-02) ---');
@@ -468,6 +480,20 @@ function installDomStub(idMap) {
     const onDiscardedAbsent = !/chrome\.tabs\.onDiscarded\.addListener/.test(sidepanelSrc);
     ok(onDiscardedAbsent,
        'Part 6.4 -- sidepanel.js does NOT register chrome.tabs.onDiscarded (D-15 preserve)');
+  }
+
+  // 6.5 (debug-phase-11-tab-swap-stale defense-in-depth pin) -- sidepanel.js
+  // registers chrome.windows.onFocusChanged as a backstop for the primary
+  // chrome.tabs.onActivated listener. When focus shifts to a real Chrome
+  // window the backstop re-resolves the chip + chat surface against the
+  // user's active tab. Source-level grep is sufficient: a regression that
+  // removed this backstop would re-introduce the brand-new-tab edge case
+  // where chip + lockout state stay frozen on the previous tab.
+  {
+    const sidepanelSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
+    const hasFocusChanged = /chrome\.windows\.onFocusChanged\.addListener/.test(sidepanelSrc);
+    ok(hasFocusChanged,
+       'Part 6.5 -- sidepanel.js registers chrome.windows.onFocusChanged backstop (debug-phase-11-tab-swap-stale defense-in-depth)');
   }
 
   console.log('\n--- Part 7: INV-04 + INV-06 byte-freeze regression (FILLED in Plan 11-04) ---');

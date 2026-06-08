@@ -440,8 +440,16 @@ function applyInputLockout(foreignOwned) {
       el.classList.add('fsb-foreign-owned-disabled');
     } else {
       if (spec.kind === 'button') {
-        // Do NOT undo isRunning-driven disable; updateSendButtonState() at
-        // line ~498 restores the correct sendBtn state below.
+        // Phase 11 FIX (debug-phase-11-tab-swap-stale): restore disabled=false
+        // on stopBtn + micBtn. sendBtn is exempt -- it is governed by
+        // isRunning via updateSendButtonState (called below). Pre-fix the
+        // unlock path ONLY cleared aria-disabled, leaving el.disabled=true
+        // forever after a single lockout cycle, which produced the UAT-11
+        // symptom "input controls stay disabled after switching to a free
+        // tab while autopilot runs on the previous tab".
+        if (spec.id !== 'sendBtn') {
+          el.disabled = false;
+        }
         el.removeAttribute('aria-disabled');
       } else {
         el.setAttribute('contenteditable', 'true');
@@ -494,6 +502,11 @@ async function refreshOwnerChip() {
     if (!chipEl) return;
     if (typeof FSBOwnerChip === 'undefined') {
       chipEl.style.display = 'none';
+      // Phase 11 FIX (debug-phase-11-tab-swap-stale): honor the unlock
+      // contract on every chip-hidden path. Pre-fix the helpers branch
+      // skipped applyInputLockout(false) which could leave stopBtn +
+      // micBtn dimmed indefinitely after the first lockout.
+      applyInputLockout(false);
       return;
     }
 
@@ -501,6 +514,10 @@ async function refreshOwnerChip() {
     const tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
       chipEl.style.display = 'none';
+      // Phase 11 FIX (debug-phase-11-tab-swap-stale): see above. The
+      // no-active-tab branch must also unlock so controls re-enable when
+      // the active-tab race resolves favorably on the next refresh.
+      applyInputLockout(false);
       return;
     }
 
@@ -582,6 +599,35 @@ try {
       && typeof chrome.tabs.onRemoved.addListener === 'function') {
     chrome.tabs.onRemoved.addListener(async (tabId) => {
       try { await dropTabConversation(tabId); } catch (_e) { /* swallow */ }
+    });
+  }
+} catch (_e) { /* swallow */ }
+
+// Phase 11 FIX (debug-phase-11-tab-swap-stale) -- defense-in-depth backstop
+// for chrome.tabs.onActivated. The MV3 sidepanel page document context can
+// in rare cases miss an onActivated fire when a brand-new tab is created
+// and immediately becomes active as part of the create (Ctrl+T, opener-
+// linked target=_blank). Adding chrome.windows.onFocusChanged ensures the
+// chip + chat surface re-resolve against the user's real active tab
+// whenever window focus changes. Best-effort: any throw inside swallows.
+//
+// Implementation note: onFocusChanged fires with windowId = -1 (WINDOW_ID_NONE)
+// when focus leaves Chrome entirely. We skip the no-op case so we do not
+// query a stale tab during the un-focused window. When focus returns to a
+// real Chrome window, we resolve the active tab in THAT window (not the
+// sidepanel's hosting window blindly) via tabs.query({active:true, windowId}).
+try {
+  if (typeof chrome !== 'undefined' && chrome.windows && chrome.windows.onFocusChanged
+      && typeof chrome.windows.onFocusChanged.addListener === 'function') {
+    chrome.windows.onFocusChanged.addListener(async (windowId) => {
+      try {
+        if (typeof windowId !== 'number' || windowId < 0) return;
+        await refreshOwnerChip();
+        var tabs = await chrome.tabs.query({ active: true, windowId: windowId });
+        if (tabs && tabs[0] && typeof tabs[0].id === 'number') {
+          await swapToTabConversation(tabs[0].id);
+        }
+      } catch (_e) { /* swallow */ }
     });
   }
 } catch (_e) { /* swallow */ }
