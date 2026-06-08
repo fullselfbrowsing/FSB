@@ -16,6 +16,24 @@ let livenessFailCount = 0;
 let isHistoryViewActive = false;
 let showSidepanelProgressEnabled = false;
 
+// Phase 11 debug-phase-11-sidepanel-reopen-empty -- declare module-scope
+// thread state that pre-existing renderAutomationCompletionPayload /
+// recoverLatestThreadTerminalOutcome scaffolding referenced without ever
+// declaring. Without these, any call into that scaffolding throws a
+// ReferenceError on first assignment. Defaults are null/no-op so the
+// existing scaffolding behaves identically to its prior dead-code state
+// until the new hydrate-on-boot path activates it.
+let historySessionId = null;
+let activeConversationId = null;
+let lastRenderedTerminalSessionId = null;
+
+// No-op stub for the pre-existing scaffolding's persist call. Thread
+// state today is reconstructable from the per-tab conversation envelope
+// + fsbSessionLogs index, so no separate persist surface is needed.
+// Wiring a real persistence backend is out of Phase 11 scope; the stub
+// keeps renderAutomationCompletionPayload callable without ReferenceError.
+function persistSidepanelThreadState() { /* no-op stub -- thread state is derived */ }
+
 // Phase 240 D-02: synthesize legacy:sidepanel agentId once per side panel
 // load. The side panel is longer-lived than the popup but still gets
 // recreated by Chrome on certain events; the registry's
@@ -140,6 +158,20 @@ async function initTabConversationStore() {
 // when chrome.tabs.onActivated fires. Peek-only: does NOT mint (D-17).
 // If no entry exists, conversationId is set to null and chatMessages is
 // cleared; first send triggers ensureTabConversationForActiveTab().
+//
+// Phase 11 debug-phase-11-sidepanel-reopen-empty -- when the target tab
+// has a bound conversationId, hydrate the chat surface from that
+// conversation's persisted session log (same path as boot). Without
+// hydrate, swap leaves chatMessages empty even though the underlying
+// conversation already has a transcript, which is the same UX problem
+// as the boot-reopen-empty bug. With hydrate, swapping back to a tab
+// the user has chatted in restores that tab's transcript.
+//
+// This is consistent with the spirit of RESOLVED Open Question #1 in
+// 11-RESEARCH.md (no auto-render of NEW state on swap) -- swap still
+// does no work for unminted tabs; only tabs with an EXISTING bound
+// conversation render their transcript, and they render the SAME
+// transcript that a fresh sidepanel reopen on that tab would.
 async function swapToTabConversation(tabId) {
   try {
     await _envelopeReadyPromise;
@@ -150,6 +182,13 @@ async function swapToTabConversation(tabId) {
     conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
     if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
       chatMessages.innerHTML = '';
+    }
+    // If the target tab has a bound conversation, hydrate its transcript.
+    // hydrateChatFromConversationId clears chatMessages internally before
+    // rendering, so the manual clear above is harmless (covers the
+    // null-convId / unminted-tab case where hydrate early-returns 0).
+    if (nextConvId) {
+      try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* swallow */ }
     }
   } catch (_e) { /* swallow: swap is best-effort */ }
 }
@@ -213,6 +252,110 @@ async function ensureTabConversationForActiveTab(overwrite) {
     var errFallback = _mintConversationId();
     conversationId = errFallback;
     return errFallback;
+  }
+}
+
+// Phase 11 debug-phase-11-sidepanel-reopen-empty -- hydrate the chat
+// surface from persisted session logs for a given conversationId.
+//
+// Background: fsbSessionLogs (chrome.storage.local) stores one row per
+// session keyed by sessionId, with metadata { conversationId, commands[],
+// completionMessage, result, error, outcome, startTime, status }. Follow-
+// up commands in the same conversation reuse the same session row (via
+// the conversationSessions continuity map in background.js), so commands[]
+// represents the user's chronological prompts in that conversation. A new
+// conversation produces a new session row that shares the conversationId.
+//
+// Restore strategy:
+//   1. Read fsbSessionIndex (lightweight metadata array) + fsbSessionLogs
+//      (full session detail map).
+//   2. Filter index entries where conversationId matches the target.
+//   3. Sort ascending by startTime (oldest first -- chronological replay).
+//   4. For each matching session: replay session.commands[] as 'user'
+//      messages, then session.completionMessage (or session.result) as a
+//      single 'ai' completion message. Skip empty completions.
+//
+// Idempotent + race-tolerant: callers may invoke multiple times; each
+// call clears chatMessages first then re-renders the full transcript.
+// Best-effort: storage failures degrade to no-op (caller proceeds with
+// empty chat surface + welcome message as before).
+//
+// @param {string} convId - conversationId to hydrate; null returns early.
+// @returns {Promise<number>} count of session rows rendered (0 if none).
+async function hydrateChatFromConversationId(convId) {
+  if (!convId || typeof convId !== 'string') return 0;
+  if (!chatMessages) return 0;
+  try {
+    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
+    const sessionStorage = stored.fsbSessionLogs || {};
+    const sessionIndex = stored.fsbSessionIndex || [];
+    if (!Array.isArray(sessionIndex) || sessionIndex.length === 0) return 0;
+
+    var matching = [];
+    for (var i = 0; i < sessionIndex.length; i++) {
+      var entry = sessionIndex[i];
+      if (entry && entry.conversationId === convId) {
+        var detail = (entry.id && sessionStorage[entry.id]) ? sessionStorage[entry.id] : entry;
+        matching.push(detail);
+      }
+    }
+    if (matching.length === 0) return 0;
+
+    matching.sort(function(a, b) {
+      var aTime = a?.startTime || 0;
+      var bTime = b?.startTime || 0;
+      return aTime - bTime;
+    });
+
+    // Clear chat surface before replay so repeated calls do not duplicate.
+    chatMessages.innerHTML = '';
+
+    for (var s = 0; s < matching.length; s++) {
+      var session = matching[s] || {};
+      var commands = Array.isArray(session.commands) ? session.commands : [];
+      // Fallback: if commands[] is empty but lastTask is present, use it
+      // as the single user message (covers older session rows written
+      // before commands[] tracking).
+      if (commands.length === 0 && session.lastTask) commands = [session.lastTask];
+
+      for (var c = 0; c < commands.length; c++) {
+        var cmd = commands[c];
+        if (typeof cmd === 'string' && cmd.trim().length > 0) {
+          addMessage(cmd, 'user');
+        }
+      }
+
+      // Replay the completion as a single ai message. Prefer
+      // completionMessage > result > nothing. Skip silent completions.
+      var completion = session.completionMessage || session.result || '';
+      if (typeof completion === 'string' && completion.trim().length > 0) {
+        var outcomeStr = typeof session.outcome === 'string' ? session.outcome.toLowerCase() : '';
+        var isPartial = outcomeStr === 'partial';
+        var isError = outcomeStr === 'failure' || (session.error && !completion);
+        if (isError) {
+          addMessage(completion, 'error');
+        } else {
+          addCompletionMessage(completion, 'ai', isPartial);
+        }
+      } else if (session.error && typeof session.error === 'string' && session.error.trim().length > 0) {
+        addMessage(session.error, 'error');
+      }
+    }
+
+    // Track the most recent hydrated session so the existing
+    // recoverLatestThreadTerminalOutcome scaffolding does not re-render
+    // a duplicate terminal outcome for the same row.
+    var latest = matching[matching.length - 1];
+    if (latest && latest.id) {
+      lastRenderedTerminalSessionId = latest.id;
+      historySessionId = latest.historySessionId || latest.id;
+    }
+    activeConversationId = convId;
+
+    return matching.length;
+  } catch (_e) {
+    // Best-effort: storage failures degrade to caller-side fallback.
+    return 0;
   }
 }
 
@@ -757,8 +900,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     new FSBSpeechToText(chatInput, micBtn, sendBtn);
   }
 
-  // Add welcome message
-  addMessage('Welcome to FSB. How can I help?', 'system');
+  // Phase 11 debug-phase-11-sidepanel-reopen-empty -- hydrate the chat
+  // surface from the per-tab conversation's persisted session log BEFORE
+  // adding the welcome message. If conversationId is null (D-17 lazy
+  // mint: no entry minted yet on this tab) OR no matching session rows
+  // exist (fresh conversation), the welcome message renders into an
+  // empty chat as before. Otherwise prior user prompts + ai completions
+  // replay in chronological order and the welcome is suppressed -- the
+  // user sees their conversation continuation, not a redundant greeting.
+  var hydratedCount = 0;
+  try {
+    hydratedCount = await hydrateChatFromConversationId(conversationId);
+  } catch (_e) { /* swallow: hydrate is best-effort */ }
+
+  if (hydratedCount === 0) {
+    // No prior conversation to restore -- show the welcome greeting.
+    addMessage('Welcome to FSB. How can I help?', 'system');
+  }
 
   // Focus the input
   chatInput.focus();
