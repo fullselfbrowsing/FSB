@@ -6423,6 +6423,32 @@ async function handleStartAutomation(request, sender, sendResponse) {
     // Get the target tab ID (may be updated by smart tab management below)
     let targetTabId = tabId || sender.tab?.id;
 
+    // Phase 12 FINT-24 (Plan 12-04) -- per-tab sidepanel auto-open binding.
+    // The setOptions + open awaits MUST be the FIRST awaits in this handler
+    // so the user-gesture context (originating from the sendBtn click in
+    // sidepanel.js -> chrome.runtime.sendMessage round-trip) is preserved
+    // through to the panel-open call per Chrome MV3 user-gesture contract
+    // (12-RESEARCH Section 7.1 + Pitfall 2 -- gesture decays through long
+    // await chains; calling these two awaits BEFORE any other await
+    // prevents the decay). Best-effort try/catch per CONTEXT D-13:
+    // sidePanel API failure does NOT abort automation. Graceful
+    // degradation on Chrome <114 (the API is undefined; rare).
+    if (targetTabId && typeof chrome.sidePanel !== 'undefined') {
+      try {
+        await chrome.sidePanel.setOptions({
+          tabId: targetTabId,
+          enabled: true,
+          path: 'ui/sidepanel.html'
+        });
+        await chrome.sidePanel.open({ tabId: targetTabId });
+      } catch (sidePanelErr) {
+        console.warn('[FSB] Phase 12 FINT-24 sidePanel auto-open failed', {
+          tabId: targetTabId,
+          error: sidePanelErr && sidePanelErr.message
+        });
+      }
+    }
+
     // Check for existing conversation session for follow-up reuse
     if (conversationId && conversationSessions.has(conversationId)) {
       const convEntry = conversationSessions.get(conversationId);
