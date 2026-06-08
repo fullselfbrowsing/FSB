@@ -13000,30 +13000,6 @@ chrome.action.onClicked.addListener(async (tab) => {
   armMcpBridge('action.onClicked');
   automationLogger.logInit('sidepanel', 'opening', { windowId: tab.windowId });
 
-  // QT-7bi-01 (force-open with welcome state) -- ensure the per-tab
-  // enabled flag is true BEFORE chrome.sidePanel.open so a previously
-  // collapsed tab (from chrome.tabs.onActivated isWorking=false branch)
-  // can be force-opened by the user clicking the action icon. Per
-  // CONTEXT D-02: never block manual open. Defensive try/catch; the
-  // existing open call below already has its own try/catch so a failure
-  // here MUST NOT short-circuit the open attempt.
-  if (tab && typeof tab.id === 'number'
-      && typeof chrome.sidePanel !== 'undefined'
-      && typeof chrome.sidePanel.setOptions === 'function') {
-    try {
-      await chrome.sidePanel.setOptions({
-        tabId: tab.id,
-        enabled: true,
-        path: 'ui/sidepanel.html'
-      });
-    } catch (setErr) {
-      console.warn('[FSB] QT-7bi-01 force-open setOptions failed', {
-        tabId: tab.id,
-        error: setErr && setErr.message
-      });
-    }
-  }
-
   // Open global side panel for the entire browser window
   try {
     await chrome.sidePanel.open({ windowId: tab.windowId });
@@ -13036,41 +13012,6 @@ chrome.action.onClicked.addListener(async (tab) => {
       type: 'popup',
       width: 400,
       height: 600
-    });
-  }
-});
-
-// QT-7bi-01 (panel-visibility per-tab) -- chrome.tabs.onActivated listener.
-// Toggles chrome.sidePanel.setOptions({ tabId, enabled }) so the panel
-// collapses on non-working tabs and re-enables on working tabs. Working
-// means findActiveAutomationSessionForTab(tabId) is truthy (the tab has
-// an in-flight FSB automation session). Per CONTEXT D-01: all working
-// tabs stay enabled simultaneously -- the active-tab change ONLY mutates
-// state for the tab being activated; other working tabs are NOT touched.
-// Best-effort try/catch: sidePanel API failure must not break tab switching.
-// Chrome <114 has no chrome.sidePanel -- typeof guard skips silently.
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  try {
-    if (!activeInfo || typeof activeInfo.tabId !== 'number') return;
-    if (typeof chrome.sidePanel === 'undefined'
-        || typeof chrome.sidePanel.setOptions !== 'function') return;
-    var isWorking = !!findActiveAutomationSessionForTab(activeInfo.tabId);
-    if (isWorking) {
-      await chrome.sidePanel.setOptions({
-        tabId: activeInfo.tabId,
-        enabled: true,
-        path: 'ui/sidepanel.html'
-      });
-    } else {
-      await chrome.sidePanel.setOptions({
-        tabId: activeInfo.tabId,
-        enabled: false
-      });
-    }
-  } catch (err) {
-    console.warn('[FSB] QT-7bi-01 sidePanel setOptions failed', {
-      tabId: activeInfo && activeInfo.tabId,
-      error: err && err.message
     });
   }
 });
