@@ -5387,22 +5387,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       handleAICall(request, sender, sendResponse);
       return true; // Will respond asynchronously
       
-    case 'getStatus':
-      // Return sessionIds so UI can recover after service worker restart
-      const sessionIds = Array.from(activeSessions.keys());
-      const firstSession = sessionIds.length > 0 ? activeSessions.get(sessionIds[0]) : null;
+    case 'getStatus': {
+      // QT-wnz Codex-2 -- tab-scoped status lookup.
+      // Pre-wnz: returned sessionIds[0] globally; a fresh sidepanel document
+      // on Tab B would adopt sess_A if sess_A was activeSessions.keys()[0],
+      // poisoning Tab B's currentSessionId. See CODEX-RESPONSE.md L10042.
+      var _allSessionIds = Array.from(activeSessions.keys());
+      var _scopedSessionIds = _allSessionIds;
+      var _scopedFirst = null;
+      if (typeof request.activeTabId === 'number') {
+        _scopedSessionIds = _allSessionIds.filter(function (sid) {
+          var s = activeSessions.get(sid);
+          return s && s.tabId === request.activeTabId;
+        });
+        _scopedFirst = _scopedSessionIds.length > 0 ? activeSessions.get(_scopedSessionIds[0]) : null;
+      } else {
+        // Backward-compat: legacy callers (popup.js) may omit activeTabId.
+        // Preserve global sessionIds[0] behavior + warn so we can find them.
+        console.warn('[FSB] getStatus called without activeTabId -- legacy global-scope fallback. See .planning/quick/260608-wnz-codex-strategy-b-5-item-architectural-fi/');
+        _scopedFirst = _allSessionIds.length > 0 ? activeSessions.get(_allSessionIds[0]) : null;
+      }
       sendResponse({
         status: 'ready',
-        activeSessions: activeSessions.size,
-        sessionIds: sessionIds,
-        currentSessionId: sessionIds[0] || null,  // First active session for UI recovery
-        currentTask: firstSession?.task || null,
-        currentStartTime: firstSession?.startTime || null,
-        currentIterationCount: firstSession?.iterationCount || 0,
-        currentMaxIterations: firstSession?.maxIterations || 100,
-        currentActionCount: firstSession?.actionHistory?.length || 0
+        activeSessions: _scopedSessionIds.length,
+        sessionIds: _scopedSessionIds,
+        currentSessionId: _scopedSessionIds[0] || null,
+        currentTask: _scopedFirst?.task || null,
+        currentStartTime: _scopedFirst?.startTime || null,
+        currentIterationCount: _scopedFirst?.iterationCount || 0,
+        currentMaxIterations: _scopedFirst?.maxIterations || 100,
+        currentActionCount: _scopedFirst?.actionHistory?.length || 0
       });
       break;
+    }
 
     case 'checkSessionAlive': {
       const sessionId = request.sessionId;

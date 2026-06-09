@@ -1048,8 +1048,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Check current status
-  chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
+  // QT-wnz Codex-2 -- send activeTabId so background returns only sessions
+  // owned by THIS tab. Pre-wnz the call omitted activeTabId and background
+  // returned sessionIds[0] globally, which is wrong when another tab has
+  // an older active session.
+  chrome.runtime.sendMessage({ action: 'getStatus', activeTabId: _activeTabIdSnapshot }, (response) => {
     if (chrome.runtime.lastError) {
       console.log('Background script not ready yet');
       return;
