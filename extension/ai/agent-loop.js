@@ -1512,6 +1512,26 @@ async function runAgentIteration(sessionId, options) {
   // Helper: full session finalization (overlays + logger + sidepanel + cleanup)
   async function finalizeSession(sid, sess, terminal) {
     saveToLogger(sid, sess, sess.status);
+    // QT-wnz Codex-3 -- background-side authoritative terminal persist
+    // BEFORE broadcast. Defends against sidepanel context fanout +
+    // ephemeral doc lifetime; the durable write must not depend on which
+    // sidepanel happens to be alive when the broadcast fires. The content
+    // chain (terminal.resultText -> sess.completionMessage -> default)
+    // mirrors notifySidepanel L1441 so what gets persisted MATCHES what
+    // notifySidepanel broadcasts as request.result; C4's dedupe correctly
+    // recognizes it as "the same message."
+    try {
+      var helperHost = (typeof globalThis !== 'undefined') ? globalThis : null;
+      if (helperHost && typeof helperHost.fsbPersistTerminalMessageToConversation === 'function') {
+        var _convId = sess && sess.conversationId;
+        var _content = (terminal && (terminal.resultText || terminal.summary))
+          || (sess && (sess.completionMessage || sess.result))
+          || 'Task completed.';
+        if (typeof _convId === 'string' && _convId.length > 0) {
+          await helperHost.fsbPersistTerminalMessageToConversation(_convId, sid, _content);
+        }
+      }
+    } catch (_e) { /* non-fatal */ }
     notifySidepanel(sid, sess, terminal);
     // Give the final overlay state a moment to render before cleanup clears it.
     await sleep(900);

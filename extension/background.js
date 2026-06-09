@@ -2157,6 +2157,81 @@ function fsbBroadcastAutomationLifecycle(message) {
 if (typeof globalThis !== 'undefined') {
   globalThis.fsbBroadcastAutomationLifecycle = fsbBroadcastAutomationLifecycle;
 }
+
+/**
+ * QT-wnz Codex-3 -- background-side authoritative terminal persist.
+ *
+ * Writes an assistant terminal message into chrome.storage.local key
+ * 'fsbConversationMessages' (the same envelope sidepanel reads via
+ * FSBSidepanelMessageLog) so the durable record exists BEFORE the
+ * broadcast goes out. Sidepanel's automationComplete handler still
+ * persists as an idempotent backup (C4 adds dedupe to make this safe).
+ *
+ * Idempotency: scans the per-conv log for any existing message with
+ * sessionId === sessionId AND terminal === true. If found, no-op.
+ *
+ * Best-effort: chrome.storage failures swallowed silently. The broadcast
+ * still goes out via the caller (finalizeSession -> notifySidepanel).
+ *
+ * @param {string} convId
+ * @param {string} sessionId
+ * @param {string} content
+ * @returns {Promise<void>}
+ */
+async function fsbPersistTerminalMessageToConversation(convId, sessionId, content) {
+  if (typeof convId !== 'string' || convId.length === 0) return;
+  if (typeof sessionId !== 'string' || sessionId.length === 0) return;
+  if (typeof content !== 'string' || content.length === 0) return;
+  try {
+    var STORAGE_KEY = 'fsbConversationMessages';
+    var bag = await chrome.storage.local.get(STORAGE_KEY);
+    var envelope = bag[STORAGE_KEY];
+    if (!envelope || envelope.v !== 1 || !envelope.byConv || !Array.isArray(envelope.lru)) {
+      envelope = { v: 1, byConv: {}, lru: [] };
+    }
+    var log = envelope.byConv[convId];
+    var now = Date.now();
+    if (!log || !Array.isArray(log.messages)) {
+      log = { v: 1, messages: [], lastWriteAt: now, createdAt: now };
+      envelope.byConv[convId] = log;
+    }
+    // Idempotency: skip if terminal for this sessionId already present.
+    for (var i = 0; i < log.messages.length; i++) {
+      var m = log.messages[i];
+      if (m && m.sessionId === sessionId && m.terminal === true) {
+        return;
+      }
+    }
+    log.messages.push({
+      role: 'assistant',
+      content: content,
+      timestamp: now,
+      kind: 'text',
+      sessionId: sessionId,
+      terminal: true
+    });
+    log.lastWriteAt = now;
+    // LRU touch (head).
+    var idx = envelope.lru.indexOf(convId);
+    if (idx !== -1) envelope.lru.splice(idx, 1);
+    envelope.lru.unshift(convId);
+    // Cap = 50 (matches sidepanel-message-log.js DEFAULT_CAP).
+    while (envelope.lru.length > 50) {
+      var tailKey = envelope.lru.pop();
+      if (tailKey) delete envelope.byConv[tailKey];
+    }
+    var payload = {};
+    payload[STORAGE_KEY] = envelope;
+    await chrome.storage.local.set(payload);
+  } catch (_e) {
+    // Best-effort: do not block broadcast on storage failure.
+  }
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.fsbPersistTerminalMessageToConversation = fsbPersistTerminalMessageToConversation;
+}
+
 const mcpVisualSessionManager = (typeof MCPVisualSessionUtils !== 'undefined' && typeof MCPVisualSessionUtils.McpVisualSessionManager === 'function')
   ? new MCPVisualSessionUtils.McpVisualSessionManager()
   : null;
