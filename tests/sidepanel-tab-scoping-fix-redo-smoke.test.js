@@ -75,25 +75,29 @@ function extractAfterAnchor(src, anchor) {
 }
 
 // =====================================================================
-// PART 1 -- REMOVED per Strategy B (debug session qt93i-regression, 2026-06-08)
+// PART 1 -- RE-ADDED for Chrome 141+ sidePanel.close auto-collapse (A-FIX)
 // =====================================================================
 //
-// The chrome.tabs.onActivated listener in background.js was reverted because
-// chrome.sidePanel.setOptions({tabId, enabled:false}) does NOT hide an
-// already-open side panel when the manifest declares side_panel.default_path
-// (Chrome architectural limitation, pre-Chrome-141). The per-tab CONTENT
-// scoping (swapToTabConversation + _tabRunningMap) delivers the actual
-// user-visible per-tab behavior; the panel itself stays visible on every tab.
+// Updated for QT-uof-6 (.planning/debug/cluster1-routing.md Cluster 2
+// leftover items). The chrome.tabs.onActivated listener is RE-ADDED but
+// uses the Chrome 141+ chrome.sidePanel.close({windowId}) API -- a
+// SEPARATE API from setOptions({tabId, enabled:false}) -- with a
+// feature-detect (typeof chrome.sidePanel.close === 'function') so
+// pre-141 installs degrade silently. The original prohibition on
+// setOptions enabled:false (qt93i-regression.md) STILL stands; only
+// the new close() API is in scope.
 //
-// See .planning/debug/qt93i-regression.md for the full root-cause analysis.
-// See .planning/quick/260608-bu4-qt93i-regression-strategy-b-revert-auto-/260608-bu4-PLAN.md for the closure plan.
-//
-// Defensive assertion: confirm the listener stays REMOVED. If a future plan
-// re-introduces chrome.tabs.onActivated in background.js, this assertion
-// fires loudly so the author re-reads the debug doc before shipping.
-console.log('\nPart 1 -- chrome.tabs.onActivated listener REMOVED per Strategy B:');
-ok(bgSrc.indexOf('chrome.tabs.onActivated.addListener') === -1,
-   'Part 1 -- chrome.tabs.onActivated listener REMOVED from background.js per Strategy B');
+// Per-window has-any-working-tab gate: enumerate chrome.tabs.query({windowId})
+// and filter via findActiveAutomationSessionForTab so a user switching from
+// a working Tab A to a non-working Tab B in the SAME window does NOT lose
+// Tab A's panel.
+console.log('\nPart 1 -- chrome.tabs.onActivated listener RE-ADDED for Chrome 141+ sidePanel.close auto-collapse:');
+ok(bgSrc.indexOf('chrome.tabs.onActivated.addListener') !== -1,
+   'Part 1 -- chrome.tabs.onActivated listener PRESENT in background.js (A-FIX cluster1-routing.md)');
+ok(bgSrc.indexOf('chrome.sidePanel.close') !== -1,
+   'Part 1 -- chrome.sidePanel.close call present (Chrome 141+ auto-collapse)');
+ok(bgSrc.indexOf('findActiveAutomationSessionForTab') !== -1,
+   'Part 1 -- per-window has-any-working-tab gate via findActiveAutomationSessionForTab');
 
 runPart2();
 

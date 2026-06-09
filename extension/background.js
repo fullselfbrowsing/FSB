@@ -852,6 +852,55 @@ function findActiveAutomationSessionForTab(tabId) {
   return null;
 }
 
+// QT-uof-6 (A-FIX) -- Chrome 141+ sidePanel.close auto-collapse with
+// per-window has-any-working-tab gate. See .planning/debug/cluster1-routing.md
+// Cluster 2 leftover items + memory file project_chrome_sidepanel_no_close.md
+// (amended in this same commit with an EXCEPTION block for the Chrome 141+
+// close() API).
+//
+// Pre-Chrome-141: silently skip (feature-detect via typeof). The original
+// memory prohibition on setOptions({tabId, enabled:false}) STILL stands --
+// this listener uses chrome.sidePanel.close({windowId}), which is a
+// SEPARATE API added in Chrome 141+ that operates per-window and DOES
+// close the panel reliably even when the manifest declares
+// side_panel.default_path.
+//
+// Per-window gate: if ANY tab in the activated tab's window has an active
+// automation session (e.g., user switches from working Tab A to non-working
+// Tab B in the SAME window), DO NOT close -- Tab A's panel must stay
+// visible. Only close when NO tab in the window has an active session.
+chrome.tabs.onActivated.addListener(async function (activeInfo) {
+  try {
+    if (typeof chrome.sidePanel === 'undefined') return;
+    if (typeof chrome.sidePanel.close !== 'function') return; // pre-Chrome-141
+
+    var activatedTabId = activeInfo && activeInfo.tabId;
+    var activatedWindowId = activeInfo && activeInfo.windowId;
+    if (typeof activatedTabId !== 'number' || typeof activatedWindowId !== 'number') return;
+
+    // Per-window has-any-working-tab gate.
+    var tabsInWindow = await chrome.tabs.query({ windowId: activatedWindowId });
+    var anyWorking = false;
+    for (var i = 0; i < tabsInWindow.length; i++) {
+      var t = tabsInWindow[i];
+      if (t && typeof t.id === 'number' && findActiveAutomationSessionForTab(t.id)) {
+        anyWorking = true;
+        break;
+      }
+    }
+    if (anyWorking) return; // keep panel visible -- some tab in this window still working
+
+    // No working tab in this window -- close the panel.
+    try {
+      await chrome.sidePanel.close({ windowId: activatedWindowId });
+    } catch (closeErr) {
+      console.warn('[FSB] chrome.sidePanel.close failed (non-fatal)', closeErr && closeErr.message);
+    }
+  } catch (outerErr) {
+    console.warn('[FSB] chrome.tabs.onActivated A-FIX handler error', outerErr && outerErr.message);
+  }
+});
+
 async function updateMcpVisualSessionProgress(sessionToken, message) {
   const manager = getMcpVisualSessionManager();
   if (isMcpVisualSessionFinalizing(sessionToken)) {
