@@ -6480,6 +6480,16 @@ async function handleStartAutomation(request, sender, sendResponse) {
     // Get the target tab ID (may be updated by smart tab management below)
     let targetTabId = tabId || sender.tab?.id;
 
+    // QT-wnz Codex-1 -- the sidepanel reopen rekeys the document, which
+    // loses the post-send callback that records currentSessionId in this
+    // tab's _tabRunningMap. When the start request originated from inside
+    // an already-open sidepanel context (sender.url ends in
+    // 'ui/sidepanel.html'), skip the reopen. sender.tab may be undefined
+    // for sidepanel senders; sender.url is the durable discriminator per
+    // Chrome MV3 docs. Non-sidepanel callers (popup.js etc.) still hit
+    // the setOptions + open path below to bind the panel for first-open.
+    var _senderIsSidepanel = sender && typeof sender.url === 'string' && sender.url.endsWith('ui/sidepanel.html');
+
     // Phase 12 FINT-24 (Plan 12-04) -- per-tab sidepanel auto-open binding.
     // The setOptions + open awaits MUST be the FIRST awaits in this handler
     // so the user-gesture context (originating from the sendBtn click in
@@ -6490,7 +6500,7 @@ async function handleStartAutomation(request, sender, sendResponse) {
     // prevents the decay). Best-effort try/catch per CONTEXT D-13:
     // sidePanel API failure does NOT abort automation. Graceful
     // degradation on Chrome <114 (the API is undefined; rare).
-    if (targetTabId && typeof chrome.sidePanel !== 'undefined') {
+    if (targetTabId && typeof chrome.sidePanel !== 'undefined' && !_senderIsSidepanel) {
       try {
         await chrome.sidePanel.setOptions({
           tabId: targetTabId,
