@@ -167,6 +167,10 @@ function buildDispatcher(injection) {
     // QT-uof-5 (B-FIX) -- per-tab status intent helpers. The handler's
     // if-branch calls _clearTabStatusIntent after manual loader cleanup.
     '_clearTabStatusIntent', '_persistTabStatusIntent', '_restoreTabStatusIntent',
+    // QT-wnz Codex-4 -- dedupe guard references _messageLogPendingBuffer
+    // (sync buffer-peek) and FSBSidepanelMessageLog.hasTerminalForSession
+    // + .STORAGE_KEY (async storage-peek). Inject as test stubs.
+    '_messageLogPendingBuffer', 'FSBSidepanelMessageLog',
     fnSrc
   );
   return function dispatch(request) {
@@ -186,7 +190,8 @@ function buildDispatcher(injection) {
       injection.isHistoryViewActive, injection.historySessionId, injection.lastRenderedTerminalSessionId,
       injection.showSidepanelProgressEnabled,
       injection.chatMessages, injection.scrollToBottom,
-      injection.clearTabStatusIntent, injection.persistTabStatusIntent, injection.restoreTabStatusIntent
+      injection.clearTabStatusIntent, injection.persistTabStatusIntent, injection.restoreTabStatusIntent,
+      injection.messageLogPendingBuffer, injection.fsbSidepanelMessageLog
     );
   };
 }
@@ -353,9 +358,25 @@ function makeInjection(opts) {
     clearTabStatusIntent: clearTabStatusIntent,
     persistTabStatusIntent: persistTabStatusIntent,
     restoreTabStatusIntent: restoreTabStatusIntent,
+    // QT-wnz Codex-4 -- empty Map so the sync buffer-peek finds no
+    // pre-existing terminal entries (dedupe-flag stays false; existing
+    // assertions about persist+render call counts remain valid).
+    messageLogPendingBuffer: new Map(),
+    // QT-wnz Codex-4 -- hasTerminalForSession stub returns false so the
+    // async storage peek never triggers buffer trim (existing assertions
+    // hold). STORAGE_KEY is a string so the typeof check passes.
+    fsbSidepanelMessageLog: {
+      STORAGE_KEY: 'fsbConversationMessages',
+      hasTerminalForSession: function () { return false; }
+    },
     chrome: {
       runtime: {
         sendMessage: function (msg, cb) { if (typeof cb === 'function') cb({}); return Promise.resolve({}); }
+      },
+      storage: {
+        local: {
+          get: function () { return Promise.resolve({}); }
+        }
       },
       tabs: {
         query: function (filter, cb) {

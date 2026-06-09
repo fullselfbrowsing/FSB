@@ -109,6 +109,11 @@
     if (typeof msg.content !== 'string') return false;
     if (typeof msg.timestamp !== 'number' || !Number.isFinite(msg.timestamp)) return false;
     if (typeof msg.kind !== 'string' || !ALLOWED_KINDS[msg.kind]) return false;
+    // QT-wnz Codex-4 -- OPTIONAL sessionId + terminal fields. Validate ONLY
+    // when defined (preserves backward-compat: existing rows without these
+    // fields keep validating).
+    if (msg.sessionId !== undefined && typeof msg.sessionId !== 'string') return false;
+    if (msg.terminal !== undefined && typeof msg.terminal !== 'boolean') return false;
     return true;
   }
 
@@ -137,12 +142,18 @@
       };
       envelope.byConv[key] = log;
     }
-    log.messages.push({
+    // QT-wnz Codex-4 -- conditionally include sessionId + terminal so rows
+    // without these fields look identical to pre-wnz rows (backward-compat
+    // for getMessages consumers + on-disk envelope shape).
+    var row = {
       role: msg.role,
       content: msg.content,
       timestamp: msg.timestamp,
       kind: msg.kind
-    });
+    };
+    if (typeof msg.sessionId === 'string') row.sessionId = msg.sessionId;
+    if (msg.terminal === true) row.terminal = true;
+    log.messages.push(row);
     log.lastWriteAt = now;
     _touchLru(envelope, key);
     _enforceLruCap(envelope, DEFAULT_CAP);
@@ -164,14 +175,41 @@
     var out = [];
     for (var i = 0; i < log.messages.length; i++) {
       var m = log.messages[i];
-      out.push({
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp,
-        kind: m.kind
-      });
+      // QT-wnz Codex-4 -- conditionally include sessionId + terminal so
+      // legacy consumers see identical shape; new consumers see the
+      // optional fields when present.
+      var row = { role: m.role, content: m.content, timestamp: m.timestamp, kind: m.kind };
+      if (typeof m.sessionId === 'string') row.sessionId = m.sessionId;
+      if (m.terminal === true) row.terminal = true;
+      out.push(row);
     }
     return out;
+  }
+
+  /**
+   * QT-wnz Codex-4 -- idempotency check for terminal completion messages.
+   * Returns true if any message in convId's log has sessionId === sessionId
+   * AND terminal === true. Used by sidepanel automationComplete handler to
+   * skip duplicate persist+render when background or another sidepanel
+   * context has already written the terminal.
+   *
+   * @param {object} envelope
+   * @param {string} convId
+   * @param {string} sessionId
+   * @returns {boolean}
+   */
+  function hasTerminalForSession(envelope, convId, sessionId) {
+    if (!isValidEnvelope(envelope)) return false;
+    var key = _normalizeConvId(convId);
+    if (key === null) return false;
+    if (typeof sessionId !== 'string' || sessionId.length === 0) return false;
+    var log = envelope.byConv[key];
+    if (!log || !Array.isArray(log.messages)) return false;
+    for (var i = 0; i < log.messages.length; i++) {
+      var m = log.messages[i];
+      if (m && m.sessionId === sessionId && m.terminal === true) return true;
+    }
+    return false;
   }
 
   /**
@@ -286,6 +324,7 @@
     appendMessage: appendMessage,
     getMessages: getMessages,
     dropConversationMessages: dropConversationMessages,
+    hasTerminalForSession: hasTerminalForSession,
     _touchLru: _touchLru,
     _enforceLruCap: _enforceLruCap,
     createDebouncer: createDebouncer

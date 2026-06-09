@@ -1953,7 +1953,7 @@ function _persistMessage(role, content, kind) {
  * Storage failures swallow silently -- DOM render must never block on
  * persistence (mirrors _persistMessage contract).
  */
-function _persistMessageToConversation(role, content, kind, convId) {
+function _persistMessageToConversation(role, content, kind, convId, sessionId, terminal) {
   if (typeof FSBSidepanelMessageLog === 'undefined') return;
   if (!convId || typeof convId !== 'string') return;
   if (typeof content !== 'string' || content.length === 0) return;
@@ -1967,12 +1967,18 @@ function _persistMessageToConversation(role, content, kind, convId) {
     buffer = [];
     _messageLogPendingBuffer.set(convId, buffer);
   }
-  buffer.push({
+  var row = {
     role: resolvedRole,
     content: content,
     timestamp: Date.now(),
     kind: resolvedKind
-  });
+  };
+  // QT-wnz Codex-4 -- carry sessionId + terminal through to envelope so
+  // hasTerminalForSession can dedupe redundant terminal writes (post-C3
+  // the background already persisted; sidepanel is now idempotent backup).
+  if (typeof sessionId === 'string' && sessionId.length > 0) row.sessionId = sessionId;
+  if (terminal === true) row.terminal = true;
+  buffer.push(row);
 
   _messageLogDebouncer.schedule(convId, function () {
     return _flushMessageLog(convId);
@@ -2462,11 +2468,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? request.conversationId
         : conversationId;
 
+      // QT-wnz Codex-4 -- dedupe guard. Background C3 already persisted the
+      // terminal entry BEFORE this broadcast fired. Check fsbConversationMessages
+      // for an existing terminal entry for this sessionId on this convId; if
+      // present, skip BOTH the redundant persist AND the redundant DOM render
+      // (the user already saw it, or will see it via hydrate-on-swap from the
+      // authoritative background write).
+      var _wnzTerminalDedupe = false;
+      try {
+        var _pendingBuf = (typeof _messageLogPendingBuffer !== 'undefined' && _messageLogPendingBuffer)
+          ? _messageLogPendingBuffer.get(originatingConvId)
+          : null;
+        if (Array.isArray(_pendingBuf)) {
+          for (var _bi = 0; _bi < _pendingBuf.length; _bi++) {
+            var _bm = _pendingBuf[_bi];
+            if (_bm && _bm.sessionId === request.sessionId && _bm.terminal === true) {
+              _wnzTerminalDedupe = true;
+              break;
+            }
+          }
+        }
+      } catch (_e) { /* swallow -- best-effort */ }
+
+      if (!_wnzTerminalDedupe && typeof FSBSidepanelMessageLog !== 'undefined' &&
+          typeof FSBSidepanelMessageLog.hasTerminalForSession === 'function' &&
+          typeof FSBSidepanelMessageLog.STORAGE_KEY === 'string') {
+        // Fire-and-forget async storage peek. If storage confirms a prior
+        // terminal write (background C3 path or another sidepanel context),
+        // remove any same-sessionId+terminal entry we just buffered so the
+        // debounced flush does not produce a duplicate. Cannot await here
+        // (handler is sync) -- the buffer-peek above is the primary guard.
+        (async function () {
+          try {
+            var bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+            if (FSBSidepanelMessageLog.hasTerminalForSession(bag[FSBSidepanelMessageLog.STORAGE_KEY], originatingConvId, request.sessionId)) {
+              if (typeof _messageLogPendingBuffer !== 'undefined' && _messageLogPendingBuffer) {
+                var _b = _messageLogPendingBuffer.get(originatingConvId);
+                if (Array.isArray(_b)) {
+                  for (var _i = _b.length - 1; _i >= 0; _i--) {
+                    if (_b[_i] && _b[_i].sessionId === request.sessionId && _b[_i].terminal === true) {
+                      _b.splice(_i, 1);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_storageErr) { /* swallow */ }
+        })();
+      }
+
       // D-FIX: persistence runs UNCONDITIONALLY for any session-matched
       // message. Absence of this call on the background-tab path was the
       // primary D root cause -- conv_B's message log stayed empty so
       // hydrate-on-swap rendered nothing for the missing-second-completion.
-      _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId);
+      // QT-wnz Codex-4 -- now gated on the dedupe-flag + carries the
+      // sessionId + terminal:true markers so future fanouts can dedupe.
+      if (!_wnzTerminalDedupe) {
+        _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId, request.sessionId, true);
+      }
 
       // Resolve the originating tabId. request.tabId is now threaded
       // through every automationComplete broadcast site per QT-uof-2;
@@ -2483,8 +2542,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // the same conv we already wrote above. Manually clear the loader
       // DOM and invoke _renderCompletionDomOnly directly so the bubble
       // renders exactly once and persistence fires exactly once.
+      // QT-wnz Codex-4 -- DOM render is now also gated on the dedupe-flag;
+      // if a prior context already rendered, hydrate-on-swap from storage
+      // will surface the message instead.
       var isOriginatingActive = (originatingConvId === conversationId);
-      if (isOriginatingActive) {
+      if (!_wnzTerminalDedupe && isOriginatingActive) {
         if (currentStatusMessage) {
           try { currentStatusMessage.remove(); } catch (_e) {}
           currentStatusMessage = null;
