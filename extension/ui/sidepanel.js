@@ -2330,101 +2330,136 @@ async function recoverLatestThreadTerminalOutcome(options = {}) {
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
+    // QT-uof-1 (D-FIX + E-FIX) -- see .planning/debug/cluster1-routing.md.
+    //
+    // D-FIX (Symptom D, primary): pre-fix outer bail at this case dropped
+    // EVERY completion whose sessionId did not match currentSessionId. That
+    // meant background-tab sessions never got persisted into their own
+    // conv's message log, and their _tabRunningMap entry never flipped to
+    // isRunning:false. The relaxed outer guard below admits ANY session
+    // that lives in _tabRunningMap (active OR background); persistence and
+    // per-tab state updates run UNCONDITIONALLY for those messages. Only
+    // the DOM render stays gated on isOriginatingActive.
+    //
+    // E-FIX (Symptom E, secondary): the pre-fix active-tab path called
+    // _persistMessageToConversation, THEN completeStatusMessage, which calls
+    // addCompletionMessage, which calls _persistMessage AGAIN against the
+    // module-scope conversationId (== originatingConvId when active). That
+    // produced a double-persist into conv_A. The if-branch below now
+    // manually removes the loader DOM and invokes _renderCompletionDomOnly
+    // directly so persistence fires EXACTLY ONCE.
     case 'automationComplete': {
-      if (!isRunning && request.sessionId !== currentSessionId) {
-        // QT-7bi-02 -- if the completion is for OUR currentSessionId we
-        // must still process it (clear running state). If isRunning is
-        // already false AND the session is not ours, drop the duplicate.
-        return;
-      }
-      if (request.sessionId === currentSessionId) {
-        // AI must always provide a meaningful completion message
-        var completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
-        var isPartial = request.partial === true;
-
-        // QT-7bi-02 -- persist FIRST against request.conversationId so the
-        // originating conversation's log captures the completion regardless
-        // of which tab is currently displayed. Falls back to module-scope
-        // conversationId only when the broadcast did not supply one
-        // (defensive; all 15+ background.js call sites do supply it).
-        var originatingConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
-          ? request.conversationId
-          : conversationId;
-        _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId);
-
-        // QT-7bi-02 -- DOM render only when the originating conv matches the
-        // currently-displayed conv. Otherwise the message is persisted
-        // silently and replays via hydrateChatFromConversationId when the
-        // user switches to the originating tab.
-        var isOriginatingActive = (originatingConvId === conversationId);
-        if (isOriginatingActive) {
-          if (currentStatusMessage) {
-            completeStatusMessage(completionMessage, isPartial ? 'partial' : undefined);
-          } else {
-            // addCompletionMessage internally calls _persistMessage which uses
-            // the module-scope conversationId. Since isOriginatingActive===true
-            // here, the module-scope conversationId already equals
-            // originatingConvId, so the double-write would persist the same
-            // message twice into the same conv. Inline a DOM-only render to
-            // avoid the duplicate.
-            _renderCompletionDomOnly(completionMessage, 'ai', isPartial);
+      // D-FIX: relaxed outer guard. We accept the message if it targets
+      // (a) our currently-active sessionId, OR (b) any sessionId carried
+      // by a known _tabRunningMap entry (background-tab completion). Drop
+      // only when the sessionId is genuinely unknown to this sidepanel.
+      var sessionKnown = (request.sessionId === currentSessionId);
+      if (!sessionKnown) {
+        var _iter = _tabRunningMap.values();
+        var _n = _iter.next();
+        while (!_n.done) {
+          if (_n.value && _n.value.sessionId === request.sessionId) {
+            sessionKnown = true;
+            break;
           }
+          _n = _iter.next();
         }
+      }
+      if (!sessionKnown) return;
 
-        // QT-93i-02 -- resolve the originating tab from the broadcast
-        // payload. background.js fsbBroadcastAutomationLifecycle includes
-        // tabId on every automationComplete payload (verified -- session.tabId
-        // is persisted at session creation). Fall back to the active tab
-        // when tabId is missing (defensive; pre-93i baseline).
-        var originatingTabId = (typeof request.tabId === 'number')
-          ? request.tabId
-          : _activeTabIdSnapshot;
-        setIdleState(originatingTabId);
-        // Refresh history list if history view is active
-        if (isHistoryViewActive) {
-          loadHistoryList();
+      // AI must always provide a meaningful completion message.
+      var completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
+      var isPartial = request.partial === true;
+
+      // Resolve the originating conv from the broadcast (falls back to
+      // module-scope only when the broadcast omitted it; agent-loop +
+      // background.js both supply it per QT-7bi-02 + QT-uof-2).
+      var originatingConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
+        ? request.conversationId
+        : conversationId;
+
+      // D-FIX: persistence runs UNCONDITIONALLY for any session-matched
+      // message. Absence of this call on the background-tab path was the
+      // primary D root cause -- conv_B's message log stayed empty so
+      // hydrate-on-swap rendered nothing for the missing-second-completion.
+      _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId);
+
+      // Resolve the originating tabId. request.tabId is now threaded
+      // through every automationComplete broadcast site per QT-uof-2;
+      // _resolveTabIdForSession is the defense-in-depth fallback that
+      // walks _tabRunningMap for a matching sessionId.
+      var originatingTabId = (typeof request.tabId === 'number')
+        ? request.tabId
+        : _resolveTabIdForSession(request.sessionId);
+
+      // E-FIX: the if-branch (active tab AND currentStatusMessage non-null)
+      // must NOT call completeStatusMessage. completeStatusMessage routes
+      // through addCompletionMessage, which calls _persistMessage against
+      // the module-scope conversationId -- producing a SECOND persist into
+      // the same conv we already wrote above. Manually clear the loader
+      // DOM and invoke _renderCompletionDomOnly directly so the bubble
+      // renders exactly once and persistence fires exactly once.
+      var isOriginatingActive = (originatingConvId === conversationId);
+      if (isOriginatingActive) {
+        if (currentStatusMessage) {
+          try { currentStatusMessage.remove(); } catch (_e) {}
+          currentStatusMessage = null;
+          currentActionGroup = null;
         }
+        _renderCompletionDomOnly(completionMessage, isPartial ? 'partial' : 'ai', isPartial);
+      }
 
-        // Check if reconnaissance could help (partial/stuck completions on unmapped sites).
-        // Only fire on the originating tab so the recon prompt lands on the right surface.
-        if (isPartial && isOriginatingActive) {
-          (async () => {
-            try {
-              const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-              const currentUrl = tabs[0]?.url;
-              if (currentUrl && currentUrl.startsWith('http')) {
-                const domain = new URL(currentUrl).hostname;
-                const siteMapCheck = await chrome.runtime.sendMessage({
-                  action: 'checkSiteMap',
-                  domain
+      // D-FIX: per-tab state update UNCONDITIONALLY. setIdleState only
+      // mutates the active-tab UI when target === _activeTabIdSnapshot;
+      // for background tabs it simply flips the per-tab entry so the
+      // owning tab's sendBtn re-enables on swap-back.
+      setIdleState(originatingTabId);
+
+      // Refresh history list if history view is active.
+      if (isHistoryViewActive) {
+        loadHistoryList();
+      }
+
+      // Recon suggestion (preserved verbatim) -- only fires on the active
+      // tab + partial completion path, so this gate is unchanged from
+      // QT-7bi-02.
+      if (isPartial && isOriginatingActive) {
+        (async () => {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const currentUrl = tabs[0]?.url;
+            if (currentUrl && currentUrl.startsWith('http')) {
+              const domain = new URL(currentUrl).hostname;
+              const siteMapCheck = await chrome.runtime.sendMessage({
+                action: 'checkSiteMap',
+                domain
+              });
+
+              if (!siteMapCheck || !siteMapCheck.exists) {
+                const reconDiv = document.createElement('div');
+                reconDiv.className = 'message system new recon-suggestion';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'recon-suggestion-text';
+                textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
+                reconDiv.appendChild(textSpan);
+
+                const reconBtn = document.createElement('button');
+                reconBtn.className = 'recon-btn';
+                reconBtn.id = 'reconFromSidepanel';
+                reconBtn.textContent = 'Run Reconnaissance';
+                reconBtn.addEventListener('click', () => {
+                  startReconFromSidepanel(currentUrl, request.task || completionMessage);
                 });
+                reconDiv.appendChild(reconBtn);
 
-                if (!siteMapCheck || !siteMapCheck.exists) {
-                  const reconDiv = document.createElement('div');
-                  reconDiv.className = 'message system new recon-suggestion';
-                  const textSpan = document.createElement('span');
-                  textSpan.className = 'recon-suggestion-text';
-                  textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
-                  reconDiv.appendChild(textSpan);
-
-                  const reconBtn = document.createElement('button');
-                  reconBtn.className = 'recon-btn';
-                  reconBtn.id = 'reconFromSidepanel';
-                  reconBtn.textContent = 'Run Reconnaissance';
-                  reconBtn.addEventListener('click', () => {
-                    startReconFromSidepanel(currentUrl, request.task || completionMessage);
-                  });
-                  reconDiv.appendChild(reconBtn);
-
-                  chatMessages.appendChild(reconDiv);
-                  scrollToBottom();
-                }
+                chatMessages.appendChild(reconDiv);
+                scrollToBottom();
               }
-            } catch (e) {
-              console.warn('Recon suggestion check failed:', e.message);
             }
-          })();
-        }
+          } catch (e) {
+            console.warn('Recon suggestion check failed:', e.message);
+          }
+        })();
       }
       break;
     }
