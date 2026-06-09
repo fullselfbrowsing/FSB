@@ -865,6 +865,12 @@ try {
     // sequentially; both are best-effort, so a failure in one does not
     // poison the other.
     chrome.tabs.onActivated.addListener(async (activeInfo) => {
+      // QT-uof-5 (B-FIX) -- persist the OUTGOING tab's
+      // (currentStatusMessage, currentActionGroup) BEFORE the swap clobbers
+      // them. Read _activeTabIdSnapshot here (pre-reassignment) so the
+      // entry is keyed by the tab the user is leaving.
+      try { _persistTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
+
       try { await refreshOwnerChip(); } catch (_e) { /* swallow */ }
       try { await swapToTabConversation(activeInfo && activeInfo.tabId); } catch (_e) { /* swallow */ }
 
@@ -885,6 +891,12 @@ try {
           }
         }
       } catch (_e) { /* swallow: re-sync is best-effort */ }
+
+      // QT-uof-5 (B-FIX) -- restore the INCOMING tab's previously-persisted
+      // (currentStatusMessage, currentActionGroup). When the tab has no
+      // entry (never had a loader), this nulls the module-scope vars so
+      // subsequent code does not inherit the outgoing tab's references.
+      try { _restoreTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
     });
   }
 } catch (_e) {
@@ -1505,7 +1517,19 @@ function setIdleState(tabId) {
       currentStatusMessage = null;
     }
     currentActionGroup = null;
+    // QT-uof-5 (B-FIX) -- active tab is now idle; the per-tab intent mirror
+    // for this tab should match (statusMessage = null, actionGroup = null).
+    // Drop the entry so a future swap-IN does not restore a stale loader.
+    _clearTabStatusIntent(_activeTabIdSnapshot);
     updateSendButtonState();
+  } else if (typeof targetTabId === 'number') {
+    // QT-uof-5 (B-FIX) -- background tab transitioned to idle. Drop its
+    // per-tab intent so a future swap-IN does not restore a stale loader
+    // reference (the DOM the loader pointed at may have been removed by
+    // the active-tab's chatMessages.innerHTML wipe during the swap-out
+    // earlier; we never want to re-set currentStatusMessage to a detached
+    // node).
+    _clearTabStatusIntent(targetTabId);
   }
 }
 
@@ -1538,6 +1562,46 @@ let currentStatusMessage = null;
 
 // Collapsible debug panel for action steps (lives inside the status message)
 let currentActionGroup = null;
+
+// QT-uof-5 (B-FIX) -- per-tab mirror of (currentStatusMessage,
+// currentActionGroup). The module-scope vars above are SINGLE -- when the
+// user switches tabs while one tab has a loader and another has a different
+// loader, the swap clobbers them. Eagerly persisted on tab swap-OUT;
+// lazily restored on tab swap-IN. Treats both fields as a single per-tab
+// intent pair (audit: currentActionGroup has the EXACT same lifecycle as
+// currentStatusMessage -- set inside ensureActionGroup which returns null
+// without currentStatusMessage; cleared at the same sites). See
+// .planning/debug/cluster1-routing.md Cluster 2 leftover items.
+var _tabStatusIntentMap = new Map(); // Map<tabId, {statusMessage, actionGroup}>
+
+function _persistTabStatusIntent(tabId) {
+  if (typeof tabId !== 'number') return;
+  _tabStatusIntentMap.set(tabId, {
+    statusMessage: currentStatusMessage,
+    actionGroup: currentActionGroup
+  });
+}
+
+function _restoreTabStatusIntent(tabId) {
+  if (typeof tabId !== 'number') {
+    currentStatusMessage = null;
+    currentActionGroup = null;
+    return;
+  }
+  var entry = _tabStatusIntentMap.get(tabId);
+  if (entry) {
+    currentStatusMessage = entry.statusMessage || null;
+    currentActionGroup = entry.actionGroup || null;
+  } else {
+    currentStatusMessage = null;
+    currentActionGroup = null;
+  }
+}
+
+function _clearTabStatusIntent(tabId) {
+  if (typeof tabId !== 'number') return;
+  _tabStatusIntentMap.delete(tabId);
+}
 
 function ensureActionGroup() {
   if (currentActionGroup) return currentActionGroup;
@@ -2422,6 +2486,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           try { currentStatusMessage.remove(); } catch (_e) {}
           currentStatusMessage = null;
           currentActionGroup = null;
+          // QT-uof-5 (B-FIX) -- the loader has been removed from the
+          // active tab; drop the per-tab intent entry so a future
+          // swap-OUT does not persist a stale reference.
+          _clearTabStatusIntent(_activeTabIdSnapshot);
         }
         _renderCompletionDomOnly(completionMessage, isPartial ? 'partial' : 'ai', isPartial);
       }

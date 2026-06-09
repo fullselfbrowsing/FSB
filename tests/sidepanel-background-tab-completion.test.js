@@ -164,6 +164,9 @@ function buildDispatcher(injection) {
     'isHistoryViewActive', 'historySessionId', 'lastRenderedTerminalSessionId',
     'showSidepanelProgressEnabled',
     'chatMessages', 'scrollToBottom',
+    // QT-uof-5 (B-FIX) -- per-tab status intent helpers. The handler's
+    // if-branch calls _clearTabStatusIntent after manual loader cleanup.
+    '_clearTabStatusIntent', '_persistTabStatusIntent', '_restoreTabStatusIntent',
     fnSrc
   );
   return function dispatch(request) {
@@ -182,7 +185,8 @@ function buildDispatcher(injection) {
       injection.loadHistoryList, injection.showChatView, injection.startReconFromSidepanel,
       injection.isHistoryViewActive, injection.historySessionId, injection.lastRenderedTerminalSessionId,
       injection.showSidepanelProgressEnabled,
-      injection.chatMessages, injection.scrollToBottom
+      injection.chatMessages, injection.scrollToBottom,
+      injection.clearTabStatusIntent, injection.persistTabStatusIntent, injection.restoreTabStatusIntent
     );
   };
 }
@@ -266,6 +270,14 @@ function makeInjection(opts) {
     }
   }
 
+  // QT-uof-5 (B-FIX) -- per-tab status intent helpers. Track calls but
+  // do not mutate test state; correctness for these helpers is verified
+  // structurally elsewhere.
+  state.clearTabStatusIntentCalls = [];
+  function clearTabStatusIntent(tabId) { state.clearTabStatusIntentCalls.push(tabId); }
+  function persistTabStatusIntent(_tabId) { /* no-op */ }
+  function restoreTabStatusIntent(_tabId) { /* no-op */ }
+
   function persistMessageToConversation(role, content, kind, convId) {
     state.persistCalls.push({ role: role, content: content, kind: kind, convId: convId });
   }
@@ -338,6 +350,9 @@ function makeInjection(opts) {
     showSidepanelProgressEnabled: true,
     chatMessages: { children: [], appendChild: function () {}, innerHTML: '' },
     scrollToBottom: function () {},
+    clearTabStatusIntent: clearTabStatusIntent,
+    persistTabStatusIntent: persistTabStatusIntent,
+    restoreTabStatusIntent: restoreTabStatusIntent,
     chrome: {
       runtime: {
         sendMessage: function (msg, cb) { if (typeof cb === 'function') cb({}); return Promise.resolve({}); }

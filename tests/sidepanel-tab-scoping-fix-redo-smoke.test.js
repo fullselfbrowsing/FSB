@@ -323,6 +323,11 @@ function runPart3() {
       'livenessFailCount', 'livenessInterval', 'currentStatusMessage', 'currentActionGroup',
       'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'updateSendButtonState', 'clearInterval',
       '_getTabRunningEntry',
+      // QT-uof-5 (B-FIX) -- setIdleState now calls _clearTabStatusIntent to
+      // drop the per-tab (currentStatusMessage, currentActionGroup) mirror
+      // when a tab transitions to idle. The sandbox provides a no-op so the
+      // setter body executes without ReferenceError.
+      '_clearTabStatusIntent',
       setIdleBody + ' ; return { _tabRunningMap: _tabRunningMap, isRunning: isRunning, currentSessionId: currentSessionId };'
     );
     function _getTabRunningEntry(id) {
@@ -331,6 +336,7 @@ function runPart3() {
       if (!e) { e = { isRunning: false, sessionId: null }; sandboxState._tabRunningMap.set(id, e); }
       return e;
     }
+    function _clearTabStatusIntent(_id) { /* no-op for sandbox */ }
     return fn(
       tabId,
       sandboxState._tabRunningMap, sandboxState._activeTabIdSnapshot,
@@ -339,7 +345,8 @@ function runPart3() {
       null, null,
       sandboxState.sendBtn, sandboxState.stopBtn, sandboxState.statusDot,
       sandboxState.statusText, sandboxState.updateSendButtonState, sandboxState.clearInterval,
-      _getTabRunningEntry
+      _getTabRunningEntry,
+      _clearTabStatusIntent
     );
   }
 
