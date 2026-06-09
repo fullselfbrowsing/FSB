@@ -7136,6 +7136,31 @@ async function handleStopAutomation(request, sender, sendResponse) {
     });
   } else {
     automationLogger.warn('Session not found in memory or storage', { sessionId });
+
+    // QT-uof-4 (C-FIX) -- tier-3 lookup: if the sessionId appears in
+    // fsbSessionLogs, this session completed cleanly and was cleaned up
+    // (likely between UI state and stop-click). Distinguish so the
+    // sidepanel renders a friendly "Already completed" toast instead of
+    // the misleading "Session not found" error. See
+    // .planning/debug/cluster1-routing.md (Symptom C is a consequence of
+    // D, but C-FIX is a cosmetic polish for the narrow race window).
+    try {
+      const stored = await chrome.storage.local.get(['fsbSessionLogs']);
+      const sessionLogs = stored.fsbSessionLogs || {};
+      if (sessionLogs[sessionId]) {
+        automationLogger.info('Stop on already-completed session (race with natural completion)', { sessionId });
+        sendResponse({
+          success: false,
+          alreadyEnded: true,
+          error: 'Already completed'
+        });
+        return;
+      }
+    } catch (logsErr) {
+      automationLogger.warn('fsbSessionLogs tier-3 lookup failed', { sessionId, error: logsErr.message });
+      // fall through to default 'Session not found' response
+    }
+
     sendResponse({
       success: false,
       error: 'Session not found'

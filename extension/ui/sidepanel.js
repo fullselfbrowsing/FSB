@@ -1334,9 +1334,26 @@ function stopAutomation() {
       console.log('Side panel: Automation stopped successfully');
     } else {
       const errorMsg = response ? response.error : 'Unknown error';
-      addMessage(`Error stopping automation: ${errorMsg}`, 'error');
-      stopRequested = false;
-      console.error('Side panel: Stop automation failed:', errorMsg);
+      if (response && response.alreadyEnded) {
+        // QT-uof-4 (C-FIX) -- the session completed cleanly between UI
+        // state and stop-click. Treat as a friendly outcome: complete
+        // the loader DOM (or render a system message), set idle, and
+        // skip the misleading 'Session not found' error toast. See
+        // .planning/debug/cluster1-routing.md.
+        if (currentStatusMessage) {
+          completeStatusMessage('Already completed', 'system');
+        } else {
+          addMessage('Already completed', 'system');
+        }
+        setIdleState(_resolveTabIdForSession(currentSessionId));
+        currentSessionId = null;
+        stopRequested = false;
+        console.log('Side panel: Stop arrived after natural completion (alreadyEnded)');
+      } else {
+        addMessage(`Error stopping automation: ${errorMsg}`, 'error');
+        stopRequested = false;
+        console.error('Side panel: Stop automation failed:', errorMsg);
+      }
     }
   });
 }
