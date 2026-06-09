@@ -1430,6 +1430,12 @@ async function runAgentIteration(sessionId, options) {
       var message = {
         action: terminal && terminal.outcome === 'error' ? 'automationError' : 'automationComplete',
         sessionId: sid,
+        // QT-uof-2 (BROADCAST-tabId-THREAD) -- thread tabId so the sidepanel
+        // automationComplete handler can route setIdleState to the OWNING
+        // tab without falling back to _activeTabIdSnapshot (which is wrong
+        // when the user is on a different tab while a background session
+        // completes). See .planning/debug/cluster1-routing.md.
+        tabId: (sess && typeof sess.tabId === 'number') ? sess.tabId : null,
         conversationId: sess.conversationId || null,
         historySessionId: sess.historySessionId || sid,
         result: terminal.resultText || 'Task completed.',

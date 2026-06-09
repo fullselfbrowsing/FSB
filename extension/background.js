@@ -2306,6 +2306,8 @@ async function restoreSessionsFromStorage() {
               fsbBroadcastAutomationLifecycle({
                 action: 'automationComplete',
                 sessionId: persistedSession.sessionId,
+                // QT-uof-2 (BROADCAST-tabId-THREAD) -- thread tabId per .planning/debug/cluster1-routing.md
+                tabId: (persistedSession && typeof persistedSession.tabId === 'number') ? persistedSession.tabId : null,
                 conversationId: persistedSession.conversationId || null,
                 historySessionId: persistedSession.historySessionId || persistedSession.sessionId,
                 result: 'Session interrupted by service worker restart. Automation cannot resume.',
@@ -2575,6 +2577,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
         fsbBroadcastAutomationLifecycle({
           action: 'automationComplete',
           sessionId: sessionId,
+          // QT-uof-2 (BROADCAST-tabId-THREAD) -- thread tabId; the for-loop key is sessionId
+          // but the value is `session` with .tabId. Falls back to the loop variable tabId
+          // (the tab being torn down) for parity with the onTabRemoved closure scope.
+          tabId: (session && typeof session.tabId === 'number') ? session.tabId : (typeof tabId === 'number' ? tabId : null),
           conversationId: session.conversationId || null,
           historySessionId: session.historySessionId || sessionId,
           result: 'Tab was closed during automation.',
@@ -3484,6 +3490,8 @@ async function executeReplaySequence(replaySessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId: replaySessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: `Replay complete: ${successCount}/${session.totalSteps} steps executed successfully.${failedCount > 0 ? ` ${failedCount} steps skipped.` : ''}`
       });
     } catch (e) { /* UI may not be listening */ }
@@ -7110,6 +7118,8 @@ async function handleStopAutomation(request, sender, sendResponse) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId: sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         outcome: 'stopped',
         reason: 'user_stopped',
         stopped: true,
@@ -9380,6 +9390,8 @@ async function startAutomationLoop(sessionId) {
     fsbBroadcastAutomationLifecycle({
       action: 'automationComplete',
       sessionId,
+      // QT-uof-2 (BROADCAST-tabId-THREAD)
+      tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
       result: finalResult,
       partial: true,
       reason: 'max_iterations',
@@ -9415,6 +9427,8 @@ async function startAutomationLoop(sessionId) {
     fsbBroadcastAutomationLifecycle({
       action: 'automationComplete',
       sessionId,
+      // QT-uof-2 (BROADCAST-tabId-THREAD)
+      tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
       result: finalResult,
       partial: true,
       reason: 'timeout',
@@ -11034,6 +11048,8 @@ async function startAutomationLoop(sessionId) {
           fsbBroadcastAutomationLifecycle({
             action: 'automationComplete',
             sessionId,
+            // QT-uof-2 (BROADCAST-tabId-THREAD)
+            tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
             result: session.multiSiteResult
           });
           return;
@@ -11072,6 +11088,8 @@ async function startAutomationLoop(sessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: finalResult,
         partial: true,
         reason: 'no_progress',
@@ -11115,6 +11133,8 @@ async function startAutomationLoop(sessionId) {
         fsbBroadcastAutomationLifecycle({
           action: 'automationComplete',
           sessionId,
+          // QT-uof-2 (BROADCAST-tabId-THREAD)
+          tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
           result: session.multiSiteResult || repeatedResult,
           navigatedTo: currentUrl
         });
@@ -11163,6 +11183,8 @@ async function startAutomationLoop(sessionId) {
           fsbBroadcastAutomationLifecycle({
             action: 'automationComplete',
             sessionId,
+            // QT-uof-2 (BROADCAST-tabId-THREAD)
+            tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
             result: session.multiSiteResult
           });
           return;
@@ -11204,6 +11226,8 @@ async function startAutomationLoop(sessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: finalResult,
         partial: true,
         task: session.task
@@ -11349,6 +11373,8 @@ async function startAutomationLoop(sessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: aiResponse.result
       });
     } else {
