@@ -5136,6 +5136,12 @@ textarea.form-input {
   align-items: center;
   gap: var(--space-2, 0.5rem);
 }
+.model-search-row {
+  margin-bottom: var(--space-2, 0.5rem);
+}
+.model-search-row .form-input {
+  width: 100%;
+}
 .model-select-row .form-select {
   flex: 1 1 auto;
   min-width: 0;

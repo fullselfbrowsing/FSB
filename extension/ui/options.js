@@ -135,6 +135,7 @@ function cacheElements() {
   
   // Form elements
   elements.modelProvider = document.getElementById('modelProvider');
+  elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
   elements.geminiApiKey = document.getElementById('geminiApiKey');
@@ -419,6 +420,15 @@ function setupEventListeners() {
         return;
       }
       ui.runDiscovery(provider, { force: true, previousSelection: elements.modelName?.value });
+    });
+  }
+
+  const modelSearch = document.getElementById('modelSearch');
+  if (modelSearch) {
+    modelSearch.addEventListener('input', (e) => {
+      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+      if (!ui || typeof ui.applyModelSearch !== 'function') return;
+      ui.applyModelSearch(e.target.value, { previousSelection: elements.modelName?.value });
     });
   }
   
@@ -6374,6 +6384,8 @@ function initializeSyncSection() {
   // Per-provider debounce timers for API-key input handling.
   const _debounceTimers = {};
   const DEFAULT_DEBOUNCE_MS = 500;
+  let _currentModels = [];
+  let _currentSearchQuery = '';
 
   function _doc() { return (typeof document !== 'undefined') ? document : null; }
 
@@ -6410,13 +6422,67 @@ function initializeSyncSection() {
     chip.removeAttribute('hidden');
   }
 
-  function renderModelDropdown(models, selectedId) {
+  function _normalizeModelSearchText(value) {
+    return String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function _tokenizeModelSearch(query) {
+    return _normalizeModelSearchText(query)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function _modelSearchText(model) {
+    if (!model) return '';
+    return _normalizeModelSearchText([
+      model.id,
+      model.displayName,
+      model.name,
+      model.description,
+      model.provider
+    ].filter(Boolean).join(' '));
+  }
+
+  function filterModelsForSearch(models, query) {
+    const list = Array.isArray(models) ? models : [];
+    const tokens = _tokenizeModelSearch(query);
+    if (!tokens.length) return list.slice();
+    return list.filter(model => {
+      const haystack = _modelSearchText(model);
+      return tokens.every(token => haystack.indexOf(token) !== -1);
+    });
+  }
+
+  function _readSearchQuery() {
+    const doc = _doc();
+    if (!doc) return _currentSearchQuery;
+    const input = doc.getElementById('modelSearch');
+    return input && typeof input.value === 'string' ? input.value : _currentSearchQuery;
+  }
+
+  function _renderModelDropdownOptions(models, selectedId) {
     const doc = _doc();
     if (!doc) return null;
     const sel = doc.getElementById('modelName');
     if (!sel) return null;
     sel.innerHTML = '';
     const list = models || [];
+    const hasSearch = _tokenizeModelSearch(_currentSearchQuery).length > 0;
+
+    if (!list.length) {
+      const opt = doc.createElement('option');
+      opt.value = '';
+      opt.textContent = hasSearch ? 'No models match search' : 'No models available';
+      opt.disabled = true;
+      sel.appendChild(opt);
+      sel.value = '';
+      sel.disabled = false;
+      return null;
+    }
 
     // Phase 232: sticky selection. If the user previously saved a model that's
     // not in the freshly-discovered list (preview model expired, provider
@@ -6444,6 +6510,21 @@ function initializeSyncSection() {
     sel.value = chosen || '';
     sel.disabled = false;
     return chosen;
+  }
+
+  function renderModelDropdown(models, selectedId) {
+    _currentModels = (Array.isArray(models) ? models : []).map(m => ({ ...m }));
+    _currentSearchQuery = _readSearchQuery();
+    return _renderModelDropdownOptions(filterModelsForSearch(_currentModels, _currentSearchQuery), selectedId);
+  }
+
+  function applyModelSearch(query, opts) {
+    const options = opts || {};
+    _currentSearchQuery = String(query || '');
+    return _renderModelDropdownOptions(
+      filterModelsForSearch(_currentModels, _currentSearchQuery),
+      options.previousSelection
+    );
   }
 
   function _setControlsDisabled(disabled) {
@@ -6490,7 +6571,8 @@ function initializeSyncSection() {
     const list = (fallbackTable[provider] || []).map(m => ({
       id: m.id,
       displayName: m.name || m.id,
-      description: m.description
+      description: m.description,
+      provider
     }));
     renderModelDropdown(list);
     _setControlsDisabled(false);
@@ -6565,7 +6647,10 @@ function initializeSyncSection() {
     if (result && result.ok) {
       const list = (result.models || []).map(m => ({
         id: m.id,
-        displayName: m.displayName || m.name || m.id
+        displayName: m.displayName || m.name || m.id,
+        name: m.name,
+        description: m.description,
+        provider
       }));
       const chosen = renderModelDropdown(list, options.previousSelection);
       _setControlsDisabled(false);
@@ -6614,7 +6699,9 @@ function initializeSyncSection() {
     runDiscovery,
     scheduleDiscoveryFromKeyChange,
     setDiscoveryStatus,
-    renderModelDropdown
+    renderModelDropdown,
+    applyModelSearch,
+    filterModelsForSearch
   };
 
   global.FSBDiscoveryUI = api;
