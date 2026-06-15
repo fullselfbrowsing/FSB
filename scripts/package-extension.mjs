@@ -49,7 +49,6 @@ const excludes = [
   'config/dev-*',
   'config/local-*',
   'node_modules/*',
-  'dist/*',
   'build/*',
 ];
 
