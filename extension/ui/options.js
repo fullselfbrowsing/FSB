@@ -1,4 +1,4 @@
-// FSB v0.9.50 - Modern Dashboard Control Panel Script
+// FSB v0.9.90 - Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {

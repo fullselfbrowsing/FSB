@@ -1,5 +1,5 @@
 /**
- * Configuration management for FSB v0.9.50
+ * Configuration management for FSB v0.9.90
  * This file handles loading configuration from environment variables and Chrome storage
  */
 

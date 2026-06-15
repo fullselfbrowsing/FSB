@@ -1,4 +1,4 @@
-// Background service worker for FSB v0.9.50
+// Background service worker for FSB v0.9.90
 
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
