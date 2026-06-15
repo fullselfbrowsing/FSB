@@ -32,7 +32,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 Phase: 13 (Public Lattice package integration) — COMPLETE
 Plan: 13-01 public-package replug + guardrail modernization
 Status: Automated verification passed; no Phase 13 human UAT required
-Last activity: 2026-06-15 - Replaced the missing local `file:./lattice/packages/lattice` dependency with public npm alias `lattice@npm:@full-self-browsing/lattice@1.3.0`; added `@full-self-browsing/lattice-cli@1.3.0`; updated LATTICE-PIN package metadata and public-package smoke; backfilled `.planning/phases/13-public-lattice-package-integration/` GSD artifacts with plan, summary, and verification.
+Last activity: 2026-06-15 - Completed quick task 260615-4zl: lightweight smart search for the control panel model selector.
 
 ### Phase 13 public Lattice package replug outputs (FSB-side; uncommitted in this workspace)
 
@@ -181,6 +181,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | 260608-bu4 | qt93i-regression Strategy B: revert auto-collapse listener (Chrome API limitation, no programmatic close pre-141) + thread tabId through 8 leaky setter call sites + new real-runtime progress-tick routing test | 2026-06-08 | 09576615 | [260608-bu4-qt93i-regression-strategy-b-revert-auto-](./quick/260608-bu4-qt93i-regression-strategy-b-revert-auto-/) |
 | 260608-uof | Cluster 1+2 bundled fix: D (open automationComplete to background-tab completions) + E (collapse if-branch double-persist) + C (alreadyEnded distinction in stop) + tabId thread through 12 broadcast sites + new background-tab completion regression test + per-tab currentStatusMessage/currentActionGroup + Chrome 141+ sidePanel.close auto-collapse with per-window gate | 2026-06-08 | 24d05f72 | [260608-uof-cluster-1-2-bundled-fix-d-fix-open-autom](./quick/260608-uof-cluster-1-2-bundled-fix-d-fix-open-autom/) |
 | 260608-wnz | Codex Strategy B 5-item architectural fix for cluster1 D/E persistence (verifier PASSED): C1 no-reopen gate in handleStartAutomation + C2 tab-scoped getStatus + C3 background-side durable terminal persist before broadcast + C4 sessionId+terminal dedupe in message-log schema + handler guard + C5 multi-document fanout regression test | 2026-06-09 | 3ab7e534 | [260608-wnz-codex-strategy-b-5-item-architectural-fi](./quick/260608-wnz-codex-strategy-b-5-item-architectural-fi/) |
+| 260615-4zl | Add lightweight smart search to the control panel model selector | 2026-06-15 | 5d42ebf0 | [260615-4zl-add-lightweight-smart-model-search-to-co](./quick/260615-4zl-add-lightweight-smart-model-search-to-co/) |
 | Phase 08 P03 | 14min | 3 tasks | 3 files |
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
 | Phase 10 P01 | 18min | 4 tasks | 5 files |
