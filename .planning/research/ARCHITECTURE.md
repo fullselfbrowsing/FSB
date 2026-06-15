@@ -1,693 +1,489 @@
-# Architecture Research: v0.9.69 Anonymous Telemetry Pipeline + Dashboard Streaming Fix
+# Architecture Research: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
 
-**Milestone:** v0.9.69 (subsequent milestone; existing FSB architecture preserved)
-**Researched:** 2026-05-14
-**Branch:** `Refinements`
-**Confidence:** HIGH (codebase walked end-to-end for every integration point)
+**Domain:** MV3 Chrome extension reactive DOM-watcher tool family (`trigger`) integrating into FSB's existing service-worker / content-script / offscreen / MCP-bridge architecture
+**Milestone:** v0.11.0 (subsequent milestone; existing FSB architecture preserved, integrate WITH it)
+**Researched:** 2026-06-15
+**Confidence:** HIGH (grounded in direct reads of the FSB codebase; every named file/line verified against the working tree on branch `automation-worktree`)
 
----
-
-## 0. Scope
-
-This document is exclusively about the NEW v0.9.69 features layered onto the existing FSB stack. The Chrome MV3 extension structure, Express + SQLite showcase server, Angular 20 standalone components, `ws` library at `/ws`, `LZString` envelope contract, and `chrome.storage.local` analytics store are **assumed**, not re-researched.
-
-What we add:
-
-1. **MCP request logger** in the extension (single source of truth for "an MCP tool was just dispatched").
-2. **API pricing module** mapping `(MCP client label, tool, model) -> USD cost`.
-3. **Anonymous telemetry collector** that batches events and POSTs them to the showcase server.
-4. **Server ingest** at `/api/telemetry/*` with daily-salt IP hashing, raw event table, daily rollups, public aggregates.
-5. **Public `/api/public-stats/*` endpoint** consumed by the existing `/stats` Easter-egg page via a new `FSBTelemetryService` paralleling `GitHubStatsService`.
-6. **DOM-streaming-fix diagnosis** (last phase) of the `dash:dom-stream-*` pipeline.
+> Scope note: This is an *integration* design, not an ecosystem survey. The question is "how does a standing `trigger` watcher bolt onto FSB's existing MV3 plumbing without violating INV-01/02/04?" Findings map every new piece to an existing precedent already shipping in the tree.
 
 ---
 
-## 1. Extension-side Data Flow for MCP Logging
+## Standard Architecture
 
-### 1.1 The hook point: ONE chokepoint, both dispatchers
+### The load-bearing precedents (what we mirror, not invent)
 
-There are two dispatch entry points for an MCP request, and we must hook **both** (or hook a common upstream point that both call):
+Four shipping subsystems already solve every hard sub-problem of `trigger`. The design is "copy the shape, change the constants":
 
-| Entry point | File / line | Used by |
-|-------------|-------------|---------|
-| `dispatchMcpToolRoute({ tool, params, client, tab, payload })` | `extension/ws/mcp-tool-dispatcher.js:285-301` | Tool-name routes (`navigate`, `open_tab`, `execute_js`, `run_task`, `read_page`, `get_dom_snapshot`, etc.) -- 28 entries in `MCP_PHASE199_TOOL_ROUTES` |
-| `dispatchMcpMessageRoute({ type, payload, client, mcpMsgId })` | `extension/ws/mcp-tool-dispatcher.js:303-331` | Raw `mcp:` message types from `MCPBridgeClient._routeMessage` -- agent lifecycle, get-tabs, get-diagnostics, get-status, list-sessions, etc. |
+| Sub-problem | Existing precedent (verified) | What it proves |
+|-------------|-------------------------------|----------------|
+| Standing entity that survives SW eviction | `extension/utils/mcp-visual-session-lifecycle.js` — per-tab `chrome.alarms` named `mcpVisualDeath:<tabId>` + `chrome.storage.session` entry `mcpVisualSession:<tabId>` + SW-startup restore + `chrome.tabs.onRemoved` cleanup | A per-entity alarm+storage+restore lifecycle is already a proven FSB pattern |
+| Persisted lifecycle snapshot map | `extension/utils/mcp-task-store.js` — versioned envelope `{v:1, records:{[id]:snapshot}}` under `chrome.storage.session` key `fsbRunTaskRegistry`; empty-map-removes-key discipline | The exact storage-helper module shape for a `trigger-store.js` |
+| Blocking call that holds open with heartbeats + safety net | `extension/ws/mcp-bridge-client.js:_handleStartAutomation` (lines 979-1158) — 30s `setInterval` heartbeat, `settle()` single-resolve guard, 600s safety net, `partial_state` snapshot read | The exact blocking-return machinery for blocking `trigger()` |
+| Live MutationObserver → SW reporting | `extension/content/dom-stream.js` — `startMutationStream()`/`stopMutationStream()`, `requestAnimationFrame` batch/debounce, `chrome.runtime.sendMessage`, message-driven `domStreamStart`/`domStreamStop` router | The exact content-script live-observe path |
 
-Both are called from `MCPBridgeClient._routeMessage` in `extension/ws/mcp-bridge-client.js:373-485` -- some cases call `dispatchMcpMessageRoute` directly (lines 381, 384, 387, 390, 393), others call helper methods that ultimately call `dispatchMcpToolRoute` (line 851 inside `_handleExecuteBackground`, line 523 inside `_handleGetTabs`).
+Nothing about `trigger` requires a new architectural primitive. It requires assembling these four into a new tool family.
 
-**Recommended hook point: `dispatchMcpToolRoute` and `dispatchMcpMessageRoute` themselves**, with a thin `MCPMetricsRecorder.recordDispatch({ surface, tool|type, params, payload, startedAt, result, durationMs })` invoked AFTER the route handler resolves but BEFORE returning to the caller.
-
-Specifically:
-
-```javascript
-// extension/ws/mcp-tool-dispatcher.js:285
-async function dispatchMcpToolRoute({ tool, params, client, tab, payload }) {
-  // ... existing route lookup + ownership gate ...
-  const startedAt = Date.now();
-  let result, error;
-  try {
-    result = await route.handler({ tool, params: params || {}, client, tab, payload, route });
-    return result;
-  } catch (e) {
-    error = e;
-    throw e;
-  } finally {
-    // NEW (Phase v0.9.69):
-    try {
-      if (typeof globalThis.MCPMetricsRecorder !== 'undefined') {
-        globalThis.MCPMetricsRecorder.recordDispatch({
-          surface: 'tool',
-          tool,
-          params,
-          payload,
-          client,
-          startedAt,
-          durationMs: Date.now() - startedAt,
-          result,
-          error,
-          routeFamily: route.routeFamily
-        });
-      }
-    } catch (_e) { /* never let metrics break dispatch */ }
-  }
-}
-```
-
-The same `try/finally` pattern fires in `dispatchMcpMessageRoute` (line 303) with `surface: 'message'`.
-
-**Why this is the right hook point** (not `MCPBridgeClient._handleMessage` and not the per-route handlers):
-
-- **One chokepoint, both inbound flows.** Phase 199's existing architecture (D-06: "single dispatch chokepoint") already guarantees these two functions are the only ways an MCP call can reach a route handler. Anything that bypasses them is a contract violation that fails loud elsewhere.
-- **Post-resolve, pre-return = success/failure both captured.** The `finally` block runs whether the route handler resolved successfully, returned an `{ success: false }` envelope, or threw. Token cost can only be estimated from the result envelope (see `change_report` / `result.tokensUsed` shapes that already exist on `run_task` outputs).
-- **No double-counting risk.** A single MCP tool call enters the extension via the WebSocket, is parsed once in `_handleMessage`, routed once to either `dispatchMcpToolRoute` or `dispatchMcpMessageRoute` (never both -- they're mutually exclusive by `type` vs `tool` discriminator), and the result envelope is returned to `_handleMessage` exactly once for `mcp:result` / `mcp:error` emit. One dispatch -> one metrics record.
-- **AI-side cost-tracker (`extension/ai/cost-tracker.js`) is orthogonal.** That tracker hooks `agent-loop.js` API calls. MCP-side metrics hook MCP dispatch. They cover disjoint surfaces (AI provider API call vs MCP tool dispatch). No overlap.
-
-### 1.2 The new module: `MCPMetricsRecorder`
-
-**Location:** `extension/utils/mcp-metrics-recorder.js`
-**Registered:** Imported via `importScripts('utils/mcp-metrics-recorder.js')` in `background.js`, ordered AFTER `analytics.js` (`background.js:31`) and BEFORE `ws/mcp-bridge-client.js` (`background.js:40`).
-
-**Shape (mirroring `CostTracker` in `extension/ai/cost-tracker.js:111` -- function/prototype pattern, NOT ES class, for `importScripts` compatibility):**
-
-```javascript
-// extension/utils/mcp-metrics-recorder.js
-function MCPMetricsRecorder() {
-  this._loaded = false;
-  this._init();
-}
-MCPMetricsRecorder.prototype._init = async function() { /* hydrate from chrome.storage.local.fsbMcpUsageData */ };
-MCPMetricsRecorder.prototype.recordDispatch = async function({ surface, tool, type, params, payload, client, startedAt, durationMs, result, error, routeFamily }) {
-  // 1. Resolve client label from MCPBridgeClient.getConnectionId() + payload metadata
-  //    (See Section 2.2 -- the bridge-side client label allowlist already exists at
-  //    extension/utils/mcp-visual-session.js MCPVisualSessionUtils.normalizeMcpVisualClientLabel)
-  // 2. Resolve cost via globalThis.MCP_PRICING.estimate({ client, tool, tokensIn, tokensOut })
-  //    -- tokens harvested from result.tokensUsed for run_task; for non-run_task tools tokens=0,
-  //    cost=0 (only the call count and tool name matter).
-  // 3. Append to chrome.storage.local.fsbMcpUsageData (mirrors FSBAnalytics.usageData in utils/analytics.js:108)
-  // 4. Broadcast { type: 'MCP_METRICS_UPDATE' } via chrome.runtime.sendMessage (mirrors
-  //    broadcastAnalyticsUpdate at background.js:11440)
-  // 5. Enqueue an anonymous summary into TelemetryCollector.enqueue(...) -- see Section 3.
-};
-MCPMetricsRecorder.prototype.getRecentCalls = function(limit) { /* read-back for control-panel UI */ };
-MCPMetricsRecorder.prototype.getAggregates = function(timeRange) { /* totals for the hero */ };
-
-// Expose on globalThis like FSBAnalytics does
-globalThis.MCPMetricsRecorder = new MCPMetricsRecorder();
-```
-
-### 1.3 Write into the existing analytics store -- data flow
-
-The existing AI analytics store is `chrome.storage.local.fsbUsageData` (`extension/utils/analytics.js:148`). It contains entries shaped `{ timestamp, model, provider, inputTokens, outputTokens, success, source, cost }`.
-
-**DO NOT mix MCP entries into `fsbUsageData`.** Two different surfaces, two different schemas. Instead:
-
-- New key: `chrome.storage.local.fsbMcpUsageData` (parallel to `fsbUsageData`).
-- Entry shape: `{ timestamp, mcpClient, tool, routeFamily, surface, durationMs, success, errorCode, estimatedCost, estimatedTokensIn, estimatedTokensOut, modelAssumed }`.
-- Read-back: control-panel UI reads BOTH `fsbUsageData` (AI calls) AND `fsbMcpUsageData` (MCP calls) and renders separately.
-
-**Control-panel rendering flow** (mirrors existing `FSBAnalytics.updateDashboard` at `extension/utils/analytics.js:657-676`):
-
-1. `chrome.runtime.onMessage` listener on `MCP_METRICS_UPDATE` (new, paralleling existing `ANALYTICS_UPDATE` listener) -- listener lives in `extension/ui/control_panel.html`'s page script.
-2. On receipt, fetches `chrome.storage.local.fsbMcpUsageData`, computes aggregates, updates new hero tiles "MCP Calls", "MCP Cost", "Active MCP Clients" alongside the existing four (lines `extension/ui/control_panel.html:106-122`).
-3. New section below the four hero tiles: "Per-MCP-Client Log" table -- timestamp, client badge, tool name, duration, cost. Mirrors the existing per-call table pattern that lives in the analytics section below the chart canvas (`#usageChart`, line 149).
-
-### 1.4 Avoiding double-counting -- single source of truth
-
-This is THE critical quality-gate constraint. The architecture:
+### System Overview
 
 ```
-                                  +------------------------------+
-                                  |   MCPMetricsRecorder         |
-                                  |   .recordDispatch(...)       |
-                                  |  [extension/utils/mcp-       |
-                                  |   metrics-recorder.js]       |
-                                  +-------------+----------------+
-                                                |
-                       +------------------------+--------------------------+
-                       |                        |                          |
-                       v                        v                          v
-        chrome.storage.local.        chrome.runtime.sendMessage   TelemetryCollector
-        fsbMcpUsageData              ({type:'MCP_METRICS_UPDATE'})  .enqueue(summary)
-        (local persistence;          (broadcast to control-panel)   (outbound batch)
-         drives control-panel hero)
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  MCP CLIENT (Claude Code / Codex / OpenClaw)                                  │
+│      trigger() · stop_trigger() · get_trigger_status() · list_triggers()      │
+└───────────────────────────────────┬──────────────────────────────────────────┘
+                                     │ JSON-RPC (stdio) + notifications/progress
+┌────────────────────────────────────▼──────────────────────────────────────────┐
+│  MCP SERVER (mcp/src)                                                          │
+│   NEW  tools/trigger.ts  ── server.tool() x4 ── routes via bridge.sendAndWait  │
+│   MOD  runtime.ts (add registerTriggerTools)  · queue.ts (read-only set +2)    │
+└───────────────────────────────────┬──────────────────────────────────────────┘
+                                     │ WebSocket bridge  (mcp:trigger-* messages)
+┌────────────────────────────────────▼──────────────────────────────────────────┐
+│  SERVICE WORKER (extension/background.js + ws/ + utils/)                        │
+│                                                                                │
+│   MOD ai/tool-definitions.js  ── TOOL_REGISTRY += 4 tool defs (additive only)  │
+│   MOD ws/mcp-tool-dispatcher.js ── route tables += trigger aliases+messages    │
+│   NEW utils/trigger-store.js     ── chrome.storage.session envelope (snapshot) │
+│   NEW utils/trigger-lifecycle.js ── chrome.alarms `fsbTrigger:<id>` + restore  │
+│   NEW utils/trigger-manager.js   ── arm/evaluate/fire/stop + cap + tab binding │
+│   MOD ws/mcp-bridge-client.js    ── blocking trigger() heartbeat/settle host   │
+│   MOD background.js              ── onAlarm dispatch branch + SW-startup hook   │
+│                                     + chrome.tabs.onRemoved trigger cleanup    │
+│        ┌────────────── refresh-poll ──────────────┐  ┌──── live-observe ────┐  │
+│        │ alarm tick → reload OWNED tab → re-read  │  │ tell content to watch │  │
+│        │ element via existing read path → compare │  │ → receive change msgs │  │
+│        └───────────────────────────────────────────┘  └──────────────────────┘ │
+└──────────────┬───────────────────────────────────────────────┬────────────────┘
+               │ chrome.tabs.sendMessage (read / observe / pulse) │
+┌───────────────▼───────────────────────────────────────────────▼────────────────┐
+│  CONTENT SCRIPT (isolated world; extension/content/*)                          │
+│   MOD content/messaging.js     ── router: triggerObserveStart/Stop, triggerRead │
+│   NEW content/trigger-observe.js ── MutationObserver on ONE element (debounced) │
+│   MOD content/visual-feedback.js ── HighlightManager analyzing-PULSE variant +  │
+│                                      ViewportGlow "watching a trigger" label    │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+  OFFSCREEN (extension/offscreen/lattice-host.js) — NOT on the trigger path.
+  Lattice survivability adapter is consulted as a pattern reference only (see §
+  "State management"). Trigger snapshots use chrome.storage.session directly,
+  exactly like mcp-task-store.js does today.
 ```
 
-Both "control panel local analytics" AND "outbound telemetry beat" derive from the same `recordDispatch` call. The collector receives an in-memory summary directly from `recordDispatch` (NOT by re-reading storage; storage is a side effect, not a source). Single fact -> two consumers. No double-count possible because there's only one fact-generation site: the `finally` block of `dispatchMcpToolRoute` / `dispatchMcpMessageRoute`.
+### Component Responsibilities
+
+| Component | Responsibility | Existing precedent it mirrors |
+|-----------|----------------|-------------------------------|
+| `utils/trigger-store.js` (NEW) | Versioned `chrome.storage.session` envelope `{v:1, records:{[trigger_id]:snapshot}}`; CRUD + `listActive()` | `utils/mcp-task-store.js` (near byte-for-byte clone, new constants) |
+| `utils/trigger-lifecycle.js` (NEW) | Per-trigger `chrome.alarms` (`fsbTrigger:<id>`), arm/clear/re-arm, SW-startup restore, tab-close cleanup | `utils/mcp-visual-session-lifecycle.js` |
+| `utils/trigger-manager.js` (NEW) | Domain logic: arm a trigger, evaluate fire conditions (changed/threshold/equals/contains), smart value extraction, cap enforcement, tab-binding decision, emit fire | new — cap logic mirrors `utils/agent-registry.js` (1-64, default 8) |
+| `content/trigger-observe.js` (NEW) | Live-observe: MutationObserver scoped to ONE element, debounced, reports value deltas to SW | `content/dom-stream.js` (start/stop + rAF batch + `chrome.runtime.sendMessage`) |
+| `ws/mcp-bridge-client.js` (MOD) | Host the *blocking* `trigger()` promise: heartbeats, `settle()`, fire/timeout resolve | its own `_handleStartAutomation` (lines 979-1158) |
+| `ws/mcp-tool-dispatcher.js` (MOD) | Route `trigger`/`stop_trigger`/`get_trigger_status`/`list_triggers` + `mcp:trigger-*` messages | existing `run_task`/`mcp:start-automation` route-table rows (lines 62-91) |
+| `ai/tool-definitions.js` (MOD) | Add 4 tool defs to `TOOL_REGISTRY` (additive; existing 52 untouched → INV-01/02) | the registry array itself (line 94) |
+| `mcp/src/tools/trigger.ts` (NEW) | 4 `server.tool()` registrations; `trigger` is blocking-capable (progress notifications), companions read-only | `mcp/src/tools/autopilot.ts` (run_task family) + `observability.ts` (read-only family) |
+| `content/visual-feedback.js` (MOD) | "Analyzing pulse" glow variant on the watched element; `ViewportGlow` "watching a trigger" label | `HighlightManager.show()` + `ViewportGlow` `state-thinking` |
 
 ---
 
-## 2. Anonymous Identity Bootstrap
+## Recommended Project Structure
 
-### 2.1 Where the UUID lives
+NEW files (5) + MODIFIED files (8). No existing schema changes.
 
-**File:** `extension/utils/install-identity.js` (new, registered via `importScripts` in `background.js` at the TOP of the dependency chain, BEFORE `analytics.js`, `mcp-bridge-client.js`, `ws-client.js`, and the new `mcp-metrics-recorder.js`).
+```
+extension/
+├── utils/
+│   ├── trigger-store.js          # NEW  — chrome.storage.session snapshot envelope
+│   │                             #        (clone of mcp-task-store.js; key fsbTriggerRegistry)
+│   ├── trigger-lifecycle.js      # NEW  — chrome.alarms fsbTrigger:<id> + restore + tab cleanup
+│   │                             #        (clone of mcp-visual-session-lifecycle.js shape)
+│   ├── trigger-manager.js        # NEW  — arm/evaluate/fire/stop, fire-condition eval,
+│   │                             #        value extraction, cap enforcement, tab binding
+│   ├── mcp-task-store.js         #  (reference template — unchanged)
+│   ├── mcp-visual-session-lifecycle.js  # (reference template — unchanged)
+│   └── agent-registry.js         #  (cap precedent — unchanged; trigger cap mirrors it)
+├── content/
+│   ├── trigger-observe.js        # NEW  — single-element MutationObserver (live-observe)
+│   ├── messaging.js              # MOD  — router cases: triggerObserveStart/Stop/Read + pulse
+│   └── visual-feedback.js        # MOD  — analyzing-pulse glow variant + "watching" label
+├── ws/
+│   ├── mcp-tool-dispatcher.js    # MOD  — route tables (+4 tool aliases, +N message routes)
+│   └── mcp-bridge-client.js      # MOD  — blocking trigger() heartbeat/settle handler
+├── ai/
+│   └── tool-definitions.js       # MOD  — TOOL_REGISTRY += 4 defs (additive) + .cjs mirror
+├── background.js                 # MOD  — onAlarm branch, SW-startup restore, tab cleanup hook
+└── manifest.json                 #  (NO CHANGE — alarms/storage/tabs/scripting/webNavigation granted)
 
-**Init pattern** (mirrors the existing `FSBAnalytics.initialize` lazy-init at `extension/utils/analytics.js:121`):
-
-```javascript
-// extension/utils/install-identity.js
-const FSB_INSTALL_UUID_KEY = 'fsb_install_uuid';
-const FSB_TELEMETRY_OPT_OUT_KEY = 'fsb_telemetry_opt_out';
-
-async function getOrCreateInstallUuid() {
-  try {
-    const data = await chrome.storage.local.get([FSB_INSTALL_UUID_KEY]);
-    if (data && typeof data[FSB_INSTALL_UUID_KEY] === 'string' && data[FSB_INSTALL_UUID_KEY].length === 36) {
-      return data[FSB_INSTALL_UUID_KEY];
-    }
-    const uuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-      ? crypto.randomUUID()
-      : _fallbackUuid(); // hex(now) + hex(Math.random) -- never trigger in practice; mirrors mcp-bridge-client.js:124-126
-    await chrome.storage.local.set({ [FSB_INSTALL_UUID_KEY]: uuid });
-    return uuid;
-  } catch (_e) {
-    return null; // chrome.storage.local unavailable -- see 2.3
-  }
-}
-
-async function isTelemetryOptedOut() {
-  const data = await chrome.storage.local.get([FSB_TELEMETRY_OPT_OUT_KEY]);
-  return data && data[FSB_TELEMETRY_OPT_OUT_KEY] === true;
-}
-
-globalThis.FSBInstallIdentity = { getOrCreateInstallUuid, isTelemetryOptedOut, FSB_INSTALL_UUID_KEY, FSB_TELEMETRY_OPT_OUT_KEY };
+mcp/src/
+├── tools/
+│   └── trigger.ts                # NEW  — server.tool() x4 (1 blocking + 3 read-only/mutation)
+├── runtime.ts                    # MOD  — import + call registerTriggerTools(...)
+└── queue.ts                      # MOD  — readOnlyTools += get_trigger_status, list_triggers
 ```
 
-**Bootstrap call site:** `chrome.runtime.onInstalled` listener in `background.js:13015-13048`. Add `await FSBInstallIdentity.getOrCreateInstallUuid()` between `initializeAnalytics()` (line 13019) and `loadDebugMode()` (line 13022). Also fire in `chrome.runtime.onStartup` listener at line 13051 (idempotent -- the get-or-create is a no-op when the UUID already exists).
+### Structure Rationale
 
-### 2.2 Sharing the UUID across surfaces
-
-**Pattern: single getter on `globalThis`, never duplicated.** All three downstream consumers (`MCPMetricsRecorder`, `TelemetryCollector`, control-panel privacy UI) call `globalThis.FSBInstallIdentity.getOrCreateInstallUuid()` lazily on first use AND cache the value in-module for the lifetime of the service-worker incarnation.
-
-Why one getter, not one cached top-level constant: the service worker can be evicted at any moment in MV3. A constant initialized at top-of-file would lose its value across eviction-revival. The getter pattern means each module fetches once-per-incarnation (cheap) without depending on module load order.
-
-**Control panel UI** (`extension/ui/control_panel.html`) is a separate document context, NOT a service-worker context, so it must read the UUID directly via `chrome.storage.local.get('fsb_install_uuid')`. Mirrors the same direct-storage-read pattern that the existing analytics dashboard uses (`extension/utils/analytics.js:148` runs in document context when the page-side script loads).
-
-### 2.3 Fallback when `chrome.storage.local` is unavailable
-
-This is rare but real -- corrupted profiles, certain enterprise policy configurations. **Recommendation:**
-
-| Scenario | Behaviour |
-|----------|-----------|
-| `chrome.storage.local` throws / returns undefined | `getOrCreateInstallUuid()` returns `null`; `TelemetryCollector.enqueue()` becomes a no-op when UUID is null; MCP local analytics still work (in-memory only, won't survive SW eviction but that's an existing limitation across all FSB storage paths). |
-| User in incognito | The extension is not configured for `incognito: 'split'`, so service worker is not spawned for incognito windows -- moot. |
-| `fsb_telemetry_opt_out === true` | UUID is still minted (needed for control-panel display "Your install ID: ..." so user can verify what's NOT being sent); `TelemetryCollector` checks `isTelemetryOptedOut()` at every enqueue and short-circuits. |
-
-**Don't do "session-only UUID" -- it has no purpose.** A session UUID can't be correlated across beats so it offers no aggregation value, and re-minting per session pollutes the global "active installs" count. Either we have a stable UUID or we send nothing.
+- **`utils/` gets the three new SW-side modules** because that is where every other SW-survivable lifecycle helper already lives (`mcp-task-store.js`, `mcp-visual-session-lifecycle.js`, `agent-registry.js`, `agent-tab-resolver.js`). The SW glue (`background.js`) imports them via `importScripts` and drives them — exactly the boot-order note documented at the top of `mcp-visual-session-lifecycle.js`.
+- **`content/trigger-observe.js` is a new module, not bolted into `dom-stream.js`**, because `dom-stream.js` is a whole-page observer feeding the remote-control dashboard; trigger live-observe is single-element and notify-only. Sharing would risk the streaming watchdog (`fsb-domstream-watchdog`) and the `ext:dom-mutations` wire shape, both locked. New module, same proven internals.
+- **`mcp/src/tools/trigger.ts` is one new file** registered from `runtime.ts` (the single registration call site at lines 35-41). This is precisely how every existing family was added; no `index.ts` change needed beyond what `runtime.ts` already centralizes.
 
 ---
 
-## 3. Telemetry Beat Schedule
+## Architectural Patterns
 
-### 3.1 Queue architecture
+### Pattern 1: Trigger Registry as a parallel-but-analogous lifecycle (NOT reuse of run_task machinery)
 
-**Module:** `extension/utils/telemetry-collector.js` (new, `importScripts`'d after `install-identity.js` and `mcp-metrics-recorder.js`).
+**What:** A dedicated trigger registry (`trigger-store.js` + `trigger-lifecycle.js` + `trigger-manager.js`) that *mirrors* the run_task lifecycle shape but does not share its code paths or storage key.
 
-**Queue storage:** `chrome.storage.local.fsbTelemetryQueue` -- array of events, capped at 200 entries (~20 KB at typical event sizes). New events shift oldest if cap hit. Mirrors the `usageData` cleanup pattern at `extension/utils/analytics.js:189-192` (30-day rolling window there; here a 200-event hard cap).
+**When to use:** Always, for v0.11.0.
 
-**Why `chrome.storage.local` not in-memory:** MV3 service workers evict after 30s of idle. An in-memory queue would lose events on every eviction. `chrome.storage.local` persists across SW lifecycle and (separately from telemetry) is `unlimitedStorage`-permission-backed already (`extension/manifest.json:10`).
+**Recommendation: BUILD PARALLEL-BUT-ANALOGOUS. Do NOT graft onto `run_task`/`activeSessions`.** Rationale:
 
-### 3.2 Beat trigger
+1. **Semantic mismatch.** `run_task` is a finite agent loop driven by `agent-loop.js`'s `setTimeout`-chained iterator (INV-04, byte-frozen at lines 2003/2702/2771). A trigger is a *standing* watcher with no AI loop, no iteration count, no completion scoring. Forcing it through `activeSessions` would pollute the session schema and risk the frozen iterator.
+2. **Lifetime mismatch.** `run_task` has a 600s safety net; a price watch runs for hours. The trigger's persistence cadence is alarm-tick-driven (refresh-poll) or event-driven (live-observe), not a 30s heartbeat loop.
+3. **INV-04 protection.** Keeping triggers out of `agent-loop.js` entirely means zero risk to the load-bearing iterator. The blocking-*return* mechanics (heartbeat/settle) are reused from `mcp-bridge-client.js`, but the *watcher* itself never touches the agent loop.
+4. **Precedent says parallel.** v0.9.36 visual sessions and v0.9.60 run_task tracking are *separate* registries (`fsbMcpVisualSessions`, `fsbRunTaskRegistry`) by deliberate decision (PROJECT.md Key Decisions: "Keep client-owned visual sessions separate from autopilot `activeSessions`"). The trigger registry is the third sibling: `fsbTriggerRegistry`.
 
-**Recommended schedule: "every N events OR every M minutes, whichever fires first" with the following values:**
+What IS reused: the *return* machinery (heartbeat/settle/safety-net from `mcp-bridge-client.js`) and the *storage/alarm/restore* shapes (from `mcp-task-store.js` + `mcp-visual-session-lifecycle.js`). What is NOT reused: `activeSessions`, the agent loop, the run_task storage key.
 
-| Trigger | Value | Rationale |
-|---------|-------|-----------|
-| Event-count threshold | 20 events queued | Keeps payload size small enough to fit in a single 1MB Express body (`server.js:85`) with massive room to spare. |
-| Time-based interval | Every 15 minutes | Long enough that idle installs barely contact the server (privacy + cost), short enough that "active users right now" aggregate (5-min window on server) catches active installs reliably. |
-| Cold-start trigger | On `chrome.runtime.onStartup`, flush any queue from prior SW life | Recovers the "user uninstalled mid-beat" edge where the prior service worker queued events but never sent them. |
-| Pre-eviction trigger | NO explicit pre-eviction flush | MV3 doesn't expose a pre-eviction hook; `chrome.alarms` is the only reliable scheduler -- see 3.3. |
-
-### 3.3 Surviving MV3 service-worker eviction
-
-Critical pitfall. The existing `MCPBridgeClient` already solves this via `chrome.alarms` (see `mcp-bridge-client.js:14` `MCP_RECONNECT_ALARM` + `_scheduleReconnectAlarm` at line 291-303). Mirror that pattern.
-
-**Recommendation:**
-
+**Example (storage envelope, mirroring `mcp-task-store.js`):**
 ```javascript
-// extension/utils/telemetry-collector.js
-const TELEMETRY_BEAT_ALARM = 'fsb-telemetry-beat';
-chrome.alarms.create(TELEMETRY_BEAT_ALARM, { periodInMinutes: 15 });
-
-// In background.js, add to chrome.alarms.onAlarm listener (chrome.alarms minimum is 30s
-// but periodInMinutes:15 is well above that floor):
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === TELEMETRY_BEAT_ALARM) {
-    globalThis.TelemetryCollector?.flushBeat({ trigger: 'alarm' });
-  }
-});
+// utils/trigger-store.js — chrome.storage.session key 'fsbTriggerRegistry'
+// snapshot shape per trigger_id:
+{
+  trigger_id, status,            // 'armed' | 'fired' | 'stopped' | 'error' | 'partial'
+  watch: 'refresh-poll' | 'live-observe',
+  condition: { kind, op, value, extract },   // changed|threshold|equals|contains
+  selector, target_tab_id, agent_id,
+  initial_value, last_value, last_evaluated_at,
+  poll_interval_ms, armed_at, fired_at,
+  fire_envelope                  // populated on fire (the "what happened" payload)
+}
 ```
 
-The alarm fires whether the service worker is awake or not -- Chrome wakes the SW to deliver the alarm, the SW imports scripts, `TelemetryCollector` re-hydrates queue from storage, sends, marks sent, sleeps. This is the same lifecycle pattern that MCP bridge reconnect uses; it's proven.
+### Pattern 2: SW-eviction survival via chrome.alarms tick → wake → re-evaluate (generalizes run_task partial_state)
 
-### 3.4 Offline retry without leaking timing data
+**What:** Each trigger owns a `chrome.alarms` alarm. For refresh-poll, the alarm IS the poll clock (`periodInMinutes`). For live-observe, the alarm is a low-frequency *watchdog* (re-arm/re-attach the observer after SW wake, since the content observer survives but the SW that receives its messages may have evicted).
 
-**Privacy concern:** if the server is unreachable and the queue grows, an attacker who later compromises the server could correlate "first received event at time T" with "queue contained events from time T-Xh" and infer when the user was offline.
+**When to use:** Always — this is the crux of the milestone (PROJECT.md: "MV3 survivability is the crux").
 
-**Mitigation:**
+**Mapping to the run_task partial_state pattern (explicit):**
 
-- On send-failure: leave the queue intact, retry on next 15-min alarm tick. Exponential backoff is NOT needed -- 15 min is already coarse.
-- On send-success: clear ONLY the events that were successfully POSTed (server returns event IDs it accepted).
-- **Per-event timestamps are batched at WHOLE-MINUTE resolution server-side** (see Section 4 schema). The event itself carries `tsMinute = Math.floor(Date.now() / 60000) * 60000` not `Date.now()`. A 60-second resolution is sufficient for "active users in last 5 min" and removes sub-minute fingerprinting.
-- Hard upper bound: events older than 24 hours are dropped client-side at queue-load time (not sent), preventing infinite backlog from a long-offline install masquerading as a recent active user.
+| run_task (Phase 239, shipped) | trigger (v0.11.0, proposed) |
+|-------------------------------|------------------------------|
+| 30s `setInterval` heartbeat writes `in_progress` snapshot to `fsbRunTaskRegistry` | Alarm tick (refresh-poll) OR observe-event (live-observe) writes `armed` snapshot to `fsbTriggerRegistry` after each evaluation |
+| SW eviction → WebSocket drops → bridge `sendAndWait` rejects `Bridge disconnected` → server reads persisted `partial_state` | SW eviction → alarm persists in `chrome.alarms` (NOT SW memory) → next tick wakes SW → `background.js` onAlarm branch re-hydrates trigger from `trigger-store.js` → re-evaluates |
+| `chrome.storage.session` snapshot is source of truth across eviction | identical |
+| 600s safety net resolves blocking call | blocking `trigger()` has a configurable timeout with a safety ceiling (PROJECT.md: "recommend detached beyond a few minutes"); detached triggers simply persist and keep ticking |
+| `_reconcileInFlightTasksOnConnect` on bridge reconnect | SW-startup `restoreTriggersFromStorage()` (mirrors `restoreVisualSessionLifecyclesFromStorage`) re-arms every `status:'armed'` trigger's alarm on cold boot |
 
----
+The key insight: **`chrome.alarms` is the eviction-survival mechanism, not the SW.** The visual-session lifecycle already proves this — its `mcpVisualDeath:<tabId>` alarm "survives MV3 SW eviction because chrome.alarms persists across SW lifetime" (background.js:13288-13289). A trigger alarm with `periodInMinutes` keeps firing and waking the SW even after eviction; each wake re-reads the snapshot and re-evaluates. No offscreen document or Lattice adapter is needed for survival — `chrome.storage.session` + `chrome.alarms` is sufficient and is the lower-risk path.
 
-## 4. Server-side Ingestion Architecture
+> Note on `chrome.storage.session` vs `local`: `session` is wiped on browser restart (not on SW eviction). `mcp-task-store.js` and the visual lifecycle both use `session` deliberately — a trigger should not silently resurrect across a full browser restart with a stale tab id. RECOMMEND `chrome.storage.session` for the live snapshot (consistent with both precedents). The trigger *cap* setting mirrors `agent-registry.js` which uses `chrome.storage.local` (a user preference that SHOULD persist) — keep that split.
 
-### 4.1 SQLite schema (new tables, added to `showcase/server/src/db/schema.js`)
-
-The existing `initializeDatabase` function (`schema.js:5-87`) already follows an "additive only" migration pattern (lines 76-84 do `ALTER TABLE ADD COLUMN` inside `try/catch`). Add the new telemetry tables to the same function:
-
-```sql
--- Raw events table: append-only, kept for 7 days, then deleted by daily housekeeper.
-CREATE TABLE IF NOT EXISTS telemetry_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  install_uuid TEXT NOT NULL,           -- UUID v4 from extension; NEVER joined with hash_keys
-  event_type TEXT NOT NULL,             -- 'mcp_call' | 'session_summary' | 'install_announce'
-  ts_minute INTEGER NOT NULL,           -- floor(Date.now() / 60000) * 60000 -- minute-precision
-  ip_hash TEXT NOT NULL,                -- SHA256(IP + daily_salt), 64 hex chars
-  daily_salt_version INTEGER NOT NULL,  -- rotation counter so we can detect cross-day hashes
-  payload TEXT NOT NULL,                -- JSON: tokens_in, tokens_out, mcp_client, model, tool, etc.
-  received_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000)
-);
-CREATE INDEX IF NOT EXISTS idx_telemetry_events_ts_minute ON telemetry_events(ts_minute);
-CREATE INDEX IF NOT EXISTS idx_telemetry_events_install_uuid ON telemetry_events(install_uuid);
-CREATE INDEX IF NOT EXISTS idx_telemetry_events_ip_hash ON telemetry_events(ip_hash);
-
--- Per-UUID per-day rollups: populated by an hourly cron-like timer that reads from
--- telemetry_events and aggregates. Used to compute "most-popular agent / MCP client"
--- without scanning raw events.
-CREATE TABLE IF NOT EXISTS telemetry_rollups_daily (
-  install_uuid TEXT NOT NULL,
-  day TEXT NOT NULL,                    -- 'YYYY-MM-DD' UTC
-  mcp_client TEXT NOT NULL,             -- 'claude-code' | 'codex' | 'openclaw' | 'cursor' | 'unknown'
-  model TEXT NOT NULL,                  -- 'claude-sonnet-4-5-20250929' etc.
-  total_tokens_in INTEGER NOT NULL DEFAULT 0,
-  total_tokens_out INTEGER NOT NULL DEFAULT 0,
-  total_cost_usd REAL NOT NULL DEFAULT 0,
-  total_calls INTEGER NOT NULL DEFAULT 0,
-  active_agents_peak INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (install_uuid, day, mcp_client, model)
-);
-
--- Global daily aggregates: the public stats page reads from here.
--- Recomputed by the same hourly timer.
-CREATE TABLE IF NOT EXISTS telemetry_global_aggregates (
-  day TEXT PRIMARY KEY,                 -- 'YYYY-MM-DD' UTC
-  total_tokens INTEGER NOT NULL DEFAULT 0,
-  total_cost_usd REAL NOT NULL DEFAULT 0,
-  active_users INTEGER NOT NULL DEFAULT 0,        -- distinct install_uuid in this day
-  total_users_lifetime INTEGER NOT NULL DEFAULT 0,
-  active_agents_now INTEGER NOT NULL DEFAULT 0,   -- snapshot at recompute time
-  total_agents_lifetime INTEGER NOT NULL DEFAULT 0,
-  most_popular_mcp_client TEXT,
-  most_popular_agent_label TEXT,
-  avg_agents_per_user REAL NOT NULL DEFAULT 0,
-  computed_at INTEGER NOT NULL
-);
-
--- Live in-flight cache (in-memory only, not persisted): seen_in_last_5_min for
--- "active users right now" aggregate. Implemented as a Map<install_uuid, last_seen_ts>
--- in showcase/server/src/telemetry/active-users.js. NOT SQLite -- it churns too fast.
+**Example (onAlarm dispatch branch, mirroring background.js:13284-13301):**
+```javascript
+// background.js — inside the single chrome.alarms.onAlarm listener, ADD a branch
+// BEFORE the existing mcpVisualDeath / telemetry / reconnect branches:
+if (typeof TriggerLifecycleUtils !== 'undefined'
+    && alarm?.name?.startsWith(TriggerLifecycleUtils.TRIGGER_ALARM_PREFIX)) {   // 'fsbTrigger:'
+  try { await TriggerLifecycleUtils.handleTriggerAlarm(alarm); }                // re-hydrate + re-evaluate
+  catch (err) { console.warn('[FSB TRG] trigger alarm failed (non-blocking):', err?.message); }
+  return;
+}
 ```
 
-**Why a separate rollup table** (and not just SQL aggregation queries against raw events on every read): the public `/stats` page is polled at 5-minute cadence by potentially many concurrent visitors. Each query scanning a multi-day raw events table is expensive. Pre-aggregating into `telemetry_rollups_daily` keeps the public read path on a tiny table (< 10K rows even at significant adoption).
+### Pattern 3: Two watch paths, explicit layer placement
 
-**Why keep raw events for 7 days, not forever:** the rollups capture everything the public page needs. Raw events are kept short-term only for re-aggregation (if we discover a bucketing bug) and for the ip_hash rate-limit check. After 7 days, the rollups are authoritative; raw events are dropped by the daily housekeeper.
+**What:** `refresh-poll` and `live-observe` are different data flows that run in different layers.
 
-### 4.2 Daily salt rotation
+**When to use:** Per-trigger selectable (PROJECT.md target feature).
 
-**Location:** `showcase/server/data/salt.json` (gitignored; created with 0600 perms on first start by `showcase/server/src/telemetry/salt-rotator.js`).
+| Step | refresh-poll | live-observe |
+|------|--------------|--------------|
+| Clock | SW `chrome.alarms` `fsbTrigger:<id>` (`periodInMinutes`, default ~60s, hard floor ~30s — Chrome MV3 prod alarm minimum is 30s, same constraint the visual lifecycle documents) | Content MutationObserver fires on DOM change; SW alarm is a low-freq watchdog only |
+| Page reload | SW reloads the OWNED tab via the existing background reload path (same path the `refresh` tool uses), background-tab, no focus steal | none — element watched in place |
+| Element read | SW → `chrome.tabs.sendMessage(tabId, {action:'triggerRead', selector, extract})` → content reads via existing selector/extraction utilities | content reads on each mutation; debounced |
+| Value extraction | content (reuse `selectors.js` / `dom-analysis.js` value reads) | content (same) |
+| Comparison / fire decision | **SW** (`trigger-manager.evaluate`) — keeps fire logic in one place, survivable | **SW** — content sends raw value deltas; SW evaluates (so eviction can't drop the fire decision) |
+| Reporting | SW writes snapshot + (if blocking) resolves the held promise | identical |
 
+**Critical placement decision: fire evaluation lives in the SW, not the content script.** Content scripts die on navigation and are not persisted; the SW (re-hydratable from `chrome.storage.session`) is the durable authority. Content's job is narrow: read the element value and report it. This mirrors how `dom-stream.js` content sends raw mutations and the SW/dashboard interprets them.
+
+**Live-observe survival nuance:** the content MutationObserver survives SW eviction (it lives in the page), but its `chrome.runtime.sendMessage` calls will *wake* the SW. If the page is reloaded/navigated, the observer dies — so live-observe triggers MUST re-arm the observer on `chrome.webNavigation`/`chrome.tabs.onUpdated` for their owned tab (FSB already re-injects content scripts after navigation per the BF-cache resilience work in v0.9.11). The low-freq watchdog alarm is the backstop that detects "observer should be running but the SW has no record of a recent report" and re-issues `triggerObserveStart`.
+
+### Pattern 4: Visual feedback — analyzing pulse + "watching a trigger" label
+
+**What:** While a trigger is armed, the watched element shows a *gentle analyzing pulse* (a variant of the existing orange glow), and the viewport monitor labels itself "watching a trigger."
+
+**When to use:** On arm; stop on fire/cancel; survive reload in refresh-poll mode.
+
+**Wiring (grounded in `visual-feedback.js`):**
+- The orange glow is `HighlightManager.show(element, {glowColor, duration})` (visual-feedback.js:33-72). The steady glow uses a static `box-shadow`. The analyzing pulse is a **new glow variant** — a CSS keyframe animation toggled by a flag (e.g. `HighlightManager.showPulse(element)` or a `{pulse:true}` option) so it visually differs from the action-targeting glow.
+- The element pulse is triggered exactly like the existing `highlightElement` content-router case (messaging.js:1229-1243): SW sends `chrome.tabs.sendMessage(tabId, {action:'triggerPulseStart', selector})`; content resolves the element and applies the pulse. `triggerPulseStop` clears it.
+- The "watching a trigger" label rides on the existing `overlayState` contract (`overlay-state.js` + `ViewportGlow`). `ViewportGlow` already has `state-thinking` (orange, "AI analyzing page") at visual-feedback.js:884-1108. ADD a `mode`/`phase`-style field (e.g. `overlayState.mode = 'trigger-watch'`) so the monitor renders "Watching a trigger" instead of a task phase. This is additive to the overlay state object — no existing field changes.
+- **Lifecycle:** pulse starts when `trigger-manager.arm()` succeeds; stops on fire or `stop_trigger`. In **refresh-poll mode the pulse must survive reload** — so on each poll tick after the tab reloads and content re-injects, the SW re-issues `triggerPulseStart` (same way the dashboard re-issues `dash:dom-stream-start` after navigation, dom-stream.js:1073-1075). In live-observe mode the pulse persists with the page until navigation, then re-arms with the observer.
+
+**Example (pulse glow variant, extending HighlightManager):**
 ```javascript
-// showcase/server/src/telemetry/salt-rotator.js
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-
-const SALT_PATH = path.join(__dirname, '..', '..', 'data', 'salt.json');
-
-function _readOrCreate() {
-  try {
-    const raw = fs.readFileSync(SALT_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    // Rotate if last_rotated_at is older than 24 hours
-    const ageMs = Date.now() - (parsed.last_rotated_at || 0);
-    if (ageMs > 24 * 60 * 60 * 1000) {
-      return _rotate(parsed.version || 1);
-    }
-    return parsed;
-  } catch {
-    return _rotate(0);
-  }
+// content/visual-feedback.js — HighlightManager gets a pulse variant.
+// Steady glow (existing): static box-shadow. Pulse (new): animated, distinct.
+showPulse(element) {
+  element.style.setProperty('animation', 'fsb-trigger-pulse 1.8s ease-in-out infinite', 'important');
+  // @keyframes fsb-trigger-pulse cycles box-shadow opacity — gentle, not the
+  // steady action glow. Injected into the same Shadow DOM style sheet so it
+  // inherits the existing CSS isolation (Shadow DOM decision, PROJECT.md).
 }
-
-function _rotate(prevVersion) {
-  const next = {
-    salt: crypto.randomBytes(32).toString('hex'),
-    version: prevVersion + 1,
-    last_rotated_at: Date.now()
-  };
-  fs.mkdirSync(path.dirname(SALT_PATH), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(SALT_PATH, JSON.stringify(next, null, 2), { mode: 0o600 });
-  return next;
-}
-
-function hashIp(ip) {
-  const s = _readOrCreate();
-  const h = crypto.createHash('sha256').update(ip + s.salt).digest('hex');
-  return { hash: h, version: s.version };
-}
-
-module.exports = { hashIp };
 ```
 
-**Why file (not env var):** the salt has to persist across restarts (otherwise yesterday's hashes are unverifiable), but must NOT be committed (otherwise the hash is reversible). A gitignored file with 0600 perms beside the SQLite DB is the cleanest fit; the same `data/` directory pattern is used for `DB_PATH` in `server.js:24`. An env var works but requires a separate persistence layer the user has to wire (env file -> deployment config) and doesn't auto-rotate.
+### Pattern 5: Concurrency cap mirroring the agent cap
 
-**Don't rotate more often than daily.** The whole point of the daily salt is that hashes from the same IP yesterday and today look different to a database snooper. Sub-daily rotation buys no extra privacy and complicates the cron / "have we already rotated today" check.
+**What:** A configurable cap on concurrent armed triggers (1-64, sensible default), enforced at arm time with a fail-loud typed error.
 
-### 4.3 Rate limiting
+**When to use:** Always (PROJECT.md target feature: "mirrors the v0.9.60 agent/tab cap: 1-64, sensible default").
 
-**Per `ip_hash` + per `install_uuid` -- belt-and-suspenders:**
+**Recommendation:** Mirror `agent-registry.js` cap machinery exactly (lines 52-76, 302-308): a `chrome.storage.local` key `fsbTriggerCap`, `FSB_TRIGGER_CAP_DEFAULT` (recommend 8 to match the agent cap), `MIN=1`, `MAX=64`, clamp helper, and a typed reject `{error:'TRIGGER_CAP_REACHED', code:'TRIGGER_CAP_REACHED', cap, active}` when arming the (N+1)th trigger. Grandfather active triggers when the cap is lowered (same as agents). Surface the control in `control_panel.html` next to the existing Concurrency Cap control.
 
-- Max events per `install_uuid` per minute: 100 (one event per ~600ms, generous for a fast-running test session).
-- Max events per `ip_hash` per minute: 500 (allows multiple installs behind the same NAT, e.g. a household).
-- Implemented as a sliding-window counter in `showcase/server/src/telemetry/rate-limiter.js` (in-memory `Map<key, [ts1, ts2, ...]>`, sweep older-than-60s entries on each insert). For larger scale we'd swap to Redis, but for the current showcase server scale this is right-sized.
-- On rate-limit hit: respond `429 Too Many Requests`. Client backs off via the 15-minute alarm cadence (it would normally retry the queue contents on next alarm -- no special-case code needed).
-- Replay protection: events with `received_at - ts_minute > 24h` are rejected at ingest. The 24h client-side drop in 3.4 means honest clients never hit this; it bounds replay-attack value to 24 hours.
+**Tab ownership interaction (the subtle part):**
 
-### 4.4 Retention
+- **Each trigger binds to exactly one tab** (the tab it was armed against), resolved via the existing agent-scoped tab resolver (`utils/agent-tab-resolver.js`, `resolveAgentTabOrError`). A trigger does NOT *exclusively lock* the tab — locking is wrong because the user (or another agent) may keep using that tab.
+- **Multiple triggers CAN share a tab.** Two live-observe triggers watching two elements on the same crypto dashboard is a legitimate case. They register independent MutationObservers, or (preferable for perf) the content module multiplexes one observer over multiple target elements.
+- **refresh-poll + live-observe on the SAME tab is a conflict** and must be rejected or coordinated: a refresh-poll trigger *reloads* the tab, which would destroy a co-located live-observe trigger's observer. RECOMMEND: at arm time, `trigger-manager.js` checks the target tab's existing triggers; if a refresh-poll trigger would reload a tab that hosts a live-observe trigger (or vice versa), reject with a typed `TRIGGER_TAB_WATCH_CONFLICT` and steer the caller to a separate tab (FSB's forced-new-tab pooling from v0.9.60 already supports background tab creation). Two refresh-poll triggers on one tab must *coordinate their reload cadence* (one reload serves both reads) rather than reload twice.
+- **Ownership is reused, not reinvented:** trigger arm/stop/status go through the same `dispatchMcpToolRoute` ownership gate as every other MCP tool (mcp-tool-dispatcher.js:389 inline gate). Cross-agent `stop_trigger` on a trigger you don't own rejects with `TAB_NOT_OWNED`, consistent with INV-01 error vocabulary.
 
-| Table | Retention | Reason |
-|-------|-----------|--------|
-| `telemetry_events` | 7 days | Re-aggregation buffer + ip_hash rate-limit; longer is creep |
-| `telemetry_rollups_daily` | 365 days | Year-over-year comparisons on `/stats` |
-| `telemetry_global_aggregates` | Forever (one row per day, ~365 rows/year, trivial) | Historical chart |
-| `active_users` (in-memory) | 5 min sliding window | "Active right now" semantic |
+### Pattern 6: Blocking vs detached return (reuse the run_task return machinery)
 
-Housekeeper: a single `setInterval` in `showcase/server/src/telemetry/housekeeper.js`, runs hourly, executes:
+**What:** `trigger()` blocks by default (holds the MCP call open with `notifications/progress` heartbeats, resolves on fire or timeout); a `block:false` flag returns a `trigger_id` immediately for polling via `get_trigger_status`/`list_triggers`.
 
-1. `DELETE FROM telemetry_events WHERE received_at < (now - 7d)`.
-2. Re-aggregate `telemetry_rollups_daily` for today and yesterday (idempotent upsert).
-3. Recompute `telemetry_global_aggregates` for today.
-4. (Daily, separately) `SaltRotator.checkAndRotate()`.
+**Recommendation:** **Reuse the `_handleStartAutomation` return pattern** (mcp-bridge-client.js:1014-1158) for the blocking path — this is the one place run_task machinery IS reused, because the blocking-hold-with-heartbeats problem is identical. The blocking `trigger()` handler:
+1. Arms the trigger (`trigger-manager.arm()` → writes `armed` snapshot, sets alarm or starts observer, starts pulse).
+2. Returns a Promise with the same `settle()` single-resolve guard + 30s heartbeat `setInterval` (heartbeat payload = `{trigger_id, alive, last_value, evaluated_count, elapsed_ms}`) + a configurable timeout (NOT a hard 600s — triggers legitimately run longer, but blocking ones get a safety ceiling per PROJECT.md).
+3. Resolves when `trigger-manager` emits a fire event (via a dedicated `globalThis.fsbTriggerLifecycleBus`, mirroring the `globalThis.fsbAutomationLifecycleBus` run_task uses) OR on timeout (resolving with the persisted `partial_state` / "still armed" snapshot, mirroring run_task's `partial_outcome:'timeout'`).
+4. On SW eviction during a blocking call: bridge drops → server catches `Bridge disconnected` → reads persisted snapshot (mirror autopilot.ts:144-197 `sw_evicted` shape) → returns the armed/last-value state. The trigger keeps running (its alarm survives); the caller can re-poll with `get_trigger_status`.
 
----
+The detached path is trivial: arm and return `{trigger_id, status:'armed'}` immediately; no held promise. `get_trigger_status(trigger_id)` and `list_triggers()` are read-only reads of `trigger-store.js` (mirror `get_task_status` / `list_sessions`). `stop_trigger` is a mutation (clears alarm/observer/pulse), so it goes through the queue like `stop_task`.
 
-## 5. Public `/stats` Aggregates Endpoint
-
-### 5.1 Route choice
-
-**NEW public path: `/api/public-stats/global` (no auth).** Do NOT extend the existing `/api/stats` (`server.js:106-113`) -- that path is gated by `authMiddleware` and ties to a hash key. The new endpoint serves global aggregates that have no per-user identity, so it must NOT carry the auth middleware.
-
-```javascript
-// showcase/server/src/routes/public-stats.js (new)
-const express = require('express');
-
-function createPublicStatsRouter(queries) {
-  const router = express.Router();
-
-  router.get('/global', (req, res) => {
-    // queries.getGlobalTelemetryAggregates() reads from telemetry_global_aggregates +
-    // active_users in-memory map (Section 4.1)
-    const aggregates = queries.getGlobalTelemetryAggregates();
-    res.set('Cache-Control', 'public, max-age=60');  // 60-second edge cache
-    res.json(aggregates);
+**MCP-side shape (mirroring autopilot.ts + observability.ts):**
+```typescript
+// mcp/src/tools/trigger.ts
+server.tool('trigger', '<desc>', { selector: z.string(), condition: <z schema>, watch: <enum>,
+            extract: z.enum(['text','number','attribute']).optional(),
+            block: z.boolean().optional() /* default true */ },
+  async (args, extra) => {
+    if (!bridge.isConnected) return mapFSBError({success:false, error:'extension_not_connected'});
+    return queue.enqueue('trigger', async () =>
+      sendAgentScopedBridgeMessage(bridge, agentScope, 'mcp:arm-trigger', args,
+        { timeout: <configurable safety ceiling>, onProgress /* reshape heartbeats, like run_task */ }));
   });
-
-  router.get('/global/series', (req, res) => {
-    // Last 30 days of telemetry_global_aggregates rows for line charts
-    const series = queries.getGlobalTelemetrySeries({ days: 30 });
-    res.set('Cache-Control', 'public, max-age=300'); // 5-min edge cache; data is daily-stable
-    res.json(series);
-  });
-
-  return router;
-}
-module.exports = createPublicStatsRouter;
+// get_trigger_status + list_triggers: read-only → ALSO added to queue.ts readOnlyTools set.
+// stop_trigger: mutation → goes through the queue like stop_task.
 ```
-
-Mount in `server.js` AFTER the auth-protected routes (so an accidental future change can't shadow public-stats with an auth wrapper):
-
-```javascript
-// server.js, after line 113:
-app.use('/api/public-stats', createPublicStatsRouter(queries));
-```
-
-### 5.2 Caching strategy
-
-| Layer | TTL | Reason |
-|-------|-----|--------|
-| HTTP `Cache-Control` header | 60s on `/global`, 5min on `/global/series` | Browser + any CDN respect the freshness. The 60s cadence matches the "active users in last 5 min" granularity perfectly -- a 60s-stale snapshot can't say someone is active who left 6 minutes ago. |
-| In-process: SQLite query memo | 30s `Map<routeName, {data, expiresAt}>` in `routes/public-stats.js` | Burst-protection for many concurrent visitors hitting `/stats` -- one SQLite query per 30s window regardless of visitor count. |
-| Server-side recompute | Hourly housekeeper (Section 4.4) | The underlying rollup tables are recomputed hourly anyway; in-process memo just avoids re-running aggregation reads. |
-
-**No materialized views needed.** SQLite doesn't natively support them; the housekeeper-maintained `telemetry_global_aggregates` IS our materialized view, just via explicit row writes.
-
-### 5.3 CORS stance
-
-Existing CORS config at `server.js:80-84` is `cors({ origin: true, credentials: true })`. This reflects whatever Origin sends -- effectively any-origin with credentials.
-
-**Recommendation for `/api/public-stats/*`: do not change anything.** The data is already public-by-design; allowing any origin to fetch is correct. If the `/stats` page is later embedded on a third-party blog as a widget, it'll just work.
-
-**Privacy callout:** because `credentials: true` is on globally, the public-stats endpoint will reflect cookies that don't exist on a public visit anyway. Worth a one-line code comment in `public-stats.js` documenting that this endpoint does not use cookies (route is auth-free) and doesn't change behaviour based on session.
-
-### 5.4 Angular consumer: `FSBTelemetryService`
-
-**Location:** `showcase/angular/src/app/core/stats/fsb-telemetry.service.ts` (new, mirrors `github-stats.service.ts` exactly).
-
-Copy the GitHubStatsService skeleton:
-
-- `@Injectable({ providedIn: 'root' })`
-- `PLATFORM_ID` injection + `isPlatformBrowser` SSR gate (mirror lines 74, 105 of github-stats.service.ts)
-- `BehaviorSubject<DatasetState<...>>` per dataset -- four subjects: `globalAggregates$`, `globalSeries$`, `mostPopular$`, `activeNow$`
-- `POLL_INTERVAL_MS = 5 * 60 * 1000` matching GitHub's 5-minute cadence
-- Visibility-aware polling (mirror lines 116-138)
-- `start()` / `stop()` lifecycle
-- Endpoints: `${API_BASE}/api/public-stats/global` and `${API_BASE}/api/public-stats/global/series`
-- ETag caching follows the existing pattern at lines 295-332 -- the new public-stats Express route should add ETag headers via Express's built-in support (`server.js:160` already has `etag: true` for static).
-
-The stats page (`showcase/angular/src/app/pages/stats/stats-page.component.ts`) gains a toggle group "FSB Telemetry" -- subscribe to the same four BehaviorSubjects and render in chart/table widgets. No new chart libraries needed; reuse Chart.js the page already lazy-loads.
 
 ---
 
-## 6. DOM-Streaming Fix -- Diagnostic Architecture
+## Data Flow
 
-**Constraint:** the user wants this phase **last**. We do not fix in research -- we map the surface, identify suspected break points, and recommend an inspection order.
-
-### 6.1 The actual message flow (extension -> server -> dashboard)
+### Arm flow (blocking, refresh-poll)
 
 ```
-                                    EXTENSION SIDE
-+--------------------------------------------------------------------------+
-| extension/ws/ws-client.js                                                |
-|                                                                          |
-|   Outbound: ext:dom-snapshot / ext:dom-mutations / ext:dom-scroll /      |
-|             ext:dom-overlay / ext:dom-dialog / ext:stream-state /        |
-|             ext:page-ready                                               |
-|   Inbound:  dash:dom-stream-start (line 1081) ->                         |
-|             _handleDashboardStreamStart (line 1029) ->                   |
-|             _forwardToContentScript('domStreamStart') (line 1054) ->     |
-|             chrome.tabs.sendMessage(tabId, {action:'domStreamStart'})    |
-|                                       |                                   |
-|                                       v                                   |
-|   extension/content/dom-stream.js (content-script side, mutation tap)    |
-+--------------------------------------------------------------------------+
-                                       |
-                                       | WebSocket frames (LZ-compressed)
-                                       v
-+--------------------------------------------------------------------------+
-|                          SHOWCASE SERVER                                  |
-| showcase/server/src/ws/handler.js                                        |
-|                                                                          |
-|  rooms: Map<hashKey, {extensions: Set, dashboards: Set}>                 |
-|  relayToRoom(hashKey, senderWs, rawMessage, messageType) line 251-259    |
-|    - senderWs._fsbRole === 'extension' -> targets = room.dashboards      |
-|    - senderWs._fsbRole === 'dashboard' -> targets = room.extensions      |
-|  sendToClients(...) line 66-111: iterates ws.send() on each target       |
-|                                                                          |
-|  ! DEBUG log at line 202 already prints every relay's deliveredCount     |
-|  ! and droppedCount per type -- this is the diagnostic surface to read   |
-|    when reproducing the bug. Note: it's marked `TEMP DEBUG (Phase 212    |
-|    diagnosis)` in a comment -- it's been there since the prior streaming |
-|    work.                                                                  |
-+--------------------------------------------------------------------------+
-                                       |
-                                       v
-                                  DASHBOARD SIDE
-+--------------------------------------------------------------------------+
-| showcase/angular/src/app/pages/dashboard/dashboard-page.component.ts     |
-|                                                                          |
-|  ws.onmessage (line 3315-3334) ->                                        |
-|    LZ envelope decompression (line 3319-3325) ->                         |
-|    handleWSMessage (line 3393) ->                                        |
-|      ext:dom-snapshot -> handleDOMSnapshot (line 2802, srcdoc iframe)    |
-|      ext:dom-mutations -> handleDOMMutations (line 3129, patch iframe)   |
-|      ext:dom-scroll   -> handleDOMScroll (line 3193)                     |
-|      ext:dom-overlay  -> handleDOMOverlay (line 3201)                    |
-|      ext:dom-dialog   -> handleDOMDialog (line 3252)                     |
-|      ext:stream-state -> handleRecoveredStreamState (line 2691)          |
-|      ext:page-ready   -> auto-fires dash:dom-stream-start (line 3517)    |
-+--------------------------------------------------------------------------+
+MCP trigger(selector, threshold>=100, watch=refresh-poll, block=true)
+   ↓ JSON-RPC
+trigger.ts server.tool → queue.enqueue → sendAgentScopedBridgeMessage('mcp:arm-trigger')
+   ↓ WebSocket
+mcp-tool-dispatcher route 'mcp:arm-trigger' → ownership gate → trigger-manager.arm()
+   ↓
+trigger-manager: cap check → resolve owned tab → read INITIAL value (content) →
+   write 'armed' snapshot (trigger-store) → set chrome.alarms fsbTrigger:<id> →
+   send triggerPulseStart to content (analyzing pulse)
+   ↓
+mcp-bridge-client blocking handler: hold promise + 30s heartbeats (notifications/progress)
+   ⋮ (SW may evict here — alarm survives, promise's bridge drops, server reads snapshot)
+[alarm tick] → background.js onAlarm 'fsbTrigger:<id>' → trigger-lifecycle.handleTriggerAlarm
+   ↓
+reload owned tab (background) → re-read element (content triggerRead) →
+   trigger-manager.evaluate(last, current, condition)
+   ↓ condition met
+emit fire → fsbTriggerLifecycleBus → blocking promise settle(fire_envelope) →
+   write 'fired' snapshot → clear alarm → triggerPulseStop
+   ↓ JSON-RPC result
+MCP client receives fire_envelope ("what happened": old→new value, url, timestamp)
 ```
 
-### 6.2 Suspected break points (ranked by probability)
+### Arm flow (detached, live-observe)
 
-**HIGH PROBABILITY (read these first):**
+```
+MCP trigger(selector, contains="In Stock", watch=live-observe, block=false)
+   ↓
+... same path to trigger-manager.arm() ...
+   ↓
+trigger-manager: send triggerObserveStart(selector, extract) to content →
+   content/trigger-observe.js starts MutationObserver on the element (debounced) →
+   write 'armed' snapshot → low-freq watchdog alarm → triggerPulseStart
+   ↓ returns immediately
+MCP client gets { trigger_id, status:'armed' }
+   ⋮ later, page DOM mutates
+content observer (debounced) → chrome.runtime.sendMessage('triggerValueChanged', {trigger_id, value})
+   ↓ (wakes SW if evicted)
+background.js onMessage → trigger-manager.evaluate → condition met → fire →
+   write 'fired' snapshot → clear observer + alarm + pulse
+   ↓
+MCP client later calls get_trigger_status(trigger_id) → reads 'fired' snapshot → fire_envelope
+```
 
-1. **Pair handshake gating the room match.** `handler.js:151` requires `wss.handleUpgrade` to have been called with `{ hashKey, role }` from the URL params (server.js:241-262). If the dashboard's hashKey differs from the extension's hashKey -- because the user paired with a stale session or the auth middleware (`server.js:103-105` line `authMiddleware(queries)`) doesn't validate the same key both ends -- the dashboard and extension end up in DIFFERENT rooms and the relay log line at handler.js:202 will show `deliveredCount=0` for every extension->dashboard frame. **Inspection order #1: read the server logs while the bug repros and verify both extension and dashboard log connect events with the SAME `hashKey.substring(0,8)` prefix at lines 152 + 156.**
+### State management (where state lives)
 
-2. **Stream-tab resolution returns "not-ready" silently.** `extension/ws/ws-client.js:1029 _handleDashboardStreamStart` calls `_resolveStreamCandidate()` first (line 1030). If the candidate isn't ready, it emits `ext:stream-state` with `not-ready` and returns without calling `_forwardToContentScript` (lines 1032-1046). The dashboard's `handleRecoveredStreamState` (component line 2691) then renders the disconnected pane. **Inspection order #2: in dev tools network panel, watch for an outbound `ext:stream-state` message right after pressing the wake button -- if it carries `status: 'not-ready'`, the extension side never started the content-script tap.**
+```
+chrome.storage.session  'fsbTriggerRegistry'  → live trigger snapshots (survives SW evict,
+                                                 wiped on browser restart — intentional)
+chrome.alarms           'fsbTrigger:<id>'      → poll clock (refresh-poll) / watchdog (live)
+chrome.storage.local    'fsbTriggerCap'        → user cap preference (survives restart)
+SW memory (ephemeral)   in-flight blocking promises, heartbeat timers (rebuilt from snapshot
+                                                 on SW restart via restoreTriggersFromStorage)
+content (page memory)   the MutationObserver instance (live-observe; dies on navigation,
+                                                 re-armed by SW watchdog)
+```
 
-3. **`_forwardToContentScript` hits "no tab resolved" branch.** Line 1359-1376 of ws-client.js: if neither `_streamingTabId` nor `_dashboardTaskTabId` is set, the fallback `chrome.tabs.query({active:true})` runs but is famously unreliable from a service worker. Records `recordFSBTransportFailure('dom-forward-failed', {readyState: 'no-tab'})` and silently returns. **Inspection order #3: check `chrome.storage.local.fsbDiagnostics_ring` for `dom-forward-failed` entries (the Phase 211 diagnostics ring buffer at `extension/utils/diagnostics-ring-buffer.js` captures these).**
+**On reusing the Lattice survivability adapter (explicit answer):** `extension/ai/lattice-runtime-adapter.js` implements Lattice's `SurvivabilityAdapter<TState>` over `chrome.storage.session` (serialize/deserialize/onEviction/resume). It is *available* and conceptually aligned, BUT it is keyed and shaped for **agent-loop session state** (the `run_task` runtime), and INV-06 pins the Lattice package. RECOMMEND: **do NOT route trigger snapshots through the Lattice adapter for v0.11.0.** Use `chrome.storage.session` directly via `trigger-store.js`, exactly as `mcp-task-store.js` does today (which also did not route through Lattice). Rationale: (1) lower risk — no coupling to the pinned Lattice contract or the offscreen host lifetime (the offscreen page "evicts before the SW" per lattice-host.js:71-72, which is *worse* survivability than a direct alarm); (2) the trigger snapshot is a flat record, not a Lattice `TState`; (3) keeps the offscreen document off the trigger hot path entirely. The Lattice *Capability Receipt* shape MAY inform the `fire_envelope` ("what happened") payload as a design reference, but generating a signed receipt is a deferred candidate, not v0.11.0 scope.
 
-**MEDIUM PROBABILITY:**
+### Key data flows
 
-4. **`ext:status` broadcast is missing or arrives before the dashboard's listener is wired.** `handler.js:158-163` broadcasts `ext:status {online:true}` when an extension connects. If the dashboard connects AFTER the extension, lines 166-172 send the snapshot. If the dashboard's `handleWSMessage` (component line 3411) is not yet registered (component constructor hasn't finished), the `extensionOnline = false` state persists, blocking `scheduleStreamRecovery` (component line 3425). **Inspection order #4: trace the order of `[WS] dashboard connected` and `[WS] extension connected` log lines from server.js console output.**
-
-5. **LZ decompression failure on the dashboard side.** Component line 3319-3325 silently returns on decompress-failure with only a transport-error record. The user wouldn't see anything in the UI -- the frame appears to never arrive. **Inspection order #5: in the dashboard's transport-event ring (visible via the dashboard's existing diagnostic export, see component `recordTransportError` calls), look for `message-parse-failed` events with context `'parse'`.**
-
-**LOW PROBABILITY:**
-
-6. **Stale-mutation auto-resync loop.** Component lines 3144-3146 / 3162 / 3168 / 3175 trigger `requestPreviewResync` after 3 stale mutations. If the iframe doc is wiped between snapshot and a mutation arriving, every mutation goes stale, and the resync request itself is dropped by 1/2/3/4 above -- net result: dashboard sits at a stale snapshot forever. This is downstream of 1-5; fixing those should re-establish the chain.
-
-7. **Mutation `data-fsb-nid` selector contract drift.** Lines 3142, 3153, 3161, 3167, 3174 of the dashboard use `'[data-fsb-nid="' + m.parentNid + '"]'` to find target nodes. If the content-script side (extension/content/dom-stream.js) emits a snapshot with a different attribute name or numbering scheme than the mutations, every patch fails. Worth grepping both files for `data-fsb-nid` once the upstream chain is verified intact.
-
-### 6.3 Recommended inspection / fix order
-
-Phase ordering (within the final fix phase, not across the milestone):
-
-1. **Repro + capture three logs simultaneously:** server stdout (handler.js:152, 156, 202), extension diagnostics ring (`fsb_diagnostics_ring`), and dashboard transport events.
-2. **Confirm hashKey parity** across the two `connected` lines (Break-point 1).
-3. **Confirm `dash:dom-stream-start` reaches the extension** by reading server log line 202 -- look for `extension->dashboard ... type=ext:stream-state delivered=1` followed by the dashboard's reaction.
-4. **If 2-3 are clean,** trace the content-script side: is `dom-stream.js` emitting `ext:dom-snapshot`? Add temporary logging at `extension/content/dom-stream.js:1063` (the `ext:page-ready -> dash:dom-stream-start auto-start chain` comment is already there).
-5. **If snapshot arrives at dashboard** but iframe doesn't render: check `handleDOMSnapshot` line 2851-2856 iframe load handler -- a CSP block on the showcase domain could deny `srcdoc` content.
-
-**Do NOT fix** anything outside the surface diagnosed by the above chain. The break-point ranking is hypotheses, not solutions; the actual root cause is one of these 7 points and must be confirmed by the inspection chain before code changes ship.
+1. **Tool registration (INV-01/02):** `tool-definitions.js TOOL_REGISTRY` += 4 additive defs → the `.cjs` mirror (`ai/tool-definitions.cjs`, consumed by `queue.ts`) regenerates → `runtime.ts` calls `registerTriggerTools` alongside the existing 5 registrars. Existing 52 tool schemas stay byte-identical (INV-01). Same registry feeds autopilot and MCP (INV-02): autopilot's `agent-loop.js getPublicTools()` reads the same `TOOL_REGISTRY`, so the AI can arm triggers too.
+2. **Fire decision durability:** value reads happen in content; the compare/fire decision happens in the SW (`trigger-manager.evaluate`) backed by `chrome.storage.session`, so an eviction between "value read" and "fire decision" cannot drop a fire — the next alarm tick re-reads and re-evaluates against the persisted `last_value`.
+3. **Visual lifecycle:** arm → `triggerPulseStart`; each refresh-poll reload → re-issue `triggerPulseStart` (survive reload); fire/stop → `triggerPulseStop`; overlay `mode:'trigger-watch'` drives the "watching a trigger" label.
 
 ---
 
-## 7. Phase Build Order Recommendation
+## Scaling Considerations
 
-### 7.1 Hard constraint
+| Scale | Architecture adjustments |
+|-------|--------------------------|
+| 1-8 triggers (default cap) | Each refresh-poll trigger = one alarm; live-observe = one observer + one watchdog alarm. No concern. Chrome alarms are cheap. |
+| 8-64 triggers (max cap) | Coordinate co-located refresh-poll reloads (one reload per tab per cadence, not per trigger) to avoid hammering a site and tripping rate limits (PROJECT.md "hard floor; avoid hammering sites"). Multiplex live-observe onto one observer per tab. |
+| >64 | Rejected by cap (fail-loud `TRIGGER_CAP_REACHED`). No silent backpressure — same posture as the agent cap (PROJECT.md decision: "fail-loud on cap"). |
 
-The milestone goal explicitly fixes the dashboard streaming fix LAST. Everything else must precede it.
+### Scaling priorities
 
-### 7.2 Dependency graph
-
-```
-        Phase A: install-identity.js + opt-out plumbing
-                    |
-                    | (UUID available)
-                    v
-        Phase B: MCPMetricsRecorder + dispatcher hooks            +-- Phase C: mcp-pricing.js
-                    |                                              |   (independent;
-                    | (recordDispatch emits)                       |    pure data table)
-                    +--------------------------+-------------------+
-                                               |
-                                               | (record + pricing both live)
-                                               v
-                            Phase D: TelemetryCollector + alarms + queue
-                                               |
-                                               | (events queueing)
-                                               v
-                            Phase E: Server ingest (/api/telemetry/* + schema + salt + rate-limit)
-                                               |
-                                               | (events accepted + rolled up)
-                                               v
-                            Phase F: Public aggregates endpoint + FSBTelemetryService Angular consumer
-                                               |
-                                               | (stats page renders aggregates)
-                                               v
-                            Phase G: Control-panel MCP analytics UI + opt-out toggle + first-run banner
-                                               |
-                                               | (operator can see + control everything)
-                                               v
-                            Phase H: Dashboard DOM-streaming fix (diagnostic + repair)
-```
-
-### 7.3 Parallelism opportunities
-
-| Parallel pair | Why safe |
-|---------------|----------|
-| Phase A and Phase C | Pure data + storage bootstrap; no shared writes. UUID gen doesn't depend on pricing table; pricing table doesn't read storage. |
-| Phase B and Phase E (after A, C done) | The extension-side recorder writes to chrome.storage; the server-side ingest creates SQLite tables. No coupling until Phase D wires the network call. |
-| Phase F and Phase G | Different surfaces (Angular page vs control-panel HTML). Both read from already-existing data plumbing. |
-
-### 7.4 Recommended phase numbering (continuing existing FSB phase counter)
-
-Last phase shipped was **268** (v0.9.63 close). Suggested:
-
-| # | Phase | Mode | Parallel-with |
-|---|-------|------|---------------|
-| 269 | Install identity + opt-out scaffold | Sequential | -- |
-| 270 | API pricing module (`extension/ai/mcp-pricing.js`) | Parallel with 269 | 269 |
-| 271 | MCPMetricsRecorder + dispatcher hooks + control-panel hero wiring | Sequential | -- |
-| 272 | TelemetryCollector + alarm scheduling + queue persistence | Sequential | -- |
-| 273 | Server schema + telemetry routes + salt rotator + rate limiter + housekeeper | Sequential | -- |
-| 274 | Public aggregates endpoint + FSBTelemetryService Angular + `/stats` toggle group | Sequential | -- |
-| 275 | First-run privacy banner + opt-out UX polish + integration smoke | Sequential | -- |
-| 276 | Dashboard DOM-streaming diagnostic + fix | Sequential | -- (LAST per constraint) |
-
-### 7.5 Phases that can shift if research surfaces new info
-
-- **270 (pricing)** has the lowest risk and can move earlier or be folded into 271 if the pricing table proves trivial.
-- **275 (privacy UX polish)** could fold into 274 if the toggle is a one-line addition to the existing control-panel; treat as optional split.
-- **271-272 cannot merge** -- the metrics recorder writes a record-shape on every dispatch, the telemetry collector batches OUTBOUND. Conflating them would mean an outbound HTTP call on every MCP tool dispatch -- pathologically chatty and breaks the privacy story (the user expects batched anonymization, not real-time POSTs).
+1. **First bottleneck: refresh-poll reload storms.** N triggers on one site reloading independently. Fix: per-tab reload coalescing in `trigger-manager` (one reload serves all refresh-poll triggers on that tab; hard floor on interval). This is the single most important perf guard.
+2. **Second bottleneck: alarm minimum granularity.** Chrome MV3 production alarms fire at minimum 30s (`mcp-visual-session-lifecycle.js:64-67` documents this). Sub-30s polling is impossible via alarms — enforce a ~30s hard floor and document it. Live-observe (event-driven, no alarm floor) is the answer for truly real-time tickers.
 
 ---
 
-## 8. Integration Points Summary (for ROADMAP.md consumption)
+## Anti-Patterns
 
-| Touch point | Existing file | New code | Phase |
-|-------------|---------------|----------|-------|
-| MCP dispatch chokepoint -- tool routes | `extension/ws/mcp-tool-dispatcher.js:285-301` | `try/finally` around `route.handler(...)` call | 271 |
-| MCP dispatch chokepoint -- message routes | `extension/ws/mcp-tool-dispatcher.js:303-331` | `try/finally` around `route.handler(...)` and `client[route.helperName](...)` | 271 |
-| Service-worker boot | `extension/background.js:13015` (onInstalled) + `:13051` (onStartup) | `await FSBInstallIdentity.getOrCreateInstallUuid()` | 269 |
-| Service-worker boot importScripts chain | `extension/background.js:4-65` | Insert `utils/install-identity.js`, `utils/mcp-metrics-recorder.js`, `utils/telemetry-collector.js`, `ai/mcp-pricing.js` | 269-272 |
-| Analytics broadcast pattern (mirror) | `extension/background.js:11440-11447 broadcastAnalyticsUpdate` | New `broadcastMcpMetricsUpdate` -- emits `MCP_METRICS_UPDATE` | 271 |
-| chrome.alarms beat scheduler (mirror) | `extension/ws/mcp-bridge-client.js:291-303 _scheduleReconnectAlarm` | `TELEMETRY_BEAT_ALARM` periodInMinutes:15 | 272 |
-| Control panel analytics hero (additive) | `extension/ui/control_panel.html:104-122` | New "MCP Calls/Cost/Active Clients" tiles + per-call log section | 271, 275 |
-| Server schema | `showcase/server/src/db/schema.js:9-73` | Add `telemetry_events`, `telemetry_rollups_daily`, `telemetry_global_aggregates` to the single `db.exec` block | 273 |
-| Server queries | `showcase/server/src/db/queries.js:11-136 _prepareStatements` | New `insertTelemetryEvent`, `getGlobalTelemetryAggregates`, `getGlobalTelemetrySeries` prepared statements | 273 |
-| Server routes mount | `showcase/server/server.js:99-113` | Add `app.use('/api/telemetry', createTelemetryRouter(queries))` (auth-NOT-required), `app.use('/api/public-stats', createPublicStatsRouter(queries))` | 273-274 |
-| Salt + housekeeper init | `showcase/server/server.js:27-29` (post DB init) | `setInterval(housekeeper, 60*60*1000); housekeeper()` | 273 |
-| Stats page consumer | `showcase/angular/src/app/pages/stats/stats-page.component.ts:32 import GitHubStatsService` | Add `import { FSBTelemetryService }`, new toggle group + view widgets | 274 |
-| Existing dashboard streaming surface to diagnose | `showcase/server/src/ws/handler.js:175-203` (relay) + `extension/ws/ws-client.js:1029-1055` (start) + `showcase/angular/src/app/pages/dashboard/dashboard-page.component.ts:2802-3505` (consume) | Read-only diagnosis; targeted fix in one of these three files | 276 |
+### Anti-Pattern 1: Running the watcher inside the agent loop / `activeSessions`
 
----
+**What people do:** Reuse `agent-loop.js`'s iterator or the `activeSessions` map to "host" the standing trigger.
+**Why it's wrong:** INV-04 freezes the `setTimeout`-chained iterator (lines 2003/2702/2771). A standing watcher has no AI iteration, no completion scoring, and a far longer lifetime. Grafting it on risks the load-bearing iterator and pollutes the session schema.
+**Do this instead:** A parallel trigger registry (`trigger-store.js`/`trigger-lifecycle.js`/`trigger-manager.js`), exactly as v0.9.36 visual sessions and v0.9.60 run_task tracking are kept separate from `activeSessions`.
 
-## 9. Outstanding Open Questions (to resolve during CONTEXT.md scoping)
+### Anti-Pattern 2: Evaluating fire conditions in the content script
 
-1. **MCP client label allowlist.** The existing visual-session allowlist (`extension/utils/mcp-visual-session.js MCPVisualSessionUtils.normalizeMcpVisualClientLabel`) already covers "Claude Code", "Codex", "OpenClaw". Telemetry should reuse this exact list so the badge surface and the telemetry aggregation use identical labels. Verify the function is callable from `MCPMetricsRecorder` (it should be -- it's already imported by the dispatcher at `mcp-tool-dispatcher.js:42`).
+**What people do:** Let the content MutationObserver decide "threshold crossed → fire."
+**Why it's wrong:** Content scripts die on navigation and aren't persisted; an eviction or reload mid-evaluation drops the fire. The "did it cross?" decision needs the durable `last_value` in `chrome.storage.session`.
+**Do this instead:** Content reads and reports raw values; the SW (`trigger-manager.evaluate`) owns the fire decision backed by the persisted snapshot — mirroring `dom-stream.js` (content sends mutations, SW/dashboard interprets).
 
-2. **Should the first beat fire immediately or wait for the 15-min alarm?** Recommendation: fire on `chrome.runtime.onInstalled` and `onStartup` (after a 30-second idle grace so install_announce isn't conflated with first-actual-use) with a single `install_announce` event. Lets the server count total installs even from users who never use an MCP tool.
+### Anti-Pattern 3: A refresh-poll trigger reloading a tab that hosts a live-observe trigger
 
-3. **`run_task` token harvesting shape.** The result envelope from `dispatchMcpToolRoute({tool:'run_task'})` ultimately resolves with `{sessionId, status, result, ...}` (from `_handleStartAutomation` in mcp-bridge-client.js:1196-1202). Where exactly inside `result` are token counts? Looks like they go through `automationComplete` message details -- verify path during Phase 271.
+**What people do:** Allow any mix of watch modes on one tab.
+**Why it's wrong:** The refresh-poll reload destroys the co-located observer; the live-observe trigger silently stops watching.
+**Do this instead:** Detect the conflict at arm time and reject with a typed `TRIGGER_TAB_WATCH_CONFLICT`, steering to a separate (background) tab via the existing forced-new-tab pooling.
 
-4. **Dashboard streaming fix scope.** The 7 break-points in Section 6.2 are an analytic ranking; the actual fix may be a one-liner OR may require a structural change to the pair-handshake. Final scope only knowable post-Phase-275 diagnostic. **Phase 276 must include a CONTEXT.md "diagnostic-first" plan** that decides scope after step 1-2 of Section 6.3.
+### Anti-Pattern 4: New manifest permissions or a new background context
+
+**What people do:** Add permissions or spin up a new persistent worker for "always-on" watching.
+**Why it's wrong:** `manifest.json` already grants `alarms`, `storage`, `unlimitedStorage`, `tabs`, `scripting`, `webNavigation`, `offscreen` — everything trigger needs. MV3 forbids persistent background pages; the alarm+storage+restore pattern IS the MV3-correct "always-on."
+**Do this instead:** Zero manifest changes. Reuse `chrome.alarms` + `chrome.storage.session` + SW-startup restore, exactly like the visual-session lifecycle.
 
 ---
 
-**End of v0.9.69 architecture research.**
+## Integration Points
+
+### External boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| MCP client ↔ MCP server | JSON-RPC stdio + `notifications/progress` | Blocking `trigger()` streams heartbeats exactly like `run_task`; INV-01 keeps existing tool wires byte-identical |
+| MCP server ↔ SW | WebSocket bridge, `mcp:trigger-*` messages | New message types only; existing `mcp:*` routes untouched |
+| SW ↔ content | `chrome.tabs.sendMessage` (read/observe/pulse) + `chrome.runtime.sendMessage` (value reports) | New `action` cases in `content/messaging.js` router; existing cases untouched |
+| SW ↔ Chrome platform | `chrome.alarms`, `chrome.storage.session/local`, `chrome.tabs`, `chrome.webNavigation` | All already permissioned |
+
+### Internal boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `tool-definitions.js` ↔ autopilot + MCP | shared `TOOL_REGISTRY` array | INV-02: one registry, both consumers; `.cjs` mirror feeds `queue.ts` |
+| `trigger-manager` ↔ `trigger-store` ↔ `trigger-lifecycle` | direct function calls in SW | three new `utils/` modules, importScripts-loaded like the visual lifecycle |
+| `mcp-bridge-client` ↔ `trigger-manager` | `globalThis.fsbTriggerLifecycleBus` (fire events) | mirrors `globalThis.fsbAutomationLifecycleBus` used by run_task |
+| `trigger-manager` ↔ tab ownership | `agent-tab-resolver.js` + `agent-registry.js` ownership gate | reuse, do not reinvent (INV consistency) |
+
+---
+
+## Dependency-Ordered Build Sequence
+
+Ordered so each phase's output feeds the next (the project's established "data dependency chain for phases" discipline). Each phase is independently testable.
+
+1. **Storage + lifecycle primitives (foundation).** `utils/trigger-store.js` (clone `mcp-task-store.js`, new key/constants) + `utils/trigger-lifecycle.js` (clone `mcp-visual-session-lifecycle.js` shape: `fsbTrigger:<id>` alarm, restore, tab-close cleanup). Pure modules, Node-testable with mocked `chrome`. *No behavior wired yet — exactly like the visual lifecycle's boot-order note.*
+
+2. **Trigger manager + fire-condition engine + value extraction + cap.** `utils/trigger-manager.js`: `arm`/`stop`/`evaluate`/`fire`; the four conditions (changed/threshold/equals/contains); smart extraction (strip `$`,`,`,whitespace for number; raw for text; `extract` override); cap enforcement mirroring `agent-registry.js`. Depends on (1). Unit-testable in isolation.
+
+3. **SW glue: onAlarm branch + SW-startup restore + tab-close cleanup.** `background.js`: add the `fsbTrigger:` branch to the single `chrome.alarms.onAlarm` listener (before existing branches), call `restoreTriggersFromStorage()` in the bootstrap pipeline, add `chrome.tabs.onRemoved` trigger cleanup. Depends on (1)+(2). This makes refresh-poll *survive eviction* — the milestone crux — verifiable via alarm-tick tests.
+
+4. **Content live-observe + read + pulse.** `content/trigger-observe.js` (single-element MutationObserver, debounced, reports to SW) + `content/messaging.js` router cases (`triggerObserveStart/Stop`, `triggerRead`, `triggerPulseStart/Stop`) + `content/visual-feedback.js` analyzing-pulse glow variant + `ViewportGlow` "watching" label. Depends on (2)+(3) for the SW side to receive reports and drive pulses.
+
+5. **Tool registry + dispatcher routing (INV-01/02).** `ai/tool-definitions.js` += 4 additive defs; regenerate `.cjs` mirror; `ws/mcp-tool-dispatcher.js` route tables += trigger aliases + `mcp:trigger-*` message routes (with ownership gate). Verifies existing 52 schemas unchanged (schema-lock test) and that autopilot can arm triggers (INV-02). Depends on (2)-(4).
+
+6. **MCP server tools + blocking return.** `mcp/src/tools/trigger.ts` (4 `server.tool()`), `runtime.ts` registration, `queue.ts` read-only set += `get_trigger_status`/`list_triggers`; `ws/mcp-bridge-client.js` blocking `trigger()` heartbeat/settle handler (clone `_handleStartAutomation` shape; trigger-specific timeout ceiling + `partial_state` on eviction). Depends on (5). End-to-end MCP path now closes.
+
+7. **Cap UI + polish + docs.** `control_panel.html` trigger-cap control next to the agent cap; CHANGELOG + mcp/README trigger tool docs; concurrency/conflict edge cases (refresh-poll vs live-observe on same tab → `TRIGGER_TAB_WATCH_CONFLICT`, co-located reload coalescing). Knock-on `fsb-mcp-server@0.10.0` minor bump. Depends on (6).
+
+**Rationale for this order:** survivability primitives (1-3) must exist before anything can be tested for eviction-survival (the milestone's stated crux). Content (4) needs the SW to receive its reports. Registration/MCP (5-6) is meaningless until the watcher works. The blocking-return machinery (6) reuses the most code (`_handleStartAutomation`) and is therefore lowest-risk *last*, after the watcher itself is proven. This matches FSB's prior milestone discipline (e.g. v0.9.60: lifecycle/ownership primitives before MCP surface; v0.9.69: pipeline before consumption surface).
+
+---
+
+## NEW vs MODIFIED Summary
+
+**NEW (5):**
+- `extension/utils/trigger-store.js` — snapshot envelope (clone of `mcp-task-store.js`)
+- `extension/utils/trigger-lifecycle.js` — alarm + restore + cleanup (clone of `mcp-visual-session-lifecycle.js`)
+- `extension/utils/trigger-manager.js` — arm/evaluate/fire/stop + cap + tab binding
+- `extension/content/trigger-observe.js` — single-element MutationObserver (live-observe)
+- `mcp/src/tools/trigger.ts` — 4 `server.tool()` registrations
+
+**MODIFIED (8):**
+- `extension/ai/tool-definitions.js` — `TOOL_REGISTRY` += 4 additive defs (+ regenerate `.cjs` mirror)
+- `extension/ws/mcp-tool-dispatcher.js` — route tables (tool aliases + `mcp:trigger-*` messages)
+- `extension/ws/mcp-bridge-client.js` — blocking `trigger()` heartbeat/settle handler
+- `extension/background.js` — onAlarm branch, SW-startup restore, `chrome.tabs.onRemoved` cleanup
+- `extension/content/messaging.js` — router cases (observe/read/pulse)
+- `extension/content/visual-feedback.js` — analyzing-pulse glow variant + "watching" label
+- `mcp/src/runtime.ts` — call `registerTriggerTools(...)`
+- `mcp/src/queue.ts` — `readOnlyTools` += `get_trigger_status`, `list_triggers`
+
+**NO CHANGE:** `manifest.json` (permissions sufficient), all existing 52 tool schemas (INV-01), `agent-loop.js` iterator (INV-04), Lattice package/adapter (INV-06).
+
+---
+
+## Sources
+
+- `extension/utils/mcp-task-store.js` — `chrome.storage.session` versioned envelope; the `trigger-store.js` template (HIGH — direct read)
+- `extension/utils/mcp-visual-session-lifecycle.js` — per-entity `chrome.alarms` + storage + SW-startup restore + tab-close cleanup; the `trigger-lifecycle.js` template (HIGH — direct read)
+- `extension/ws/mcp-bridge-client.js:979-1158` — blocking heartbeat/`settle()`/600s safety-net/`partial_state` pattern; the blocking `trigger()` template (HIGH — direct read)
+- `extension/background.js:13283-13360` — single `chrome.alarms.onAlarm` listener with per-prefix branches; the onAlarm dispatch insertion point (HIGH — direct read)
+- `extension/content/dom-stream.js:740-1075` — MutationObserver start/stop + rAF debounce + `chrome.runtime.sendMessage` reporting + message-driven router; the live-observe template (HIGH — direct read)
+- `extension/content/visual-feedback.js:33-72, 884-1108` — `HighlightManager` orange glow + `ViewportGlow` thinking/acting states; the analyzing-pulse + "watching" label wiring (HIGH — direct read)
+- `extension/content/messaging.js:1229-1432` — content router + `highlightElement` precedent; pulse message entry (HIGH — direct read)
+- `extension/ai/tool-definitions.js:36-120, 94, 1213-1254` — shared `TOOL_REGISTRY` + `withVisualSessionFields` + read-only filter; INV-01/02 additive-registration surface (HIGH — direct read)
+- `extension/ws/mcp-tool-dispatcher.js:62-91, 389, 447` — tool-alias + message route tables + inline ownership gate; the routing insertion point (HIGH — direct read)
+- `extension/utils/agent-registry.js:52-76, 302-308, 810-891` — cap machinery (1-64, default 8, fail-loud, grandfather-on-lower); the trigger-cap template (HIGH — direct read)
+- `extension/utils/agent-tab-resolver.js` — `resolveAgentTabOrError`; tab-binding reuse (HIGH — direct read)
+- `extension/ai/lattice-runtime-adapter.js:1-199` — Lattice `SurvivabilityAdapter<TState>` over `chrome.storage.session`; evaluated and deliberately NOT used for trigger snapshots (HIGH — direct read)
+- `extension/offscreen/lattice-host.js:60-72, 240-243` — offscreen host lifetime ("evicts before SW"); rationale for keeping triggers off the offscreen path (HIGH — direct read)
+- `mcp/src/tools/autopilot.ts` — `run_task`/`stop_task`/`get_task_status` family + `sw_evicted` resolve shape; the `trigger.ts` template (HIGH — direct read)
+- `mcp/src/tools/observability.ts` — read-only tool registration shape; the `get_trigger_status`/`list_triggers` template (HIGH — direct read)
+- `mcp/src/runtime.ts:33-41` — single `register*Tools` call site (HIGH — direct read)
+- `mcp/src/queue.ts:30-64` — `readOnlyTools` set + `.cjs` registry bridge (HIGH — direct read)
+- `extension/manifest.json` — `alarms`/`storage`/`unlimitedStorage`/`tabs`/`scripting`/`webNavigation`/`offscreen` permissions already granted (HIGH — direct read)
+- `.planning/PROJECT.md` — v0.11.0 Trigger Tool milestone + invariants INV-01/02/03/04/06 (HIGH — direct read)
+
+---
+*Architecture research for: FSB `trigger` tool family MV3 integration*
+*Researched: 2026-06-15*
