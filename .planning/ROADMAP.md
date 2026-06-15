@@ -427,7 +427,9 @@ Plans:
 
 Plans:
 
-- [ ] TBD
+- [x] **10-01:** Visual-session schema extension (`10-01-PLAN.md`) -- `FSB Autopilot` allowlist entry, lifecycle `driver` discriminator, TOOL_DISPATCH `recordVisualSessionTick` call, and Wave 0 smoke harness.
+- [x] **10-02:** Metrics recorder integration + driving-model attribution (`10-02-PLAN.md`) -- `dispatcher_route: 'autopilot'`, optional `drivingModel` row field, post-toolResults `recordDispatch` call, and xAI `reasoning_tokens` smoke coverage.
+- [x] **10-03:** Documentation ceremony + final smoke (`10-03-PLAN.md`) -- FINT-16/17/18 traceability, INV-02 wording promotion, Phase 10 LATTICE-PIN row with SHA unchanged, milestone audit status history, and UAT-10 deferral.
 
 ### Phase 11: Tab-aware side panel surface — friendly owner-chip + foreign-owned input lockout + per-tab chat history
 
