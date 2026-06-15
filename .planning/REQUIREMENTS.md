@@ -105,55 +105,64 @@ Explicitly excluded for v0.11.0. Anti-features carried from `FEATURES.md` with r
 
 ## Traceability
 
-Which phase covers which requirement. Phase column populated by the roadmapper.
+Which phase covers which requirement. Phase numbering continues from v0.10.0 (Phases 01-13); this milestone is Phases 14-20.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRIG-01 | TBD | Pending |
-| TRIG-02 | TBD | Pending |
-| TRIG-03 | TBD | Pending |
-| TRIG-04 | TBD | Pending |
-| TRIG-05 | TBD | Pending |
-| TRIG-06 | TBD | Pending |
-| TRIG-07 | TBD | Pending |
-| WATCH-01 | TBD | Pending |
-| WATCH-02 | TBD | Pending |
-| WATCH-03 | TBD | Pending |
-| WATCH-04 | TBD | Pending |
-| WATCH-05 | TBD | Pending |
-| EXTRACT-01 | TBD | Pending |
-| EXTRACT-02 | TBD | Pending |
-| EXTRACT-03 | TBD | Pending |
-| EXTRACT-04 | TBD | Pending |
-| REPORT-01 | TBD | Pending |
-| REPORT-02 | TBD | Pending |
-| REPORT-03 | TBD | Pending |
-| REPORT-04 | TBD | Pending |
-| REPORT-05 | TBD | Pending |
-| REPORT-06 | TBD | Pending |
-| REPORT-07 | TBD | Pending |
-| LIFE-01 | TBD | Pending |
-| LIFE-02 | TBD | Pending |
-| LIFE-03 | TBD | Pending |
-| LIFE-04 | TBD | Pending |
-| LIFE-05 | TBD | Pending |
-| SURV-01 | TBD | Pending |
-| SURV-02 | TBD | Pending |
-| SURV-03 | TBD | Pending |
-| VIS-01 | TBD | Pending |
-| VIS-02 | TBD | Pending |
-| VIS-03 | TBD | Pending |
-| VIS-04 | TBD | Pending |
-| REG-01 | TBD | Pending |
-| REG-02 | TBD | Pending |
-| REG-03 | TBD | Pending |
-| REG-04 | TBD | Pending |
+| TRIG-01 | Phase 18 | Pending |
+| TRIG-02 | Phase 15 | Pending |
+| TRIG-03 | Phase 15 | Pending |
+| TRIG-04 | Phase 15 | Pending |
+| TRIG-05 | Phase 15 | Pending |
+| TRIG-06 | Phase 15 | Pending |
+| TRIG-07 | Phase 15 | Pending |
+| WATCH-01 | Phase 16 | Pending |
+| WATCH-02 | Phase 17 | Pending |
+| WATCH-03 | Phase 17 | Pending |
+| WATCH-04 | Phase 17 | Pending |
+| WATCH-05 | Phase 16 | Pending |
+| EXTRACT-01 | Phase 15 | Pending |
+| EXTRACT-02 | Phase 15 | Pending |
+| EXTRACT-03 | Phase 15 | Pending |
+| EXTRACT-04 | Phase 15 | Pending |
+| REPORT-01 | Phase 19 | Pending |
+| REPORT-02 | Phase 19 | Pending |
+| REPORT-03 | Phase 19 | Pending |
+| REPORT-04 | Phase 19 | Pending |
+| REPORT-05 | Phase 19 | Pending |
+| REPORT-06 | Phase 19 | Pending |
+| REPORT-07 | Phase 19 | Pending |
+| LIFE-01 | Phase 18 | Pending |
+| LIFE-02 | Phase 18 | Pending |
+| LIFE-03 | Phase 18 | Pending |
+| LIFE-04 | Phase 15 | Pending |
+| LIFE-05 | Phase 14 | Pending |
+| SURV-01 | Phase 14 | Pending |
+| SURV-02 | Phase 14 | Pending |
+| SURV-03 | Phase 14 | Pending |
+| VIS-01 | Phase 16 | Pending |
+| VIS-02 | Phase 16 | Pending |
+| VIS-03 | Phase 16 | Pending |
+| VIS-04 | Phase 16 | Pending |
+| REG-01 | Phase 18 | Pending |
+| REG-02 | Phase 18 | Pending |
+| REG-03 | Phase 18 | Pending |
+| REG-04 | Phase 18 | Pending |
 
 **Coverage:**
 - v1 requirements: 39 total
-- Mapped to phases: 0 (roadmapper to map all 39)
-- Unmapped: 39 (pending roadmap)
+- Mapped to phases: 39 (Phases 14-20; Phase 20 is the integration/composition phase carrying no net-new requirement)
+- Unmapped: 0
+
+**Per-phase requirement counts:**
+- Phase 14 (Trigger Survivability Foundation): SURV-01, SURV-02, SURV-03, LIFE-05 (4)
+- Phase 15 (Fire-Condition Engine & Value Extraction): TRIG-02, TRIG-03, TRIG-04, TRIG-05, TRIG-06, TRIG-07, EXTRACT-01, EXTRACT-02, EXTRACT-03, EXTRACT-04, LIFE-04 (11)
+- Phase 16 (Live-Observe Watch & Analyzing Pulse): WATCH-01, WATCH-05, VIS-01, VIS-02, VIS-03, VIS-04 (6)
+- Phase 17 (Refresh-Poll Watch): WATCH-02, WATCH-03, WATCH-04 (3)
+- Phase 18 (Shared Tool Registry & Dispatcher Wiring): TRIG-01, REG-01, REG-02, REG-03, REG-04, LIFE-01, LIFE-02, LIFE-03 (8)
+- Phase 19 (MCP Tools & Blocking/Detached Reporting): REPORT-01, REPORT-02, REPORT-03, REPORT-04, REPORT-05, REPORT-06, REPORT-07 (7)
+- Phase 20 (Integration, Cap UI, Docs & Edge Cases): composition phase (0 net-new)
 
 ---
 *Requirements defined: 2026-06-15*
-*Last updated: 2026-06-15 after initial definition for milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring)*
+*Last updated: 2026-06-15 after roadmap creation for milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- all 39 v1 requirements mapped to Phases 14-20*
