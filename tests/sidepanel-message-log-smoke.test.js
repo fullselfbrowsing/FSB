@@ -25,6 +25,7 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const { validatePublicLatticePin } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -670,10 +671,11 @@ function _loadSidepanelHydrate() {
     }
     ok(!violation, 'Part 8.3: INV-04 Phase-12 token awk-scan empty inside all setTimeout lambdas');
 
-    // Test 4: LATTICE-PIN.md SHA literal byte-frozen.
-    const pinSrc = fs.readFileSync(path.join(__dirname, '..', '.planning/LATTICE-PIN.md'), 'utf8');
-    ok(/current_lattice_sha:\s*e95067bfa87ed1b75838fc3b3ef217a3b01acbd3/.test(pinSrc),
-       'Part 8.4: INV-06 LATTICE-PIN.md frontmatter current_lattice_sha literal === e95067bfa87ed1b75838fc3b3ef217a3b01acbd3');
+    // Test 4: LATTICE-PIN.md public package pin.
+    const publicPin = validatePublicLatticePin(path.join(__dirname, '..'));
+    ok(publicPin.ok,
+       'Part 8.4: INV-06 LATTICE-PIN.md public package pin is coherent'
+       + (publicPin.ok ? '' : ' (' + publicPin.errors.join('; ') + ')'));
   }
 
   console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');

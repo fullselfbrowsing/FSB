@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
-status: executing
-stopped_at: Completed 12-03-PLAN.md (FINT-22 live progress wiring shipped)
-last_updated: "2026-06-08T08:19:39.644Z"
-last_activity: 2026-06-08
+status: human_needed
+stopped_at: Phase 13 public Lattice package replug complete; consolidated Chrome MV3 UAT from earlier UI phases remains pending
+last_updated: "2026-06-15T00:00:00.000Z"
+last_activity: 2026-06-15
 progress:
-  total_phases: 12
-  completed_phases: 11
-  total_plans: 51
-  completed_plans: 50
-  percent: 92
+  total_phases: 13
+  completed_phases: 13
+  total_plans: 52
+  completed_plans: 52
+  percent: 100
 ---
 
 # Project State
@@ -25,14 +25,24 @@ See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed 
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 11 — Tab-aware side panel surface
+**Current focus:** Phase 13 complete — public Lattice package integration
 
 ## Current Position
 
-Phase: 11 (Tab-aware side panel surface) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute
-Last activity: 2026-06-09 - Completed quick task 260608-wnz: Codex Strategy B 5-item architectural fix for cluster1 persistence (verifier PASSED)
+Phase: 13 (Public Lattice package integration) — COMPLETE
+Plan: 13-01 public-package replug + guardrail modernization
+Status: Automated verification passed; no Phase 13 human UAT required
+Last activity: 2026-06-15 - Replaced the missing local `file:./lattice/packages/lattice` dependency with public npm alias `lattice@npm:@full-self-browsing/lattice@1.3.0`; added `@full-self-browsing/lattice-cli@1.3.0`; updated LATTICE-PIN package metadata and public-package smoke; backfilled `.planning/phases/13-public-lattice-package-integration/` GSD artifacts with plan, summary, and verification.
+
+### Phase 13 public Lattice package replug outputs (FSB-side; uncommitted in this workspace)
+
+- `package.json` now pins `"lattice": "npm:@full-self-browsing/lattice@1.3.0"` and devDependency `"@full-self-browsing/lattice-cli": "1.3.0"`.
+- Root Node engine now requires `>=24.0.0`, matching the public Lattice runtime and CLI package engines.
+- `package-lock.json` resolves `node_modules/lattice` to `@full-self-browsing/lattice@1.3.0` with registry integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
+- `.planning/LATTICE-PIN.md` now records public package source, package integrity, CLI version, source tag `v1.3.0`, and source SHA `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`.
+- `tests/lattice-public-package.test.js` validates package.json/package-lock/LATTICE-PIN coherence, public runtime exports, receipt schema `lattice-receipt/v1.2`, and CLI command surface.
+- Existing Lattice smokes now validate the public package receipt schema while preserving route, signature, step-marker, checkpoint, provider, survivability, bridge, and step-emitter behavior.
+- `.planning/phases/13-public-lattice-package-integration/13-VERIFICATION.md` records the GSD automated pass for Phase 13.
 
 ### Phase 10 Plan 10-02 outputs (FSB-side; 3 commits on `automation` branch):
 
@@ -102,10 +112,11 @@ Progress: [##########] 100% (Phase 01: 2/2 plans complete; phase verifier + mile
 
 ## Lattice Integration State
 
-- Lattice version baseline: v1.1 Capability Receipts (shipped 2026-05-12; 451 tests). Cloned from https://github.com/LakshmanTurlapati/Lattice.
-- Lattice working branch: `fsb-integration-experiments` (created 2026-05-24 from `main`).
-- Lattice pinned SHA (FSB depends on): `22bf98627ae86b1576db5d34cf447ab2b321b3e1` (recorded in `.planning/LATTICE-PIN.md` frontmatter + `.planning/phases/01-lattice-gap-survey-scaffold/01-01-SHA.txt`).
-- FSB integration model: `"lattice": "file:./lattice/packages/lattice"` (now live in `package.json` line 81; `node_modules/lattice` is a working symlink; smoke `tests/lattice-smoke.test.js` exercises the round-trip in `npm test`).
+- Active Lattice runtime: public npm package `@full-self-browsing/lattice@1.3.0`, consumed through the stable bare specifier alias `lattice`.
+- Active Lattice CLI: public npm package `@full-self-browsing/lattice-cli@1.3.0`.
+- Active source audit pin: tag `v1.3.0`, source SHA `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`, package integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
+- FSB integration model: `"lattice": "npm:@full-self-browsing/lattice@1.3.0"` in `package.json`; `node_modules/lattice` resolves to the scoped public package, not to a gitignored local symlink.
+- Active guardrail: `tests/lattice-public-package.test.js` plus package-lock/LATTICE-PIN validation prevent accidental drift back to `file:./lattice/packages/lattice`.
 - Phase 1 Plan 01-01 outputs (committed on Lattice's `fsb-integration-experiments` branch, NOT pushed -- D-15):
   - `ab6c1f6` feat(receipts): re-export createReceipt + CreateReceiptInput from package surface
   - `195e5ae` docs(fsb-integration): add FSB integration gap survey across 6 surfaces

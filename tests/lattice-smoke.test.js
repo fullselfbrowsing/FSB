@@ -3,14 +3,14 @@
 /**
  * Phase 1 (v0.10.0-attempt-2) -- Lattice integration smoke test.
  *
- * Purpose: prove FSB consumes Lattice end-to-end via the npm file: dependency.
+ * Purpose: prove FSB consumes Lattice end-to-end via the public npm package.
  * Mints ONE Capability Receipt with an ephemeral Ed25519 keypair, verifies
  * the envelope round-trip, asserts the verified body fields match what was
  * signed. No persistence, no shared state -- the keypair is generated per
  * test run and discarded when the process exits.
  *
  * Coverage:
- *   - CONTEXT.md D-10 (mint one receipt via Lattice's existing v1.1 surface)
+ *   - CONTEXT.md D-10 (mint one receipt via Lattice's public receipt surface)
  *   - CONTEXT.md D-12 #2 (Node smoke check -- the substantive proof)
  *   - INV-06 (the primitive lives in Lattice; FSB just consumes)
  *
@@ -18,6 +18,7 @@
  */
 
 const assert = require('node:assert/strict');
+const { EXPECTED_PUBLIC_LATTICE } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -40,7 +41,7 @@ function passAssertEqual(actual, expected, msg) {
 }
 
 (async () => {
-  console.log('\n--- Lattice v1.1 smoke: mint + verify one Capability Receipt ---');
+  console.log('\n--- Public Lattice smoke: mint + verify one Capability Receipt ---');
 
   // Dynamic ESM import -- Lattice is "type": "module"; FSB's test convention
   // is CJS. Node 16+ supports dynamic import() from CJS to ESM.
@@ -49,7 +50,7 @@ function passAssertEqual(actual, expected, msg) {
     lattice = await import('lattice');
   } catch (err) {
     console.error('  FAIL: dynamic import("lattice") threw:', err && err.message ? err.message : err);
-    console.error('         If you see ERR_MODULE_NOT_FOUND, did you run `cd lattice && pnpm install && pnpm build`?');
+    console.error('         If you see ERR_MODULE_NOT_FOUND, did you run npm install?');
     process.exit(1);
   }
 
@@ -136,7 +137,7 @@ function passAssertEqual(actual, expected, msg) {
   passAssertEqual(result.ok, true, 'verifyReceipt result.ok is true (round-trip successful)');
 
   if (result.ok === true) {
-    passAssertEqual(result.body.version, 'lattice-receipt/v1', 'verified body.version is lattice-receipt/v1');
+    passAssertEqual(result.body.version, EXPECTED_PUBLIC_LATTICE.receiptVersion, 'verified body.version matches public Lattice receipt schema');
     passAssertEqual(result.body.kid, 'fsb-phase-1-smoke-key', 'verified body.kid round-trips');
     passAssertEqual(result.body.runId, 'fsb-phase-1-smoke-run', 'verified body.runId round-trips');
     passAssertEqual(result.body.contractVerdict, 'success', 'verified body.contractVerdict round-trips');

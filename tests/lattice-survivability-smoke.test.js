@@ -7,14 +7,14 @@
  * Purpose: end-to-end real-runtime validation of the FSB-side standalone
  * MV3-survivability adapter (extension/ai/lattice-runtime-adapter.js)
  * against Lattice's SurvivabilityAdapter<TState> contract (Plan 05-02
- * lattice/packages/lattice/src/runtime/survivability.ts).
+ * public Lattice SurvivabilityAdapter<TState> contract.
  *
  * Coverage:
  *   Part 1: surface presence on the 'lattice' bare specifier (Plan 05-03
  *           re-export). 6 PASS.
  *   Part 2: FSB-side adapter factory + 4 contract methods + ResumePolicy
  *           dispatch. 9 PASS.
- *   Part 3: integration -- mint v1.1 receipt via real Ed25519 keypair,
+ *   Part 3: integration -- mint public receipt via real Ed25519 keypair,
  *           embed in adapter state, serialize + deserialize + verifyReceipt
  *           round-trip. 6 PASS.
  *   Part 4: feature flag default-off + flag-on persistence smoke
@@ -34,6 +34,8 @@
  *
  * Run: node tests/lattice-survivability-smoke.test.js
  */
+
+const { EXPECTED_PUBLIC_LATTICE } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -110,7 +112,7 @@ function createChromeStorageSessionMock() {
     lattice = await import('lattice');
   } catch (err) {
     console.error('  FAIL: dynamic import("lattice") threw:', err && err.message ? err.message : err);
-    console.error('         Did you run `cd lattice && pnpm install && pnpm build` after Phase 5 Plan 05-02 + 05-03 commits?');
+    console.error('         Did you run npm install?');
     process.exit(1);
   }
 
@@ -191,8 +193,8 @@ function createChromeStorageSessionMock() {
   const noStateSnap = adapter.serialize(null);
   passAssertEqual(await adapter.resume(noStateSnap), 'SAFE', 'null state -> SAFE');
 
-  // ---- Part 3: integration -- mint v1.1 receipt + embed + round-trip ----
-  console.log('\n--- Part 3: real v1.1 receipt embedded in adapter state + verifyReceipt round-trip ---');
+  // ---- Part 3: integration -- mint public receipt + embed + round-trip ----
+  console.log('\n--- Part 3: real public receipt embedded in adapter state + verifyReceipt round-trip ---');
 
   const { privateKeyJwk, publicKeyJwk } = await lattice.generateEd25519KeyPairJwk();
   const signer = lattice.createInMemorySigner(privateKeyJwk, { kid: 'smoke-kid-A', publicKeyJwk });
@@ -201,7 +203,7 @@ function createChromeStorageSessionMock() {
   const envelope = await lattice.createReceipt(
     {
       runId: 'smoke-run-A',
-      version: 'lattice-receipt/v1.1',
+      version: EXPECTED_PUBLIC_LATTICE.receiptVersion,
       model: { requested: 'lattice-smoke/none', observed: null },
       route: { providerId: 'lattice-smoke', capabilityId: 'lattice-smoke/none', attemptNumber: 1 },
       usage: { promptTokens: 0, completionTokens: 0, costUsd: null },
@@ -216,7 +218,7 @@ function createChromeStorageSessionMock() {
     },
     signer
   );
-  passAssertEqual(envelope.payloadType, 'application/vnd.lattice.receipt+json', 'real v1.1 receipt minted with step-marker fields');
+  passAssertEqual(envelope.payloadType, 'application/vnd.lattice.receipt+json', 'real public receipt minted with step-marker fields');
 
   const integratedState = {
     sessionId: 'smoke-session-A',

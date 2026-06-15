@@ -75,11 +75,10 @@
  *     persistence is a follow-on).
  */
 
-// Import the Lattice surface published in Plan 05-03. The 'lattice' bare
-// specifier resolves via the file: dep wired in Phase 1; esbuild rewrites
-// it at build time so the production bundle does not need a runtime
-// resolver. Lattice's dist/ exports the values + types listed below
-// (see Plan 05-03 src/index.ts edit).
+// Import the public Lattice surface. The 'lattice' bare specifier resolves
+// through package.json's npm alias to @full-self-browsing/lattice; esbuild
+// rewrites it at build time so the production bundle does not need a runtime
+// resolver.
 import {
   createHookPipeline,
   createCheckpointHook,

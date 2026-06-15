@@ -1,8 +1,8 @@
 # Roadmap
 
-**Status:** v0.10.0 (attempt 2) -- In progress. Phases 1-5 complete; Phases 6-7 inserted 2026-05-27 to close the FINT-KK..L Lattice-provider-consumption gap after the `xai-key-rejected-400` debug surfaced that FSB's custom `universal-provider.js` runtime path has defects (missing trim + stale storage read) that Lattice's adapters do not. Phase 8 (delegation primitive) remains deferred to v0.11.0+. UAT-1 (consolidated single Chrome MV3 reload) deferred to Phase 7 end. Phases 8 + 9 + 10 added 2026-05-31 to close the v0.10.0 half-step (FSB agent brain on Lattice runtime + SurvivabilityAdapter activation + MCP-philosophy parity for autopilot driver); all three shipped, consolidated UAT-08+09+10 deferred to a Chrome MV3 reload session. Phase 11 added 2026-06-06 (tab-aware side panel surface: friendly owner-chip + foreign-owned input lockout + per-tab chat history); ships before the consolidated UAT, which then expands to UAT-08+09+10+11. Phase 12 added 2026-06-08 (side panel follows automation: live progress + persistent per-conversation message log + per-tab sidepanel auto-open/close) after UAT-FINAL surfaced 3 UX gaps Phase 11 did not address; UAT expands to UAT-08+09+10+11+12. Pivot from v0.10.0-attempt-1 (FSB-first) committed 2026-05-24; see `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the rationale.
+**Status:** v0.10.0 (attempt 2) -- In progress. Phases 1-12 shipped the local-clone Lattice integration, provider bridge, survivability activation, autopilot telemetry parity, and sidepanel automation UX. Phase 13 added 2026-06-15 to replug FSB from the missing local `file:./lattice/packages/lattice` dependency to the public package `@full-self-browsing/lattice@1.3.0`, consumed through the existing `lattice` alias, with package-pin guardrails and CLI availability. Pivot from v0.10.0-attempt-1 (FSB-first) committed 2026-05-24; see `.planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md` for the rationale.
 
-**Branch posture:** `automation` branch reset to `51bdbb36` (merge-base with `main`). Pre-pivot work preserved on `pre-pivot-archive/v0.10.0-fsb-first`. Lattice cloned into `./lattice/` (gitignored) on branch `fsb-integration-experiments`. FSB will consume Lattice via `npm install ./lattice` (path: dependency) or `npm link`.
+**Branch posture:** `automation` branch reset to `51bdbb36` (merge-base with `main`). Pre-pivot work preserved on `pre-pivot-archive/v0.10.0-fsb-first`. Historical Phases 1-12 used a gitignored local Lattice checkout; active Phase 13 consumption uses public npm alias `"lattice": "npm:@full-self-browsing/lattice@1.3.0"`.
 
 **Phase numbering:** v0.10.0-attempt-2 resets phase numbering to start at **1**. v0.9.69 ended at phase 276; v0.10.0-attempt-1 used phases 1-2 (now archived). v0.10.0-attempt-2 uses phases 1-N (TBD).
 
@@ -10,17 +10,17 @@
 
 ## Active Milestone: v0.10.0 Autopilot via Lattice SDK (attempt 2)
 
-**Goal:** Improve FSB's task completion reliability by treating Lattice as the underlying SDK. Build the SDK primitives (state envelopes, tripwire safety contracts, provider adapters, delegation primitive) inside the Lattice repo on the `fsb-integration-experiments` branch, then consume Lattice from FSB as a path: dependency. FSB's autopilot engine becomes a thin browser-runtime layer over Lattice's primitives.
+**Goal:** Improve FSB's task completion reliability by treating Lattice as the underlying SDK. The active runtime is the public npm package `@full-self-browsing/lattice@1.3.0`, consumed through the stable `lattice` alias; FSB's autopilot engine remains a browser-runtime layer over Lattice's primitives.
 
 **Why this matters:** v0.10.0-attempt-1 invented the same patterns inside FSB and planned to port them to Lattice later via separate PRs. That created duplication risk (FSB's checkpoint-hook + Lattice's signed-receipt are conceptually the same shape but live in two repos) and deferred the Lattice round-trip validation. Attempt-2 inverts: Lattice owns the primitives, FSB consumes; the Lattice round-trip happens continuously during development.
 
 **Lattice integration model:**
 
-- Lattice repo cloned at `./lattice/` (developer-side experimental sandbox; not tracked by FSB git)
-- Lattice's `fsb-integration-experiments` branch carries the SDK extensions FSB needs
-- FSB depends on `./lattice` via `package.json` `path:` dependency or `npm link` during development
-- Lattice's existing v1.1 Capability Receipts (451 tests) is the starting baseline
-- SDK additions land as commits on Lattice's `fsb-integration-experiments` branch first; once validated by FSB integration, open PRs to Lattice mainline as separate work
+- FSB consumes Lattice through package.json alias `"lattice": "npm:@full-self-browsing/lattice@1.3.0"`.
+- FSB pins `@full-self-browsing/lattice-cli@1.3.0` as dev tooling.
+- `package-lock.json` and `.planning/LATTICE-PIN.md` record package version, source tag/SHA, and registry integrity.
+- Runtime imports stay as `from "lattice"`; esbuild continues to bundle the offscreen host from the bare specifier.
+- Historical local-checkout work remains audit history under Phases 1-12, but active verification no longer needs `./lattice`.
 
 **Lattice SDK extension candidates (to be scoped during phase discussion):**
 
@@ -513,6 +513,29 @@ Plans:
 
 ---
 
+### Phase 13: Public Lattice package integration
+
+**Goal:** Replace FSB's local-clone Lattice dependency with the public Lattice runtime available on npm today while preserving the existing `lattice` import alias and all already-wired extension/offscreen integration surfaces.
+
+**Scope in:**
+- `package.json` + `package-lock.json` dependency replug to `lattice@npm:@full-self-browsing/lattice@1.3.0`.
+- Dev-tooling pin for `@full-self-browsing/lattice-cli@1.3.0`.
+- Root Node engine alignment to `>=24.0.0`.
+- `.planning/LATTICE-PIN.md` package-source metadata, registry integrity, source tag `v1.3.0`, and source SHA `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`.
+- Public package smoke proving runtime exports, CLI command surface, and receipt schema `lattice-receipt/v1.2`.
+- Existing Lattice smokes updated from local-clone receipt-version assumptions to the public package schema.
+
+**Scope out:**
+- Replacing FSB's provider bridge strategy with Lattice's higher-level agent/crew runtime APIs.
+- Reworking prompt construction, tool-call validation, or model negotiation to use new public `1.3.0` helpers in production. Those are follow-on integration phases after the package boundary is stable.
+- Renaming the `lattice` import specifier; the alias remains intentional to avoid code churn.
+
+Plans:
+
+- [x] `13-01-PLAN.md` — Public package replug. Install public runtime alias and CLI, update lockfile, Node engine, LATTICE-PIN package metadata, package-pin helper, public package smoke, existing Lattice receipt-version expectations, and stale local-clone comments. `npm run test:lattice` exits 0; `13-VERIFICATION.md` records the automated pass. (completed 2026-06-15)
+
+---
+
 ## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
 
 **Status:** Pivoted before milestone completion. Phases 1-2 shipped FSB-side code (hooks-foundation + state-inspectability-carve-out, 617/617 tests green) before the team re-evaluated and chose to pivot to the Lattice-first approach. All work preserved.
@@ -537,4 +560,4 @@ Plans:
 
 ---
 
-*Last updated: 2026-06-08 -- Phase 12 added (side panel follows automation). UAT-FINAL on 2026-06-08 (consolidated Chrome MV3 reload session walking the UAT-08+09+10+11 procedure) surfaced three UX gaps Phase 11 did not address: (1) live progress messages do not render in the sidepanel during a running autopilot task ("I see no progress"); (2) sidepanel close + reopen shows empty chat because `fsbSessionLogs` is session-level metadata (commands + final outcome only) and does not carry intermediate assistant / progress / tool messages — Bug 2 partial fix at `b8b761e8` hydrates from this incomplete source; (3) the sidepanel is globally available on every tab regardless of whether automation is bound to that tab. Two debug fixes landed before scope decision: `ba107c87` fixed Phase 11 input-lockout restoration + chip refresh on tab swap + chrome.windows.onFocusChanged backstop (Bug 1 fully resolved); `b8b761e8` cleaned up pre-existing dead `recoverLatestThreadTerminalOutcome` scaffolding + added hydrate scaffold (Bug 2 partial — the scaffold is correct but its data source `fsbSessionLogs` is incomplete; Phase 12 repoints it). Phase 12 ships three coupled surfaces: live progress wiring (FINT-22), per-conversation message log + hydrate repoint (FINT-23), per-tab sidepanel auto-open/close via `chrome.sidePanel.setOptions` + `open` (FINT-24). UAT expands to UAT-08+09+10+11+12 in one consolidated Chrome MV3 reload session post-Phase-12 ship. INV-01/02/04/05/06 carry forward; INV-06 ZERO Lattice-side commits expected. 2026-06-06 entry: Phase 11 added (tab-aware side panel surface). Three coupled UX gaps observed during the OpenRouter integration session: (1) owner chip displays raw `agent_<uuid>` short prefix when the human-friendly client label is already known via the MCP visual-session lifecycle map; (2) no input gating when a foreign agent owns the active tab, so the user can fire chat-input requests into a tab the sidepanel does not own; (3) single global `fsbSidepanelConversationId` means switching tabs drops the prior conversation. Phase 11 ships all three as one coherent UX delivery using existing Phase 10 visual-session lifecycle + Phase 243 owner-chip primitives. Consolidated UAT expands from UAT-08+09+10 to UAT-08+09+10+11 in one Chrome MV3 reload session post-Phase-11 ship. INV-01/02/04/05/06 carry forward unchanged; INV-06 ZERO Lattice-side commits expected. 2026-05-31 entry: Milestone v0.10.0 re-opened (2nd time) after UAT-1 PASS. Phase 8 added to close the half-step: FSB's agent BRAIN (iterator + tool dispatch + visual-session UX + metrics + driving-model attribution) ran on FSB-owned code paths bypassing both Lattice's runtime primitives (G1 + G2 + Flow 4) and the MCP-driven session lifecycle. Phase 8 brought autopilot into philosophical parity with MCP-driven sessions (same tools per INV-02 already; same lifecycle + telemetry + attribution as new scope) while consuming Lattice's tracer/checkpoint/survivability primitives. The original Phase 8 "delegation primitive" sketch from 2026-05-27 (see section above) remains separately deferred to v0.11.0+ as before. Phases 1-10 + UAT-1 stand individually passed; consolidated UAT-08+09+10+11 outstanding.*
+*Last updated: 2026-06-15 -- Phase 13 added (public Lattice package integration). FSB now consumes `@full-self-browsing/lattice@1.3.0` through the `lattice` alias, pins `@full-self-browsing/lattice-cli@1.3.0`, records package integrity + source tag/SHA in LATTICE-PIN, and validates the package boundary with `tests/lattice-public-package.test.js` plus `npm run test:lattice`. Earlier Phase 12/11/10 history remains above and in phase artifacts.*

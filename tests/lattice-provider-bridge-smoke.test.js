@@ -1,5 +1,7 @@
 'use strict';
 
+const { validatePublicLatticePin } = require('./helpers/lattice-public-pin.js');
+
 /**
  * Phase 6 Plan 06-00 (v0.10.0-attempt-2) -- Lattice provider-bridge
  * Wave 0 scaffold smoke.
@@ -264,7 +266,7 @@ async function loadOffscreenHandlerSource(chromeMock) {
     lattice = await import('lattice');
   } catch (err) {
     console.error('  FAIL: dynamic import("lattice") threw:', err && err.message ? err.message : err);
-    console.error('         Did you run `cd lattice && pnpm install && pnpm build` after Phase 5 commits?');
+    console.error('         Did you run npm install?');
     process.exit(1);
   }
 
@@ -741,21 +743,12 @@ async function loadOffscreenHandlerSource(chromeMock) {
     'INV-05: deprecated agent modules absent OR carry DEPRECATED banner: ' + invFiveDetail
   );
 
-  // ---- INV-06: Lattice byte-frozen FSB-side (no Phase 6 Lattice commits) ----
-  const pinSrc = fs.readFileSync('.planning/LATTICE-PIN.md', 'utf8');
-  const shaMatch = pinSrc.match(/current_lattice_sha:\s*([0-9a-f]{40})/);
+  // ---- INV-06: Lattice public package pin coherent FSB-side ----
+  const publicPin = validatePublicLatticePin(process.cwd());
   passAssert(
-    shaMatch !== null,
-    'INV-06: LATTICE-PIN.md frontmatter declares current_lattice_sha'
-  );
-  // Phase 6 Plan 06-05 runs BEFORE Plan 06-06's ceremony, so the SHA is still the Phase 5 value.
-  // Phase 6 ships ZERO Lattice-side commits per CONTEXT.md INV-06. Plan 06-06 may add a FSB-side
-  // audit row but the SHA itself MUST NOT change.
-  const PHASE_5_LATTICE_SHA = 'e95067bfa87ed1b75838fc3b3ef217a3b01acbd3';
-  passAssertEqual(
-    shaMatch && shaMatch[1],
-    PHASE_5_LATTICE_SHA,
-    'INV-06: LATTICE-PIN.md current_lattice_sha equals Phase 5 SHA (Phase 6 ships zero Lattice-side commits)'
+    publicPin.ok,
+    'INV-06: LATTICE-PIN.md + package files pin public Lattice package coherently'
+      + (publicPin.ok ? '' : ': ' + publicPin.errors.join('; '))
   );
 
   // ---- Phase 7 readiness: universal-provider.js still on disk; _archive/ not yet ----

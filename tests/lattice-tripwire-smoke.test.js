@@ -1,12 +1,12 @@
 'use strict';
 
 /**
- * Phase 2 (v0.10.0-attempt-2) -- Lattice tripwire + receipt v1.1 smoke.
+ * Phase 2 (v0.10.0-attempt-2) -- Lattice tripwire + public receipt smoke.
  *
  * Purpose: prove FSB consumes Phase 2's newly-shipped Lattice primitives
- * end-to-end via the existing file: dependency. Exercises:
- *   (1) Capability Receipt v1.1 mint with step-marker fields populated
- *   (2) Capability Receipt v1 mint without step markers (backward compat)
+ * end-to-end via the public npm package. Exercises:
+ *   (1) Capability Receipt mint with step-marker fields populated
+ *   (2) Capability Receipt mint without step markers (field backward compat)
  *   (3) Tripwire band pipeline: 3-band ordering for one BEFORE_TOOL fire
  *   (4) Matcher regex: non-matching event does NOT invoke handler
  *   (5) pipeline.freeze() blocks subsequent register() with thrown error
@@ -19,6 +19,8 @@
  *
  * Run: node tests/lattice-tripwire-smoke.test.js
  */
+
+const { EXPECTED_PUBLIC_LATTICE } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -41,14 +43,14 @@ function passAssertEqual(actual, expected, msg) {
 }
 
 (async () => {
-  console.log('\n--- Lattice v1.1 + tripwire bands smoke ---');
+  console.log('\n--- Public Lattice receipt + tripwire bands smoke ---');
 
   let lattice;
   try {
     lattice = await import('lattice');
   } catch (err) {
     console.error('  FAIL: dynamic import("lattice") threw:', err && err.message ? err.message : err);
-    console.error('         Did you run `cd lattice && pnpm install && pnpm build` after Phase 2 commits?');
+    console.error('         Did you run npm install?');
     process.exit(1);
   }
 
@@ -66,8 +68,8 @@ function passAssertEqual(actual, expected, msg) {
     process.exit(1);
   }
 
-  // ---- Part 1: v1.1 receipt round-trip with step-marker fields populated ----
-  console.log('\n--- Part 1: v1.1 receipt mint + verify ---');
+  // ---- Part 1: receipt round-trip with step-marker fields populated ----
+  console.log('\n--- Part 1: public receipt mint + verify with step markers ---');
 
   const { privateKeyJwk: pk1, publicKeyJwk: vk1 } = await lattice.generateEd25519KeyPairJwk();
   const signer1 = lattice.createInMemorySigner(pk1, { kid: 'fsb-phase-2-smoke-key', publicKeyJwk: vk1 });
@@ -82,7 +84,7 @@ function passAssertEqual(actual, expected, msg) {
       contractHash: null,
       inputHashes: [],
       outputHash: null,
-      // v1.1 step-marker fields -- presence triggers the version bump
+      // Step-marker fields must round-trip under the public receipt schema.
       stepName: 'click-link',
       stepIndex: 3,
       parentStepName: 'parent-step',
@@ -97,19 +99,19 @@ function passAssertEqual(actual, expected, msg) {
     { kid: 'fsb-phase-2-smoke-key', publicKeyJwk: vk1, state: 'active' }
   ]);
   const verifyV11 = await lattice.verifyReceipt(envelopeV11, keySet1);
-  passAssertEqual(verifyV11.ok, true, 'v1.1 receipt verifies (ok=true)');
+  passAssertEqual(verifyV11.ok, true, 'step-marker receipt verifies (ok=true)');
   if (verifyV11.ok === true) {
-    passAssertEqual(verifyV11.body.version, 'lattice-receipt/v1.1', 'v1.1 body.version is "lattice-receipt/v1.1"');
-    passAssertEqual(verifyV11.body.stepName, 'click-link', 'v1.1 body.stepName round-trips');
-    passAssertEqual(verifyV11.body.stepIndex, 3, 'v1.1 body.stepIndex round-trips');
-    passAssertEqual(verifyV11.body.parentStepName, 'parent-step', 'v1.1 body.parentStepName round-trips');
-    passAssertEqual(verifyV11.body.previousStepName, 'previous-step', 'v1.1 body.previousStepName round-trips');
-    passAssertEqual(verifyV11.body.sessionId, 'fsb-smoke-session-1', 'v1.1 body.sessionId round-trips');
-    passAssertEqual(verifyV11.body.timestamp, '2026-05-24T18:00:00.000Z', 'v1.1 body.timestamp round-trips');
+    passAssertEqual(verifyV11.body.version, EXPECTED_PUBLIC_LATTICE.receiptVersion, 'receipt body.version matches public Lattice receipt schema');
+    passAssertEqual(verifyV11.body.stepName, 'click-link', 'receipt body.stepName round-trips');
+    passAssertEqual(verifyV11.body.stepIndex, 3, 'receipt body.stepIndex round-trips');
+    passAssertEqual(verifyV11.body.parentStepName, 'parent-step', 'receipt body.parentStepName round-trips');
+    passAssertEqual(verifyV11.body.previousStepName, 'previous-step', 'receipt body.previousStepName round-trips');
+    passAssertEqual(verifyV11.body.sessionId, 'fsb-smoke-session-1', 'receipt body.sessionId round-trips');
+    passAssertEqual(verifyV11.body.timestamp, '2026-05-24T18:00:00.000Z', 'receipt body.timestamp round-trips');
   }
 
-  // ---- Part 2: v1 receipt round-trip (backward compat) ----
-  console.log('\n--- Part 2: v1 receipt backward compat ---');
+  // ---- Part 2: receipt round-trip without step-marker fields ----
+  console.log('\n--- Part 2: public receipt without step markers ---');
 
   const envelopeV1 = await lattice.createReceipt(
     {
@@ -121,16 +123,16 @@ function passAssertEqual(actual, expected, msg) {
       contractHash: null,
       inputHashes: [],
       outputHash: null,
-      // NO step-marker fields -- emits version === "lattice-receipt/v1"
+      // NO step-marker fields -- the optional step fields should stay absent.
     },
     signer1
   );
   const verifyV1 = await lattice.verifyReceipt(envelopeV1, keySet1);
-  passAssertEqual(verifyV1.ok, true, 'v1 receipt still verifies (backward compat)');
+  passAssertEqual(verifyV1.ok, true, 'receipt without step markers verifies (ok=true)');
   if (verifyV1.ok === true) {
-    passAssertEqual(verifyV1.body.version, 'lattice-receipt/v1', 'v1 body.version stays "lattice-receipt/v1" when no step markers');
-    passAssertEqual(verifyV1.body.stepName, undefined, 'v1 body has no stepName field');
-    passAssertEqual(verifyV1.body.sessionId, undefined, 'v1 body has no sessionId field');
+    passAssertEqual(verifyV1.body.version, EXPECTED_PUBLIC_LATTICE.receiptVersion, 'receipt body.version matches public Lattice receipt schema when no step markers');
+    passAssertEqual(verifyV1.body.stepName, undefined, 'receipt body has no stepName field');
+    passAssertEqual(verifyV1.body.sessionId, undefined, 'receipt body has no sessionId field');
   }
 
   // ---- Part 3: band pipeline ordering ----

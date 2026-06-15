@@ -24,6 +24,7 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const { validatePublicLatticePin } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -535,13 +536,13 @@ function installDomStub(idMap) {
      'Part 7.3 -- INV-04 awk-scan: NO Phase 11 token inside any setTimeout lambda body'
      + (foundLambdaWithToken ? ' (violation at ' + foundLambdaWithToken + ')' : ''));
 
-  // 7.4 LATTICE-PIN.md frontmatter SHA byte-freeze (INV-06)
+  // 7.4 LATTICE-PIN.md public package pin (INV-06)
   const latticePinPath = path.resolve(__dirname, '../.planning/LATTICE-PIN.md');
   const latticePinSrc = fs.readFileSync(latticePinPath, 'utf8');
-  const shaMatch = latticePinSrc.match(/^current_lattice_sha:\s*([a-f0-9]+)/m);
-  ok(shaMatch && shaMatch[1] === 'e95067bfa87ed1b75838fc3b3ef217a3b01acbd3',
-     'Part 7.4 -- INV-06 LATTICE-PIN current_lattice_sha frozen at e95067bf...'
-     + (shaMatch ? ' (got ' + shaMatch[1] + ')' : ' (frontmatter not found)'));
+  const publicPin = validatePublicLatticePin(path.resolve(__dirname, '..'));
+  ok(publicPin.ok && /current_lattice_source:\s*npm/.test(latticePinSrc),
+     'Part 7.4 -- INV-06 LATTICE-PIN public package pin is coherent'
+     + (publicPin.ok ? '' : ' (' + publicPin.errors.join('; ') + ')'));
 
   // Module references used to keep require side-effect alive across the
   // smoke and demonstrate downstream availability for Plan 11-01+ fills.

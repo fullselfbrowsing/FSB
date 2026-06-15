@@ -4,7 +4,7 @@
  * Phase 3 (v0.10.0-attempt-2) -- Lattice checkpoint-hook end-to-end smoke.
  *
  * Purpose: prove FSB consumes Phase 3's createCheckpointHook factory
- * end-to-end via the existing file: dependency. Exercises:
+ * end-to-end via the public npm package. Exercises:
  *   (1) Surface presence: createCheckpointHook + STEP_TRANSITION_EVENT_NAME
  *       + DEFAULT_CHECKPOINT_BAND reachable via bare specifier.
  *   (2) HookPipeline registration: register the checkpoint handler at
@@ -15,7 +15,7 @@
  *         step-3: nested child    parent='step-1',  previous='step-2',  idx=2
  *   (4) Tracer event capture: exactly 3 step.transition events, monotonic
  *       stepIndex, threading fields preserved.
- *   (5) Receipt mint + verify: 3 v1.1 envelopes minted, all 3 verify via
+ *   (5) Receipt mint + verify: 3 public receipt envelopes minted, all 3 verify via
  *       verifyReceipt with result.ok === true, all 6 step-marker fields
  *       round-trip through canonical+sign+verify.
  *   (6) Phase 2 baseline carryforward smoke check: pipeline.freeze() still
@@ -29,6 +29,8 @@
  *
  * Run: node tests/lattice-checkpoint-smoke.test.js
  */
+
+const { EXPECTED_PUBLIC_LATTICE } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -58,7 +60,7 @@ function passAssertEqual(actual, expected, msg) {
     lattice = await import('lattice');
   } catch (err) {
     console.error('  FAIL: dynamic import("lattice") threw:', err && err.message ? err.message : err);
-    console.error('         Did you run `cd lattice && pnpm install && pnpm build` after Phase 3 commits?');
+    console.error('         Did you run npm install?');
     process.exit(1);
   }
 
@@ -208,7 +210,7 @@ function passAssertEqual(actual, expected, msg) {
       passAssertEqual(result.ok, true, 'receipt[' + i + '] verifies (verifyReceipt result.ok === true)');
       if (result.ok === true) {
         verifiedBodies.push(result.body);
-        passAssertEqual(result.body.version, 'lattice-receipt/v1.1', 'receipt[' + i + '].version === "lattice-receipt/v1.1"');
+        passAssertEqual(result.body.version, EXPECTED_PUBLIC_LATTICE.receiptVersion, 'receipt[' + i + '].version matches public Lattice receipt schema');
       } else {
         // Surface the typed error so a failure is debuggable from CI logs.
         console.error('  receipt[' + i + '] verify failed with error:', JSON.stringify(result.error));

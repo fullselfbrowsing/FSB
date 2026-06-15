@@ -15,6 +15,7 @@
  */
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { validatePublicLatticePin } = require('./helpers/lattice-public-pin.js');
 
 let pass = 0;
 let fail = 0;
@@ -332,9 +333,9 @@ ok('Part 6.4 INV-05 deprecated agent modules absent OR carry DEPRECATED banner',
   assert.equal(true, true);
 });
 
-ok('Part 6.5 INV-06 LATTICE-PIN.md current_lattice_sha equals e95067bfa87ed1b75838fc3b3ef217a3b01acbd3', () => {
-  const pin = fs.readFileSync(path.join(__dirname, '..', '.planning', 'LATTICE-PIN.md'), 'utf8');
-  assert.match(pin, /current_lattice_sha:\s*e95067bfa87ed1b75838fc3b3ef217a3b01acbd3/);
+ok('Part 6.5 INV-06 public Lattice package pin is coherent', () => {
+  const result = validatePublicLatticePin(path.join(__dirname, '..'));
+  assert.equal(result.ok, true, result.errors.join('; '));
 });
 
 ok('Part 6.6 lattice-step-emitter.js contains zero setTimeout (Pitfall 1 module-level)', () => {

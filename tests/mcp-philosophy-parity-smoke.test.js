@@ -19,6 +19,7 @@
  * Exit 0 on failed === 0; exit 1 on any FAIL.
  */
 const path = require('node:path');
+const { validatePublicLatticePin } = require('./helpers/lattice-public-pin.js');
 
 let passed = 0;
 let failed = 0;
@@ -402,9 +403,9 @@ const REC = require(REC_PATH);
      'Part 9.4 -- awk-scan: ZERO recordDispatch inside any setTimeout lambda body');
 
   var latticePinSrc = fs.readFileSync('.planning/LATTICE-PIN.md', 'utf8');
-  var shaMatch = latticePinSrc.match(/current_lattice_sha:\s*(\S+)/);
-  ok(shaMatch && shaMatch[1] === 'e95067bfa87ed1b75838fc3b3ef217a3b01acbd3',
-     'Part 9.5 -- INV-06 LATTICE-PIN current_lattice_sha frozen at Phase 5 SHA');
+  var publicPin = validatePublicLatticePin(process.cwd());
+  ok(publicPin.ok,
+     'Part 9.5 -- INV-06 public Lattice package pin is coherent' + (publicPin.ok ? '' : ': ' + publicPin.errors.join('; ')));
 
   var reqSrc = fs.readFileSync('.planning/REQUIREMENTS.md', 'utf8');
   ok(reqSrc.indexOf('LIFECYCLE + TELEMETRY + DRIVING-MODEL ATTRIBUTION') !== -1,

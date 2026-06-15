@@ -4,7 +4,7 @@
  * Phase 4 (v0.10.0-attempt-2) -- Lattice provider-adapter surface-presence smoke.
  *
  * Purpose: prove FSB can reach Phase 4's 5 new native provider factories
- * via the existing file: dependency. This is the FSB-side ceremony parity
+ * via the public npm package. This is the FSB-side ceremony parity
  * smoke (one per phase since Phase 1). The SUBSTANTIVE INV-03 proof lives
  * in the Lattice-side `parity.test.ts` (Plan 04-04 Task 2).
  *
@@ -87,7 +87,7 @@ const OPENAI_COMPAT_FAKE_BODY = {
     lattice = await import('lattice');
   } catch (err) {
     console.error('  FAIL: dynamic import("lattice") threw:', err && err.message ? err.message : err);
-    console.error('         Did you run `cd lattice && pnpm install && pnpm build` after Phase 4 commits?');
+    console.error('         Did you run npm install?');
     process.exit(1);
   }
 
