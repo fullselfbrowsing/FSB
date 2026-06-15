@@ -29,6 +29,40 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
+## Current Milestone: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+
+**Goal:** Add a `trigger` tool family to FSB autopilot and the MCP server that watches a targeted DOM element and reports back when its value changes, crosses a threshold, equals a target, or contains text -- surviving service-worker eviction, with a gentle "analyzing" pulse on the watched element while the trigger is active.
+
+**Why this matters:** FSB today executes a task and stops. A trigger turns FSB into a *reactive* watcher -- "tell me when this crypto/stock/product price crosses X" or "ping me when this changes." The AI still decides what to do on fire; the trigger only reports what happened, preserving FSB's core value (the AI decides, the mechanics execute).
+
+**Target features:**
+- **`trigger()`** -- target one element via FSB's uniqueness-scored selector, define a fire condition, get notified when it fires.
+- **Fire conditions (all four):** `changed` (any delta from the initial value) - `threshold` (`>=`, `<=`, `>`, `<`, numeric) - `equals`/`regex` (exact value or text pattern) - `contains` (substring appears, e.g. "In Stock").
+- **Watch mechanism, selectable per-trigger:** `refresh-poll` (periodically reload the page and re-read the element -- for static pages like an Amazon listing) OR `live-observe` (watch the element in place via MutationObserver, no reload -- for live-updating pages like a crypto ticker).
+- **Reporting, dual-mode:** blocking by default (the `trigger()` call stays open with periodic heartbeats, returns on fire or timeout -- mirrors `run_task` lifecycle return); detached opt-in (returns a `trigger_id` immediately; the caller polls).
+- **Companion tools:** `stop_trigger`, `get_trigger_status`, `list_triggers` -- mirror the `run_task` / `stop_task` / `get_task_status` family.
+- **Multiple concurrent triggers** with a configurable cap (mirrors the v0.9.60 agent/tab cap: 1-64, sensible default).
+- **Smart value extraction:** auto-parse numbers (strip `$`, commas, whitespace) for `threshold`/`equals`; raw text for `changed`/`contains`; `extract: text | number | attribute` override (with attribute name).
+- **Visual feedback:** while a trigger is active the visual monitor stays on and labels itself as *watching a trigger*; the orange overlay shifts from the steady glow to a **gentle analyzing pulse** on the watched element.
+
+**Architecture notes (to confirm in research/planning):**
+- **MV3 survivability is the crux.** A price watch can run for hours; the MV3 service worker is evicted after ~30s idle. The monitor must outlive eviction via `chrome.alarms` + the resume-sidecar machinery already built for v0.10.0 (Lattice survivability adapter). This generalizes the SW-eviction `partial_state` pattern from `run_task` (Phase 239) into a standing watcher.
+- **Single shared registry (INV-02).** `trigger` and its companions are registered once and exposed to BOTH autopilot and MCP -- no autopilot-only tool stack.
+- **Refresh-poll must own its tab.** Periodic reloads target the trigger's own tab and must not steal focus or disrupt other agents/tabs (reuse v0.9.60 agent-scoped tab resolution + background-tab defaults).
+
+**Proposed defaults (tunable in planning):** refresh-poll interval default ~60s with a hard floor (avoid hammering sites); blocking-mode timeout configurable with a safety ceiling (recommend detached beyond a few minutes); concurrent-trigger cap mirrors the existing agent cap default.
+
+**Notify-only (by design / out of scope for v0.11.0):** the trigger reports *what happened*; the AI/caller decides any follow-up action. No auto-act-on-fire (e.g. auto-add-to-cart), no desktop/Chrome push notifications -- both deferrable to a later milestone.
+
+**Carried-forward invariants (apply to this milestone):**
+- **INV-01** existing MCP wire contracts stay byte-identical -- `trigger` and companions are purely additive new tools.
+- **INV-02** autopilot uses the SAME tool registry MCP exposes.
+- **INV-03** provider parity -- trigger is provider-agnostic DOM monitoring; autopilot integration works across all 7 providers.
+- **INV-04** MV3-survivability preserved -- the existing `setTimeout`-chained iterator stays load-bearing; trigger monitoring is additive runtime adaptation.
+- **INV-06** Lattice public package stays pinned and audited (`.planning/LATTICE-PIN.md` + `package-lock.json` + tests agree).
+
+**Knock-on version:** new MCP tools -> likely `fsb-mcp-server@0.10.0` (minor bump). Extension/showcase version bump per existing milestone-close convention.
+
 ## Last Milestone: v0.10.0 Autopilot via Lattice SDK
 
 **Status:** Shipped and archived on 2026-06-15. FSB no longer depends on the gitignored local `./lattice` checkout for runtime consumption. The active dependency is the public npm package `@full-self-browsing/lattice@1.3.0`, installed under the existing `lattice` import alias, with `@full-self-browsing/lattice-cli@1.3.0` added for receipt verification workflows. The package requires Node `>=24`, so the root `engines.node` floor is now `>=24.0.0`. `.planning/LATTICE-PIN.md` is now a package pin as well as source-tag audit trail: source tag `v1.3.0`, tag commit `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`, package integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
@@ -354,7 +388,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.62 Implicit Visual Session Contract in scoping -- requirements pending REQUIREMENTS.md generation.)
+(Milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring) in scoping -- requirements pending REQUIREMENTS.md generation.)
 
 ### Validated (v0.9.60)
 
@@ -605,4 +639,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 after v0.10.0 milestone archival. v0.10.0 Autopilot via Lattice SDK shipped with 13 phases / 52 plans archived under `.planning/milestones/v0.10.0-*`; active planning is ready for the next milestone.*
+*Last updated: 2026-06-15 -- milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring) started. Goal: a reactive `trigger` tool family (block + detached, refresh-poll + live-observe, four fire conditions) for FSB autopilot and the MCP server, MV3-survivable, with a gentle analyzing pulse on the watched element. Requirements + roadmap generation next.*

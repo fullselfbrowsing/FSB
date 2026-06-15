@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.10.0
-milestone_name: Autopilot via Lattice SDK
-status: Awaiting next milestone
-stopped_at: Milestone v0.10.0 archived; next milestone not scoped
-last_updated: "2026-06-15T13:47:43.990Z"
-last_activity: 2026-06-15 — Milestone v0.10.0 completed and archived
+milestone: v0.11.0
+milestone_name: Trigger Tool (Reactive DOM Monitoring)
+status: planning
+last_updated: "2026-06-15T15:36:39.736Z"
+last_activity: 2026-06-15
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 52
-  completed_plans: 52
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -29,10 +28,10 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 
 ## Current Position
 
-Phase: Milestone v0.10.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-15 — Milestone v0.10.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-15 — Milestone v0.11.0 started
 
 ## Deferred Items
 
