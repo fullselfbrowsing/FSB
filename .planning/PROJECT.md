@@ -10,9 +10,10 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last shipped:** v0.9.63 Showcase i18n -- 2026-05-13. Phases 261, 262, 264, 265, 266, 267, 268 translated the FSB marketing site (`showcase/angular`) into en/es/de/ja/zh-CN/zh-TW. `LocaleService` + 6-locale registry mirrored Angular ESM <-> Express CJS with `verify-locale-sync.mjs` parity invariant; 420 trans-units in `messages.xlf` (7 namespaces); AI-filled target XLIFFs for all 5 non-en locales with `i18nMissingTranslation: error` enforcing build-time completeness; `lint:i18n` and `extract-i18n-clean` promoted to hard-fail CI gates; 30 prerendered HTMLs (6 marketing routes x 5 locale subpaths + en root) with `<link rel="alternate" hreflang>` + canonical fan-out and `<html lang>` reflecting the served locale; `verify:hreflang` CI assertion gates the count; Express middleware on `/` does BCP-47 Accept-Language parsing with 302-redirect to matching locale subpath, cookie-respecting and bot-safe. Phase 268 (post-audit cleanup) deduplicated the server.js literal locale list against the CJS registry and backfilled six per-phase `VERIFICATION.md` artifacts. Audit status `passed` (14/14 requirements, 7/7 phases, 12/12 integration points, 3/3 E2E flows). `feat/showcase-i18n` branch + `v0.9.63` tag remain user-gated for push and merge.
+**Last shipped:** v0.10.0 Autopilot via Lattice SDK -- 2026-06-15. FSB now consumes the public `@full-self-browsing/lattice@1.3.0` runtime through the stable `lattice` alias, with Lattice-owned receipt, checkpoint, tripwire, provider, survivability, and CLI surfaces wired through FSB's offscreen host, provider bridge, agent-loop step transitions, MV3 resume sidecars, autopilot visual-session metrics, and tab-aware side panel. Automated verification and phase execution completed across 13 phases / 52 plans; 11 human-gated Chrome MV3/UAT evidence items were acknowledged as deferred closeout debt rather than marked as passed.
 
 **Recent shipping cadence:**
+- v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
 - v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
 - v0.9.63 Showcase i18n -- shipped 2026-05-13
 - v0.9.62 Implicit Visual Session Contract -- shipped 2026-05-11
@@ -28,9 +29,9 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone: v0.10.0 Autopilot via Lattice SDK (Phase 13 public package replug)
+## Last Milestone: v0.10.0 Autopilot via Lattice SDK
 
-**Status:** Phase 13 is active as of 2026-06-15. FSB no longer depends on the gitignored local `./lattice` checkout for runtime consumption. The active dependency is the public npm package `@full-self-browsing/lattice@1.3.0`, installed under the existing `lattice` import alias, with `@full-self-browsing/lattice-cli@1.3.0` added for receipt verification workflows. The package requires Node `>=24`, so the root `engines.node` floor is now `>=24.0.0`. `.planning/LATTICE-PIN.md` is now a package pin as well as source-tag audit trail: source tag `v1.3.0`, tag commit `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`, package integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
+**Status:** Shipped and archived on 2026-06-15. FSB no longer depends on the gitignored local `./lattice` checkout for runtime consumption. The active dependency is the public npm package `@full-self-browsing/lattice@1.3.0`, installed under the existing `lattice` import alias, with `@full-self-browsing/lattice-cli@1.3.0` added for receipt verification workflows. The package requires Node `>=24`, so the root `engines.node` floor is now `>=24.0.0`. `.planning/LATTICE-PIN.md` is now a package pin as well as source-tag audit trail: source tag `v1.3.0`, tag commit `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`, package integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
 
 **Goal:** Keep FSB's production import surface stable (`import ... from "lattice"`) while replacing the local clone dependency with the stable public Lattice package available today. The milestone now validates the package boundary directly: package metadata, lockfile integrity, public runtime exports, CLI availability, receipt schema `lattice-receipt/v1.2`, provider factories, checkpoint hooks, survivability adapter, bridge wiring, and the existing offscreen bundle path.
 
@@ -604,4 +605,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-24 -- v0.10.0-attempt-2 pivot. Branch `automation` reset to merge-base with main (51bdbb36). Cloned Lattice into ./lattice/ (gitignored) on experiment branch `fsb-integration-experiments`. Pre-pivot v0.10.0-attempt-1 work (Phase 1 hooks-foundation + Phase 2 state-inspectability-carve-out, 617/617 tests, 30+ commits) preserved on branch `pre-pivot-archive/v0.10.0-fsb-first` and on-disk under `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`. v0.10.0-attempt-2 (Lattice-SDK-first) in pre-planning -- detailed phases TBD via `/gsd-discuss-phase 1`.*
+*Last updated: 2026-06-15 after v0.10.0 milestone archival. v0.10.0 Autopilot via Lattice SDK shipped with 13 phases / 52 plans archived under `.planning/milestones/v0.10.0-*`; active planning is ready for the next milestone.*

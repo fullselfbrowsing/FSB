@@ -1,6 +1,6 @@
 ---
 slug: qt93i-regression
-status: investigating
+status: resolved
 trigger: |
   QT-93i (commits 8bb40a9b + 19b031cc + 5f846208) shipped two related
   tab-scoping fixes whose code shape passes the smoke tests (26 PASS / 0
@@ -24,10 +24,18 @@ trigger: |
   delegate this debug task to codex using appropriate GSD skill" --
   i.e. stop guessing, run the scientific method.
 created: 2026-06-08
-updated: 2026-06-08
+updated: 2026-06-15
 ---
 
 # Debug Session: QT-93i tab-scoping regression (symptoms ship but behavior is wrong)
+
+## Resolution
+
+Resolved by quick task `260608-bu4`, with follow-on completion-routing
+hardening in `260608-uof` and `260608-wnz`. The broken auto-collapse
+strategy was reverted, explicit tabId routing was threaded through the
+leaky setter sites, and regression tests were added for progress-tick
+setter routing plus background-tab completion fanout.
 
 ## Symptoms (from user)
 

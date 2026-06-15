@@ -1,8 +1,8 @@
 ---
-status: verifying
+status: resolved
 trigger: "FSB automation is unreliable - actions fail silently, API timeouts, massive DOM payloads"
 created: 2026-01-28T10:00:00Z
-updated: 2026-01-28T10:45:00Z
+updated: 2026-06-15
 ---
 
 ## Current Focus
@@ -118,3 +118,10 @@ files_changed:
 3. **Failure reporting**: Failed tasks will be reported as failed, not complete
 4. **Action logging**: Logs will correctly show "failed" when actions fail
 5. **Session termination**: Sessions will stop on error instead of marking complete
+
+## Closeout
+
+Closed as historical. The current tree preserves the documented reliability
+fixes: fallback responses do not mark failures complete, failedDueToError is
+handled explicitly, and the old provider path has since been superseded by
+the Lattice provider bridge.

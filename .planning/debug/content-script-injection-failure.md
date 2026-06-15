@@ -1,8 +1,8 @@
 ---
-status: verifying
+status: resolved
 trigger: "FSB content script fails to inject/respond on LinkedIn, causing automation sessions to fail with 0 actions executed"
 created: 2026-02-04T00:00:00Z
-updated: 2026-02-04T02:35:00Z
+updated: 2026-06-15
 ---
 
 ## Current Focus
@@ -109,3 +109,10 @@ fix: Applied changes:
 verification: Reload extension, open Google.com tab, start automation task. Content script should connect within 5 seconds without TDZ errors.
 
 files_changed: ['background.js', 'content.js']
+
+## Closeout
+
+Closed as historical. The recorded fixes are present in the current tree:
+programmatic injection uses the content-script dependency chain, and
+`extension/content/lifecycle.js` owns the background-port lifecycle without
+the original TDZ-prone top-level guard shape.

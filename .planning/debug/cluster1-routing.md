@@ -1,6 +1,6 @@
 ---
 slug: cluster1-routing
-status: diagnosed
+status: resolved
 trigger: |
   Cluster 1 completion routing / dedup investigation (--diagnose).
   Three coupled symptoms observed in production after the 260608-bu4
@@ -20,10 +20,19 @@ trigger: |
   shortly after. Likely sidepanel-vs-background sessionId state
   mismatch during cleanup window. May be related to D/E timing.
 created: 2026-06-08
-updated: 2026-06-08T16:00:00Z
+updated: 2026-06-15
 ---
 
 # Debug Session: Cluster 1 -- completion routing dedup + missing-second-session
+
+## Resolution
+
+Resolved by quick tasks `260608-uof` and `260608-wnz`.
+`260608-uof` shipped D-FIX/E-FIX completion routing, `tabId` threading,
+already-ended stop handling, and per-tab status mirrors. `260608-wnz`
+then shipped the Strategy B persistence hardening: no-reopen gate,
+tab-scoped status, durable background-side persistence, sessionId plus
+terminal dedupe, and multi-document fanout regression coverage.
 
 ## Symptoms (from user)
 

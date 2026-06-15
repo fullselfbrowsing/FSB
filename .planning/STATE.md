@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: Autopilot via Lattice SDK
-status: human_needed
-stopped_at: Phase 13 public Lattice package replug complete; consolidated Chrome MV3 UAT from earlier UI phases remains pending
-last_updated: "2026-06-15T00:00:00.000Z"
-last_activity: 2026-06-15
+status: Awaiting next milestone
+stopped_at: Milestone v0.10.0 archived; next milestone not scoped
+last_updated: "2026-06-15T13:47:43.990Z"
+last_activity: 2026-06-15 — Milestone v0.10.0 completed and archived
 progress:
   total_phases: 13
   completed_phases: 13
@@ -18,21 +18,41 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-24 -- v0.10.0-attempt-2 Lattice-first pivot)
-See: .planning/MILESTONES.md (v0.9.63, v0.9.69 entries; v0.10.0-attempt-1 archived)
-See: .planning/ROADMAP.md (v0.10.0-attempt-2 scaffolded 2026-05-24, phases TBD)
-See: .planning/REQUIREMENTS.md (v0.10.0-attempt-2 high-level scaffold; detailed REQs TBD via phase planning)
+See: .planning/PROJECT.md (updated 2026-06-15 -- v0.10.0 archived)
+See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
+See: .planning/ROADMAP.md (compact post-v0.10.0 roadmap; next milestone not scoped)
+See: .planning/milestones/v0.10.0-REQUIREMENTS.md (archived v0.10.0 requirements)
 See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (pivot rationale + reset audit trail)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
-**Current focus:** Phase 13 complete — public Lattice package integration
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 13 (Public Lattice package integration) — COMPLETE
-Plan: 13-01 public-package replug + guardrail modernization
-Status: Automated verification passed; no Phase 13 human UAT required
-Last activity: 2026-06-15 - Completed quick task 260615-5ks: replace stale hardcoded 0.9.50 version literals in extension logs with live manifest version.
+Phase: Milestone v0.10.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-15 — Milestone v0.10.0 completed and archived
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-06-15:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gap | Phase 01 / 01-HUMAN-UAT.md | partial; 1 pending scenario |
+| verification_gap | Phase 01 / 01-VERIFICATION.md | human_needed |
+| verification_gap | Phase 02 / 02-VERIFICATION.md | human_needed |
+| verification_gap | Phase 03 / 03-VERIFICATION.md | human_needed |
+| verification_gap | Phase 04 / 04-VERIFICATION.md | human_needed |
+| verification_gap | Phase 05 / 05-VERIFICATION.md | human_needed |
+| verification_gap | Phase 08 / 08-VERIFICATION.md | human_needed |
+| verification_gap | Phase 09 / 09-VERIFICATION.md | human_needed |
+| verification_gap | Phase 10 / 10-VERIFICATION.md | human_needed |
+| verification_gap | Phase 11 / 11-VERIFICATION.md | human_needed |
+| verification_gap | Phase 12 / 12-VERIFICATION.md | human_needed |
+
+Closeout note: these are Chrome MV3/manual UAT evidence gaps, not fabricated passes. Detailed procedures remain archived under `.planning/milestones/v0.10.0-phases/`.
 
 ### Phase 13 public Lattice package replug outputs (FSB-side; uncommitted in this workspace)
 
@@ -204,3 +224,7 @@ Stopped at: Completed 12-03-PLAN.md (FINT-22 live progress wiring shipped)
 ## Decisions
 
 - [Phase 12]: Plan 12-03 (Wave 3 FINT-22): flipped showSidepanelProgress default false->true at 4 sites (options.js + sidepanel.js module-scope + boot read + storage.onChanged listener); added unconditional _persistMessage in case 'iteration_complete' BEFORE typing-dots gate; smoke 51 PASS / 0 FAIL.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

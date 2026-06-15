@@ -1,6 +1,7 @@
 ---
-status: diagnosed
+status: resolved
 discovered: 2026-04-03
+updated: 2026-06-15
 session_id: session_1775188402694
 milestone: v0.9.24
 ---
@@ -39,3 +40,10 @@ The run completed useful research work, then hit the LinkedIn messaging auth bou
 
 - Phase 162.1: Partial Completion Lifecycle
 - Phase 162.2: Auth Wall Handoff with Result Preservation
+
+## Resolution
+
+Resolved by archived milestone v0.9.24. `.planning/milestones/v0.9.24-ROADMAP.md`
+records Phase 162.1 as shipped for first-class partial/blocked terminal
+outcomes and Phase 162.2 as shipped for auth-wall handoff with result
+preservation.

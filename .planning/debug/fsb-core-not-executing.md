@@ -1,8 +1,8 @@
 ---
-status: verifying
+status: resolved
 trigger: "FSB core functionality is broken -- tasks don't execute after recent changes"
 created: 2026-02-04T00:00:00Z
-updated: 2026-02-04T02:00:00Z
+updated: 2026-06-15
 ---
 
 ## Current Focus
@@ -139,3 +139,9 @@ files_changed:
     - Lines 3379-3391: Health check logging fix (accurate success/fail reporting)
     - Lines 2541-2556: handleTestAPI API key validation for all providers
     - Lines 4662-4672: callAIAPI API key validation for all providers
+
+## Closeout
+
+Closed as historical. The current tree preserves the documented content-script
+readiness fixes and has since moved provider execution through the Lattice
+provider bridge.

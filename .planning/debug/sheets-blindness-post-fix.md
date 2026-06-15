@@ -1,8 +1,8 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "AI cannot see Google Sheets cell content despite plan 24-05 fix"
 created: 2026-03-09T00:00:00Z
-updated: 2026-03-09T00:00:00Z
+updated: 2026-06-15
 ---
 
 ## Current Focus
@@ -134,3 +134,12 @@ fix_direction: |
 
 verification: not yet verified
 files_changed: []
+
+## Resolution
+
+Resolved by archived v10.0 Google Sheets follow-up work. `.planning/milestones/v10.0-ROADMAP.md`
+records Phase 24 gap closure for Sheets Stage 1b injection, formula bar
+content reading, and enhanced pipeline logging; Phase 25 then shipped
+snapshot pipeline fixes so formula bar content and name box refs appear
+regardless of DOM visibility and parent filtering; Phase 26 added selector
+resilience and diagnostics for empty formula bar/name box visibility.

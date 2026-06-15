@@ -1,3 +1,8 @@
+---
+status: complete
+updated: 2026-06-15
+---
+
 # GSD Debug Knowledge Base
 
 Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypotheses at the start of new investigations.
@@ -11,4 +16,3 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Fix:** (a) Declare the missing module-scope thread state vars + add no-op persistSidepanelThreadState stub. (b) Add hydrateChatFromConversationId(convId) helper that reads fsbSessionLogs + fsbSessionIndex, filters by conversationId, sorts ascending by startTime, replays session.commands[] as user messages and session.completionMessage as ai completion. (c) Wire into DOMContentLoaded after initTabConversationStore -- welcome suppressed when hydrate count > 0. (d) Wire into swapToTabConversation for tabs with bound convId. (e) Update RESOLVED #1 + #3 in 11-RESEARCH.md inline.
 - **Files changed:** extension/ui/sidepanel.js, .planning/phases/11-tab-aware-side-panel-surface/11-RESEARCH.md
 ---
-
