@@ -1,17 +1,24 @@
 ---
 phase: 06-fsb-engine-consumes-lattice-provider-abstraction
 verified: 2026-05-27T17:15:00Z
-status: human_needed
-score: 8/8 automated criteria verified; 2 manual UAT items deferred to Phase 7 UAT-1
-overrides_applied: 0
-re_verification: null
+status: passed
+score: 8/8 automated criteria verified; 0.9.90 beta UAT accepted via provider-agnostic Lattice-backed autopilot pass
+overrides_applied: 1
+re_verification: 2026-06-15T13:00:22Z
+release_bar: "provider-agnostic Lattice-backed autopilot pass accepted for 0.9.90 beta; xAI/Grok-specific coverage deferred"
 human_verification:
   - test: "Paste fresh xAI API key, click Test Connection -> connection succeeds end-to-end"
     expected: "Test Connection returns success (P1 missing-trim + P2 stale-storage-read defects both closed by side effect of Phase 6 migration)"
-    why_human: "Requires Chrome MV3 reload + DOM input field + real xAI HTTPS round-trip; not exercisable from Node smoke. Deferred to Phase 7 UAT-1 consolidated single-session procedure per .planning/v0.10.0-MILESTONE-AUDIT.md UAT-1 + Phase 6 CONTEXT.md deferred block."
-  - test: "Run one autopilot iteration completing >= 1 step using xAI through the bridge"
-    expected: "Autopilot iteration completes at least one step via executeViaBridge path with real xAI provider response"
-    why_human: "Requires Chrome MV3 reload + real autopilot session + real xAI HTTPS round-trip. Deferred to Phase 7 UAT-1 consolidated single-session procedure per .planning/v0.10.0-MILESTONE-AUDIT.md UAT-1."
+    why_human: "Requires extension Control Panel UI access + real xAI HTTPS round-trip. Deferred as provider-specific follow-up after user-approved 2026-06-15 beta release bar change; not release-blocking for 0.9.90."
+    status: skipped
+    verdict: deferred_provider_specific_follow_up
+  - test: "Run one Lattice-backed autopilot iteration completing >= 1 step through the bridge"
+    expected: "Autopilot iteration completes at least one step via executeViaBridge path with any configured Lattice-backed provider response"
+    why_human: "Requires real Chrome MV3 extension runtime + real provider HTTPS round-trip."
+    status: executed
+    verdict: passed
+    executed_date: 2026-06-15
+    evidence: "FSB MCP session_1781527203189 completed successfully with provider openrouter/model openai/gpt-oss-120b:free; iterationCount=2; actionCount=1; read_page observed heading 'Example Domain'."
 ---
 
 # Phase 6: FSB engine consumes Lattice provider abstraction — Verification Report
@@ -19,8 +26,10 @@ human_verification:
 **Phase Goal:** Wire FSB's autopilot engine (`extension/ai/agent-loop.js`) and settings test-connection path (`extension/ui/options.js`) to consume Lattice's 7 provider adapters (shipped Phase 4) through the offscreen Lattice host bus (extended over Phase 5 FINT-04), replacing FSB's own `extension/ai/universal-provider.js` runtime path. Strategy A: offscreen handler does its own fetch() for autopilot path (preserves FSB's multi-turn tool-use payload); Lattice `adapter.execute({task, artifacts, outputs})` for test-connection only. Closes `xai-key-rejected-400` P1 (missing trim) + P2 (stale storage read) defects as side effects.
 
 **Verified:** 2026-05-27T17:15:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** passed
+**Re-verification:** Yes — 2026-06-15 beta UAT release-bar update
+
+> **0.9.90 beta UAT update 2026-06-15:** User approved provider-agnostic release bar: any Lattice-backed provider completing one autopilot step is sufficient for beta release. Local unpacked 0.9.90 extension `dbnccpgldejajngmeebehmjdflhaafnl` was confirmed loaded. FSB MCP session `session_1781527203189` completed successfully via OpenRouter with one `read_page` action on `example.com`. xAI/Grok Test Connection remains provider-specific follow-up coverage, not a 0.9.90 beta release blocker.
 
 ## Goal Achievement
 
@@ -30,14 +39,14 @@ human_verification:
 |---|-------|--------|----------|
 | 1 | Lattice vitest still passes (Phase 6 is FSB-side only; no Lattice changes) | VERIFIED | `cd lattice && git rev-parse HEAD` returns `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` (Phase 5 SHA UNCHANGED); zero Lattice-side commits per CONTEXT.md INV-06 scope-lock |
 | 2 | FSB `npm test` passes including new tests/lattice-provider-bridge-smoke.test.js (>= 20 PASS) | VERIFIED | `npm test` exits 0; bridge smoke `node tests/lattice-provider-bridge-smoke.test.js` reports 85 PASS / 0 FAIL across all 6 Parts and all 7 providers (xai, openai, anthropic, gemini, openrouter, lmstudio, custom); >= 20 floor exceeded 4x over |
-| 3 | Manual: paste fresh xAI key, click Test → connection succeeds end-to-end (P1+P2 closed) | DEFERRED (human_verification) | Static-text verification PASS: saveSettings has 9 .trim() calls + checkApiConnection reads input field directly + delegates to executeViaBridge. Functional UAT deferred to Phase 7 UAT-1 per CONTEXT.md + v0.10.0-MILESTONE-AUDIT.md |
-| 4 | Manual: one autopilot iteration completes >= 1 step using xAI through the bridge | DEFERRED (human_verification) | Static-text verification PASS: agent-loop.js line 1044 has feature-flag-gated `executeViaBridge` invocation (default-on idiom); INV-04 setTimeout iterator PATTERN preserved. Functional UAT deferred to Phase 7 UAT-1 |
+| 3 | Provider-specific: paste fresh xAI key, click Test → connection succeeds end-to-end (P1+P2 closed) | DEFERRED (non-release-blocking) | Static-text verification PASS: saveSettings has 9 .trim() calls + checkApiConnection reads input field directly + delegates to executeViaBridge. Functional xAI/Grok UI UAT deferred as provider-specific follow-up after user-approved 2026-06-15 beta release bar change |
+| 4 | Beta release bar: one Lattice-backed autopilot iteration completes >= 1 step through the bridge | VERIFIED | FSB MCP session `session_1781527203189` on confirmed local 0.9.90 beta completed successfully via OpenRouter (`provider=openrouter`, `model=openai/gpt-oss-120b:free`), `iterationCount=2`, `actionCount=1`, tool call `read_page`, result observed heading `Example Domain`; INV-04 setTimeout iterator PATTERN preserved |
 | 5 | extension/ai/universal-provider.js byte-frozen (flag-gated fallback active when flag=false) | VERIFIED | `git status --porcelain extension/ai/universal-provider.js` returns empty; smoke Part 6 asserts `Phase 6 keeps universal-provider.js as flag-false fallback`; legacy `providerInstance.sendRequest(requestBody)` preserved in agent-loop.js as flag-false branch |
 | 6 | extension/background.js: only diff is chrome.offscreen.createDocument startup wiring + hasDocument guard; 153 importScripts chain BYTE-UNCHANGED | VERIFIED | `grep -c "importScripts" extension/background.js` returns 154 (Phase 5 baseline 153 + 1 new bare line for ai/lattice-provider-bridge.js at line 12 between cli-parser.js line 11 and ai-integration.js line 13; relative order byte-frozen); `ensureLatticeOffscreen()` declaration + 2 call sites (onInstalled + onStartup) + hasDocument guard + WORKERS reason — 4 small inserts, otherwise byte-frozen |
 | 7 | INV-01..06 all HOLDING | VERIFIED | Smoke Part 6 (14 PASSes): INV-01/02 parity test present + 142 PASS; INV-04 setTimeout count = 8 + 4 iterator hits via content-discovery + each block contains runAgentIteration(sessionId, options) within 5 lines; INV-05 deprecated agent modules present + DEPRECATED banner intact; INV-06 LATTICE-PIN.md current_lattice_sha equals Phase 5 SHA e95067bfa87ed1b75838fc3b3ef217a3b01acbd3 |
 | 8 | .planning/LATTICE-PIN.md + .planning/REQUIREMENTS.md updated | VERIFIED | LATTICE-PIN.md gained Phase 6 row (last_updated bumped 2026-05-24 -> 2026-05-27; current_lattice_sha UNCHANGED at Phase 5 SHA); REQUIREMENTS.md FINT-07 + FINT-08 flipped Pending -> Complete in BOTH narrative (lines 75-76 with `- [x]` checkbox + DONE 2026-05-27 prefix + FSB commit SHAs + 9-field rationale for FINT-08) AND traceability table (lines 161-162); footer line 167 updated to "31 Complete + 1 newly-promoted = 32 concrete" |
 
-**Score:** 8/8 automated criteria verified; 2 manual UAT items deferred (Pass Criteria 3 + 4)
+**Score:** 8/8 automated criteria verified; 0.9.90 beta UAT accepted via provider-agnostic Lattice-backed autopilot pass; xAI/Grok-specific UI coverage deferred as non-release-blocking follow-up
 
 ### Required Artifacts
 
@@ -121,29 +130,29 @@ All 6 invariants HOLDING end-of-Phase-6 (verified by smoke Part 6 + this verific
 
 | Issue | Closed via | Plan | Status |
 |-------|------------|------|--------|
-| xai-key-rejected-400 P1 (missing trim on save -- root cause: clipboard managers / paste handlers add trailing whitespace; xAI's masked echo `xa***cy` does not reveal trailing bytes) | FINT-08c saveSettings 9-field `.trim()` defense | 06-04 | CLOSED (static verification; functional UAT deferred to Phase 7 UAT-1) |
-| xai-key-rejected-400 P2 (stale storage read -- old checkApiConnection read from chrome.storage via getStoredSettings BEFORE the user clicked Save) | FINT-08d checkApiConnection rewrite to read input fields directly via PROVIDER_KEY_GETTERS | 06-04 | CLOSED (static verification; functional UAT deferred to Phase 7 UAT-1) |
+| xai-key-rejected-400 P1 (missing trim on save -- root cause: clipboard managers / paste handlers add trailing whitespace; xAI's masked echo `xa***cy` does not reveal trailing bytes) | FINT-08c saveSettings 9-field `.trim()` defense | 06-04 | CLOSED by static verification; provider-specific functional xAI UAT deferred as non-release-blocking follow-up |
+| xai-key-rejected-400 P2 (stale storage read -- old checkApiConnection read from chrome.storage via getStoredSettings BEFORE the user clicked Save) | FINT-08d checkApiConnection rewrite to read input fields directly via PROVIDER_KEY_GETTERS | 06-04 | CLOSED by static verification; provider-specific functional xAI UAT deferred as non-release-blocking follow-up |
 | Audit gap G3 (SW does not open offscreen host at startup) per `.planning/v0.10.0-MILESTONE-AUDIT.md` | FINT-07b background.js ensureLatticeOffscreen() helper + fire-and-forget call from BOTH onInstalled + onStartup | 06-02 | CLOSED (static verification confirms WORKERS reason + hasDocument guard + 2 call sites) |
 
-## Human Verification Required
+## Provider-Specific Follow-Up
 
-2 items deferred to Phase 7 UAT-1 consolidated single-session procedure per `.planning/v0.10.0-MILESTONE-AUDIT.md` UAT-1 + Phase 6 `06-CONTEXT.md` deferred block. Rationale: Phases 6 + 7 add code paths to the offscreen host bus + agent-loop + options.js test-connection that the same Chrome MV3 reload session naturally exercises. Running UAT-1 once at Phase 7 end validates the full v0.10.0 surface in a single human session — strictly more leverage than running it twice.
+On 2026-06-15 the release bar was revised for the 0.9.90 beta: provider-agnostic Lattice-backed autopilot success is sufficient for release UAT. FSB MCP session `session_1781527203189` satisfied that bar through OpenRouter. The xAI/Grok-specific UI path remains useful follow-up coverage, but it no longer blocks the 0.9.90 beta verification verdict.
 
-### 1. Manual: paste fresh xAI API key, click Test Connection -> connection succeeds end-to-end
+### 1. Deferred: paste fresh xAI API key, click Test Connection -> connection succeeds end-to-end
 
 **Test:** Open extension options page, paste a fresh xAI API key (intentionally include trailing whitespace from clipboard), click "Test Connection" button without first clicking "Save".
 **Expected:** Test Connection returns success (P1 missing-trim + P2 stale-storage-read defects both closed by side effect of Phase 6 migration). The connection succeeds because (a) checkApiConnection reads from the input field directly via PROVIDER_KEY_GETTERS (not chrome.storage), and (b) the getter trims whitespace inline.
-**Why human:** Requires Chrome MV3 reload + DOM input field + real xAI HTTPS round-trip; not exercisable from Node smoke. Static-text verification confirms the code paths are in place; functional verification needs a real user clipboard + key + browser session.
+**Why deferred:** Requires extension Control Panel UI access + real xAI HTTPS round-trip. FSB MCP cannot script `chrome-extension://dbnccpgldejajngmeebehmjdflhaafnl/ui/control_panel.html` because Chrome blocks extension-page content-script access. Static-text verification confirms the code paths are in place; functional xAI verification can be run later from the UI.
 
-### 2. Manual: one autopilot iteration completes >= 1 step using xAI through the bridge
+### 2. Passed: one Lattice-backed autopilot iteration completes >= 1 step through the bridge
 
-**Test:** With FSB_LATTICE_PROVIDER_BRIDGE_ENABLED at its default value (default-on), start an autopilot session with xAI as the provider. Observe the SW console log for the bridge boot tag and the autopilot iteration log.
-**Expected:** Autopilot iteration completes at least one step via executeViaBridge path with real xAI provider response. The iteration uses the Strategy A autopilot fetch path inside the offscreen page (preserves multi-turn messages + tools[]). INV-04 setTimeout iterator continues to drive next-iteration scheduling unchanged.
-**Why human:** Requires Chrome MV3 reload + real autopilot session + real xAI HTTPS round-trip + real DOM session. Static-text verification confirms the bridge call site is in place + INV-04 iterator is byte-frozen; functional verification needs a real autopilot session.
+**Test:** With FSB_LATTICE_PROVIDER_BRIDGE_ENABLED at its default value (default-on), start an autopilot session with a configured Lattice-backed provider. Observe at least one completed provider-backed step.
+**Expected:** Autopilot iteration completes at least one step via executeViaBridge path with a real provider response. The iteration uses the Strategy A autopilot fetch path inside the offscreen page (preserves multi-turn messages + tools[]). INV-04 setTimeout iterator continues to drive next-iteration scheduling unchanged.
+**Result:** PASS. FSB MCP session `session_1781527203189` completed successfully on confirmed local 0.9.90 beta using OpenRouter (`openai/gpt-oss-120b:free`), `iterationCount=2`, `actionCount=1`, tool call `read_page`, result observed heading `Example Domain`.
 
 ### Gaps Summary
 
-No code gaps. 8/8 automated ROADMAP pass criteria verified. 2 of 8 are MANUAL by design (Pass Criteria 3 + 4) and are explicitly deferred to Phase 7 UAT-1 per CONTEXT.md + v0.10.0-MILESTONE-AUDIT.md. The deferral is sanctioned by the milestone planning documents and is not a Phase 6 gap.
+No code gaps. 8/8 automated ROADMAP pass criteria verified. 0.9.90 beta release UAT is satisfied by confirmed local beta load plus provider-backed OpenRouter autopilot success. xAI/Grok-specific Test Connection coverage is deferred as non-release-blocking provider-specific follow-up.
 
 ---
 
