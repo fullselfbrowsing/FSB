@@ -36,7 +36,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. After the service worker is evicted for >30s (devtools closed), a `chrome.alarms` tick wakes it, re-hydrates the trigger registry from storage, and re-evaluates — with no keepalive antipattern present (the SW is allowed to idle to eviction; the load-bearing `setTimeout` agent-loop iterator is byte-untouched, INV-04).
   3. On SW startup / browser restart, the registry reconciles persisted triggers against `chrome.alarms.getAll()`, re-arms `armed` triggers, and drops `fired`/expired ones with no duplicate fires or orphaned watchers (alarm-into-the-void is impossible).
   4. A trigger has a maximum lifetime (TTL); expired or orphaned triggers are reaped and their alarm + registry entry released (a trigger whose tab closed is reaped via `chrome.tabs.onRemoved`).
-**Plans**: TBD
+**Plans**: 3 plans (1 per wave)
+- [ ] 14-01-PLAN.md — trigger-store.js (chrome.storage.session envelope, clone of mcp-task-store.js) + Node-mock test + npm test wiring [SURV-01]
+- [ ] 14-02-PLAN.md — trigger-lifecycle.js (alarm handler, reconcile + getAll() orphan sweep, TTL/tab-close reap; overlay stripped) + Node-mock test + npm test wiring [SURV-02, SURV-03, LIFE-05]
+- [ ] 14-03-PLAN.md — background.js 4 additive glue points (importScripts, bootstrap restore, onAlarm branch, tabs.onRemoved) + live-Chrome survival checkpoint [SURV-01, SURV-03, LIFE-05]
 
 ### Phase 15: Fire-Condition Engine & Value Extraction
 **Goal**: A pure, SW-side trigger manager can evaluate every fire condition against a persisted baseline with locale-correct value extraction, edge-fire semantics, and a configurable concurrency cap — the genuinely-new comparison logic, unit-testable in isolation.
@@ -115,7 +118,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 14. Trigger Survivability Foundation | v0.11.0 | 0/TBD | Not started | - |
+| 14. Trigger Survivability Foundation | v0.11.0 | 0/3 | Not started | - |
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 0/TBD | Not started | - |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 0/TBD | Not started | - |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 0/TBD | Not started | - |
