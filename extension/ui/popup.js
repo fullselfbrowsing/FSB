@@ -957,7 +957,7 @@ chatInput.addEventListener('input', adjustInputHeight);
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => e.preventDefault());
 
-console.log('FSB v0.9.50 chat interface loaded');
+console.log(`FSB v${chrome.runtime.getManifest().version} chat interface loaded`);
 
 // ==========================================
 // /agent Slash Command Handler

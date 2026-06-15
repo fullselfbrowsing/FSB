@@ -13455,7 +13455,7 @@ async function ensureLatticeOffscreen() {
 
 // Set up side panel behavior
 chrome.runtime.onInstalled.addListener(async () => {
-  automationLogger.logInit('extension', 'installed', { version: 'v0.9.50' });
+  automationLogger.logInit('extension', 'installed', { version: chrome.runtime.getManifest().version });
 
   // Initialize analytics
   initializeAnalytics();

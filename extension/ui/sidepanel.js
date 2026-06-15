@@ -989,7 +989,7 @@ try {
 
 // Initialize side panel
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('FSB v0.9.50 side panel loaded');
+  console.log(`FSB v${chrome.runtime.getManifest().version} side panel loaded`);
 
   // Apply theme first
   applyTheme();
@@ -3371,7 +3371,7 @@ function escapeHtml(str) {
 }
 
 
-console.log('FSB v0.9.50 side panel script loaded');
+console.log(`FSB v${chrome.runtime.getManifest().version} side panel script loaded`);
 
 // ==========================================
 // /agent Slash Command Handler
