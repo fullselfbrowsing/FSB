@@ -32,7 +32,7 @@ See: .planning/milestones/v0.10.0-attempt-1-pre-pivot/PIVOT-v0.10.0-PLAN.md (piv
 Phase: 13 (Public Lattice package integration) — COMPLETE
 Plan: 13-01 public-package replug + guardrail modernization
 Status: Automated verification passed; no Phase 13 human UAT required
-Last activity: 2026-06-15 - Completed quick task 260615-4zl: lightweight smart search for the control panel model selector.
+Last activity: 2026-06-15 - Completed quick task 260615-5ks: replace stale hardcoded 0.9.50 version literals in extension logs with live manifest version.
 
 ### Phase 13 public Lattice package replug outputs (FSB-side; uncommitted in this workspace)
 
@@ -182,6 +182,7 @@ On-disk archive: `.planning/milestones/v0.10.0-attempt-1-pre-pivot/`
 | 260608-uof | Cluster 1+2 bundled fix: D (open automationComplete to background-tab completions) + E (collapse if-branch double-persist) + C (alreadyEnded distinction in stop) + tabId thread through 12 broadcast sites + new background-tab completion regression test + per-tab currentStatusMessage/currentActionGroup + Chrome 141+ sidePanel.close auto-collapse with per-window gate | 2026-06-08 | 24d05f72 | [260608-uof-cluster-1-2-bundled-fix-d-fix-open-autom](./quick/260608-uof-cluster-1-2-bundled-fix-d-fix-open-autom/) |
 | 260608-wnz | Codex Strategy B 5-item architectural fix for cluster1 D/E persistence (verifier PASSED): C1 no-reopen gate in handleStartAutomation + C2 tab-scoped getStatus + C3 background-side durable terminal persist before broadcast + C4 sessionId+terminal dedupe in message-log schema + handler guard + C5 multi-document fanout regression test | 2026-06-09 | 3ab7e534 | [260608-wnz-codex-strategy-b-5-item-architectural-fi](./quick/260608-wnz-codex-strategy-b-5-item-architectural-fi/) |
 | 260615-4zl | Add lightweight smart search to the control panel model selector | 2026-06-15 | 5d42ebf0 | [260615-4zl-add-lightweight-smart-model-search-to-co](./quick/260615-4zl-add-lightweight-smart-model-search-to-co/) |
+| 260615-5ks | Replace stale hardcoded 0.9.50 version literals in extension logs with manifest version | 2026-06-15 | c37a91bf | [260615-5ks-replace-stale-hardcoded-0-9-50-version-l](./quick/260615-5ks-replace-stale-hardcoded-0-9-50-version-l/) |
 | Phase 08 P03 | 14min | 3 tasks | 3 files |
 | Phase 09 P03 | 6min | 3 tasks | 3 files (REQUIREMENTS.md, LATTICE-PIN.md, v0.10.0-MILESTONE-AUDIT.md) |
 | Phase 10 P01 | 18min | 4 tasks | 5 files |
