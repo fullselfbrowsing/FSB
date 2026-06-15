@@ -77,10 +77,15 @@ function ok(condition, message) {
 
   const cli = spawnSync(path.join(repoRoot, 'node_modules', '.bin', 'lattice'), ['--help'], {
     cwd: repoRoot,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    env: { ...process.env, NO_COLOR: '1' }
   });
   ok(cli.status === 0, 'lattice --help exits 0');
-  ok(/USAGE lattice repro\|verify\|eval/.test(cli.stdout), 'lattice CLI exposes repro|verify|eval commands');
+  // The published @full-self-browsing/lattice-cli (citty) colorizes its help
+  // banner with ANSI escape codes even when stdout is not a TTY (NO_COLOR is
+  // not load-bearing on its own), so strip ANSI before matching the usage line.
+  const cliStdout = (cli.stdout || '').replace(/\x1b\[[0-9;]*m/g, '');
+  ok(/USAGE lattice repro\|verify\|eval/.test(cliStdout), 'lattice CLI exposes repro|verify|eval commands');
 
   console.log('\nPublic Lattice package smoke: ' + passed + ' PASS / 0 FAIL');
 })().catch((err) => {
