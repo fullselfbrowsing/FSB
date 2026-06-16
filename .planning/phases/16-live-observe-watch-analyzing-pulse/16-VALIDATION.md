@@ -3,7 +3,7 @@ phase: 16
 slug: live-observe-watch-analyzing-pulse
 status: approved
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-06-16
 ---
 
@@ -41,22 +41,22 @@ created: 2026-06-16
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | WATCH-01 | — | `optsFor(extract)` → `{childList,characterData,subtree}` (text/number) / `{attributes,attributeFilter:[attr]}` (attribute) | unit (Node-mock) | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-01 | — | mutation → debounced single `sendMessage({action:'triggerValueChanged', value:{text}})`; N mutations coalesce to 1 | unit (mock MutationObserver+setTimeout+sendMessage) | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-01 | — | value report shape is exactly `{text, attributes?}` (evaluate() contract) | unit | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-01 | T-16-V5 | SW value-report case validates `typeof value.text==='string'`, keeps `sender.id===chrome.runtime.id` guard, writes `reported_value`, SEAM fires on edge-true | unit (extend trigger-lifecycle harness) | `node tests/trigger-lifecycle.test.js` | ✅ extend | ⬜ pending |
-| TBD | TBD | TBD | WATCH-05 | — | idempotent start: second `start(same_id)` disconnects the prior observer (no stacking) | unit (observe/disconnect counts) | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-05 | — | **leak test:** every observer created is disconnected after stop/disconnectAll (disconnect count === observe count, registry empty) | unit | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-05 | — | `pagehide(persisted)` does NOT disconnect; non-persisted DOES (BF-cache survival, D-04) | unit (fire fake events, assert disconnect count) | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-05 | — | per-batch re-resolve calls `querySelectorWithShadow`; stale (`!isConnected`) cache hit busted (Pitfall 6) | unit (mock selectors + swapped node) | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | WATCH-05 | — | SOURCE: full-reload re-arm wired off `webNavigation.onCommitted`/`ensureContentScriptInjected`; google-gated SPA hooks NOT relied on | static-grep (source assertions) | `node tests/trigger-observe.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | VIS-01 | — | SOURCE: `@keyframes fsb-trigger-pulse` present, animates opacity/transform only (no box-shadow/top/left); distinct `.box-overlay.trigger-pulse` | static-grep on visual-feedback.js | `node tests/trigger-observe-pulse.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | VIS-01 | — | `ActionGlowOverlay.showPulse(el)` adds `trigger-pulse` class to boxOverlay | unit (vm sandbox) | `node tests/trigger-observe-pulse.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | VIS-02 | — | `buildOverlayState({mode:'trigger-watch'})` includes `mode:'trigger-watch'`; no existing field changed | unit | `node tests/test-overlay-state.js` (extend) | ✅ extend | ⬜ pending |
-| TBD | TBD | TBD | VIS-03 | — | `clearPulse()` removes class + destroys overlay; `beforeunload`/non-persisted `pagehide` clears it | unit (vm sandbox) | `node tests/trigger-observe-pulse.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | VIS-03 | — | SOURCE: fire SEAM path + `deadline_at` reap delete the snapshot so nothing re-asserts the pulse (already covered) | covered | `node tests/trigger-lifecycle.test.js` | ✅ exists | ⬜ pending |
-| TBD | TBD | TBD | VIS-04 | — | SOURCE: `@media (prefers-reduced-motion: reduce)` sets `animation:none` on `.box-overlay.trigger-pulse` + keeps a static cue | static-grep | `node tests/trigger-observe-pulse.test.js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | INV-04 | — | SOURCE: `extension/ai/agent-loop.js` byte-unchanged (setTimeout count guard) | static (diff/grep) | `node tests/agent-loop-empty-contents.test.js` | ✅ exists | ⬜ pending |
+| 16-01 | 16-01 | 1 | WATCH-01 | — | `optsFor(extract)` → `{childList,characterData,subtree}` (text/number) / `{attributes,attributeFilter:[attr]}` (attribute) | unit (Node-mock) | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-01 | 16-01 | 1 | WATCH-01 | — | mutation → debounced single `sendMessage({action:'triggerValueChanged', value:{text}})`; N mutations coalesce to 1 | unit (mock MutationObserver+setTimeout+sendMessage) | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-01 | 16-01 | 1 | WATCH-01 | — | value report shape is exactly `{text, attributes?}` (evaluate() contract) | unit | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-04 | 16-04 | 2 | WATCH-01 | T-16-V5 | SW value-report case validates `typeof value.text==='string'`, keeps `sender.id===chrome.runtime.id` guard, writes `reported_value`, SEAM fires on edge-true | unit (extend trigger-lifecycle harness) | `node tests/trigger-lifecycle.test.js` | ✅ exists | ✅ green |
+| 16-01 | 16-01 | 1 | WATCH-05 | — | idempotent start: second `start(same_id)` disconnects the prior observer (no stacking) | unit (observe/disconnect counts) | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-01 | 16-01 | 1 | WATCH-05 | — | **leak test:** every observer created is disconnected after stop/disconnectAll (disconnect count === observe count, registry empty) | unit | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-01 | 16-01 | 1 | WATCH-05 | — | `pagehide(persisted)` does NOT disconnect; non-persisted DOES (BF-cache survival, D-04) | unit (fire fake events, assert disconnect count) | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-01 | 16-01 | 1 | WATCH-05 | — | per-batch re-resolve calls `querySelectorWithShadow`; stale (`!isConnected`) cache hit busted (Pitfall 6) | unit (mock selectors + swapped node) | `node tests/trigger-observe.test.js` | ✅ exists | ✅ green |
+| 16-04 | 16-04 | 2 | WATCH-05 | — | SOURCE: full-reload re-arm wired off `webNavigation.onCommitted`/`ensureContentScriptInjected`; google-gated SPA hooks NOT relied on | static-grep (source assertions) | `node tests/trigger-lifecycle.test.js` | ✅ exists | ✅ green |
+| 16-02 | 16-02 | 1 | VIS-01 | — | SOURCE: `@keyframes fsb-trigger-pulse` present, animates opacity/transform only (no box-shadow/top/left); distinct `.box-overlay.trigger-pulse` | static-grep on visual-feedback.js | `node tests/trigger-observe-pulse.test.js` | ✅ exists | ✅ green |
+| 16-02 | 16-02 | 1 | VIS-01 | — | `ActionGlowOverlay.showPulse(el)` adds `trigger-pulse` class to boxOverlay | unit (vm sandbox) | `node tests/trigger-observe-pulse.test.js` | ✅ exists | ✅ green |
+| 16-02 | 16-02 | 1 | VIS-02 | — | `buildOverlayState({mode:'trigger-watch'})` includes `mode:'trigger-watch'`; no existing field changed | unit | `node tests/test-overlay-state.js` | ✅ exists | ✅ green |
+| 16-02 | 16-02 | 1 | VIS-03 | — | `clearPulse()` removes class + destroys overlay; `beforeunload`/non-persisted `pagehide` clears it | unit (vm sandbox) | `node tests/trigger-observe-pulse.test.js` | ✅ exists | ✅ green |
+| 16-04 | 16-04 | 2 | VIS-03 | — | SOURCE: fire SEAM path + `deadline_at` reap delete the snapshot so nothing re-asserts the pulse (already covered) | covered | `node tests/trigger-lifecycle.test.js` | ✅ exists | ✅ green |
+| 16-02 | 16-02 | 1 | VIS-04 | — | SOURCE: `@media (prefers-reduced-motion: reduce)` sets `animation:none` on `.box-overlay.trigger-pulse` + keeps a static cue | static-grep | `node tests/trigger-observe-pulse.test.js` | ✅ exists | ✅ green |
+| 16-04 | 16-04 | 2 | INV-04 | — | SOURCE: `extension/ai/agent-loop.js` byte-unchanged (setTimeout count guard) | static (diff/grep) | `node tests/agent-loop-empty-contents.test.js` | ✅ exists | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -64,12 +64,12 @@ created: 2026-06-16
 
 ## Wave 0 Requirements
 
-- [ ] `tests/trigger-observe.test.js` — WATCH-01 + WATCH-05 (observe-options, debounce-coalesce, report shape, idempotent start, **leak test**, BF-cache `pagehide` nuance, per-batch re-resolve + stale-cache bust, source re-arm wiring). Harness: `vm.createContext` content sandbox (mirror `overlay-stability-cadence.test.js:211-242`) + stub `MutationObserver` recording observe/disconnect pairs (mirror `change-report-builder.test.js:31`), fake `document`/`setTimeout`/`chrome.runtime.sendMessage`.
-- [ ] `tests/trigger-observe-pulse.test.js` — VIS-01 + VIS-03 + VIS-04 (showPulse/clearPulse class toggle via the vm-sandbox `ActionGlowOverlay`; source-grep keyframe / opacity-only / reduced-motion invariants). Harness: the `overlay-stability-cadence.test.js` vm sandbox + the `module.exports` test hook (`visual-feedback.js:2300`).
-- [ ] Extend `tests/trigger-lifecycle.test.js` — add: SW writes `reported_value`, on-report path fires on edge-true and disarms (reuse `setupSeamHarness`).
-- [ ] Extend `tests/test-overlay-state.js` — assert `mode:'trigger-watch'` additive field; no existing field regressed.
-- [ ] Append both new files to the `package.json` `test` chain (beside `trigger-cap.test.js`).
-- [ ] Framework install: none — Node built-in test pattern already in place.
+- [x] `tests/trigger-observe.test.js` — WATCH-01 + WATCH-05 (observe-options, debounce-coalesce, report shape, idempotent start, **leak test**, BF-cache `pagehide` nuance, per-batch re-resolve + stale-cache bust, stale marker re-arm regression). Harness: `vm.createContext` content sandbox + stub `MutationObserver` recording observe/disconnect pairs, fake `document`/`setTimeout`/`chrome.runtime.sendMessage`.
+- [x] `tests/trigger-observe-pulse.test.js` — VIS-01 + VIS-03 + VIS-04 (showPulse/clearPulse class toggle via the vm-sandbox `ActionGlowOverlay`; source-grep keyframe / opacity-only / reduced-motion invariants).
+- [x] Extend `tests/trigger-lifecycle.test.js` — add: SW writes `reported_value`, on-report path fires on edge-true and disarms; attribute reports pass through the SEAM; background source invariants cover full-reload re-arm.
+- [x] Extend `tests/test-overlay-state.js` — assert `mode:'trigger-watch'` additive field; no existing field regressed.
+- [x] Append both new files to the `package.json` `test` chain (beside `trigger-cap.test.js`).
+- [x] Framework install: none — Node built-in test pattern already in place.
 
 ---
 
@@ -95,6 +95,6 @@ created: 2026-06-16
 - [x] Feedback latency < 2s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-> `wave_0_complete` stays `false` until execution authors `tests/trigger-observe.test.js` + `tests/trigger-observe-pulse.test.js` (Wave 1, plans 16-01/16-02).
+> `wave_0_complete` is true after execution: `tests/trigger-observe.test.js`, `tests/trigger-observe-pulse.test.js`, the lifecycle extension, and the overlay-state extension are all present and green in `npm test`.
 
 **Approval:** approved 2026-06-16 (plan-checker verified — Dimension 8 passes against plan content)

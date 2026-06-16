@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 16-03-PLAN.md
-last_updated: "2026-06-16T16:43:43.899Z"
+status: ready
+stopped_at: Completed Phase 16 execution; live-browser UAT saved to 16-HUMAN-UAT.md
+last_updated: "2026-06-16T16:56:32.347Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 11
-  percent: 100
+  completed_plans: 10
+  percent: 38
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 16 — live-observe-watch-analyzing-pulse
+**Current focus:** Phase 17 — refresh-poll-watch-tab-owning-background-reload
 
 ## Current Position
 
-Phase: 16 (live-observe-watch-analyzing-pulse) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
+Phase: 17 (refresh-poll-watch-tab-owning-background-reload) — READY TO PLAN
+Plan: 0 of TBD
+Status: Phase 16 complete with tracked live-browser UAT; Phase 17 ready to plan
 Last activity: 2026-06-16
 
-Progress: [███·······] 25% (2/8 phases)
+Progress: [████······] 38% (3/8 phases)
 
 ## Roadmap At A Glance (v0.11.0)
 
@@ -42,7 +42,7 @@ Progress: [███·······] 25% (2/8 phases)
 |-------|------|--------------|--------|
 | 14 | Trigger Survivability Foundation | SURV-01..03, LIFE-05 (4) | Complete |
 | 15 | Fire-Condition Engine & Value Extraction | TRIG-02..07, EXTRACT-01..04, LIFE-04 (11) | Complete |
-| 16 | Live-Observe Watch & Analyzing Pulse | WATCH-01, WATCH-05, VIS-01..04 (6) | Context ready — ready to plan |
+| 16 | Live-Observe Watch & Analyzing Pulse | WATCH-01, WATCH-05, VIS-01..04 (6) | Complete |
 | 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | Not started |
 | 18 | Shared Tool Registry & Dispatcher Wiring | TRIG-01, REG-01..04, LIFE-01..03 (8) | Not started |
 | 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Not started |
@@ -54,7 +54,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 2 (Phase 14: 14-01 trigger-store, 14-02 trigger-lifecycle)
+- Total plans completed (this milestone): 10 (Phase 14: 3, Phase 15: 3, Phase 16: 4)
 - Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
 
 **By Phase:**
@@ -63,6 +63,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 |-------|-------|-------|----------|
 | 14 | 3 | - | - |
 | 15 | 3 | - | - |
+| 16 | 4 | 12min | 3min |
 
 *Updated after each plan completion.*
 | Phase 14 P01 | 5min | 2 tasks | 4 files |
@@ -74,6 +75,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 16 P01 | 3 min | 2 tasks | 3 files |
 | Phase 16 P02 | 3 min | 2 tasks | 4 files |
 | Phase 16 P03 | 1 min | 1 tasks | 1 files |
+| Phase 16 P04 | 5 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -93,6 +95,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 15 Plan 01: value-extractor.js is a pure dual-export IIFE (FsbValueExtractor, no browser-API resolver) exposing exactly parseLocaleNumber + extractValue. parseLocaleNumber uses Intl.NumberFormat formatToParts separator discovery memoized per locale; literal split/join (never a separator-built RegExp); % kept raw with isPercent (never /100); NaN -> distinct parse_error (never 0, EXTRACT-04); decimal_separator override wins over locale (D-04). extractValue selects text|number|attribute over { text, attributes? } (EXTRACT-03/D-05) -- that shape is the Phase 16/17 watch-layer report contract.
 - [Phase ?]: Phase 15 Plan 02: trigger-manager.js evaluate(snapshot, reportedValue, now?) is STRUCTURALLY pure (D-02), proven by a brace-matched source-grep (no storage access / no chrome resolver in the evaluate() body even after the durable-local cap is added to the same file). Implements all 6 kinds + compound { combinator:'AND'|'OR', conditions[] } with error short-circuit (Pitfall 5) + edge-trigger/fire-once via persisted was_satisfied. Regex flag policy is default-flags-only (no /g lastIndex footgun); caps PATTERN_MAX_LEN=1000 / TEXT_MAX_LEN_ELEMENT=10000 / TEXT_MAX_LEN_PAGE=100000 are the hard CPU bound, EVIL_SHAPES heuristic is defense-in-depth. The inline cap (D-09) counts listArmedSnapshots() (storage-first, survives SW eviction) NOT a heap set, and serializes concurrent arms via a _withArmLock module-scope mutex (TOCTOU fix); Plan 03/Phase 18 inherit a serialized arm path.
 - [Phase ?]: Phase 15 Plan 03: the Phase-14 evaluated_noop SEAM in trigger-lifecycle.js is replaced with FsbTriggerManager.evaluate(snap, reportedValue, now) + an atomic terminal write-back -- on outcome 'fired' it sets status:'fired'+fired_at, folds next_state, writes in one writeSnapshot, then clearAlarm (disarm); on no_fire/parse_error/pattern_error it merges next_state and stays armed. The SEAM is the SOLE owner of fire-path storage I/O (D-02); evaluate() stays pure. parse_error/pattern_error NEVER write status:'fired' (EXTRACT-04). The preserved noop_terminal guard + the atomic write together give exactly-one-fire across SW eviction (D-07). reportedValue contract { text, attributes? } sourced from snap.reported_value ?? snap.last_value until Phase 16/17 supplies a live scrape. background.js loads value-extractor.js + trigger-manager.js in load-bearing order value-extractor->store->manager->lifecycle. Phase 15 closed with full automated coverage, no live-Chrome UAT. INV-01/INV-04 held.
+- [Phase ?]: Phase 16 wires live-observe end-to-end without adding public tool schemas: `content/trigger-observe.js` emits `triggerValueChanged` `{text, attributes?}` from a single stable-container MutationObserver; `messaging.js` exposes triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop; `background.js` validates and stages reports then delegates fire decisions to `FsbTriggerLifecycle.handleTriggerAlarm` (no duplicate fire writer). Re-arm is owned-tab only (`target_tab_id` + `ensureContentScriptInjected`), backed by `fsbTriggerObserveWatchdog:<id>` (1 min period, stale after 2 min). The in-memory observer registry is authoritative; stale DOM `data-fsb-trigger-armed` markers never block fresh-context re-arm (fixed in `87403c77`). Live-browser UAT is tracked in 16-HUMAN-UAT.md for Phase 20.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -127,6 +130,7 @@ Items acknowledged and deferred at v0.10.0 milestone close on 2026-06-15 (Chrome
 | verification_gap | Phase 10 / 10-VERIFICATION.md | human_needed | v0.10.0 close |
 | verification_gap | Phase 11 / 11-VERIFICATION.md | human_needed | v0.10.0 close |
 | verification_gap | Phase 12 / 12-VERIFICATION.md | human_needed | v0.10.0 close |
+| uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 Phase 16 close |
 
 Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0; `clawhub publish "skills/FSB Skill"`; 4 live-OpenClaw runtime UAT items.
 
@@ -138,11 +142,12 @@ Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp
 
 ## Session Continuity
 
-Last session: 2026-06-16T16:43:43.896Z
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-06-16T16:56:32.344Z
+Stopped at: Completed Phase 16 execution; verification human UAT deferred
 Resume file: None
 
 ## Next Actions
 
-1. `/gsd:plan-phase 14` -- decompose the Trigger Survivability Foundation into plans (in-tree patterns well-documented; research-phase can be skipped per SUMMARY).
-2. Phases flagged for `--research-phase` during planning: 16 (live-observe re-arm), 19 (blocking ceiling / detached TTL + fire-envelope shape), 14/17 (cross-browser-restart resume semantics).
+1. `/gsd-plan-phase 17` -- plan Refresh-Poll Watch (Tab-Owning Background Reload).
+2. Carry Phase 16 live-browser UAT to Phase 20 integration: `16-HUMAN-UAT.md` has 4 pending scenarios.
+3. Phases flagged for extra research during planning: 17 (refresh/reload semantics), 19 (blocking ceiling / detached TTL + fire-envelope shape).

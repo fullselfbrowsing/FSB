@@ -22,7 +22,7 @@ key-files:
     - package.json
 key-decisions:
   - "Debounce value is 200ms within the D-06 150-300ms band."
-  - "Idempotent arm guard uses leaf.dataset.fsbTriggerArmed, surfaced as data-fsb-trigger-armed in the page DOM dataset."
+  - "The in-memory observer registry is authoritative for idempotent restarts; leaf.dataset.fsbTriggerArmed is cleanup metadata only and never blocks a fresh observer start."
   - "stableAncestor climbs up to five ancestors for id/role/data-testid, then falls back to parentElement and relies on the SW watchdog for wrong guesses."
 patterns-established:
   - "Content reports raw { text, attributes? } through triggerValueChanged; the service worker remains the fire-decision owner."
@@ -47,7 +47,7 @@ completed: 2026-06-16
 ## Accomplishments
 
 - Added `extension/content/trigger-observe.js` with `FSB.triggerObserve.start`, `stop`, `disconnectAll`, `optsFor`, and `readValue`.
-- Implemented one observer per trigger id, idempotent restart, `dataset.fsbTriggerArmed` duplicate-arm guard, stable container selection, and stale-cache re-query through `FSB.querySelectorWithShadow`.
+- Implemented one observer per trigger id, idempotent restart, `dataset.fsbTriggerArmed` cleanup metadata, stable container selection, and stale-cache re-query through `FSB.querySelectorWithShadow`.
 - Added `tests/trigger-observe.test.js`, covering observe options, debounce coalescing, report shape, idempotent restart, leak cleanup, BF-cache `pagehide`, and stale selector re-query.
 - Appended `trigger-observe.test.js` and the upcoming `trigger-observe-pulse.test.js` to the root test chain after `trigger-cap.test.js`.
 
@@ -65,7 +65,7 @@ completed: 2026-06-16
 ## Decisions Made
 
 - Used `DEBOUNCE_MS = 200` to stay inside the planned 150-300ms trailing debounce band.
-- Used `dataset.fsbTriggerArmed` as the idempotent arm guard. A same-instance restart disconnects and re-observes; a fresh injection that sees the existing dataset marker returns `{ ok:true, already:true }`.
+- Kept the registry as the idempotent restart authority. `dataset.fsbTriggerArmed` is used for cleanup metadata only, so a fresh content-script context still installs an observer even if the page DOM retained a stale marker.
 - Resolved the stable-container heuristic to a five-ancestor climb for `id`, `role`, or `data-testid`, falling back to `parentElement`, then the leaf only when no parent exists.
 - Chose `triggerValueChanged` as the content-to-SW report action string.
 
@@ -77,6 +77,7 @@ None - plan executed exactly as written.
 
 - The first VM-object assertions failed because Node strict deep equality treats objects created in the VM context as different-prototype objects. The test now normalizes VM results to plain JSON before comparison; behavior was unchanged.
 - Full `npm test` is intentionally not run until Plan 02 creates `tests/trigger-observe-pulse.test.js`, which Plan 01 wired into the chain.
+- Code review caught that a stale `dataset.fsbTriggerArmed` marker could block fresh-context re-arm without installing a `MutationObserver`; fixed in `87403c77` with a regression test.
 
 ## User Setup Required
 
