@@ -359,6 +359,47 @@ function reported(text, attributes) {
   }
 
   // ====================================================================
+  // REGRESSION (Phase 15 code review): CR-01 ReDoS bypass, WR-01 degraded
+  // extractor spurious fire, WR-02 $-anchor truncation false positive.
+  // The earlier paren-blind heuristic compiled ((a+))+ / (a{1,}){1,} cleanly and
+  // a 34-char input hung .test() for >8s (CR-01); hasNestedQuantifier now rejects
+  // the exponential class at compile time. A regression here would HANG this
+  // test (a freeze), not merely fail an assertion.
+  // ====================================================================
+  console.log('--- REGRESSION: ReDoS guard (CR-01) + degraded extractor (WR-01) + truncation (WR-02) ---');
+  {
+    var evilPatterns = ['((a+))+$', '((a+))+', '(a{1,}){1,}', '(a+)+', '(a*)*', '(a|a)*', '(.*)*', '((ab)+)+'];
+    var hugeText = new Array(41).join('a') + 'X'; // 41 chars -> exponential on the above
+    for (var ei = 0; ei < evilPatterns.length; ei++) {
+      var t0 = Date.now();
+      var er = evaluate(snap({ kind: 'regex', pattern: evilPatterns[ei] }, 'seed', 'seed', false), reported(hugeText), NOW);
+      var dt = Date.now() - t0;
+      check(er.outcome !== 'fired' && er.outcome !== 'no_fire', 'CR-01 evil pattern ' + evilPatterns[ei] + ' -> error outcome (rejected), not a fire');
+      check(dt < 100, 'CR-01 evil pattern ' + evilPatterns[ei] + ' returns fast (no backtracking freeze), got ' + dt + 'ms');
+    }
+    // legit patterns must STILL compile + match (the detector must not over-reject)
+    check(evaluate(snap({ kind: 'regex', pattern: '((ab)+)' }, 'seed', 'seed', false), reported('abab'), NOW).outcome === 'fired',
+      'CR-01 legit single-nested ((ab)+) still matches (not over-rejected)');
+    check(evaluate(snap({ kind: 'regex', pattern: 'https?://' }, 'seed', 'seed', false), reported('http://x'), NOW).outcome === 'fired',
+      'CR-01 legit https?:// still matches');
+    check(evaluate(snap({ kind: 'regex', pattern: '\\d{3}-\\d{4}' }, 'seed', 'seed', false), reported('123-4567'), NOW).outcome === 'fired',
+      'CR-01 legit \\d{3}-\\d{4} still matches');
+    // WR-02: a $-anchored pattern against TRUNCATED text must not fire on the cut boundary
+    var longText = new Array(20002).join('Y') + 'Z'; // > 10000 cap; real end is Z
+    check(evaluate(snap({ kind: 'regex', pattern: 'Y$' }, 'seed', 'seed', false), reported(longText), NOW).outcome !== 'fired',
+      'WR-02 /Y$/ on truncated text does not false-fire on the artificial cut boundary');
+    // WR-01: a missing extractor must fail CLOSED for string kinds too
+    var savedExtractor = globalThis.FsbValueExtractor;
+    try {
+      globalThis.FsbValueExtractor = undefined;
+      check(evaluate(snap({ kind: 'changed' }, 'old-price-99', 'old-price-99', false), reported('old-price-99'), NOW).outcome !== 'fired',
+        'WR-01 changed does not spuriously fire when the extractor is absent (fails closed)');
+    } finally {
+      globalThis.FsbValueExtractor = savedExtractor;
+    }
+  }
+
+  // ====================================================================
   console.log('');
   console.log('trigger-manager.test: ' + passed + ' passed, ' + failed + ' failed');
   if (failed > 0) {

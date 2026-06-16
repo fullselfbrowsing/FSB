@@ -231,6 +231,22 @@ function numEq(actual, expected) {
     check(r === '50', "extract:'number' -> '50' (raw text; parse at compare site)");
   })();
 
+  // 21. REGRESSION (Phase 15 code review WR-03): a decimal_separator override that
+  //     COLLIDES with the locale group separator must WIN -- the group strip must
+  //     not eat the override character first. '1,5' en-US + decimal_separator ','
+  //     parses to 1.5, not 15.
+  (function () {
+    const r = parseLocaleNumber('1,5', { locale: 'en-US', decimal_separator: ',' });
+    check(r && r.value === 1.5, "WR-03 '1,5' en-US decimal_separator ',' -> 1.5 (override wins over group strip)");
+  })();
+
+  // 22. REGRESSION (Phase 15 code review WR-04): a malformed multi-decimal value
+  //     must be parse_error, not a silent parseFloat truncation ('1.2.3' -> 1.2).
+  (function () {
+    const r = parseLocaleNumber('1.2.3', { locale: 'en-US' });
+    check(r && r.error === 'parse_error', "WR-04 '1.2.3' -> parse_error (no silent truncation to 1.2)");
+  })();
+
   console.log('\n--- Phase 15 plan 01 value-extractor summary ---');
   console.log('  passed:', passed);
   console.log('  failed:', failed);

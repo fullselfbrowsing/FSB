@@ -82,28 +82,100 @@
 
   // ---- Regex ReDoS guard (D-08) --------------------------------------------
   //
-  // The pattern-length cap and the candidate-text-length cap are the HARD CPU
-  // bound (a synchronous match blocks the single SW thread, so there is no sound
-  // way to time-box it -- the length caps ARE the guarantee). The evil-shape
-  // heuristic is defense-in-depth (static super-linear-backtracking detection is
-  // provably incomplete -- that is accepted). A rejected or syntactically-invalid
-  // pattern yields a distinct pattern_error -- never a silent pass, never a NaN
-  // fire. Patterns are compiled once and cached by their raw string.
+  // The regex condition compiles a CALLER-SUPPLIED pattern and runs .test()
+  // against UNTRUSTED page text on the single, synchronous SW thread -- a
+  // catastrophic-backtracking pattern would freeze the whole extension, and a
+  // synchronous .test() cannot be time-boxed. Defense, in layers:
+  //   1. hasNestedQuantifier(): a paren-aware structural walk that REJECTS the
+  //      exponential-backtracking class at compile time -- a quantifier (+ * {n,})
+  //      applied to a group that itself contains a quantifier or an alternation
+  //      (e.g. (a+)+, ((a+))+, (a{1,}){1,}, (a|a)*). This is the load-bearing
+  //      guard: exponential blowup needs only ~30 chars, so NO input-length cap
+  //      can bound it -- only rejecting the pattern shape can. The earlier
+  //      paren-blind regex heuristic missed ((a+))+ and {n,} forms (CR-01).
+  //   2. EVIL_SHAPES: a fast pre-filter for adjacent unbounded quantifiers
+  //      (.*.*), a POLYNOMIAL shape that the length caps below DO bound.
+  //   3. PATTERN_MAX_LEN + the candidate-text-length caps: bound polynomial
+  //      backtracking work; they do NOT bound exponential blowup (layer 1 does).
+  // A rejected or syntactically-invalid pattern yields a distinct pattern_error --
+  // never a silent pass, never a NaN fire. Patterns are compiled once and cached.
+  // RESIDUAL RISK: static detection cannot be PROVEN complete; a hard guarantee
+  // for arbitrary caller regex would require an off-thread, killable match
+  // (offscreen document + watchdog timer), tracked for a future phase.
 
   var PATTERN_MAX_LEN = 1000;          // longest legitimately-expected pattern
   var TEXT_MAX_LEN_ELEMENT = 10000;    // element-text candidate cap
   var TEXT_MAX_LEN_PAGE = 100000;      // whole-page candidate cap (multi-element)
   var _regexCache = new Map();         // raw pattern string -> compiled RegExp
 
-  // Static evil-shape heuristic. Each entry flags a known catastrophic-
-  // backtracking silhouette: a nested quantifier such as (a+)+ / (a*)*, an
-  // alternation under a quantifier such as (a|a)* / (a|b)+, and adjacent
-  // unbounded quantifiers such as .*.* / .+.+.
+  // Fast pre-filter for adjacent unbounded quantifiers (.*.* / .+.+) -- a
+  // POLYNOMIAL silhouette bounded by the text caps. Nested quantifiers and
+  // alternation-under-quantifier (the EXPONENTIAL class) are handled structurally
+  // by hasNestedQuantifier() below, which is paren-aware and {n,}-aware.
   var EVIL_SHAPES = [
-    /\([^)]*[+*]\)[+*]/,              // nested quantifier
-    /\([^)]*\|[^)]*\)[+*]/,          // alternation under a quantifier
     /[.][*+][.][*+]/                 // adjacent unbounded quantifiers
   ];
+
+  /**
+   * Paren-aware structural detector for the exponential-backtracking class.
+   * Walks the pattern tracking, per open group, whether the group body already
+   * contains a quantifier (+ * {) or an alternation (|). When a group closes and
+   * is immediately quantified while its body had a quantifier/alternation, the
+   * pattern can backtrack exponentially -- reject it. A closed group that was
+   * itself quantified or contained one propagates that fact to its PARENT group,
+   * so ((a+))+ is caught even though the inner group is not directly quantified.
+   * Character classes [...] are skipped (their | + { are literal). '?' is NOT a
+   * trigger -- it is bounded (0 or 1) and does not drive catastrophic blowup.
+   */
+  function hasNestedQuantifier(pattern) {
+    var groups = [];          // stack: per open '(' -> body had a quantifier/alternation
+    var inClass = false;      // inside a [...] character class
+    var i = 0;
+    var n = pattern.length;
+    while (i < n) {
+      var ch = pattern[i];
+      if (ch === '\\') { i += 2; continue; }            // skip escaped char
+      if (inClass) { if (ch === ']') inClass = false; i++; continue; }
+      if (ch === '[') { inClass = true; i++; continue; }
+      if (ch === '(') { groups.push(false); i++; continue; }
+      if (ch === '|') { if (groups.length) groups[groups.length - 1] = true; i++; continue; }
+      if (ch === ')') {
+        var innerHadQuant = groups.length ? groups.pop() : false;
+        var next = pattern[i + 1];
+        var quantified = (next === '+' || next === '*' || next === '{');
+        if (quantified && innerHadQuant) return true;   // nested / alternation under quantifier
+        // The closed group is a token in its parent. If it was quantified OR
+        // contained a quantifier/alternation, the parent now "contains a quantifier".
+        if (groups.length && (quantified || innerHadQuant)) groups[groups.length - 1] = true;
+        i++;
+        continue;
+      }
+      if (ch === '+' || ch === '*' || ch === '{') {
+        if (groups.length) groups[groups.length - 1] = true;
+        i++;
+        continue;
+      }
+      i++;
+    }
+    return false;
+  }
+
+  /**
+   * True if the pattern contains an unescaped end anchor ($) outside a character
+   * class. Used to refuse matching an end-anchored pattern against TRUNCATED text,
+   * where $ would bind the artificial cut boundary instead of the real end (WR-02).
+   */
+  function _hasUnescapedEndAnchor(pattern) {
+    var inClass = false;
+    for (var i = 0; i < pattern.length; i++) {
+      var ch = pattern[i];
+      if (ch === '\\') { i++; continue; }
+      if (inClass) { if (ch === ']') inClass = false; continue; }
+      if (ch === '[') { inClass = true; continue; }
+      if (ch === '$') return true;
+    }
+    return false;
+  }
 
   /**
    * Validate + compile a caller pattern. Returns { re } on success or
@@ -124,6 +196,9 @@
       if (EVIL_SHAPES[i].test(pattern)) {
         return { error: 'pattern_error', reason: 'evil_shape' };
       }
+    }
+    if (hasNestedQuantifier(pattern)) {
+      return { error: 'pattern_error', reason: 'nested_quantifier' };
     }
     if (_regexCache.has(pattern)) {
       return { re: _regexCache.get(pattern) };
@@ -147,8 +222,18 @@
     var g = guardAndCompile(pattern);
     if (g.error) return g;
     var limit = (typeof maxLen === 'number' && maxLen > 0) ? maxLen : TEXT_MAX_LEN_ELEMENT;
-    var bounded = (typeof text === 'string') ? text.slice(0, limit) : '';
-    return { matched: g.re.test(bounded) };
+    var str = (typeof text === 'string') ? text : '';
+    if (str.length > limit) {
+      // WR-02: slicing would let a `$` end-anchor match the artificial cut
+      // boundary (a false positive). Refuse an end-anchored pattern against
+      // truncated text rather than fire on a fabricated end; unanchored patterns
+      // are safe to bound.
+      if (_hasUnescapedEndAnchor(pattern)) {
+        return { error: 'pattern_error', reason: 'text_truncated_end_anchor' };
+      }
+      str = str.slice(0, limit);
+    }
+    return { matched: g.re.test(str) };
   }
 
   // ---- Single-condition dispatch (the six kinds, D-06) ---------------------
@@ -162,7 +247,11 @@
 
   function evaluateOne(condition, snapshot, reportedValue, opts) {
     var extractor = _getExtractor();
-    var raw = extractor ? extractor.extractValue(reportedValue, condition) : '';
+    // WR-01: a missing extractor (a tolerated importScripts failure) must fail
+    // CLOSED for EVERY kind. Otherwise `changed` sees raw='' !== baseline and
+    // fires spuriously. The numeric kinds already guarded this; do it once here.
+    if (!extractor) return { error: 'parse_error' };
+    var raw = extractor.extractValue(reportedValue, condition);
 
     switch (condition.kind) {
       case 'changed': {

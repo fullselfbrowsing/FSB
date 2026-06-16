@@ -141,6 +141,14 @@
     var groupSep = seps.group;
     var decimalSep = (opts && opts.decimal_separator) ? opts.decimal_separator : seps.decimal;
 
+    // WR-03: when the (override) decimal separator collides with the locale group
+    // separator, the decimal override must WIN. Do not strip that character as a
+    // group separator first -- that silently defeats the override (e.g. '1,5'
+    // with locale en-US + decimal_separator ',' would yield 15 instead of 1.5).
+    if (decimalSep && decimalSep === groupSep) {
+      groupSep = '';
+    }
+
     // (3) remove the group separator with a LITERAL split/join. A RegExp built
     //     from groupSep is forbidden: '.' (the de-DE group sep) is a regex
     //     metacharacter and would mis-strip.
@@ -156,6 +164,13 @@
     // (5) strip everything non-[0-9.] -- currency/crypto glyphs, '%', letters,
     //     and any residual separator characters all fall to this generic strip.
     s = s.replace(/[^0-9.]/g, '');
+
+    // (5b) WR-04: a residual with more than one '.' is malformed/ambiguous
+    //      ("1.2.3" -> parseFloat would silently truncate to 1.2). Surface
+    //      parse_error instead of letting an ambiguous value drive a comparison.
+    if ((s.match(/\./g) || []).length > 1) {
+      return { error: 'parse_error', isPercent: isPercent };
+    }
 
     // (6) parseFloat; a non-finite result is a parse_error (NEVER zero, NEVER a
     //     falsy-coalesce to a numeric fallback). This is the EXTRACT-04
