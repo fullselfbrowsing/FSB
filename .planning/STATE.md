@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.11.0
 milestone_name: Trigger Tool (Reactive DOM Monitoring)
-status: executing
-stopped_at: Completed 15-01-PLAN.md (value-extractor)
-last_updated: "2026-06-16T06:37:55.749Z"
+status: verifying
+stopped_at: Completed 15-03-PLAN.md (fire-condition engine SEAM wiring); Phase 15 complete, ready for verification
+last_updated: "2026-06-16T06:51:42.714Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 7
-  percent: 13
+  completed_plans: 8
+  percent: 25
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 Phase: 15 (fire-condition-engine-value-extraction) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-16
 
 Progress: [██████████] 100%
@@ -69,6 +69,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 14 P03 | 5min | 1 tasks | 3 files |
 | Phase 15 P01 | 7min | 2 tasks | 3 files |
 | Phase 15 P02 | 9min | 3 tasks | 4 files |
+| Phase 15 P3 | 9min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 14 Plan 03: live-Chrome MV3 SW-eviction survival (Task 2 checkpoint:human-verify) DEFERRED to milestone-end Chrome MV3 UAT per 14-VALIDATION.md Manual-Only Verifications + the v0.10.0 UAT-debt pattern; autonomous code 100% complete and committed (06a241e3), all trigger logic has deterministic Node-mock coverage.
 - [Phase ?]: Phase 15 Plan 01: value-extractor.js is a pure dual-export IIFE (FsbValueExtractor, no browser-API resolver) exposing exactly parseLocaleNumber + extractValue. parseLocaleNumber uses Intl.NumberFormat formatToParts separator discovery memoized per locale; literal split/join (never a separator-built RegExp); % kept raw with isPercent (never /100); NaN -> distinct parse_error (never 0, EXTRACT-04); decimal_separator override wins over locale (D-04). extractValue selects text|number|attribute over { text, attributes? } (EXTRACT-03/D-05) -- that shape is the Phase 16/17 watch-layer report contract.
 - [Phase ?]: Phase 15 Plan 02: trigger-manager.js evaluate(snapshot, reportedValue, now?) is STRUCTURALLY pure (D-02), proven by a brace-matched source-grep (no storage access / no chrome resolver in the evaluate() body even after the durable-local cap is added to the same file). Implements all 6 kinds + compound { combinator:'AND'|'OR', conditions[] } with error short-circuit (Pitfall 5) + edge-trigger/fire-once via persisted was_satisfied. Regex flag policy is default-flags-only (no /g lastIndex footgun); caps PATTERN_MAX_LEN=1000 / TEXT_MAX_LEN_ELEMENT=10000 / TEXT_MAX_LEN_PAGE=100000 are the hard CPU bound, EVIL_SHAPES heuristic is defense-in-depth. The inline cap (D-09) counts listArmedSnapshots() (storage-first, survives SW eviction) NOT a heap set, and serializes concurrent arms via a _withArmLock module-scope mutex (TOCTOU fix); Plan 03/Phase 18 inherit a serialized arm path.
+- [Phase ?]: Phase 15 Plan 03: the Phase-14 evaluated_noop SEAM in trigger-lifecycle.js is replaced with FsbTriggerManager.evaluate(snap, reportedValue, now) + an atomic terminal write-back -- on outcome 'fired' it sets status:'fired'+fired_at, folds next_state, writes in one writeSnapshot, then clearAlarm (disarm); on no_fire/parse_error/pattern_error it merges next_state and stays armed. The SEAM is the SOLE owner of fire-path storage I/O (D-02); evaluate() stays pure. parse_error/pattern_error NEVER write status:'fired' (EXTRACT-04). The preserved noop_terminal guard + the atomic write together give exactly-one-fire across SW eviction (D-07). reportedValue contract { text, attributes? } sourced from snap.reported_value ?? snap.last_value until Phase 16/17 supplies a live scrape. background.js loads value-extractor.js + trigger-manager.js in load-bearing order value-extractor->store->manager->lifecycle. Phase 15 closed with full automated coverage, no live-Chrome UAT. INV-01/INV-04 held.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -132,8 +134,8 @@ Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp
 
 ## Session Continuity
 
-Last session: 2026-06-16T06:37:29.417Z
-Stopped at: Completed 15-01-PLAN.md (value-extractor)
+Last session: 2026-06-16T06:51:42.709Z
+Stopped at: Completed 15-03-PLAN.md (fire-condition engine SEAM wiring); Phase 15 complete, ready for verification
 Resume file: None
 
 ## Next Actions

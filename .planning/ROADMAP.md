@@ -54,7 +54,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans (1 per wave)
 - [x] 15-01-PLAN.md — value-extractor.js (locale-aware numeric parse via Intl.formatToParts + text/number/attribute extract) + test [EXTRACT-01..04]
 - [x] 15-02-PLAN.md — trigger-manager.js (6 condition kinds + compound AND/OR + edge/fire-once/hysteresis + ReDoS-guarded regex + storage-first concurrency cap) + tests [TRIG-02..07, LIFE-04]
-- [ ] 15-03-PLAN.md — wire evaluate() into the trigger-lifecycle SEAM (atomic fired write-back) + background.js importScripts glue + extended lifecycle test [TRIG-02..07, EXTRACT-01..04, LIFE-04]
+- [x] 15-03-PLAN.md — wire evaluate() into the trigger-lifecycle SEAM (atomic fired write-back) + background.js importScripts glue + extended lifecycle test [TRIG-02..07, EXTRACT-01..04, LIFE-04]
 
 ### Phase 16: Live-Observe Watch & Analyzing Pulse
 **Goal**: A trigger can watch a live-updating element in place (no reload) via a debounced single-element MutationObserver that re-arms across SPA/BF-cache navigation, while the watched element shows a gentle "analyzing" pulse distinct from the `run_task` glow — FSB's genuine moat and the highest-risk runtime piece.
@@ -122,7 +122,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 14. Trigger Survivability Foundation | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
-| 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 2/3 | In Progress|  |
+| 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 3/3 | Complete   | 2026-06-16 |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 0/TBD | Not started | - |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 0/TBD | Not started | - |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 0/TBD | Not started | - |
