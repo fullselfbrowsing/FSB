@@ -3408,6 +3408,71 @@ function fsbTriggerIsLiveObserveSnapshot(snap) {
   return snap.watch === 'live-observe' || snap.watch === 'live_observe' || snap.mode === 'live-observe';
 }
 
+function fsbTriggerIsRefreshPollSnapshot(snap) {
+  if (!snap || snap.status !== 'armed') return false;
+  return snap.watch === 'refresh-poll' || snap.watch === 'refresh_poll' || snap.mode === 'refresh-poll';
+}
+
+function fsbTriggerValidateRefreshPollOwnership(snap) {
+  const tabId = Number(snap && snap.target_tab_id);
+  const rawAgentId = snap && snap.agent_id;
+  const agentId = (typeof rawAgentId === 'string') ? rawAgentId.trim() : '';
+  const base = {
+    requestedTabId: Number.isFinite(tabId) ? tabId : snap && snap.target_tab_id,
+    requestingAgentId: agentId || rawAgentId || null
+  };
+
+  if (!Number.isFinite(tabId)) {
+    return Object.assign({ ok: false, code: 'INVALID_TAB_ID' }, base);
+  }
+  if (!agentId) {
+    return Object.assign({ ok: false, code: 'AGENT_NOT_REGISTERED' }, base, {
+      requestedTabId: tabId,
+      requestingAgentId: agentId || null
+    });
+  }
+
+  const registry = globalThis && globalThis.fsbAgentRegistryInstance;
+  if (!registry) {
+    return Object.assign({ ok: false, code: 'AGENT_REGISTRY_UNAVAILABLE' }, base, {
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    });
+  }
+
+  if (typeof registry.hasAgent === 'function' && registry.hasAgent(agentId) === false) {
+    return {
+      ok: false,
+      code: 'AGENT_NOT_REGISTERED',
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  const owner = (typeof registry.getOwner === 'function') ? registry.getOwner(tabId) : null;
+  if (owner && owner !== agentId) {
+    return {
+      ok: false,
+      code: 'TAB_NOT_OWNED',
+      ownerAgentId: owner,
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  if (typeof registry.isOwnedBy === 'function' && registry.isOwnedBy(tabId, agentId, snap && snap.ownership_token) === false) {
+    return {
+      ok: false,
+      code: 'TAB_NOT_OWNED',
+      ownerAgentId: owner || null,
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  return { ok: true, tabId, agentId, registry };
+}
+
 function fsbTriggerExtractKind(snap) {
   const condition = snap && snap.condition && typeof snap.condition === 'object' ? snap.condition : {};
   return snap.extract || condition.extract || 'text';
