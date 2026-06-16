@@ -578,22 +578,27 @@ function evaluateOne(condition, snapshot, reportedValue, opts) {
 
 **Note:** All five are LOW/MEDIUM internal-structure or boundary-tuning assumptions explicitly delegated to the planner by CONTEXT's "Claude's Discretion" section. No *locked decision* is assumed -- the spine (D-01..D-09) is fully grounded in verified codebase reads and the verified `Intl` recipe.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three are non-blocking and are carried into the plans as concrete, unit-tested decisions. None gated planning.
 
 1. **`reportedValue` shape contract with Phase 16/17**
    - What we know: `evaluate()` consumes a reported value; Phase 15 does not scrape (D-02). The natural shape is `{ text, attributes? }` (A1).
    - What's unclear: whether Phase 16/17 will report a single string or a structured object, and how `attribute` values arrive.
    - Recommendation: Phase 15 defines the `extractValue(reportedValue, descriptor)` interface it needs (`{ text, attributes }`); Phase 16/17 conform to it. Document this as the consumer contract in the P3 plan so the later watch phases inherit it. It does not block Phase 15 (tests inject the shape directly).
+   - RESOLVED: `{ text, attributes? }` adopted in plans 15-01 (`extractValue` producer) and 15-03 (SEAM constructs `{ text: snap.reported_value ?? snap.last_value }`); later watch phases conform.
 
 2. **Regex flag policy (A3)**
    - What we know: default-flag compile is safest (no `lastIndex` state).
    - What's unclear: whether any real caller needs case-insensitive (`i`) regex (note: `contains` already provides case-insensitive substring, so `i`-regex demand may be near-zero).
    - Recommendation: default-flags-only for v0.11.0; if a flag is needed, allow `i`/`m`/`s` and explicitly strip `g`/`y`. Cheap to revisit in Phase 19.
+   - RESOLVED: default-flags-only compile adopted in plan 15-02 Task 2 (acceptance asserts no `AbortController`; default-flag compile, no `/g` `lastIndex` footgun).
 
 3. **Where the snapshot is first built at arm time**
    - What we know: `trigger-lifecycle.armTrigger(snapshot)` (`:173`) is pure plumbing that persists a *fully-formed* snapshot; the manager builds it (Pattern 5).
    - What's unclear: nothing blocking -- Phase 18 wires the actual `trigger()` tool; Phase 15's `armTrigger` is the internal cap-gated builder that Phase 18 calls.
    - Recommendation: implement `TriggerManager.armTrigger(spec)` to build the snapshot (baseline capture from the reported initial value, `deadline_at = now + FSB_TRIGGER_DEFAULT_TTL_MS`, `was_satisfied:false`) and delegate persistence to the Phase-14 seam. Phase 18 calls it; Phase 15 unit-tests it against the mock.
+   - RESOLVED: `armTrigger(spec)` builder adopted in plan 15-02 Task 3 (cap-gated via `_withArmLock`, `deadline_at = now + TTL`, `was_satisfied:false`).
 
 ## Environment Availability
 
