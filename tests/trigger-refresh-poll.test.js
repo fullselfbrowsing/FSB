@@ -11,8 +11,14 @@
  * Run: node tests/trigger-refresh-poll.test.js
  */
 
+const fs = require('fs');
+const path = require('path');
+
 let passed = 0;
 let failed = 0;
+
+const ROOT = path.resolve(__dirname, '..');
+const BACKGROUND_PATH = path.join(ROOT, 'extension', 'background.js');
 
 function check(cond, msg) {
   if (cond) {
@@ -57,6 +63,21 @@ function createStorageArea(initial) {
     },
     _dump() { return Object.assign({}, store); }
   };
+}
+
+function readSource(filePath) {
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+function sourceSliceBetween(src, startNeedle, endNeedles) {
+  const start = src.indexOf(startNeedle);
+  if (start < 0) return '';
+  let end = src.length;
+  (endNeedles || []).forEach((needle) => {
+    const idx = src.indexOf(needle, start + startNeedle.length);
+    if (idx >= 0 && idx < end) end = idx;
+  });
+  return src.slice(start, end);
 }
 
 function createChromeMock() {
@@ -365,6 +386,31 @@ async function caseJitterAndDeadlineFloor() {
   });
 }
 
+async function caseOwnershipSourceGuards() {
+  console.log('\n--- Case I: refresh-poll ownership source guards ---');
+  const src = readSource(BACKGROUND_PATH);
+  const block = sourceSliceBetween(src, 'function fsbTriggerIsRefreshPollSnapshot', [
+    'async function fsbTriggerStartObserveForSnapshot',
+    'async function fsbTriggerRearmLiveObserversForTab'
+  ]);
+
+  check(/function\s+fsbTriggerIsRefreshPollSnapshot\s*\(/.test(src),
+    'I.1 fsbTriggerIsRefreshPollSnapshot helper exists');
+  check(/function\s+fsbTriggerValidateRefreshPollOwnership\s*\(/.test(src),
+    'I.2 fsbTriggerValidateRefreshPollOwnership helper exists');
+  check(/TAB_NOT_OWNED/.test(src), 'I.3 TAB_NOT_OWNED ownership rejection exists');
+  check(/hasAgent/.test(block) && /getOwner/.test(block) && /isOwnedBy/.test(block),
+    'I.4 ownership helper consults hasAgent, getOwner, and isOwnedBy');
+  check(/ownerAgentId/.test(block) && /requestedTabId/.test(block) && /requestingAgentId/.test(block),
+    'I.5 TAB_NOT_OWNED shape includes ownerAgentId, requestedTabId, and requestingAgentId');
+  check(!/sendMessageWithRetry\s*\(/.test(block),
+    'I.6 refresh-poll helper block does not call sendMessageWithRetry');
+  check(!/chrome\.tabs\.query\s*\([\s\S]{0,140}active\s*:\s*true/.test(block),
+    'I.7 refresh-poll helper block does not query active tab');
+  check(!/chrome\.tabs\.update\s*\([\s\S]{0,180}active\s*:\s*true/.test(block),
+    'I.8 refresh-poll helper block does not activate tabs');
+}
+
 (async () => {
   console.log('--- Phase 17 Plan 01: trigger refresh-poll cadence ---');
   await caseDefaultInterval();
@@ -375,6 +421,7 @@ async function caseJitterAndDeadlineFloor() {
   await caseRestoreUsesPersistedNextPoll();
   await caseRestoreRecomputesUnsafeNextPoll();
   await caseJitterAndDeadlineFloor();
+  await caseOwnershipSourceGuards();
 
   console.log('\ntrigger-refresh-poll.test: ' + passed + ' passed, ' + failed + ' failed');
   if (failed > 0) process.exit(1);
