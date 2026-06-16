@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 14: Trigger Survivability Foundation** — Storage-backed trigger registry + per-trigger alarm lifecycle that survives SW eviction and reconciles on wake/restart.
 - [ ] **Phase 15: Fire-Condition Engine & Value Extraction** — The six fire conditions + compound AND/OR, locale-aware number/text extraction, edge-fire + cap, all SW-side and unit-testable.
 - [ ] **Phase 16: Live-Observe Watch & Analyzing Pulse** — In-place single-element MutationObserver (no reload) with SPA/BF-cache re-arm, plus the gentle "analyzing" pulse on the watched element.
-- [ ] **Phase 17: Refresh-Poll Watch (Tab-Owning Background Reload)** — Alarm-driven background reload of the trigger's own tab with a 30s floor, no focus theft.
+- [x] **Phase 17: Refresh-Poll Watch (Tab-Owning Background Reload)** — Alarm-driven background reload of the trigger's own tab with a 30s floor, no focus theft. (completed 2026-06-16)
 - [ ] **Phase 18: Shared Tool Registry & Dispatcher Wiring** — Register `trigger` + 3 companions once for autopilot AND MCP; companions in the read-only bypass; watcher in background.js; INV-01 schema-lock stays green.
 - [ ] **Phase 19: MCP Tools & Blocking/Detached Reporting** — The 4 MCP `server.tool()` registrations with blocking-by-default (heartbeats + auto-convert-to-detached) and detached opt-in, returning structured notify-only fire events.
 - [ ] **Phase 20: Integration, Cap UI, Docs & Edge Cases** — Compose the full system: trigger-cap control, watch-mode conflict + reload coalescing, CHANGELOG/README docs, `fsb-mcp-server@0.10.0` bump.
@@ -132,7 +132,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 14. Trigger Survivability Foundation | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
-| 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
+| 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete    | 2026-06-16 |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 0/TBD | Not started | - |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 0/TBD | Not started | - |
 | 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 0/TBD | Not started | - |

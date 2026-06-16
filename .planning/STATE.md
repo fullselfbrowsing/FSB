@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 17-04-PLAN.md
-last_updated: "2026-06-16T18:36:46.941Z"
+stopped_at: Phase 17 complete; ready for Phase 18
+last_updated: "2026-06-16T19:01:04.880Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 8
@@ -25,13 +25,13 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 17 — Refresh-Poll Watch (Tab-Owning Background Reload)
+**Current focus:** Phase 18 — Shared Tool Registry & Dispatcher Wiring
 
 ## Current Position
 
-Phase: 17 (Refresh-Poll Watch (Tab-Owning Background Reload)) — COMPLETE
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 18
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-16
 
 Progress: [█████·····] 50% (4/8 phases)
@@ -64,7 +64,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | 14 | 3 | - | - |
 | 15 | 3 | - | - |
 | 16 | 4 | 12min | 3min |
-| 17 | 4 | 25min | 6min |
+| 17 | 4 | - | - |
 
 *Updated after each plan completion.*
 | Phase 14 P01 | 5min | 2 tasks | 4 files |
@@ -162,4 +162,4 @@ Resume file: None
 
 ## Next Actions
 
-Run Phase 17 verification, then proceed to Phase 18 shared trigger tool registry planning/execution.
+Proceed to Phase 18 shared trigger tool registry planning/execution.
