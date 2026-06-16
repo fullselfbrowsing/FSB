@@ -19,7 +19,8 @@ findings:
   warning: 4
   info: 2
   total: 7
-status: issues_found
+status: resolved
+resolution: all 5 actionable findings (CR-01 + WR-01..04) fixed in commit 12642007 with regression tests; 2 Info items deferred (v1-out-of-scope / Phase 19)
 ---
 
 # Phase 15: Code Review Report
@@ -27,7 +28,21 @@ status: issues_found
 **Reviewed:** 2026-06-16
 **Depth:** standard
 **Files Reviewed:** 10
-**Status:** issues_found
+**Status:** resolved (fixes applied in commit 12642007)
+
+## Resolution
+
+All five actionable findings were fixed during the phase-execution code-review gate and locked with regression tests (commit `12642007`):
+
+- **CR-01 (BLOCKER)** -- replaced the paren-blind evil-shape heuristic with a paren-aware, `{n,}`-aware structural `hasNestedQuantifier()` that rejects the exponential-backtracking class (`((a+))+`, `(a{1,}){1,}`, `(a|a)*`, ...) at compile time -> distinct `pattern_error`. Verified: the reviewer's exploit `((a+))+$` on a 41-char input now returns in 0ms (was >8s); legitimate patterns (`((ab)+)`, `https?://`, `\d{3}-\d{4}`) still compile and match. A residual-risk note (a hard guarantee for arbitrary caller regex needs an off-thread killable match) is documented in-code for a future phase.
+- **WR-01** -- `evaluateOne` now fails closed (`parse_error`) for ALL condition kinds when the extractor is absent, so `changed` no longer spuriously fires.
+- **WR-02** -- `regexMatches` refuses an end-anchored (`$`) pattern against truncated text instead of matching the artificial cut boundary.
+- **WR-03** -- when a `decimal_separator` override collides with the locale group separator, the override now wins (`'1,5'` en-US + `decimal_separator:','` -> `1.5`).
+- **WR-04** -- a residual with more than one `.` (`'1.2.3'`) now returns `parse_error` instead of silently truncating to `1.2`.
+
+Deferred (correctly out of v1 scope): **IN-01** (unbounded cache growth -- bounded in practice by cap 8 + SW eviction) and **IN-02** (`loadCapFromStorage()` wiring at SW bootstrap -- Phase 19 tool-surface scope).
+
+Regression coverage added: `tests/trigger-manager.test.js` (CR-01 evil + legit patterns, WR-01, WR-02) and `tests/value-extractor.test.js` (WR-03, WR-04). Full trigger family green (218 assertions).
 
 ## Summary
 
