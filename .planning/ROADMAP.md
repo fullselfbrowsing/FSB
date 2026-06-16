@@ -66,7 +66,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. While a trigger is active its watched element shows a gentle analyzing pulse (a Shadow-DOM glow variant, GPU-composited) that is visually distinct from the steady `run_task` glow, and the visual monitor labels itself "watching a trigger."
   4. The pulse clears on fire / stop / timeout / reap with no stuck glow (storage-backed clear deadline so a dead SW cannot strand it), does not collide with the `run_task` glow (one overlay owner per tab), and honors `prefers-reduced-motion` (animation off, static cue kept).
 **Plans**: 4 plans (Wave 1: 16-01, 16-02 parallel; Wave 2: 16-03, 16-04 parallel)
-- [ ] 16-01-PLAN.md — trigger-observe.js: isolated-world single-element MutationObserver (clone dom-stream, rAF→trailing-setTimeout, narrowest container) + per-batch selector re-resolve + idempotent-arm guard + disconnect-all leak test + Node-mock tests [WATCH-01, WATCH-05]
+- [x] 16-01-PLAN.md — trigger-observe.js: isolated-world single-element MutationObserver (clone dom-stream, rAF→trailing-setTimeout, narrowest container) + per-batch selector re-resolve + idempotent-arm guard + disconnect-all leak test + Node-mock tests [WATCH-01, WATCH-05]
 - [ ] 16-02-PLAN.md — analyzing pulse: ActionGlowOverlay @keyframes fsb-trigger-pulse Shadow-DOM variant (opacity/transform only, distinct from run_task glow) + reduced-motion + additive overlayState.mode='trigger-watch' label + pulse/overlay-state tests [VIS-01, VIS-02, VIS-03, VIS-04]
 - [ ] 16-03-PLAN.md — messaging.js router: 5 additive cases (triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop) wiring the observer + pulse APIs, one-overlay-per-tab gate [WATCH-01, VIS-01, VIS-03]
 - [ ] 16-04-PLAN.md — background.js SW glue: value-report onMessage ingress (writes reported_value → drives shipped Phase-15 SEAM) + idempotent watchdog alarm + SW-side full-reload re-arm + onAlarm watchdog branch + CONTENT_SCRIPT_FILES registration + test-arm path + extended SEAM test [WATCH-01, WATCH-05]
@@ -127,7 +127,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 |-------|-----------|----------------|--------|-----------|
 | 14. Trigger Survivability Foundation | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
-| 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 0/TBD | Not started | - |
+| 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 1/4 | In Progress|  |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 0/TBD | Not started | - |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 0/TBD | Not started | - |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 0/TBD | Not started | - |
