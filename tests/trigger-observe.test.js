@@ -152,12 +152,34 @@ vm.runInContext(fs.readFileSync(modulePath, 'utf8'), vm.createContext(sandbox), 
 });
 
 const triggerObserve = sandbox.module.exports;
+const messagingPath = path.join(__dirname, '..', 'extension', 'content', 'messaging.js');
+const messagingSource = fs.readFileSync(messagingPath, 'utf8');
+
+function triggerReadBlock() {
+  const caseIndex = messagingSource.indexOf("case 'triggerRead':");
+  assert.notEqual(caseIndex, -1, 'triggerRead case exists in messaging.js');
+  const returnIndex = messagingSource.indexOf('return true;', caseIndex);
+  assert.notEqual(returnIndex, -1, 'triggerRead case keeps async return true');
+  return messagingSource.slice(caseIndex, returnIndex + 'return true;'.length);
+}
 
 function invokeWindowEvent(type, event) {
   (windowListeners[type] || []).forEach((fn) => fn(event || {}));
 }
 
 console.log('--- Phase 16 Plan 01: trigger-observe content module ---');
+
+check('triggerRead returns ELEMENT_NOT_FOUND before value extraction', () => {
+  const block = triggerReadBlock();
+  const missingIndex = block.indexOf('ELEMENT_NOT_FOUND');
+  const readIndex = block.indexOf('readValue');
+  assert.notEqual(missingIndex, -1, 'ELEMENT_NOT_FOUND branch present');
+  assert.match(block, /reason\s*:\s*['"]element_not_found['"]/, 'typed element_not_found reason present');
+  assert.notEqual(readIndex, -1, 'readValue call still present for successful reads');
+  assert.ok(missingIndex < readIndex, 'missing-element branch appears before readValue extraction');
+  assert.match(block, /success\s*:\s*true/, 'success path remains typed as success true');
+  assert.match(block, /ok\s*:\s*true/, 'success path remains typed as ok true');
+});
 
 check('optsFor text/number observes childList + characterData + subtree only', () => {
   assert.deepEqual(plain(triggerObserve.optsFor('text')), { childList: true, characterData: true, subtree: true });
