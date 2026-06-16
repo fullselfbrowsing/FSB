@@ -3695,12 +3695,24 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
   }
 
   const ownership = fsbTriggerValidateRefreshPollOwnership(snap);
-  if (!ownership || ownership.ok !== true) return ownership;
+  if (!ownership || ownership.ok !== true) {
+    return fsbTriggerMarkRefreshPollAttention(
+      triggerId,
+      snap,
+      'ownership_failed',
+      ownership || { code: 'OWNERSHIP_VALIDATION_FAILED' }
+    );
+  }
   const tabId = ownership.tabId;
   const registry = ownership.registry;
 
   if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
-    return { ok: false, code: 'TABS_UNAVAILABLE', requestedTabId: tabId, requestingAgentId: ownership.agentId };
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: 'TABS_UNAVAILABLE',
+      requestedTabId: tabId,
+      requestingAgentId: ownership.agentId
+    });
   }
 
   const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
@@ -3715,16 +3727,25 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
     } catch (_err) { /* best-effort navigation stamp */ }
   }
 
-  await chrome.tabs.reload(tabId);
-  await fsbTriggerWaitForRefreshPollReady(tabId);
+  let readResult;
+  try {
+    await chrome.tabs.reload(tabId);
+    await fsbTriggerWaitForRefreshPollReady(tabId);
 
-  const postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
-  if (postReloadTab && postReloadTab.blocked) {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
-      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    const postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+    if (postReloadTab && postReloadTab.blocked) {
+      return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    }
+
+    readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  } catch (err) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      error: err && err.message ? err.message : String(err)
+    });
   }
 
-  const readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
   if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
     return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
       fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
@@ -3806,6 +3827,19 @@ async function fsbTriggerHandleRefreshPollAlarm(alarm) {
     const result = await fsbTriggerRunRefreshPollTick(triggerId, snap);
     return Object.assign({ handled: true }, result || {});
   } catch (err) {
+    try {
+      if (typeof FsbTriggerStore !== 'undefined'
+          && FsbTriggerStore
+          && typeof FsbTriggerStore.readSnapshot === 'function'
+          && typeof FsbTriggerStore.writeSnapshot === 'function') {
+        const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+        if (fsbTriggerIsRefreshPollSnapshot(latestSnap)) {
+          await fsbTriggerMarkRefreshPollAttention(triggerId, latestSnap, 'refresh_poll_failed', {
+            error: err && err.message ? err.message : String(err)
+          });
+        }
+      }
+    } catch (_markErr) { /* preserve the original failure result */ }
     return {
       handled: true,
       ok: false,
