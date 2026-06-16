@@ -91,7 +91,7 @@ None - stub scan found only pre-existing source initializers, placeholder select
 
 ## Verification
 
-- `node tests/trigger-observe.test.js` failed before implementation with `ELEMENT_NOT_FOUND branch present`, confirming the RED gate.
+- `node tests/trigger-observe.test.js` produced the expected RED gate before implementation with `ELEMENT_NOT_FOUND branch present`.
 - `node --check extension/content/messaging.js` - passed.
 - `node tests/trigger-observe.test.js` - passed, 11/11 assertions.
 - `node --check extension/content/messaging.js && node tests/trigger-observe.test.js` - passed.
@@ -103,7 +103,7 @@ None - stub scan found only pre-existing source initializers, placeholder select
 
 ## TDD Gate Compliance
 
-PASS - `test(17-02)` commit `6cfb2040` precedes `feat(17-02)` commit `94eaa161`, and the test failed for the intended missing `ELEMENT_NOT_FOUND` invariant before implementation.
+PASS - `test(17-02)` commit `6cfb2040` precedes `feat(17-02)` commit `94eaa161`, and the test demonstrated the intended missing `ELEMENT_NOT_FOUND` invariant before implementation.
 
 ## Self-Check: PASSED
 
