@@ -3627,6 +3627,319 @@ async function fsbTriggerSendRefreshPollRead(tabId, snap) {
   }, { frameId: 0 });
 }
 
+function fsbTriggerFirstString() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function fsbTriggerFirstFiniteTabId() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = Number(arguments[i]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function fsbTriggerReadSnapshotAgentId(snap) {
+  return fsbTriggerFirstString(
+    snap && snap.agent_id,
+    snap && snap.agentId
+  );
+}
+
+function fsbTriggerReadSnapshotOwnershipToken(snap) {
+  return fsbTriggerFirstString(
+    snap && snap.ownership_token,
+    snap && snap.ownershipToken
+  );
+}
+
+function fsbTriggerReadRegistryOwner(registry, tabId) {
+  if (!registry || !Number.isFinite(Number(tabId))) return null;
+  try {
+    if (typeof registry.findAgentByTabId === 'function') {
+      const found = registry.findAgentByTabId(Number(tabId));
+      if (typeof found === 'string' && found) return found;
+      if (found && typeof found === 'object') {
+        const fromFound = fsbTriggerFirstString(found.agentId, found.agent_id);
+        if (fromFound) return fromFound;
+      }
+    }
+  } catch (_err) { /* fall through to getOwner */ }
+  try {
+    if (typeof registry.getOwner === 'function') {
+      return fsbTriggerFirstString(registry.getOwner(Number(tabId)));
+    }
+  } catch (_err) { /* best-effort owner read */ }
+  return null;
+}
+
+function fsbTriggerReadRegistryOwnershipToken(registry, tabId) {
+  if (!registry || !Number.isFinite(Number(tabId)) || typeof registry.getTabMetadata !== 'function') return null;
+  try {
+    const meta = registry.getTabMetadata(Number(tabId));
+    return fsbTriggerFirstString(meta && meta.ownershipToken, meta && meta.ownership_token);
+  } catch (_err) {
+    return null;
+  }
+}
+
+function fsbTriggerAccessDeniedContext(base, extra) {
+  return Object.assign({
+    source: base && base.source,
+    tabId: base && base.tabId,
+    agentId: base && base.agentId,
+    ownershipToken: base && base.ownershipToken,
+    accessDenied: true,
+    errorCode: 'TRIGGER_ACCESS_DENIED'
+  }, extra || {});
+}
+
+async function fsbTriggerOwnerContext(payload, sender) {
+  const input = (payload && typeof payload === 'object') ? payload : {};
+  const source = fsbTriggerFirstString(input.source) || 'unknown';
+  const tabId = fsbTriggerFirstFiniteTabId(
+    input.tabId,
+    input.tab_id,
+    input.target_tab_id,
+    sender && sender.tab && sender.tab.id
+  );
+
+  if (source === 'autopilot') {
+    const base = { source, tabId, agentId: null, ownershipToken: null };
+    if (!Number.isFinite(Number(tabId))) return base;
+
+    const registry = globalThis && globalThis.fsbAgentRegistryInstance;
+    if (!registry) return Object.assign(base, { registry: null });
+
+    let ownerAgentId = fsbTriggerReadRegistryOwner(registry, tabId);
+    if (ownerAgentId && ownerAgentId !== 'legacy:autopilot') {
+      return fsbTriggerAccessDeniedContext(Object.assign(base, { agentId: 'legacy:autopilot' }), {
+        ownerAgentId,
+        requestedTabId: tabId,
+        requestingAgentId: 'legacy:autopilot'
+      });
+    }
+
+    let ownershipToken = fsbTriggerReadRegistryOwnershipToken(registry, tabId);
+    if (!ownerAgentId
+        && typeof registry.getOrRegisterLegacyAgent === 'function'
+        && typeof registry.bindTab === 'function') {
+      try {
+        const legacy = await registry.getOrRegisterLegacyAgent('autopilot');
+        const legacyAgentId = fsbTriggerFirstString(legacy && legacy.agentId, legacy && legacy.agent_id);
+        if (legacyAgentId) {
+          const bindResult = await registry.bindTab(legacyAgentId, Number(tabId));
+          if (bindResult === false) {
+            ownerAgentId = fsbTriggerReadRegistryOwner(registry, tabId);
+            if (ownerAgentId && ownerAgentId !== legacyAgentId) {
+              return fsbTriggerAccessDeniedContext(Object.assign(base, { agentId: legacyAgentId }), {
+                ownerAgentId,
+                requestedTabId: tabId,
+                requestingAgentId: legacyAgentId
+              });
+            }
+          } else {
+            ownerAgentId = fsbTriggerFirstString(bindResult && bindResult.agentId, legacyAgentId);
+            ownershipToken = fsbTriggerFirstString(bindResult && bindResult.ownershipToken, ownershipToken);
+          }
+        }
+      } catch (_err) { /* best-effort legacy bind */ }
+    }
+
+    if (!ownerAgentId) ownerAgentId = fsbTriggerReadRegistryOwner(registry, tabId) || 'legacy:autopilot';
+    ownershipToken = fsbTriggerFirstString(ownershipToken, fsbTriggerReadRegistryOwnershipToken(registry, tabId));
+    return { source, tabId: Number(tabId), agentId: ownerAgentId, ownershipToken, registry };
+  }
+
+  return {
+    source,
+    tabId,
+    agentId: fsbTriggerFirstString(input.agentId, input.agent_id),
+    ownershipToken: fsbTriggerFirstString(input.ownershipToken, input.ownership_token)
+  };
+}
+
+function fsbTriggerSnapshotVisibleToContext(snap, context) {
+  if (!snap || typeof snap !== 'object') return false;
+  if (context && context.accessDenied) return false;
+
+  const snapshotAgentId = fsbTriggerReadSnapshotAgentId(snap);
+  const contextAgentId = fsbTriggerFirstString(context && context.agentId, context && context.agent_id);
+  if (!snapshotAgentId || !contextAgentId) return true;
+  if (snapshotAgentId !== contextAgentId) return false;
+
+  const snapshotToken = fsbTriggerReadSnapshotOwnershipToken(snap);
+  const contextToken = fsbTriggerFirstString(context && context.ownershipToken, context && context.ownership_token);
+  if (snapshotToken && !contextToken) return false;
+  if (snapshotToken && contextToken && snapshotToken !== contextToken) return false;
+  return true;
+}
+
+function fsbTriggerProjectFiniteDuration(from, to) {
+  const start = Number(from);
+  const end = Number(to);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.max(0, Math.floor(end - start));
+}
+
+function fsbTriggerProjectRemaining(deadlineAt, now) {
+  const deadline = Number(deadlineAt);
+  const baseNow = Number(now);
+  if (!Number.isFinite(deadline) || !Number.isFinite(baseNow)) return null;
+  return Math.max(0, Math.floor(deadline - baseNow));
+}
+
+function fsbTriggerProjectCurrentValue(snap) {
+  if (!snap || typeof snap !== 'object') return null;
+  if (snap.reported_value !== undefined && snap.reported_value !== null) return snap.reported_value;
+  if (snap.last_value !== undefined && snap.last_value !== null) return snap.last_value;
+  return snap.baseline !== undefined ? snap.baseline : null;
+}
+
+function fsbTriggerProjectTriggerStatus(snap, now) {
+  const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  return {
+    trigger_id: snap && snap.trigger_id,
+    status: snap && snap.status,
+    watch: snap && (snap.watch || snap.mode || null),
+    condition: snap && snap.condition,
+    target_tab_id: snap && snap.target_tab_id,
+    agent_id: fsbTriggerReadSnapshotAgentId(snap),
+    initial_value: snap && snap.baseline !== undefined ? snap.baseline : null,
+    current_value: fsbTriggerProjectCurrentValue(snap),
+    armed_at: snap && snap.armed_at,
+    elapsed_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
+    remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
+    last_evaluated_at: snap && snap.last_evaluated_at,
+    last_reported_at: snap && snap.last_reported_at,
+    attention_reason: snap && snap.attention_reason,
+    last_attention: snap && snap.last_attention
+  };
+}
+
+function fsbTriggerProjectTriggerSummary(snap, now) {
+  const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  return {
+    trigger_id: snap && snap.trigger_id,
+    status: snap && snap.status,
+    watch: snap && (snap.watch || snap.mode || null),
+    agent_id: fsbTriggerReadSnapshotAgentId(snap),
+    target_tab_id: snap && snap.target_tab_id,
+    age_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
+    remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
+    last_evaluated_at: snap && snap.last_evaluated_at,
+    last_reported_at: snap && snap.last_reported_at,
+    attention_reason: snap && snap.attention_reason
+  };
+}
+
+function fsbTriggerNormalizeListStatuses(params) {
+  const input = params && (params.statuses || params.status);
+  if (Array.isArray(input)) {
+    const filtered = input.map((value) => fsbTriggerFirstString(value)).filter(Boolean);
+    if (filtered.length) return new Set(filtered);
+  }
+  const one = fsbTriggerFirstString(input);
+  if (one) return new Set([one]);
+  return new Set(['armed', 'needs_attention', 'blocked']);
+}
+
+function fsbTriggerMergeParamsAndContext(params, context) {
+  return Object.assign({}, params || {}, context || {});
+}
+
+async function fsbTriggerHandleToolStatus(params, context) {
+  const triggerId = fsbTriggerFirstString(params && params.trigger_id);
+  if (!triggerId) {
+    return { success: false, errorCode: 'INVALID_TRIGGER_ID' };
+  }
+
+  let ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(params, context),
+    context && context.sender
+  );
+  if (ownerContext && ownerContext.accessDenied) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: triggerId };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', trigger_id: triggerId };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap) {
+    return { success: false, errorCode: 'TRIGGER_NOT_FOUND', trigger_id: triggerId };
+  }
+
+  if (ownerContext
+      && ownerContext.source === 'autopilot'
+      && !Number.isFinite(Number(ownerContext.tabId))
+      && Number.isFinite(Number(snap.target_tab_id))) {
+    ownerContext = await fsbTriggerOwnerContext(
+      fsbTriggerMergeParamsAndContext(Object.assign({}, params || {}, { target_tab_id: snap.target_tab_id }), context),
+      context && context.sender
+    );
+  }
+
+  if (!fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: triggerId };
+  }
+
+  return { success: true, status: fsbTriggerProjectTriggerStatus(snap, Date.now()) };
+}
+
+async function fsbTriggerHandleToolList(params, context) {
+  let ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(params, context),
+    context && context.sender
+  );
+  if (ownerContext && ownerContext.accessDenied) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', triggers: [] };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.hydrate !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', triggers: [] };
+  }
+
+  const wanted = fsbTriggerNormalizeListStatuses(params);
+  const envelope = await FsbTriggerStore.hydrate();
+  const records = (envelope && envelope.records && typeof envelope.records === 'object') ? envelope.records : {};
+  const now = Date.now();
+  const triggers = [];
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const snap = records[keys[i]];
+    if (!snap || !wanted.has(snap.status)) continue;
+
+    let perSnapshotContext = ownerContext;
+    if (ownerContext
+        && ownerContext.source === 'autopilot'
+        && !Number.isFinite(Number(ownerContext.tabId))
+        && Number.isFinite(Number(snap.target_tab_id))) {
+      perSnapshotContext = await fsbTriggerOwnerContext(
+        fsbTriggerMergeParamsAndContext(Object.assign({}, params || {}, { target_tab_id: snap.target_tab_id }), context),
+        context && context.sender
+      );
+      if (perSnapshotContext && perSnapshotContext.accessDenied) continue;
+    }
+
+    if (fsbTriggerSnapshotVisibleToContext(snap, perSnapshotContext)) {
+      triggers.push(fsbTriggerProjectTriggerSummary(snap, now));
+    }
+  }
+  return { success: true, triggers };
+}
+
+globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList };
+
 async function fsbTriggerGetRefreshPollTabState(tabId) {
   if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
     return { blocked: false, url: '' };

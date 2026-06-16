@@ -51,8 +51,9 @@ function functionSource(src, fnName) {
 
 function loadToolHandlers(extraGlobals) {
   const src = readSource(BACKGROUND_PATH);
-  const start = src.indexOf('function fsbTriggerOwnerContext');
-  assert.ok(start >= 0, 'fsbTriggerOwnerContext exists in background.js');
+  const start = src.indexOf('function fsbTriggerFirstString');
+  assert.ok(start >= 0, 'trigger helper block exists in background.js');
+  assert.ok(src.includes('async function fsbTriggerOwnerContext'), 'fsbTriggerOwnerContext exists in background.js');
   const marker = 'globalThis.fsbTriggerToolHandlersForTest';
   const markerIndex = src.indexOf(marker, start);
   assert.ok(markerIndex > start, 'test-only trigger tool handler bundle exists');
@@ -149,7 +150,7 @@ async function caseListDefaultsToActiveAttentionStates() {
   });
   const result = await handlers.fsbTriggerHandleToolList({}, {});
   assert.strictEqual(result.success, true, 'list succeeds');
-  assert.deepStrictEqual(result.triggers.map(t => t.trigger_id).sort(), ['active', 'attention', 'blocked'], 'default list returns active and attention states only');
+  assert.deepStrictEqual(Array.from(result.triggers.map(t => t.trigger_id).sort()), ['active', 'attention', 'blocked'], 'default list returns active and attention states only');
 }
 
 async function caseCrossAgentStatusRejected() {
