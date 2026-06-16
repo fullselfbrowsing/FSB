@@ -3610,6 +3610,36 @@ async function fsbTriggerSendRefreshPollRead(tabId, snap) {
   }, { frameId: 0 });
 }
 
+async function fsbTriggerGetRefreshPollTabState(tabId) {
+  if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
+    return { blocked: false, url: '' };
+  }
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab && (typeof tab.url === 'string' ? tab.url : (typeof tab.pendingUrl === 'string' ? tab.pendingUrl : ''));
+    if (!url || isRestrictedURL(url)) {
+      return { blocked: true, blocked_reason: 'restricted_url', url: url || '' };
+    }
+    return { blocked: false, url };
+  } catch (err) {
+    return {
+      blocked: true,
+      blocked_reason: 'restricted_url',
+      url: '',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+function fsbTriggerBuildBlockedAttention(snap, blockedReason, url, extra) {
+  return Object.assign({
+    selector: snap && snap.selector,
+    code: 'TRIGGER_PAGE_BLOCKED',
+    blocked_reason: blockedReason || 'challenge',
+    url: typeof url === 'string' ? url : ''
+  }, extra || {});
+}
+
 async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra) {
   if (!triggerId || typeof triggerId !== 'string') {
     return { ok: false, reason: 'invalid_trigger_id' };
@@ -3618,7 +3648,11 @@ async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra
     return { ok: false, reason: 'store_unavailable' };
   }
   const now = Date.now();
-  snap.status = reason === 'blocked' ? 'blocked' : 'needs_attention';
+  if (reason === 'blocked') {
+    snap.status = 'blocked';
+  } else {
+    snap.status = 'needs_attention';
+  }
   snap.attention_reason = reason;
   snap.attention_at = now;
   snap.last_attention = Object.assign({ reason, at: now }, extra || {});
@@ -3652,6 +3686,12 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
     return { ok: false, code: 'TABS_UNAVAILABLE', requestedTabId: tabId, requestingAgentId: ownership.agentId };
   }
 
+  const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  if (preReloadTab && preReloadTab.blocked) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', preReloadTab.url, { error: preReloadTab.error }));
+  }
+
   if (registry && typeof registry.stampAgentNavigation === 'function') {
     try {
       registry.stampAgentNavigation(tabId);
@@ -3661,9 +3701,19 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
   await chrome.tabs.reload(tabId);
   await fsbTriggerWaitForRefreshPollReady(tabId);
 
+  const postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  if (postReloadTab && postReloadTab.blocked) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+  }
+
   const readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
+  }
   if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector });
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector, code: 'ELEMENT_NOT_FOUND' });
   }
   if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
     return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {

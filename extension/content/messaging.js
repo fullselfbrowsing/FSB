@@ -67,6 +67,29 @@
     }
   }
 
+  function fsbClassifyTriggerReadBlockedPage() {
+    const href = (window.location && window.location.href) ? String(window.location.href) : '';
+    const title = (document && document.title) ? String(document.title) : '';
+    const haystack = (href + ' ' + title).toLowerCase();
+
+    if (/\/(login|signin|auth|challenge)(\/|[?#:]|$)/i.test(href) || /(captcha|challenge|verify)/i.test(haystack)) {
+      return { blocked_reason: haystack.includes('captcha') ? 'captcha' : (haystack.includes('challenge') || haystack.includes('verify') ? 'challenge' : 'login') };
+    }
+
+    try {
+      if (document.querySelector('input[type="password"]')) {
+        return { blocked_reason: 'login' };
+      }
+      if (document.querySelector('.g-recaptcha, [data-sitekey], iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare.com"], .cf-turnstile')) {
+        return { blocked_reason: 'captcha' };
+      }
+    } catch (_err) {
+      return null;
+    }
+
+    return null;
+  }
+
   // Handle messages from parent frame for coordinated DOM extraction
   window.addEventListener('message', (event) => {
     // Only process FSB-specific messages
@@ -1283,6 +1306,18 @@
             const reader = FSB.triggerObserve && FSB.triggerObserve['read' + 'Value'];
             if (!FSB.triggerObserve || typeof reader !== 'function') {
               sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            const blockedPage = fsbClassifyTriggerReadBlockedPage();
+            if (blockedPage) {
+              sendResponse({
+                success: false,
+                ok: false,
+                code: 'TRIGGER_PAGE_BLOCKED',
+                reason: 'blocked',
+                blocked_reason: blockedPage.blocked_reason,
+                url: window.location.href
+              });
               return;
             }
             const selector = request.selector;
