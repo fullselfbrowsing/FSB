@@ -659,22 +659,27 @@ window.addEventListener('pagehide', function(e) {
 
 **If this table is empty:** it is not — 5 assumptions flagged. A1 and A2 are the load-bearing ones; the planner should confirm the SW-ingress wiring choice (A1) and the guard mechanism (A2) during plan authoring.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three resolved during planning (2026-06-16) and implemented in the Phase-16 plans; inline `RESOLVED` markers below.
 
 1. **On-report evaluate: reuse `handleTriggerAlarm` or add `evaluateReportedValue`?**
    - What we know: The SEAM (trigger-lifecycle.js:289-371) already does readSnapshot→guard→evaluate→atomic-write and reads `snap.reported_value`. Feeding it via the alarm-shaped call reuses 100% of the fire path.
    - What's unclear: Whether running the TTL-reap branch (:307) on every value report is desirable, or whether the report path should skip TTL and only check terminal+evaluate.
    - Recommendation: Default to invoking `handleTriggerAlarm` (simplest, fully reuses the dedupe). If TTL-on-every-report is unwanted, extract a sibling `evaluateReportedValue` that runs the same block minus the TTL check. Decide at plan time (A1).
+   - **RESOLVED in 16-04:** default to `handleTriggerAlarm` (full fire-path reuse, TTL-on-every-report accepted); `evaluateReportedValue` confirmed unnecessary.
 
 2. **Stable-container heuristic (`stableAncestor`).**
    - What we know: Must survive SPA re-render; D-discretion leaves it to the planner; PITFALLS.md prefers ARIA/role/`data-testid` anchors.
    - What's unclear: `parentElement` vs nearest-stable-ancestor climb vs a fixed depth — site-dependent.
    - Recommendation: Start with a small heuristic climb to the nearest ancestor with a stable id/role/`data-testid` (fall back to `parentElement`); the SW watchdog backstops a wrong guess. Confirm on real SPA fixtures in Phase 20 (A4).
+   - **RESOLVED in 16-01 (Task 1):** ≤5-ancestor climb to the nearest `id` / `[role]` / `[data-testid]` ancestor, falling back to `parentElement`/leaf; SW watchdog backstops; live-confirm deferred to Phase 20.
 
 3. **Watchdog alarm naming + re-issue policy (D-03).**
    - What we know: D-03 wants a low-freq watchdog that re-issues `triggerObserveStart` when "the observer should be running but the SW saw no recent report." The existing `fsbTrigger:<id>` alarm already exists for TTL; a SEPARATE `fsbTriggerObserveWatchdog:<id>` (periodInMinutes≥0.5) avoids overloading the TTL alarm's one-shot `when` semantics.
    - What's unclear: Whether to reuse the per-trigger `fsbTrigger:` alarm (currently one-shot `{when:deadline_at}`) or a new recurring watchdog name; and the "no recent report" staleness threshold.
    - Recommendation: Use a NEW recurring `fsbTriggerObserveWatchdog:<id>` (or a single shared one) so the TTL one-shot alarm semantics stay clean; track `last_evaluated_at` and re-issue if `now - last_evaluated_at > N×period`. The 30s alarm floor applies (Chrome 120). Planner finalizes N.
+   - **RESOLVED in 16-04 (Task 1):** new recurring `fsbTriggerObserveWatchdog:<id>` (`periodInMinutes:1`) keyed on `last_evaluated_at` staleness; the one-shot TTL `fsbTrigger:<id>` alarm is left untouched.
 
 ## Environment Availability
 

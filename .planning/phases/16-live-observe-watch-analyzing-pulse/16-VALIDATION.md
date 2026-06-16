@@ -1,8 +1,8 @@
 ---
 phase: 16
 slug: live-observe-watch-analyzing-pulse
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-16
 ---
@@ -88,11 +88,13 @@ created: 2026-06-16
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 2s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (the two new test files + extensions)
+- [x] No watch-mode flags
+- [x] Feedback latency < 2s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+> `wave_0_complete` stays `false` until execution authors `tests/trigger-observe.test.js` + `tests/trigger-observe-pulse.test.js` (Wave 1, plans 16-01/16-02).
+
+**Approval:** approved 2026-06-16 (plan-checker verified — Dimension 8 passes against plan content)
