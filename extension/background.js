@@ -3938,7 +3938,90 @@ async function fsbTriggerHandleToolList(params, context) {
   return { success: true, triggers };
 }
 
-globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList };
+function fsbTriggerCleanupOk(result) {
+  return result && result.ok === false ? false : true;
+}
+
+function fsbTriggerCleanupError(err) {
+  return err && err.message ? err.message : String(err);
+}
+
+async function fsbTriggerHandleToolStop(params, context) {
+  const triggerId = fsbTriggerFirstString(params && params.trigger_id);
+  if (!triggerId) {
+    return { success: false, errorCode: 'INVALID_TRIGGER_ID' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', trigger_id: triggerId };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap) {
+    return { success: true, stopped: false, idempotent: true, trigger_id: triggerId, status: 'not_found' };
+  }
+
+  let ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(Object.assign({}, params || {}, { target_tab_id: snap.target_tab_id }), context),
+    context && context.sender
+  );
+  if ((ownerContext && ownerContext.accessDenied) || !fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: triggerId };
+  }
+
+  const cleanup = {
+    observe: { ok: true, skipped: true },
+    watchdog: { ok: false, skipped: true },
+    lifecycle: { ok: false, skipped: true }
+  };
+
+  const terminal = snap.status === 'fired' || snap.status === 'stopped';
+  if (!terminal) {
+    try {
+      const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
+      cleanup.observe = { ok: fsbTriggerCleanupOk(observeResult), result: observeResult };
+    } catch (err) {
+      cleanup.observe = { ok: false, error: fsbTriggerCleanupError(err) };
+    }
+  }
+
+  try {
+    const watchdogResult = await fsbTriggerClearObserveWatchdog(triggerId);
+    cleanup.watchdog = { ok: fsbTriggerCleanupOk(watchdogResult), result: watchdogResult };
+  } catch (err) {
+    cleanup.watchdog = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  try {
+    if (typeof FsbTriggerLifecycle !== 'undefined'
+        && FsbTriggerLifecycle
+        && typeof FsbTriggerLifecycle.clearTrigger === 'function') {
+      const lifecycleResult = await FsbTriggerLifecycle.clearTrigger(triggerId);
+      cleanup.lifecycle = { ok: fsbTriggerCleanupOk(lifecycleResult), result: lifecycleResult };
+    } else {
+      cleanup.lifecycle = { ok: false, reason: 'lifecycle_unavailable' };
+    }
+  } catch (err) {
+    cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  if (terminal) {
+    return {
+      success: true,
+      stopped: false,
+      idempotent: true,
+      trigger_id: triggerId,
+      status: snap.status,
+      cleanup
+    };
+  }
+
+  return { success: true, stopped: true, trigger_id: triggerId, cleanup };
+}
+
+globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList, fsbTriggerHandleToolStop: fsbTriggerHandleToolStop };
 
 async function fsbTriggerGetRefreshPollTabState(tabId) {
   if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
