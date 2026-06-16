@@ -335,6 +335,9 @@
     var reportedValue = {
       text: (snap.reported_value != null ? snap.reported_value : snap.last_value)
     };
+    if (snap.reported_attributes && typeof snap.reported_attributes === 'object') {
+      reportedValue.attributes = snap.reported_attributes;
+    }
 
     var outcome = manager.evaluate(snap, reportedValue, now);
 

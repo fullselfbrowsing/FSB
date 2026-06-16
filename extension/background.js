@@ -277,12 +277,18 @@ const CONTENT_SCRIPT_FILES = [
   'content/selectors.js',
   'content/badge-combine.js',
   'content/visual-feedback.js',
+  'content/trigger-observe.js',
   'content/accessibility.js',
   'content/actions.js',
   'content/dom-analysis.js',
   'content/messaging.js',
   'content/lifecycle.js'
 ];
+
+const FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX = 'fsbTriggerObserveWatchdog:';
+const FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES = 1;
+const FSB_TRIGGER_OBSERVE_STALE_MS = FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES * 60 * 1000 * 2;
+const FSB_TRIGGER_REPORTED_TEXT_MAX = 10000;
 
 async function loadBundledSiteMap(domain) {
   if (bundledSiteMapCache.has(domain)) {
@@ -2716,6 +2722,19 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     transitionType: details.transitionType,
     url: details.url
   });
+
+  fsbTriggerRearmLiveObserversForTab(tabId, 'webNavigation.onCommitted')
+    .catch((err) => {
+      console.warn('[FSB TRG] live-observe webNavigation re-arm failed (non-blocking):', err && err.message);
+    });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo || changeInfo.status !== 'complete') return;
+  fsbTriggerRearmLiveObserversForTab(tabId, 'tabs.onUpdated.complete')
+    .catch((err) => {
+      console.warn('[FSB TRG] live-observe tabs.onUpdated re-arm failed (non-blocking):', err && err.message);
+    });
 });
 
 // PERF: Clean up all state when a tab is closed to prevent memory leaks
@@ -3375,6 +3394,241 @@ async function ensureContentScriptInjected(tabId, maxRetries = 3) {
   }
   return false;
 }
+
+function fsbTriggerObserveWatchdogName(triggerId) {
+  return FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX + triggerId;
+}
+
+function fsbTriggerSnapshotId(snap) {
+  return snap && typeof snap.trigger_id === 'string' && snap.trigger_id ? snap.trigger_id : null;
+}
+
+function fsbTriggerIsLiveObserveSnapshot(snap) {
+  if (!snap || snap.status !== 'armed') return false;
+  return snap.watch === 'live-observe' || snap.watch === 'live_observe' || snap.mode === 'live-observe';
+}
+
+function fsbTriggerExtractKind(snap) {
+  const condition = snap && snap.condition && typeof snap.condition === 'object' ? snap.condition : {};
+  return snap.extract || condition.extract || 'text';
+}
+
+function fsbTriggerAttrName(snap) {
+  const condition = snap && snap.condition && typeof snap.condition === 'object' ? snap.condition : {};
+  return snap.attrName || snap.attribute || condition.attrName || condition.attribute || null;
+}
+
+function fsbTriggerObserveMessage(snap) {
+  return {
+    action: 'triggerObserveStart',
+    trigger_id: fsbTriggerSnapshotId(snap),
+    selector: snap.selector,
+    extract: fsbTriggerExtractKind(snap),
+    attrName: fsbTriggerAttrName(snap)
+  };
+}
+
+async function fsbTriggerArmObserveWatchdog(triggerId) {
+  if (!triggerId || !chrome.alarms || typeof chrome.alarms.create !== 'function') return;
+  try {
+    const created = chrome.alarms.create(fsbTriggerObserveWatchdogName(triggerId), {
+      periodInMinutes: FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES
+    });
+    if (created && typeof created.catch === 'function') {
+      created.catch(function() { /* best-effort */ });
+    }
+  } catch (_e) { /* best-effort */ }
+}
+
+async function fsbTriggerClearObserveWatchdog(triggerId) {
+  if (!triggerId || !chrome.alarms || typeof chrome.alarms.clear !== 'function') return;
+  try {
+    const cleared = chrome.alarms.clear(fsbTriggerObserveWatchdogName(triggerId));
+    if (cleared && typeof cleared.catch === 'function') {
+      cleared.catch(function() { /* best-effort */ });
+    }
+  } catch (_e) { /* best-effort */ }
+}
+
+async function fsbTriggerSendTabMessage(tabId, payload) {
+  if (!Number.isFinite(Number(tabId)) || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return { ok: false, reason: 'tabs_unavailable' };
+  }
+  try {
+    await chrome.tabs.sendMessage(Number(tabId), payload);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'send_failed', error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function fsbTriggerStartObserveForSnapshot(snap, reason) {
+  const triggerId = fsbTriggerSnapshotId(snap);
+  const tabId = Number(snap && snap.target_tab_id);
+  if (!triggerId || !Number.isFinite(tabId) || !snap.selector) {
+    return { ok: false, reason: 'invalid_snapshot' };
+  }
+  await ensureContentScriptInjected(tabId);
+  const observeResult = await fsbTriggerSendTabMessage(tabId, fsbTriggerObserveMessage(snap));
+  const pulseResult = await fsbTriggerSendTabMessage(tabId, {
+    action: 'triggerPulseStart',
+    selector: snap.selector,
+    reason: reason || 'trigger-watch'
+  });
+  await fsbTriggerArmObserveWatchdog(triggerId);
+  return { ok: observeResult.ok !== false, observe: observeResult, pulse: pulseResult };
+}
+
+async function fsbTriggerStopObserveForSnapshot(snap) {
+  const triggerId = fsbTriggerSnapshotId(snap);
+  const tabId = Number(snap && snap.target_tab_id);
+  if (!triggerId || !Number.isFinite(tabId)) return;
+  await fsbTriggerSendTabMessage(tabId, { action: 'triggerObserveStop', trigger_id: triggerId });
+  await fsbTriggerSendTabMessage(tabId, { action: 'triggerPulseStop', trigger_id: triggerId });
+}
+
+function fsbTriggerCopyReportedAttributes(attributes) {
+  if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return null;
+  const out = {};
+  Object.keys(attributes).slice(0, 50).forEach((name) => {
+    const value = attributes[name];
+    if (typeof name === 'string' && typeof value === 'string') {
+      out[name] = value.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX);
+    }
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+async function fsbTriggerHandleValueReport(request, sender) {
+  const triggerId = request && typeof request.trigger_id === 'string' ? request.trigger_id : null;
+  if (!triggerId) return { ok: false, reason: 'invalid_trigger_id' };
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap || snap.status !== 'armed') {
+    return { ok: true, ignored: true };
+  }
+
+  const senderTabId = sender && sender.tab ? Number(sender.tab.id) : null;
+  if (Number.isFinite(Number(snap.target_tab_id))
+      && (!Number.isFinite(senderTabId) || Number(snap.target_tab_id) !== senderTabId)) {
+    return { ok: true, ignored: true, reason: 'foreign_tab' };
+  }
+
+  const value = request.value && typeof request.value === 'object' ? request.value : {};
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  await fsbTriggerArmObserveWatchdog(triggerId);
+
+  if (seamResult && seamResult.action === 'fired') {
+    await fsbTriggerClearObserveWatchdog(triggerId);
+    await fsbTriggerStopObserveForSnapshot(Object.assign({}, snap, {
+      target_tab_id: Number.isFinite(senderTabId) ? senderTabId : snap.target_tab_id
+    }));
+  }
+
+  return { ok: true, result: seamResult };
+}
+
+async function fsbTriggerRearmLiveObserversForTab(tabId, reason) {
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.listArmedSnapshots !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+  const armed = await FsbTriggerStore.listArmedSnapshots();
+  const owned = (Array.isArray(armed) ? armed : []).filter((snap) => {
+    return fsbTriggerIsLiveObserveSnapshot(snap) && Number(snap.target_tab_id) === Number(tabId);
+  });
+  for (const snap of owned) {
+    try {
+      await fsbTriggerStartObserveForSnapshot(snap, reason || 'rearm');
+    } catch (err) {
+      console.warn('[FSB TRG] live-observe re-arm failed (non-blocking):', err && err.message);
+    }
+  }
+  return { ok: true, rearmed: owned.length };
+}
+
+async function fsbTriggerHandleObserveWatchdog(alarm) {
+  const triggerId = alarm && typeof alarm.name === 'string'
+    ? alarm.name.slice(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX.length)
+    : '';
+  if (!triggerId
+      || typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'invalid_watchdog' };
+  }
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!fsbTriggerIsLiveObserveSnapshot(snap)) {
+    await fsbTriggerClearObserveWatchdog(triggerId);
+    return { ok: true, ignored: true };
+  }
+  const now = Date.now();
+  const lastSeen = Number(snap.last_reported_at || snap.last_evaluated_at || snap.armed_at || 0);
+  if (Number.isFinite(lastSeen) && lastSeen > 0 && now - lastSeen <= FSB_TRIGGER_OBSERVE_STALE_MS) {
+    return { ok: true, stale: false };
+  }
+  return fsbTriggerStartObserveForSnapshot(snap, 'watchdog');
+}
+
+async function fsbTriggerArmLiveObserveForTest(spec) {
+  const safeSpec = spec && typeof spec === 'object' ? spec : {};
+  if (typeof FsbTriggerLifecycle === 'undefined'
+      || !FsbTriggerLifecycle
+      || typeof FsbTriggerLifecycle.armTrigger !== 'function') {
+    return { ok: false, reason: 'lifecycle_unavailable' };
+  }
+  const now = typeof safeSpec.now === 'number' ? safeSpec.now : Date.now();
+  const triggerId = safeSpec.trigger_id || ('test-live-observe-' + now);
+  const ttl = typeof FsbTriggerLifecycle.FSB_TRIGGER_DEFAULT_TTL_MS === 'number'
+    ? FsbTriggerLifecycle.FSB_TRIGGER_DEFAULT_TTL_MS
+    : 21600000;
+  const snapshot = {
+    trigger_id: triggerId,
+    status: 'armed',
+    watch: 'live-observe',
+    condition: safeSpec.condition || { kind: 'changed' },
+    baseline: safeSpec.baseline == null ? null : safeSpec.baseline,
+    last_value: safeSpec.baseline == null ? null : safeSpec.baseline,
+    was_satisfied: false,
+    selector: safeSpec.selector,
+    extract: safeSpec.extract || (safeSpec.condition && safeSpec.condition.extract) || 'text',
+    attrName: safeSpec.attrName || (safeSpec.condition && safeSpec.condition.attribute) || null,
+    target_tab_id: safeSpec.target_tab_id,
+    agent_id: safeSpec.agent_id || 'test-trigger-agent',
+    armed_at: now,
+    deadline_at: now + ttl,
+    alarm_name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+  };
+  const armed = await FsbTriggerLifecycle.armTrigger(snapshot);
+  if (armed && armed.ok !== false) {
+    await fsbTriggerStartObserveForSnapshot(snapshot, 'test-arm');
+  }
+  return Object.assign({ snapshot }, armed || {});
+}
+
+globalThis.fsbTriggerArmLiveObserveForTest = fsbTriggerArmLiveObserveForTest;
 
 // Classify failure type based on error message and context
 function classifyFailure(error, action, context = {}) {
@@ -6335,6 +6589,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // ==========================================
     // DOM Stream forwarding (content -> dashboard via WebSocket)
     // ==========================================
+
+    case 'triggerValueChanged':
+    case 'triggerValueReport':
+      (async () => {
+        try {
+          const result = await fsbTriggerHandleValueReport(request, sender);
+          sendResponse(result);
+        } catch (error) {
+          sendResponse({ ok: false, error: error && error.message ? error.message : String(error) });
+        }
+      })();
+      return true;
 
     case 'domStreamSnapshot':
       if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
@@ -13361,6 +13627,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await FsbTriggerLifecycle.handleTriggerAlarm(alarm);
     } catch (err) {
       console.warn('[FSB TRG] handleTriggerAlarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
+  if (alarm
+      && typeof alarm.name === 'string'
+      && alarm.name.startsWith(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX)) {
+    try {
+      await fsbTriggerHandleObserveWatchdog(alarm);
+    } catch (err) {
+      console.warn('[FSB TRG] live-observe watchdog failed (non-blocking):', err && err.message);
     }
     return;
   }

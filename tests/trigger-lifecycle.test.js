@@ -724,6 +724,97 @@ async function caseR() {
 }
 
 // ------------------------------------------------------------------
+// Case S: Phase 16 on-report value path -- reported_value feeds the
+//         existing SEAM and fires through the atomic write-back.
+// ------------------------------------------------------------------
+
+async function caseS() {
+  console.log('\n--- Case S: Phase 16 reported_value -> SEAM fired path ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  await store.writeSnapshot('trg_report_fire', makeSnapshot({
+    trigger_id: 'trg_report_fire',
+    status: 'armed',
+    watch: 'live-observe',
+    condition: { kind: 'changed' },
+    baseline: 'old',
+    last_value: 'old',
+    reported_value: 'new',
+    was_satisfied: false,
+    fired_at: null,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_report_fire' });
+  check(r && r.ok === true && r.action === 'fired', 'S.1 reported_value drives changed condition to fired');
+
+  const after = await store.readSnapshot('trg_report_fire');
+  check(after && after.status === 'fired', 'S.2 snapshot transitioned to status:fired through lifecycle seam');
+  check(after && after.last_value === 'new', 'S.3 last_value updated from reported_value');
+  check(chromeMock.alarms._cleared().includes('fsbTrigger:trg_report_fire'), 'S.4 alarm cleared on report-driven fire');
+}
+
+// ------------------------------------------------------------------
+// Case T: Phase 16 reported_attributes pass through the same reportedValue
+//         contract so attribute extract conditions are not dropped.
+// ------------------------------------------------------------------
+
+async function caseT() {
+  console.log('\n--- Case T: Phase 16 reported_attributes -> attribute condition ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  await store.writeSnapshot('trg_attr_fire', makeSnapshot({
+    trigger_id: 'trg_attr_fire',
+    status: 'armed',
+    watch: 'live-observe',
+    condition: { kind: 'equals', extract: 'attribute', attribute: 'data-price', value: '42' },
+    baseline: null,
+    last_value: null,
+    reported_value: '',
+    reported_attributes: { 'data-price': '42' },
+    was_satisfied: false,
+    fired_at: null,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_attr_fire' });
+  check(r && r.ok === true && r.action === 'fired', 'T.1 reported_attributes are included in reportedValue');
+
+  const after = await store.readSnapshot('trg_attr_fire');
+  check(after && after.status === 'fired', 'T.2 attribute condition fires through lifecycle seam');
+  check(chromeMock.alarms._cleared().includes('fsbTrigger:trg_attr_fire'), 'T.3 alarm cleared on attribute-driven fire');
+}
+
+// ------------------------------------------------------------------
+// Case U: background.js Phase 16 source invariants for value-report ingress.
+// ------------------------------------------------------------------
+
+function caseU() {
+  console.log('\n--- Case U: Phase 16 background value-report source invariants ---');
+  const bgPath = path.resolve(__dirname, '..', 'extension', 'background.js');
+  const src = fs.readFileSync(bgPath, 'utf8');
+  const valueBlockStart = src.indexOf("case 'triggerValueChanged':");
+  const valueBlockEnd = src.indexOf("case 'domStreamSnapshot':", valueBlockStart);
+  const valueBlock = valueBlockStart >= 0 && valueBlockEnd > valueBlockStart
+    ? src.slice(valueBlockStart, valueBlockEnd)
+    : '';
+
+  check(src.includes("'content/trigger-observe.js'"), 'U.1 trigger-observe.js registered in CONTENT_SCRIPT_FILES');
+  check(src.indexOf("'content/visual-feedback.js'") < src.indexOf("'content/trigger-observe.js'")
+      && src.indexOf("'content/trigger-observe.js'") < src.indexOf("'content/messaging.js'"),
+    'U.2 trigger-observe.js loads after visual-feedback and before messaging');
+  check(valueBlock.includes("case 'triggerValueReport':"), 'U.3 dual value-report action names accepted');
+  check(src.includes("typeof value.text === 'string'"), 'U.4 value.text type validation present');
+  check(src.includes('reported_value'), 'U.5 reported_value is written before seam dispatch');
+  check(src.includes('reported_attributes'), 'U.6 reported_attributes are preserved for attribute extracts');
+  check(src.includes('FsbTriggerLifecycle.handleTriggerAlarm'), 'U.7 value report drives existing lifecycle seam');
+  check(src.includes('fsbTriggerObserveWatchdog:'), 'U.8 live-observe watchdog prefix present');
+  check(src.includes('ensureContentScriptInjected(tabId)'), 'U.9 full-reload re-arm calls ensureContentScriptInjected');
+  check(src.includes('globalThis.fsbTriggerArmLiveObserveForTest'), 'U.10 test-only arm helper is exposed without tool schema registration');
+  check(!/status\s*=\s*['"]fired['"]|status\s*:\s*['"]fired['"]/.test(valueBlock), 'U.11 value-report case does not write fired status directly');
+}
+
+// ------------------------------------------------------------------
 // Driver
 // ------------------------------------------------------------------
 
@@ -750,6 +841,9 @@ async function caseR() {
   await caseP();
   await caseQ();
   await caseR();
+  await caseS();
+  await caseT();
+  caseU();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');
   console.log('  passed:', passed);
