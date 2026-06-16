@@ -52,7 +52,7 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### SURV -- MV3 survivability (session-scoped)
 
-- [ ] **SURV-01**: An armed trigger survives service-worker eviction -- trigger state persists in `chrome.storage.session` and the watch re-arms on SW wake via `chrome.alarms` (no keepalive antipatterns; the load-bearing `setTimeout` agent-loop iterator is untouched, INV-04).
+- [x] **SURV-01**: An armed trigger survives service-worker eviction -- trigger state persists in `chrome.storage.session` and the watch re-arms on SW wake via `chrome.alarms` (no keepalive antipatterns; the load-bearing `setTimeout` agent-loop iterator is untouched, INV-04).
 - [ ] **SURV-02**: Fire evaluation (compare + fire decision) happens in the service worker against persisted state, so an eviction between read and decision cannot drop or duplicate a fire.
 - [ ] **SURV-03**: On SW wake, the trigger registry reconciles persisted triggers (re-attach observers / reschedule polls) without duplicate fires or orphaned watchers.
 
@@ -137,7 +137,7 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | LIFE-03 | Phase 18 | Pending |
 | LIFE-04 | Phase 15 | Pending |
 | LIFE-05 | Phase 14 | Pending |
-| SURV-01 | Phase 14 | Pending |
+| SURV-01 | Phase 14 | Complete |
 | SURV-02 | Phase 14 | Pending |
 | SURV-03 | Phase 14 | Pending |
 | VIS-01 | Phase 16 | Pending |
