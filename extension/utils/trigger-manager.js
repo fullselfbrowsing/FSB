@@ -344,10 +344,194 @@
     };
   }
 
-  // ---- Export shape (mirror trigger-lifecycle.js dual-export) --------------
+  // ---- Inline concurrency cap (LIFE-04 / D-09) -----------------------------
   //
-  // Task 3 (the inline concurrency cap) extends this same exportsObj with
-  // armTrigger / getCap / setCap and the cap constants.
+  // A clone of agent-registry.js (constants, clamp, typed reject, getCap/setCap,
+  // grandfather-on-lower), translated from its instance pattern to this module-
+  // singleton IIFE. Two things matter for correctness:
+  //
+  //   (a) The cap value persists in the durable local storage area (key
+  //       'fsbTriggerCap') so it survives a SW restart. This is the ONLY storage
+  //       access in this module and it is confined to the cap functions -- it is
+  //       never reached from evaluate(), which stays pure.
+  //   (b) THE DELIBERATE DIVERGENCE (D-09): the active count is the number of
+  //       persisted armed snapshots (listArmedSnapshots().length), NOT a heap
+  //       set. agent-registry counts a heap set because its agents live only in
+  //       memory; triggers are storage-first and survive SW eviction, so a heap
+  //       counter would reset to zero on wake and silently stop enforcing the cap
+  //       across the very eviction the milestone is built around. There is no
+  //       in-heap registry of triggers in this module.
+
+  var FSB_TRIGGER_CAP_STORAGE_KEY = 'fsbTriggerCap'; // durable local area, survives restart
+  var FSB_TRIGGER_CAP_DEFAULT = 8;
+  var FSB_TRIGGER_CAP_MIN = 1;
+  var FSB_TRIGGER_CAP_MAX = 64;
+
+  function _clampCap(v) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) return FSB_TRIGGER_CAP_DEFAULT;
+    var i = Math.floor(v);
+    if (i < FSB_TRIGGER_CAP_MIN) return FSB_TRIGGER_CAP_MIN;
+    if (i > FSB_TRIGGER_CAP_MAX) return FSB_TRIGGER_CAP_MAX;
+    return i;
+  }
+
+  var _cachedCap = FSB_TRIGGER_CAP_DEFAULT; // module-scope (was this._cachedCap in the instance clone)
+
+  /**
+   * Read-path clamp = poisoned-cache defense-in-depth (mirror
+   * agent-registry.js:787-789): even if the cache were corrupted by a malformed
+   * change event, an out-of-range cap can never leak to callers.
+   */
+  function getCap() {
+    return _clampCap(_cachedCap);
+  }
+
+  /**
+   * Set the cap, clamping to [MIN, MAX]. Updates the in-memory cache, then writes
+   * to the durable local area best-effort (a storage hiccup must never throw --
+   * the cache is already updated). When the new cap is below the active count at
+   * change time, emits one diagnostic (grandfather-on-lower; no eviction) if a
+   * global rate-limited warn hook exists. Returns the clamped value.
+   */
+  function setCap(value) {
+    var clamped = _clampCap(value);
+    var previousCap = _clampCap(_cachedCap);
+    _cachedCap = clamped;
+    var c = _getChrome();
+    if (c && c.storage && c.storage.local && typeof c.storage.local.set === 'function') {
+      try {
+        var payload = {};
+        payload[FSB_TRIGGER_CAP_STORAGE_KEY] = clamped;
+        var ret = c.storage.local.set(payload);
+        if (ret && typeof ret.catch === 'function') {
+          ret.catch(function() { /* best-effort */ });
+        }
+      } catch (_e) { /* best-effort */ }
+    }
+    // Diagnostic-only grandfather emission. activeAtChange is read best-effort
+    // from the persisted store; if the read is unavailable we skip the emission
+    // (a missing diagnostic never blocks setCap).
+    if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
+      var store = _getStore();
+      if (store && typeof store.listArmedSnapshots === 'function') {
+        Promise.resolve(store.listArmedSnapshots()).then(function(armed) {
+          var activeAtChange = Array.isArray(armed) ? armed.length : 0;
+          if (clamped < activeAtChange) {
+            try {
+              globalThis.rateLimitedWarn(
+                '[FSB][trigger]',
+                'trigger-cap-lowered-grandfathered',
+                'trigger cap lowered while triggers active (grandfathered)',
+                { previousCap: previousCap, newCap: clamped, activeAtChange: activeAtChange }
+              );
+            } catch (_e2) { /* swallow */ }
+          }
+        }).catch(function() { /* swallow */ });
+      }
+    }
+    return clamped;
+  }
+
+  /**
+   * Best-effort hydrate of the cached cap from the durable local area. Intended
+   * to be called at SW wake so the worker serves the operator-configured cap
+   * (not the static default). Errors are swallowed; the default stands when
+   * storage is unavailable.
+   */
+  async function loadCapFromStorage() {
+    var c = _getChrome();
+    if (!c || !c.storage || !c.storage.local || typeof c.storage.local.get !== 'function') return;
+    try {
+      var stored = await c.storage.local.get([FSB_TRIGGER_CAP_STORAGE_KEY]);
+      var raw = stored && stored[FSB_TRIGGER_CAP_STORAGE_KEY];
+      if (typeof raw === 'number' && Number.isFinite(raw)) {
+        _cachedCap = _clampCap(raw);
+      }
+    } catch (_e) { /* keep default */ }
+  }
+
+  // ---- Arm serialization mutex (the concurrent-arm TOCTOU fix) -------------
+  //
+  // Ported from agent-registry.js:181 (withRegistryLock). The MV3 service worker
+  // is single-threaded; one module-scope promise chain serializes all arms. The
+  // .then(fn, fn) shape runs the next handler whether the prior fulfilled or
+  // rejected, so a single thrown handler does not poison the chain; the
+  // .catch(...) on assignment ensures the chain itself never holds a rejected
+  // promise. After SW eviction the chain is reborn as a resolved promise, which
+  // is correct because no arms are in-flight on a freshly-spawned worker.
+  //
+  // Why this is mandatory: armTrigger reads the active count ASYNC from the
+  // store, so a naive read-then-write races -- two concurrent arms could both
+  // read active=7 under cap=8 and both proceed to 9. Running the
+  // listArmedSnapshots() read + cap compare + delegated write inside one lock
+  // turn makes the cap atomic. evaluate() is lock-free and pure; only arm (which
+  // is not the hot path) is serialized.
+
+  var _armChain = Promise.resolve();
+  function _withArmLock(fn) {
+    var run = _armChain.then(fn, fn);
+    _armChain = run.catch(function() { /* swallow so the chain continues */ });
+    return run;
+  }
+
+  /**
+   * Arm a trigger, cap-gated. Runs ENTIRELY inside _withArmLock so the active-
+   * count read + cap compare + delegated persist are one atomic turn. The active
+   * count comes from the persisted store (D-09 divergence), so the cap keeps
+   * enforcing across SW eviction. On success, builds the flat-scalar snapshot
+   * (status:'armed', was_satisfied:false, baseline, deadline_at = now + TTL,
+   * carrying condition/selector/target_tab_id/agent_id from the spec) and
+   * delegates the storage write + alarm to the Phase-14 lifecycle seam.
+   *
+   * @param {object} spec { trigger_id, condition, baseline?, selector?,
+   *                        target_tab_id?, agent_id?, now? }
+   * @returns {Promise<object>} the lifecycle result merged with trigger_id, OR
+   *          { error:'TRIGGER_CAP_REACHED', code, cap, active } when over cap.
+   */
+  function armTrigger(spec) {
+    return _withArmLock(async function() {
+      var safeSpec = (spec && typeof spec === 'object') ? spec : {};
+      var store = _getStore();
+      var armed = (store && typeof store.listArmedSnapshots === 'function')
+        ? await store.listArmedSnapshots()
+        : [];
+      var active = Array.isArray(armed) ? armed.length : 0; // storage-of-truth, NOT a heap set
+      var cap = getCap();
+      if (active >= cap) {
+        return { error: 'TRIGGER_CAP_REACHED', code: 'TRIGGER_CAP_REACHED', cap: cap, active: active };
+      }
+
+      var now = (typeof safeSpec.now === 'number') ? safeSpec.now : Date.now();
+      var lifecycle = _getLifecycle();
+      var ttl = (lifecycle && typeof lifecycle.FSB_TRIGGER_DEFAULT_TTL_MS === 'number')
+        ? lifecycle.FSB_TRIGGER_DEFAULT_TTL_MS
+        : 21600000; // 6h default if the lifecycle constant is unavailable
+
+      var snapshot = {
+        trigger_id: safeSpec.trigger_id,
+        status: 'armed',
+        condition: safeSpec.condition,
+        baseline: (safeSpec.baseline === undefined) ? null : safeSpec.baseline,
+        last_value: (safeSpec.baseline === undefined) ? null : safeSpec.baseline,
+        was_satisfied: false,
+        selector: safeSpec.selector,
+        target_tab_id: safeSpec.target_tab_id,
+        agent_id: safeSpec.agent_id,
+        armed_at: now,
+        deadline_at: now + ttl
+      };
+
+      if (!lifecycle || typeof lifecycle.armTrigger !== 'function') {
+        return { error: 'LIFECYCLE_UNAVAILABLE', code: 'LIFECYCLE_UNAVAILABLE', trigger_id: snapshot.trigger_id };
+      }
+      var armedResult = await lifecycle.armTrigger(snapshot);
+      var merged = (armedResult && typeof armedResult === 'object') ? armedResult : {};
+      merged.trigger_id = snapshot.trigger_id;
+      return merged;
+    });
+  }
+
+  // ---- Export shape (mirror trigger-lifecycle.js dual-export) --------------
 
   var exportsObj = {
     evaluate: evaluate,
@@ -357,7 +541,15 @@
     regexMatches: regexMatches,
     PATTERN_MAX_LEN: PATTERN_MAX_LEN,
     TEXT_MAX_LEN_ELEMENT: TEXT_MAX_LEN_ELEMENT,
-    TEXT_MAX_LEN_PAGE: TEXT_MAX_LEN_PAGE
+    TEXT_MAX_LEN_PAGE: TEXT_MAX_LEN_PAGE,
+    armTrigger: armTrigger,
+    getCap: getCap,
+    setCap: setCap,
+    loadCapFromStorage: loadCapFromStorage,
+    FSB_TRIGGER_CAP_STORAGE_KEY: FSB_TRIGGER_CAP_STORAGE_KEY,
+    FSB_TRIGGER_CAP_DEFAULT: FSB_TRIGGER_CAP_DEFAULT,
+    FSB_TRIGGER_CAP_MIN: FSB_TRIGGER_CAP_MIN,
+    FSB_TRIGGER_CAP_MAX: FSB_TRIGGER_CAP_MAX
   };
 
   global.FsbTriggerManager = exportsObj;            // SW importScripts consumer
