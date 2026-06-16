@@ -1,31 +1,37 @@
 {
   "version": "1.0",
-  "timestamp": "2026-04-20T08:15:51.638Z",
-  "phase": "post-milestone",
-  "phase_name": "v0.9.33 complete - pre-verification",
-  "phase_dir": ".planning/",
-  "plan": null,
-  "task": null,
-  "total_tasks": null,
-  "status": "paused",
+  "timestamp": "2026-06-16T14:46:59.226Z",
+  "phase": "15",
+  "phase_name": "fire-condition-engine-value-extraction",
+  "phase_dir": ".planning/phases/15-fire-condition-engine-value-extraction",
+  "plan": 3,
+  "task": 3,
+  "total_tasks": 8,
+  "status": "phase_complete",
   "completed_tasks": [
-    {"id": 1, "name": "Fix sidepanel completion message rendering (literal \\n)", "status": "done", "commit": "3c9a813"},
-    {"id": 2, "name": "Fix dashboard metrics all-zeros (missing provider param)", "status": "done", "commit": "3c9a813"},
-    {"id": 3, "name": "Reinstall FSB MCP server (user scope, v0.5.2)", "status": "done", "commit": null}
+    {"id": 1, "name": "15-01 value-extractor.js (locale parse + extract, EXTRACT-01..04)", "status": "done", "commit": "a640f746"},
+    {"id": 2, "name": "15-02 trigger-manager.js (6 condition kinds + AND/OR + edge/fire-once + ReDoS regex + cap, TRIG-02..07, LIFE-04)", "status": "done", "commit": "41033e64"},
+    {"id": 3, "name": "15-03 SEAM wiring (evaluate() + atomic fired write-back) + background.js glue", "status": "done", "commit": "5a0576d1"},
+    {"id": 4, "name": "Code review (1 BLOCKER CR-01 ReDoS bypass + 4 warnings) found and fixed", "status": "done", "commit": "12642007"},
+    {"id": 5, "name": "Phase verification (5/5 success criteria, 11/11 REQ-IDs, status passed)", "status": "done", "commit": "5725fb21"},
+    {"id": 6, "name": "Security verification (15/15 threats closed, threats_open 0)", "status": "done", "commit": "6f21d343"}
   ],
-  "remaining_tasks": [
-    {"id": 4, "name": "Push 21 local commits to origin/main", "status": "not_started"},
-    {"id": 5, "name": "Verify showcase dashboard deployment after push", "status": "not_started"},
-    {"id": 6, "name": "Run /gsd-verify-work or /gsd-complete-milestone for v0.9.33", "status": "not_started"},
-    {"id": 7, "name": "Update ROADMAP.md to mark phases 189/190 as Complete", "status": "not_started"}
-  ],
+  "remaining_tasks": [],
   "blockers": [],
-  "human_actions_pending": [],
-  "decisions": [
-    {"decision": "Fix literal \\n in markdown-renderer.js via normalizeEscapes + plainTextToHtml helpers", "rationale": "AI returns escaped newlines; markdown detector cant match patterns without real newlines", "phase": "post-190"},
-    {"decision": "Fix BackgroundAnalytics.trackUsage missing provider param", "rationale": "Undeclared provider variable caused ReferenceError on every call, preventing saveData from running", "phase": "post-190"}
+  "human_actions_pending": [
+    {"action": "Milestone-end Chrome MV3 live-fire / SW-eviction UAT for the trigger family", "context": "Phase 15 is unit-testable in isolation (element value injected as a test input); real-fire MV3-survival UAT is deferred to milestone close per 15-VALIDATION.md and the Phase-14 deferral pattern. NOT a Phase-15 blocker.", "blocking": false}
   ],
-  "uncommitted_files": [".planning/ROADMAP.md", ".planning/STATE.md", ".mcp.json"],
-  "next_action": "Push local commits to origin/main, verify showcase deployment, then run /gsd-complete-milestone",
-  "context_notes": "All 5 milestone phases (186-190) are executed with summaries. Two post-milestone bugs were fixed and committed. ROADMAP.md and STATE.md have local edits that should be committed. 20+ commits ahead of origin/main including all v0.9.33 work."
+  "decisions": [
+    {"decision": "ReDoS guard uses a paren-aware structural hasNestedQuantifier() detector, not just length caps", "rationale": "Code review (CR-01) proved exponential backtracking hangs on ~34 chars, far under the 10000-char text cap, so length caps cannot bound it; only rejecting the nested-quantifier pattern shape at compile time can. The original plan/research claim that length caps are the load-bearing ReDoS guarantee was FALSE for the exponential class.", "phase": "15"},
+    {"decision": "evaluate() is a pure function; the trigger-lifecycle SEAM owns the atomic fired write-back", "rationale": "D-02 — keeps exactly-one-fire-across-eviction correct and the engine unit-testable with no browser/storage.", "phase": "15"},
+    {"decision": "Concurrency cap active-count reads listArmedSnapshots() (storage), not an in-heap Set", "rationale": "D-09 — an in-heap counter resets to 0 on SW eviction and would silently stop enforcing the cap; _withArmLock serializes the check-then-arm (TOCTOU).", "phase": "15"},
+    {"decision": "Two documented accepted security residuals carried forward", "rationale": "T-15-03 (_sepCache growth, bounded by locale set) and the CR-01 residual (static ReDoS detection cannot be proven complete; a hard guarantee needs an off-thread killable match — offscreen + watchdog — tracked for a future phase).", "phase": "15"}
+  ],
+  "uncommitted_files": [
+    ".planning/config.json (pre-existing, out-of-scope — dirty before this session, NOT part of Phase 15)",
+    "showcase/angular/public/llms-full.txt (pre-existing, out-of-scope)",
+    "showcase/angular/public/sitemap.xml (pre-existing, out-of-scope)"
+  ],
+  "next_action": "Phase 15 is fully closed. Start the next roadmap phase: /gsd-discuss-phase 999.1 --auto (Phase 999.1 'MCP tool gaps — click heuristics'). Note: invoke GSD skills as /gsd-<name>; the /gsd:<name> namespace did not resolve in this environment.",
+  "context_notes": "The full /gsd-discuss-phase 15 --auto pipeline ran clean end to end: discuss (assumptions mode, 2 external-research topics resolved) -> plan (3 plans, 3 sequential waves, plan-checker PASS) -> execute (3 waves, sequential on main tree, USE_WORKTREES=false) -> verify (passed) -> code-review (BLOCKER+4 warnings, all fixed inline + regression-tested) -> secure (15/15 closed). 218 trigger-family assertions green; INV-01 (MCP schemas byte-identical) and INV-04 (agent-loop.js byte-untouched) hold. The single biggest lesson: adversarial code review caught a real ReDoS DoS that all prior gates (plan-checker, executor self-check, verifier) missed because they trusted the plan's stated mitigation. Phases 16-19 also process untrusted page content — carry the structural-detector lesson forward."
 }
