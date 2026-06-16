@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-06-16T18:04:25.984Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-06-16T18:11:00.522Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 14
-  completed_plans: 13
-  percent: 93
+  completed_plans: 14
+  percent: 100
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 17 (Refresh-Poll Watch (Tab-Owning Background Reload)) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-16
 
@@ -77,6 +77,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 16 P03 | 1 min | 1 tasks | 1 files |
 | Phase 16 P04 | 5 min | 2 tasks | 3 files |
 | Phase 17 P01 | 8 min | 2 tasks | 4 files |
+| Phase 17 P02 | 2 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 16 wires live-observe end-to-end without adding public tool schemas: `content/trigger-observe.js` emits `triggerValueChanged` `{text, attributes?}` from a single stable-container MutationObserver; `messaging.js` exposes triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop; `background.js` validates and stages reports then delegates fire decisions to `FsbTriggerLifecycle.handleTriggerAlarm` (no duplicate fire writer). Re-arm is owned-tab only (`target_tab_id` + `ensureContentScriptInjected`), backed by `fsbTriggerObserveWatchdog:<id>` (1 min period, stale after 2 min). The in-memory observer registry is authoritative; stale DOM `data-fsb-trigger-armed` markers never block fresh-context re-arm (fixed in `87403c77`). Live-browser UAT is tracked in 16-HUMAN-UAT.md for Phase 20.
 - [Phase 17]: Plan 01: Refresh-poll interval validation runs before snapshot persistence or lifecycle delegation so invalid sub-floor requests cannot consume cap slots or create alarms.
 - [Phase 17]: Plan 01: Refresh-poll cadence uses next_poll_at while deadline_at remains the absolute TTL/reap boundary.
+- [Phase 17]: Plan 02: triggerRead returns ELEMENT_NOT_FOUND before the successful readValue extraction so refresh-poll can distinguish missing selectors from legitimate empty text.
+- [Phase 17]: Plan 02: the missing-module guard avoids a literal readValue token before the missing-element branch so the source-invariant test protects extraction order.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -143,8 +146,8 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-16T18:04:25.981Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-06-16T18:11:00.518Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
 
 ## Next Actions
