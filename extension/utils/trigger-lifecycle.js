@@ -22,7 +22,7 @@
    *      chrome.alarms.getAll() orphan sweep (D-08) that clears any fsbTrigger:*
    *      alarm with no backing snapshot ("alarm into the void" is impossible).
    *
-   * SURV-01: the only timer surface is chrome.alarms (no setInterval / keepalive).
+   * SURV-01: the only timer surface is chrome.alarms (no standing interval / keepalive).
    * The SW is NOT the survival mechanism: chrome.storage.session holds state and
    * chrome.alarms wakes the SW.
    *
@@ -130,7 +130,7 @@
 
   // ---- Alarm helpers (best-effort no-throw, cloned from the template) ------
   //
-  // The ONLY timer surface (no setInterval -- SURV-01 / Pitfall #3). Arm shape
+  // The ONLY timer surface (no standing interval timer -- SURV-01 / Pitfall #3). Arm shape
   // is one-shot { when: deadline_at } (the recurring { periodInMinutes } clock is
   // Phase 17).
 
@@ -180,6 +180,77 @@
     return TRIGGER_ALARM_PREFIX + triggerId;
   }
 
+  function isRefreshPollSnapshot(snapshot) {
+    return snapshot
+      && typeof snapshot === 'object'
+      && (snapshot.watch === 'refresh-poll'
+        || snapshot.watch === 'refresh_poll'
+        || snapshot.mode === 'refresh-poll');
+  }
+
+  function refreshPollIntervalMs(snapshot) {
+    var raw = snapshot && snapshot.poll_interval_ms;
+    var interval = Number(raw);
+    if (!Number.isFinite(interval)) interval = 60000;
+    interval = Math.floor(interval);
+    return interval < TRIGGER_ALARM_MIN_PERIOD_MS ? TRIGGER_ALARM_MIN_PERIOD_MS : interval;
+  }
+
+  function computeRefreshPollJitterMs(intervalMs, snapshot) {
+    void intervalMs;
+    var raw;
+    if (snapshot && Number.isFinite(Number(snapshot.poll_jitter_ms))) {
+      raw = Number(snapshot.poll_jitter_ms);
+    } else {
+      raw = Math.floor(Math.random() * 3000);
+    }
+    var jitter = Math.floor(raw);
+    if (jitter < 0) return 0;
+    if (jitter > 3000) return 3000;
+    return jitter;
+  }
+
+  function computeRefreshPollNextAt(snapshot, now) {
+    var baseNow = (typeof now === 'number' && Number.isFinite(now)) ? now : Date.now();
+    var deadlineAt = Number(snapshot && snapshot.deadline_at);
+    if (Number.isFinite(deadlineAt)) {
+      var remainingMs = deadlineAt - baseNow;
+      if (remainingMs < TRIGGER_ALARM_MIN_PERIOD_MS) {
+        return deadlineAt;
+      }
+    }
+    var intervalMs = refreshPollIntervalMs(snapshot);
+    var jitterMs = computeRefreshPollJitterMs(intervalMs, snapshot);
+    var nextAt = baseNow + intervalMs + jitterMs;
+    if (Number.isFinite(deadlineAt) && nextAt > deadlineAt) {
+      return deadlineAt;
+    }
+    return nextAt;
+  }
+
+  function isUsableRefreshPollNextAt(snapshot, now) {
+    var nextPollAt = Number(snapshot && snapshot.next_poll_at);
+    var deadlineAt = Number(snapshot && snapshot.deadline_at);
+    var baseNow = (typeof now === 'number' && Number.isFinite(now)) ? now : Date.now();
+    if (!Number.isFinite(nextPollAt) || nextPollAt <= baseNow) return false;
+    if (nextPollAt - baseNow < TRIGGER_ALARM_MIN_PERIOD_MS) return false;
+    if (Number.isFinite(deadlineAt) && nextPollAt > deadlineAt) return false;
+    return true;
+  }
+
+  async function scheduleNextRefreshPollAlarm(snapshot, now) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return { ok: false, reason: 'invalid_snapshot' };
+    }
+    var alarmName = alarmNameForTrigger(snapshot.trigger_id);
+    if (!alarmName) {
+      return { ok: false, reason: 'invalid_trigger_id' };
+    }
+    snapshot.next_poll_at = computeRefreshPollNextAt(snapshot, now);
+    var armed = await createAlarm(alarmName, { when: snapshot.next_poll_at });
+    return { ok: true, armed: armed, next_poll_at: snapshot.next_poll_at };
+  }
+
   // ---- Optional pure-plumbing helpers (RESEARCH Open Q1; ZERO fire logic) --
 
   /**
@@ -205,11 +276,17 @@
     if (!store) {
       return { ok: false, reason: 'store_unavailable' };
     }
-    await store.writeSnapshot(triggerId, snapshot);
-    var deadlineAt = Number(snapshot.deadline_at);
     var armed = false;
-    if (Number.isFinite(deadlineAt)) {
-      armed = await createAlarm(alarmName, { when: deadlineAt });
+    if (isRefreshPollSnapshot(snapshot)) {
+      snapshot.next_poll_at = computeRefreshPollNextAt(snapshot, Date.now());
+      await store.writeSnapshot(triggerId, snapshot);
+      armed = await createAlarm(alarmName, { when: snapshot.next_poll_at });
+    } else {
+      await store.writeSnapshot(triggerId, snapshot);
+      var deadlineAt = Number(snapshot.deadline_at);
+      if (Number.isFinite(deadlineAt)) {
+        armed = await createAlarm(alarmName, { when: deadlineAt });
+      }
     }
     return { ok: true, armed: armed };
   }
@@ -369,6 +446,17 @@
     if (nextState.last_value !== undefined) snap.last_value = nextState.last_value;
     if (nextState.was_satisfied !== undefined) snap.was_satisfied = nextState.was_satisfied;
     if (nextState.last_evaluated_at !== undefined) snap.last_evaluated_at = nextState.last_evaluated_at;
+    if (isRefreshPollSnapshot(snap)) {
+      var scheduled = await scheduleNextRefreshPollAlarm(snap, now);
+      await store.writeSnapshot(triggerId, snap);
+      return {
+        ok: true,
+        action: outcome.outcome,
+        outcome: outcome,
+        armed: scheduled && scheduled.armed === true,
+        next_poll_at: snap.next_poll_at
+      };
+    }
     await store.writeSnapshot(triggerId, snap);
     return { ok: true, action: outcome.outcome, outcome: outcome };
   }
@@ -490,8 +578,16 @@
         await clearAlarm(alarmName);
         counters.reaped++;
       } else {
-        // Re-arm the survivor with its ORIGINAL deadline (idempotent create).
-        await createAlarm(alarmName, { when: Number(snap.deadline_at) });
+        if (isRefreshPollSnapshot(snap)) {
+          if (!isUsableRefreshPollNextAt(snap, now)) {
+            snap.next_poll_at = computeRefreshPollNextAt(snap, now);
+            await store.writeSnapshot(id, snap);
+          }
+          await createAlarm(alarmName, { when: Number(snap.next_poll_at) });
+        } else {
+          // Re-arm the survivor with its ORIGINAL deadline (idempotent create).
+          await createAlarm(alarmName, { when: Number(snap.deadline_at) });
+        }
         counters.restored++;
       }
     }
@@ -517,6 +613,7 @@
     TRIGGER_ALARM_MIN_PERIOD_MS: TRIGGER_ALARM_MIN_PERIOD_MS,
     TRIGGER_ALARM_MIN_PERIOD_MINUTES: TRIGGER_ALARM_MIN_PERIOD_MINUTES,
     alarmNameForTrigger: alarmNameForTrigger,
+    scheduleNextRefreshPollAlarm: scheduleNextRefreshPollAlarm,
     armTrigger: armTrigger,
     clearTrigger: clearTrigger,
     handleTriggerAlarm: handleTriggerAlarm,
