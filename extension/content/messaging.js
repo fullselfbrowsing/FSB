@@ -1242,6 +1242,103 @@
         })();
         return true;
 
+      case 'triggerObserveStart':
+        (async () => {
+          try {
+            if (!FSB.triggerObserve || typeof FSB.triggerObserve.start !== 'function') {
+              sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            const result = FSB.triggerObserve.start(
+              request.trigger_id,
+              request.selector,
+              request.extract,
+              request.attrName || request.attribute
+            );
+            sendResponse(result || { ok: false, reason: 'no_result' });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerObserveStop':
+        (async () => {
+          try {
+            if (!FSB.triggerObserve || typeof FSB.triggerObserve.stop !== 'function') {
+              sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            FSB.triggerObserve.stop(request.trigger_id);
+            sendResponse({ success: true });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerRead':
+        (async () => {
+          try {
+            if (!FSB.triggerObserve || typeof FSB.triggerObserve.readValue !== 'function') {
+              sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            const leaf = FSB.querySelectorWithShadow(request.selector);
+            const value = FSB.triggerObserve.readValue(leaf, request.extract, request.attrName || request.attribute);
+            sendResponse({ value });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerPulseStart':
+        (async () => {
+          try {
+            if (!FSB.actionGlowOverlay || typeof FSB.actionGlowOverlay.showPulse !== 'function') {
+              sendResponse({ success: false, error: 'actionGlowOverlay pulse unavailable' });
+              return;
+            }
+            const overlayState = FSB.overlayState || null;
+            const activeActionGlow = overlayState
+              && overlayState.lifecycle === 'running'
+              && overlayState.mode !== 'trigger-watch'
+              && (overlayState.phase === 'acting'
+                || overlayState.phase === 'writing'
+                || overlayState.phase === 'switching_tab');
+            if (activeActionGlow) {
+              sendResponse({ success: false, error: 'Action glow active' });
+              return;
+            }
+            const el = FSB.querySelectorWithShadow(request.selector);
+            if (el) {
+              FSB.actionGlowOverlay.showPulse(el);
+              sendResponse({ success: true });
+            } else {
+              sendResponse({ success: false, error: 'Element not found' });
+            }
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerPulseStop':
+        (async () => {
+          try {
+            if (!FSB.actionGlowOverlay || typeof FSB.actionGlowOverlay.clearPulse !== 'function') {
+              sendResponse({ success: false, error: 'actionGlowOverlay pulse unavailable' });
+              return;
+            }
+            FSB.actionGlowOverlay.clearPulse();
+            sendResponse({ success: true });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
       case 'resetDOMState':
         try {
           logger.logDOMOperation(FSB.sessionId, 'reset_state', { reason: 'new_session' });
