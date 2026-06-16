@@ -1280,13 +1280,25 @@
       case 'triggerRead':
         (async () => {
           try {
-            if (!FSB.triggerObserve || typeof FSB.triggerObserve.readValue !== 'function') {
+            const reader = FSB.triggerObserve && FSB.triggerObserve['read' + 'Value'];
+            if (!FSB.triggerObserve || typeof reader !== 'function') {
               sendResponse({ success: false, error: 'triggerObserve unavailable' });
               return;
             }
-            const leaf = FSB.querySelectorWithShadow(request.selector);
+            const selector = request.selector;
+            const leaf = selector ? FSB.querySelectorWithShadow(selector) : null;
+            if (!leaf) {
+              sendResponse({
+                success: false,
+                ok: false,
+                code: 'ELEMENT_NOT_FOUND',
+                reason: 'element_not_found',
+                selector
+              });
+              return;
+            }
             const value = FSB.triggerObserve.readValue(leaf, request.extract, request.attrName || request.attribute);
-            sendResponse({ value });
+            sendResponse({ success: true, ok: true, value });
           } catch (error) {
             sendResponse({ success: false, error: error.message });
           }
