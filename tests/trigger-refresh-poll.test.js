@@ -411,6 +411,43 @@ async function caseOwnershipSourceGuards() {
     'I.8 refresh-poll helper block does not activate tabs');
 }
 
+async function caseRefreshPollRunSourceGuards() {
+  console.log('\n--- Case J: refresh-poll reload/read/evaluate source guards ---');
+  const src = readSource(BACKGROUND_PATH);
+  const block = sourceSliceBetween(src, 'async function fsbTriggerSendRefreshPollRead', [
+    'async function fsbTriggerRearmLiveObserversForTab',
+    'async function fsbTriggerHandleObserveWatchdog'
+  ]);
+  const runIdx = block.indexOf('async function fsbTriggerRunRefreshPollTick');
+  const validateIdx = block.indexOf('fsbTriggerValidateRefreshPollOwnership');
+  const stampIdx = block.indexOf('stampAgentNavigation');
+  const reloadIdx = block.indexOf('chrome.tabs.reload');
+  const reportedIdx = block.indexOf('reported_value');
+  const handleIdx = block.indexOf('handleTriggerAlarm');
+  const elementNotFoundIdx = block.indexOf('ELEMENT_NOT_FOUND');
+
+  check(/async\s+function\s+fsbTriggerSendRefreshPollRead\s*\(/.test(src),
+    'J.1 fsbTriggerSendRefreshPollRead helper exists');
+  check(/async\s+function\s+fsbTriggerRunRefreshPollTick\s*\(/.test(src),
+    'J.2 fsbTriggerRunRefreshPollTick helper exists');
+  check(validateIdx >= 0 && reloadIdx >= 0 && validateIdx < reloadIdx,
+    'J.3 ownership validation appears before chrome.tabs.reload');
+  check(stampIdx >= 0 && reloadIdx >= 0 && stampIdx < reloadIdx,
+    'J.4 stampAgentNavigation appears before chrome.tabs.reload');
+  check(/chrome\.tabs\.reload\s*\(\s*(tabId|Number\s*\(\s*tabId\s*\))/.test(block),
+    'J.5 chrome.tabs.reload is called with explicit tabId');
+  check(/ensureContentScriptInjected\s*\(\s*tabId\s*\)/.test(block),
+    'J.6 refresh-poll read helper ensures content scripts before read');
+  check(/frameId\s*:\s*0/.test(block),
+    'J.7 triggerRead message targets frameId: 0');
+  check(reportedIdx >= 0 && handleIdx >= 0 && reportedIdx < handleIdx,
+    'J.8 reported_value is staged before handleTriggerAlarm');
+  check(elementNotFoundIdx >= 0 && handleIdx >= 0 && elementNotFoundIdx < handleIdx,
+    'J.9 ELEMENT_NOT_FOUND is handled before lifecycle delegation');
+  check(!/status\s*=\s*['"]fired['"]/.test(block) && !/status\s*:\s*['"]fired['"]/.test(block),
+    'J.10 refresh-poll background helpers do not set fired status');
+}
+
 (async () => {
   console.log('--- Phase 17 Plan 01: trigger refresh-poll cadence ---');
   await caseDefaultInterval();
@@ -422,6 +459,7 @@ async function caseOwnershipSourceGuards() {
   await caseRestoreRecomputesUnsafeNextPoll();
   await caseJitterAndDeadlineFloor();
   await caseOwnershipSourceGuards();
+  await caseRefreshPollRunSourceGuards();
 
   console.log('\ntrigger-refresh-poll.test: ' + passed + ' passed, ' + failed + ' failed');
   if (failed > 0) process.exit(1);
