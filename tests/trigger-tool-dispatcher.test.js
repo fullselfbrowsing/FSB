@@ -49,6 +49,14 @@ function functionSource(src, fnName) {
   return '';
 }
 
+function assertOrdered(src, earlier, later, msg) {
+  const a = src.indexOf(earlier);
+  const b = src.indexOf(later);
+  assert.ok(a >= 0, earlier + ' exists for order assertion');
+  assert.ok(b >= 0, later + ' exists for order assertion');
+  assert.ok(a < b, msg || (earlier + ' appears before ' + later));
+}
+
 function loadToolHandlers(extraGlobals) {
   const src = readSource(BACKGROUND_PATH);
   const start = src.indexOf('function fsbTriggerFirstString');
@@ -124,6 +132,19 @@ async function caseStorageSourceContracts() {
   assert.ok(!listSrc.includes('activeSessions'), 'list does not project from activeSessions');
 }
 
+async function caseStopSourceOrdering() {
+  const src = readSource(BACKGROUND_PATH);
+  const stopSrc = functionSource(src, 'fsbTriggerHandleToolStop');
+  const stopObserveSrc = functionSource(src, 'fsbTriggerStopObserveForSnapshot');
+  assert.ok(stopSrc.includes('function fsbTriggerHandleToolStop'), 'stop handler exists');
+  assert.ok(stopObserveSrc.includes('triggerObserveStop'), 'observe cleanup sends triggerObserveStop');
+  assert.ok(stopObserveSrc.includes('triggerPulseStop'), 'observe cleanup sends triggerPulseStop');
+  assertOrdered(stopSrc, 'FsbTriggerStore.readSnapshot', 'fsbTriggerStopObserveForSnapshot', 'stop reads snapshot before content cleanup');
+  assertOrdered(stopObserveSrc, 'triggerObserveStop', 'triggerPulseStop', 'observe stop precedes pulse stop');
+  assertOrdered(stopSrc, 'fsbTriggerStopObserveForSnapshot', 'FsbTriggerLifecycle.clearTrigger', 'content cleanup precedes lifecycle clear');
+  assertOrdered(stopSrc, 'fsbTriggerClearObserveWatchdog', 'FsbTriggerLifecycle.clearTrigger', 'watchdog cleanup precedes lifecycle clear');
+}
+
 async function caseStatusProjectionMath() {
   const handlers = loadToolHandlers();
   const status = handlers.fsbTriggerProjectTriggerStatus(makeSnapshot(), 2500);
@@ -168,6 +189,112 @@ async function caseCrossAgentStatusRejected() {
   assert.strictEqual(result.success, false, 'cross-agent status fails');
   assert.strictEqual(result.errorCode, 'TRIGGER_ACCESS_DENIED', 'cross-agent status returns typed access denial');
   assert.strictEqual(result.status, undefined, 'cross-agent status does not return snapshot data');
+}
+
+async function caseStopMissingIsIdempotent() {
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return null;
+      }
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolStop({ trigger_id: 'trg_missing' }, {});
+  assert.strictEqual(result.success, true, 'missing stop succeeds');
+  assert.strictEqual(result.stopped, false, 'missing stop does not report stopped');
+  assert.strictEqual(result.idempotent, true, 'missing stop is idempotent');
+  assert.strictEqual(result.status, 'not_found', 'missing stop status is not_found');
+}
+
+async function caseStopRejectsCrossAgentBeforeCleanup() {
+  const calls = [];
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot({ status: 'armed', agent_id: 'agent_a', ownership_token: 'tok_a' });
+      }
+    },
+    async fsbTriggerStopObserveForSnapshot() {
+      calls.push('observe');
+      return { ok: true };
+    },
+    async fsbTriggerClearObserveWatchdog() {
+      calls.push('watchdog');
+      return { ok: true };
+    },
+    FsbTriggerLifecycle: {
+      async clearTrigger() {
+        calls.push('lifecycle');
+        return { ok: true };
+      }
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolStop(
+    { trigger_id: 'trg_status' },
+    { agentId: 'agent_b', ownershipToken: 'tok_b' }
+  );
+  assert.strictEqual(result.success, false, 'cross-agent stop fails');
+  assert.strictEqual(result.errorCode, 'TRIGGER_ACCESS_DENIED', 'cross-agent stop returns typed denial');
+  assert.deepStrictEqual(calls, [], 'cross-agent stop performs no cleanup side effects');
+}
+
+async function caseStopActiveCleanupOrder() {
+  const calls = [];
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot({ status: 'armed', agent_id: null, ownership_token: null });
+      }
+    },
+    async fsbTriggerStopObserveForSnapshot() {
+      calls.push('observe');
+      return { ok: true };
+    },
+    async fsbTriggerClearObserveWatchdog() {
+      calls.push('watchdog');
+      return { ok: true };
+    },
+    FsbTriggerLifecycle: {
+      async clearTrigger() {
+        calls.push('lifecycle');
+        return { ok: true };
+      }
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolStop({ trigger_id: 'trg_status' }, {});
+  assert.strictEqual(result.success, true, 'active stop succeeds');
+  assert.strictEqual(result.stopped, true, 'active stop reports stopped');
+  assert.deepStrictEqual(calls, ['observe', 'watchdog', 'lifecycle'], 'active stop cleanup order is observe, watchdog, lifecycle');
+}
+
+async function caseStopTerminalCleanupIdempotent() {
+  const calls = [];
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot({ status: 'fired', agent_id: null, ownership_token: null });
+      }
+    },
+    async fsbTriggerStopObserveForSnapshot() {
+      calls.push('observe');
+      return { ok: true };
+    },
+    async fsbTriggerClearObserveWatchdog() {
+      calls.push('watchdog');
+      return { ok: true };
+    },
+    FsbTriggerLifecycle: {
+      async clearTrigger() {
+        calls.push('lifecycle');
+        return { ok: true };
+      }
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolStop({ trigger_id: 'trg_status' }, {});
+  assert.strictEqual(result.success, true, 'terminal stop succeeds');
+  assert.strictEqual(result.idempotent, true, 'terminal stop is idempotent');
+  assert.strictEqual(result.status, 'fired', 'terminal stop reports prior status');
+  assert.deepStrictEqual(calls, ['watchdog', 'lifecycle'], 'terminal stop skips content cleanup and clears watchdog before lifecycle');
 }
 
 async function caseAutopilotDerivesLegacyOwnerToken() {
@@ -228,9 +355,14 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('package wiring includes dispatcher test exactly once', casePackageWiring);
   await runCase('background exposes status/list helper surface', caseSourceSurface);
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
+  await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('status projection derives elapsed and remaining time', caseStatusProjectionMath);
   await runCase('list defaults to armed and attention states', caseListDefaultsToActiveAttentionStates);
   await runCase('cross-agent status is rejected without snapshot data', caseCrossAgentStatusRejected);
+  await runCase('missing stop returns idempotent success', caseStopMissingIsIdempotent);
+  await runCase('cross-agent stop is rejected before cleanup', caseStopRejectsCrossAgentBeforeCleanup);
+  await runCase('active stop clears observe then watchdog then lifecycle', caseStopActiveCleanupOrder);
+  await runCase('terminal stop clears watchdog and lifecycle idempotently', caseStopTerminalCleanupIdempotent);
   await runCase('autopilot derives legacy owner and ownership token', caseAutopilotDerivesLegacyOwnerToken);
   await runCase('autopilot rejects a tab owned by another agent', caseAutopilotRejectsForeignOwner);
 
