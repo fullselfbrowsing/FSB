@@ -452,25 +452,22 @@ The existing route-contract test already treats missing background registry rout
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
 | A1 | The exact public `trigger` input schema should include `selector`, `condition`, `watch`, `tab_id`/`tabId`, extraction options, and optional refresh-poll interval, but final names are at planner discretion. [ASSUMED] | Architecture Patterns | Tests and clients may need adjustment if implementation chooses different field names. |
-| A2 | A small `mcp/src/tools/triggers.ts` registrar is the cleanest way to keep `trigger` itself out of ordinary visual-session/manual registration while still sourcing schemas from the registry. [ASSUMED] | Recommended Project Structure | Planner may choose a smaller diff using `manual.ts` for bounded `trigger`; if so, Phase 19 must ensure no blocking wait is ever queued. |
-| A3 | Missing `get_trigger_status` should return a stable structured not-found response rather than throwing, mirroring cancellation idempotency where practical. [ASSUMED] | Open Questions | Client behavior may differ if status not-found is specified as an error envelope. |
+| A2 | A small `mcp/src/tools/triggers.ts` registrar is the chosen way to keep the trigger family out of ordinary visual-session/manual registration while still sourcing schemas from the registry. [RESOLVED] | Recommended Project Structure | If implementation instead uses `manual.ts`, the plan must be revised because duplicate registration and future Phase 19 queue migration risk return. |
+| A3 | Missing `get_trigger_status` returns a stable structured not-found error envelope rather than throwing. [RESOLVED] | Open Questions | Clients get deterministic not-found handling without conflating missing snapshots with active trigger state. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `trigger` itself bypass the MCP mutation queue in Phase 18?**
+1. **Should `trigger` itself bypass the MCP mutation queue in Phase 18? (RESOLVED)**
    - What we know: companions must bypass; `trigger` returns a bounded arm result in Phase 18; future blocking wait behavior is Phase 19. [VERIFIED: .planning/phases/18-shared-tool-registry-dispatcher-wiring/18-CONTEXT.md]
-   - What's unclear: locked decisions do not require `trigger` itself to bypass the queue in Phase 18. [VERIFIED: .planning/phases/18-shared-tool-registry-dispatcher-wiring/18-CONTEXT.md]
-   - Recommendation: register `trigger` through a trigger-specific direct registrar sourced from the shared registry and exclude the trigger family from `manual.ts`; this avoids visual-session fields and avoids creating a Phase 19 queue migration. [ASSUMED]
+   - Resolution: register `trigger` through a trigger-specific direct MCP registrar sourced from the shared registry, and exclude `trigger` from `manual.ts`. This keeps Phase 18 bounded, avoids visual-session fields, and avoids creating a Phase 19 queue migration. [RESOLVED: 18-03-PLAN.md]
 
-2. **What exact envelope should missing `get_trigger_status` return?**
+2. **What exact envelope should missing `get_trigger_status` return? (RESOLVED)**
    - What we know: `stop_trigger` missing/terminal is successful idempotent; status/list must be snapshot-backed. [VERIFIED: .planning/phases/18-shared-tool-registry-dispatcher-wiring/18-CONTEXT.md]
-   - What's unclear: context does not lock whether missing status is `{success:false,errorCode:'TRIGGER_NOT_FOUND'}` or `{success:true,status:'not_found'}`. [VERIFIED: .planning/phases/18-shared-tool-registry-dispatcher-wiring/18-CONTEXT.md]
-   - Recommendation: use a stable structured not-found response for status and exclude missing triggers from default list. [ASSUMED]
+   - Resolution: `get_trigger_status` returns `{ success:false, errorCode:'TRIGGER_NOT_FOUND', trigger_id }` for missing snapshots. `list_triggers` excludes missing/deleted triggers by construction and defaults to active/attention states. [RESOLVED: 18-02-PLAN.md]
 
-3. **How should autopilot calls carry `agent_id` and ownership token into background trigger arming?**
+3. **How should autopilot calls carry `agent_id` and ownership token into background trigger arming? (RESOLVED)**
    - What we know: MCP scoped bridge messages carry `agentId`/`ownershipToken`, and background refresh-poll ownership checks already use them. [VERIFIED: mcp/src/agent-bridge.ts; extension/background.js; extension/utils/agent-registry.js]
-   - What's unclear: autopilot `executeTool` currently passes tool args and `tabId` to background data handling, so Phase 18 needs to confirm where the active session’s `agent_id` is threaded for provider-driven `trigger`. [VERIFIED: extension/ai/agent-loop.js; extension/ai/tool-executor.js]
-   - Recommendation: explicitly thread active session `agent_id`/ownership token through the background tool call or derive it from the target tab owner in background before writing the trigger snapshot. [VERIFIED: extension/utils/agent-registry.js]
+   - Resolution: autopilot trigger calls pass `{ tabId, source:'autopilot' }` through `tool-executor.js`; `extension/background.js` derives `agentId` and `ownershipToken` from `globalThis.fsbAgentRegistryInstance` using the target tab. This matches the existing `handleStartAutomation` precedent that synthesizes/binds `legacy:autopilot` before autopilot loops run, and avoids trusting caller-supplied `agent_id`. [RESOLVED: extension/background.js; extension/ai/agent-loop.js; tests/legacy-agent-synthesis.test.js; 18-02-PLAN.md; 18-04-PLAN.md]
 
 ## Environment Availability
 
