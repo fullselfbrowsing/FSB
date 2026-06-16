@@ -407,9 +407,13 @@ const REC = require(REC_PATH);
   ok(publicPin.ok,
      'Part 9.5 -- INV-06 public Lattice package pin is coherent' + (publicPin.ok ? '' : ': ' + publicPin.errors.join('; ')));
 
-  var reqSrc = fs.readFileSync('.planning/REQUIREMENTS.md', 'utf8');
+  // Phase 10 (v0.10.0) ceremony assertion: validates the v0.10.0 REQUIREMENTS.md INV-02
+  // wording. v0.10.0 shipped and was archived, so this reads the archived requirements --
+  // the live .planning/REQUIREMENTS.md now holds the ACTIVE milestone's requirements and
+  // must be free to change each milestone without breaking this historical check.
+  var reqSrc = fs.readFileSync('.planning/milestones/v0.10.0-REQUIREMENTS.md', 'utf8');
   ok(reqSrc.indexOf('LIFECYCLE + TELEMETRY + DRIVING-MODEL ATTRIBUTION') !== -1,
-     'Part 9.6 -- REQUIREMENTS.md INV-02 wording extension landed (Phase 10 ceremony Plan 10-03 Task 1)');
+     'Part 9.6 -- v0.10.0 REQUIREMENTS.md INV-02 wording extension landed (Phase 10 ceremony Plan 10-03 Task 1; archived)');
 
   ok(/\|\s*Phase 10\s*\|/.test(latticePinSrc),
      'Part 9.7 -- LATTICE-PIN.md Phase 10 row present (Plan 10-03 Task 2 ceremony)');
