@@ -35,6 +35,29 @@ assertEqual(genericState.lifecycle, 'running', 'generic lifecycle is running');
 assertEqual(genericState.phase, 'analyzing', 'generic phase remains analyzing');
 assertEqual(genericState.progress.mode, 'indeterminate', 'generic automation is indeterminate');
 
+console.log('\n--- trigger watch mode is additive ---');
+
+const triggerWatchBaseInput = {
+  phase: 'analyzing',
+  taskName: 'Watch the price field',
+  iteration: 1,
+  maxIterations: 20
+};
+const triggerWatchControl = overlayStateUtils.buildOverlayState(triggerWatchBaseInput, null);
+const triggerWatchState = overlayStateUtils.buildOverlayState({
+  ...triggerWatchBaseInput,
+  mode: 'trigger-watch'
+}, null);
+
+assertEqual(triggerWatchState.mode, 'trigger-watch', 'trigger-watch mode passes through');
+assert(!Object.prototype.hasOwnProperty.call(triggerWatchControl, 'mode'), 'mode is absent when not supplied');
+assertEqual(triggerWatchState.lifecycle, triggerWatchControl.lifecycle, 'trigger-watch does not alter lifecycle');
+assertEqual(triggerWatchState.result, triggerWatchControl.result, 'trigger-watch does not alter result');
+assertEqual(triggerWatchState.phase, triggerWatchControl.phase, 'trigger-watch does not alter phase');
+assertEqual(JSON.stringify(triggerWatchState.display), JSON.stringify(triggerWatchControl.display), 'trigger-watch does not alter display');
+assertEqual(JSON.stringify(triggerWatchState.progress), JSON.stringify(triggerWatchControl.progress), 'trigger-watch does not alter progress');
+assertEqual(overlayStateUtils.humanizeOverlayPhase('trigger-watch'), 'Watching a trigger', 'trigger-watch label is centralized');
+
 console.log('\n--- explicit progress wins ---');
 
 const explicitState = overlayStateUtils.buildOverlayState({

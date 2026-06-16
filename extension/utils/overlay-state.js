@@ -136,6 +136,7 @@
       recovering: 'Recovering',
       writing: 'Writing',
       switching_tab: 'Switching Tabs',
+      'trigger-watch': 'Watching a trigger',
       complete: 'Complete',
       error: 'Error',
       cleared: 'Hidden'
@@ -370,6 +371,7 @@
     var sessionToken = statusData && statusData.sessionToken ? String(statusData.sessionToken) : null;
     var version = Number.isFinite(statusData && statusData.version) ? Number(statusData.version) : null;
     var clientLabel = statusData && statusData.clientLabel ? String(statusData.clientLabel) : null;
+    var mode = statusData && statusData.mode ? String(statusData.mode) : null;
     // Phase 243 plan 03 (UI-01): thread short agent id alongside clientLabel.
     // Sourced via formatAgentIdForDisplay (agent-registry.js:184) -- never sliced
     // locally. agentIdShort is a SEPARATE field (not concatenated upstream) so
@@ -381,6 +383,7 @@
       ...(version !== null ? { version: version } : {}),
       ...(clientLabel ? { clientLabel: clientLabel } : {}),
       ...(agentIdShort ? { agentIdShort: agentIdShort } : {}),
+      ...(mode ? { mode: mode } : {}),
       lifecycle: lifecycle,
       result: result,
       phase: lifecycle === 'cleared' ? 'cleared' : normalizedPhase,
