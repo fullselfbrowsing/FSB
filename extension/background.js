@@ -3707,6 +3707,42 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
   return { ok: true, action: 'evaluated', result: seamResult };
 }
 
+async function fsbTriggerHandleRefreshPollAlarm(alarm) {
+  if (typeof FsbTriggerLifecycle === 'undefined'
+      || !FsbTriggerLifecycle
+      || !FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX
+      || !alarm
+      || typeof alarm.name !== 'string'
+      || !alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
+    return { handled: false };
+  }
+
+  const triggerId = alarm.name.slice(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX.length);
+  if (!triggerId) {
+    return { handled: false, reason: 'malformed_alarm_name' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { handled: false, reason: 'store_unavailable' };
+  }
+
+  try {
+    const snap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+      return { handled: false };
+    }
+    const result = await fsbTriggerRunRefreshPollTick(triggerId, snap);
+    return Object.assign({ handled: true }, result || {});
+  } catch (err) {
+    return {
+      handled: true,
+      ok: false,
+      reason: 'refresh_poll_failed',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
 async function fsbTriggerHandleValueReport(request, sender) {
   const triggerId = request && typeof request.trigger_id === 'string' ? request.trigger_id : null;
   if (!triggerId) return { ok: false, reason: 'invalid_trigger_id' };
@@ -3837,6 +3873,7 @@ async function fsbTriggerArmLiveObserveForTest(spec) {
 }
 
 globalThis.fsbTriggerArmLiveObserveForTest = fsbTriggerArmLiveObserveForTest;
+globalThis.fsbTriggerHandleRefreshPollForTest = fsbTriggerHandleRefreshPollAlarm;
 
 // Classify failure type based on error message and context
 function classifyFailure(error, action, context = {}) {
@@ -13832,6 +13869,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       && typeof alarm.name === 'string'
       && alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
     try {
+      const refreshPoll = await fsbTriggerHandleRefreshPollAlarm(alarm);
+      if (refreshPoll && refreshPoll.handled) return;
       await FsbTriggerLifecycle.handleTriggerAlarm(alarm);
     } catch (err) {
       console.warn('[FSB TRG] handleTriggerAlarm failed (non-blocking):', err && err.message);
