@@ -65,7 +65,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. After in-page navigation / BF-cache restore / SPA soft-navigation the observer re-establishes itself and re-resolves the element via uniqueness scoring (against a stable container) so a watched element keeps firing; every observer is guaranteed-disconnected on fire/stop/`beforeunload`/re-injection (no leak, verified by an "every observer disconnected" test).
   3. While a trigger is active its watched element shows a gentle analyzing pulse (a Shadow-DOM glow variant, GPU-composited) that is visually distinct from the steady `run_task` glow, and the visual monitor labels itself "watching a trigger."
   4. The pulse clears on fire / stop / timeout / reap with no stuck glow (storage-backed clear deadline so a dead SW cannot strand it), does not collide with the `run_task` glow (one overlay owner per tab), and honors `prefers-reduced-motion` (animation off, static cue kept).
-**Plans**: TBD
+**Plans**: 4 plans (Wave 1: 16-01, 16-02 parallel; Wave 2: 16-03, 16-04 parallel)
+- [ ] 16-01-PLAN.md — trigger-observe.js: isolated-world single-element MutationObserver (clone dom-stream, rAF→trailing-setTimeout, narrowest container) + per-batch selector re-resolve + idempotent-arm guard + disconnect-all leak test + Node-mock tests [WATCH-01, WATCH-05]
+- [ ] 16-02-PLAN.md — analyzing pulse: ActionGlowOverlay @keyframes fsb-trigger-pulse Shadow-DOM variant (opacity/transform only, distinct from run_task glow) + reduced-motion + additive overlayState.mode='trigger-watch' label + pulse/overlay-state tests [VIS-01, VIS-02, VIS-03, VIS-04]
+- [ ] 16-03-PLAN.md — messaging.js router: 5 additive cases (triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop) wiring the observer + pulse APIs, one-overlay-per-tab gate [WATCH-01, VIS-01, VIS-03]
+- [ ] 16-04-PLAN.md — background.js SW glue: value-report onMessage ingress (writes reported_value → drives shipped Phase-15 SEAM) + idempotent watchdog alarm + SW-side full-reload re-arm + onAlarm watchdog branch + CONTENT_SCRIPT_FILES registration + test-arm path + extended SEAM test [WATCH-01, WATCH-05]
 **UI hint**: yes
 
 ### Phase 17: Refresh-Poll Watch (Tab-Owning Background Reload)
