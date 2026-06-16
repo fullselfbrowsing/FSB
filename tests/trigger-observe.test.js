@@ -181,6 +181,20 @@ check('triggerRead returns ELEMENT_NOT_FOUND before value extraction', () => {
   assert.match(block, /ok\s*:\s*true/, 'success path remains typed as ok true');
 });
 
+check('triggerRead returns TRIGGER_PAGE_BLOCKED before selector/value extraction', () => {
+  const block = triggerReadBlock();
+  const blockedIndex = block.indexOf('TRIGGER_PAGE_BLOCKED');
+  const queryIndex = block.indexOf('querySelectorWithShadow');
+  const readIndex = block.indexOf('readValue');
+  assert.notEqual(blockedIndex, -1, 'TRIGGER_PAGE_BLOCKED branch present');
+  assert.notEqual(queryIndex, -1, 'selector resolution remains present');
+  assert.notEqual(readIndex, -1, 'readValue call still present for successful reads');
+  assert.ok(blockedIndex < queryIndex, 'blocked-page branch appears before selector resolution');
+  assert.ok(blockedIndex < readIndex, 'blocked-page branch appears before value extraction');
+  assert.match(block, /blocked_reason/, 'blocked response includes blocked_reason');
+  assert.match(block, /url/, 'blocked response includes page url');
+});
+
 check('optsFor text/number observes childList + characterData + subtree only', () => {
   assert.deepEqual(plain(triggerObserve.optsFor('text')), { childList: true, characterData: true, subtree: true });
   assert.deepEqual(plain(triggerObserve.optsFor('number')), { childList: true, characterData: true, subtree: true });

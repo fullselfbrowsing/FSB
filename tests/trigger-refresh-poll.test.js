@@ -448,6 +448,33 @@ async function caseRefreshPollRunSourceGuards() {
     'J.10 refresh-poll background helpers do not set fired status');
 }
 
+async function caseBlockedPageSourceGuards() {
+  console.log('\n--- Case L: refresh-poll blocked-page source guards ---');
+  const src = readSource(BACKGROUND_PATH);
+  const block = sourceSliceBetween(src, 'async function fsbTriggerSendRefreshPollRead', [
+    'async function fsbTriggerRearmLiveObserversForTab',
+    'async function fsbTriggerHandleObserveWatchdog'
+  ]);
+  const restrictedIdx = block.indexOf('isRestrictedURL');
+  const reloadIdx = block.indexOf('await chrome.tabs.reload');
+  const blockedIdx = block.indexOf('TRIGGER_PAGE_BLOCKED');
+  const reportedIdx = block.indexOf('reported_value');
+  const handleIdx = block.indexOf('handleTriggerAlarm');
+
+  check(/TRIGGER_PAGE_BLOCKED/.test(src), 'L.1 TRIGGER_PAGE_BLOCKED handling exists in background source');
+  check(/status\s*=\s*['"]blocked['"]/.test(block) || /status\s*:\s*['"]blocked['"]/.test(block),
+    'L.2 blocked handling writes status blocked');
+  check(/attention_reason/.test(block), 'L.3 blocked handling writes attention_reason');
+  check(/last_attention/.test(block), 'L.4 blocked handling writes last_attention');
+  check(/blocked_reason/.test(block), 'L.5 blocked handling preserves blocked_reason');
+  check(restrictedIdx >= 0 && reloadIdx >= 0 && restrictedIdx < reloadIdx,
+    'L.6 restricted URL check appears before chrome.tabs.reload');
+  check(blockedIdx >= 0 && reportedIdx >= 0 && blockedIdx < reportedIdx,
+    'L.7 blocked response is handled before staging reported_value');
+  check(blockedIdx >= 0 && handleIdx >= 0 && blockedIdx < handleIdx,
+    'L.8 blocked response is handled before handleTriggerAlarm');
+}
+
 async function caseAlarmBranchSourceGuards() {
   console.log('\n--- Case K: refresh-poll alarm branch source guards ---');
   const src = readSource(BACKGROUND_PATH);
@@ -480,6 +507,7 @@ async function caseAlarmBranchSourceGuards() {
   await caseJitterAndDeadlineFloor();
   await caseOwnershipSourceGuards();
   await caseRefreshPollRunSourceGuards();
+  await caseBlockedPageSourceGuards();
   await caseAlarmBranchSourceGuards();
 
   console.log('\ntrigger-refresh-poll.test: ' + passed + ' passed, ' + failed + ' failed');
