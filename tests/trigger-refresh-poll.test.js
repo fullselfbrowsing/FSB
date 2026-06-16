@@ -475,6 +475,29 @@ async function caseBlockedPageSourceGuards() {
     'L.8 blocked response is handled before handleTriggerAlarm');
 }
 
+async function casePulseRestartSourceGuards() {
+  console.log('\n--- Case M: refresh-poll pulse restart source guards ---');
+  const src = readSource(BACKGROUND_PATH);
+  const block = sourceSliceBetween(src, 'async function fsbTriggerSendRefreshPollRead', [
+    'async function fsbTriggerRearmLiveObserversForTab',
+    'async function fsbTriggerHandleObserveWatchdog'
+  ]);
+  const handleIdx = block.indexOf('handleTriggerAlarm');
+  const latestIdx = block.indexOf('latestSnap');
+  const armedIdx = block.indexOf("latestSnap.status === 'armed'");
+  const pulseIdx = block.indexOf('triggerPulseStart', handleIdx);
+  const scheduleIdx = block.indexOf('scheduleNextRefreshPollAlarm', handleIdx);
+
+  check(/triggerPulseStart/.test(block), 'M.1 refresh-poll helper restarts triggerPulseStart');
+  check(/reason\s*:\s*['"]refresh-poll['"]/.test(block), 'M.2 pulse restart uses reason refresh-poll');
+  check(handleIdx >= 0 && latestIdx >= 0 && handleIdx < latestIdx,
+    'M.3 latest snapshot is re-read after handleTriggerAlarm');
+  check(armedIdx >= 0 && pulseIdx >= 0 && armedIdx < pulseIdx,
+    'M.4 status armed check appears before pulse restart');
+  check(pulseIdx >= 0 && scheduleIdx >= 0 && pulseIdx < scheduleIdx,
+    'M.5 pulse restart appears before next refresh-poll scheduling');
+}
+
 async function caseAlarmBranchSourceGuards() {
   console.log('\n--- Case K: refresh-poll alarm branch source guards ---');
   const src = readSource(BACKGROUND_PATH);
@@ -508,6 +531,7 @@ async function caseAlarmBranchSourceGuards() {
   await caseOwnershipSourceGuards();
   await caseRefreshPollRunSourceGuards();
   await caseBlockedPageSourceGuards();
+  await casePulseRestartSourceGuards();
   await caseAlarmBranchSourceGuards();
 
   console.log('\ntrigger-refresh-poll.test: ' + passed + ' passed, ' + failed + ' failed');
