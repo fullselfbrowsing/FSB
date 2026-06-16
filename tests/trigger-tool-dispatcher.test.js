@@ -76,7 +76,21 @@ function loadToolHandlers(extraGlobals) {
     String,
     Promise,
     Math,
-    crypto: { randomUUID: () => 'test-random-uuid' }
+    crypto: { randomUUID: () => 'test-random-uuid' },
+    fsbTriggerAttrName(snap) {
+      const condition = snap && snap.condition && typeof snap.condition === 'object' ? snap.condition : {};
+      return snap && (snap.attrName || snap.attribute || condition.attrName || condition.attribute || null);
+    },
+    fsbTriggerCopyReportedAttributes(attributes) {
+      if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return null;
+      return Object.assign({}, attributes);
+    },
+    fsbTriggerIsLiveObserveSnapshot(snap) {
+      return snap && snap.status === 'armed' && (snap.watch === 'live-observe' || snap.watch === 'live_observe');
+    },
+    fsbTriggerIsRefreshPollSnapshot(snap) {
+      return snap && snap.status === 'armed' && (snap.watch === 'refresh-poll' || snap.watch === 'refresh_poll');
+    }
   }, extraGlobals || {});
   context.globalThis = context;
   vm.createContext(context);

@@ -3627,6 +3627,322 @@ async function fsbTriggerSendRefreshPollRead(tabId, snap) {
   }, { frameId: 0 });
 }
 
+
+async function fsbTriggerGetRefreshPollTabState(tabId) {
+  if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
+    return { blocked: false, url: '' };
+  }
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab && (typeof tab.url === 'string' ? tab.url : (typeof tab.pendingUrl === 'string' ? tab.pendingUrl : ''));
+    if (!url || isRestrictedURL(url)) {
+      return { blocked: true, blocked_reason: 'restricted_url', url: url || '' };
+    }
+    return { blocked: false, url };
+  } catch (err) {
+    return {
+      blocked: true,
+      blocked_reason: 'restricted_url',
+      url: '',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+function fsbTriggerBuildBlockedAttention(snap, blockedReason, url, extra) {
+  return Object.assign({
+    selector: snap && snap.selector,
+    code: 'TRIGGER_PAGE_BLOCKED',
+    blocked_reason: blockedReason || 'challenge',
+    url: typeof url === 'string' ? url : ''
+  }, extra || {});
+}
+
+async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra) {
+  if (!triggerId || typeof triggerId !== 'string') {
+    return { ok: false, reason: 'invalid_trigger_id' };
+  }
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.writeSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+  const now = Date.now();
+  if (reason === 'blocked') {
+    snap.status = 'blocked';
+  } else {
+    snap.status = 'needs_attention';
+  }
+  snap.attention_reason = reason;
+  snap.attention_at = now;
+  snap.last_attention = Object.assign({ reason, at: now }, extra || {});
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+  return { ok: true, action: snap.status, reason };
+}
+
+async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
+  if (!triggerId || typeof triggerId !== 'string') {
+    return { ok: false, reason: 'invalid_trigger_id' };
+  }
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+    return { ok: true, ignored: true };
+  }
+  if (!snap.selector) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'invalid_selector');
+  }
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.writeSnapshot !== 'function'
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const ownership = fsbTriggerValidateRefreshPollOwnership(snap);
+  if (!ownership || ownership.ok !== true) {
+    return fsbTriggerMarkRefreshPollAttention(
+      triggerId,
+      snap,
+      'ownership_failed',
+      ownership || { code: 'OWNERSHIP_VALIDATION_FAILED' }
+    );
+  }
+  const tabId = ownership.tabId;
+  const registry = ownership.registry;
+
+  if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: 'TABS_UNAVAILABLE',
+      requestedTabId: tabId,
+      requestingAgentId: ownership.agentId
+    });
+  }
+
+  const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  if (preReloadTab && preReloadTab.blocked) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', preReloadTab.url, { error: preReloadTab.error }));
+  }
+
+  if (registry && typeof registry.stampAgentNavigation === 'function') {
+    try {
+      registry.stampAgentNavigation(tabId);
+    } catch (_err) { /* best-effort navigation stamp */ }
+  }
+
+  let readResult;
+  try {
+    await chrome.tabs.reload(tabId);
+    await fsbTriggerWaitForRefreshPollReady(tabId);
+
+    const postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+    if (postReloadTab && postReloadTab.blocked) {
+      return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    }
+
+    readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  } catch (err) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+
+  if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
+  }
+  if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector, code: 'ELEMENT_NOT_FOUND' });
+  }
+  if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: readResult && readResult.code,
+      error: readResult && (readResult.error || readResult.reason)
+    });
+  }
+
+  const value = readResult.value;
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  if (seamResult && seamResult.action !== 'fired'
+      && typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
+    const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (fsbTriggerIsRefreshPollSnapshot(latestSnap) && latestSnap.status === 'armed') {
+      await fsbTriggerSendTabMessage(tabId, {
+        action: 'triggerPulseStart',
+        selector: latestSnap.selector,
+        reason: 'refresh-poll'
+      });
+      await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
+      await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
+    }
+  }
+
+  return { ok: true, action: 'evaluated', result: seamResult };
+}
+
+async function fsbTriggerHandleRefreshPollAlarm(alarm) {
+  if (typeof FsbTriggerLifecycle === 'undefined'
+      || !FsbTriggerLifecycle
+      || !FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX
+      || !alarm
+      || typeof alarm.name !== 'string'
+      || !alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
+    return { handled: false };
+  }
+
+  const triggerId = alarm.name.slice(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX.length);
+  if (!triggerId) {
+    return { handled: false, reason: 'malformed_alarm_name' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { handled: false, reason: 'store_unavailable' };
+  }
+
+  try {
+    const snap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+      return { handled: false };
+    }
+    const result = await fsbTriggerRunRefreshPollTick(triggerId, snap);
+    return Object.assign({ handled: true }, result || {});
+  } catch (err) {
+    try {
+      if (typeof FsbTriggerStore !== 'undefined'
+          && FsbTriggerStore
+          && typeof FsbTriggerStore.readSnapshot === 'function'
+          && typeof FsbTriggerStore.writeSnapshot === 'function') {
+        const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+        if (fsbTriggerIsRefreshPollSnapshot(latestSnap)) {
+          await fsbTriggerMarkRefreshPollAttention(triggerId, latestSnap, 'refresh_poll_failed', {
+            error: err && err.message ? err.message : String(err)
+          });
+        }
+      }
+    } catch (_markErr) { /* preserve the original failure result */ }
+    return {
+      handled: true,
+      ok: false,
+      reason: 'refresh_poll_failed',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+async function fsbTriggerHandleValueReport(request, sender) {
+  const triggerId = request && typeof request.trigger_id === 'string' ? request.trigger_id : null;
+  if (!triggerId) return { ok: false, reason: 'invalid_trigger_id' };
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap || snap.status !== 'armed') {
+    return { ok: true, ignored: true };
+  }
+
+  const senderTabId = sender && sender.tab ? Number(sender.tab.id) : null;
+  if (Number.isFinite(Number(snap.target_tab_id))
+      && (!Number.isFinite(senderTabId) || Number(snap.target_tab_id) !== senderTabId)) {
+    return { ok: true, ignored: true, reason: 'foreign_tab' };
+  }
+
+  const value = request.value && typeof request.value === 'object' ? request.value : {};
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  await fsbTriggerArmObserveWatchdog(triggerId);
+
+  if (seamResult && seamResult.action === 'fired') {
+    await fsbTriggerClearObserveWatchdog(triggerId);
+    await fsbTriggerStopObserveForSnapshot(Object.assign({}, snap, {
+      target_tab_id: Number.isFinite(senderTabId) ? senderTabId : snap.target_tab_id
+    }));
+  }
+
+  return { ok: true, result: seamResult };
+}
+
+async function fsbTriggerRearmLiveObserversForTab(tabId, reason) {
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.listArmedSnapshots !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+  const armed = await FsbTriggerStore.listArmedSnapshots();
+  const owned = (Array.isArray(armed) ? armed : []).filter((snap) => {
+    return fsbTriggerIsLiveObserveSnapshot(snap) && Number(snap.target_tab_id) === Number(tabId);
+  });
+  for (const snap of owned) {
+    try {
+      await fsbTriggerStartObserveForSnapshot(snap, reason || 'rearm');
+    } catch (err) {
+      console.warn('[FSB TRG] live-observe re-arm failed (non-blocking):', err && err.message);
+    }
+  }
+  return { ok: true, rearmed: owned.length };
+}
+
+async function fsbTriggerHandleObserveWatchdog(alarm) {
+  const triggerId = alarm && typeof alarm.name === 'string'
+    ? alarm.name.slice(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX.length)
+    : '';
+  if (!triggerId
+      || typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'invalid_watchdog' };
+  }
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!fsbTriggerIsLiveObserveSnapshot(snap)) {
+    await fsbTriggerClearObserveWatchdog(triggerId);
+    return { ok: true, ignored: true };
+  }
+  const now = Date.now();
+  const lastSeen = Number(snap.last_reported_at || snap.last_evaluated_at || snap.armed_at || 0);
+  if (Number.isFinite(lastSeen) && lastSeen > 0 && now - lastSeen <= FSB_TRIGGER_OBSERVE_STALE_MS) {
+    return { ok: true, stale: false };
+  }
+  return fsbTriggerStartObserveForSnapshot(snap, 'watchdog');
+}
+
 function fsbTriggerFirstString() {
   for (let i = 0; i < arguments.length; i++) {
     const value = arguments[i];
@@ -4021,322 +4337,220 @@ async function fsbTriggerHandleToolStop(params, context) {
   return { success: true, stopped: true, trigger_id: triggerId, cleanup };
 }
 
-globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList, fsbTriggerHandleToolStop: fsbTriggerHandleToolStop };
-
-async function fsbTriggerGetRefreshPollTabState(tabId) {
-  if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
-    return { blocked: false, url: '' };
+function fsbTriggerValidateToolCondition(condition, nested) {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'condition_required' };
   }
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    const url = tab && (typeof tab.url === 'string' ? tab.url : (typeof tab.pendingUrl === 'string' ? tab.pendingUrl : ''));
-    if (!url || isRestrictedURL(url)) {
-      return { blocked: true, blocked_reason: 'restricted_url', url: url || '' };
+
+  const combinator = fsbTriggerFirstString(condition.combinator);
+  if (combinator) {
+    const upper = combinator.toUpperCase();
+    if (nested || (upper !== 'AND' && upper !== 'OR') || !Array.isArray(condition.conditions) || condition.conditions.length === 0) {
+      return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'compound_invalid' };
     }
-    return { blocked: false, url };
-  } catch (err) {
-    return {
-      blocked: true,
-      blocked_reason: 'restricted_url',
-      url: '',
-      error: err && err.message ? err.message : String(err)
-    };
-  }
-}
-
-function fsbTriggerBuildBlockedAttention(snap, blockedReason, url, extra) {
-  return Object.assign({
-    selector: snap && snap.selector,
-    code: 'TRIGGER_PAGE_BLOCKED',
-    blocked_reason: blockedReason || 'challenge',
-    url: typeof url === 'string' ? url : ''
-  }, extra || {});
-}
-
-async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra) {
-  if (!triggerId || typeof triggerId !== 'string') {
-    return { ok: false, reason: 'invalid_trigger_id' };
-  }
-  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.writeSnapshot !== 'function') {
-    return { ok: false, reason: 'store_unavailable' };
-  }
-  const now = Date.now();
-  if (reason === 'blocked') {
-    snap.status = 'blocked';
-  } else {
-    snap.status = 'needs_attention';
-  }
-  snap.attention_reason = reason;
-  snap.attention_at = now;
-  snap.last_attention = Object.assign({ reason, at: now }, extra || {});
-  await FsbTriggerStore.writeSnapshot(triggerId, snap);
-  return { ok: true, action: snap.status, reason };
-}
-
-async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
-  if (!triggerId || typeof triggerId !== 'string') {
-    return { ok: false, reason: 'invalid_trigger_id' };
-  }
-  if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
-    return { ok: true, ignored: true };
-  }
-  if (!snap.selector) {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'invalid_selector');
-  }
-  if (typeof FsbTriggerStore === 'undefined'
-      || !FsbTriggerStore
-      || typeof FsbTriggerStore.writeSnapshot !== 'function'
-      || typeof FsbTriggerStore.readSnapshot !== 'function') {
-    return { ok: false, reason: 'store_unavailable' };
-  }
-
-  const ownership = fsbTriggerValidateRefreshPollOwnership(snap);
-  if (!ownership || ownership.ok !== true) {
-    return fsbTriggerMarkRefreshPollAttention(
-      triggerId,
-      snap,
-      'ownership_failed',
-      ownership || { code: 'OWNERSHIP_VALIDATION_FAILED' }
-    );
-  }
-  const tabId = ownership.tabId;
-  const registry = ownership.registry;
-
-  if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
-      selector: snap.selector,
-      code: 'TABS_UNAVAILABLE',
-      requestedTabId: tabId,
-      requestingAgentId: ownership.agentId
-    });
-  }
-
-  const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
-  if (preReloadTab && preReloadTab.blocked) {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
-      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', preReloadTab.url, { error: preReloadTab.error }));
-  }
-
-  if (registry && typeof registry.stampAgentNavigation === 'function') {
-    try {
-      registry.stampAgentNavigation(tabId);
-    } catch (_err) { /* best-effort navigation stamp */ }
-  }
-
-  let readResult;
-  try {
-    await chrome.tabs.reload(tabId);
-    await fsbTriggerWaitForRefreshPollReady(tabId);
-
-    const postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
-    if (postReloadTab && postReloadTab.blocked) {
-      return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
-        fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    for (let i = 0; i < condition.conditions.length; i++) {
+      const child = fsbTriggerValidateToolCondition(condition.conditions[i], true);
+      if (!child.ok) return child;
     }
-
-    readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
-  } catch (err) {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
-      selector: snap.selector,
-      error: err && err.message ? err.message : String(err)
-    });
+    return { ok: true };
   }
 
+  const kind = fsbTriggerFirstString(condition.kind);
+  if (['changed', 'threshold', 'equals', 'regex', 'contains', 'percent_change'].indexOf(kind) === -1) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'kind_invalid' };
+  }
+
+  if (kind === 'threshold') {
+    const operator = fsbTriggerFirstString(condition.operator);
+    if (['>=', '<=', '>', '<'].indexOf(operator) === -1 || condition.target === undefined || condition.target === null) {
+      return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'threshold_invalid' };
+    }
+  }
+  if (kind === 'regex' && typeof condition.pattern !== 'string') {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'regex_invalid' };
+  }
+  if ((kind === 'contains' || kind === 'equals') && condition.value === undefined) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: kind + '_invalid' };
+  }
+  if (kind === 'percent_change' && !Number.isFinite(Number(condition.percent))) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'percent_change_invalid' };
+  }
+
+  return { ok: true };
+}
+
+function fsbTriggerNormalizeToolWatch(value) {
+  const raw = fsbTriggerFirstString(value) || 'live-observe';
+  if (raw === 'refresh_poll') return 'refresh-poll';
+  if (raw === 'live_observe') return 'live-observe';
+  if (raw === 'refresh-poll' || raw === 'live-observe') return raw;
+  return null;
+}
+
+function fsbTriggerToolAttrName(params) {
+  return fsbTriggerFirstString(
+    params && params.attrName,
+    params && params.attr_name,
+    params && params.attribute
+  );
+}
+
+function fsbTriggerToolExtract(params, condition) {
+  return fsbTriggerFirstString(
+    params && params.extract,
+    condition && condition.extract
+  ) || 'text';
+}
+
+function fsbTriggerCopyIntervalAliases(params, spec) {
+  ['poll_interval_ms', 'pollIntervalMs', 'interval_ms', 'intervalMs'].forEach((key) => {
+    if (params && Object.prototype.hasOwnProperty.call(params, key)) {
+      spec[key] = params[key];
+    }
+  });
+}
+
+function fsbTriggerReadResultValue(readResult) {
+  if (!readResult || readResult.success === false || readResult.ok === false) return null;
+  if (readResult.value && typeof readResult.value === 'object') return readResult.value;
+  return null;
+}
+
+async function fsbTriggerHandleToolArm(params, context) {
+  const safeParams = (params && typeof params === 'object') ? params : {};
+  const sender = context && context.sender;
+  const tabId = fsbTriggerFirstFiniteTabId(
+    safeParams.tab_id,
+    safeParams.target_tab_id,
+    safeParams.tabId,
+    context && context.tab_id,
+    context && context.target_tab_id,
+    context && context.tabId,
+    sender && sender.tab && sender.tab.id
+  );
+
+  const ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(Object.assign({}, safeParams, { target_tab_id: tabId }), context),
+    sender
+  );
+  if (ownerContext && ownerContext.accessDenied) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED' };
+  }
+
+  const selector = fsbTriggerFirstString(safeParams.selector);
+  if (!selector) {
+    return { success: false, errorCode: 'TRIGGER_SELECTOR_INVALID' };
+  }
+  if (!Number.isFinite(Number(tabId))) {
+    return { success: false, errorCode: 'INVALID_TAB_ID' };
+  }
+
+  const condition = safeParams.condition;
+  const conditionValidation = fsbTriggerValidateToolCondition(condition);
+  if (!conditionValidation.ok) {
+    return Object.assign({ success: false }, conditionValidation);
+  }
+
+  const watch = fsbTriggerNormalizeToolWatch(safeParams.watch || safeParams.mode);
+  if (!watch) {
+    return { success: false, errorCode: 'TRIGGER_WATCH_INVALID' };
+  }
+
+  const extract = fsbTriggerToolExtract(safeParams, condition);
+  const attrName = fsbTriggerToolAttrName(safeParams) || fsbTriggerAttrName({ condition });
+  const readShape = { selector, condition, extract, attrName };
+  const readResult = await fsbTriggerSendRefreshPollRead(Number(tabId), readShape);
   if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
-      fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
+    return Object.assign({ success: false, errorCode: 'TRIGGER_PAGE_BLOCKED' }, readResult);
   }
   if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector, code: 'ELEMENT_NOT_FOUND' });
+    return Object.assign({ success: false, errorCode: 'ELEMENT_NOT_FOUND' }, readResult);
   }
-  if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
-    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
-      selector: snap.selector,
-      code: readResult && readResult.code,
-      error: readResult && (readResult.error || readResult.reason)
-    });
-  }
-
-  const value = readResult.value;
-  const now = Date.now();
-  snap.reported_value = (typeof value.text === 'string')
-    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
-    : snap.last_value;
-  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
-  if (attrs) snap.reported_attributes = attrs;
-  snap.last_reported_at = now;
-  await FsbTriggerStore.writeSnapshot(triggerId, snap);
-
-  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
-  if (typeof FsbTriggerLifecycle !== 'undefined'
-      && FsbTriggerLifecycle
-      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
-      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
-    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
-      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
-    });
-  }
-
-  if (seamResult && seamResult.action !== 'fired'
-      && typeof FsbTriggerLifecycle !== 'undefined'
-      && FsbTriggerLifecycle
-      && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
-    const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
-    if (fsbTriggerIsRefreshPollSnapshot(latestSnap) && latestSnap.status === 'armed') {
-      await fsbTriggerSendTabMessage(tabId, {
-        action: 'triggerPulseStart',
-        selector: latestSnap.selector,
-        reason: 'refresh-poll'
-      });
-      await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
-      await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
-    }
-  }
-
-  return { ok: true, action: 'evaluated', result: seamResult };
-}
-
-async function fsbTriggerHandleRefreshPollAlarm(alarm) {
-  if (typeof FsbTriggerLifecycle === 'undefined'
-      || !FsbTriggerLifecycle
-      || !FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX
-      || !alarm
-      || typeof alarm.name !== 'string'
-      || !alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
-    return { handled: false };
-  }
-
-  const triggerId = alarm.name.slice(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX.length);
-  if (!triggerId) {
-    return { handled: false, reason: 'malformed_alarm_name' };
-  }
-
-  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
-    return { handled: false, reason: 'store_unavailable' };
-  }
-
-  try {
-    const snap = await FsbTriggerStore.readSnapshot(triggerId);
-    if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
-      return { handled: false };
-    }
-    const result = await fsbTriggerRunRefreshPollTick(triggerId, snap);
-    return Object.assign({ handled: true }, result || {});
-  } catch (err) {
-    try {
-      if (typeof FsbTriggerStore !== 'undefined'
-          && FsbTriggerStore
-          && typeof FsbTriggerStore.readSnapshot === 'function'
-          && typeof FsbTriggerStore.writeSnapshot === 'function') {
-        const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
-        if (fsbTriggerIsRefreshPollSnapshot(latestSnap)) {
-          await fsbTriggerMarkRefreshPollAttention(triggerId, latestSnap, 'refresh_poll_failed', {
-            error: err && err.message ? err.message : String(err)
-          });
-        }
-      }
-    } catch (_markErr) { /* preserve the original failure result */ }
+  const value = fsbTriggerReadResultValue(readResult);
+  if (!value || typeof value.text !== 'string') {
     return {
-      handled: true,
-      ok: false,
-      reason: 'refresh_poll_failed',
-      error: err && err.message ? err.message : String(err)
+      success: false,
+      errorCode: 'TRIGGER_READ_FAILED',
+      reason: readResult && (readResult.reason || readResult.error || readResult.code)
     };
   }
-}
 
-async function fsbTriggerHandleValueReport(request, sender) {
-  const triggerId = request && typeof request.trigger_id === 'string' ? request.trigger_id : null;
-  if (!triggerId) return { ok: false, reason: 'invalid_trigger_id' };
-  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
-    return { ok: false, reason: 'store_unavailable' };
-  }
-
-  const snap = await FsbTriggerStore.readSnapshot(triggerId);
-  if (!snap || snap.status !== 'armed') {
-    return { ok: true, ignored: true };
-  }
-
-  const senderTabId = sender && sender.tab ? Number(sender.tab.id) : null;
-  if (Number.isFinite(Number(snap.target_tab_id))
-      && (!Number.isFinite(senderTabId) || Number(snap.target_tab_id) !== senderTabId)) {
-    return { ok: true, ignored: true, reason: 'foreign_tab' };
-  }
-
-  const value = request.value && typeof request.value === 'object' ? request.value : {};
-  const now = Date.now();
-  snap.reported_value = (typeof value.text === 'string')
-    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
-    : snap.last_value;
+  const triggerId = fsbTriggerFirstString(safeParams.trigger_id)
+    || (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : ('trigger_' + Date.now().toString(36)));
+  const spec = {
+    trigger_id: triggerId,
+    condition,
+    selector,
+    baseline: value.text,
+    reported_value: value.text,
+    target_tab_id: Number(tabId),
+    agent_id: ownerContext && ownerContext.agentId,
+    ownership_token: ownerContext && ownerContext.ownershipToken,
+    watch,
+    extract,
+    attrName
+  };
   const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
-  if (attrs) snap.reported_attributes = attrs;
-  snap.last_reported_at = now;
-  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+  if (attrs) spec.reported_attributes = attrs;
+  fsbTriggerCopyIntervalAliases(safeParams, spec);
 
-  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
-  if (typeof FsbTriggerLifecycle !== 'undefined'
-      && FsbTriggerLifecycle
-      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
-      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
-    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
-      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+  const triggerManager = (typeof FsbTriggerManager !== 'undefined') ? FsbTriggerManager : null;
+  if (!triggerManager || typeof triggerManager.armTrigger !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_MANAGER_UNAVAILABLE', trigger_id: triggerId };
+  }
+
+  const armResult = await FsbTriggerManager.armTrigger(spec);
+  if (!armResult || armResult.ok === false || armResult.error || armResult.code) {
+    return Object.assign({
+      success: false,
+      errorCode: (armResult && (armResult.code || armResult.error)) || 'TRIGGER_ARM_FAILED',
+      trigger_id: triggerId
+    }, armResult || {});
+  }
+
+  let snapshot = null;
+  if (typeof FsbTriggerStore !== 'undefined'
+      && FsbTriggerStore
+      && typeof FsbTriggerStore.readSnapshot === 'function') {
+    snapshot = await FsbTriggerStore.readSnapshot(triggerId);
+  }
+  if (!snapshot) snapshot = Object.assign({ status: 'armed', armed_at: Date.now() }, spec);
+
+  if (fsbTriggerIsLiveObserveSnapshot(snapshot)) {
+    await fsbTriggerStartObserveForSnapshot(snapshot, 'trigger-arm');
+  } else if (fsbTriggerIsRefreshPollSnapshot(snapshot)) {
+    await fsbTriggerSendTabMessage(Number(tabId), {
+      action: 'triggerPulseStart',
+      selector: snapshot.selector,
+      reason: 'trigger-arm'
     });
   }
 
-  await fsbTriggerArmObserveWatchdog(triggerId);
-
-  if (seamResult && seamResult.action === 'fired') {
-    await fsbTriggerClearObserveWatchdog(triggerId);
-    await fsbTriggerStopObserveForSnapshot(Object.assign({}, snap, {
-      target_tab_id: Number.isFinite(senderTabId) ? senderTabId : snap.target_tab_id
-    }));
-  }
-
-  return { ok: true, result: seamResult };
+  return {
+    success: true,
+    trigger_id: triggerId,
+    status: fsbTriggerProjectTriggerStatus(snapshot, Date.now())
+  };
 }
 
-async function fsbTriggerRearmLiveObserversForTab(tabId, reason) {
-  if (typeof FsbTriggerStore === 'undefined'
-      || !FsbTriggerStore
-      || typeof FsbTriggerStore.listArmedSnapshots !== 'function') {
-    return { ok: false, reason: 'store_unavailable' };
+async function fsbTriggerDispatchToolRequest(toolName, params, context) {
+  switch (toolName) {
+    case 'trigger':
+      return fsbTriggerHandleToolArm(params, context);
+    case 'stop_trigger':
+      return fsbTriggerHandleToolStop(params, context);
+    case 'get_trigger_status':
+      return fsbTriggerHandleToolStatus(params, context);
+    case 'list_triggers':
+      return fsbTriggerHandleToolList(params, context);
+    default:
+      return { success: false, errorCode: 'TRIGGER_TOOL_UNKNOWN', tool: toolName };
   }
-  const armed = await FsbTriggerStore.listArmedSnapshots();
-  const owned = (Array.isArray(armed) ? armed : []).filter((snap) => {
-    return fsbTriggerIsLiveObserveSnapshot(snap) && Number(snap.target_tab_id) === Number(tabId);
-  });
-  for (const snap of owned) {
-    try {
-      await fsbTriggerStartObserveForSnapshot(snap, reason || 'rearm');
-    } catch (err) {
-      console.warn('[FSB TRG] live-observe re-arm failed (non-blocking):', err && err.message);
-    }
-  }
-  return { ok: true, rearmed: owned.length };
 }
 
-async function fsbTriggerHandleObserveWatchdog(alarm) {
-  const triggerId = alarm && typeof alarm.name === 'string'
-    ? alarm.name.slice(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX.length)
-    : '';
-  if (!triggerId
-      || typeof FsbTriggerStore === 'undefined'
-      || !FsbTriggerStore
-      || typeof FsbTriggerStore.readSnapshot !== 'function') {
-    return { ok: false, reason: 'invalid_watchdog' };
-  }
-  const snap = await FsbTriggerStore.readSnapshot(triggerId);
-  if (!fsbTriggerIsLiveObserveSnapshot(snap)) {
-    await fsbTriggerClearObserveWatchdog(triggerId);
-    return { ok: true, ignored: true };
-  }
-  const now = Date.now();
-  const lastSeen = Number(snap.last_reported_at || snap.last_evaluated_at || snap.armed_at || 0);
-  if (Number.isFinite(lastSeen) && lastSeen > 0 && now - lastSeen <= FSB_TRIGGER_OBSERVE_STALE_MS) {
-    return { ok: true, stale: false };
-  }
-  return fsbTriggerStartObserveForSnapshot(snap, 'watchdog');
-}
+globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerValidateToolCondition: fsbTriggerValidateToolCondition, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList, fsbTriggerHandleToolStop: fsbTriggerHandleToolStop, fsbTriggerHandleToolArm: fsbTriggerHandleToolArm, fsbTriggerDispatchToolRequest: fsbTriggerDispatchToolRequest };
 
 async function fsbTriggerArmLiveObserveForTest(spec) {
   const safeSpec = spec && typeof spec === 'object' ? spec : {};
