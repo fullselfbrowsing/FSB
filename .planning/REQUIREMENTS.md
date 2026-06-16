@@ -48,13 +48,13 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 - [ ] **LIFE-02**: User can query a trigger with `get_trigger_status` -- state, current vs initial value, condition, watch mode, elapsed / remaining, last-check time.
 - [ ] **LIFE-03**: User can list all active triggers with `list_triggers`.
 - [ ] **LIFE-04**: Multiple triggers can be active concurrently under a configurable cap (mirrors the v0.9.60 agent cap, 1-64); exceeding the cap fails loudly with a typed error.
-- [ ] **LIFE-05**: A trigger has a maximum lifetime (TTL); orphaned / expired triggers are reaped and their resources (observer, alarm, pulse, registry entry) released.
+- [x] **LIFE-05**: A trigger has a maximum lifetime (TTL); orphaned / expired triggers are reaped and their resources (observer, alarm, pulse, registry entry) released.
 
 ### SURV -- MV3 survivability (session-scoped)
 
 - [x] **SURV-01**: An armed trigger survives service-worker eviction -- trigger state persists in `chrome.storage.session` and the watch re-arms on SW wake via `chrome.alarms` (no keepalive antipatterns; the load-bearing `setTimeout` agent-loop iterator is untouched, INV-04).
-- [ ] **SURV-02**: Fire evaluation (compare + fire decision) happens in the service worker against persisted state, so an eviction between read and decision cannot drop or duplicate a fire.
-- [ ] **SURV-03**: On SW wake, the trigger registry reconciles persisted triggers (re-attach observers / reschedule polls) without duplicate fires or orphaned watchers.
+- [x] **SURV-02**: Fire evaluation (compare + fire decision) happens in the service worker against persisted state, so an eviction between read and decision cannot drop or duplicate a fire.
+- [x] **SURV-03**: On SW wake, the trigger registry reconciles persisted triggers (re-attach observers / reschedule polls) without duplicate fires or orphaned watchers.
 
 ### VIS -- Visual feedback
 
@@ -136,10 +136,10 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | LIFE-02 | Phase 18 | Pending |
 | LIFE-03 | Phase 18 | Pending |
 | LIFE-04 | Phase 15 | Pending |
-| LIFE-05 | Phase 14 | Pending |
+| LIFE-05 | Phase 14 | Complete |
 | SURV-01 | Phase 14 | Complete |
-| SURV-02 | Phase 14 | Pending |
-| SURV-03 | Phase 14 | Pending |
+| SURV-02 | Phase 14 | Complete |
+| SURV-03 | Phase 14 | Complete |
 | VIS-01 | Phase 16 | Pending |
 | VIS-02 | Phase 16 | Pending |
 | VIS-03 | Phase 16 | Pending |
