@@ -10,12 +10,12 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 ### TRIG -- Core trigger tool & fire conditions
 
 - [ ] **TRIG-01**: User can arm a trigger on one targeted DOM element (via FSB's uniqueness-scored selector) by specifying a fire condition.
-- [ ] **TRIG-02**: A trigger supports the `changed` condition -- fires when the element's value differs from the baseline captured at arm time.
-- [ ] **TRIG-03**: A trigger supports the `threshold` condition with operators `>=`, `<=`, `>`, `<` against a numeric target.
-- [ ] **TRIG-04**: A trigger supports the `equals` / `regex` condition -- exact value match or a caller-supplied regular expression (compiled once, guarded against catastrophic backtracking).
-- [ ] **TRIG-05**: A trigger supports the `contains` condition -- fires when the extracted text contains a substring (case-insensitive by default).
-- [ ] **TRIG-06**: A trigger supports the `percent_change` condition -- fires when the value moves +/- N% from the arm-time baseline.
-- [ ] **TRIG-07**: A trigger supports compound conditions -- multiple conditions on the same element combined with explicit AND / OR semantics in a single trigger.
+- [x] **TRIG-02**: A trigger supports the `changed` condition -- fires when the element's value differs from the baseline captured at arm time.
+- [x] **TRIG-03**: A trigger supports the `threshold` condition with operators `>=`, `<=`, `>`, `<` against a numeric target.
+- [x] **TRIG-04**: A trigger supports the `equals` / `regex` condition -- exact value match or a caller-supplied regular expression (compiled once, guarded against catastrophic backtracking).
+- [x] **TRIG-05**: A trigger supports the `contains` condition -- fires when the extracted text contains a substring (case-insensitive by default).
+- [x] **TRIG-06**: A trigger supports the `percent_change` condition -- fires when the value moves +/- N% from the arm-time baseline.
+- [x] **TRIG-07**: A trigger supports compound conditions -- multiple conditions on the same element combined with explicit AND / OR semantics in a single trigger.
 
 ### WATCH -- Watch mechanisms
 
@@ -47,7 +47,7 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 - [ ] **LIFE-01**: User can stop an active trigger with `stop_trigger`, which tears down the observer / cancels the poll alarm and clears the visual pulse.
 - [ ] **LIFE-02**: User can query a trigger with `get_trigger_status` -- state, current vs initial value, condition, watch mode, elapsed / remaining, last-check time.
 - [ ] **LIFE-03**: User can list all active triggers with `list_triggers`.
-- [ ] **LIFE-04**: Multiple triggers can be active concurrently under a configurable cap (mirrors the v0.9.60 agent cap, 1-64); exceeding the cap fails loudly with a typed error.
+- [x] **LIFE-04**: Multiple triggers can be active concurrently under a configurable cap (mirrors the v0.9.60 agent cap, 1-64); exceeding the cap fails loudly with a typed error.
 - [x] **LIFE-05**: A trigger has a maximum lifetime (TTL); orphaned / expired triggers are reaped and their resources (observer, alarm, pulse, registry entry) released.
 
 ### SURV -- MV3 survivability (session-scoped)
@@ -110,12 +110,12 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | TRIG-01 | Phase 18 | Pending |
-| TRIG-02 | Phase 15 | Pending |
-| TRIG-03 | Phase 15 | Pending |
-| TRIG-04 | Phase 15 | Pending |
-| TRIG-05 | Phase 15 | Pending |
-| TRIG-06 | Phase 15 | Pending |
-| TRIG-07 | Phase 15 | Pending |
+| TRIG-02 | Phase 15 | Complete |
+| TRIG-03 | Phase 15 | Complete |
+| TRIG-04 | Phase 15 | Complete |
+| TRIG-05 | Phase 15 | Complete |
+| TRIG-06 | Phase 15 | Complete |
+| TRIG-07 | Phase 15 | Complete |
 | WATCH-01 | Phase 16 | Pending |
 | WATCH-02 | Phase 17 | Pending |
 | WATCH-03 | Phase 17 | Pending |
@@ -135,7 +135,7 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | LIFE-01 | Phase 18 | Pending |
 | LIFE-02 | Phase 18 | Pending |
 | LIFE-03 | Phase 18 | Pending |
-| LIFE-04 | Phase 15 | Pending |
+| LIFE-04 | Phase 15 | Complete |
 | LIFE-05 | Phase 14 | Complete |
 | SURV-01 | Phase 14 | Complete |
 | SURV-02 | Phase 14 | Complete |
