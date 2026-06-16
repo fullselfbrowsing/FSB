@@ -356,17 +356,15 @@ const result = await FsbTriggerLifecycle.handleTriggerAlarm({
 |---|-------|---------|---------------|
 | A1 | Research should be revalidated after 2026-07-16 if implementation has not started. [ASSUMED] | Metadata | Chrome docs or local phase decisions may change after the research window. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact attention field names**
+1. **Exact attention field names (RESOLVED)**
    - What we know: downstream tools must distinguish `element_not_found`, `blocked`, `parse_error`, and ordinary `no_fire`. [VERIFIED: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md]
-   - What's unclear: whether snapshots should store `status:'blocked'` or `status:'needs_attention'` plus `attention_reason:'blocked'`. [VERIFIED: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md]
-   - Recommendation: use `status:'needs_attention'` for missing element, `status:'blocked'` for challenge/auth/restricted page, and always store `attention_reason`. [VERIFIED: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md]
+   - RESOLVED: use `status:'needs_attention'` for a missing watched element, `status:'blocked'` for challenge/auth/restricted pages, and always store `attention_reason`. [VERIFIED: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md]
 
-2. **Helper extraction boundary**
+2. **Helper extraction boundary (RESOLVED)**
    - What we know: helper placement is discretionary if importScripts load order stays coherent. [VERIFIED: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md]
-   - What's unclear: whether to keep helpers in `background.js` or extract `extension/utils/trigger-refresh-poll.js`. [VERIFIED: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md]
-   - Recommendation: keep the first implementation in `background.js` beside Phase-16 helpers unless the patch becomes large enough to need a dual-export helper module for tests. [VERIFIED: extension/background.js:3398-3631]
+   - RESOLVED: keep the first refresh-poll implementation in `extension/background.js` beside Phase-16 helpers; defer extraction unless implementation pressure later proves a helper module is necessary. [VERIFIED: extension/background.js:3398-3631]
 
 ## Environment Availability
 
