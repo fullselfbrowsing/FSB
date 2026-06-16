@@ -145,6 +145,23 @@ async function caseStopSourceOrdering() {
   assertOrdered(stopSrc, 'fsbTriggerClearObserveWatchdog', 'FsbTriggerLifecycle.clearTrigger', 'watchdog cleanup precedes lifecycle clear');
 }
 
+async function caseArmSourceContracts() {
+  const src = readSource(BACKGROUND_PATH);
+  const validateSrc = functionSource(src, 'fsbTriggerValidateToolCondition');
+  const armSrc = functionSource(src, 'fsbTriggerHandleToolArm');
+  const dispatchSrc = functionSource(src, 'fsbTriggerDispatchToolRequest');
+  assert.ok(validateSrc.includes('TRIGGER_CONDITION_INVALID'), 'condition validator returns TRIGGER_CONDITION_INVALID');
+  assert.ok(armSrc.includes('function fsbTriggerHandleToolArm'), 'arm handler exists');
+  assert.ok(dispatchSrc.includes('trigger'), 'dispatch helper maps trigger tools');
+  assertOrdered(armSrc, 'fsbTriggerOwnerContext', 'FsbTriggerManager.armTrigger', 'ownership context is resolved before armTrigger');
+  assertOrdered(armSrc, 'fsbTriggerValidateToolCondition', 'FsbTriggerManager.armTrigger', 'condition validation precedes armTrigger');
+  assertOrdered(armSrc, 'fsbTriggerSendRefreshPollRead', 'FsbTriggerManager.armTrigger', 'initial triggerRead precedes armTrigger');
+  assert.ok(armSrc.includes('crypto.randomUUID'), 'arm handler generates missing trigger ids with crypto.randomUUID');
+  assertOrdered(armSrc, 'FsbTriggerManager.armTrigger', 'fsbTriggerStartObserveForSnapshot', 'live observe startup happens after armTrigger');
+  assertOrdered(armSrc, 'FsbTriggerManager.armTrigger', 'triggerPulseStart', 'refresh-poll pulse startup happens after armTrigger');
+  assert.strictEqual(/heartbeat|auto[-_ ]detach|blocking wait|while\s*\(/.test(armSrc), false, 'arm handler has no Phase 19 wait loop, heartbeat, or auto-detach');
+}
+
 async function caseStatusProjectionMath() {
   const handlers = loadToolHandlers();
   const status = handlers.fsbTriggerProjectTriggerStatus(makeSnapshot(), 2500);
@@ -297,6 +314,191 @@ async function caseStopTerminalCleanupIdempotent() {
   assert.deepStrictEqual(calls, ['watchdog', 'lifecycle'], 'terminal stop skips content cleanup and clears watchdog before lifecycle');
 }
 
+async function caseInvalidConditionRejectedBeforeArm() {
+  const calls = [];
+  const handlers = loadToolHandlers({
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: '10' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger() {
+        calls.push('arm');
+        return { ok: true };
+      }
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition: { kind: 'threshold', operator: '!=', target: 5 }
+  }, {});
+  assert.strictEqual(result.success, false, 'invalid condition rejects');
+  assert.strictEqual(result.errorCode, 'TRIGGER_CONDITION_INVALID', 'invalid condition uses typed error');
+  assert.deepStrictEqual(calls, [], 'invalid condition does not read DOM or arm trigger');
+}
+
+async function caseArmReadsBaselineBeforeManagerAndStartsLiveObserve() {
+  const calls = [];
+  let receivedSpec = null;
+  const handlers = loadToolHandlers({
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: '10', attributes: { title: 'Price' } } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        calls.push('arm');
+        receivedSpec = spec;
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot(Object.assign({}, receivedSpec || {}, {
+          status: 'armed',
+          agent_id: receivedSpec && receivedSpec.agent_id,
+          ownership_token: receivedSpec && receivedSpec.ownership_token
+        }));
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      calls.push('start-live');
+      return { ok: true };
+    },
+    async fsbTriggerSendTabMessage() {
+      calls.push('pulse');
+      return { ok: true };
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition: { kind: 'changed' },
+    watch: 'live-observe'
+  }, { agentId: 'agent_a', ownershipToken: 'tok_a' });
+  assert.strictEqual(result.success, true, 'arm succeeds');
+  assert.deepStrictEqual(calls, ['read', 'arm', 'start-live'], 'arm reads baseline, persists through manager, then starts live observe');
+  assert.strictEqual(receivedSpec.baseline, '10', 'baseline is captured from triggerRead');
+  assert.strictEqual(receivedSpec.reported_value, '10', 'reported_value is captured from triggerRead');
+  assert.strictEqual(receivedSpec.reported_attributes.title, 'Price', 'reported attributes are captured');
+  assert.strictEqual(receivedSpec.agent_id, 'agent_a', 'agent id is bound into arm spec');
+  assert.strictEqual(receivedSpec.ownership_token, 'tok_a', 'ownership token is bound into arm spec');
+  assert.strictEqual(receivedSpec.trigger_id, 'test-random-uuid', 'missing trigger id uses crypto.randomUUID');
+}
+
+async function caseArmAutopilotLegacySpec() {
+  let receivedSpec = null;
+  const handlers = loadToolHandlers({
+    fsbAgentRegistryInstance: {
+      getOwner() {
+        return null;
+      },
+      getTabMetadata() {
+        return { ownershipToken: 'tok_legacy' };
+      },
+      async getOrRegisterLegacyAgent() {
+        return { agentId: 'legacy:autopilot', ownershipToken: null };
+      },
+      async bindTab(agentId, tabId) {
+        return { agentId, tabId, ownershipToken: 'tok_legacy' };
+      }
+    },
+    async fsbTriggerSendRefreshPollRead() {
+      return { success: true, value: { text: 'old' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        receivedSpec = spec;
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot(Object.assign({}, receivedSpec || {}, {
+          status: 'armed',
+          agent_id: receivedSpec && receivedSpec.agent_id,
+          ownership_token: receivedSpec && receivedSpec.ownership_token
+        }));
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      return { ok: true };
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 77,
+    condition: { kind: 'changed' },
+    agentId: 'spoofed'
+  }, { source: 'autopilot' });
+  assert.strictEqual(result.success, true, 'autopilot arm succeeds on legacy-owned tab');
+  assert.strictEqual(receivedSpec.agent_id, 'legacy:autopilot', 'autopilot arm spec uses derived legacy agent');
+  assert.strictEqual(receivedSpec.ownership_token, 'tok_legacy', 'autopilot arm spec uses registry ownership token');
+}
+
+async function caseArmAutopilotForeignRejectsBeforeArm() {
+  const calls = [];
+  const handlers = loadToolHandlers({
+    fsbAgentRegistryInstance: {
+      getOwner() {
+        return 'agent_other';
+      },
+      getTabMetadata() {
+        return { ownershipToken: 'tok_other' };
+      }
+    },
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: 'old' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger() {
+        calls.push('arm');
+        return { ok: true };
+      }
+    }
+  });
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 88,
+    condition: { kind: 'changed' }
+  }, { source: 'autopilot' });
+  assert.strictEqual(result.success, false, 'foreign-owned autopilot arm fails');
+  assert.strictEqual(result.errorCode, 'TRIGGER_ACCESS_DENIED', 'foreign-owned autopilot arm uses typed denial');
+  assert.deepStrictEqual(calls, [], 'foreign-owned autopilot arm rejects before read or armTrigger');
+}
+
+async function caseDispatchHelperMapsTriggerTools() {
+  let stopped = false;
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot(triggerId) {
+        return makeSnapshot({ trigger_id: triggerId, agent_id: null, ownership_token: null });
+      },
+      async hydrate() {
+        return { v: 1, records: { one: makeSnapshot({ trigger_id: 'one', agent_id: null, ownership_token: null }) } };
+      }
+    },
+    async fsbTriggerClearObserveWatchdog() {
+      return { ok: true };
+    },
+    FsbTriggerLifecycle: {
+      async clearTrigger() {
+        stopped = true;
+        return { ok: true };
+      }
+    }
+  });
+  const status = await handlers.fsbTriggerDispatchToolRequest('get_trigger_status', { trigger_id: 'one' }, {});
+  const list = await handlers.fsbTriggerDispatchToolRequest('list_triggers', {}, {});
+  const stop = await handlers.fsbTriggerDispatchToolRequest('stop_trigger', { trigger_id: 'one' }, {});
+  assert.strictEqual(status.success, true, 'dispatch maps get_trigger_status');
+  assert.strictEqual(list.success, true, 'dispatch maps list_triggers');
+  assert.strictEqual(stop.success, true, 'dispatch maps stop_trigger');
+  assert.strictEqual(stopped, true, 'dispatch stop reaches stop handler');
+}
+
 async function caseAutopilotDerivesLegacyOwnerToken() {
   const calls = [];
   const handlers = loadToolHandlers({
@@ -356,6 +558,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('background exposes status/list helper surface', caseSourceSurface);
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
+  await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
   await runCase('status projection derives elapsed and remaining time', caseStatusProjectionMath);
   await runCase('list defaults to armed and attention states', caseListDefaultsToActiveAttentionStates);
   await runCase('cross-agent status is rejected without snapshot data', caseCrossAgentStatusRejected);
@@ -363,6 +566,11 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('cross-agent stop is rejected before cleanup', caseStopRejectsCrossAgentBeforeCleanup);
   await runCase('active stop clears observe then watchdog then lifecycle', caseStopActiveCleanupOrder);
   await runCase('terminal stop clears watchdog and lifecycle idempotently', caseStopTerminalCleanupIdempotent);
+  await runCase('invalid arm condition rejects before read or arm', caseInvalidConditionRejectedBeforeArm);
+  await runCase('arm reads baseline before manager and starts live observe', caseArmReadsBaselineBeforeManagerAndStartsLiveObserve);
+  await runCase('autopilot arm spec binds legacy owner and token', caseArmAutopilotLegacySpec);
+  await runCase('autopilot arm rejects foreign-owned tabs before side effects', caseArmAutopilotForeignRejectsBeforeArm);
+  await runCase('dispatch helper maps trigger companion tools', caseDispatchHelperMapsTriggerTools);
   await runCase('autopilot derives legacy owner and ownership token', caseAutopilotDerivesLegacyOwnerToken);
   await runCase('autopilot rejects a tab owned by another agent', caseAutopilotRejectsForeignOwner);
 
