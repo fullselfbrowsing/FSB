@@ -27,10 +27,10 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### EXTRACT -- Value extraction
 
-- [ ] **EXTRACT-01**: For `threshold` / `equals` / `percent_change`, the trigger auto-parses a number from the element (strips currency symbols, thousands separators, whitespace) with locale-aware decimal/group handling.
-- [ ] **EXTRACT-02**: For `changed` / `contains`, the trigger compares raw extracted text.
-- [ ] **EXTRACT-03**: User can override extraction with `extract: text | number | attribute` (plus an attribute name) to read a specific source (e.g. `data-price`, `aria-valuenow`).
-- [ ] **EXTRACT-04**: A failed numeric parse yields a distinct `parse_error` outcome and never fires the trigger (no firing on NaN).
+- [x] **EXTRACT-01**: For `threshold` / `equals` / `percent_change`, the trigger auto-parses a number from the element (strips currency symbols, thousands separators, whitespace) with locale-aware decimal/group handling.
+- [x] **EXTRACT-02**: For `changed` / `contains`, the trigger compares raw extracted text.
+- [x] **EXTRACT-03**: User can override extraction with `extract: text | number | attribute` (plus an attribute name) to read a specific source (e.g. `data-price`, `aria-valuenow`).
+- [x] **EXTRACT-04**: A failed numeric parse yields a distinct `parse_error` outcome and never fires the trigger (no firing on NaN).
 
 ### REPORT -- Reporting & fire semantics
 
@@ -121,10 +121,10 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | WATCH-03 | Phase 17 | Pending |
 | WATCH-04 | Phase 17 | Pending |
 | WATCH-05 | Phase 16 | Pending |
-| EXTRACT-01 | Phase 15 | Pending |
-| EXTRACT-02 | Phase 15 | Pending |
-| EXTRACT-03 | Phase 15 | Pending |
-| EXTRACT-04 | Phase 15 | Pending |
+| EXTRACT-01 | Phase 15 | Complete |
+| EXTRACT-02 | Phase 15 | Complete |
+| EXTRACT-03 | Phase 15 | Complete |
+| EXTRACT-04 | Phase 15 | Complete |
 | REPORT-01 | Phase 19 | Pending |
 | REPORT-02 | Phase 19 | Pending |
 | REPORT-03 | Phase 19 | Pending |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.11.0
 milestone_name: Trigger Tool (Reactive DOM Monitoring)
 status: executing
-stopped_at: Phase 15 context gathered (assumptions mode)
-last_updated: "2026-06-16T06:13:17.615Z"
-last_activity: 2026-06-16 -- Phase 15 planning complete
+stopped_at: Completed 15-01-PLAN.md (value-extractor)
+last_updated: "2026-06-16T06:26:42.874Z"
+last_activity: 2026-06-16
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 13
 ---
 
@@ -25,14 +25,14 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
+**Current focus:** Phase 15 — fire-condition-engine-value-extraction
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 15 (fire-condition-engine-value-extraction) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-06-16 -- Phase 15 planning complete
+Last activity: 2026-06-16
 
 Progress: [██████████] 100%
 
@@ -67,6 +67,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 14 P01 | 5min | 2 tasks | 4 files |
 | Phase 14 P02 | 7min | 2 tasks | 3 files |
 | Phase 14 P03 | 5min | 1 tasks | 3 files |
+| Phase 15 P01 | 7min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 14 Plan 02: trigger-lifecycle.js clones mcp-visual-session-lifecycle.js with overlay STRIPPED, over FsbTriggerStore (storage-is-truth, re-read every tick). handleTriggerAlarm adds a noop_terminal idempotent fire-guard (D-09); restoreTriggersFromStorage adds the getAll() orphan sweep scoped to fsbTrigger: (D-08); three reap paths via absolute deadline_at (LIFE-05). FSB_TRIGGER_DEFAULT_TTL_MS=21600000 (6h, D-11) + 30s alarm-floor declared for Phase 17. evaluated_noop + armTrigger/clearTrigger are the fire-free Phase 15 seam.
 - [Phase ?]: Phase 14 Plan 03: wired the two trigger modules into background.js at four ADDITIVE glue points (importScripts store-before-lifecycle, bootstrap restoreTriggersFromStorage, onAlarm fsbTrigger: branch with early return, new tabs.onRemoved sibling), each mirroring its verified visual-lifecycle sibling. SURV-01/SURV-03/LIFE-05 now live in the SW; INV-04 held (agent-loop.js byte-untouched, setTimeout=8).
 - [Phase ?]: Phase 14 Plan 03: live-Chrome MV3 SW-eviction survival (Task 2 checkpoint:human-verify) DEFERRED to milestone-end Chrome MV3 UAT per 14-VALIDATION.md Manual-Only Verifications + the v0.10.0 UAT-debt pattern; autonomous code 100% complete and committed (06a241e3), all trigger logic has deterministic Node-mock coverage.
+- [Phase ?]: Phase 15 Plan 01: value-extractor.js is a pure dual-export IIFE (FsbValueExtractor, no browser-API resolver) exposing exactly parseLocaleNumber + extractValue. parseLocaleNumber uses Intl.NumberFormat formatToParts separator discovery memoized per locale; literal split/join (never a separator-built RegExp); % kept raw with isPercent (never /100); NaN -> distinct parse_error (never 0, EXTRACT-04); decimal_separator override wins over locale (D-04). extractValue selects text|number|attribute over { text, attributes? } (EXTRACT-03/D-05) -- that shape is the Phase 16/17 watch-layer report contract.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -128,9 +130,9 @@ Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp
 
 ## Session Continuity
 
-Last session: 2026-06-16T05:26:53.771Z
-Stopped at: Phase 15 context gathered (assumptions mode)
-Resume file: .planning/phases/15-fire-condition-engine-value-extraction/15-CONTEXT.md
+Last session: 2026-06-16T06:26:42.870Z
+Stopped at: Completed 15-01-PLAN.md (value-extractor)
+Resume file: None
 
 ## Next Actions
 
