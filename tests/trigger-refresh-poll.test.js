@@ -448,6 +448,26 @@ async function caseRefreshPollRunSourceGuards() {
     'J.10 refresh-poll background helpers do not set fired status');
 }
 
+async function caseAlarmBranchSourceGuards() {
+  console.log('\n--- Case K: refresh-poll alarm branch source guards ---');
+  const src = readSource(BACKGROUND_PATH);
+  const branch = sourceSliceBetween(src, 'alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)', [
+    'alarm.name.startsWith(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX)',
+    'if (alarm && alarm.name ==='
+  ]);
+  const refreshIdx = branch.indexOf('fsbTriggerHandleRefreshPollAlarm');
+  const fallbackIdx = branch.indexOf('FsbTriggerLifecycle.handleTriggerAlarm(alarm)');
+
+  check(/async\s+function\s+fsbTriggerHandleRefreshPollAlarm\s*\(/.test(src),
+    'K.1 fsbTriggerHandleRefreshPollAlarm helper exists');
+  check(refreshIdx >= 0, 'K.2 fsbTrigger alarm branch calls fsbTriggerHandleRefreshPollAlarm');
+  check(fallbackIdx >= 0, 'K.3 fsbTrigger alarm branch preserves lifecycle fallback');
+  check(refreshIdx >= 0 && fallbackIdx >= 0 && refreshIdx < fallbackIdx,
+    'K.4 refresh-poll handling appears before lifecycle fallback');
+  check(/fsbTriggerHandleRefreshPollForTest/.test(src),
+    'K.5 test-only refresh-poll alarm hook exists');
+}
+
 (async () => {
   console.log('--- Phase 17 Plan 01: trigger refresh-poll cadence ---');
   await caseDefaultInterval();
@@ -460,6 +480,7 @@ async function caseRefreshPollRunSourceGuards() {
   await caseJitterAndDeadlineFloor();
   await caseOwnershipSourceGuards();
   await caseRefreshPollRunSourceGuards();
+  await caseAlarmBranchSourceGuards();
 
   console.log('\ntrigger-refresh-poll.test: ' + passed + ' passed, ' + failed + ' failed');
   if (failed > 0) process.exit(1);
