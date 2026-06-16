@@ -4,8 +4,8 @@ milestone: v0.10.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 17 context gathered (assumptions mode)
-last_updated: "2026-06-16T17:51:23.063Z"
-last_activity: 2026-06-16 -- Phase 17 planning complete
+last_updated: "2026-06-16T17:52:12.303Z"
+last_activity: 2026-06-16 -- Phase 17 execution started
 progress:
   total_phases: 8
   completed_phases: 3
@@ -25,14 +25,14 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 17 — refresh-poll-watch-tab-owning-background-reload
+**Current focus:** Phase 17 — Refresh-Poll Watch (Tab-Owning Background Reload)
 
 ## Current Position
 
-Phase: 17 (refresh-poll-watch-tab-owning-background-reload) — READY TO PLAN
-Plan: 0 of TBD
-Status: Ready to execute
-Last activity: 2026-06-16 -- Phase 17 planning complete
+Phase: 17 (Refresh-Poll Watch (Tab-Owning Background Reload)) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 17
+Last activity: 2026-06-16 -- Phase 17 execution started
 
 Progress: [████······] 38% (3/8 phases)
 
