@@ -85,7 +85,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 17-01-PLAN.md — Wave 0 validation harness + refresh-poll cadence normalization/scheduling [WATCH-03]
 - [x] 17-02-PLAN.md — explicit triggerRead missing-element outcome before refresh-poll reads [WATCH-02]
 - [x] 17-03-PLAN.md — own-tab background reload/read/evaluate alarm handling [WATCH-02, WATCH-04]
-- [ ] 17-04-PLAN.md — blocked-page attention states, pulse reassertion, and live-UAT tracking [WATCH-02, WATCH-04]
+- [x] 17-04-PLAN.md — blocked-page attention states, pulse reassertion, and live-UAT tracking [WATCH-02, WATCH-04]
 
 ### Phase 18: Shared Tool Registry & Dispatcher Wiring
 **Goal**: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` are registered exactly once in the shared registry and exposed to BOTH autopilot and MCP, with the companions in the read-only bypass and the watcher in background.js so a blocking trigger can never starve the queue — the INV-01 / INV-02 verification point.
@@ -132,7 +132,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 14. Trigger Survivability Foundation | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
-| 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 3/4 | In Progress|  |
+| 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 0/TBD | Not started | - |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 0/TBD | Not started | - |
 | 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 0/TBD | Not started | - |
