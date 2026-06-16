@@ -21,7 +21,7 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 - [x] **WATCH-01**: User can choose `live-observe` mode -- the trigger watches the element in place via MutationObserver and fires with no page reload (for live pages / SPAs / tickers).
 - [ ] **WATCH-02**: User can choose `refresh-poll` mode -- the trigger periodically reloads the element's tab and re-reads the value (for static, server-rendered pages).
-- [ ] **WATCH-03**: Refresh-poll interval is configurable with a hard floor of 30s (Chrome `chrome.alarms` minimum) and a ~60s default; a sub-floor interval is rejected with guidance to use live-observe.
+- [x] **WATCH-03**: Refresh-poll interval is configurable with a hard floor of 30s (Chrome `chrome.alarms` minimum) and a ~60s default; a sub-floor interval is rejected with guidance to use live-observe.
 - [ ] **WATCH-04**: Refresh-poll reloads target the trigger's OWN tab and never steal focus from the user or other agents (reuses v0.9.60 agent-scoped tab resolution / background-tab defaults).
 - [x] **WATCH-05**: Live-observe re-establishes its observer and baseline after in-page navigation / BF-cache restore / SPA soft-navigation so a watched element keeps firing correctly (re-resolve the selector via uniqueness scoring on re-attach).
 
@@ -118,7 +118,7 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | TRIG-07 | Phase 15 | Complete |
 | WATCH-01 | Phase 16 | Complete |
 | WATCH-02 | Phase 17 | Pending |
-| WATCH-03 | Phase 17 | Pending |
+| WATCH-03 | Phase 17 | Complete |
 | WATCH-04 | Phase 17 | Pending |
 | WATCH-05 | Phase 16 | Complete |
 | EXTRACT-01 | Phase 15 | Complete |

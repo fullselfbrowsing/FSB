@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 17 context gathered (assumptions mode)
-last_updated: "2026-06-16T17:52:12.303Z"
-last_activity: 2026-06-16 -- Phase 17 execution started
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-06-16T18:04:25.984Z"
+last_activity: 2026-06-16
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 13
+  percent: 93
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 17 (Refresh-Poll Watch (Tab-Owning Background Reload)) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 17
-Last activity: 2026-06-16 -- Phase 17 execution started
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-06-16
 
 Progress: [████······] 38% (3/8 phases)
 
@@ -43,7 +43,7 @@ Progress: [████······] 38% (3/8 phases)
 | 14 | Trigger Survivability Foundation | SURV-01..03, LIFE-05 (4) | Complete |
 | 15 | Fire-Condition Engine & Value Extraction | TRIG-02..07, EXTRACT-01..04, LIFE-04 (11) | Complete |
 | 16 | Live-Observe Watch & Analyzing Pulse | WATCH-01, WATCH-05, VIS-01..04 (6) | Complete |
-| 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | Not started |
+| 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | In Progress |
 | 18 | Shared Tool Registry & Dispatcher Wiring | TRIG-01, REG-01..04, LIFE-01..03 (8) | Not started |
 | 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Not started |
 | 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Not started |
@@ -54,7 +54,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 10 (Phase 14: 3, Phase 15: 3, Phase 16: 4)
+- Total plans completed (this milestone): 11 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 1)
 - Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
 
 **By Phase:**
@@ -76,6 +76,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 16 P02 | 3 min | 2 tasks | 4 files |
 | Phase 16 P03 | 1 min | 1 tasks | 1 files |
 | Phase 16 P04 | 5 min | 2 tasks | 3 files |
+| Phase 17 P01 | 8 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 15 Plan 02: trigger-manager.js evaluate(snapshot, reportedValue, now?) is STRUCTURALLY pure (D-02), proven by a brace-matched source-grep (no storage access / no chrome resolver in the evaluate() body even after the durable-local cap is added to the same file). Implements all 6 kinds + compound { combinator:'AND'|'OR', conditions[] } with error short-circuit (Pitfall 5) + edge-trigger/fire-once via persisted was_satisfied. Regex flag policy is default-flags-only (no /g lastIndex footgun); caps PATTERN_MAX_LEN=1000 / TEXT_MAX_LEN_ELEMENT=10000 / TEXT_MAX_LEN_PAGE=100000 are the hard CPU bound, EVIL_SHAPES heuristic is defense-in-depth. The inline cap (D-09) counts listArmedSnapshots() (storage-first, survives SW eviction) NOT a heap set, and serializes concurrent arms via a _withArmLock module-scope mutex (TOCTOU fix); Plan 03/Phase 18 inherit a serialized arm path.
 - [Phase ?]: Phase 15 Plan 03: the Phase-14 evaluated_noop SEAM in trigger-lifecycle.js is replaced with FsbTriggerManager.evaluate(snap, reportedValue, now) + an atomic terminal write-back -- on outcome 'fired' it sets status:'fired'+fired_at, folds next_state, writes in one writeSnapshot, then clearAlarm (disarm); on no_fire/parse_error/pattern_error it merges next_state and stays armed. The SEAM is the SOLE owner of fire-path storage I/O (D-02); evaluate() stays pure. parse_error/pattern_error NEVER write status:'fired' (EXTRACT-04). The preserved noop_terminal guard + the atomic write together give exactly-one-fire across SW eviction (D-07). reportedValue contract { text, attributes? } sourced from snap.reported_value ?? snap.last_value until Phase 16/17 supplies a live scrape. background.js loads value-extractor.js + trigger-manager.js in load-bearing order value-extractor->store->manager->lifecycle. Phase 15 closed with full automated coverage, no live-Chrome UAT. INV-01/INV-04 held.
 - [Phase ?]: Phase 16 wires live-observe end-to-end without adding public tool schemas: `content/trigger-observe.js` emits `triggerValueChanged` `{text, attributes?}` from a single stable-container MutationObserver; `messaging.js` exposes triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop; `background.js` validates and stages reports then delegates fire decisions to `FsbTriggerLifecycle.handleTriggerAlarm` (no duplicate fire writer). Re-arm is owned-tab only (`target_tab_id` + `ensureContentScriptInjected`), backed by `fsbTriggerObserveWatchdog:<id>` (1 min period, stale after 2 min). The in-memory observer registry is authoritative; stale DOM `data-fsb-trigger-armed` markers never block fresh-context re-arm (fixed in `87403c77`). Live-browser UAT is tracked in 16-HUMAN-UAT.md for Phase 20.
+- [Phase 17]: Plan 01: Refresh-poll interval validation runs before snapshot persistence or lifecycle delegation so invalid sub-floor requests cannot consume cap slots or create alarms.
+- [Phase 17]: Plan 01: Refresh-poll cadence uses next_poll_at while deadline_at remains the absolute TTL/reap boundary.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -136,18 +139,14 @@ Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp
 
 ## Lattice Integration State (carried, INV-06)
 
-- Active Lattice runtime: public npm package `@full-self-browsing/lattice@1.3.0` via the bare specifier alias `lattice`; CLI `@full-self-browsing/lattice-cli@1.3.0`.
-- Source audit pin: tag `v1.3.0`, source SHA `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`, package integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
-- Guardrail: `tests/lattice-public-package.test.js` + package-lock/LATTICE-PIN validation prevent drift. The trigger family deliberately does NOT route snapshots through the Lattice survivability adapter (uses `chrome.storage.session` directly via a `trigger-store.js` clone of `mcp-task-store.js`).
+Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrails remain `.planning/LATTICE-PIN.md`, package-lock integrity, and `tests/lattice-public-package.test.js`.
 
 ## Session Continuity
 
-Last session: 2026-06-16T17:10:30.295Z
-Stopped at: Phase 17 context gathered (assumptions mode)
-Resume file: .planning/phases/17-refresh-poll-watch-tab-owning-background-reload/17-CONTEXT.md
+Last session: 2026-06-16T18:04:25.981Z
+Stopped at: Completed 17-01-PLAN.md
+Resume file: None
 
 ## Next Actions
 
-1. `/gsd-plan-phase 17` -- plan Refresh-Poll Watch (Tab-Owning Background Reload).
-2. Carry Phase 16 live-browser UAT to Phase 20 integration: `16-HUMAN-UAT.md` has 4 pending scenarios.
-3. Phases flagged for extra research during planning: 17 (refresh/reload semantics), 19 (blocking ceiling / detached TTL + fire-envelope shape).
+Execute `17-02-PLAN.md`; carry Phase 16 live-browser UAT to Phase 20 integration.
