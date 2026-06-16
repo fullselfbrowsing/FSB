@@ -32,6 +32,14 @@ try { importScripts('utils/agent-tab-resolver.js'); } catch (e) { console.error(
 // at this file's line ~2464 calls FsbAgentNavEmission._maybeEmitUserNavigation.
 try { importScripts('utils/agent-nav-emission.js'); } catch (e) { console.error('[FSB] Failed to load agent-nav-emission.js:', e.message); }
 try { importScripts('utils/mcp-task-store.js'); } catch (e) { console.error('[FSB] Failed to load mcp-task-store.js:', e.message); }
+// Phase 14 Plan 03 (v0.11.0): trigger survivability modules. trigger-store.js
+// is the chrome.storage.session envelope store; trigger-lifecycle.js is the
+// chrome.alarms lifecycle that calls FsbTriggerStore at load/runtime, so the
+// store MUST be imported BEFORE the lifecycle (D-07 glue point 0). Wrapped in
+// try/catch (mirroring mcp-task-store.js) so a load failure logs and the
+// typeof FsbTriggerLifecycle guards at every call site make the glue inert.
+try { importScripts('utils/trigger-store.js'); } catch (e) { console.error('[FSB] Failed to load trigger-store.js:', e.message); }
+try { importScripts('utils/trigger-lifecycle.js'); } catch (e) { console.error('[FSB] Failed to load trigger-lifecycle.js:', e.message); }
 // Phase 245 (v0.9.60): action-verification.js exports buildChangeReport /
 // applyChangeReportSizeCap which the dispatcher calls from SW context after
 // harvesting mutations from the page. capturePageState / startMutationHarvest
@@ -2494,6 +2502,21 @@ async function restoreSessionsFromStorage() {
       MCPVisualSessionLifecycleUtils.restoreVisualSessionLifecyclesFromStorage()
         .catch((err) => {
           console.warn('[FSB MCP] restoreVisualSessionLifecyclesFromStorage failed (non-blocking):', err && err.message);
+        });
+    }
+
+    // Phase 14 Plan 03 (v0.11.0) -- restore survivable trigger registry after
+    // MV3 SW eviction / cold boot. Reads the single fsbTriggerRegistry envelope
+    // from chrome.storage.session, re-arms non-elapsed armed snapshots with
+    // their original deadline_at, drops terminal/expired entries, and sweeps
+    // orphan fsbTrigger:* alarms (D-07.2 / D-08). Non-blocking .catch so a
+    // reconcile failure never aborts SW bootstrap.
+    // Requirements satisfied: SURV-03 (cold-boot reconcile + orphan sweep).
+    if (typeof FsbTriggerLifecycle !== 'undefined'
+        && typeof FsbTriggerLifecycle.restoreTriggersFromStorage === 'function') {
+      FsbTriggerLifecycle.restoreTriggersFromStorage()
+        .catch((err) => {
+          console.warn('[FSB TRG] restoreTriggersFromStorage failed (non-blocking):', err && err.message);
         });
     }
 
@@ -13175,6 +13198,21 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     });
 });
 
+// Phase 14 Plan 03 (v0.11.0) -- trigger tab-close reap. Independent per-concern
+// onRemoved listener (FSB already registers multiple) that scans the trigger
+// registry for snapshots bound to the closed tab (target_tab_id) and reaps
+// their entry + alarm. Guarded + non-blocking (Promise.resolve(...).catch) so a
+// reap failure never disrupts sibling onRemoved concerns (D-07.3 / D-10c).
+// Requirements satisfied: LIFE-05 (tab-close reap).
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (typeof FsbTriggerLifecycle === 'undefined') return;
+  if (typeof FsbTriggerLifecycle.handleTriggerTabRemoved !== 'function') return;
+  Promise.resolve(FsbTriggerLifecycle.handleTriggerTabRemoved(tabId))
+    .catch((err) => {
+      console.warn('[FSB TRG] handleTriggerTabRemoved failed (non-blocking):', err && err.message);
+    });
+});
+
 /**
  * Clean up keyboard emulator when extension is suspended/unloaded
  */
@@ -13296,6 +13334,25 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await MCPVisualSessionLifecycleUtils.handleVisualSessionLifecycleAlarm(alarm);
     } catch (err) {
       console.warn('[FSB MCP] handleVisualSessionLifecycleAlarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
+  // Phase 14 Plan 03 (v0.11.0) -- trigger alarm tick. Alarm names of the form
+  // 'fsbTrigger:<triggerId>' route to the lifecycle helper which re-reads the
+  // snapshot from chrome.storage.session (storage-is-truth) and decides against
+  // persisted state. Additive branch with an early return so the fan-out stops
+  // at the matched concern (mirrors the visual branch above); never throws out
+  // of the listener (try/catch + non-blocking warn).
+  // Requirements satisfied: SURV-01 (alarm-wake routing to handleTriggerAlarm).
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && alarm
+      && typeof alarm.name === 'string'
+      && alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
+    try {
+      await FsbTriggerLifecycle.handleTriggerAlarm(alarm);
+    } catch (err) {
+      console.warn('[FSB TRG] handleTriggerAlarm failed (non-blocking):', err && err.message);
     }
     return;
   }

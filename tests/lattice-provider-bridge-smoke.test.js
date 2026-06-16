@@ -526,12 +526,15 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // which counts ALL importScripts token mentions (including comment references).
   // Phase 5 baseline: 153 mentions. Phase 6 Plan 06-02: 154 mentions (+1 new line).
   // Phase 8 Plan 08-01: 155 mentions (+1 new line for ai/lattice-step-emitter.js).
+  // Phase 14 Plan 14-03: 157 mentions (+2 new lines for utils/trigger-store.js +
+  // utils/trigger-lifecycle.js -- D-07 glue point 0, store imported before lifecycle).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 155, 'background.js importScripts count = 155 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 for ai/lattice-step-emitter.js)');
+  passAssertEqual(importScriptsCount, 157, 'background.js importScripts count = 157 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 for utils/trigger-store.js & utils/trigger-lifecycle.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
-  // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152.
+  // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
+  // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 152, 'background.js importScripts() call sites = 152 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 for ai/lattice-step-emitter.js)');
+  passAssertEqual(importScriptsCallSites, 154, 'background.js importScripts() call sites = 154 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 for trigger-store.js & trigger-lifecycle.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
