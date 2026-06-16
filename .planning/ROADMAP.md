@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A trigger has a maximum lifetime (TTL); expired or orphaned triggers are reaped and their alarm + registry entry released (a trigger whose tab closed is reaped via `chrome.tabs.onRemoved`).
 **Plans**: 3 plans (1 per wave)
 - [x] 14-01-PLAN.md — trigger-store.js (chrome.storage.session envelope, clone of mcp-task-store.js) + Node-mock test + npm test wiring [SURV-01]
-- [ ] 14-02-PLAN.md — trigger-lifecycle.js (alarm handler, reconcile + getAll() orphan sweep, TTL/tab-close reap; overlay stripped) + Node-mock test + npm test wiring [SURV-02, SURV-03, LIFE-05]
+- [x] 14-02-PLAN.md — trigger-lifecycle.js (alarm handler, reconcile + getAll() orphan sweep, TTL/tab-close reap; overlay stripped) + Node-mock test + npm test wiring [SURV-02, SURV-03, LIFE-05]
 - [ ] 14-03-PLAN.md — background.js 4 additive glue points (importScripts, bootstrap restore, onAlarm branch, tabs.onRemoved) + live-Chrome survival checkpoint [SURV-01, SURV-03, LIFE-05]
 
 ### Phase 15: Fire-Condition Engine & Value Extraction
@@ -118,7 +118,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 14. Trigger Survivability Foundation | v0.11.0 | 1/3 | In Progress|  |
+| 14. Trigger Survivability Foundation | v0.11.0 | 2/3 | In Progress|  |
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 0/TBD | Not started | - |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 0/TBD | Not started | - |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 0/TBD | Not started | - |
