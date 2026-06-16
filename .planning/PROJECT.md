@@ -33,6 +33,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Goal:** Add a `trigger` tool family to FSB autopilot and the MCP server that watches a targeted DOM element and reports back when its value changes, crosses a threshold, equals a target, or contains text -- surviving service-worker eviction, with a gentle "analyzing" pulse on the watched element while the trigger is active.
 
+**Progress:** Phases 14-17 are complete as of 2026-06-16. The trigger runtime now has storage-backed survivability, the fire-condition/value-extraction seam, live-observe with analyzing pulse, and refresh-poll that reloads only the trigger-owned tab, reads through `triggerRead`, handles missing/blocked pages as attention states, and delegates fired/no-fire decisions to the existing lifecycle seam. Phase 18 is next: shared trigger tool registry and dispatcher wiring.
+
 **Why this matters:** FSB today executes a task and stops. A trigger turns FSB into a *reactive* watcher -- "tell me when this crypto/stock/product price crosses X" or "ping me when this changes." The AI still decides what to do on fire; the trigger only reports what happened, preserving FSB's core value (the AI decides, the mechanics execute).
 
 **Target features:**
@@ -328,6 +330,7 @@ Carry-forward backlog candidates:
 - ✓ Tool-aware system prompt with TOOL SELECTION GUIDE, canvas task type detection, PRIORITY TOOLS conditional injection, and text-selection/file-upload sub-pattern hints -- v0.9.8/P98
 - ✓ 500+ v0.9.7 diagnostic recommendations embedded as prepended strategy hints in 49 site guide files across 5 categories (canvas, micro, scroll, context, dark) -- v0.9.8/P99
 - ✓ Procedural memory extraction from successful sessions and RECOMMENDED APPROACH injection into autopilot prompts with per-domain cap of 5 -- v0.9.8/P100
+- ✓ Refresh-poll trigger watch with 30s alarm floor, owned-tab background reload, typed missing/blocked attention states, lifecycle-seam evaluation, and pulse reassertion -- v0.11.0 Phase 17
 - ✓ Autonomous memory intelligence: auto-consolidation (10-session/80% triggers), cross-domain strategy transfer with taskType matching, domain-change memory refresh, dead episodic code removed -- v0.9.8/P101
 - ✓ Robustness hardening: viewport bounds validation for CDP tools, bidirectional stuck recovery, 3-stage progressive prompt trimming, 2-stage CLI parse retry with simplified hint -- v0.9.8/P102
 - ✓ Validation test harness with 50 autopilot-adapted edge case prompts, results tracking, and milestone gate metrics (VALID-02/03/04) -- v0.9.8/P103 (harness built, manual execution pending)
@@ -639,4 +642,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 -- milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring) started. Goal: a reactive `trigger` tool family (block + detached, refresh-poll + live-observe, four fire conditions) for FSB autopilot and the MCP server, MV3-survivable, with a gentle analyzing pulse on the watched element. Requirements + roadmap generation next.*
+*Last updated: 2026-06-16 -- v0.11.0 Trigger Tool Phases 14-17 complete. Refresh-poll watch is implemented and verified; Phase 18 shared tool registry + dispatcher wiring is next.*
