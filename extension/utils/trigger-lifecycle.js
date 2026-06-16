@@ -106,6 +106,28 @@
     return null;
   }
 
+  /**
+   * Resolve the FsbTriggerManager (Phase 15 Plan 02) at call time. In the SW it is
+   * set on the global by trigger-manager.js's IIFE, which importScripts loads
+   * AFTER trigger-store.js and BEFORE this module. In Node tests the manager's IIFE
+   * assigns globalThis.FsbTriggerManager on require(). Returned only when it
+   * actually exposes evaluate() -- the Phase 15 SEAM degrades to evaluated_noop
+   * (the Phase 14 behavior) when the manager is absent at boot, never throwing out
+   * of the SW glue (mirrors the typeof guards in background.js).
+   * @returns {object|null}
+   */
+  function _getManager() {
+    if (global && global.FsbTriggerManager
+        && typeof global.FsbTriggerManager.evaluate === 'function') {
+      return global.FsbTriggerManager;
+    }
+    if (typeof globalThis !== 'undefined' && globalThis.FsbTriggerManager
+        && typeof globalThis.FsbTriggerManager.evaluate === 'function') {
+      return globalThis.FsbTriggerManager;
+    }
+    return null;
+  }
+
   // ---- Alarm helpers (best-effort no-throw, cloned from the template) ------
   //
   // The ONLY timer surface (no setInterval -- SURV-01 / Pitfall #3). Arm shape
@@ -219,9 +241,9 @@
    * The survivable-evaluation harness (D-02): re-reads the persisted snapshot
    * from chrome.storage.session on EVERY tick (never the SW heap) and decides
    * against that persisted state, so an eviction between read and decision
-   * cannot drop or duplicate a fire. Phase 14 ships only the idempotent
-   * re-read/reap scaffold; the evaluate-and-fire comparison operators are
-   * Phase 15 and plug into the marked seam below.
+   * cannot drop or duplicate a fire. Phase 15 (Plan 03) plugs the pure
+   * FsbTriggerManager.evaluate() into the marked seam below; this handler still
+   * owns ALL fire-path storage I/O (the atomic terminal write-back + disarm).
    *
    * Outcomes:
    *   - not_our_alarm        : alarm missing / name not an fsbTrigger:* name.
@@ -230,7 +252,16 @@
    *   - noop_terminal        : snapshot already 'fired' or 'stopped' -- the
    *                            idempotent fire-guard against duplicate fire (D-09 / Pitfall #16).
    *   - reaped_ttl           : now >= deadline_at -> delete snapshot + clear alarm (LIFE-05 a).
-   *   - evaluated_noop       : armed + not elapsed -> Phase 15 plugs evaluate-and-fire HERE.
+   *   - fired                : evaluate() returned 'fired' -> atomic status:'fired'
+   *                            + fired_at write-back, then disarm (Phase 15 / D-07).
+   *   - no_fire              : evaluate() returned 'no_fire' -> next_state merged,
+   *                            snapshot stays armed.
+   *   - parse_error          : evaluate() returned 'parse_error' -> NEVER fires,
+   *                            next_state merged, stays armed (EXTRACT-04).
+   *   - pattern_error        : evaluate() returned 'pattern_error' -> NEVER fires,
+   *                            next_state merged, stays armed.
+   *   - evaluated_noop       : manager absent at boot OR malformed outcome ->
+   *                            degrade to the Phase-14 no-op (T-15-13).
    *
    * @param {{ name: string }} alarm Chrome alarm object.
    * @returns {Promise<object>} Typed outcome descriptor.
@@ -280,14 +311,63 @@
     }
 
     // ----------------------------------------------------------------------
-    // Phase 15 SEAM: plug the evaluate-and-fire step in HERE.
-    //   - resolve the selector, extract the value, compare against the
-    //     condition/baseline, and on a match write status:'fired' + fired_at
-    //     back to storage ATOMICALLY before any delivery.
-    // Phase 14 ships only the survivable re-read/re-arm scaffold. Do NOT add
-    // comparison operators in this module.
+    // Phase 15 SEAM (Plan 03): evaluate-and-fire. The pure comparison lives in
+    // FsbTriggerManager.evaluate(); THIS seam owns ALL fire-path storage I/O
+    // (D-02) -- the atomic status:'fired' write-back + disarm on a fire, or the
+    // next_state merge + stay-armed on a non-fire. The noop_terminal guard above
+    // (status fired/stopped) is the storage-backed dedupe, so a duplicate tick
+    // after the fired write-back no-ops there before reaching here. Do NOT add
+    // comparison operators in this module -- they live in trigger-manager.js.
     // ----------------------------------------------------------------------
-    return { ok: true, action: 'evaluated_noop' };
+
+    var manager = _getManager();
+    if (!manager) {
+      // Manager not on the global yet (boot ordering / load failure). Degrade to
+      // the Phase-14 no-op rather than throwing out of the SW glue (T-15-13).
+      return { ok: true, action: 'evaluated_noop' };
+    }
+
+    // reportedValue is the INPUT the Phase 16/17 watch layer will supply (the raw
+    // scraped value). Phase 15 has no live scrape, so the seam constructs it from
+    // what the snapshot already carries -- snap.reported_value if a future watch
+    // layer staged one, else the prior tick's last_value. Consumer contract:
+    // { text, attributes? }; the watch layer must conform to this shape.
+    var reportedValue = {
+      text: (snap.reported_value != null ? snap.reported_value : snap.last_value)
+    };
+
+    var outcome = manager.evaluate(snap, reportedValue, now);
+
+    // Defensive: a null/malformed outcome (manager returned nothing) degrades to
+    // the no-op rather than throwing or writing a half-formed snapshot.
+    if (!outcome || typeof outcome !== 'object' || typeof outcome.outcome !== 'string') {
+      return { ok: true, action: 'evaluated_noop' };
+    }
+
+    var nextState = (outcome.next_state && typeof outcome.next_state === 'object')
+      ? outcome.next_state : {};
+
+    if (outcome.outcome === 'fired') {
+      // ATOMIC terminal write-back: stamp the terminal status + fire time, fold in
+      // the edge-state patch, then persist in a single writeSnapshot, then disarm.
+      snap.status = 'fired';
+      snap.fired_at = now;
+      if (nextState.last_value !== undefined) snap.last_value = nextState.last_value;
+      if (nextState.was_satisfied !== undefined) snap.was_satisfied = nextState.was_satisfied;
+      if (nextState.last_evaluated_at !== undefined) snap.last_evaluated_at = nextState.last_evaluated_at;
+      await store.writeSnapshot(triggerId, snap);
+      await clearAlarm(alarm.name);
+      return { ok: true, action: 'fired', outcome: outcome };
+    }
+
+    // Non-fire (no_fire / parse_error / pattern_error): persist the edge state and
+    // STAY armed. LANDMINE (EXTRACT-04): a parse_error/pattern_error MUST NOT set
+    // status:'fired' -- it never fires; the snapshot stays armed for the next tick.
+    if (nextState.last_value !== undefined) snap.last_value = nextState.last_value;
+    if (nextState.was_satisfied !== undefined) snap.was_satisfied = nextState.was_satisfied;
+    if (nextState.last_evaluated_at !== undefined) snap.last_evaluated_at = nextState.last_evaluated_at;
+    await store.writeSnapshot(triggerId, snap);
+    return { ok: true, action: outcome.outcome, outcome: outcome };
   }
 
   // ---- Tab-close reap (LIFE-05 c / D-10c) ---------------------------------
