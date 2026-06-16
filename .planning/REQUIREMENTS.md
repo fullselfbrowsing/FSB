@@ -58,10 +58,10 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### VIS -- Visual feedback
 
-- [ ] **VIS-01**: While a trigger is active, its watched element shows a gentle "analyzing" pulse -- visually distinct from the steady `run_task` glow -- reusing FSB's Shadow DOM overlay.
-- [ ] **VIS-02**: The visual monitor explicitly labels itself as "watching a trigger" while one or more triggers are active.
-- [ ] **VIS-03**: The pulse clears when the trigger fires, is stopped, times out, or is reaped (no stuck glow, including across a refresh-poll reload).
-- [ ] **VIS-04**: The analyzing pulse respects the user's reduced-motion preference.
+- [x] **VIS-01**: While a trigger is active, its watched element shows a gentle "analyzing" pulse -- visually distinct from the steady `run_task` glow -- reusing FSB's Shadow DOM overlay.
+- [x] **VIS-02**: The visual monitor explicitly labels itself as "watching a trigger" while one or more triggers are active.
+- [x] **VIS-03**: The pulse clears when the trigger fires, is stopped, times out, or is reaped (no stuck glow, including across a refresh-poll reload).
+- [x] **VIS-04**: The analyzing pulse respects the user's reduced-motion preference.
 
 ### REG -- Registry parity & contract safety
 
@@ -140,10 +140,10 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | SURV-01 | Phase 14 | Complete |
 | SURV-02 | Phase 14 | Complete |
 | SURV-03 | Phase 14 | Complete |
-| VIS-01 | Phase 16 | Pending |
-| VIS-02 | Phase 16 | Pending |
-| VIS-03 | Phase 16 | Pending |
-| VIS-04 | Phase 16 | Pending |
+| VIS-01 | Phase 16 | Complete |
+| VIS-02 | Phase 16 | Complete |
+| VIS-03 | Phase 16 | Complete |
+| VIS-04 | Phase 16 | Complete |
 | REG-01 | Phase 18 | Pending |
 | REG-02 | Phase 18 | Pending |
 | REG-03 | Phase 18 | Pending |
