@@ -38,7 +38,15 @@ try { importScripts('utils/mcp-task-store.js'); } catch (e) { console.error('[FS
 // store MUST be imported BEFORE the lifecycle (D-07 glue point 0). Wrapped in
 // try/catch (mirroring mcp-task-store.js) so a load failure logs and the
 // typeof FsbTriggerLifecycle guards at every call site make the glue inert.
+// Phase 15 Plan 03 (v0.11.0): the fire-condition engine joins the load chain.
+// LOAD ORDER (load-bearing): the value-extractor module (pure, no deps) loads
+// BEFORE the trigger store so FsbValueExtractor is on the global; the trigger
+// manager loads AFTER the store (its cap resolves FsbTriggerStore) and BEFORE
+// the lifecycle (whose Phase-15 SEAM calls FsbTriggerManager.evaluate). Concrete
+// order below: value-extractor -> trigger-store -> trigger-manager -> lifecycle.
+try { importScripts('utils/value-extractor.js'); } catch (e) { console.error('[FSB] Failed to load value-extractor.js:', e.message); }
 try { importScripts('utils/trigger-store.js'); } catch (e) { console.error('[FSB] Failed to load trigger-store.js:', e.message); }
+try { importScripts('utils/trigger-manager.js'); } catch (e) { console.error('[FSB] Failed to load trigger-manager.js:', e.message); }
 try { importScripts('utils/trigger-lifecycle.js'); } catch (e) { console.error('[FSB] Failed to load trigger-lifecycle.js:', e.message); }
 // Phase 245 (v0.9.60): action-verification.js exports buildChangeReport /
 // applyChangeReportSizeCap which the dispatcher calls from SW context after

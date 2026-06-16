@@ -528,13 +528,17 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 8 Plan 08-01: 155 mentions (+1 new line for ai/lattice-step-emitter.js).
   // Phase 14 Plan 14-03: 157 mentions (+2 new lines for utils/trigger-store.js +
   // utils/trigger-lifecycle.js -- D-07 glue point 0, store imported before lifecycle).
+  // Phase 15 Plan 15-03: 159 mentions (+2 new lines for utils/value-extractor.js +
+  // utils/trigger-manager.js -- the fire-condition engine; load order
+  // value-extractor -> trigger-store -> trigger-manager -> trigger-lifecycle).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 157, 'background.js importScripts count = 157 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 for utils/trigger-store.js & utils/trigger-lifecycle.js)');
+  passAssertEqual(importScriptsCount, 159, 'background.js importScripts count = 159 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 for utils/value-extractor.js & utils/trigger-manager.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
-  // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154.
+  // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
+  // (value-extractor + trigger-manager) -> 156.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 154, 'background.js importScripts() call sites = 154 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 for trigger-store.js & trigger-lifecycle.js)');
+  passAssertEqual(importScriptsCallSites, 156, 'background.js importScripts() call sites = 156 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 for value-extractor.js & trigger-manager.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
