@@ -128,15 +128,11 @@
       return { ok: false, reason: 'invalid_request' };
     }
 
-    var hadEntry = registry.has(triggerId);
     stop(triggerId);
 
     var leaf = resolveLeaf(selector);
     if (!leaf) {
       return { ok: false, reason: 'not_found' };
-    }
-    if (!hadEntry && leaf.dataset && leaf.dataset.fsbTriggerArmed === triggerId) {
-      return { ok: true, already: true };
     }
 
     var container = stableAncestor(leaf);

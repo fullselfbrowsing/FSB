@@ -215,6 +215,24 @@ check('idempotent start disconnects prior observer before re-observe', () => {
   assert.equal(triggerObserve.registry.size, 1);
 });
 
+check('stale armed dataset marker does not block a fresh observer start', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ role: 'status' });
+  const leaf = makeNode({
+    text: 'fresh',
+    parent: container,
+    dataset: { fsbTriggerArmed: 'trg_stale' }
+  });
+  queryResolver = () => leaf;
+
+  const started = triggerObserve.start('trg_stale', '#stale', 'text');
+  assert.equal(started.ok, true);
+  assert.equal(started.already, undefined);
+  assert.equal(observerInstances.length, 1);
+  assert.equal(triggerObserve.registry.size, 1);
+});
+
 check('leak test: disconnectAll pairs every observe with disconnect and empties registry', () => {
   triggerObserve.disconnectAll();
   resetRuntime();
