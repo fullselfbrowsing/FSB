@@ -96,7 +96,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `stop_trigger` tears down the observer / cancels the poll alarm and clears the pulse; `get_trigger_status` returns state, current vs initial value, condition, watch mode, elapsed/remaining, and last-check time; `list_triggers` lists all active triggers with age and owner.
   3. While a blocking `trigger()` is outstanding, a second tool call AND `stop_trigger` on that same trigger both return promptly — `stop_trigger` / `get_trigger_status` / `list_triggers` are in the MCP read-only bypass set and the long-running watcher runs in `background.js`, not the MCP handler, so the single-slot task queue is never deadlocked (a caller can always cancel a trigger it is blocked on).
   4. The existing MCP tool schemas remain byte-identical (the trigger family is purely additive, INV-01) — the existing schema-lock CI gate stays green — and the trigger tools behave identically across all 7 AI providers when driven by autopilot (INV-03).
-**Plans**: TBD
+**Plans**: 4 plans (Wave 1: 18-01, 18-02 parallel; Wave 2: 18-03; Wave 3: 18-04)
+- [ ] 18-01-PLAN.md — shared trigger tool registry definitions, MCP mirror, parity/provider schema tests [REG-01, REG-03, REG-04, TRIG-01]
+- [ ] 18-02-PLAN.md — background trigger arm/stop/status/list handlers and Wave 0 dispatcher tests [TRIG-01, LIFE-01, LIFE-02, LIFE-03, REG-02]
+- [ ] 18-03-PLAN.md — MCP trigger registrar, runtime/manual queue-bypass wiring, smoke tests [REG-01, REG-02, LIFE-01, LIFE-02, LIFE-03]
+- [ ] 18-04-PLAN.md — extension MCP route contracts, autopilot executor wiring, full integration gate [REG-01, REG-02, REG-03, REG-04]
 
 ### Phase 19: MCP Tools & Blocking/Detached Reporting
 **Goal**: The MCP server exposes the trigger family end-to-end with blocking-by-default reporting (periodic heartbeats, auto-convert to detached past a safety ceiling) and detached opt-in, returning structured notify-only fire events — reusing the proven `run_task` blocking-return machinery as a parallel envelope.
@@ -133,7 +137,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete    | 2026-06-16 |
-| 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 0/TBD | Not started | - |
+| 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 0/4 | Not started | - |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 0/TBD | Not started | - |
 | 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 0/TBD | Not started | - |
 
