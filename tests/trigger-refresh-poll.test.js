@@ -486,7 +486,7 @@ async function casePulseRestartSourceGuards() {
   const latestIdx = block.indexOf('latestSnap');
   const armedIdx = block.indexOf("latestSnap.status === 'armed'");
   const pulseIdx = block.indexOf('triggerPulseStart', handleIdx);
-  const scheduleIdx = block.indexOf('scheduleNextRefreshPollAlarm', handleIdx);
+  const scheduleIdx = block.indexOf('await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm', handleIdx);
 
   check(/triggerPulseStart/.test(block), 'M.1 refresh-poll helper restarts triggerPulseStart');
   check(/reason\s*:\s*['"]refresh-poll['"]/.test(block), 'M.2 pulse restart uses reason refresh-poll');

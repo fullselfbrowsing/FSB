@@ -3748,7 +3748,12 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
       && FsbTriggerLifecycle
       && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
     const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
-    if (fsbTriggerIsRefreshPollSnapshot(latestSnap)) {
+    if (fsbTriggerIsRefreshPollSnapshot(latestSnap) && latestSnap.status === 'armed') {
+      await fsbTriggerSendTabMessage(tabId, {
+        action: 'triggerPulseStart',
+        selector: latestSnap.selector,
+        reason: 'refresh-poll'
+      });
       await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
       await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
     }
