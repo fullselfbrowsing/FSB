@@ -3564,6 +3564,149 @@ function fsbTriggerCopyReportedAttributes(attributes) {
   return Object.keys(out).length ? out : null;
 }
 
+async function fsbTriggerWaitForRefreshPollReady(tabId) {
+  if (typeof pageLoadWatcher !== 'undefined'
+      && pageLoadWatcher
+      && typeof pageLoadWatcher.waitForPageReady === 'function') {
+    try {
+      const ready = await pageLoadWatcher.waitForPageReady(tabId, {
+        maxWait: 30000,
+        requireDOMStable: false
+      });
+      if (ready && ready.success !== false) return ready;
+    } catch (_err) { /* fall through to explicit tab completion polling */ }
+  }
+
+  if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
+    return { success: false, method: 'tabs-unavailable' };
+  }
+
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab || tab.status === 'complete') {
+        return { success: true, method: 'tabs.get' };
+      }
+    } catch (err) {
+      return { success: false, method: 'tabs.get-error', error: err && err.message ? err.message : String(err) };
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return { success: false, method: 'tabs.get-timeout' };
+}
+
+async function fsbTriggerSendRefreshPollRead(tabId, snap) {
+  if (!Number.isFinite(Number(tabId)) || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return { ok: false, success: false, reason: 'tabs_unavailable' };
+  }
+  const numericTabId = Number(tabId);
+  await ensureContentScriptInjected(tabId);
+  return chrome.tabs.sendMessage(numericTabId, {
+    action: 'triggerRead',
+    selector: snap.selector,
+    extract: fsbTriggerExtractKind(snap),
+    attrName: fsbTriggerAttrName(snap)
+  }, { frameId: 0 });
+}
+
+async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra) {
+  if (!triggerId || typeof triggerId !== 'string') {
+    return { ok: false, reason: 'invalid_trigger_id' };
+  }
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.writeSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+  const now = Date.now();
+  snap.status = reason === 'blocked' ? 'blocked' : 'needs_attention';
+  snap.attention_reason = reason;
+  snap.attention_at = now;
+  snap.last_attention = Object.assign({ reason, at: now }, extra || {});
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+  return { ok: true, action: snap.status, reason };
+}
+
+async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
+  if (!triggerId || typeof triggerId !== 'string') {
+    return { ok: false, reason: 'invalid_trigger_id' };
+  }
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+    return { ok: true, ignored: true };
+  }
+  if (!snap.selector) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'invalid_selector');
+  }
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.writeSnapshot !== 'function'
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const ownership = fsbTriggerValidateRefreshPollOwnership(snap);
+  if (!ownership || ownership.ok !== true) return ownership;
+  const tabId = ownership.tabId;
+  const registry = ownership.registry;
+
+  if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
+    return { ok: false, code: 'TABS_UNAVAILABLE', requestedTabId: tabId, requestingAgentId: ownership.agentId };
+  }
+
+  if (registry && typeof registry.stampAgentNavigation === 'function') {
+    try {
+      registry.stampAgentNavigation(tabId);
+    } catch (_err) { /* best-effort navigation stamp */ }
+  }
+
+  await chrome.tabs.reload(tabId);
+  await fsbTriggerWaitForRefreshPollReady(tabId);
+
+  const readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector });
+  }
+  if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: readResult && readResult.code,
+      error: readResult && (readResult.error || readResult.reason)
+    });
+  }
+
+  const value = readResult.value;
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  if (seamResult && seamResult.action !== 'fired'
+      && typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
+    const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (fsbTriggerIsRefreshPollSnapshot(latestSnap)) {
+      await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
+      await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
+    }
+  }
+
+  return { ok: true, action: 'evaluated', result: seamResult };
+}
+
 async function fsbTriggerHandleValueReport(request, sender) {
   const triggerId = request && typeof request.trigger_id === 'string' ? request.trigger_id : null;
   if (!triggerId) return { ok: false, reason: 'invalid_trigger_id' };

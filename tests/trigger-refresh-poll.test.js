@@ -421,7 +421,7 @@ async function caseRefreshPollRunSourceGuards() {
   const runIdx = block.indexOf('async function fsbTriggerRunRefreshPollTick');
   const validateIdx = block.indexOf('fsbTriggerValidateRefreshPollOwnership');
   const stampIdx = block.indexOf('stampAgentNavigation');
-  const reloadIdx = block.indexOf('chrome.tabs.reload');
+  const reloadIdx = block.indexOf('await chrome.tabs.reload');
   const reportedIdx = block.indexOf('reported_value');
   const handleIdx = block.indexOf('handleTriggerAlarm');
   const elementNotFoundIdx = block.indexOf('ELEMENT_NOT_FOUND');
