@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 18 context gathered (assumptions mode)
-last_updated: "2026-06-16T21:14:11.515Z"
-last_activity: 2026-06-16 -- Phase 18 execution started
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-06-16T21:22:53.860Z"
+last_activity: 2026-06-16
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
-  percent: 89
+  completed_plans: 17
+  percent: 94
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 18 (shared-tool-registry-dispatcher-wiring) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 18
-Last activity: 2026-06-16 -- Phase 18 execution started
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-06-16
 
 Progress: [█████·····] 50% (4/8 phases)
 
@@ -81,6 +81,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 17 P02 | 2 min | 2 tasks | 2 files |
 | Phase 17 P03 | 8 min | 3 tasks | 2 files |
 | Phase 17 P04 | 7 min | 2 tasks | 5 files |
+| Phase 18-shared-tool-registry-dispatcher-wiring P01 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 17]: Plan 04: Refresh-poll blocked outcomes persist status blocked with attention_reason blocked and last_attention context instead of staging challenge text.
 - [Phase 17]: Plan 04: Refresh-poll restarts triggerPulseStart only after lifecycle evaluation and only if the latest snapshot remains armed refresh-poll.
 - [Phase 17]: Plan 04: Real inactive-tab focus retention is deferred_to_phase_20 live-browser UAT, not marked as automated proof.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger tools are plain background-routed registry entries, not visual-session action tools.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: stop_trigger, get_trigger_status, and list_triggers are _readOnly:true so queue bypass can derive from the shared registry.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger.condition stays a JSON Schema object; nested condition validation remains in the trigger runtime.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -156,9 +160,9 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-16T20:21:21.423Z
-Stopped at: Phase 18 context gathered (assumptions mode)
-Resume file: .planning/phases/18-shared-tool-registry-dispatcher-wiring/18-CONTEXT.md
+Last session: 2026-06-16T21:22:53.856Z
+Stopped at: Completed 18-01-PLAN.md
+Resume file: None
 
 ## Next Actions
 

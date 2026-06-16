@@ -9,7 +9,7 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### TRIG -- Core trigger tool & fire conditions
 
-- [ ] **TRIG-01**: User can arm a trigger on one targeted DOM element (via FSB's uniqueness-scored selector) by specifying a fire condition.
+- [x] **TRIG-01**: User can arm a trigger on one targeted DOM element (via FSB's uniqueness-scored selector) by specifying a fire condition.
 - [x] **TRIG-02**: A trigger supports the `changed` condition -- fires when the element's value differs from the baseline captured at arm time.
 - [x] **TRIG-03**: A trigger supports the `threshold` condition with operators `>=`, `<=`, `>`, `<` against a numeric target.
 - [x] **TRIG-04**: A trigger supports the `equals` / `regex` condition -- exact value match or a caller-supplied regular expression (compiled once, guarded against catastrophic backtracking).
@@ -44,9 +44,9 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### LIFE -- Lifecycle & concurrency (companion tools)
 
-- [ ] **LIFE-01**: User can stop an active trigger with `stop_trigger`, which tears down the observer / cancels the poll alarm and clears the visual pulse.
-- [ ] **LIFE-02**: User can query a trigger with `get_trigger_status` -- state, current vs initial value, condition, watch mode, elapsed / remaining, last-check time.
-- [ ] **LIFE-03**: User can list all active triggers with `list_triggers`.
+- [x] **LIFE-01**: User can stop an active trigger with `stop_trigger`, which tears down the observer / cancels the poll alarm and clears the visual pulse.
+- [x] **LIFE-02**: User can query a trigger with `get_trigger_status` -- state, current vs initial value, condition, watch mode, elapsed / remaining, last-check time.
+- [x] **LIFE-03**: User can list all active triggers with `list_triggers`.
 - [x] **LIFE-04**: Multiple triggers can be active concurrently under a configurable cap (mirrors the v0.9.60 agent cap, 1-64); exceeding the cap fails loudly with a typed error.
 - [x] **LIFE-05**: A trigger has a maximum lifetime (TTL); orphaned / expired triggers are reaped and their resources (observer, alarm, pulse, registry entry) released.
 
@@ -65,10 +65,10 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### REG -- Registry parity & contract safety
 
-- [ ] **REG-01**: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` are registered once in the shared tool registry and exposed to BOTH FSB autopilot and the MCP server (INV-02).
+- [x] **REG-01**: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` are registered once in the shared tool registry and exposed to BOTH FSB autopilot and the MCP server (INV-02).
 - [ ] **REG-02**: The companion tools (`stop_trigger` / `get_trigger_status` / `list_triggers`) are in the MCP read-only bypass set, and the long-running watcher runs in `background.js` (not the MCP handler), so a blocking `trigger()` never starves the single-slot task queue or deadlocks its own `stop_trigger`.
-- [ ] **REG-03**: All existing MCP tool schemas remain byte-identical; the trigger family is purely additive (INV-01), verified by the existing schema-lock CI gate.
-- [ ] **REG-04**: The trigger tools behave identically across all 7 AI providers when driven by autopilot (INV-03; trigger logic is provider-agnostic).
+- [x] **REG-03**: All existing MCP tool schemas remain byte-identical; the trigger family is purely additive (INV-01), verified by the existing schema-lock CI gate.
+- [x] **REG-04**: The trigger tools behave identically across all 7 AI providers when driven by autopilot (INV-03; trigger logic is provider-agnostic).
 
 ## Future Requirements (deferred -- tracked, not in this roadmap)
 
@@ -109,7 +109,7 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRIG-01 | Phase 18 | Pending |
+| TRIG-01 | Phase 18 | Complete |
 | TRIG-02 | Phase 15 | Complete |
 | TRIG-03 | Phase 15 | Complete |
 | TRIG-04 | Phase 15 | Complete |
@@ -132,9 +132,9 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | REPORT-05 | Phase 19 | Pending |
 | REPORT-06 | Phase 19 | Pending |
 | REPORT-07 | Phase 19 | Pending |
-| LIFE-01 | Phase 18 | Pending |
-| LIFE-02 | Phase 18 | Pending |
-| LIFE-03 | Phase 18 | Pending |
+| LIFE-01 | Phase 18 | Complete |
+| LIFE-02 | Phase 18 | Complete |
+| LIFE-03 | Phase 18 | Complete |
 | LIFE-04 | Phase 15 | Complete |
 | LIFE-05 | Phase 14 | Complete |
 | SURV-01 | Phase 14 | Complete |
@@ -144,10 +144,10 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | VIS-02 | Phase 16 | Complete |
 | VIS-03 | Phase 16 | Complete |
 | VIS-04 | Phase 16 | Complete |
-| REG-01 | Phase 18 | Pending |
+| REG-01 | Phase 18 | Complete |
 | REG-02 | Phase 18 | Pending |
-| REG-03 | Phase 18 | Pending |
-| REG-04 | Phase 18 | Pending |
+| REG-03 | Phase 18 | Complete |
+| REG-04 | Phase 18 | Complete |
 
 **Coverage:**
 - v1 requirements: 39 total
