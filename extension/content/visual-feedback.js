@@ -1208,6 +1208,7 @@
       this.currentGeometry = null;
       this.currentMode = null;
       this._isVisible = false;
+      this._pulseMode = false;
       // Phase 229-01 (OVERLAY-02): rect memoization fields.
       this._rectDirty = true;
       this._onWindowChange = null;
@@ -1547,6 +1548,16 @@
         40%  { transform: scale(1.03); }
         100% { transform: scale(1); }
       }
+      @keyframes fsb-trigger-pulse {
+        0%, 100% {
+          opacity: 0.55;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.92;
+          transform: scale(1.025);
+        }
+      }
       @keyframes fsbTextGlow {
         0%, 100% {
           background: linear-gradient(90deg, rgba(255, 140, 0, 0.30), rgba(255, 166, 0, 0.16));
@@ -1584,6 +1595,14 @@
         opacity: 1;
         animation: fsbActionGlow 1.5s ease-in-out infinite, fsbGlowAppear 0.3s ease-out;
       }
+      .box-overlay.trigger-pulse,
+      .box-overlay.trigger-pulse.active {
+        opacity: 1;
+        border-color: rgba(0, 188, 212, 0.95);
+        background: rgba(0, 188, 212, 0.07);
+        animation: fsb-trigger-pulse 2.4s ease-in-out infinite;
+        will-change: opacity, transform;
+      }
       .text-highlight {
         border-radius: 6px;
         transform: scale(0.985);
@@ -1606,6 +1625,14 @@
         .box-overlay.active,
         .text-highlight.active {
           animation: none;
+        }
+        .box-overlay.trigger-pulse,
+        .box-overlay.trigger-pulse.active {
+          animation: none;
+          opacity: 1;
+          transform: none;
+          border-color: rgba(0, 188, 212, 0.95);
+          background: rgba(0, 188, 212, 0.10);
         }
       }
     `;
@@ -1646,6 +1673,22 @@
       }
     }
 
+    showPulse(element) {
+      this.show(element);
+      this._pulseMode = true;
+      if (this.boxOverlay) {
+        this.boxOverlay.classList.add('trigger-pulse');
+      }
+    }
+
+    clearPulse() {
+      this._pulseMode = false;
+      if (this.boxOverlay) {
+        this.boxOverlay.classList.remove('trigger-pulse');
+      }
+      this.destroy();
+    }
+
     _updatePosition() {
       if (!this.targetElement || !this.overlayRoot) return;
 
@@ -1682,6 +1725,9 @@
           this.boxOverlay.classList.add('active');
         } else {
           this.boxOverlay.classList.remove('active');
+        }
+        if (this._pulseMode) {
+          this.boxOverlay.classList.add('trigger-pulse');
         }
       }
 
@@ -1788,6 +1834,7 @@
         this.currentGeometry = null;
         this.currentMode = null;
         this._isVisible = false;
+        this._pulseMode = false;
         this._inTopLayer = false;
       }, 250);
     }
@@ -1813,6 +1860,7 @@
       this.currentGeometry = null;
       this.currentMode = null;
       this._isVisible = false;
+      this._pulseMode = false;
       this._inTopLayer = false;
     }
   }
@@ -2263,6 +2311,13 @@
         FSB.elementCache.observer.disconnect();
       }
     } catch (e) { /* ignore cleanup errors on unload */ }
+  });
+
+  window.addEventListener('pagehide', (e) => {
+    if (e.persisted) return;
+    try {
+      actionGlowOverlay.destroy();
+    } catch (_err) { /* ignore cleanup errors on pagehide */ }
   });
 
   // ============================================================================
