@@ -123,6 +123,33 @@ function makeRefreshPollSpec(overrides) {
   }, overrides || {});
 }
 
+function makeRefreshPollSnapshot(overrides) {
+  return Object.assign({
+    trigger_id: 'trg_refresh_snapshot',
+    status: 'armed',
+    watch: 'refresh-poll',
+    condition: { kind: 'changed' },
+    baseline: 'old',
+    last_value: 'old',
+    selector: '#price',
+    target_tab_id: 123,
+    agent_id: 'agent_refresh',
+    armed_at: 1000000,
+    deadline_at: 9000000,
+    poll_interval_ms: 60000
+  }, overrides || {});
+}
+
+async function withFixedNow(now, fn) {
+  const priorNow = Date.now;
+  Date.now = function() { return now; };
+  try {
+    return await fn();
+  } finally {
+    Date.now = priorNow;
+  }
+}
+
 async function readSnapshot(harness, triggerId) {
   return await harness.store.readSnapshot(triggerId);
 }
@@ -219,12 +246,135 @@ async function caseNonRefreshNoPollField() {
   check(snap && snap.poll_interval_ms === undefined, 'D.2 non-refresh snapshot does not gain poll_interval_ms');
 }
 
+async function caseArmSchedulesNextPoll() {
+  console.log('\n--- Case E: lifecycle arm writes next_poll_at and alarms next poll ---');
+  const now = 2000000;
+  await withFixedNow(now, async () => {
+    const h = setupRefreshPollHarness();
+    const deadline = now + 3600000;
+    const snapshot = makeRefreshPollSnapshot({
+      trigger_id: 'trg_arm_next',
+      poll_interval_ms: 45000,
+      poll_jitter_ms: 2000,
+      deadline_at: deadline
+    });
+
+    check(typeof h.lifecycle.scheduleNextRefreshPollAlarm === 'function',
+      'E.1 lifecycle exports scheduleNextRefreshPollAlarm');
+    const result = await h.lifecycle.armTrigger(snapshot);
+    const stored = await readSnapshot(h, 'trg_arm_next');
+    const alarm = h.chromeMock.alarms._created().find((a) => a.name === 'fsbTrigger:trg_arm_next');
+
+    check(result && result.ok === true && result.armed === true, 'E.2 refresh-poll lifecycle arm succeeds');
+    check(stored && stored.next_poll_at === now + 47000,
+      'E.3 arm writes next_poll_at = now + interval + deterministic jitter');
+    check(stored && stored.deadline_at === deadline, 'E.4 deadline_at is preserved as TTL');
+    check(alarm && alarm.when === stored.next_poll_at && alarm.when !== deadline,
+      'E.5 alarm is created for next_poll_at, not deadline_at');
+  });
+}
+
+async function caseRestoreUsesPersistedNextPoll() {
+  console.log('\n--- Case F: restore uses persisted future next_poll_at ---');
+  const now = 3000000;
+  await withFixedNow(now, async () => {
+    const h = setupRefreshPollHarness();
+    const nextPollAt = now + 65000;
+    const deadline = now + 3600000;
+    await h.store.writeSnapshot('trg_restore_keep', makeRefreshPollSnapshot({
+      trigger_id: 'trg_restore_keep',
+      next_poll_at: nextPollAt,
+      deadline_at: deadline
+    }));
+
+    const result = await h.lifecycle.restoreTriggersFromStorage();
+    const stored = await readSnapshot(h, 'trg_restore_keep');
+    const alarm = h.chromeMock.alarms._created().find((a) => a.name === 'fsbTrigger:trg_restore_keep');
+
+    check(result && result.ok === true && result.restored === 1, 'F.1 restore keeps armed refresh-poll survivor');
+    check(stored && stored.next_poll_at === nextPollAt, 'F.2 restore preserves valid persisted next_poll_at');
+    check(stored && stored.deadline_at === deadline, 'F.3 restore preserves deadline_at');
+    check(alarm && alarm.when === nextPollAt, 'F.4 restore creates alarm at persisted next_poll_at');
+  });
+}
+
+async function caseRestoreRecomputesUnsafeNextPoll() {
+  console.log('\n--- Case G: restore recomputes unsafe next_poll_at floor-safely ---');
+  const now = 4000000;
+  await withFixedNow(now, async () => {
+    const h = setupRefreshPollHarness();
+    const deadline = now + 3600000;
+    await h.store.writeSnapshot('trg_restore_recompute', makeRefreshPollSnapshot({
+      trigger_id: 'trg_restore_recompute',
+      next_poll_at: now + 10000,
+      poll_interval_ms: 45000,
+      poll_jitter_ms: 1000,
+      deadline_at: deadline
+    }));
+
+    const result = await h.lifecycle.restoreTriggersFromStorage();
+    const stored = await readSnapshot(h, 'trg_restore_recompute');
+    const alarm = h.chromeMock.alarms._created().find((a) => a.name === 'fsbTrigger:trg_restore_recompute');
+
+    check(result && result.ok === true && result.restored === 1, 'G.1 restore keeps armed refresh-poll survivor');
+    check(stored && stored.next_poll_at === now + 46000,
+      'G.2 restore recomputes stale/floor-unsafe next_poll_at from interval + jitter');
+    check(stored && stored.deadline_at === deadline, 'G.3 recompute preserves deadline_at');
+    check(alarm && alarm.when === now + 46000, 'G.4 recomputed next_poll_at is used for alarm');
+  });
+}
+
+async function caseJitterAndDeadlineFloor() {
+  console.log('\n--- Case H: deterministic jitter is clamped and deadline-safe ---');
+  const now = 5000000;
+  await withFixedNow(now, async () => {
+    const h = setupRefreshPollHarness();
+
+    await h.lifecycle.armTrigger(makeRefreshPollSnapshot({
+      trigger_id: 'trg_jitter_cap',
+      poll_interval_ms: 30000,
+      poll_jitter_ms: 5000,
+      deadline_at: now + 3600000
+    }));
+    const capped = await readSnapshot(h, 'trg_jitter_cap');
+    check(capped && capped.next_poll_at === now + 33000,
+      'H.1 deterministic jitter is capped to 3000ms');
+
+    await h.lifecycle.armTrigger(makeRefreshPollSnapshot({
+      trigger_id: 'trg_jitter_floor',
+      poll_interval_ms: 30000,
+      poll_jitter_ms: -5000,
+      deadline_at: now + 3600000
+    }));
+    const floored = await readSnapshot(h, 'trg_jitter_floor');
+    check(floored && floored.next_poll_at === now + 30000,
+      'H.2 negative deterministic jitter clamps to 0 and keeps the 30s floor');
+
+    await h.lifecycle.armTrigger(makeRefreshPollSnapshot({
+      trigger_id: 'trg_deadline_soon',
+      poll_interval_ms: 60000,
+      poll_jitter_ms: 3000,
+      deadline_at: now + 20000
+    }));
+    const shortTtl = await readSnapshot(h, 'trg_deadline_soon');
+    const shortAlarm = h.chromeMock.alarms._created().find((a) => a.name === 'fsbTrigger:trg_deadline_soon');
+    check(shortTtl && shortTtl.next_poll_at === now + 20000,
+      'H.3 deadline_at owns the next wake when remaining TTL is below the floor');
+    check(shortAlarm && shortAlarm.when === shortTtl.next_poll_at,
+      'H.4 short-TTL alarm is scheduled at deadline_at for reap');
+  });
+}
+
 (async () => {
   console.log('--- Phase 17 Plan 01: trigger refresh-poll cadence ---');
   await caseDefaultInterval();
   await caseAcceptedExplicitInterval();
   await caseSubFloorAliasesReject();
   await caseNonRefreshNoPollField();
+  await caseArmSchedulesNextPoll();
+  await caseRestoreUsesPersistedNextPoll();
+  await caseRestoreRecomputesUnsafeNextPoll();
+  await caseJitterAndDeadlineFloor();
 
   console.log('\ntrigger-refresh-poll.test: ' + passed + ' passed, ' + failed + ' failed');
   if (failed > 0) process.exit(1);
