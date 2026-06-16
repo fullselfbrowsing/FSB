@@ -654,6 +654,9 @@
         ? lifecycle.FSB_TRIGGER_DEFAULT_TTL_MS
         : 21600000; // 6h default if the lifecycle constant is unavailable
 
+      var ownershipToken = (typeof safeSpec.ownership_token === 'string' && safeSpec.ownership_token)
+        ? safeSpec.ownership_token
+        : safeSpec.ownershipToken;
       var snapshot = {
         trigger_id: safeSpec.trigger_id,
         status: 'armed',
@@ -664,6 +667,7 @@
         selector: safeSpec.selector,
         target_tab_id: safeSpec.target_tab_id,
         agent_id: safeSpec.agent_id,
+        ownership_token: (typeof ownershipToken === 'string' && ownershipToken) ? ownershipToken : undefined,
         armed_at: now,
         deadline_at: now + ttl
       };

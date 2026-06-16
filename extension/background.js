@@ -3460,7 +3460,24 @@ function fsbTriggerValidateRefreshPollOwnership(snap) {
     };
   }
 
-  if (typeof registry.isOwnedBy === 'function' && registry.isOwnedBy(tabId, agentId, snap && snap.ownership_token) === false) {
+  const snapshotOwnershipToken = snap && typeof snap.ownership_token === 'string'
+    ? snap.ownership_token
+    : (snap && typeof snap.ownershipToken === 'string' ? snap.ownershipToken : undefined);
+  const tabMetadata = (typeof registry.getTabMetadata === 'function') ? registry.getTabMetadata(tabId) : null;
+  const registryOwnershipToken = tabMetadata && typeof tabMetadata.ownershipToken === 'string'
+    ? tabMetadata.ownershipToken
+    : null;
+  if (registryOwnershipToken && !snapshotOwnershipToken) {
+    return {
+      ok: false,
+      code: 'TAB_NOT_OWNED',
+      ownerAgentId: owner || null,
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  if (typeof registry.isOwnedBy === 'function' && registry.isOwnedBy(tabId, agentId, snapshotOwnershipToken) === false) {
     return {
       ok: false,
       code: 'TAB_NOT_OWNED',
