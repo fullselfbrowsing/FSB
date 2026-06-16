@@ -60,11 +60,14 @@ const VISUAL_SESSION_READ_ONLY_TOOLS = [
   'read_sheet', 'read_page', 'get_text', 'get_attribute',
   'get_dom_snapshot', 'list_tabs', 'get_page_snapshot', 'get_site_guide',
   'search_memory', 'report_progress', 'complete_task', 'partial_task',
-  'fail_task', 'wait_for_element', 'wait_for_stable'
+  'fail_task', 'wait_for_element', 'wait_for_stable',
+  'stop_trigger', 'get_trigger_status', 'list_triggers'
 ];
 
 check(VISUAL_SESSION_ACTION_TOOLS.length === 36, '36 canonical action tools enumerated');
-check(VISUAL_SESSION_READ_ONLY_TOOLS.length === 15, '15 canonical read-only tools enumerated');
+check(VISUAL_SESSION_READ_ONLY_TOOLS.length === 18, '18 canonical read-only tools enumerated');
+check(VISUAL_SESSION_ACTION_TOOLS.indexOf('trigger') < 0,
+  'trigger is not in the visual-session action-tool field-bundle list');
 
 // -------------------------------------------------------------------
 // Section 1: TOOL_REGISTRY schema-shape invariants
@@ -123,9 +126,23 @@ check(waitForElement && waitForElement._readOnly === true,
 check(waitForStable && waitForStable._readOnly === true,
   'wait_for_stable is reclassified as _readOnly: true');
 
-// getReadOnlyTools() count = 15
-check(getReadOnlyTools().length === 15,
-  'getReadOnlyTools() returns exactly 15 entries');
+const triggerTool = getToolByName('trigger');
+check(!!triggerTool, 'trigger is present in TOOL_REGISTRY');
+if (triggerTool) {
+  const triggerProps = (triggerTool.inputSchema && triggerTool.inputSchema.properties) || {};
+  check(triggerTool._readOnly === false,
+    'trigger is registered as a side-effecting tool, not read-only');
+  check(!triggerProps.visual_reason,
+    'trigger inputSchema.properties does NOT contain visual_reason');
+  check(!triggerProps.client,
+    'trigger inputSchema.properties does NOT contain client');
+  check(!triggerProps.is_final,
+    'trigger inputSchema.properties does NOT contain is_final');
+}
+
+// getReadOnlyTools() count = 18
+check(getReadOnlyTools().length === 18,
+  'getReadOnlyTools() returns exactly 18 entries');
 
 // -------------------------------------------------------------------
 // Section 2: Dispatcher rejection runtime invariants

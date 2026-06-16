@@ -17,6 +17,7 @@
  */
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -30,6 +31,57 @@ function check(cond, msg) {
 
 const extPath = path.resolve(__dirname, '..', 'extension', 'ai', 'tool-definitions.js');
 const mcpPath = path.resolve(__dirname, '..', 'mcp', 'ai', 'tool-definitions.cjs');
+
+const TRIGGER_TOOL_NAMES = ['trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers'];
+const TRIGGER_COMPANION_TOOL_NAMES = ['stop_trigger', 'get_trigger_status', 'list_triggers'];
+const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];
+const EXPECTED_NON_TRIGGER_TOOL_NAMES = [
+  'execute_js', 'navigate', 'search', 'go_back', 'go_forward', 'refresh',
+  'click', 'type_text', 'press_enter', 'press_key', 'select_option',
+  'check_box', 'hover', 'right_click', 'double_click', 'select_text_range',
+  'drag_drop', 'drop_file', 'focus', 'clear_input', 'scroll',
+  'scroll_to_top', 'scroll_to_bottom', 'scroll_to_element',
+  'wait_for_element', 'wait_for_stable', 'open_tab', 'switch_tab',
+  'close_tab', 'fill_sheet', 'read_sheet', 'click_at', 'click_and_hold',
+  'drag', 'drag_variable_speed', 'scroll_at', 'insert_text',
+  'double_click_at', 'read_page', 'get_text', 'get_attribute',
+  'set_attribute', 'get_dom_snapshot', 'list_tabs', 'get_page_snapshot',
+  'get_site_guide', 'search_memory', 'report_progress', 'complete_task',
+  'partial_task', 'fail_task'
+];
+const EXPECTED_NON_TRIGGER_REGISTRY_HASH = 'ad6efb8cc3275d964488b67222129b1c0278c5c3b69c64888d926beb89a3926b';
+
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable);
+  if (value && typeof value === 'object') {
+    return Object.keys(value).sort().reduce(function(out, key) {
+      out[key] = stable(value[key]);
+      return out;
+    }, {});
+  }
+  return value;
+}
+
+function registryHash(tools) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify(tools.map(stable)))
+    .digest('hex');
+}
+
+function countRegistryName(registry, name) {
+  return registry.filter(function(tool) { return tool.name === name; }).length;
+}
+
+function formattedToolNames(formatted, provider) {
+  if (provider === 'gemini') {
+    return ((formatted[0] && formatted[0].functionDeclarations) || [])
+      .map(function(decl) { return decl.name; });
+  }
+  if (provider === 'anthropic') {
+    return formatted.map(function(tool) { return tool.name; });
+  }
+  return formatted.map(function(tool) { return tool.function && tool.function.name; });
+}
 
 // Test 1: both files exist
 check(fs.existsSync(extPath), 'extension/ai/tool-definitions.js exists');
@@ -66,6 +118,53 @@ if (Buffer.compare(extBuf, mcpBuf) !== 0) {
 // have tab_id (Plan 01 Task 6) and open_tab has active boolean (Plan 01
 // Task 5) by parsing the file content.
 const td = require('../mcp/ai/tool-definitions.cjs');
+const agentLoop = require('../extension/ai/agent-loop.js');
+const { formatToolsForProvider } = require('../extension/ai/tool-use-adapter.js');
+
+// Test 3a: Phase 18 trigger registry additivity and provider visibility.
+EXPECTED_NON_TRIGGER_TOOL_NAMES.forEach(function(name) {
+  check(!!td.getToolByName(name), 'pre-trigger tool ' + name + ' still exists in TOOL_REGISTRY');
+});
+
+const nonTriggerTools = td.TOOL_REGISTRY.filter(function(tool) {
+  return TRIGGER_TOOL_NAMES.indexOf(tool.name) < 0;
+});
+check(nonTriggerTools.length === EXPECTED_NON_TRIGGER_TOOL_NAMES.length,
+  'non-trigger registry size remains ' + EXPECTED_NON_TRIGGER_TOOL_NAMES.length);
+check(registryHash(nonTriggerTools) === EXPECTED_NON_TRIGGER_REGISTRY_HASH,
+  'non-trigger registry definitions remain byte-equivalent to the locked pre-trigger baseline');
+check(td.TOOL_REGISTRY.length === EXPECTED_NON_TRIGGER_TOOL_NAMES.length + TRIGGER_TOOL_NAMES.length,
+  'TOOL_REGISTRY contains only the locked pre-trigger tools plus the four trigger tools');
+
+TRIGGER_TOOL_NAMES.forEach(function(name) {
+  const tool = td.getToolByName(name);
+  check(!!tool, 'trigger-family tool ' + name + ' resolves via getToolByName');
+  check(countRegistryName(td.TOOL_REGISTRY, name) === 1,
+    'trigger-family tool ' + name + ' appears exactly once in TOOL_REGISTRY');
+  if (tool) {
+    check(tool._route === 'background', name + ' is background-routed');
+  }
+});
+
+const triggerTool = td.getToolByName('trigger');
+check(!!triggerTool && triggerTool._readOnly === false,
+  'trigger is side-effecting (_readOnly: false)');
+TRIGGER_COMPANION_TOOL_NAMES.forEach(function(name) {
+  const tool = td.getToolByName(name);
+  check(!!tool && tool._readOnly === true,
+    name + ' is read-only/bypass class (_readOnly: true)');
+});
+
+const publicTools = agentLoop.getPublicTools();
+PROVIDER_KEYS.forEach(function(provider) {
+  const formatted = formatToolsForProvider(publicTools, provider);
+  const names = formattedToolNames(formatted, provider);
+  TRIGGER_TOOL_NAMES.forEach(function(name) {
+    check(names.indexOf(name) >= 0,
+      provider + ' formatted tool envelope exposes ' + name);
+  });
+});
+
 const readTools = ['read_page', 'get_text', 'get_attribute', 'get_dom_snapshot', 'get_page_snapshot', 'read_sheet'];
 readTools.forEach(function(name) {
   const t = td.getToolByName(name);
