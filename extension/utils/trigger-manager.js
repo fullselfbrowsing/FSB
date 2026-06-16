@@ -455,6 +455,60 @@
   var FSB_TRIGGER_CAP_DEFAULT = 8;
   var FSB_TRIGGER_CAP_MIN = 1;
   var FSB_TRIGGER_CAP_MAX = 64;
+  var REFRESH_POLL_DEFAULT_INTERVAL_MS = 60000;
+  var REFRESH_POLL_INTERVAL_TOO_LOW = 'REFRESH_POLL_INTERVAL_TOO_LOW';
+  var REFRESH_POLL_INTERVAL_GUIDANCE = 'Use live-observe for sub-30s changes.';
+
+  function isRefreshPollSpec(spec) {
+    return spec
+      && (spec.watch === 'refresh-poll'
+        || spec.watch === 'refresh_poll'
+        || spec.mode === 'refresh-poll');
+  }
+
+  function _hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
+  function _refreshPollFloorMs() {
+    var lifecycle = _getLifecycle();
+    var floor = lifecycle && typeof lifecycle.TRIGGER_ALARM_MIN_PERIOD_MS === 'number'
+      ? lifecycle.TRIGGER_ALARM_MIN_PERIOD_MS
+      : 30000;
+    return Number.isFinite(floor) ? floor : 30000;
+  }
+
+  function requestedRefreshPollInterval(spec) {
+    var keys = ['poll_interval_ms', 'pollIntervalMs', 'interval_ms', 'intervalMs'];
+    for (var i = 0; i < keys.length; i++) {
+      if (_hasOwn(spec, keys[i])) {
+        return { supplied: true, value: spec[keys[i]] };
+      }
+    }
+    return { supplied: false, value: REFRESH_POLL_DEFAULT_INTERVAL_MS };
+  }
+
+  function normalizeRefreshPollInterval(spec) {
+    if (!isRefreshPollSpec(spec)) {
+      return { is_refresh_poll: false };
+    }
+    var requested = requestedRefreshPollInterval(spec);
+    var requestedMs = Number(requested.value);
+    var minIntervalMs = _refreshPollFloorMs();
+    if (!Number.isFinite(requestedMs) || requestedMs < minIntervalMs) {
+      return {
+        error: REFRESH_POLL_INTERVAL_TOO_LOW,
+        code: REFRESH_POLL_INTERVAL_TOO_LOW,
+        min_interval_ms: minIntervalMs,
+        requested_interval_ms: requestedMs,
+        guidance: REFRESH_POLL_INTERVAL_GUIDANCE
+      };
+    }
+    return {
+      is_refresh_poll: true,
+      poll_interval_ms: Math.floor(requestedMs)
+    };
+  }
 
   function _clampCap(v) {
     if (typeof v !== 'number' || !Number.isFinite(v)) return FSB_TRIGGER_CAP_DEFAULT;
@@ -580,6 +634,10 @@
   function armTrigger(spec) {
     return _withArmLock(async function() {
       var safeSpec = (spec && typeof spec === 'object') ? spec : {};
+      var refreshPoll = normalizeRefreshPollInterval(safeSpec);
+      if (refreshPoll.error) {
+        return refreshPoll;
+      }
       var store = _getStore();
       var armed = (store && typeof store.listArmedSnapshots === 'function')
         ? await store.listArmedSnapshots()
@@ -609,6 +667,11 @@
         armed_at: now,
         deadline_at: now + ttl
       };
+
+      if (refreshPoll.is_refresh_poll) {
+        snapshot.watch = 'refresh-poll';
+        snapshot.poll_interval_ms = refreshPoll.poll_interval_ms;
+      }
 
       if (!lifecycle || typeof lifecycle.armTrigger !== 'function') {
         return { error: 'LIFECYCLE_UNAVAILABLE', code: 'LIFECYCLE_UNAVAILABLE', trigger_id: snapshot.trigger_id };
