@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-06-16T18:11:00.522Z"
+stopped_at: Completed 17-03-PLAN.md
+last_updated: "2026-06-16T18:24:08.491Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 14
-  completed_plans: 14
-  percent: 100
+  completed_plans: 13
+  percent: 93
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 17 (Refresh-Poll Watch (Tab-Owning Background Reload)) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-16
 
@@ -54,7 +54,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 11 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 1)
+- Total plans completed (this milestone): 13 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 3)
 - Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
 
 **By Phase:**
@@ -78,6 +78,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 16 P04 | 5 min | 2 tasks | 3 files |
 | Phase 17 P01 | 8 min | 2 tasks | 4 files |
 | Phase 17 P02 | 2 min | 2 tasks | 2 files |
+| Phase 17 P03 | 8 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 17]: Plan 01: Refresh-poll cadence uses next_poll_at while deadline_at remains the absolute TTL/reap boundary.
 - [Phase 17]: Plan 02: triggerRead returns ELEMENT_NOT_FOUND before the successful readValue extraction so refresh-poll can distinguish missing selectors from legitimate empty text.
 - [Phase 17]: Plan 02: the missing-module guard avoids a literal readValue token before the missing-element branch so the source-invariant test protects extraction order.
+- [Phase 17]: Plan 03: Refresh-poll ownership validation returns typed TAB_NOT_OWNED before any chrome.tabs.reload side effect.
+- [Phase 17]: Plan 03: Refresh-poll reads use direct frame-0 chrome.tabs.sendMessage instead of sendMessageWithRetry.
+- [Phase 17]: Plan 03: Background refresh-poll stages values and delegates fired/no-fire decisions to FsbTriggerLifecycle.handleTriggerAlarm.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -146,10 +150,10 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-16T18:11:00.518Z
-Stopped at: Completed 17-02-PLAN.md
+Last session: 2026-06-16T18:24:08.487Z
+Stopped at: Completed 17-03-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute `17-02-PLAN.md`; carry Phase 16 live-browser UAT to Phase 20 integration.
+Execute `17-04-PLAN.md`; carry Phase 16 live-browser UAT to Phase 20 integration.
