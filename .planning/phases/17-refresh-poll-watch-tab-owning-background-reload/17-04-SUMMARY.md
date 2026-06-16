@@ -116,7 +116,7 @@ completed: 2026-06-16
 
 None. The `pending` entries in `17-HUMAN-UAT.md` are explicit deferred live-browser evidence, not implementation stubs.
 
-## Verification
+## Automated Checks
 
 - `node tests/trigger-observe.test.js && node tests/trigger-refresh-poll.test.js && node --check extension/content/messaging.js && node --check extension/background.js` - passed.
 - `node tests/trigger-refresh-poll.test.js && node tests/trigger-observe.test.js && node tests/trigger-observe-pulse.test.js && node tests/trigger-lifecycle.test.js && node tests/agent-tab-resolver.test.js && node tests/open-tab-background-default.test.js && node --check extension/background.js` - passed.
@@ -147,7 +147,7 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-Phase 17 refresh-poll implementation is complete. Phase 18 can wire shared trigger tools against durable blocked/needs_attention status, and Phase 20 should run the deferred installed-Chrome inactive-tab no-focus UAT from `17-HUMAN-UAT.md`.
+Phase 17 refresh-poll implementation is complete. Phase 18 can wire shared trigger tools against durable attention status, and Phase 20 should run the deferred installed-Chrome inactive-tab no-focus UAT from `17-HUMAN-UAT.md`.
 
 ---
 *Phase: 17-refresh-poll-watch-tab-owning-background-reload*
