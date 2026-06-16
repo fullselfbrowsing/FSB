@@ -41,6 +41,20 @@
  *      the only timer surface is chrome.alarms.
  *   N. Module surface shape: dual-export + the documented constants/functions.
  *
+ * Phase 15 Plan 03 -- SEAM integration cases (the evaluated_noop seam replaced
+ * with FsbTriggerManager.evaluate() + atomic fired write-back):
+ *   O. FIRED: evaluate()==='fired' -> seam writes status:'fired' + fired_at
+ *      atomically AND clears the alarm (disarm). End-to-end via a `changed`
+ *      condition (false->true edge) through the real FsbTriggerManager.
+ *   P. NO-FIRE: evaluate()==='no_fire' -> seam merges next_state (last_value /
+ *      was_satisfied / last_evaluated_at) and STAYS armed; alarm not cleared.
+ *   Q. PARSE_ERROR NEVER FIRES (EXTRACT-04): evaluate()==='parse_error' -> seam
+ *      merges next_state and stays armed (NEVER status:'fired'); both scripted
+ *      and end-to-end (a `threshold` against an unparseable value).
+ *   R. DEDUPE across re-read: after a fired write-back a duplicate alarm tick
+ *      hits the :267-269 noop_terminal guard and no-ops; the disarm is
+ *      idempotent (no double-clear). Proves no double fire across SW eviction.
+ *
  * Run: node tests/trigger-lifecycle.test.js
  */
 
@@ -137,6 +151,13 @@ function createChromeMock() {
 
 const STORE_MODULE_PATH = require.resolve('../extension/utils/trigger-store.js');
 const LIFECYCLE_MODULE_PATH = require.resolve('../extension/utils/trigger-lifecycle.js');
+// Phase 15 Plan 03 SEAM: the lifecycle now calls global.FsbTriggerManager.evaluate
+// at the seam. The manager consumes FsbValueExtractor for the numeric paths. Both
+// are required here so the SEAM integration cases run END-TO-END through the real
+// Plan-01/Plan-02 modules (a controllable stub can also be swapped in per case via
+// withManagerStub() below for a scripted outcome).
+const MANAGER_MODULE_PATH = require.resolve('../extension/utils/trigger-manager.js');
+const EXTRACTOR_MODULE_PATH = require.resolve('../extension/utils/value-extractor.js');
 
 function setupHarness() {
   const chromeMock = createChromeMock();
@@ -148,6 +169,52 @@ function setupHarness() {
   const lc = require(LIFECYCLE_MODULE_PATH);
 
   return { chromeMock, store, lc };
+}
+
+// ------------------------------------------------------------------
+// Phase 15 Plan 03: extended harness that ALSO installs the real
+// FsbValueExtractor + FsbTriggerManager on the global so the lifecycle
+// SEAM (which calls global.FsbTriggerManager.evaluate) runs end-to-end.
+// The chrome mock is installed FIRST, then every module is fresh-required
+// so each lazy resolver (_getChrome/_getStore/_getExtractor) binds the
+// fresh mock + the freshly-required siblings.
+// ------------------------------------------------------------------
+
+function setupSeamHarness() {
+  const chromeMock = createChromeMock();
+  global.chrome = chromeMock;
+
+  delete require.cache[STORE_MODULE_PATH];
+  delete require.cache[LIFECYCLE_MODULE_PATH];
+  delete require.cache[MANAGER_MODULE_PATH];
+  delete require.cache[EXTRACTOR_MODULE_PATH];
+
+  const store = require(STORE_MODULE_PATH);          // sets global.FsbTriggerStore
+  const extractor = require(EXTRACTOR_MODULE_PATH);  // sets global.FsbValueExtractor
+  const lc = require(LIFECYCLE_MODULE_PATH);         // sets global.FsbTriggerLifecycle
+  const manager = require(MANAGER_MODULE_PATH);      // sets global.FsbTriggerManager
+
+  return { chromeMock, store, extractor, lc, manager };
+}
+
+// Swap in a scripted FsbTriggerManager.evaluate for one case, then restore the
+// real module. Lets a case force a specific outcome (e.g. 'fired' with a chosen
+// next_state, or 'parse_error') without constructing a condition that produces it.
+async function withManagerStub(scriptedOutcome, fn) {
+  const prior = global.FsbTriggerManager;
+  let received = null;
+  global.FsbTriggerManager = {
+    evaluate: function(snapshot, reportedValue, now) {
+      received = { snapshot: snapshot, reportedValue: reportedValue, now: now };
+      return scriptedOutcome;
+    }
+  };
+  try {
+    await fn(function() { return received; });
+  } finally {
+    if (prior === undefined) delete global.FsbTriggerManager;
+    else global.FsbTriggerManager = prior;
+  }
 }
 
 // Trigger snapshot factory (D-01 flat-scalar schema).
@@ -468,6 +535,194 @@ function caseN() {
   check(hasFloor, 'N.11 a 30s alarm-floor constant is exported for Phase 17 (D-03)');
 }
 
+// ==================================================================
+// Phase 15 Plan 03: SEAM integration cases (P3 row in 15-VALIDATION.md).
+// These run handleTriggerAlarm(alarm) THROUGH the new evaluate()-and-fire
+// seam (the replaced evaluated_noop return). The seam owns the storage
+// re-read + atomic terminal write-back around the pure evaluate(); the
+// existing noop_terminal guard is the storage-backed dedupe.
+// ==================================================================
+
+// ------------------------------------------------------------------
+// Case O: FIRED path -- evaluate() outcome 'fired' drives the atomic
+//         status:'fired' + fired_at write-back AND disarms (clears the
+//         alarm). Driven END-TO-END through the real FsbTriggerManager
+//         via a `changed` condition whose reported value differs from the
+//         baseline (was_satisfied:false -> true edge fire).
+// ------------------------------------------------------------------
+
+async function caseO() {
+  console.log('\n--- Case O: SEAM FIRED -> atomic status:fired write-back + disarm ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  // `changed`: baseline 'old', reported (last_value) 'new' -> satisfied now;
+  // was_satisfied:false so this is the false->true edge -> outcome 'fired'.
+  await store.writeSnapshot('trg_fire', makeSnapshot({
+    trigger_id: 'trg_fire',
+    status: 'armed',
+    condition: { kind: 'changed' },
+    baseline: 'old',
+    last_value: 'new',
+    was_satisfied: false,
+    fired_at: null,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_fire' });
+  check(r && r.ok === true, 'O.1 handler returned ok=true');
+  check(r && r.action !== 'evaluated_noop', 'O.2 action is NOT evaluated_noop (seam replaced)');
+  check(r && r.action === 'fired', 'O.3 action is fired');
+
+  const after = await store.readSnapshot('trg_fire');
+  check(after && after.status === 'fired', 'O.4 snapshot transitioned to status:fired (atomic terminal write-back)');
+  check(after && typeof after.fired_at === 'number', 'O.5 fired_at stamped on the snapshot');
+  check(chromeMock.alarms._cleared().includes('fsbTrigger:trg_fire'), 'O.6 alarm cleared (disarm) on fire');
+}
+
+// ------------------------------------------------------------------
+// Case P: NO-FIRE path -- evaluate() returns 'no_fire' with a next_state.
+//         The seam merges last_value + was_satisfied (+ last_evaluated_at)
+//         and the snapshot STAYS armed; the alarm is NOT cleared.
+//         Scripted via withManagerStub so the merged next_state is exact.
+// ------------------------------------------------------------------
+
+async function caseP() {
+  console.log('\n--- Case P: SEAM NO-FIRE -> next_state merge, stay armed, no disarm ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  await store.writeSnapshot('trg_nofire', makeSnapshot({
+    trigger_id: 'trg_nofire',
+    status: 'armed',
+    condition: { kind: 'changed' },
+    baseline: 'same',
+    last_value: 'same',
+    was_satisfied: false,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const scripted = {
+    outcome: 'no_fire',
+    matched_condition: undefined,
+    old_value: 'same',
+    new_value: 'same',
+    next_state: { last_value: 'same', was_satisfied: false, last_evaluated_at: 123456 }
+  };
+
+  await withManagerStub(scripted, async () => {
+    const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_nofire' });
+    check(r && r.ok === true && r.action === 'no_fire', 'P.1 action is no_fire');
+
+    const after = await store.readSnapshot('trg_nofire');
+    check(after && after.status === 'armed', 'P.2 snapshot STAYS armed on no_fire');
+    check(after && after.last_value === 'same', 'P.3 last_value merged from next_state');
+    check(after && after.was_satisfied === false, 'P.4 was_satisfied merged from next_state');
+    check(after && after.last_evaluated_at === 123456, 'P.5 last_evaluated_at merged from next_state');
+    check(after && (after.fired_at === null || after.fired_at === undefined), 'P.6 no fired_at on no_fire');
+    check(chromeMock.alarms._cleared().filter((n) => n === 'fsbTrigger:trg_nofire').length === 0, 'P.7 alarm NOT cleared on no_fire (stays armed)');
+  });
+}
+
+// ------------------------------------------------------------------
+// Case Q: PARSE_ERROR NEVER FIRES -- evaluate() returns 'parse_error';
+//         the seam merges next_state and the snapshot STAYS armed (NOT
+//         fired), NO fired_at, alarm stays armed. The load-bearing
+//         EXTRACT-04 integration assertion. Both stub-scripted AND
+//         end-to-end (a `threshold` against an unparseable value).
+// ------------------------------------------------------------------
+
+async function caseQ() {
+  console.log('\n--- Case Q: SEAM PARSE_ERROR -> never fires, stay armed (EXTRACT-04) ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  // (1) Scripted parse_error: the seam must never write status:'fired'.
+  await store.writeSnapshot('trg_perr', makeSnapshot({
+    trigger_id: 'trg_perr',
+    status: 'armed',
+    condition: { kind: 'threshold', operator: '>=', target: '100' },
+    baseline: null,
+    last_value: 'not-a-number',
+    was_satisfied: false,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const scriptedErr = {
+    outcome: 'parse_error',
+    matched_condition: undefined,
+    old_value: null,
+    new_value: 'not-a-number',
+    next_state: { last_value: 'not-a-number', was_satisfied: false, last_evaluated_at: 777 }
+  };
+
+  await withManagerStub(scriptedErr, async () => {
+    const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_perr' });
+    check(r && r.ok === true && r.action === 'parse_error', 'Q.1 action is parse_error');
+
+    const after = await store.readSnapshot('trg_perr');
+    check(after && after.status === 'armed', 'Q.2 snapshot STAYS armed on parse_error (NOT fired)');
+    check(after && after.status !== 'fired', 'Q.3 status is never fired on parse_error (EXTRACT-04)');
+    check(after && (after.fired_at === null || after.fired_at === undefined), 'Q.4 no fired_at on parse_error');
+    check(chromeMock.alarms._cleared().filter((n) => n === 'fsbTrigger:trg_perr').length === 0, 'Q.5 alarm NOT cleared on parse_error (stays armed)');
+  });
+
+  // (2) END-TO-END parse_error through the real manager: a `threshold` whose
+  // reported value is unparseable must also never fire.
+  await store.writeSnapshot('trg_perr_e2e', makeSnapshot({
+    trigger_id: 'trg_perr_e2e',
+    status: 'armed',
+    condition: { kind: 'threshold', operator: '>=', target: '100' },
+    baseline: null,
+    last_value: 'garbage-not-numeric',
+    was_satisfied: false,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r2 = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_perr_e2e' });
+  check(r2 && r2.ok === true && r2.action === 'parse_error', 'Q.6 end-to-end real-manager threshold on garbage -> parse_error');
+  const after2 = await store.readSnapshot('trg_perr_e2e');
+  check(after2 && after2.status === 'armed', 'Q.7 end-to-end: snapshot stays armed (never fires on NaN)');
+}
+
+// ------------------------------------------------------------------
+// Case R: DEDUPE across re-read (mirror Case C + F) -- after a fired
+//         write-back, a duplicate alarm tick for the SAME trigger hits the
+//         existing :267-269 noop_terminal guard (status:'fired') and
+//         no-ops; the disarm is idempotent (no double _cleared). Proves no
+//         double fire across an eviction-style re-read.
+// ------------------------------------------------------------------
+
+async function caseR() {
+  console.log('\n--- Case R: SEAM dedupe -> second tick after fire is noop_terminal (no double fire) ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  await store.writeSnapshot('trg_dedupe', makeSnapshot({
+    trigger_id: 'trg_dedupe',
+    status: 'armed',
+    condition: { kind: 'changed' },
+    baseline: 'before',
+    last_value: 'after',
+    was_satisfied: false,
+    fired_at: null,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  // First tick fires (changed: before -> after, false->true edge).
+  const r1 = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_dedupe' });
+  check(r1 && r1.action === 'fired', 'R.1 first tick fires');
+  const clearedAfterFirst = chromeMock.alarms._cleared().filter((n) => n === 'fsbTrigger:trg_dedupe').length;
+  check(clearedAfterFirst === 1, 'R.2 alarm cleared exactly once on the fire');
+
+  // Second tick (duplicate / replayed after eviction): storage now says fired,
+  // so the :267-269 noop_terminal guard short-circuits BEFORE the seam.
+  const r2 = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_dedupe' });
+  check(r2 && r2.ok === true && r2.action === 'noop_terminal', 'R.3 second tick -> noop_terminal (dedupe via storage-of-truth guard)');
+
+  const clearedAfterSecond = chromeMock.alarms._cleared().filter((n) => n === 'fsbTrigger:trg_dedupe').length;
+  check(clearedAfterSecond === 1, 'R.4 disarm idempotent: no second clear (no double-fire across re-read)');
+
+  const after = await store.readSnapshot('trg_dedupe');
+  check(after && after.status === 'fired', 'R.5 snapshot remains terminal:fired after the duplicate tick');
+}
+
 // ------------------------------------------------------------------
 // Driver
 // ------------------------------------------------------------------
@@ -488,6 +743,13 @@ function caseN() {
   await caseL();
   caseM();
   caseN();
+  // Phase 15 Plan 03 SEAM integration cases (evaluate() -> atomic fired
+  // write-back + disarm; no_fire next_state merge; parse_error never fires;
+  // noop_terminal dedupe across re-read).
+  await caseO();
+  await caseP();
+  await caseQ();
+  await caseR();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');
   console.log('  passed:', passed);
