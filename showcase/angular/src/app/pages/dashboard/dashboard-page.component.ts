@@ -170,6 +170,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private previewState: PreviewState = 'hidden';
   private previewLayoutMode: PreviewLayoutMode = 'inline';
   private previewScale = 1;
+  private previewViewer: any = null;
+  private previewViewerHealth: any = null;
   private previewHideTimer: any = null;
   private previewSnapshotData: any = null;
   private lastPreviewScroll = { x: 0, y: 0 };
@@ -272,7 +274,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   // DOM preview refs
   private previewContainer!: HTMLElement | null;
-  private previewIframe!: HTMLIFrameElement | null;
+  private previewViewerHost!: HTMLElement | null;
   private previewLoading!: HTMLElement | null;
   private previewGlow!: HTMLElement | null;
   private previewProgress!: HTMLElement | null;
@@ -417,6 +419,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
+
+    if (this.previewViewer && typeof this.previewViewer.destroy === 'function') {
+      this.previewViewer.destroy();
+      this.previewViewer = null;
+    }
   }
 
   // ==================== DOM INITIALIZATION ====================
@@ -474,7 +481,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.taskStopBtn = this.el('dash-task-stop');
 
     this.previewContainer = this.el('dash-preview');
-    this.previewIframe = this.el('dash-preview-iframe') as HTMLIFrameElement | null;
+    this.previewViewerHost = this.el('dash-preview-viewer');
     this.previewLoading = this.el('dash-preview-loading');
     this.previewGlow = this.el('dash-preview-glow');
     this.previewProgress = this.el('dash-preview-progress');
@@ -977,6 +984,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private resetPreviewGenerationState(): void {
     this.staleMutationCount = 0;
     this.mutationApplyFailures = 0;
+    this.previewViewerHealth = null;
     // Phase 276 STREAM-04: reset tooltip counters on every generation cycle
     // so a fresh snapshot starts counting from 0. lastFrameTime is left as-is
     // (refreshed on the next message) so the tooltip's "X seconds ago" reading
@@ -985,9 +993,85 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.previewResyncPending = false;
   }
 
+  private handlePreviewViewerHealth(health: any): void {
+    this.previewViewerHealth = health || null;
+    if (this.previewViewerHealth) {
+      if (typeof this.previewViewerHealth.staleMisses === 'number') {
+        this.staleMutationCount = this.previewViewerHealth.staleMisses;
+      }
+      if (typeof this.previewViewerHealth.applyFailures === 'number') {
+        this.mutationApplyFailures = this.previewViewerHealth.applyFailures;
+      }
+      if (typeof this.previewViewerHealth.lastFrameAt === 'number' && this.previewViewerHealth.lastFrameAt > 0) {
+        this.lastFrameTime = this.previewViewerHealth.lastFrameAt;
+      }
+      if (typeof this.previewViewerHealth.lastSnapshotAt === 'number' && this.previewViewerHealth.lastSnapshotAt > 0) {
+        this.lastSnapshotTime = this.previewViewerHealth.lastSnapshotAt;
+      }
+    }
+    this.updatePreviewTooltip();
+  }
+
+  private handlePreviewViewerState(event: any): void {
+    const state = event?.state || '';
+    this.recordTransportEvent('phantomstream-viewer-state', {
+      state,
+      reason: event?.reason || '',
+    });
+    if (state === 'live' && this.previewState === 'loading' && this.previewSnapshotData) {
+      this.setPreviewState('streaming');
+    }
+  }
+
+  private ensurePreviewViewer(): any {
+    if (this.previewViewer) return this.previewViewer;
+    if (!this.previewViewerHost) {
+      this.recordTransportError('phantomstream-viewer-missing', 'Preview viewer host missing', {
+        type: 'dashboard-preview',
+      });
+      return null;
+    }
+    const bridge = (window as any).FSBPhantomStreamViewer;
+    if (!bridge || typeof bridge.createDashboardViewer !== 'function') {
+      this.recordTransportError('phantomstream-viewer-missing', 'PhantomStream viewer bundle missing', {
+        type: 'dashboard-preview',
+      });
+      return null;
+    }
+    this.previewViewer = bridge.createDashboardViewer({
+      container: this.previewViewerHost,
+      logger: console,
+      onResync: (payload: any) => {
+        payload = payload || {};
+        this.requestPreviewResync(payload.reason || 'phantomstream-viewer-resync', payload);
+      },
+      onSubtreeRequest: (payload: any) => {
+        this.recordTransportEvent('phantomstream-subtree-request-deferred', {
+          requestId: payload?.requestId || '',
+          nid: payload?.nid || '',
+        });
+      },
+      onUnsupportedControl: (type: string) => {
+        this.recordTransportEvent('phantomstream-control-ignored', {
+          type: type || '',
+        });
+      },
+      onState: (event: any) => this.handlePreviewViewerState(event),
+      onHealth: (health: any) => this.handlePreviewViewerHealth(health),
+    });
+    return this.previewViewer;
+  }
+
+  private dispatchPreviewViewer(type: string, payload: any): boolean {
+    const viewer = this.ensurePreviewViewer();
+    if (!viewer || typeof viewer.dispatch !== 'function') return false;
+    viewer.dispatch(type, payload || {});
+    return true;
+  }
+
   /**
    * Phase 276 STREAM-04: seconds since the last DOM frame (snapshot OR mutation)
-   * was applied to the preview iframe. Surfaced in the dash-preview-tooltip.
+   * was applied to the preview viewer. Surfaced in the dash-preview-tooltip.
    * Returns 0 when no frame has been observed yet. Capped at -- not the
    * "0s ago" reading, which would be misleading if no frame ever arrived.
    */
@@ -1369,6 +1453,12 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private clampRemotePreviewPoint(localX: number, localY: number): { x: number; y: number } {
+    if (this.previewViewer && typeof this.previewViewer.mapPointToViewport === 'function') {
+      const mapped = this.previewViewer.mapPointToViewport({ x: localX, y: localY });
+      if (mapped && mapped.inside && typeof mapped.x === 'number' && typeof mapped.y === 'number') {
+        return { x: mapped.x, y: mapped.y };
+      }
+    }
     const viewport = this.getRemoteViewportSize();
     const scale = this.previewScale > 0 ? this.previewScale : 1;
     const x = Math.round(localX / scale);
@@ -2785,7 +2875,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     // Reset all sub-views
     if (this.previewContainer) this.previewContainer.style.display = 'none';
     if (this.previewLoading) this.previewLoading.style.display = 'none';
-    if (this.previewIframe) (this.previewIframe as HTMLElement).style.display = 'none';
+    if (this.previewViewerHost) this.previewViewerHost.style.display = 'none';
     if (this.previewGlow) this.previewGlow.style.display = 'none';
     if (this.previewProgress) this.previewProgress.style.display = 'none';
     if (this.previewDialog) this.previewDialog.style.display = 'none';
@@ -2810,8 +2900,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
           this.previewLoading.style.display = 'flex';
           this.setPreviewLoadingText(previewSurface.detailText);
         }
-        if (this.previewIframe && previewSurface.showIframe) {
-          (this.previewIframe as HTMLElement).style.display = '';
+        if (this.previewViewerHost && previewSurface.showIframe) {
+          this.previewViewerHost.style.display = '';
         }
         if (this.previewDisconnected && previewSurface.showDisconnected) {
           this.previewDisconnected.style.display = 'flex';
@@ -2876,28 +2966,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.updatePreviewTooltip();
 
     try {
-      const stylesheetLinks = (payload.stylesheets || []).map((url: string) =>
-        '<link rel="stylesheet" href="' + url.replace(/"/g, '&quot;') + '">').join('\n');
-      const inlineStyleTags = (payload.inlineStyles || []).map((css: string) =>
-        '<style>' + css + '</style>').join('\n');
-      const fullHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-        '<meta name="viewport" content="width=' + (payload.viewportWidth || 1920) + '">' +
-        stylesheetLinks + inlineStyleTags +
-        '<style>body { margin: 0; overflow: hidden; } *::selection { background: transparent; } ::-webkit-scrollbar { display: none; }</style>' +
-        '</head><body>' + payload.html + '</body></html>';
-
-      if (this.previewIframe) {
-        this.previewIframe.srcdoc = fullHTML;
-        this.previewIframe.onload = () => {
-          this.updatePreviewScale();
-          try { this.previewIframe!.contentWindow?.scrollTo(payload.scrollX || 0, payload.scrollY || 0); } catch (e) {}
-          this.setPreviewState('streaming');
-        };
-        this.previewIframe.onerror = () => {
-          this.recordTransportError('dom-snapshot-render-failed', 'Iframe failed to load dashboard snapshot', { type: 'ext:dom-snapshot' });
-          this.setPreviewState('error');
-        };
+      if (!this.dispatchPreviewViewer('ext:dom-snapshot', payload)) {
+        throw new Error('phantomstream-viewer-unavailable');
       }
+      this.updatePreviewScale();
+      this.setPreviewState('streaming');
     } catch (e: any) {
       this.recordTransportError('dom-snapshot-render-failed', e.message, { type: 'ext:dom-snapshot' });
       this.setPreviewState('error');
@@ -2905,7 +2978,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private updatePreviewScale(): void {
-    if (!this.previewIframe || !this.previewContainer || !this.previewSnapshotData) return;
+    if (!this.previewViewerHost || !this.previewContainer || !this.previewSnapshotData) return;
     const containerWidth = this.previewContainer.clientWidth;
     const pageWidth = this.previewSnapshotData.viewportWidth || this.previewSnapshotData.pageWidth || 1920;
     const pageHeight = this.previewSnapshotData.viewportHeight || 1080;
@@ -2922,9 +2995,14 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     }
 
     this.previewScale = containerWidth / pageWidth;
-    this.previewIframe.style.width = pageWidth + 'px';
-    this.previewIframe.style.height = pageHeight + 'px';
-    this.previewIframe.style.transform = 'scale(' + this.previewScale + ')';
+    if (this.previewViewer && typeof this.previewViewer.getViewportMapping === 'function') {
+      try {
+        const mapping = this.previewViewer.getViewportMapping();
+        if (mapping && mapping.scale && typeof mapping.scale.s === 'number' && mapping.scale.s > 0) {
+          this.previewScale = mapping.scale.s;
+        }
+      } catch (e) {}
+    }
   }
 
   private setRemoteControl(on: boolean, options?: { silent?: boolean; source?: string }): void {
@@ -3167,74 +3245,33 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private handleDOMMutations(payload: any): void {
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-mutations')) return;
-    if (this.previewState !== 'streaming' || !this.previewIframe) return;
+    if (this.previewState !== 'streaming') return;
 
-    // Phase 276 STREAM-04: refresh the "last frame" timestamp on every
-    // mutation envelope. mutationsAppliedTotal is incremented per accepted
-    // mutation operation inside the forEach branch below.
     this.lastFrameTime = Date.now();
 
     try {
       const mutations = payload.mutations || [];
-      const doc = this.previewIframe.contentDocument;
-      if (!doc || !doc.body) return;
-
-      mutations.forEach((m: any) => {
-        try {
-          switch (m.op) {
-            case 'add': {
-              const parent = doc.querySelector('[data-fsb-nid="' + m.parentNid + '"]');
-              if (!parent) {
-                this.staleMutationCount += 1;
-                if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-parent');
-                break;
-              }
-              const temp = doc.createElement('div');
-              temp.innerHTML = m.html;
-              const newNode = temp.firstElementChild;
-              if (!newNode) break;
-              if (m.beforeNid) {
-                const before = doc.querySelector('[data-fsb-nid="' + m.beforeNid + '"]');
-                parent.insertBefore(newNode, before);
-              } else {
-                parent.appendChild(newNode);
-              }
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-            case 'rm': {
-              const el = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!el) { this.staleMutationCount += 1; if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-target'); break; }
-              if (el.parentNode) el.parentNode.removeChild(el);
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-            case 'attr': {
-              const target = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!target) { this.staleMutationCount += 1; if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-target'); break; }
-              if (m.val === null) target.removeAttribute(m.attr);
-              else target.setAttribute(m.attr, m.val);
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-            case 'text': {
-              const textTarget = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!textTarget) { this.staleMutationCount += 1; if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-target'); break; }
-              textTarget.textContent = m.text;
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-          }
-        } catch (e: any) {
-          this.mutationApplyFailures += 1;
-          if (this.mutationApplyFailures >= 2) this.requestPreviewResync('dom-mutation-apply-failed');
-        }
+      this.recordTransportEvent('dom-mutations-dispatched', {
+        type: 'ext:dom-mutations',
+        mutationCount: mutations.length,
+        streamSessionId: payload.streamSessionId || this.activePreviewStreamSessionId,
+        snapshotId: payload.snapshotId || this.activePreviewSnapshotId,
       });
-
-      try { this.previewIframe.contentWindow?.scrollTo(this.lastPreviewScroll.x, this.lastPreviewScroll.y); } catch (e) {}
+      if (!this.dispatchPreviewViewer('ext:dom-mutations', payload)) {
+        throw new Error('phantomstream-viewer-unavailable');
+      }
+      this.mutationsAppliedTotal += mutations.length;
+      this.updatePreviewTooltip();
     } catch (e: any) {
       this.mutationApplyFailures += 1;
-      this.requestPreviewResync('dom-mutation-batch-failed');
+      this.recordTransportError('dom-mutation-apply-failed', e.message, {
+        type: 'ext:dom-mutations',
+        mutationCount: payload?.mutations ? payload.mutations.length : 0,
+        mutationApplyFailures: this.mutationApplyFailures,
+      });
+      this.requestPreviewResync('dom-mutation-batch-failed', {
+        mutationCount: payload?.mutations ? payload.mutations.length : 0,
+      });
     }
   }
 
@@ -3242,8 +3279,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-scroll')) return;
     this.lastPreviewScroll.x = payload.scrollX || 0;
     this.lastPreviewScroll.y = payload.scrollY || 0;
-    if (this.previewState !== 'streaming' || !this.previewIframe) return;
-    try { this.previewIframe.contentWindow?.scrollTo({ left: this.lastPreviewScroll.x, top: this.lastPreviewScroll.y, behavior: 'smooth' }); } catch (e) {}
+    if (this.previewState !== 'streaming') return;
+    this.dispatchPreviewViewer('ext:dom-scroll', payload);
   }
 
   private handleDOMOverlay(payload: any): void {
@@ -3252,6 +3289,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       || this.previewState === 'frozen-disconnect'
       || this.previewState === 'frozen-complete';
     if (!canRenderOverlay) return;
+    this.dispatchPreviewViewer('ext:dom-overlay', payload);
     if (payload.glow?.state === 'active' && this.previewGlow) {
       this.previewGlow.style.display = '';
       this.previewGlow.style.top = (payload.glow.y * this.previewScale) + 'px';
@@ -3299,6 +3337,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private handleDOMDialog(payload: any): void {
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-dialog')) return;
+    this.dispatchPreviewViewer('ext:dom-dialog', payload);
     const dialog = payload.dialog || payload;
     if (!dialog) return;
 

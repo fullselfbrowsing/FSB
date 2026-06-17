@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
 status: phase_in_progress
-stopped_at: Completed 23-02-PLAN.md
-last_updated: "2026-06-17T18:21:13.000Z"
-last_activity: 2026-06-17 - Completed Phase 23 Plan 02 static dashboard renderer migration
+stopped_at: Completed 23-03-PLAN.md
+last_updated: "2026-06-17T18:29:35.000Z"
+last_activity: 2026-06-17 - Completed Phase 23 Plan 03 Angular dashboard renderer migration
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 19
-  completed_plans: 9
-  percent: 47
+  completed_plans: 10
+  percent: 53
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/research/PHANTOMSTREAM-PACKAGE.md (package intake facts, npm 404,
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The dashboard preview must preserve that value while PhantomStream owns the generic DOM-mirroring engine.
-**Current focus:** Phase 22 — migrate content-side capture through a PhantomStream-backed adapter while preserving FSB control messages, overlays, diagnostics, masking, and readiness.
+**Current focus:** Phase 23 — finish dashboard renderer migration through the shared PhantomStream viewer wrapper while preserving FSB preview states, side channels, diagnostics, and remote-control behavior.
 
 ## Current Position
 
 Phase: 23 (Dashboard Renderer Migration) — IN PROGRESS
-Plan: 23-03 — Angular dashboard migration and parity/source-contract tests
-Status: Static dashboard is PhantomStream renderer-backed; Angular dashboard still carries local snapshot/mutation renderer
-Last activity: 2026-06-17 - Completed Phase 23 Plan 02 static dashboard renderer migration
+Plan: 23-04 — Side-channel UI, frozen states, diagnostics, and visual regression smoke
+Status: Static and Angular dashboards are PhantomStream renderer-backed through the shared wrapper; final side-channel/frozen-state visual smoke remains
+Last activity: 2026-06-17 - Completed Phase 23 Plan 03 Angular dashboard renderer migration
 
-Progress: [█████░░░░░] 47% (9/19 milestone plans)
+Progress: [█████░░░░░] 53% (10/19 milestone plans)
 
 ## Roadmap At A Glance (v0.12.0)
 
@@ -42,7 +42,7 @@ Progress: [█████░░░░░] 47% (9/19 milestone plans)
 |-------|------|--------------|--------|
 | 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
 | 22 | Capture Adapter Migration | CAP-01..04 (4) | Complete |
-| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | In progress (2/4 plans complete) |
+| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | In progress (3/4 plans complete) |
 | 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
 | 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Pending |
 
@@ -52,7 +52,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 9 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 2/4, Phase 24: 0/4, Phase 25: 0/4)
+- Total plans completed (this milestone): 10 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 3/4, Phase 24: 0/4, Phase 25: 0/4)
 - Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
@@ -61,7 +61,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 |-------|-------|-------|----------|
 | 21 | 3/3 | - | - |
 | 22 | 4/4 | - | - |
-| 23 | 2/4 | - | - |
+| 23 | 3/4 | - | - |
 | 24 | 0/4 | - | - |
 | 25 | 0/4 | - | - |
 
@@ -183,10 +183,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 
 ## Session Continuity
 
-Last session: 2026-06-17T18:21:13.000Z
-Stopped at: Completed 23-02-PLAN.md
+Last session: 2026-06-17T18:29:35.000Z
+Stopped at: Completed 23-03-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Continue Phase 23 Dashboard Renderer Migration with `23-03-PLAN.md`: migrate the Angular dashboard through the same shared PhantomStream viewer wrapper and add static/Angular parity tests. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
+Continue Phase 23 Dashboard Renderer Migration with `23-04-PLAN.md`: close side-channel UI, frozen states, diagnostics, and visual regression smoke for the shared PhantomStream viewer path. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
