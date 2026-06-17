@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
 status: phase_in_progress
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-06-17T17:48:38.000Z"
-last_activity: 2026-06-17 - Completed Phase 22 Plan 01 capture bundle seam
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-06-17T17:55:08.000Z"
+last_activity: 2026-06-17 - Completed Phase 22 Plan 02 package-backed capture core migration
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 19
-  completed_plans: 4
-  percent: 21
+  completed_plans: 5
+  percent: 26
 ---
 
 # Project State
@@ -30,18 +30,18 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 22 (Capture Adapter Migration) — IN PROGRESS
-Plan: 22-02 — Port snapshot/diff/session/scroll behavior to PhantomStream capture primitives
-Status: Plan 22-01 complete; PhantomStream capture bundle seam and content-script injection order are verified
-Last activity: 2026-06-17 - Completed Phase 22 Plan 01 capture bundle seam
+Plan: 22-03 — Port overlay/dialog side channels and capture diagnostics/watchdogs
+Status: Plans 22-01 and 22-02 complete; dom-stream capture core is package-backed with legacy dashboard identity bridge
+Last activity: 2026-06-17 - Completed Phase 22 Plan 02 package-backed capture core migration
 
-Progress: [██░░░░░░░░] 21% (4/19 milestone plans)
+Progress: [███░░░░░░░] 26% (5/19 milestone plans)
 
 ## Roadmap At A Glance (v0.12.0)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
-| 22 | Capture Adapter Migration | CAP-01..04 (4) | In progress (1/4 plans complete) |
+| 22 | Capture Adapter Migration | CAP-01..04 (4) | In progress (2/4 plans complete) |
 | 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Pending |
 | 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
 | 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Pending |
@@ -52,7 +52,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 4 (Phase 21: 3/3, Phase 22: 1/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
+- Total plans completed (this milestone): 5 (Phase 21: 3/3, Phase 22: 2/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
 - Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
@@ -60,7 +60,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 21 | 3/3 | - | - |
-| 22 | 1/4 | - | - |
+| 22 | 2/4 | - | - |
 | 23 | 0/4 | - | - |
 | 24 | 0/4 | - | - |
 | 25 | 0/4 | - | - |
@@ -183,10 +183,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 
 ## Session Continuity
 
-Last session: 2026-06-17T17:48:38.000Z
-Stopped at: Completed 22-01-PLAN.md
+Last session: 2026-06-17T17:55:08.000Z
+Stopped at: Completed 22-02-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Continue Phase 22 Capture Adapter Migration with `22-02-PLAN.md`: replace `extension/content/dom-stream.js` snapshot/diff/session/scroll internals with a PhantomStream-backed adapter while preserving legacy dashboard payload compatibility. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
+Continue Phase 22 Capture Adapter Migration with `22-03-PLAN.md`: verify overlay/dialog side channels plus capture diagnostics/watchdogs through the package-backed adapter. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.

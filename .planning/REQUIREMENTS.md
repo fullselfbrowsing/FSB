@@ -16,7 +16,7 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 
 ### CAP -- Capture-side replacement
 
-- [ ] **CAP-01**: `extension/content/dom-stream.js` no longer owns bespoke snapshot and MutationObserver diff logic; it becomes a thin adapter around PhantomStream capture primitives.
+- [x] **CAP-01**: `extension/content/dom-stream.js` no longer owns bespoke snapshot and MutationObserver diff logic; it becomes a thin adapter around PhantomStream capture primitives.
 - [ ] **CAP-02**: Capture preserves FSB behavior for stable node identity, curated computed-style capture, budgeted snapshots, rAF-batched mutations, scroll side channel, dialog mirroring, automation overlay side channel, session stamping, and stale flush diagnostics.
 - [ ] **CAP-03**: Capture continues to respect FSB overlay exclusion, reduced page impact, content-script reinjection, pause/resume/stop semantics, and `pingDomStream` readiness probing.
 - [ ] **CAP-04**: Sensitive content handling is explicitly configured: password masking, dangerous URL/script stripping, event-handler removal, `srcdoc`/embed handling, and any custom masking hooks required by FSB.
@@ -83,7 +83,7 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | PKG-02 | Phase 21 | Complete |
 | PKG-03 | Phase 21 | Complete |
 | PKG-04 | Phase 21 | Complete |
-| CAP-01 | Phase 22 | Pending |
+| CAP-01 | Phase 22 | Complete |
 | CAP-02 | Phase 22 | Pending |
 | CAP-03 | Phase 22 | Pending |
 | CAP-04 | Phase 22 | Pending |

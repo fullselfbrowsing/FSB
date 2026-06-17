@@ -51,7 +51,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
   4. Existing capture-focused tests assert behavior through the adapter instead of depending on the old local implementation body.
 **Plans**: 4 plans
 - [x] 22-01-PLAN.md — Build capture adapter seam and preserve content-script control-message contract.
-- [ ] 22-02-PLAN.md — Port snapshot/diff/session/scroll behavior to PhantomStream capture primitives.
+- [x] 22-02-PLAN.md — Port snapshot/diff/session/scroll behavior to PhantomStream capture primitives.
 - [ ] 22-03-PLAN.md — Port overlay/dialog side channels and capture diagnostics/watchdogs.
 - [ ] 22-04-PLAN.md — Security/masking parity and capture test rewrite.
 
@@ -108,7 +108,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
-| 22. Capture Adapter Migration | v0.12.0 | 1/4 | In Progress | - |
+| 22. Capture Adapter Migration | v0.12.0 | 2/4 | In Progress | - |
 | 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | Pending | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
