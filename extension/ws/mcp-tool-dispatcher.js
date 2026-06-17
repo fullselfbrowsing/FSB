@@ -62,6 +62,10 @@ const MCP_PHASE199_TOOL_ROUTES = {
   run_task: { routeFamily: 'autopilot', messageType: 'mcp:start-automation', handler: handleToolAliasRoute },
   stop_task: { routeFamily: 'autopilot', messageType: 'mcp:stop-automation', handler: handleToolAliasRoute },
   get_task_status: { routeFamily: 'autopilot', messageType: 'mcp:get-status', handler: handleToolAliasRoute },
+  trigger: { routeFamily: 'trigger', messageType: 'mcp:trigger', handler: handleToolAliasRoute },
+  stop_trigger: { routeFamily: 'trigger', messageType: 'mcp:stop-trigger', handler: handleToolAliasRoute },
+  get_trigger_status: { routeFamily: 'trigger', messageType: 'mcp:get-trigger-status', handler: handleToolAliasRoute },
+  list_triggers: { routeFamily: 'trigger', messageType: 'mcp:list-triggers', handler: handleToolAliasRoute },
   get_site_guide: { routeFamily: 'read-only', messageType: 'mcp:get-site-guides', handler: handleToolAliasRoute },
   get_page_snapshot: { routeFamily: 'read-only', messageType: 'mcp:get-page-snapshot', handler: handleToolAliasRoute },
   list_sessions: { routeFamily: 'observability', messageType: 'mcp:list-sessions', handler: handleToolAliasRoute },
@@ -89,6 +93,10 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:start-automation': { routeFamily: 'autopilot', handler: handleStartAutomationRoute },
   'mcp:stop-automation': { routeFamily: 'autopilot', handler: handleStopAutomationRoute },
   'mcp:get-status': { routeFamily: 'autopilot', handler: handleGetStatusRoute },
+  'mcp:trigger': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
+  'mcp:stop-trigger': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
+  'mcp:get-trigger-status': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
+  'mcp:list-triggers': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
   'mcp:list-sessions': { routeFamily: 'observability', handler: handleListSessionsMessageRoute },
   'mcp:get-session': { routeFamily: 'observability', handler: handleGetSessionMessageRoute },
   'mcp:get-logs': { routeFamily: 'observability', handler: handleGetLogsMessageRoute },
@@ -105,6 +113,13 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'agent:register': { routeFamily: 'agent', handler: handleAgentRegisterRoute },
   'agent:release':  { routeFamily: 'agent', handler: handleAgentReleaseRoute },
   'agent:status':   { routeFamily: 'agent', handler: handleAgentStatusRoute }
+};
+
+const MCP_TRIGGER_MESSAGE_TO_TOOL_NAME = {
+  'mcp:trigger': 'trigger',
+  'mcp:stop-trigger': 'stop_trigger',
+  'mcp:get-trigger-status': 'get_trigger_status',
+  'mcp:list-triggers': 'list_triggers'
 };
 
 function createMcpRouteError(tool, routeFamily, recoveryHint = MCP_ROUTE_RECOVERY_HINT, extra = {}) {
@@ -1550,6 +1565,33 @@ async function handleToolAliasRoute({ params, client, route, _mcpMetricsSuppress
     client,
     _mcpMetricsSuppressInner
   });
+}
+
+async function handleTriggerToolMessageRoute({ type, payload = {}, route }) {
+  const toolName = MCP_TRIGGER_MESSAGE_TO_TOOL_NAME[type] || null;
+  if (!toolName) {
+    return createMcpRouteError(type, 'trigger', MCP_ROUTE_RECOVERY_HINT, {
+      errorCode: 'mcp_trigger_route_unknown',
+      error: `Unknown trigger route message type ${type}`
+    });
+  }
+
+  const dispatch = (typeof globalThis !== 'undefined') ? globalThis.fsbTriggerDispatchToolRequest : null;
+  if (typeof dispatch !== 'function') {
+    return createMcpRouteError(toolName, (route && route.routeFamily) || 'trigger', MCP_ROUTE_RECOVERY_HINT, {
+      errorCode: 'trigger_dispatch_unavailable',
+      error: 'fsbTriggerDispatchToolRequest unavailable'
+    });
+  }
+
+  const requestPayload = payload || {};
+  const context = {
+    agentId: requestPayload.agentId,
+    ownershipToken: requestPayload.ownershipToken,
+    tabId: requestPayload.tabId || requestPayload.tab_id,
+    source: 'mcp'
+  };
+  return dispatch(toolName, requestPayload, context);
 }
 
 async function handleStartVisualSessionRoute({ payload, client }) {
