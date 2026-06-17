@@ -316,6 +316,200 @@ async function caseArmSourceContracts() {
   assert.strictEqual(/heartbeat|auto[-_ ]detach|blocking wait|while\s*\(/.test(armSrc), false, 'arm handler has no Phase 19 wait loop, heartbeat, or auto-detach');
 }
 
+async function caseArmCrossModeConflictSourceOrdering() {
+  const src = readSource(BACKGROUND_PATH);
+  const armSrc = functionSource(src, 'fsbTriggerHandleToolArm');
+  assert.ok(src.includes('TRIGGER_TAB_WATCH_CONFLICT'), 'source declares TRIGGER_TAB_WATCH_CONFLICT');
+  assert.ok(src.includes('fsbTriggerFindTabWatchConflict'), 'source declares conflict helper');
+  assertOrdered(
+    armSrc,
+    'fsbTriggerNormalizeToolWatch',
+    'fsbTriggerFindTabWatchConflict',
+    'conflict check happens after watch normalization'
+  );
+  assertOrdered(
+    armSrc,
+    'fsbTriggerFindTabWatchConflict',
+    'fsbTriggerSendRefreshPollRead',
+    'conflict check happens before initial triggerRead'
+  );
+  assertOrdered(
+    armSrc,
+    'fsbTriggerFindTabWatchConflict',
+    'FsbTriggerManager.armTrigger',
+    'conflict check happens before armTrigger'
+  );
+}
+
+async function caseArmRejectsCrossModeConflictBeforeSideEffects() {
+  const calls = [];
+  const records = {
+    live: makeSnapshot({
+      trigger_id: 'existing_live',
+      target_tab_id: 10,
+      status: 'armed',
+      watch: 'live-observe',
+      agent_id: null,
+      ownership_token: null
+    })
+  };
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async hydrate() {
+        calls.push('hydrate');
+        return { v: 1, records };
+      },
+      async readSnapshot() {
+        calls.push('read-snapshot');
+        return null;
+      }
+    },
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: '10' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger() {
+        calls.push('arm');
+        return { ok: true };
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      calls.push('start-live');
+      return { ok: true };
+    },
+    async fsbTriggerSendTabMessage() {
+      calls.push('pulse');
+      return { ok: true };
+    }
+  });
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition: { kind: 'changed' },
+    watch: 'refresh-poll'
+  }, {});
+
+  assert.strictEqual(result.success, false, 'cross-mode conflict fails');
+  assert.strictEqual(result.error, 'TRIGGER_TAB_WATCH_CONFLICT', 'conflict error literal returned');
+  assert.strictEqual(result.code, 'TRIGGER_TAB_WATCH_CONFLICT', 'conflict code literal returned');
+  assert.strictEqual(result.errorCode, 'TRIGGER_TAB_WATCH_CONFLICT', 'conflict errorCode literal returned');
+  assert.strictEqual(result.target_tab_id, 10, 'conflict response includes target_tab_id');
+  assert.strictEqual(result.existing_trigger_id, 'existing_live', 'conflict response includes existing trigger id');
+  assert.strictEqual(result.existing_watch, 'live-observe', 'conflict response includes existing watch');
+  assert.strictEqual(result.requested_watch, 'refresh-poll', 'conflict response includes requested watch');
+  assert.deepStrictEqual(calls, ['hydrate'], 'conflict rejects before read, arm, observer, or pulse side effects');
+}
+
+async function caseArmRejectsReverseCrossModeConflictBeforeSideEffects() {
+  const calls = [];
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async hydrate() {
+        calls.push('hydrate');
+        return {
+          v: 1,
+          records: {
+            poll: makeSnapshot({
+              trigger_id: 'existing_poll',
+              target_tab_id: 11,
+              status: 'blocked',
+              watch: 'refresh-poll',
+              agent_id: null,
+              ownership_token: null
+            })
+          }
+        };
+      }
+    },
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: '10' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger() {
+        calls.push('arm');
+        return { ok: true };
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      calls.push('start-live');
+      return { ok: true };
+    }
+  });
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 11,
+    condition: { kind: 'changed' },
+    watch: 'live-observe'
+  }, {});
+
+  assert.strictEqual(result.success, false, 'reverse cross-mode conflict fails');
+  assert.strictEqual(result.errorCode, 'TRIGGER_TAB_WATCH_CONFLICT', 'reverse conflict uses typed code');
+  assert.strictEqual(result.existing_trigger_id, 'existing_poll', 'reverse conflict reports existing trigger');
+  assert.strictEqual(result.existing_watch, 'refresh-poll', 'reverse conflict reports existing watch');
+  assert.strictEqual(result.requested_watch, 'live-observe', 'reverse conflict reports requested watch');
+  assert.deepStrictEqual(calls, ['hydrate'], 'reverse conflict rejects before side effects');
+}
+
+async function caseArmAllowsSameModeAndTerminalRecords() {
+  const calls = [];
+  let receivedSpec = null;
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async hydrate() {
+        calls.push('hydrate');
+        return {
+          v: 1,
+          records: {
+            sameMode: makeSnapshot({ trigger_id: 'same_live', target_tab_id: 12, status: 'armed', watch: 'live-observe' }),
+            fired: makeSnapshot({ trigger_id: 'fired_live', target_tab_id: 12, status: 'fired', watch: 'refresh-poll' }),
+            timedOut: makeSnapshot({ trigger_id: 'timed_live', target_tab_id: 12, status: 'timed_out', watch: 'refresh-poll' }),
+            stopped: makeSnapshot({ trigger_id: 'stopped_live', target_tab_id: 12, status: 'stopped', watch: 'refresh-poll' }),
+            malformed: null
+          }
+        };
+      },
+      async readSnapshot() {
+        calls.push('read-snapshot');
+        return makeSnapshot(Object.assign({}, receivedSpec || {}, { status: 'armed' }));
+      }
+    },
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: '10' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        calls.push('arm');
+        receivedSpec = spec;
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      calls.push('start-live');
+      return { ok: true };
+    },
+    async fsbTriggerSendTabMessage() {
+      calls.push('pulse');
+      return { ok: true };
+    }
+  });
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 12,
+    condition: { kind: 'changed' },
+    watch: 'live-observe'
+  }, {});
+
+  assert.strictEqual(result.success, true, 'same-mode live/live arm succeeds despite terminal opposite records');
+  assert.deepStrictEqual(calls, ['hydrate', 'read', 'arm', 'read-snapshot', 'start-live'], 'same-mode path reaches read/arm/start-live in order');
+  assert.strictEqual(receivedSpec.watch, 'live-observe', 'same-mode arm persists requested watch');
+}
+
 async function caseStatusProjectionMath() {
   const handlers = loadToolHandlers();
   const status = handlers.fsbTriggerProjectTriggerStatus(makeSnapshot(), 2500);
@@ -852,6 +1046,10 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
+  await runCase('arm source checks cross-watch conflict before side effects', caseArmCrossModeConflictSourceOrdering);
+  await runCase('arm rejects live-to-refresh cross-watch conflict before side effects', caseArmRejectsCrossModeConflictBeforeSideEffects);
+  await runCase('arm rejects refresh-to-live cross-watch conflict before side effects', caseArmRejectsReverseCrossModeConflictBeforeSideEffects);
+  await runCase('arm allows same-mode and terminal records', caseArmAllowsSameModeAndTerminalRecords);
   await runCase('status projection derives elapsed and remaining time', caseStatusProjectionMath);
   await runCase('fired status/list projection includes event outcome', caseFiredProjectionIncludesEventOutcome);
   await runCase('list defaults to armed and attention states', caseListDefaultsToActiveAttentionStates);
