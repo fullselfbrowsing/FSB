@@ -142,7 +142,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete    | 2026-06-16 |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 4/4 | Complete    | 2026-06-17 |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 3/3 | Complete | 2026-06-17 |
-| 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 0/TBD | Not started | - |
+| 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 1/5 | In Progress|  |
 
 ## Research Flags (v0.11.0)
 
