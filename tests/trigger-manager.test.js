@@ -73,7 +73,7 @@ function reported(text, attributes) {
   return rv;
 }
 
-(function main() {
+(async function main() {
   const M = freshRequireManager();
   const evaluate = M.evaluate;
   assert.strictEqual(typeof evaluate, 'function', 'evaluate must be exported as a function');
@@ -445,6 +445,81 @@ function reported(text, attributes) {
   }
 
   // ====================================================================
+  // REGRESSION: armTrigger preserves persisted metadata for watcher startup.
+  // ====================================================================
+  console.log('--- REGRESSION: armTrigger persists live-observe metadata ---');
+  {
+    var savedStore = globalThis.FsbTriggerStore;
+    var savedLifecycle = globalThis.FsbTriggerLifecycle;
+    var capturedSnapshot = null;
+    var reportedAttrs = { 'data-price': '42' };
+    try {
+      globalThis.FsbTriggerStore = {
+        async listArmedSnapshots() { return []; }
+      };
+      globalThis.FsbTriggerLifecycle = {
+        FSB_TRIGGER_DEFAULT_TTL_MS: 6000,
+        async armTrigger(snapshotArg) {
+          capturedSnapshot = snapshotArg;
+          return { ok: true, armed: true };
+        }
+      };
+
+      var armResult = await M.armTrigger({
+        trigger_id: 'trg_live_meta',
+        watch: 'live-observe',
+        condition: { kind: 'changed', attribute: 'data-price' },
+        baseline: '41',
+        selector: '#price',
+        target_tab_id: 77,
+        agent_id: 'agent_meta',
+        ownership_token: 'token_meta',
+        extract: 'attribute',
+        attrName: 'data-price',
+        reported_value: '42',
+        reported_attributes: reportedAttrs,
+        reported_url: 'https://example.test/product',
+        last_reported_at: NOW - 10,
+        rearm_on_fire: true,
+        detached: true,
+        timeout_ms: 120000,
+        safety_ceiling_ms: 240000,
+        detached_at: NOW - 5,
+        now: NOW
+      });
+
+      check(armResult && armResult.trigger_id === 'trg_live_meta', 'armTrigger returns trigger_id after lifecycle arm');
+      check(capturedSnapshot && capturedSnapshot.watch === 'live-observe', 'armTrigger snapshot preserves live-observe watch');
+      check(capturedSnapshot && capturedSnapshot.extract === 'attribute', 'armTrigger snapshot preserves extract mode');
+      check(capturedSnapshot && capturedSnapshot.attrName === 'data-price', 'armTrigger snapshot preserves attrName');
+      check(capturedSnapshot && capturedSnapshot.reported_value === '42', 'armTrigger snapshot preserves reported_value');
+      check(capturedSnapshot && capturedSnapshot.reported_attributes && capturedSnapshot.reported_attributes['data-price'] === '42', 'armTrigger snapshot preserves reported_attributes');
+      check(capturedSnapshot && capturedSnapshot.reported_attributes !== reportedAttrs, 'armTrigger snapshot copies reported_attributes defensively');
+      check(capturedSnapshot && capturedSnapshot.reported_url === 'https://example.test/product', 'armTrigger snapshot preserves reported_url');
+      check(capturedSnapshot && capturedSnapshot.last_reported_at === NOW - 10, 'armTrigger snapshot preserves last_reported_at');
+      check(capturedSnapshot && capturedSnapshot.rearm_on_fire === true, 'armTrigger snapshot preserves rearm_on_fire');
+      check(capturedSnapshot && capturedSnapshot.detached === true, 'armTrigger snapshot preserves detached');
+      check(capturedSnapshot && capturedSnapshot.timeout_ms === 120000, 'armTrigger snapshot preserves timeout_ms');
+      check(capturedSnapshot && capturedSnapshot.safety_ceiling_ms === 240000, 'armTrigger snapshot preserves safety_ceiling_ms');
+      check(capturedSnapshot && capturedSnapshot.detached_at === NOW - 5, 'armTrigger snapshot preserves detached_at');
+      check(capturedSnapshot && capturedSnapshot.trigger_id === 'trg_live_meta', 'armTrigger snapshot preserves trigger_id');
+      check(capturedSnapshot && capturedSnapshot.condition && capturedSnapshot.condition.kind === 'changed', 'armTrigger snapshot preserves condition');
+      check(capturedSnapshot && capturedSnapshot.baseline === '41', 'armTrigger snapshot preserves baseline');
+      check(capturedSnapshot && capturedSnapshot.last_value === '41', 'armTrigger snapshot initializes last_value from baseline');
+      check(capturedSnapshot && capturedSnapshot.selector === '#price', 'armTrigger snapshot preserves selector');
+      check(capturedSnapshot && capturedSnapshot.target_tab_id === 77, 'armTrigger snapshot preserves target tab id');
+      check(capturedSnapshot && capturedSnapshot.agent_id === 'agent_meta', 'armTrigger snapshot preserves agent id');
+      check(capturedSnapshot && capturedSnapshot.ownership_token === 'token_meta', 'armTrigger snapshot preserves ownership token');
+      check(capturedSnapshot && capturedSnapshot.armed_at === NOW, 'armTrigger snapshot uses injected armed_at');
+      check(capturedSnapshot && capturedSnapshot.deadline_at === NOW + 6000, 'armTrigger snapshot computes deadline_at from lifecycle ttl');
+      check(capturedSnapshot && capturedSnapshot.poll_interval_ms === undefined, 'live-observe snapshot does not receive refresh-poll interval');
+    } finally {
+      globalThis.FsbTriggerStore = savedStore;
+      globalThis.FsbTriggerLifecycle = savedLifecycle;
+    }
+  }
+
+  // ====================================================================
   console.log('');
   console.log('trigger-manager.test: ' + passed + ' passed, ' + failed + ' failed');
   if (failed > 0) {
@@ -452,4 +527,7 @@ function reported(text, attributes) {
   } else {
     console.log('PASS trigger-manager');
   }
-})();
+})().catch(function(err) {
+  console.error('FATAL:', err);
+  process.exit(1);
+});

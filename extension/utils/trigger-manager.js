@@ -500,6 +500,50 @@
         || spec.mode === 'refresh-poll');
   }
 
+  function isLiveObserveSpec(spec) {
+    return spec
+      && (spec.watch === 'live-observe'
+        || spec.watch === 'live_observe'
+        || spec.mode === 'live-observe'
+        || spec.mode === 'live_observe');
+  }
+
+  function copyStringField(source, target, key) {
+    if (typeof source[key] === 'string' && source[key]) {
+      target[key] = source[key];
+    }
+  }
+
+  function copyFiniteNumberField(source, target, key) {
+    var value = source[key];
+    if (Number.isFinite(value)) {
+      target[key] = value;
+    }
+  }
+
+  function copyArmMetadata(source, target) {
+    copyStringField(source, target, 'extract');
+    copyStringField(source, target, 'attrName');
+    copyStringField(source, target, 'attribute');
+    copyStringField(source, target, 'attr_name');
+    copyStringField(source, target, 'reported_url');
+
+    if (source.reported_value !== undefined) {
+      target.reported_value = source.reported_value;
+    }
+    if (source.reported_attributes && typeof source.reported_attributes === 'object' && !Array.isArray(source.reported_attributes)) {
+      target.reported_attributes = Object.assign({}, source.reported_attributes);
+    }
+
+    copyFiniteNumberField(source, target, 'last_reported_at');
+    copyFiniteNumberField(source, target, 'timeout_ms');
+    copyFiniteNumberField(source, target, 'safety_ceiling_ms');
+    copyFiniteNumberField(source, target, 'detached_at');
+
+    if (source.rearm_on_fire === true) target.rearm_on_fire = true;
+    if (source.detached === true) target.detached = true;
+  }
+
   function _hasOwn(obj, key) {
     return Object.prototype.hasOwnProperty.call(obj, key);
   }
@@ -709,7 +753,10 @@
       if (refreshPoll.is_refresh_poll) {
         snapshot.watch = 'refresh-poll';
         snapshot.poll_interval_ms = refreshPoll.poll_interval_ms;
+      } else if (isLiveObserveSpec(safeSpec)) {
+        snapshot.watch = 'live-observe';
       }
+      copyArmMetadata(safeSpec, snapshot);
 
       if (!lifecycle || typeof lifecycle.armTrigger !== 'function') {
         return { error: 'LIFECYCLE_UNAVAILABLE', code: 'LIFECYCLE_UNAVAILABLE', trigger_id: snapshot.trigger_id };
