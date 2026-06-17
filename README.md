@@ -75,7 +75,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Runs natural language browser tasks from the popup or side panel.
 - Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI-compatible endpoints.
 - Discovers live provider model lists and falls back to bundled defaults.
-- Uses 50 canonical automation tools in the extension engine and 59 MCP tools for external clients.
+- Uses 55 canonical extension tool definitions and 63 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
@@ -90,6 +90,7 @@ Background agents are retired. Existing `chrome.storage.local['bgAgents']` data 
 - **Data entry**: move through structured forms with validation, dropdowns, custom controls, and table inputs.
 - **Ecommerce**: compare product pages, inspect prices, monitor availability manually, and prepare carts under supervision.
 - **Finance and dashboards**: read charts, tables, and current page state when a human remains in control.
+- **Trigger watchers**: watch one page element for changes, threshold crossings, or availability while Chrome and the extension stay open.
 - **Developer workflows**: drive GitHub, issue trackers, documentation sites, coding platforms, and browser-based tools.
 - **Accessibility and DOM inspection**: expose structure, labels, selectors, forms, and hidden controls for debugging.
 
@@ -107,6 +108,7 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
 | Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, and restricted-tab recovery messaging. |
+| Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
 
@@ -249,7 +251,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 59 tools across visual sessions, manual browser control, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 63 registered tools across visual sessions, trigger watchers, manual browser control, read-only page inspection, autopilot, vault, and observability.
 
 The extension connects to the MCP bridge on:
 
@@ -328,14 +330,16 @@ OpenCode and OpenClaw are supported through manual or unsupported fallback setup
 
 Manual tools are the default path for most external clients. They let the caller inspect the page, pick a selector, act, and verify. `run_task` is useful when the user explicitly wants FSB to run its own automation loop, but manual control is easier to audit and recover.
 
+Use Trigger Watchers when a caller wants to watch one selector for a future value change instead of polling manually. They are local to the open browser session: Chrome and the FSB extension must remain running, results are reported back to the MCP caller, and FSB does not provide server-side monitoring or push delivery.
+
 Recommended manual pattern:
 
-1. `start_visual_session` so the browser shows the trusted client badge.
+1. Add `visual_reason` and `client` on action calls when you want the trusted overlay.
 2. `read_page` or `get_dom_snapshot` to understand the current page.
 3. Use `execute_js` for safe DOM reads and simple DOM-triggered clicks.
 4. Use native tools such as `click`, `type_text`, `press_key`, and `drag` when real browser events matter.
 5. Verify with `read_page`, `get_page_snapshot`, or `get_dom_snapshot`.
-6. `end_visual_session` when done.
+6. Set `is_final:true` on the last action to clear the overlay immediately.
 
 Use `doctor` and `status --watch` before changing client configs. Most MCP failures are connection, extension wake, active-tab, or content-script readiness issues, not install problems.
 
@@ -395,8 +399,9 @@ The MCP server exposes a curated public surface around that registry:
 | Surface | Count | Examples |
 |---------|-------|----------|
 | Visual sessions | 2 | `start_visual_session`, `end_visual_session` |
-| Autopilot | 3 | `run_task`, `stop_task`, `get_task_status` |
-| Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `set_attribute` |
+| Autopilot and agent navigation | 4 | `run_task`, `stop_task`, `get_task_status`, `back` |
+| Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
+| Manual control | 36 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `set_attribute` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
 | Observability | 5 | `list_sessions`, `get_logs`, `search_memory` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |

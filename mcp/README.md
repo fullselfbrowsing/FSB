@@ -15,9 +15,9 @@
 
 **Control your browser from any MCP client.**
 
-*Manual browser tools, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
+*Manual browser tools, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Tools](#tools-60-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-63-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -32,9 +32,20 @@ The server supports two operating styles:
 - **Manual mode**: the MCP client chooses each step with tools such as `navigate`, `read_page`, `get_dom_snapshot`, `click`, `type_text`, `execute_js`, and `scroll`.
 - **Autopilot mode**: the MCP client calls `run_task`, and FSB's built-in AI loop decides the browser steps.
 
-It also supports visible client-owned visual sessions, vault autofill tools, session logs, memory search, and diagnostic commands.
+It also supports trigger watchers, visible client-owned visual sessions, vault autofill tools, session logs, memory search, and diagnostic commands.
 
 Use this package when you want your AI client to drive the browser directly while still using FSB's DOM analysis, selector handling, visual overlay, action verification, session logging, memory, and vault boundaries.
+
+### What's New In v0.10.0
+
+This is the trigger watchers release. Full details live in `CHANGELOG.md`.
+
+- New MCP tools: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers`.
+- `trigger` watches one selector and condition in the caller's owned tab. It defaults to blocking mode with 30s progress heartbeats, a 120s timeout, and a 240s safety auto-detach ceiling.
+- `detached:true` returns immediately with a `trigger_id`; callers can poll with `get_trigger_status`, list with `list_triggers`, or cancel with `stop_trigger`.
+- Watch modes: `live-observe` uses in-page mutation observation without reload; `refresh-poll` reloads the owned tab in the background and coalesces same-tab due watches into one reload.
+- `rearm_on_fire:true` keeps a watch armed after fire, with hysteresis for numeric conditions. Default behavior remains fire once.
+- Trigger output is notify-only to the caller. FSB does not send desktop/browser/email/SMS/Slack push notifications and does not run auto-act workflows.
 
 ### What's New In v0.8.0
 
@@ -65,7 +76,7 @@ This is the FSB v0.9.60 milestone release. The headline change is the new multi-
 - Secure vault tools that avoid sending raw secrets over the bridge.
 - One-command installer coverage for 21 platforms.
 
-Background-agent MCP tools were retired with the extension's background-agent sunset. The `registerAgentTools` shell remains for compatibility, but it registers no live tools.
+Background-agent MCP tools were retired with the extension's background-agent sunset. The agent registrar now only exposes `back` for ownership-gated history navigation.
 
 ---
 
@@ -256,7 +267,7 @@ npx -y fsb-mcp-server status --watch
 | Page reads fail | Make sure the active tab is a normal webpage, not `chrome://`, `edge://`, or the web store. |
 | Clicks do nothing | Refresh DOM refs with `get_dom_snapshot`, then try `click_at` or `execute_js` where appropriate. |
 | A task is stuck | Use `get_task_status`, then `stop_task` if it is still running. |
-| Visual overlay remains | Call `end_visual_session` with the latest token, or reload the tab. |
+| Visual overlay remains | Send the last action with `is_final:true`, wait for the 60s idle auto-clear, or reload the tab. |
 
 For local development, run `npm --prefix mcp run build` after TypeScript changes. The root `npm run test:mcp-smoke` command builds the MCP package before exercising lifecycle and tool smoke tests.
 
@@ -324,6 +335,31 @@ Longer-running tools have timeout overrides. For example, spreadsheet operations
 
 ---
 
+## Trigger Watchers
+
+Trigger Watchers let an MCP caller watch one DOM element and condition while keeping the browser as the source of truth. They are useful for prices, availability text, counters, queue states, and other page values that should fire when a visible or extracted value changes.
+
+| Tool | Purpose |
+|------|---------|
+| `trigger` | Arm one selector plus condition on the caller's owned tab. |
+| `stop_trigger` | Cancel a watch and clear its lifecycle work. |
+| `get_trigger_status` | Read one watch snapshot, including current status and last event. |
+| `list_triggers` | List visible watches, defaulting to active and attention states. |
+
+Use `live-observe` when the page updates in place and you do not want a reload. It uses an in-page observer plus pulse feedback. Use `refresh-poll` when the value only changes after reload; FSB reloads the owned tab in the background by tab id, waits for readiness, reads the selector, and evaluates the condition. Same-tab due refresh-poll watches share one reload per batch, while watches on other tabs reload independently.
+
+`trigger` defaults to blocking mode. The MCP server pre-generates a `trigger_id`, emits 30s progress heartbeats while waiting, uses a 120s default timeout, and auto-detaches at a 240s safety ceiling. Pass `detached:true` to return immediately and poll later with `get_trigger_status` or `list_triggers`. Outcomes include `fired`, `timed_out`, `detached`, and typed errors.
+
+Default trigger behavior is fire-once. Pass `rearm_on_fire:true` to keep the watch armed after a fire; numeric threshold and percent-change conditions use hysteresis so a rearmed trigger does not repeatedly fire on the same satisfied edge. Snapshots also clean up on timeout, TTL expiry, tab close, explicit stop, and owner release after reconnect grace.
+
+Trigger Watchers are local and session-bound. Chrome and the FSB extension must stay open and connected; this is not server-side monitoring and it does not resume across browser restart. Results are notify-only to the MCP caller: FSB reports the event, and the caller decides whether to act. There is no desktop/browser/email/SMS/Slack push delivery and no auto-act-on-fire workflow engine.
+
+Restricted pages such as `chrome://` surfaces cannot be watched by content scripts. Those cases report structured blocked-page attention (`TRIGGER_PAGE_BLOCKED`) instead of staging page text. A tab cannot have active `live-observe` and `refresh-poll` watches at the same time; the opposite-mode request returns `TRIGGER_TAB_WATCH_CONFLICT`. Same-mode co-location is allowed.
+
+The extension enforces trigger concurrency with `fsbTriggerCap`, configurable in the control panel. Default is `8`, range is `1..64`. Active usage includes armed watches plus attention states such as `needs_attention` and `blocked`; terminal states such as `fired`, `timed_out`, and `stopped` do not count as active cap usage.
+
+---
+
 ## Multi-Agent Contract (v0.8.0)
 
 Starting with `0.8.0`, FSB supports multiple concurrent MCP agents driving distinct tabs in the same Chrome profile. The contract is enforced inside the extension; MCP clients only need to know the rules.
@@ -383,7 +419,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (60 Total)
+## Tools (63 Total)
 
 ### Visual Sessions (2)
 
@@ -392,7 +428,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 | `start_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
 | `end_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
 
-### Autopilot (4)
+### Autopilot And Agent Navigation (4)
 
 | Tool | Purpose |
 |------|---------|
@@ -401,15 +437,24 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 | `get_task_status` | Check task progress, phase, and ETA. |
 | `back` | Single-step browser-history back, ownership-gated. Returns `{ status, resultingUrl, historyDepth }`. |
 
-### Manual Browser Control (37)
+### Trigger Watchers (4)
+
+| Tool | Purpose |
+|------|---------|
+| `trigger` | Arm a one-element watch with blocking or detached reporting. |
+| `stop_trigger` | Stop an armed or attention-state trigger. |
+| `get_trigger_status` | Read one trigger snapshot and latest event. |
+| `list_triggers` | List visible triggers, defaulting to active and attention states. |
+
+### Manual Browser Control (36)
 
 | Group | Tools |
 |-------|-------|
 | Power | `execute_js` |
 | Navigation | `navigate`, `search`, `go_back`, `go_forward`, `refresh` |
 | Interaction | `click`, `type_text`, `press_enter`, `press_key`, `select_option`, `check_box`, `hover`, `right_click`, `double_click`, `select_text_range`, `drag_drop`, `drop_file`, `focus`, `clear_input` |
-| Scrolling and waiting | `scroll`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element`, `wait_for_element`, `wait_for_stable` |
-| Tabs | `open_tab`, `switch_tab` |
+| Scrolling | `scroll`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element` |
+| Tabs | `open_tab`, `switch_tab`, `close_tab` |
 | Spreadsheets | `fill_sheet` |
 | Coordinates and mutation | `click_at`, `click_and_hold`, `drag`, `drag_variable_speed`, `scroll_at`, `insert_text`, `double_click_at`, `set_attribute` |
 
@@ -475,6 +520,7 @@ graph TD
       O["Observability"]
       P["Vault"]
       T["Autopilot"]
+      W["Trigger watchers"]
     end
 
     B --- Surface
@@ -531,7 +577,7 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.9.0`) because it is published independently from the extension release (`0.9.90`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
+The MCP package has its own version (`0.10.0`) because it is published independently from the extension release (`0.9.90`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -542,15 +588,16 @@ Contract-sensitive changes should be covered by tests before publishing:
 - visual-session token lifecycle
 - vault redaction boundaries
 - multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens, `back` tool
+- trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 
-### Releasing 0.8.0
+### Releasing 0.10.0
 
-This 0.8.0 build is tag-ready. The actual `npm publish` is a USER action via the existing tag-driven release workflow; autonomous mode does not run it.
+This 0.10.0 build is release-prep ready. The actual `npm publish` is a USER action via the existing tag-driven release workflow; autonomous mode does not run it.
 
 To publish:
 
-- Preferred: run the user's tag-driven release workflow (`git tag v0.8.0 && git push origin v0.8.0`); the workflow handles `npm publish` from a clean working tree.
-- Manual fallback: from the release branch, `cd mcp && npm publish` after confirming `npm whoami`, `npm --prefix mcp run build` exit 0, and `node tests/multi-agent-regression.test.js` exit 0.
+- Preferred: run the user's tag-driven release workflow (`git tag v0.10.0 && git push origin v0.10.0`); the workflow handles `npm publish` from a clean working tree.
+- Manual fallback: from the release branch, `cd mcp && npm publish` after confirming `npm whoami`, `npm --prefix mcp run build` exit 0, and the MCP smoke/parity/schema gates exit 0.
 
 Do not run `npm publish` from autonomous mode.
 
