@@ -52,6 +52,29 @@ function makeResult({ success, hadEffect = false, error = null, navigationTrigge
   };
 }
 
+function buildAutopilotTriggerParams(params, tabId) {
+  const cleaned = Object.assign({}, params || {});
+  const ownershipFields = ['agent_id', 'agentId', 'ownership_token', 'ownershipToken'];
+  const tabAliasFields = ['tab_id', 'tabId', 'target_tab_id', 'targetTabId'];
+  for (const field of ownershipFields) {
+    delete cleaned[field];
+  }
+  const hasTabAlias = tabAliasFields.some((field) => (
+    Object.prototype.hasOwnProperty.call(cleaned, field)
+  ));
+  if (!hasTabAlias && Number.isFinite(Number(tabId))) {
+    cleaned.tab_id = Number(tabId);
+  }
+  return cleaned;
+}
+
+function autopilotTriggerHadEffect(toolName, response) {
+  if (!response || response.success === false) return false;
+  if (toolName === 'trigger') return true;
+  if (toolName === 'stop_trigger') return response.stopped === true;
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
@@ -369,6 +392,29 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
           return makeResult({ success: true, hadEffect: true, result: execResult });
         }
         return makeResult({ success: false, error: execResult?.error || 'JS execution returned no result' });
+      }
+
+      case 'trigger':
+      case 'stop_trigger':
+      case 'get_trigger_status':
+      case 'list_triggers': {
+        const dispatch = (typeof globalThis !== 'undefined') ? globalThis.fsbTriggerDispatchToolRequest : null;
+        if (typeof dispatch !== 'function') {
+          return makeResult({
+            success: false,
+            error: 'fsbTriggerDispatchToolRequest unavailable'
+          });
+        }
+
+        const finalParams = buildAutopilotTriggerParams(params, tabId);
+        const response = await dispatch(tool.name, finalParams, { tabId, source: 'autopilot' });
+        const success = response && response.success !== false;
+        return makeResult({
+          success,
+          hadEffect: autopilotTriggerHadEffect(tool.name, response),
+          error: success ? null : (response?.error || response?.errorCode || null),
+          result: response
+        });
       }
 
       case 'fill_credential': {
