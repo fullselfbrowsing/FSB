@@ -38,6 +38,21 @@ check(
   'limit constant wrong: ' + handler.BACKPRESSURE_BUFFER_LIMIT_BYTES
 );
 check(
+  'RELAY_PER_MESSAGE_LIMIT_BYTES exported = 1 * 1024 * 1024',
+  handler.RELAY_PER_MESSAGE_LIMIT_BYTES === 1024 * 1024,
+  'relay cap wrong: ' + handler.RELAY_PER_MESSAGE_LIMIT_BYTES
+);
+check(
+  'checkRelayFrameLimit exported',
+  typeof handler.checkRelayFrameLimit === 'function',
+  'checkRelayFrameLimit missing'
+);
+check(
+  'classifyRelayFrame exported',
+  typeof handler.classifyRelayFrame === 'function',
+  'classifyRelayFrame missing'
+);
+check(
   'getBackpressureDroppedCount exported',
   typeof handler.getBackpressureDroppedCount === 'function',
   'accessor missing'

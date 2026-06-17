@@ -16,6 +16,7 @@ const createAuthRouter = require('./src/routes/auth');
 const createAgentsRouter = require('./src/routes/agents');
 const createPairRouter = require('./src/routes/pair');
 const { setupWSHandler } = require('./src/ws/handler');
+const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-compat');
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
 const { LOCALES, SOURCE_LOCALE } = require('./src/utils/locale-constants');
 
@@ -243,7 +244,10 @@ app.use((err, req, res, _next) => {
 
 // Create HTTP server and WebSocket server
 const server = http.createServer(app);
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  maxPayload: RELAY_PER_MESSAGE_LIMIT_BYTES + 1024
+});
 
 // Set up WS message handling
 setupWSHandler(wss);

@@ -31,8 +31,8 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 ### RELAY -- Transport and relay integration
 
 - [x] **RELAY-01**: `extension/ws/ws-client.js` uses PhantomStream-compatible protocol/envelope helpers for stream payloads without regressing existing dashboard WebSocket task/status traffic.
-- [ ] **RELAY-02**: `showcase/server/src/ws/handler.js` either adopts PhantomStream relay primitives or keeps a documented compatibility adapter, preserving hash-key room routing, dashboard/extension roles, 1 MiB message cap, and 16 MiB backpressure drop behavior.
-- [ ] **RELAY-03**: Compression remains stateless and self-identifying (`{ _lz: true, d }`) for large stream payloads, with symmetric decompression and clear diagnostics on malformed or unsupported frames.
+- [x] **RELAY-02**: `showcase/server/src/ws/handler.js` either adopts PhantomStream relay primitives or keeps a documented compatibility adapter, preserving hash-key room routing, dashboard/extension roles, 1 MiB message cap, and 16 MiB backpressure drop behavior.
+- [x] **RELAY-03**: Compression remains stateless and self-identifying (`{ _lz: true, d }`) for large stream payloads, with symmetric decompression and clear diagnostics on malformed or unsupported frames.
 - [ ] **RELAY-04**: Stream recovery still works across dashboard reconnect, extension reconnect, service-worker wake, content-script late readiness, and parked `dash:dom-stream-start` intent re-arm.
 
 ### CTRL -- Remote control and reverse mapping
@@ -92,8 +92,8 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | VIEW-03 | Phase 23 | Complete |
 | VIEW-04 | Phase 23 | Complete |
 | RELAY-01 | Phase 24 | Complete |
-| RELAY-02 | Phase 24 | Pending |
-| RELAY-03 | Phase 24 | Pending |
+| RELAY-02 | Phase 24 | Complete |
+| RELAY-03 | Phase 24 | Complete |
 | RELAY-04 | Phase 24 | Pending |
 | CTRL-01 | Phase 24 | Pending |
 | CTRL-02 | Phase 24 | Pending |
@@ -118,4 +118,4 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 
 ---
 *Requirements defined: 2026-06-17*
-*Last updated: 2026-06-17 -- Phase 24 RELAY-01 completed via PhantomStream protocol/envelope adapter for extension WebSocket frames*
+*Last updated: 2026-06-17 -- Phase 24 RELAY-02 and RELAY-03 completed via relay compatibility adapter, frame-cap enforcement, and compression-envelope parity*
