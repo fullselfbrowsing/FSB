@@ -95,6 +95,24 @@ function teardownDiagnosticCapture() {
   delete globalThis.redactForLog;
 }
 
+function installOwnerReleaseCapture() {
+  const prior = globalThis.FsbTriggerLifecycle;
+  const calls = [];
+  globalThis.FsbTriggerLifecycle = {
+    handleTriggerOwnerReleased(agentId) {
+      calls.push(agentId);
+      return Promise.resolve({ ok: true, reaped: 0 });
+    }
+  };
+  return {
+    calls: calls,
+    restore() {
+      if (prior === undefined) delete globalThis.FsbTriggerLifecycle;
+      else globalThis.FsbTriggerLifecycle = prior;
+    }
+  };
+}
+
 (async () => {
   console.log('--- Test 1: stage + cancel + expire (D-08) ---');
   {
@@ -197,6 +215,32 @@ function teardownDiagnosticCapture() {
     }
   }
   console.log('  PASS: agent-grace-expired emitted with { agentId, connectionId, poolSize }');
+
+  console.log('--- Test 3a: grace expiry notifies trigger lifecycle owner release ---');
+  {
+    setupChromeMock();
+    setupDiagnosticCapture();
+    const ownerRelease = installOwnerReleaseCapture();
+    try {
+      const fresh = freshRequireRegistry();
+      const reg = new fresh.AgentRegistry();
+      reg.setCap(8);
+
+      const A = (await reg.registerAgent()).agentId;
+      reg.stampConnectionId(A, 'conn-Z');
+
+      await reg.stageReleaseByConnectionId('conn-Z', 50);
+      await new Promise((res) => setTimeout(res, 100));
+
+      assert.deepStrictEqual(ownerRelease.calls, [A],
+        'expired grace calls handleTriggerOwnerReleased for the released agent');
+    } finally {
+      ownerRelease.restore();
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: owner-release hook called after grace expiry');
 
   console.log('--- Test 4: hydrate-time recovery, deadline already passed (Pitfall 1) ---');
   {
@@ -570,6 +614,50 @@ this.__phase241bridge = {
     }
   }
   console.log('  PASS: bridge onopen cancels prior staged release on reconnect');
+
+  console.log('--- Test 11a (bridge): reconnect cancellation suppresses owner-release hook ---');
+  {
+    setupChromeMock();
+    setupDiagnosticCapture();
+    const ownerRelease = installOwnerReleaseCapture();
+    let harness = null;
+    try {
+      const fresh = freshRequireRegistry();
+      const reg = new fresh.AgentRegistry();
+      reg.setCap(8);
+      const realStageRelease = reg.stageReleaseByConnectionId.bind(reg);
+      reg.stageReleaseByConnectionId = function(connectionId, _graceMs) {
+        return realStageRelease(connectionId, 50);
+      };
+
+      harness = buildBridgeWithRegistry(reg);
+      const client = harness.exports.mcpBridgeClient;
+
+      client.connect();
+      client._ws.open();
+      const firstConn = client._connectionId;
+      const A = (await reg.registerAgent()).agentId;
+      reg.stampConnectionId(A, firstConn);
+
+      client._ws.close();
+      await new Promise((r) => setTimeout(r, 20));
+      assert.ok(reg._stagedReleases.has(firstConn), 'first conn staged');
+
+      client.connect();
+      client._ws.open();
+      await new Promise((r) => setTimeout(r, 100));
+
+      assert.deepStrictEqual(ownerRelease.calls, [],
+        'cancelled staged release does not call handleTriggerOwnerReleased');
+      assert.ok(reg._agents.has(A), 'agent preserved after reconnect cancellation');
+    } finally {
+      teardownBridgeClient(harness && harness.exports && harness.exports.mcpBridgeClient);
+      ownerRelease.restore();
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: bridge reconnect cancellation does not notify owner-release hook');
 
   console.log('--- Test 12 (bridge): onclose with no stamped agents is a no-op ---');
   {

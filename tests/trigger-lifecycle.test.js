@@ -536,6 +536,7 @@ function caseN() {
     || (typeof lc.TRIGGER_ALARM_MIN_PERIOD_MINUTES === 'number' && lc.TRIGGER_ALARM_MIN_PERIOD_MINUTES === 0.5);
   check(hasFloor, 'N.11 a 30s alarm-floor constant is exported for Phase 17 (D-03)');
   check(typeof lc.markTriggerTimedOut === 'function', 'N.12 exports markTriggerTimedOut');
+  check(typeof lc.handleTriggerOwnerReleased === 'function', 'N.13 exports handleTriggerOwnerReleased');
 }
 
 // ==================================================================
@@ -942,6 +943,46 @@ async function caseY() {
 }
 
 // ------------------------------------------------------------------
+// Case Z: Phase 19 owner-release cleanup reaps all triggers belonging
+//         to a released agent and leaves other owners untouched.
+// ------------------------------------------------------------------
+
+async function caseZ() {
+  console.log('\n--- Case Z: Phase 19 owner-release trigger reap ---');
+  const { chromeMock, store, lc } = setupHarness();
+
+  await store.writeSnapshot('trg_owner_a', makeSnapshot({
+    trigger_id: 'trg_owner_a',
+    agent_id: 'agent_released'
+  }));
+  await store.writeSnapshot('trg_owner_b', makeSnapshot({
+    trigger_id: 'trg_owner_b',
+    agent_id: undefined,
+    agentId: 'agent_released'
+  }));
+  await store.writeSnapshot('trg_owner_other', makeSnapshot({
+    trigger_id: 'trg_owner_other',
+    agent_id: 'agent_other'
+  }));
+
+  const bad = await lc.handleTriggerOwnerReleased(42);
+  check(bad && bad.ok === true && bad.reaped === 0, 'Z.1 non-string owner id is a no-op');
+  check((await store.readSnapshot('trg_owner_a')) !== null, 'Z.2 no snapshot reaped on invalid owner id');
+
+  const r = await lc.handleTriggerOwnerReleased('agent_released');
+  check(r && r.ok === true && r.reaped === 2, 'Z.3 released owner reaps two matching triggers');
+  check((await store.readSnapshot('trg_owner_a')) === null, 'Z.4 agent_id match deleted');
+  check((await store.readSnapshot('trg_owner_b')) === null, 'Z.5 agentId alias match deleted');
+
+  const survivor = await store.readSnapshot('trg_owner_other');
+  check(survivor && survivor.agent_id === 'agent_other', 'Z.6 other owner trigger survives');
+
+  const cleared = chromeMock.alarms._cleared();
+  check(cleared.includes('fsbTrigger:trg_owner_a') && cleared.includes('fsbTrigger:trg_owner_b'), 'Z.7 matching owner alarms cleared');
+  check(!cleared.includes('fsbTrigger:trg_owner_other'), 'Z.8 other owner alarm not cleared');
+}
+
+// ------------------------------------------------------------------
 // Case U: background.js Phase 16 source invariants for value-report ingress.
 // ------------------------------------------------------------------
 
@@ -1003,6 +1044,7 @@ function caseU() {
   await caseW();
   await caseX();
   await caseY();
+  await caseZ();
   caseU();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');

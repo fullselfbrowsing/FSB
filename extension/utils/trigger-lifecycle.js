@@ -567,6 +567,30 @@
     return { ok: true, reaped: reaped };
   }
 
+  async function handleTriggerOwnerReleased(agentId) {
+    if (!agentId || typeof agentId !== 'string') {
+      return { ok: true, reaped: 0 };
+    }
+    var store = _getStore();
+    if (!store || typeof store.hydrate !== 'function') {
+      return { ok: true, reaped: 0 };
+    }
+    var envelope = await store.hydrate();
+    var records = (envelope && envelope.records && typeof envelope.records === 'object')
+      ? envelope.records : {};
+    var ids = Object.keys(records);
+    var reaped = 0;
+    for (var i = 0; i < ids.length; i++) {
+      var snap = records[ids[i]];
+      if (snap && (snap.agent_id === agentId || snap.agentId === agentId)) {
+        await store.deleteSnapshot(ids[i]);
+        await clearAlarm(TRIGGER_ALARM_PREFIX + ids[i]);
+        reaped++;
+      }
+    }
+    return { ok: true, reaped: reaped };
+  }
+
   // ---- SW-wake reconcile + orphan sweep (SURV-03 / D-08) ------------------
 
   /**
@@ -689,6 +713,7 @@
     markTriggerTimedOut: markTriggerTimedOut,
     handleTriggerAlarm: handleTriggerAlarm,
     handleTriggerTabRemoved: handleTriggerTabRemoved,
+    handleTriggerOwnerReleased: handleTriggerOwnerReleased,
     restoreTriggersFromStorage: restoreTriggersFromStorage
   };
 

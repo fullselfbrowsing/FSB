@@ -760,6 +760,16 @@
         self._tabsByAgent.delete(agentId);
         self._agents.delete(agentId);
         releasedAny = true;
+        try {
+          if (typeof globalThis !== 'undefined'
+              && globalThis.FsbTriggerLifecycle
+              && typeof globalThis.FsbTriggerLifecycle.handleTriggerOwnerReleased === 'function') {
+            var cleanup = globalThis.FsbTriggerLifecycle.handleTriggerOwnerReleased(agentId);
+            if (cleanup && typeof cleanup.catch === 'function') {
+              cleanup.catch(function() { /* best-effort */ });
+            }
+          }
+        } catch (_cleanupError) { /* best-effort */ }
         // D-09: one LOG-04 event per released agent in the connection.
         try {
           if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
