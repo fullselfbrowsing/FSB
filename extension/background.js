@@ -3413,6 +3413,8 @@ function fsbTriggerIsRefreshPollSnapshot(snap) {
   return snap.watch === 'refresh-poll' || snap.watch === 'refresh_poll' || snap.mode === 'refresh-poll';
 }
 
+const fsbTriggerRefreshPollTabLocks = new Map();
+
 function fsbTriggerValidateRefreshPollOwnership(snap) {
   const tabId = Number(snap && snap.target_tab_id);
   const rawAgentId = snap && snap.agent_id;
@@ -3678,6 +3680,286 @@ async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra
   return { ok: true, action: snap.status, reason };
 }
 
+function fsbTriggerCollectDueRefreshPollSnapshots(records, tabId, nowMs, requiredTriggerId) {
+  if (!records || typeof records !== 'object') return [];
+  const out = [];
+  const numericTabId = Number(tabId);
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    let snapshot = records[key];
+    if (!fsbTriggerIsRefreshPollSnapshot(snapshot)) continue;
+    if (Number(snapshot.target_tab_id) !== numericTabId) continue;
+    const triggerId = fsbTriggerSnapshotId(snapshot) || key;
+    if (triggerId === requiredTriggerId || Number(snapshot.next_poll_at || 0) <= nowMs) {
+      if (!fsbTriggerSnapshotId(snapshot) && typeof key === 'string' && key) {
+        snapshot = Object.assign({ trigger_id: key }, snapshot);
+      }
+      out.push(snapshot);
+    }
+  }
+  return out;
+}
+
+function fsbTriggerAddRefreshPollCandidate(candidates, seen, snap, fallbackTriggerId, tabId) {
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) return;
+  if (Number(snap.target_tab_id) !== Number(tabId)) return;
+  const triggerId = fsbTriggerSnapshotId(snap) || fallbackTriggerId;
+  if (!triggerId || seen[triggerId]) return;
+  seen[triggerId] = true;
+  candidates.push({ triggerId, snap });
+}
+
+async function fsbTriggerReadRefreshPollRecords() {
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore) return {};
+  if (typeof FsbTriggerStore.hydrate === 'function') {
+    const envelope = await FsbTriggerStore.hydrate();
+    return envelope && envelope.records && typeof envelope.records === 'object'
+      ? envelope.records
+      : {};
+  }
+  return {};
+}
+
+async function fsbTriggerWithRefreshPollTabLock(tabId, task) {
+  const key = String(Number(tabId));
+  const existing = fsbTriggerRefreshPollTabLocks.get(key);
+  if (existing) return existing;
+  const promise = Promise.resolve()
+    .then(task)
+    .finally(() => {
+      if (fsbTriggerRefreshPollTabLocks.get(key) === promise) {
+        fsbTriggerRefreshPollTabLocks.delete(key);
+      }
+    });
+  fsbTriggerRefreshPollTabLocks.set(key, promise);
+  return promise;
+}
+
+async function fsbTriggerEvaluateRefreshPollAfterReload(triggerId, snap, tabId, preReloadTab, postReloadTab) {
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+    return { ok: true, ignored: true };
+  }
+  if (!snap.selector) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'invalid_selector');
+  }
+  if (postReloadTab && postReloadTab.blocked) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+  }
+
+  let readResult;
+  try {
+    readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  } catch (err) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+
+  if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
+  }
+  if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector, code: 'ELEMENT_NOT_FOUND' });
+  }
+  if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: readResult && readResult.code,
+      error: readResult && (readResult.error || readResult.reason)
+    });
+  }
+
+  const value = readResult.value;
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  const reportedUrl = fsbTriggerFirstString(
+    readResult && readResult.url,
+    readResult && readResult.current_url,
+    postReloadTab && postReloadTab.url,
+    preReloadTab && preReloadTab.url,
+    snap.reported_url,
+    snap.url
+  );
+  if (reportedUrl) snap.reported_url = reportedUrl;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  if (seamResult && seamResult.action !== 'fired'
+      && typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
+    const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (fsbTriggerIsRefreshPollSnapshot(latestSnap) && latestSnap.status === 'armed') {
+      await fsbTriggerSendTabMessage(tabId, {
+        action: 'triggerPulseStart',
+        selector: latestSnap.selector,
+        reason: 'refresh-poll'
+      });
+      await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
+      await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
+    }
+  }
+
+  return { ok: true, action: 'evaluated', result: seamResult };
+}
+
+async function fsbTriggerRunRefreshPollTabBatch(requiredTriggerId, requiredSnap) {
+  const tabId = Number(requiredSnap && requiredSnap.target_tab_id);
+  if (!Number.isFinite(tabId)) {
+    return fsbTriggerRunRefreshPollTick(requiredTriggerId, requiredSnap);
+  }
+  return fsbTriggerWithRefreshPollTabLock(tabId, () => (
+    fsbTriggerRunRefreshPollTabBatchUnlocked(tabId, requiredTriggerId, requiredSnap)
+  ));
+}
+
+async function fsbTriggerRunRefreshPollTabBatchUnlocked(tabId, requiredTriggerId, requiredSnap) {
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.writeSnapshot !== 'function'
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const records = await fsbTriggerReadRefreshPollRecords();
+  const dueSnapshots = fsbTriggerCollectDueRefreshPollSnapshots(records, tabId, Date.now(), requiredTriggerId);
+  const seen = {};
+  const candidates = [];
+  for (let i = 0; i < dueSnapshots.length; i++) {
+    fsbTriggerAddRefreshPollCandidate(candidates, seen, dueSnapshots[i], null, tabId);
+  }
+  fsbTriggerAddRefreshPollCandidate(candidates, seen, requiredSnap, requiredTriggerId, tabId);
+
+  const results = {};
+  const eligible = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const item = candidates[i];
+    if (!item.snap.selector) {
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'invalid_selector');
+      continue;
+    }
+    const ownership = fsbTriggerValidateRefreshPollOwnership(item.snap);
+    if (!ownership || ownership.ok !== true) {
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(
+        item.triggerId,
+        item.snap,
+        'ownership_failed',
+        ownership || { code: 'OWNERSHIP_VALIDATION_FAILED' }
+      );
+      continue;
+    }
+    eligible.push({ triggerId: item.triggerId, snap: item.snap, ownership });
+  }
+
+  if (!eligible.length) {
+    return { ok: true, action: 'refresh_poll_batch_empty', tab_id: tabId, results };
+  }
+
+  if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'read_failed', {
+        selector: item.snap.selector,
+        code: 'TABS_UNAVAILABLE',
+        requestedTabId: tabId,
+        requestingAgentId: item.ownership.agentId
+      });
+    }
+    return { ok: true, action: 'refresh_poll_batch_attention', tab_id: tabId, results };
+  }
+
+  const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  if (preReloadTab && preReloadTab.blocked) {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(item.snap, 'restricted_url', preReloadTab.url, { error: preReloadTab.error }));
+    }
+    return { ok: true, action: 'refresh_poll_batch_blocked', tab_id: tabId, results };
+  }
+
+  const registry = eligible[0] && eligible[0].ownership && eligible[0].ownership.registry;
+  if (registry && typeof registry.stampAgentNavigation === 'function') {
+    try {
+      registry.stampAgentNavigation(tabId);
+    } catch (_err) { /* best-effort navigation stamp */ }
+  }
+
+  let postReloadTab = null;
+  try {
+    await chrome.tabs.reload(tabId);
+    await fsbTriggerWaitForRefreshPollReady(tabId);
+    postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  } catch (err) {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'read_failed', {
+        selector: item.snap.selector,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+    return { ok: true, action: 'refresh_poll_batch_attention', tab_id: tabId, results };
+  }
+
+  if (postReloadTab && postReloadTab.blocked) {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(item.snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    }
+    return { ok: true, action: 'refresh_poll_batch_blocked', tab_id: tabId, results };
+  }
+
+  for (let i = 0; i < eligible.length; i++) {
+    const item = eligible[i];
+    try {
+      const latestSnap = await FsbTriggerStore.readSnapshot(item.triggerId);
+      if (!fsbTriggerIsRefreshPollSnapshot(latestSnap) || Number(latestSnap.target_tab_id) !== Number(tabId)) {
+        results[item.triggerId] = { ok: true, ignored: true };
+        continue;
+      }
+      results[item.triggerId] = await fsbTriggerEvaluateRefreshPollAfterReload(
+        item.triggerId,
+        latestSnap,
+        tabId,
+        preReloadTab,
+        postReloadTab
+      );
+    } catch (err) {
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'read_failed', {
+        selector: item.snap.selector,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    action: 'refresh_poll_batch',
+    tab_id: tabId,
+    batch_size: eligible.length,
+    results
+  };
+}
+
 async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
   if (!triggerId || typeof triggerId !== 'string') {
     return { ok: false, reason: 'invalid_trigger_id' };
@@ -3835,7 +4117,7 @@ async function fsbTriggerHandleRefreshPollAlarm(alarm) {
     if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
       return { handled: false };
     }
-    const result = await fsbTriggerRunRefreshPollTick(triggerId, snap);
+    const result = await fsbTriggerRunRefreshPollTabBatch(triggerId, snap);
     return Object.assign({ handled: true }, result || {});
   } catch (err) {
     try {
