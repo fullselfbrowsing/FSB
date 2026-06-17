@@ -252,8 +252,9 @@
     // fires spuriously. The numeric kinds already guarded this; do it once here.
     if (!extractor) return { error: 'parse_error' };
     var raw = extractor.extractValue(reportedValue, condition);
+    var kind = condition.kind === 'delta_percent' ? 'percent_change' : condition.kind;
 
-    switch (condition.kind) {
+    switch (kind) {
       case 'changed': {
         var base = (snapshot.baseline === undefined || snapshot.baseline === null)
           ? '' : String(snapshot.baseline).trim();

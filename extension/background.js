@@ -4355,7 +4355,8 @@ function fsbTriggerValidateToolCondition(condition, nested) {
     return { ok: true };
   }
 
-  const kind = fsbTriggerFirstString(condition.kind);
+  const rawKind = fsbTriggerFirstString(condition.kind);
+  const kind = rawKind === 'delta_percent' ? 'percent_change' : rawKind;
   if (['changed', 'threshold', 'equals', 'regex', 'contains', 'percent_change'].indexOf(kind) === -1) {
     return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'kind_invalid' };
   }
@@ -4377,6 +4378,21 @@ function fsbTriggerValidateToolCondition(condition, nested) {
   }
 
   return { ok: true };
+}
+
+function fsbTriggerNormalizeToolCondition(condition) {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
+    return condition;
+  }
+  const normalized = Object.assign({}, condition);
+  const rawKind = fsbTriggerFirstString(normalized.kind);
+  if (rawKind === 'delta_percent') {
+    normalized.kind = 'percent_change';
+  }
+  if (Array.isArray(normalized.conditions)) {
+    normalized.conditions = normalized.conditions.map(fsbTriggerNormalizeToolCondition);
+  }
+  return normalized;
 }
 
 function fsbTriggerNormalizeToolWatch(value) {
@@ -4445,7 +4461,7 @@ async function fsbTriggerHandleToolArm(params, context) {
     return { success: false, errorCode: 'INVALID_TAB_ID' };
   }
 
-  const condition = safeParams.condition;
+  const condition = fsbTriggerNormalizeToolCondition(safeParams.condition);
   const conditionValidation = fsbTriggerValidateToolCondition(condition);
   if (!conditionValidation.ok) {
     return Object.assign({ success: false }, conditionValidation);

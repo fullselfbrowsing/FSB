@@ -492,6 +492,49 @@ async function caseInvalidConditionRejectedBeforeArm() {
   assert.deepStrictEqual(calls, [], 'invalid condition does not read DOM or arm trigger');
 }
 
+async function caseArmNormalizesDeltaPercentAlias() {
+  const calls = [];
+  let receivedSpec = null;
+  const handlers = loadToolHandlers({
+    async fsbTriggerSendRefreshPollRead() {
+      calls.push('read');
+      return { success: true, value: { text: '100' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        calls.push('arm');
+        receivedSpec = spec;
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot(Object.assign({}, receivedSpec || {}, { status: 'armed' }));
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      calls.push('start-live');
+      return { ok: true };
+    }
+  });
+
+  const condition = { kind: 'delta_percent', percent: 5 };
+  const validation = handlers.fsbTriggerValidateToolCondition(condition);
+  assert.strictEqual(validation.ok, true, 'delta_percent alias validates');
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition,
+    watch: 'live-observe'
+  }, {});
+
+  assert.strictEqual(result.success, true, 'delta_percent alias arm succeeds');
+  assert.deepStrictEqual(calls, ['read', 'arm', 'start-live'], 'delta_percent alias reaches normal arm flow');
+  assert.strictEqual(condition.kind, 'delta_percent', 'delta_percent caller condition is not mutated');
+  assert.strictEqual(receivedSpec.condition.kind, 'percent_change', 'delta_percent alias is persisted as percent_change');
+}
+
 async function caseArmReadsBaselineBeforeManagerAndStartsLiveObserve() {
   const calls = [];
   let receivedSpec = null;
@@ -728,6 +771,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('active stop clears observe then watchdog then lifecycle', caseStopActiveCleanupOrder);
   await runCase('terminal stop clears watchdog and lifecycle idempotently', caseStopTerminalCleanupIdempotent);
   await runCase('invalid arm condition rejects before read or arm', caseInvalidConditionRejectedBeforeArm);
+  await runCase('arm normalizes delta_percent alias before manager persistence', caseArmNormalizesDeltaPercentAlias);
   await runCase('arm reads baseline before manager and starts live observe', caseArmReadsBaselineBeforeManagerAndStartsLiveObserve);
   await runCase('autopilot arm spec binds legacy owner and token', caseArmAutopilotLegacySpec);
   await runCase('autopilot arm rejects foreign-owned tabs before side effects', caseArmAutopilotForeignRejectsBeforeArm);

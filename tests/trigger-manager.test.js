@@ -177,6 +177,8 @@ function reported(text, attributes) {
     check(p1.outcome === 'fired', 'percent_change: first edge fires');
     var p2 = evaluate(snap({ kind: 'percent_change', percent: 5 }, '100', '110', true), reported('110'), NOW);
     check(p2.outcome === 'no_fire', 'percent_change: re-evaluate same satisfying value -> no_fire');
+    var alias = evaluate(snap({ kind: 'delta_percent', percent: 5 }, '100', '100', false), reported('110'), NOW);
+    check(alias.outcome === 'fired', 'delta_percent alias: 100->110 (10%) >= 5% fires');
   }
 
   // ====================================================================
