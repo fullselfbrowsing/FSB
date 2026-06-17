@@ -25,8 +25,8 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 
 - [x] **VIEW-01**: The static showcase dashboard viewer delegates snapshot rendering and diff application to PhantomStream renderer primitives while preserving FSB preview states and controls.
 - [x] **VIEW-02**: The Angular dashboard viewer delegates to the same PhantomStream renderer behavior or a shared wrapper, eliminating drift between static and Angular diff application logic.
-- [ ] **VIEW-03**: Viewer behavior remains unchanged for iframe sandboxing, scaling/layout modes, stale stream/session rejection, resync on divergence, frozen-disconnect/frozen-complete states, restricted-page placeholders, and diagnostic tooltip counters.
-- [ ] **VIEW-04**: Side-channel rendering remains intact: scroll position, action glow, progress badge/client identity, native dialogs, remote-control affordances, and final/frozen overlay state.
+- [x] **VIEW-03**: Viewer behavior remains unchanged for iframe sandboxing, scaling/layout modes, stale stream/session rejection, resync on divergence, frozen-disconnect/frozen-complete states, restricted-page placeholders, and diagnostic tooltip counters.
+- [x] **VIEW-04**: Side-channel rendering remains intact: scroll position, action glow, progress badge/client identity, native dialogs, remote-control affordances, and final/frozen overlay state.
 
 ### RELAY -- Transport and relay integration
 
@@ -89,8 +89,8 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | CAP-04 | Phase 22 | Complete |
 | VIEW-01 | Phase 23 | Complete |
 | VIEW-02 | Phase 23 | Complete |
-| VIEW-03 | Phase 23 | Pending |
-| VIEW-04 | Phase 23 | Pending |
+| VIEW-03 | Phase 23 | Complete |
+| VIEW-04 | Phase 23 | Complete |
 | RELAY-01 | Phase 24 | Pending |
 | RELAY-02 | Phase 24 | Pending |
 | RELAY-03 | Phase 24 | Pending |
@@ -118,4 +118,4 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 
 ---
 *Requirements defined: 2026-06-17*
-*Last updated: 2026-06-17 -- VIEW-02 completed via Angular shared renderer wrapper migration*
+*Last updated: 2026-06-17 -- Phase 23 VIEW-01..04 completed via shared PhantomStream dashboard viewer migration*

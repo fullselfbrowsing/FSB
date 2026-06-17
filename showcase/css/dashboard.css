@@ -1893,7 +1893,7 @@
   right: 8px;
   background: rgba(0, 0, 0, 0.75);
   border-radius: var(--radius-md);
-  padding: 8px 8px;
+  padding: 8px 10px;
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
@@ -1902,6 +1902,49 @@
   z-index: 4;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+.dash-preview-progress-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-preview-progress-status {
+  min-width: 0;
+}
+
+.dash-preview-progress-detail {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 500;
+  font-family: inherit;
+  max-width: 240px;
+  word-break: break-word;
+}
+
+.dash-preview-client-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.dash-preview-client-badge-frozen {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* --- Dialog overlay card --- */
@@ -1975,6 +2018,12 @@
   padding: 12px 16px;
   pointer-events: none;
   z-index: 7;
+}
+
+.dash-preview-frozen-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .dash-preview-frozen-label {

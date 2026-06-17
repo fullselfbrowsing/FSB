@@ -75,7 +75,16 @@
   var remoteControlCaptureActive = false;
   var staleMutationCount = 0;
   var mutationApplyFailures = 0;
+  var mutationsAppliedTotal = 0;
+  var lastFrameTime = 0;
   var previewResyncPending = false;
+  var lastPreviewOverlayIdentity = {
+    clientLabel: '',
+    lifecycle: '',
+    result: '',
+    sessionToken: '',
+    version: null
+  };
   var DASHBOARD_TRANSPORT_DIAGNOSTIC_LIMIT = 100;
   var activeTaskRunId = '';
   var lastCompletedTaskRunId = '';
@@ -200,6 +209,8 @@
   function resetPreviewGenerationState() {
     staleMutationCount = 0;
     mutationApplyFailures = 0;
+    mutationsAppliedTotal = 0;
+    previewViewerHealth = null;
     previewResyncPending = false;
   }
 
@@ -211,6 +222,12 @@
       }
       if (typeof previewViewerHealth.applyFailures === 'number') {
         mutationApplyFailures = previewViewerHealth.applyFailures;
+      }
+      if (typeof previewViewerHealth.lastFrameAt === 'number' && previewViewerHealth.lastFrameAt > 0) {
+        lastFrameTime = previewViewerHealth.lastFrameAt;
+      }
+      if (typeof previewViewerHealth.lastSnapshotAt === 'number' && previewViewerHealth.lastSnapshotAt > 0) {
+        lastSnapshotTime = previewViewerHealth.lastSnapshotAt;
       }
     }
     updatePreviewTooltip();
@@ -483,6 +500,42 @@
     };
   }
 
+  function clearPreviewOverlayIdentity() {
+    lastPreviewOverlayIdentity = {
+      clientLabel: '',
+      lifecycle: '',
+      result: '',
+      sessionToken: '',
+      version: null
+    };
+  }
+
+  function rememberPreviewOverlayIdentity(progressPayload) {
+    if (!progressPayload || progressPayload.lifecycle === 'cleared') {
+      clearPreviewOverlayIdentity();
+      return;
+    }
+
+    lastPreviewOverlayIdentity = {
+      clientLabel: String(progressPayload.clientLabel || '').trim(),
+      lifecycle: String(progressPayload.lifecycle || '').trim(),
+      result: String(progressPayload.result || '').trim(),
+      sessionToken: String(progressPayload.sessionToken || '').trim(),
+      version: typeof progressPayload.version === 'number' ? progressPayload.version : null
+    };
+  }
+
+  function renderPreviewClientBadge(target, clientLabel) {
+    if (!target) return;
+    var label = String(clientLabel || '').trim();
+    target.textContent = label;
+    target.style.display = label ? 'inline-flex' : 'none';
+  }
+
+  function renderPreviewFrozenIdentity() {
+    renderPreviewClientBadge(previewFrozenBadge, lastPreviewOverlayIdentity.clientLabel);
+  }
+
   function clearTaskRecoveryTimer() {
     if (taskRecoveryTimer) {
       clearTimeout(taskRecoveryTimer);
@@ -702,10 +755,14 @@
   var previewLoading = document.getElementById('dash-preview-loading');
   var previewGlow = document.getElementById('dash-preview-glow');
   var previewProgress = document.getElementById('dash-preview-progress');
+  var previewProgressBadge = document.getElementById('dash-preview-progress-badge');
+  var previewProgressStatus = document.getElementById('dash-preview-progress-status');
+  var previewProgressDetail = document.getElementById('dash-preview-progress-detail');
   var previewStatus = document.getElementById('dash-preview-status');
   var previewRcState = document.getElementById('dash-preview-rc-state');
   var previewDisconnected = document.getElementById('dash-preview-disconnected');
   var previewFrozenOverlay = document.getElementById('dash-preview-frozen-overlay');
+  var previewFrozenBadge = document.getElementById('dash-preview-frozen-badge');
   var previewFrozenLabel = previewFrozenOverlay ? previewFrozenOverlay.querySelector('.dash-preview-frozen-label') : null;
   var previewError = document.getElementById('dash-preview-error');
   var previewDialog = document.getElementById('dash-preview-dialog');
@@ -2729,6 +2786,7 @@
         }
         if (previewFrozenOverlay && previewSurface.showFrozenOverlay) {
           previewFrozenOverlay.style.display = 'flex';
+          renderPreviewFrozenIdentity();
           if (previewFrozenLabel) {
             previewFrozenLabel.textContent = previewSurface.frozenLabel || 'Frozen';
             previewFrozenLabel.className = 'dash-preview-frozen-label ' + (previewSurface.frozenType || '');
@@ -2796,6 +2854,7 @@
 
     previewSnapshotData = payload;
     lastSnapshotTime = Date.now();
+    lastFrameTime = lastSnapshotTime;
     previewLoadStartedAt = 0;
     pageReady = true;
     lastRecoveredStreamState = 'streaming';
@@ -3192,6 +3251,7 @@
   function handleDOMMutations(payload) {
     if (!shouldAcceptPreviewMessage(payload, 'ext:dom-mutations')) return;
     if (previewState !== 'streaming') return;
+    lastFrameTime = Date.now();
 
     try {
       var mutations = payload.mutations || [];
@@ -3204,6 +3264,8 @@
       if (!dispatchPreviewViewer('ext:dom-mutations', payload)) {
         throw new Error('phantomstream-viewer-unavailable');
       }
+      mutationsAppliedTotal += mutations.length;
+      updatePreviewTooltip();
     } catch (e) {
       console.warn('[FSB-DASH] Mutation apply error:', e.message);
       mutationApplyFailures += 1;
@@ -3231,10 +3293,12 @@
 
   function handleDOMOverlay(payload) {
     if (!shouldAcceptPreviewMessage(payload, 'ext:dom-overlay')) return;
-    if (previewState !== 'streaming') return;
+    var canRenderOverlay = previewState === 'streaming' ||
+      previewState === 'frozen-disconnect' ||
+      previewState === 'frozen-complete';
+    if (!canRenderOverlay) return;
     dispatchPreviewViewer('ext:dom-overlay', payload);
 
-    // Update glow rect
     if (payload.glow && payload.glow.state === 'active' && previewGlow) {
       previewGlow.style.display = '';
       previewGlow.style.top = (payload.glow.y * previewScale) + 'px';
@@ -3245,8 +3309,15 @@
       previewGlow.style.display = 'none';
     }
 
-    // Update progress indicator
-    if (payload.progress && previewProgress) {
+    if (payload.progress && payload.progress.lifecycle !== 'cleared') {
+      rememberPreviewOverlayIdentity(payload.progress);
+    } else {
+      clearPreviewOverlayIdentity();
+    }
+    renderPreviewFrozenIdentity();
+
+    var hasActiveProgress = !!(payload.progress && payload.progress.lifecycle !== 'cleared');
+    if (hasActiveProgress && previewProgress) {
       previewProgress.style.display = '';
       var phaseText = payload.progress.phase || 'Working';
       var progressText;
@@ -3255,9 +3326,24 @@
       } else {
         progressText = payload.progress.label || phaseText || 'Working';
       }
-      previewProgress.textContent = progressText + ' - ' + phaseText;
+      if (previewProgressStatus) {
+        previewProgressStatus.textContent = progressText + ' - ' + phaseText;
+      } else {
+        previewProgress.textContent = progressText + ' - ' + phaseText;
+      }
+      var detailText = String(payload.progress.detail || '').trim();
+      if (previewProgressDetail) {
+        previewProgressDetail.textContent = detailText;
+        previewProgressDetail.style.display = detailText ? 'block' : 'none';
+      }
+      renderPreviewClientBadge(previewProgressBadge, payload.progress.clientLabel || '');
     } else if (previewProgress) {
       previewProgress.style.display = 'none';
+      if (previewProgressDetail) {
+        previewProgressDetail.textContent = '';
+        previewProgressDetail.style.display = 'none';
+      }
+      renderPreviewClientBadge(previewProgressBadge, '');
     }
   }
 
@@ -3434,6 +3520,11 @@
     }
   });
 
+  function lastFrameAgo() {
+    if (!lastFrameTime) return 0;
+    return Math.max(0, Math.round((Date.now() - lastFrameTime) / 1000));
+  }
+
   function updatePreviewTooltip() {
     if (!previewTooltip) return;
     var parts = [];
@@ -3444,6 +3535,10 @@
     if (previewLoadStartedAt && previewState === 'loading') {
       parts.push('Recovering for ' + Math.max(1, Math.round((Date.now() - previewLoadStartedAt) / 1000)) + 's');
     }
+    parts.push('last-frame: ' + lastFrameAgo() + 's ago');
+    parts.push('mutations: ' + mutationsAppliedTotal);
+    parts.push('apply failures: ' + mutationApplyFailures);
+    parts.push('stale: ' + staleMutationCount);
     previewTooltip.textContent = parts.join(' | ') || 'No stream data';
   }
 

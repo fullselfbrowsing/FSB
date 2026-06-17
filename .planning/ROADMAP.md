@@ -20,7 +20,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 
 - [x] **Phase 21: Package Intake & Contract Mapping** — Verify/install the PhantomStream package or approved immutable source; map the current FSB stream contracts to package exports before replacing code.
 - [x] **Phase 22: Capture Adapter Migration** — Replace in-house content-side snapshot/diff capture with a thin adapter around PhantomStream capture primitives.
-- [ ] **Phase 23: Dashboard Renderer Migration** — Replace static and Angular dashboard diff/render logic with PhantomStream renderer-backed behavior while preserving the current preview state machine.
+- [x] **Phase 23: Dashboard Renderer Migration** — Replace static and Angular dashboard diff/render logic with PhantomStream renderer-backed behavior while preserving the current preview state machine.
 - [ ] **Phase 24: Transport, Relay & Remote Control Integration** — Align WebSocket envelopes, relay behavior, stream recovery, and reverse remote-control mapping with PhantomStream-compatible protocol helpers.
 - [ ] **Phase 25: Parity Removal, Docs & Browser UAT** — Remove duplicated in-house engines, update docs/tests, and close with automated plus live-browser stream verification.
 
@@ -68,7 +68,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - [x] 23-01-PLAN.md — Shared dashboard viewer wrapper around PhantomStream renderer.
 - [x] 23-02-PLAN.md — Static dashboard migration and renderer behavior tests.
 - [x] 23-03-PLAN.md — Angular dashboard migration and parity/source-contract tests.
-- [ ] 23-04-PLAN.md — Side-channel UI, frozen states, diagnostics, and visual regression smoke.
+- [x] 23-04-PLAN.md — Side-channel UI, frozen states, diagnostics, and visual regression smoke.
 
 ### Phase 24: Transport, Relay & Remote Control Integration
 **Goal**: Stream transport, server relay, and reverse remote-control path are aligned with PhantomStream protocol helpers while preserving FSB's pairing, task traffic, room routing, and debugger ownership semantics.
@@ -109,7 +109,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 |-------|-----------|----------------|--------|-----------|
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 23. Dashboard Renderer Migration | v0.12.0 | 3/4 | In Progress | - |
+| 23. Dashboard Renderer Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
 
