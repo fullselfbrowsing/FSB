@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 let passed = 0;
 let failed = 0;
@@ -159,6 +160,184 @@ function makeRefreshPollSnapshot(overrides) {
     deadline_at: 9000000,
     poll_interval_ms: 60000
   }, overrides || {});
+}
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function loadRefreshPollVm(extraGlobals) {
+  const src = readSource(BACKGROUND_PATH);
+  const lockStart = src.indexOf('const fsbTriggerRefreshPollTabLocks');
+  const snapshotStart = src.indexOf('function fsbTriggerSnapshotId');
+  const start = (lockStart >= 0 && lockStart < snapshotStart) ? lockStart : snapshotStart;
+  const marker = 'globalThis.fsbTriggerHandleRefreshPollForTest = fsbTriggerHandleRefreshPollAlarm;';
+  const markerIndex = src.indexOf(marker, start);
+  if (start < 0 || markerIndex < 0) {
+    throw new Error('refresh-poll background slice not found');
+  }
+  const slice = src.slice(start, markerIndex + marker.length);
+  const context = Object.assign({
+    console,
+    Date,
+    Number,
+    Object,
+    Array,
+    String,
+    Promise,
+    Math,
+    Map,
+    Set,
+    setTimeout,
+    clearTimeout,
+    FSB_TRIGGER_REPORTED_TEXT_MAX: 4096
+  }, extraGlobals || {});
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(slice, context, { filename: 'background-refresh-poll-slice.js' });
+  return context;
+}
+
+function createRefreshPollVmHarness(seedRecords, options) {
+  const opts = options || {};
+  const records = {};
+  Object.keys(seedRecords || {}).forEach((key) => {
+    records[key] = clone(seedRecords[key]);
+  });
+  const calls = {
+    events: [],
+    reloads: [],
+    reads: [],
+    writes: [],
+    handles: [],
+    schedules: [],
+    pulses: [],
+    stamps: [],
+    ownership: [],
+    ensures: []
+  };
+  const registeredAgents = new Set(opts.registeredAgents || ['agent_refresh', 'agent_a', 'agent_b', 'agent_c']);
+  const ownerByTab = opts.ownerByTab || {};
+  const tabStates = opts.tabStates || {};
+  const readValues = opts.readValues || {};
+
+  const chromeMock = {
+    tabs: {
+      async reload(tabId) {
+        calls.events.push('reload:' + tabId);
+        calls.reloads.push(tabId);
+        if (opts.deferReload) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      },
+      async get(tabId) {
+        const state = tabStates[tabId] || {};
+        if (state.throw) throw new Error(state.throw);
+        return {
+          id: tabId,
+          status: state.status || 'complete',
+          url: state.url || 'https://example.test/page-' + tabId
+        };
+      },
+      async sendMessage(tabId, payload, sendOptions) {
+        calls.events.push((payload && payload.action ? payload.action : 'message') + ':' + tabId);
+        if (payload && payload.action === 'triggerRead') {
+          calls.reads.push({ tabId, payload: clone(payload), options: clone(sendOptions) });
+          const key = payload.selector;
+          const value = Object.prototype.hasOwnProperty.call(readValues, key)
+            ? readValues[key]
+            : { text: 'value:' + key, attributes: { selector: key } };
+          return clone({ ok: true, success: true, value });
+        }
+        if (payload && payload.action === 'triggerPulseStart') {
+          calls.pulses.push({ tabId, payload: clone(payload) });
+        }
+        return { ok: true };
+      }
+    }
+  };
+
+  const lifecyclePrefix = 'fsbTrigger:';
+  const context = loadRefreshPollVm({
+    chrome: chromeMock,
+    pageLoadWatcher: {
+      async waitForPageReady(tabId) {
+        calls.events.push('ready:' + tabId);
+        return { success: true };
+      }
+    },
+    async ensureContentScriptInjected(tabId) {
+      calls.events.push('ensure:' + tabId);
+      calls.ensures.push(tabId);
+      return true;
+    },
+    isRestrictedURL(url) {
+      return opts.restrictedUrls && opts.restrictedUrls.indexOf(url) >= 0;
+    },
+    fsbAgentRegistryInstance: {
+      hasAgent(agentId) {
+        calls.events.push('hasAgent:' + agentId);
+        calls.ownership.push({ method: 'hasAgent', agentId });
+        return registeredAgents.has(agentId);
+      },
+      getOwner(tabId) {
+        calls.events.push('getOwner:' + tabId);
+        calls.ownership.push({ method: 'getOwner', tabId });
+        return Object.prototype.hasOwnProperty.call(ownerByTab, tabId) ? ownerByTab[tabId] : null;
+      },
+      getTabMetadata(tabId) {
+        calls.events.push('getTabMetadata:' + tabId);
+        calls.ownership.push({ method: 'getTabMetadata', tabId });
+        return null;
+      },
+      isOwnedBy(tabId, agentId, token) {
+        calls.events.push('isOwnedBy:' + tabId + ':' + agentId);
+        calls.ownership.push({ method: 'isOwnedBy', tabId, agentId, token });
+        return opts.isOwnedBy ? opts.isOwnedBy(tabId, agentId, token) : true;
+      },
+      stampAgentNavigation(tabId) {
+        calls.events.push('stamp:' + tabId);
+        calls.stamps.push(tabId);
+      }
+    },
+    FsbTriggerStore: {
+      async hydrate() {
+        return { v: 1, records: clone(records) };
+      },
+      async readSnapshot(triggerId) {
+        return clone(records[triggerId] || null);
+      },
+      async writeSnapshot(triggerId, snap) {
+        records[triggerId] = clone(snap);
+        calls.writes.push({ triggerId, snap: clone(snap) });
+      }
+    },
+    FsbTriggerLifecycle: {
+      TRIGGER_ALARM_PREFIX: lifecyclePrefix,
+      async handleTriggerAlarm(alarm) {
+        calls.events.push('handle:' + alarm.name);
+        calls.handles.push(alarm.name);
+        if (typeof opts.onHandleTriggerAlarm === 'function') {
+          await opts.onHandleTriggerAlarm(alarm, records, calls);
+        }
+        return { ok: true, action: 'evaluated_noop' };
+      },
+      async scheduleNextRefreshPollAlarm(snap, now) {
+        calls.events.push('schedule:' + snap.trigger_id);
+        calls.schedules.push({ triggerId: snap.trigger_id, now });
+        return { ok: true };
+      }
+    }
+  });
+
+  return {
+    context,
+    calls,
+    records,
+    alarm(triggerId) {
+      return { name: lifecyclePrefix + triggerId };
+    }
+  };
 }
 
 async function withFixedNow(now, fn) {
@@ -386,6 +565,194 @@ async function caseJitterAndDeadlineFloor() {
   });
 }
 
+async function caseRefreshPollSameTabBatchCoalesces() {
+  console.log('\n--- Case N: same-tab refresh-poll due batch coalesces reload ---');
+  const now = 6000000;
+  await withFixedNow(now, async () => {
+    const h = createRefreshPollVmHarness({
+      trg_batch_a: makeRefreshPollSnapshot({
+        trigger_id: 'trg_batch_a',
+        selector: '#a',
+        target_tab_id: 321,
+        next_poll_at: undefined,
+        agent_id: 'agent_a'
+      }),
+      trg_batch_b: makeRefreshPollSnapshot({
+        trigger_id: 'trg_batch_b',
+        selector: '#b',
+        target_tab_id: 321,
+        next_poll_at: now - 1,
+        agent_id: 'agent_b'
+      }),
+      trg_batch_future: makeRefreshPollSnapshot({
+        trigger_id: 'trg_batch_future',
+        selector: '#future',
+        target_tab_id: 321,
+        next_poll_at: now + 60000,
+        agent_id: 'agent_a'
+      }),
+      trg_batch_terminal: makeRefreshPollSnapshot({
+        trigger_id: 'trg_batch_terminal',
+        status: 'fired',
+        selector: '#terminal',
+        target_tab_id: 321,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      })
+    }, { deferReload: true });
+
+    await Promise.all([
+      h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_batch_a')),
+      h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_batch_b'))
+    ]);
+
+    const readSelectors = h.calls.reads.map((entry) => entry.payload.selector).sort();
+    check(h.calls.reloads.length === 1 && h.calls.reloads[0] === 321,
+      'N.1 same-tab due refresh-poll alarms share one explicit tab reload');
+    check(readSelectors.join(',') === '#a,#b',
+      'N.2 due same-tab triggers are each read once after the shared reload');
+    check(h.calls.handles.length === 2,
+      'N.3 lifecycle evaluation remains per due trigger');
+    check(h.calls.handles.indexOf('fsbTrigger:trg_batch_future') === -1
+      && h.calls.handles.indexOf('fsbTrigger:trg_batch_terminal') === -1,
+      'N.4 future and terminal same-tab snapshots are not evaluated');
+    check(h.calls.pulses.length === 2 && h.calls.schedules.length === 2,
+      'N.5 armed evaluated snapshots get independent pulse and next-poll scheduling');
+  });
+}
+
+async function caseRefreshPollOtherTabsReloadIndependently() {
+  console.log('\n--- Case O: other-tab refresh-poll batches reload independently ---');
+  const now = 7000000;
+  await withFixedNow(now, async () => {
+    const h = createRefreshPollVmHarness({
+      trg_tab_a: makeRefreshPollSnapshot({
+        trigger_id: 'trg_tab_a',
+        selector: '#a',
+        target_tab_id: 401,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      }),
+      trg_tab_b: makeRefreshPollSnapshot({
+        trigger_id: 'trg_tab_b',
+        selector: '#b',
+        target_tab_id: 402,
+        next_poll_at: now - 1,
+        agent_id: 'agent_b'
+      })
+    });
+
+    await h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_tab_a'));
+    await h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_tab_b'));
+
+    check(h.calls.reloads.length === 2
+      && h.calls.reloads[0] === 401
+      && h.calls.reloads[1] === 402,
+      'O.1 due refresh-poll triggers on different tabs reload independently');
+    check(h.calls.handles.length === 2,
+      'O.2 each tab batch still performs per-trigger lifecycle evaluation');
+  });
+}
+
+async function caseRefreshPollBatchPreservesAttentionAndPulseGuards() {
+  console.log('\n--- Case P: coalescing preserves ownership, blocked, terminal, and pulse guards ---');
+  const now = 8000000;
+  await withFixedNow(now, async () => {
+    const h = createRefreshPollVmHarness({
+      trg_good: makeRefreshPollSnapshot({
+        trigger_id: 'trg_good',
+        selector: '#good',
+        target_tab_id: 501,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      }),
+      trg_bad_owner: makeRefreshPollSnapshot({
+        trigger_id: 'trg_bad_owner',
+        selector: '#bad-owner',
+        target_tab_id: 501,
+        next_poll_at: now - 1,
+        agent_id: 'missing_agent'
+      }),
+      trg_terminal: makeRefreshPollSnapshot({
+        trigger_id: 'trg_terminal',
+        status: 'stopped',
+        selector: '#terminal',
+        target_tab_id: 501,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      })
+    }, {
+      onHandleTriggerAlarm(alarm, records) {
+        if (alarm.name === 'fsbTrigger:trg_good') {
+          records.trg_good.status = 'fired';
+        }
+      }
+    });
+
+    await h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_good'));
+
+    const badOwner = h.records.trg_bad_owner;
+    const reloadIdx = h.calls.events.indexOf('reload:501');
+    const badOwnerIdx = h.calls.events.indexOf('hasAgent:missing_agent');
+    check(badOwner && badOwner.status === 'needs_attention' && badOwner.attention_reason === 'ownership_failed',
+      'P.1 ownership failures are marked needs_attention without blocking valid triggers');
+    check(badOwnerIdx >= 0 && reloadIdx >= 0 && badOwnerIdx < reloadIdx,
+      'P.2 ownership is validated for every due trigger before reload');
+    check(h.calls.reloads.length === 1 && h.calls.handles.length === 1 && h.calls.handles[0] === 'fsbTrigger:trg_good',
+      'P.3 valid due trigger evaluates once while invalid and terminal snapshots are skipped');
+    check(h.calls.pulses.length === 0 && h.calls.schedules.length === 0,
+      'P.4 pulse reassertion and next-poll scheduling skip snapshots no longer armed');
+
+    const blocked = createRefreshPollVmHarness({
+      trg_blocked: makeRefreshPollSnapshot({
+        trigger_id: 'trg_blocked',
+        selector: '#blocked',
+        target_tab_id: 502,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      })
+    }, {
+      tabStates: { 502: { url: 'chrome://settings' } },
+      restrictedUrls: ['chrome://settings']
+    });
+
+    await blocked.context.fsbTriggerHandleRefreshPollForTest(blocked.alarm('trg_blocked'));
+    check(blocked.calls.reloads.length === 0
+      && blocked.calls.reads.length === 0
+      && blocked.records.trg_blocked.status === 'blocked'
+      && blocked.records.trg_blocked.last_attention
+      && blocked.records.trg_blocked.last_attention.code === 'TRIGGER_PAGE_BLOCKED',
+      'P.5 restricted pages write blocked attention before reload or challenge-text staging');
+  });
+}
+
+async function caseRefreshPollCoalescingSourceGuards() {
+  console.log('\n--- Case Q: refresh-poll coalescing source guards ---');
+  const src = readSource(BACKGROUND_PATH);
+  const block = sourceSliceBetween(src, 'const fsbTriggerRefreshPollTabLocks', [
+    'async function fsbTriggerRunRefreshPollTick',
+    'async function fsbTriggerRearmLiveObserversForTab'
+  ]);
+  const validateIdx = block.indexOf('fsbTriggerValidateRefreshPollOwnership');
+  const reloadIdx = block.indexOf('await chrome.tabs.reload');
+  const handleIdx = block.indexOf('FsbTriggerLifecycle.handleTriggerAlarm');
+
+  check(/const\s+fsbTriggerRefreshPollTabLocks\s*=\s*new\s+Map\s*\(\s*\)/.test(src),
+    'Q.1 refresh-poll tab lock map exists');
+  check(/function\s+fsbTriggerCollectDueRefreshPollSnapshots\s*\(/.test(src),
+    'Q.2 due snapshot collector helper exists');
+  check(/async\s+function\s+fsbTriggerRunRefreshPollTabBatch\s*\(/.test(src),
+    'Q.3 tab batch helper exists');
+  check(/fsbTriggerRefreshPollTabLocks\.get/.test(block) && /fsbTriggerRefreshPollTabLocks\.set/.test(block),
+    'Q.4 batch helper joins and records in-flight per-tab work');
+  check(validateIdx >= 0 && reloadIdx >= 0 && validateIdx < reloadIdx,
+    'Q.5 batch ownership validation appears before shared tab reload');
+  check(/chrome\.tabs\.reload\s*\(\s*tabId\s*\)/.test(block),
+    'Q.6 batch reload remains explicit by tabId');
+  check(handleIdx >= 0,
+    'Q.7 batch path preserves per-trigger lifecycle evaluation');
+}
+
 async function caseOwnershipSourceGuards() {
   console.log('\n--- Case I: refresh-poll ownership source guards ---');
   const src = readSource(BACKGROUND_PATH);
@@ -528,6 +895,10 @@ async function caseAlarmBranchSourceGuards() {
   await caseRestoreUsesPersistedNextPoll();
   await caseRestoreRecomputesUnsafeNextPoll();
   await caseJitterAndDeadlineFloor();
+  await caseRefreshPollSameTabBatchCoalesces();
+  await caseRefreshPollOtherTabsReloadIndependently();
+  await caseRefreshPollBatchPreservesAttentionAndPulseGuards();
+  await caseRefreshPollCoalescingSourceGuards();
   await caseOwnershipSourceGuards();
   await caseRefreshPollRunSourceGuards();
   await caseBlockedPageSourceGuards();
