@@ -15166,7 +15166,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
           && fsbWebSocket
           && fsbWebSocket.connected
           && typeof fsbWebSocket.send === 'function') {
-        fsbWebSocket.send('ext:request-snapshot', {
+        var streamTypes = (globalThis.FSBPhantomStreamProtocol && globalThis.FSBPhantomStreamProtocol.STREAM)
+          ? globalThis.FSBPhantomStreamProtocol.STREAM
+          : {};
+        fsbWebSocket.send(streamTypes.REQUEST_SNAPSHOT || 'ext:request-snapshot', {
           reason: 'sw-watchdog-tick',
           ts: Date.now()
         });

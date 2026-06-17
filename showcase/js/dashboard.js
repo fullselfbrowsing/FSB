@@ -3916,6 +3916,13 @@
       return;
     }
 
+    if (msg.type === 'ext:request-snapshot') {
+      if (previewState !== 'frozen-complete') {
+        requestPreviewResync((msg.payload && msg.payload.reason) || 'request-snapshot', msg.payload || {});
+      }
+      return;
+    }
+
     if (msg.type === 'ext:metrics') { renderMetrics(msg.payload || {}); return; }
 
     if (msg.type === 'ext:remote-control-state') {

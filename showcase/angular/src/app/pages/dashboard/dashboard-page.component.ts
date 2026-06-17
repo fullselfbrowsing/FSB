@@ -3597,6 +3597,12 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (msg.type === 'ext:dom-overlay') { this.handleDOMOverlay(msg.payload); return; }
     if (msg.type === 'ext:dom-dialog') { this.handleDOMDialog(msg.payload); return; }
     if (msg.type === 'ext:stream-state') { this.handleRecoveredStreamState(msg.payload || {}); return; }
+    if (msg.type === 'ext:request-snapshot') {
+      if (this.previewState !== 'frozen-complete') {
+        this.requestPreviewResync(msg.payload?.reason || 'request-snapshot', msg.payload || {});
+      }
+      return;
+    }
     if (msg.type === 'ext:remote-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }
     if (msg.type === 'ext:metrics') { this.renderMetrics(msg.payload || {}); return; }
 

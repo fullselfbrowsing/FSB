@@ -66,8 +66,9 @@ const wsSource = fs.readFileSync(
   path.join(repoRoot, 'extension', 'ws', 'ws-client.js'),
   'utf8'
 );
-assert(/this\.send\('ext:stream-state',[\s\S]*?staleFlushCount[\s\S]*?\}\)/.test(wsSource),
-  'staleFlushCount field appears inside this.send(ext:stream-state, { ... }) block');
+assert(/var streamTypes = getFSBStreamTypes\(\);[\s\S]*?this\.send\(streamTypes\.STATE,[\s\S]*?staleFlushCount[\s\S]*?\}\)/.test(wsSource),
+  'staleFlushCount field appears inside this.send(streamTypes.STATE, { ... }) block');
+assert(wsSource.includes("REQUEST_SNAPSHOT: 'ext:request-snapshot'"), 'request-snapshot stream constant fallback present');
 assert(wsSource.includes('_lastDomStreamStaleFlushCount'), 'ws-client reads SW-side cache');
 console.log('  PASS: ws-client _emitStreamState invariants present');
 
