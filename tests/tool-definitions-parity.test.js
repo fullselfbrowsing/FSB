@@ -149,6 +149,20 @@ TRIGGER_TOOL_NAMES.forEach(function(name) {
 const triggerTool = td.getToolByName('trigger');
 check(!!triggerTool && triggerTool._readOnly === false,
   'trigger is side-effecting (_readOnly: false)');
+if (triggerTool) {
+  const triggerProps = (triggerTool.inputSchema && triggerTool.inputSchema.properties) || {};
+  ['trigger_id', 'detached', 'timeout_ms', 'safety_ceiling_ms', 'rearm_on_fire'].forEach(function(field) {
+    check(!!triggerProps[field], 'trigger schema includes additive reporting field ' + field);
+  });
+  check((triggerTool.inputSchema.required || []).indexOf('selector') >= 0,
+    'trigger schema still requires selector');
+  check((triggerTool.inputSchema.required || []).indexOf('condition') >= 0,
+    'trigger schema still requires condition');
+  check((triggerTool.inputSchema.required || []).indexOf('detached') < 0,
+    'trigger schema detached field is optional');
+  check((triggerTool.inputSchema.required || []).indexOf('timeout_ms') < 0,
+    'trigger schema timeout_ms field is optional');
+}
 TRIGGER_COMPANION_TOOL_NAMES.forEach(function(name) {
   const tool = td.getToolByName(name);
   check(!!tool && tool._readOnly === true,

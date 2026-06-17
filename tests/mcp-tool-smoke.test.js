@@ -282,6 +282,9 @@ async function run() {
     target_tab_id: 77,
     watch: 'live-observe',
   });
+  const triggerPayload = triggerCall && triggerCall.message && triggerCall.message.payload;
+  assert(typeof triggerPayload.trigger_id === 'string' && triggerPayload.trigger_id.length > 0,
+    'trigger pre-generates trigger_id for blocking correlation');
   assertDeepEqual(
     triggerCall && triggerCall.message,
     {
@@ -291,16 +294,49 @@ async function run() {
         condition: { kind: 'changed' },
         target_tab_id: 77,
         watch: 'live-observe',
+        trigger_id: triggerPayload.trigger_id,
         agentId: 'agent_test_smoke',
         ownershipToken: 'token_tab_77',
       },
     },
-    'trigger routes through mcp:trigger with registry params, agentId, and tab-specific ownership token',
+    'trigger routes through mcp:trigger with registry params, generated trigger_id, agentId, and tab-specific ownership token',
+  );
+  assert(triggerCall && triggerCall.options && triggerCall.options.timeout > 240_000,
+    'blocking trigger uses bridge timeout above the 240s safety ceiling');
+  assert(triggerCall && triggerCall.options && typeof triggerCall.options.onProgress === 'function',
+    'blocking trigger installs onProgress handler for heartbeats');
+
+  const detachedTriggerCall = await invokeTool(harness, 'trigger', {
+    selector: '#price',
+    condition: { kind: 'changed' },
+    target_tab_id: 77,
+    watch: 'live-observe',
+    detached: true,
+  });
+  const detachedPayload = detachedTriggerCall && detachedTriggerCall.message && detachedTriggerCall.message.payload;
+  assert(typeof detachedPayload.trigger_id === 'string' && detachedPayload.trigger_id.length > 0,
+    'detached trigger also pre-generates trigger_id');
+  assertDeepEqual(
+    detachedTriggerCall && detachedTriggerCall.message,
+    {
+      type: 'mcp:trigger',
+      payload: {
+        selector: '#price',
+        condition: { kind: 'changed' },
+        target_tab_id: 77,
+        watch: 'live-observe',
+        detached: true,
+        trigger_id: detachedPayload.trigger_id,
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_tab_77',
+      },
+    },
+    'detached trigger routes through mcp:trigger with generated trigger_id and detached flag',
   );
   assertDeepEqual(
-    triggerCall && triggerCall.options,
+    detachedTriggerCall && detachedTriggerCall.options,
     { timeout: 30_000, onProgress: undefined },
-    'trigger uses bounded 30s bridge timeout',
+    'detached trigger keeps bounded 30s bridge timeout and no progress handler',
   );
 
   const stopTriggerCall = await invokeTool(harness, 'stop_trigger', { trigger_id: 'trg_smoke', tab_id: 77 });

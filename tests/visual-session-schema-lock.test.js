@@ -138,6 +138,12 @@ if (triggerTool) {
     'trigger inputSchema.properties does NOT contain client');
   check(!triggerProps.is_final,
     'trigger inputSchema.properties does NOT contain is_final');
+  ['trigger_id', 'detached', 'timeout_ms', 'safety_ceiling_ms', 'rearm_on_fire'].forEach((field) => {
+    check(!!triggerProps[field],
+      'trigger inputSchema.properties contains additive reporting field ' + field);
+  });
+  check(!((triggerTool.inputSchema.required || []).includes('detached')),
+    'trigger detached reporting mode is OPTIONAL');
 }
 
 // getReadOnlyTools() count = 18
