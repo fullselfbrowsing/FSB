@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 20-04-PLAN.md
-last_updated: "2026-06-17T04:23:01.299Z"
+status: ready_for_milestone_close
+stopped_at: Completed 20-05-PLAN.md
+last_updated: "2026-06-17T04:32:06.070Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 26
-  completed_plans: 27
+  completed_plans: 26
   percent: 100
 ---
 
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 20 — Integration, Cap UI, Docs & Edge Cases
+**Current focus:** Phase 20 — complete from automated release-readiness gates; human/browser UAT remains explicit debt.
 
 ## Current Position
 
-Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
+Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — COMPLETE
+Plan: 5 of 5 complete
+Status: Ready for milestone close or user-gated release action decision; human/browser UAT remains `human_needed`
 Last activity: 2026-06-17
 
-Progress: [███████···] 75% (6/8 phases)
+Progress: [██████████] 100% (7/7 milestone phases)
 
 ## Roadmap At A Glance (v0.11.0)
 
@@ -46,7 +46,7 @@ Progress: [███████···] 75% (6/8 phases)
 | 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | Complete |
 | 18 | Shared Tool Registry & Dispatcher Wiring | TRIG-01, REG-01..04, LIFE-01..03 (8) | Complete |
 | 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Complete |
-| 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Ready to plan |
+| 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Complete; human_needed UAT debt |
 
 Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
@@ -54,7 +54,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 21 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4, Phase 19: 3)
+- Total plans completed (this milestone): 26 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4, Phase 19: 3, Phase 20: 5)
 - Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
 
 **By Phase:**
@@ -66,6 +66,8 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | 16 | 4 | 12min | 3min |
 | 17 | 4 | - | - |
 | 18 | 4 | - | - |
+| 19 | 3 | 47min | 16min |
+| 20 | 5 | 106min | 21min |
 
 *Updated after each plan completion.*
 | Phase 14 P01 | 5min | 2 tasks | 4 files |
@@ -93,6 +95,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 20 P02 | 13 min | 3 tasks | 2 files |
 | Phase 20 P03 | 29 min | 3 tasks | 2 files |
 | Phase 20 P04 | 24 min | 3 tasks | 10 files |
+| Phase 20 P05 | 18 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -151,6 +154,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 20]: Refresh-poll batches still validate ownership and blocked-page state before reload, then re-read each snapshot before per-trigger lifecycle evaluation.
 - [Phase 20]: MCP release metadata, generated build version, server registry metadata, lockfile root metadata, and parity target now agree on 0.10.0.
 - [Phase 20]: Trigger Watchers docs describe local browser-open notify-only behavior and explicitly exclude push delivery, server monitoring, and auto-act workflows.
+- [Phase 20]: Phase 20 final automated release-readiness gates passed; live browser UAT remains human_needed and is recorded without fabricated proof. — 20-HUMAN-UAT.md carries Phase 16 and Phase 20 browser scenarios as human_needed, while 20-RELEASE-READINESS.md records the full automated gate set.
+- [Phase 20]: Release actions for fsb-mcp-server@0.10.0 remain user-gated and were not run. — npm publish, git tag creation/push, branch push, ClawHub publish, and public package publication require explicit user instruction.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -186,8 +191,9 @@ Items acknowledged and deferred at v0.10.0 milestone close on 2026-06-15 (Chrome
 | verification_gap | Phase 11 / 11-VERIFICATION.md | human_needed | v0.10.0 close |
 | verification_gap | Phase 12 / 12-VERIFICATION.md | human_needed | v0.10.0 close |
 | uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 Phase 16 close |
+| uat_gap | Phase 20 / 20-HUMAN-UAT.md | human_needed; 12 live-browser/composed trigger scenarios | v0.11.0 Phase 20 close |
 
-Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0; `clawhub publish "skills/FSB Skill"`; 4 live-OpenClaw runtime UAT items.
+Carry-forward publish/tag gates (pre-existing and current, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items.
 
 ## Lattice Integration State (carried, INV-06)
 
@@ -195,10 +201,10 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T04:23:01.296Z
-Stopped at: Completed 20-04-PLAN.md
-Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-05-PLAN.md
+Last session: 2026-06-17T04:32:06.067Z
+Stopped at: Completed 20-05-PLAN.md
+Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-05-SUMMARY.md
 
 ## Next Actions
 
-Plan Phase 20: integration, trigger-cap UI, docs, version prep, watch-mode conflict/coalescing, and live-browser UAT capture.
+Run milestone close/audit for v0.11.0, or execute the human browser UAT in `.planning/phases/20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md`. Release actions remain user-gated and have not been run.
