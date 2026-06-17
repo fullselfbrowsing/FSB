@@ -574,14 +574,16 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 15 Plan 15-03: 159 mentions (+2 new lines for utils/value-extractor.js +
   // utils/trigger-manager.js -- the fire-condition engine; load order
   // value-extractor -> trigger-store -> trigger-manager -> trigger-lifecycle).
+  // Phase 24 Plan 24-01: 160 mentions (+1 new line for ws/phantom-stream-protocol.js).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 159, 'background.js importScripts count = 159 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 for utils/value-extractor.js & utils/trigger-manager.js)');
+  passAssertEqual(importScriptsCount, 160, 'background.js importScripts count = 160 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 + Phase 24 +1 for ws/phantom-stream-protocol.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
-  // (value-extractor + trigger-manager) -> 156.
+  // (value-extractor + trigger-manager) -> 156; Phase 24 adds 1
+  // (phantom-stream-protocol) -> 157.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 156, 'background.js importScripts() call sites = 156 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 for value-extractor.js & trigger-manager.js)');
+  passAssertEqual(importScriptsCallSites, 157, 'background.js importScripts() call sites = 157 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 + Phase 24 +1 for phantom-stream-protocol.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

@@ -22,7 +22,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - [x] **Phase 22: Capture Adapter Migration** — Replace in-house content-side snapshot/diff capture with a thin adapter around PhantomStream capture primitives.
 - [x] **Phase 23: Dashboard Renderer Migration** — Replace static and Angular dashboard diff/render logic with PhantomStream renderer-backed behavior while preserving the current preview state machine.
 - [x] **Phase 24: Transport, Relay & Remote Control Integration** — Align WebSocket envelopes, relay behavior, stream recovery, and reverse remote-control mapping with PhantomStream-compatible protocol helpers.
-- [ ] **Phase 25: Parity Removal, Docs & Browser UAT** — Remove duplicated in-house engines, update docs/tests, and close with automated plus live-browser stream verification.
+- [x] **Phase 25: Parity Removal, Docs & Browser UAT** — Remove duplicated in-house engines, update docs/tests, and close with automated plus live-browser stream verification.
 
 ## Phase Details
 
@@ -98,7 +98,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - [x] 25-01-PLAN.md — Remove duplicated in-house stream engines and dead code.
 - [x] 25-02-PLAN.md — Differential parity and security regression suite.
 - [x] 25-03-PLAN.md — Documentation, provenance, package pin record, and release notes.
-- [ ] 25-04-PLAN.md — Final automated gates plus browser UAT evidence.
+- [x] 25-04-PLAN.md — Final automated gates plus browser UAT evidence.
 
 ## Progress (v0.12.0)
 
@@ -111,7 +111,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 23. Dashboard Renderer Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 3/4 | In Progress | - |
+| 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 
 ## Research Flags (v0.12.0)
 
