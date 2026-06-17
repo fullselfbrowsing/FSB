@@ -37,6 +37,10 @@ const requiredSmokeTools = [
   'end_visual_session',
   'run_task',
   'stop_task',
+  'trigger',
+  'stop_trigger',
+  'get_trigger_status',
+  'list_triggers',
   'get_logs',
   'back',
 ];
@@ -70,6 +74,7 @@ async function run() {
   const manualModule = await loadBuildModule(pathJoin('tools', 'manual.js'));
   const visualSessionModule = await loadBuildModule(pathJoin('tools', 'visual-session.js'));
   const autopilotModule = await loadBuildModule(pathJoin('tools', 'autopilot.js'));
+  const triggersModule = await loadBuildModule(pathJoin('tools', 'triggers.js'));
   const observabilityModule = await loadBuildModule(pathJoin('tools', 'observability.js'));
   // Phase 242 plan 02: agents.ts now exposes the 'back' tool (Plan 01 D-01).
   // Loading the module here lets the smoke test register the back handler
@@ -83,6 +88,7 @@ async function run() {
   assert(typeof manualModule.registerManualTools === 'function', 'build/tools/manual.js exports registerManualTools');
   assert(typeof visualSessionModule.registerVisualSessionTools === 'function', 'build/tools/visual-session.js exports registerVisualSessionTools');
   assert(typeof autopilotModule.registerAutopilotTools === 'function', 'build/tools/autopilot.js exports registerAutopilotTools');
+  assert(typeof triggersModule.registerTriggerTools === 'function', 'build/tools/triggers.js exports registerTriggerTools');
   assert(typeof observabilityModule.registerObservabilityTools === 'function', 'build/tools/observability.js exports registerObservabilityTools');
   assert(typeof agentsModule.registerAgentTools === 'function', 'build/tools/agents.js exports registerAgentTools');
 
@@ -107,6 +113,10 @@ async function run() {
       }),
       'mcp:start-automation': { success: true, sessionId: 'smoke-session', status: 'started' },
       'mcp:stop-automation': { success: true, stopped: true },
+      'mcp:trigger': ({ payload }) => ({ success: true, trigger_id: 'trg_smoke', status: 'armed', owner: payload.agentId }),
+      'mcp:stop-trigger': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, stopped: true }),
+      'mcp:get-trigger-status': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, status: 'armed' }),
+      'mcp:list-triggers': { success: true, triggers: [] },
       'mcp:get-logs': { success: true, logs: [] },
     },
   });
@@ -118,6 +128,7 @@ async function run() {
   readOnlyModule.registerReadOnlyTools(harness.server, harness.bridge, harness.queue, agentScope);
   manualModule.registerManualTools(harness.server, harness.bridge, harness.queue, agentScope);
   visualSessionModule.registerVisualSessionTools(harness.server, harness.bridge, harness.queue, agentScope);
+  triggersModule.registerTriggerTools(harness.server, harness.bridge, harness.queue, agentScope);
   autopilotModule.registerAutopilotTools(harness.server, harness.bridge, harness.queue, agentScope);
   observabilityModule.registerObservabilityTools(harness.server, harness.bridge, harness.queue, agentScope);
   // Phase 242 D-01: registerAgentTools registers the 'back' MCP tool. Loaded
@@ -246,6 +257,93 @@ async function run() {
     'stop_task routes through mcp:stop-automation with agentId payload (Phase 238 includes agentId; Phase 240 strengthens with ownershipToken)',
   );
 
+  const triggerCall = await invokeTool(harness, 'trigger', {
+    selector: '#price',
+    condition: { kind: 'changed' },
+    target_tab_id: 77,
+    watch: 'live-observe',
+  });
+  assertDeepEqual(
+    triggerCall && triggerCall.message,
+    {
+      type: 'mcp:trigger',
+      payload: {
+        selector: '#price',
+        condition: { kind: 'changed' },
+        target_tab_id: 77,
+        watch: 'live-observe',
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_tab_77',
+      },
+    },
+    'trigger routes through mcp:trigger with registry params, agentId, and tab-specific ownership token',
+  );
+  assertDeepEqual(
+    triggerCall && triggerCall.options,
+    { timeout: 30_000, onProgress: undefined },
+    'trigger uses bounded 30s bridge timeout',
+  );
+
+  const stopTriggerCall = await invokeTool(harness, 'stop_trigger', { trigger_id: 'trg_smoke', tab_id: 77 });
+  assertDeepEqual(
+    stopTriggerCall && stopTriggerCall.message,
+    {
+      type: 'mcp:stop-trigger',
+      payload: {
+        trigger_id: 'trg_smoke',
+        tab_id: 77,
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_tab_77',
+      },
+    },
+    'stop_trigger routes through mcp:stop-trigger with agentId and ownership token',
+  );
+  assertDeepEqual(
+    stopTriggerCall && stopTriggerCall.options,
+    { timeout: 10_000, onProgress: undefined },
+    'stop_trigger uses bounded 10s bridge timeout',
+  );
+
+  const getTriggerStatusCall = await invokeTool(harness, 'get_trigger_status', { trigger_id: 'trg_smoke', tab_id: 77 });
+  assertDeepEqual(
+    getTriggerStatusCall && getTriggerStatusCall.message,
+    {
+      type: 'mcp:get-trigger-status',
+      payload: {
+        trigger_id: 'trg_smoke',
+        tab_id: 77,
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_tab_77',
+      },
+    },
+    'get_trigger_status routes through mcp:get-trigger-status with agentId and ownership token',
+  );
+  assertDeepEqual(
+    getTriggerStatusCall && getTriggerStatusCall.options,
+    { timeout: 5_000, onProgress: undefined },
+    'get_trigger_status uses bounded 5s bridge timeout',
+  );
+
+  const listTriggersCall = await invokeTool(harness, 'list_triggers', { status: 'armed', tab_id: 77 });
+  assertDeepEqual(
+    listTriggersCall && listTriggersCall.message,
+    {
+      type: 'mcp:list-triggers',
+      payload: {
+        status: 'armed',
+        tab_id: 77,
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_tab_77',
+      },
+    },
+    'list_triggers routes through mcp:list-triggers with agentId and ownership token',
+  );
+  assertDeepEqual(
+    listTriggersCall && listTriggersCall.options,
+    { timeout: 5_000, onProgress: undefined },
+    'list_triggers uses bounded 5s bridge timeout',
+  );
+
   const getLogsCall = await invokeTool(harness, 'get_logs', { sessionId: 'smoke-session', count: 10 });
   assertDeepEqual(
     getLogsCall && getLogsCall.message,
@@ -309,11 +407,15 @@ async function run() {
   // mcp/src/tools/visual-session.ts). They are excluded from queue coverage
   // alongside stop_task (which stays direct so cancellation does not wait
   // behind queued work).
-  const DIRECT_TOOLS = new Set(['stop_task', 'start_visual_session', 'end_visual_session']);
+  const DIRECT_TOOLS = new Set(['stop_task', 'start_visual_session', 'end_visual_session', 'trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers']);
   for (const toolName of requiredSmokeTools.filter((name) => !DIRECT_TOOLS.has(name))) {
     assert(harness.queueCalls.includes(toolName), `${toolName} passes through the shared queue surface`);
   }
   assert(!harness.queueCalls.includes('stop_task'), 'stop_task stays direct so cancellation does not wait behind queued work');
+  assert(!harness.queueCalls.includes('trigger'), 'trigger dispatches directly from the trigger registrar');
+  assert(!harness.queueCalls.includes('stop_trigger'), 'stop_trigger dispatches directly so cancellation does not wait behind queued work');
+  assert(!harness.queueCalls.includes('get_trigger_status'), 'get_trigger_status dispatches directly so status does not wait behind queued work');
+  assert(!harness.queueCalls.includes('list_triggers'), 'list_triggers dispatches directly so listing does not wait behind queued work');
   assert(!harness.queueCalls.includes('start_visual_session'), 'start_visual_session is a TOOL_REMOVED stub and does not enqueue');
   assert(!harness.queueCalls.includes('end_visual_session'), 'end_visual_session is a TOOL_REMOVED stub and does not enqueue');
 
