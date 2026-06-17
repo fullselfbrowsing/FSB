@@ -54,6 +54,7 @@ const fs = require('fs');
 
 const REPO_ROOT = __dirname;
 const SRC_ROOT = path.join(REPO_ROOT, 'extension');
+const SHOWCASE_ROOT = path.join(REPO_ROOT, 'showcase');
 const OUT_ROOT = path.join(REPO_ROOT, 'extension', 'dist');
 
 /**
@@ -173,6 +174,18 @@ const ENTRIES = [
     name: 'content-phantom-stream-capture',
     entryPoints: [path.join(SRC_ROOT, 'content', 'phantom-stream-capture-entry.js')],
     outfile: path.join(SRC_ROOT, 'content', 'phantom-stream-capture.js'),
+    format: 'iife',
+    sourcemap: false,
+    platform: 'browser',
+    target: ['chrome120'],
+    bundle: true,
+    legalComments: 'none',
+    allowOverwrite: true,
+  },
+  {
+    name: 'showcase-phantom-stream-viewer',
+    entryPoints: [path.join(SHOWCASE_ROOT, 'js', 'phantom-stream-viewer-entry.js')],
+    outfile: path.join(SHOWCASE_ROOT, 'js', 'phantom-stream-viewer.js'),
     format: 'iife',
     sourcemap: false,
     platform: 'browser',

@@ -65,7 +65,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
   3. Preview states remain unchanged: loading, streaming, paused, disconnected, restricted, frozen-disconnect, frozen-complete, and error.
   4. Layout modes, iframe sandboxing, scaling, stale-message rejection, resync, overlays, progress/client badge, dialogs, and diagnostic tooltip counters still work.
 **Plans**: 4 plans
-- [ ] 23-01-PLAN.md — Shared dashboard viewer wrapper around PhantomStream renderer.
+- [x] 23-01-PLAN.md — Shared dashboard viewer wrapper around PhantomStream renderer.
 - [ ] 23-02-PLAN.md — Static dashboard migration and renderer behavior tests.
 - [ ] 23-03-PLAN.md — Angular dashboard migration and parity/source-contract tests.
 - [ ] 23-04-PLAN.md — Side-channel UI, frozen states, diagnostics, and visual regression smoke.
@@ -109,7 +109,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 |-------|-----------|----------------|--------|-----------|
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | In Progress | - |
+| 23. Dashboard Renderer Migration | v0.12.0 | 1/4 | In Progress | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
 
