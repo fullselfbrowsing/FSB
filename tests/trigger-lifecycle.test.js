@@ -786,6 +786,50 @@ async function caseT() {
 }
 
 // ------------------------------------------------------------------
+// Case V: Phase 19 fire-event persistence -- the fired terminal snapshot
+//         includes the flat notify-only event in the same write-back.
+// ------------------------------------------------------------------
+
+async function caseV() {
+  console.log('\n--- Case V: Phase 19 fired snapshot persists flat last_event ---');
+  const { store, lc } = setupSeamHarness();
+
+  const startedAt = Date.now();
+  await store.writeSnapshot('trg_fire_event', makeSnapshot({
+    trigger_id: 'trg_fire_event',
+    status: 'armed',
+    watch: 'live-observe',
+    condition: { kind: 'changed' },
+    baseline: 'before',
+    last_value: 'before',
+    reported_value: 'after',
+    reported_url: 'https://example.test/item/42',
+    target_tab_id: 77,
+    was_satisfied: false,
+    fired_at: null,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_fire_event' });
+  check(r && r.ok === true && r.action === 'fired', 'V.1 reported value fires through real manager');
+
+  const after = await store.readSnapshot('trg_fire_event');
+  const event = after && after.last_event;
+  check(after && after.status === 'fired', 'V.2 status:fired persisted');
+  check(event && event.trigger_id === 'trg_fire_event', 'V.3 last_event trigger_id persisted');
+  check(event && event.matched_condition && event.matched_condition.kind === 'changed', 'V.4 matched_condition persisted');
+  check(event && event.old_value === 'before', 'V.5 old_value persisted');
+  check(event && event.new_value === 'after', 'V.6 new_value persisted');
+  check(event && event.url === 'https://example.test/item/42', 'V.7 reported URL persisted');
+  check(event && typeof event.timestamp === 'number' && event.timestamp >= startedAt, 'V.8 timestamp persisted');
+  check(event && event.target_tab_id === 77, 'V.9 target_tab_id persisted');
+  check(event && event.watch === 'live-observe', 'V.10 watch persisted');
+  check(after && after.last_fire_event && after.last_fire_event.url === event.url, 'V.11 last_fire_event alias persisted');
+  check(after && after.fire_count === 1, 'V.12 fire_count increments to 1');
+  check(after && typeof after.last_fired_at === 'number', 'V.13 last_fired_at stamped');
+}
+
+// ------------------------------------------------------------------
 // Case U: background.js Phase 16 source invariants for value-report ingress.
 // ------------------------------------------------------------------
 
@@ -843,6 +887,7 @@ function caseU() {
   await caseR();
   await caseS();
   await caseT();
+  await caseV();
   caseU();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');

@@ -3729,11 +3729,12 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
   }
 
   let readResult;
+  let postReloadTab = null;
   try {
     await chrome.tabs.reload(tabId);
     await fsbTriggerWaitForRefreshPollReady(tabId);
 
-    const postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+    postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
     if (postReloadTab && postReloadTab.blocked) {
       return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
         fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
@@ -3769,6 +3770,15 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
     : snap.last_value;
   const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
   if (attrs) snap.reported_attributes = attrs;
+  const reportedUrl = fsbTriggerFirstString(
+    readResult && readResult.url,
+    readResult && readResult.current_url,
+    postReloadTab && postReloadTab.url,
+    preReloadTab && preReloadTab.url,
+    snap.reported_url,
+    snap.url
+  );
+  if (reportedUrl) snap.reported_url = reportedUrl;
   snap.last_reported_at = now;
   await FsbTriggerStore.writeSnapshot(triggerId, snap);
 
@@ -3875,6 +3885,15 @@ async function fsbTriggerHandleValueReport(request, sender) {
     : snap.last_value;
   const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
   if (attrs) snap.reported_attributes = attrs;
+  const reportedUrl = fsbTriggerFirstString(
+    request && request.url,
+    request && request.current_url,
+    request && request.href,
+    sender && sender.tab && sender.tab.url,
+    snap.reported_url,
+    snap.url
+  );
+  if (reportedUrl) snap.reported_url = reportedUrl;
   snap.last_reported_at = now;
   await FsbTriggerStore.writeSnapshot(triggerId, snap);
 
@@ -4116,17 +4135,31 @@ function fsbTriggerProjectCurrentValue(snap) {
   return snap.baseline !== undefined ? snap.baseline : null;
 }
 
+function fsbTriggerProjectLastEvent(snap) {
+  if (!snap || typeof snap !== 'object') return null;
+  return snap.last_event || snap.last_fire_event || null;
+}
+
+function fsbTriggerProjectFireCount(snap) {
+  const count = Number(snap && snap.fire_count);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
 function fsbTriggerProjectTriggerStatus(snap, now) {
   const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   return {
     trigger_id: snap && snap.trigger_id,
     status: snap && snap.status,
+    outcome: snap && (snap.outcome || snap.status || null),
     watch: snap && (snap.watch || snap.mode || null),
     condition: snap && snap.condition,
     target_tab_id: snap && snap.target_tab_id,
     agent_id: fsbTriggerReadSnapshotAgentId(snap),
     initial_value: snap && snap.baseline !== undefined ? snap.baseline : null,
     current_value: fsbTriggerProjectCurrentValue(snap),
+    last_event: fsbTriggerProjectLastEvent(snap),
+    fire_count: fsbTriggerProjectFireCount(snap),
+    last_fired_at: snap && snap.last_fired_at,
     armed_at: snap && snap.armed_at,
     elapsed_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
     remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
@@ -4142,11 +4175,15 @@ function fsbTriggerProjectTriggerSummary(snap, now) {
   return {
     trigger_id: snap && snap.trigger_id,
     status: snap && snap.status,
+    outcome: snap && (snap.outcome || snap.status || null),
     watch: snap && (snap.watch || snap.mode || null),
     agent_id: fsbTriggerReadSnapshotAgentId(snap),
     target_tab_id: snap && snap.target_tab_id,
     age_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
     remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
+    last_event: fsbTriggerProjectLastEvent(snap),
+    fire_count: fsbTriggerProjectFireCount(snap),
+    last_fired_at: snap && snap.last_fired_at,
     last_evaluated_at: snap && snap.last_evaluated_at,
     last_reported_at: snap && snap.last_reported_at,
     attention_reason: snap && snap.attention_reason

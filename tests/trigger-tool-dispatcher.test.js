@@ -326,6 +326,40 @@ async function caseStatusProjectionMath() {
   assert.strictEqual(status.remaining_ms, 2500, 'remaining_ms derived from deadline_at');
 }
 
+async function caseFiredProjectionIncludesEventOutcome() {
+  const handlers = loadToolHandlers();
+  const lastEvent = {
+    trigger_id: 'trg_fired',
+    matched_condition: { kind: 'changed' },
+    old_value: 'before',
+    new_value: 'after',
+    url: 'https://example.test/item/42',
+    timestamp: 2400,
+    target_tab_id: 42,
+    watch: 'live-observe'
+  };
+  const snap = makeSnapshot({
+    trigger_id: 'trg_fired',
+    status: 'fired',
+    outcome: 'fired',
+    last_event: lastEvent,
+    fire_count: 1,
+    last_fired_at: 2400
+  });
+
+  const status = handlers.fsbTriggerProjectTriggerStatus(snap, 3000);
+  assert.strictEqual(status.outcome, 'fired', 'status projection includes fired outcome');
+  assert.deepStrictEqual(status.last_event, lastEvent, 'status projection includes last_event');
+  assert.strictEqual(status.fire_count, 1, 'status projection includes fire_count');
+  assert.strictEqual(status.last_fired_at, 2400, 'status projection includes last_fired_at');
+
+  const summary = handlers.fsbTriggerProjectTriggerSummary(snap, 3000);
+  assert.strictEqual(summary.outcome, 'fired', 'list summary includes fired outcome');
+  assert.deepStrictEqual(summary.last_event, lastEvent, 'list summary includes last_event');
+  assert.strictEqual(summary.fire_count, 1, 'list summary includes fire_count');
+  assert.strictEqual(summary.last_fired_at, 2400, 'list summary includes last_fired_at');
+}
+
 async function caseListDefaultsToActiveAttentionStates() {
   const records = {
     active: makeSnapshot({ trigger_id: 'active', status: 'armed' }),
@@ -764,6 +798,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
   await runCase('status projection derives elapsed and remaining time', caseStatusProjectionMath);
+  await runCase('fired status/list projection includes event outcome', caseFiredProjectionIncludesEventOutcome);
   await runCase('list defaults to armed and attention states', caseListDefaultsToActiveAttentionStates);
   await runCase('cross-agent status is rejected without snapshot data', caseCrossAgentStatusRejected);
   await runCase('missing stop returns idempotent success', caseStopMissingIsIdempotent);

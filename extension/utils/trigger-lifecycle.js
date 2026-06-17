@@ -310,6 +310,19 @@
     return { ok: true, cleared: true };
   }
 
+  var _buildFireEvent = function buildTriggerFireEvent(triggerId, snap, outcome, now) {
+    return {
+      trigger_id: triggerId,
+      matched_condition: outcome && outcome.matched_condition ? outcome.matched_condition : null,
+      old_value: outcome && outcome.old_value !== undefined ? outcome.old_value : null,
+      new_value: outcome && outcome.new_value !== undefined ? outcome.new_value : null,
+      url: (snap && (snap.reported_url || snap.url)) || null,
+      timestamp: now,
+      target_tab_id: snap && snap.target_tab_id,
+      watch: (snap && (snap.watch || snap.mode)) || null
+    };
+  };
+
   // ---- Idempotent tick handler (SURV-02 / D-09) ---------------------------
 
   /**
@@ -430,8 +443,15 @@
     if (outcome.outcome === 'fired') {
       // ATOMIC terminal write-back: stamp the terminal status + fire time, fold in
       // the edge-state patch, then persist in a single writeSnapshot, then disarm.
+      var event = _buildFireEvent(triggerId, snap, outcome, now);
+      var priorFireCount = Number(snap.fire_count || 0);
       snap.status = 'fired';
+      snap.outcome = 'fired';
       snap.fired_at = now;
+      snap.last_event = event;
+      snap.last_fire_event = event;
+      snap.fire_count = (Number.isFinite(priorFireCount) ? priorFireCount : 0) + 1;
+      snap.last_fired_at = now;
       if (nextState.last_value !== undefined) snap.last_value = nextState.last_value;
       if (nextState.was_satisfied !== undefined) snap.was_satisfied = nextState.was_satisfied;
       if (nextState.last_evaluated_at !== undefined) snap.last_evaluated_at = nextState.last_evaluated_at;
