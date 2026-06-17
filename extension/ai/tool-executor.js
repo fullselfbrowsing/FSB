@@ -59,6 +59,11 @@ function buildAutopilotTriggerParams(params, tabId) {
   for (const field of ownershipFields) {
     delete cleaned[field];
   }
+  if (Object.prototype.hasOwnProperty.call(cleaned, 'targetTabId')
+      && !Object.prototype.hasOwnProperty.call(cleaned, 'target_tab_id')) {
+    cleaned.target_tab_id = cleaned.targetTabId;
+    delete cleaned.targetTabId;
+  }
   const hasTabAlias = tabAliasFields.some((field) => (
     Object.prototype.hasOwnProperty.call(cleaned, field)
   ));
