@@ -19,7 +19,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - Decimal phases remain reserved for urgent insertions.
 
 - [x] **Phase 21: Package Intake & Contract Mapping** — Verify/install the PhantomStream package or approved immutable source; map the current FSB stream contracts to package exports before replacing code.
-- [ ] **Phase 22: Capture Adapter Migration** — Replace in-house content-side snapshot/diff capture with a thin adapter around PhantomStream capture primitives.
+- [x] **Phase 22: Capture Adapter Migration** — Replace in-house content-side snapshot/diff capture with a thin adapter around PhantomStream capture primitives.
 - [ ] **Phase 23: Dashboard Renderer Migration** — Replace static and Angular dashboard diff/render logic with PhantomStream renderer-backed behavior while preserving the current preview state machine.
 - [ ] **Phase 24: Transport, Relay & Remote Control Integration** — Align WebSocket envelopes, relay behavior, stream recovery, and reverse remote-control mapping with PhantomStream-compatible protocol helpers.
 - [ ] **Phase 25: Parity Removal, Docs & Browser UAT** — Remove duplicated in-house engines, update docs/tests, and close with automated plus live-browser stream verification.
@@ -53,7 +53,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - [x] 22-01-PLAN.md — Build capture adapter seam and preserve content-script control-message contract.
 - [x] 22-02-PLAN.md — Port snapshot/diff/session/scroll behavior to PhantomStream capture primitives.
 - [x] 22-03-PLAN.md — Port overlay/dialog side channels and capture diagnostics/watchdogs.
-- [ ] 22-04-PLAN.md — Security/masking parity and capture test rewrite.
+- [x] 22-04-PLAN.md — Security/masking parity and capture test rewrite.
 
 ### Phase 23: Dashboard Renderer Migration
 **Goal**: Both dashboard surfaces render and update the live preview through PhantomStream renderer-backed behavior without drifting from today's state machine or side-channel UI.
@@ -108,7 +108,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
-| 22. Capture Adapter Migration | v0.12.0 | 3/4 | In Progress | - |
+| 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | Pending | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
