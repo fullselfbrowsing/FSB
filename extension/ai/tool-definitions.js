@@ -1226,6 +1226,26 @@ const TOOL_REGISTRY = [
           description: 'Trigger condition object validated by the trigger manager. Supported kinds include changed, threshold, delta_percent, equals, contains, regex, and compound AND/OR conditions.',
           additionalProperties: true
         },
+        trigger_id: {
+          type: 'string',
+          description: 'Optional caller-supplied trigger correlation id. MCP callers may omit it; the server generates one before arming.'
+        },
+        detached: {
+          type: 'boolean',
+          description: 'When true, arm and return trigger_id immediately instead of blocking.'
+        },
+        timeout_ms: {
+          type: 'number',
+          description: 'Blocking wait timeout in ms. Default 120000. Timeout returns timed_out.'
+        },
+        safety_ceiling_ms: {
+          type: 'number',
+          description: 'Maximum blocking wait before auto-detach. Default/max 240000.'
+        },
+        rearm_on_fire: {
+          type: 'boolean',
+          description: 'When true, keep watching after a fire and expose fire_count/last_event through status.'
+        },
         watch: {
           type: 'string',
           enum: ['live-observe', 'refresh-poll'],

@@ -281,6 +281,7 @@ async function run() {
     condition: { kind: 'changed' },
     target_tab_id: 77,
     watch: 'live-observe',
+    timeout_ms: 600_000,
   });
   const triggerPayload = triggerCall && triggerCall.message && triggerCall.message.payload;
   assert(typeof triggerPayload.trigger_id === 'string' && triggerPayload.trigger_id.length > 0,
@@ -294,6 +295,7 @@ async function run() {
         condition: { kind: 'changed' },
         target_tab_id: 77,
         watch: 'live-observe',
+        timeout_ms: 600_000,
         trigger_id: triggerPayload.trigger_id,
         agentId: 'agent_test_smoke',
         ownershipToken: 'token_tab_77',
