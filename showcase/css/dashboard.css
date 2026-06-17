@@ -1803,7 +1803,7 @@
   50% { box-shadow: 0 0 20px rgba(255, 140, 0, 0.6), 0 0 40px rgba(255, 140, 0, 0.3); border-color: rgba(255, 140, 0, 0.8); }
 }
 
-.dash-preview-iframe {
+.dash-preview-viewer {
   width: 100%;
   height: 100%;
   border: none;
@@ -2294,7 +2294,7 @@ body.dash-layout-maximized #dash-task-progress {
 .dash-preview:fullscreen {
   background: #000;
 }
-.dash-preview:fullscreen .dash-preview-iframe {
+.dash-preview:fullscreen .dash-preview-viewer {
   transform-origin: center center;
 }
 .dash-preview:fullscreen .dash-preview-header {

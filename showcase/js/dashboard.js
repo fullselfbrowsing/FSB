@@ -55,6 +55,8 @@
   var previewState = 'hidden'; // 'hidden' | 'loading' | 'streaming' | 'disconnected' | 'frozen-disconnect' | 'frozen-complete' | 'error'
   var previewLayoutMode = 'inline'; // 'inline' | 'maximized' | 'pip' | 'fullscreen'
   var previewScale = 1;
+  var previewViewer = null;
+  var previewViewerHealth = null;
   var previewHideTimer = null;
   var previewSnapshotData = null; // Last snapshot for reconnect
   var lastPreviewScroll = { x: 0, y: 0 }; // Last known scroll position for maintenance after mutations
@@ -199,6 +201,76 @@
     staleMutationCount = 0;
     mutationApplyFailures = 0;
     previewResyncPending = false;
+  }
+
+  function handlePreviewViewerHealth(health) {
+    previewViewerHealth = health || null;
+    if (previewViewerHealth) {
+      if (typeof previewViewerHealth.staleMisses === 'number') {
+        staleMutationCount = previewViewerHealth.staleMisses;
+      }
+      if (typeof previewViewerHealth.applyFailures === 'number') {
+        mutationApplyFailures = previewViewerHealth.applyFailures;
+      }
+    }
+    updatePreviewTooltip();
+  }
+
+  function handlePreviewViewerState(event) {
+    var state = event && event.state ? event.state : '';
+    recordDashboardTransportEvent('phantomstream-viewer-state', {
+      state: state,
+      reason: event && event.reason ? event.reason : ''
+    });
+    if (state === 'live' && previewState === 'loading' && previewSnapshotData) {
+      setPreviewState('streaming');
+    }
+  }
+
+  function ensurePreviewViewer() {
+    if (previewViewer) return previewViewer;
+    if (!previewViewerHost) {
+      recordDashboardTransportError('phantomstream-viewer-missing', 'Preview viewer host missing', {
+        type: 'dashboard-preview'
+      });
+      return null;
+    }
+    var bridge = window.FSBPhantomStreamViewer;
+    if (!bridge || typeof bridge.createDashboardViewer !== 'function') {
+      recordDashboardTransportError('phantomstream-viewer-missing', 'PhantomStream viewer bundle missing', {
+        type: 'dashboard-preview'
+      });
+      return null;
+    }
+    previewViewer = bridge.createDashboardViewer({
+      container: previewViewerHost,
+      logger: console,
+      onResync: function(payload) {
+        payload = payload || {};
+        requestPreviewResync(payload.reason || 'phantomstream-viewer-resync', payload);
+      },
+      onSubtreeRequest: function(payload) {
+        recordDashboardTransportEvent('phantomstream-subtree-request-deferred', {
+          requestId: payload && payload.requestId ? payload.requestId : '',
+          nid: payload && payload.nid ? payload.nid : ''
+        });
+      },
+      onUnsupportedControl: function(type) {
+        recordDashboardTransportEvent('phantomstream-control-ignored', {
+          type: type || ''
+        });
+      },
+      onState: handlePreviewViewerState,
+      onHealth: handlePreviewViewerHealth
+    });
+    return previewViewer;
+  }
+
+  function dispatchPreviewViewer(type, payload) {
+    var viewer = ensurePreviewViewer();
+    if (!viewer || typeof viewer.dispatch !== 'function') return false;
+    viewer.dispatch(type, payload || {});
+    return true;
   }
 
   function shouldAcceptPreviewMessage(payload, messageType) {
@@ -528,6 +600,12 @@
   }
 
   function clampRemotePreviewPoint(localX, localY) {
+    if (previewViewer && typeof previewViewer.mapPointToViewport === 'function') {
+      var mapped = previewViewer.mapPointToViewport({ x: localX, y: localY });
+      if (mapped && mapped.inside && typeof mapped.x === 'number' && typeof mapped.y === 'number') {
+        return { x: mapped.x, y: mapped.y };
+      }
+    }
     var viewport = getRemoteViewportSize();
     var scale = previewScale > 0 ? previewScale : 1;
     var x = Math.round(localX / scale);
@@ -620,7 +698,7 @@
 
   // DOM preview refs
   var previewContainer = document.getElementById('dash-preview');
-  var previewIframe = document.getElementById('dash-preview-iframe');
+  var previewViewerHost = document.getElementById('dash-preview-viewer');
   var previewLoading = document.getElementById('dash-preview-loading');
   var previewGlow = document.getElementById('dash-preview-glow');
   var previewProgress = document.getElementById('dash-preview-progress');
@@ -2614,7 +2692,7 @@
     // Reset all sub-views
     if (previewContainer) previewContainer.style.display = 'none';
     if (previewLoading) previewLoading.style.display = 'none';
-    if (previewIframe) previewIframe.style.display = 'none';
+    if (previewViewerHost) previewViewerHost.style.display = 'none';
     if (previewGlow) previewGlow.style.display = 'none';
     if (previewProgress) previewProgress.style.display = 'none';
     if (previewDialog) previewDialog.style.display = 'none';
@@ -2642,8 +2720,8 @@
           previewLoading.style.display = 'flex';
           setPreviewLoadingText(previewSurface.detailText);
         }
-        if (previewIframe && previewSurface.showIframe) {
-          previewIframe.style.display = '';
+        if (previewViewerHost && previewSurface.showIframe) {
+          previewViewerHost.style.display = '';
         }
         if (previewDisconnected && previewSurface.showDisconnected) {
           previewDisconnected.style.display = 'flex';
@@ -2726,41 +2804,11 @@
     updatePreviewTooltip();
 
     try {
-      // Build full HTML document for iframe
-      var stylesheetLinks = (payload.stylesheets || []).map(function(url) {
-        return '<link rel="stylesheet" href="' + url.replace(/"/g, '&quot;') + '">';
-      }).join('\n');
-
-      var inlineStyleTags = (payload.inlineStyles || []).map(function(css) {
-        return '<style>' + css + '</style>';
-      }).join('\n');
-
-      var fullHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-        '<meta name="viewport" content="width=' + (payload.viewportWidth || 1920) + '">' +
-        stylesheetLinks +
-        inlineStyleTags +
-        '<style>body { margin: 0; overflow: hidden; } *::selection { background: transparent; } ::-webkit-scrollbar { display: none; }</style>' +
-        '</head><body>' + payload.html + '</body></html>';
-
-      // Write to iframe via srcdoc
-      if (previewIframe) {
-        previewIframe.srcdoc = fullHTML;
-        previewIframe.onload = function() {
-          // Calculate scale factor to fit container
-          updatePreviewScale();
-          // Apply initial scroll position
-          try {
-            previewIframe.contentWindow.scrollTo(payload.scrollX || 0, payload.scrollY || 0);
-          } catch (e) { /* cross-origin fallback */ }
-          setPreviewState('streaming');
-        };
-        previewIframe.onerror = function() {
-          recordDashboardTransportError('dom-snapshot-render-failed', 'Iframe failed to load dashboard snapshot', {
-            type: 'ext:dom-snapshot'
-          });
-          setPreviewState('error');
-        };
+      if (!dispatchPreviewViewer('ext:dom-snapshot', payload)) {
+        throw new Error('phantomstream-viewer-unavailable');
       }
+      updatePreviewScale();
+      setPreviewState('streaming');
     } catch (e) {
       console.warn('[FSB-DASH] DOM snapshot render failed:', e.message);
       recordDashboardTransportError('dom-snapshot-render-failed', e.message, {
@@ -2771,7 +2819,7 @@
   }
 
   function updatePreviewScale() {
-    if (!previewIframe || !previewContainer || !previewSnapshotData) return;
+    if (!previewViewerHost || !previewContainer || !previewSnapshotData) return;
 
     var containerWidth = previewContainer.clientWidth;
     var pageWidth = previewSnapshotData.viewportWidth || previewSnapshotData.pageWidth || 1920;
@@ -2795,9 +2843,14 @@
     // Scale to fit width -- overflow clips bottom (prevents responsive text reflow)
     previewScale = containerWidth / pageWidth;
 
-    previewIframe.style.width = pageWidth + 'px';
-    previewIframe.style.height = pageHeight + 'px';
-    previewIframe.style.transform = 'scale(' + previewScale + ')';
+    if (previewViewer && typeof previewViewer.getViewportMapping === 'function') {
+      try {
+        var mapping = previewViewer.getViewportMapping();
+        if (mapping && mapping.scale && typeof mapping.scale.s === 'number' && mapping.scale.s > 0) {
+          previewScale = mapping.scale.s;
+        }
+      } catch (e) { /* viewer mapping is advisory */ }
+    }
   }
 
   function setRemoteControl(on, options) {
@@ -3138,138 +3191,19 @@
 
   function handleDOMMutations(payload) {
     if (!shouldAcceptPreviewMessage(payload, 'ext:dom-mutations')) return;
-    if (previewState !== 'streaming' || !previewIframe) return;
+    if (previewState !== 'streaming') return;
 
     try {
       var mutations = payload.mutations || [];
-      var doc = previewIframe.contentDocument;
-      if (!doc || !doc.body) return;
-
-      mutations.forEach(function(m) {
-        try {
-          switch (m.op) {
-            case 'add': {
-              var parent = doc.querySelector('[data-fsb-nid="' + m.parentNid + '"]');
-              if (!parent) {
-                staleMutationCount += 1;
-                recordDashboardTransportEvent('stale-mutation-parent', {
-                  type: 'ext:dom-mutations',
-                  parentNid: m.parentNid || '',
-                  streamSessionId: payload.streamSessionId || activePreviewStreamSessionId,
-                  snapshotId: payload.snapshotId || activePreviewSnapshotId,
-                  staleMutationCount: staleMutationCount
-                });
-                if (staleMutationCount >= 3) {
-                  requestPreviewResync('stale-mutation-parent', {
-                    parentNid: m.parentNid || '',
-                    streamSessionId: payload.streamSessionId || activePreviewStreamSessionId,
-                    snapshotId: payload.snapshotId || activePreviewSnapshotId
-                  });
-                }
-                break;
-              }
-              var temp = doc.createElement('div');
-              temp.innerHTML = m.html;
-              var newNode = temp.firstElementChild;
-              if (!newNode) break;
-              if (m.beforeNid) {
-                var before = doc.querySelector('[data-fsb-nid="' + m.beforeNid + '"]');
-                parent.insertBefore(newNode, before);
-              } else {
-                parent.appendChild(newNode);
-              }
-              break;
-            }
-            case 'rm': {
-              var el = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!el) {
-                staleMutationCount += 1;
-                recordDashboardTransportEvent('stale-mutation-target', {
-                  type: 'ext:dom-mutations',
-                  op: 'rm',
-                  nid: m.nid || '',
-                  staleMutationCount: staleMutationCount
-                });
-                if (staleMutationCount >= 3) {
-                  requestPreviewResync('stale-mutation-target', {
-                    op: 'rm',
-                    nid: m.nid || ''
-                  });
-                }
-                break;
-              }
-              if (el.parentNode) el.parentNode.removeChild(el);
-              break;
-            }
-            case 'attr': {
-              var target = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!target) {
-                staleMutationCount += 1;
-                recordDashboardTransportEvent('stale-mutation-target', {
-                  type: 'ext:dom-mutations',
-                  op: 'attr',
-                  nid: m.nid || '',
-                  staleMutationCount: staleMutationCount
-                });
-                if (staleMutationCount >= 3) {
-                  requestPreviewResync('stale-mutation-target', {
-                    op: 'attr',
-                    nid: m.nid || ''
-                  });
-                }
-                break;
-              }
-              if (m.val === null) {
-                target.removeAttribute(m.attr);
-              } else {
-                target.setAttribute(m.attr, m.val);
-              }
-              break;
-            }
-            case 'text': {
-              var textTarget = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!textTarget) {
-                staleMutationCount += 1;
-                recordDashboardTransportEvent('stale-mutation-target', {
-                  type: 'ext:dom-mutations',
-                  op: 'text',
-                  nid: m.nid || '',
-                  staleMutationCount: staleMutationCount
-                });
-                if (staleMutationCount >= 3) {
-                  requestPreviewResync('stale-mutation-target', {
-                    op: 'text',
-                    nid: m.nid || ''
-                  });
-                }
-                break;
-              }
-              textTarget.textContent = m.text;
-              break;
-            }
-          }
-        } catch (e) {
-          mutationApplyFailures += 1;
-          recordDashboardTransportError('dom-mutation-apply-failed', e.message, {
-            type: 'ext:dom-mutations',
-            op: m && m.op ? m.op : '',
-            nid: m && (m.nid || m.parentNid || m.beforeNid || '') ? (m.nid || m.parentNid || m.beforeNid || '') : '',
-            mutationApplyFailures: mutationApplyFailures
-          });
-          // Skip individual mutation errors -- don't break the whole batch
-          if (mutationApplyFailures >= 2) {
-            requestPreviewResync('dom-mutation-apply-failed', {
-              op: m && m.op ? m.op : '',
-              nid: m && (m.nid || m.parentNid || m.beforeNid || '') ? (m.nid || m.parentNid || m.beforeNid || '') : ''
-            });
-          }
-        }
+      recordDashboardTransportEvent('dom-mutations-dispatched', {
+        type: 'ext:dom-mutations',
+        mutationCount: mutations.length,
+        streamSessionId: payload.streamSessionId || activePreviewStreamSessionId,
+        snapshotId: payload.snapshotId || activePreviewSnapshotId
       });
-
-      // Maintain scroll position after DOM changes
-      try {
-        previewIframe.contentWindow.scrollTo(lastPreviewScroll.x, lastPreviewScroll.y);
-      } catch (e) { /* ignore */ }
+      if (!dispatchPreviewViewer('ext:dom-mutations', payload)) {
+        throw new Error('phantomstream-viewer-unavailable');
+      }
     } catch (e) {
       console.warn('[FSB-DASH] Mutation apply error:', e.message);
       mutationApplyFailures += 1;
@@ -3291,19 +3225,14 @@
     lastPreviewScroll.x = payload.scrollX || 0;
     lastPreviewScroll.y = payload.scrollY || 0;
 
-    if (previewState !== 'streaming' || !previewIframe) return;
-    try {
-      previewIframe.contentWindow.scrollTo({
-        left: lastPreviewScroll.x,
-        top: lastPreviewScroll.y,
-        behavior: 'smooth'
-      });
-    } catch (e) { /* ignore */ }
+    if (previewState !== 'streaming') return;
+    dispatchPreviewViewer('ext:dom-scroll', payload);
   }
 
   function handleDOMOverlay(payload) {
     if (!shouldAcceptPreviewMessage(payload, 'ext:dom-overlay')) return;
     if (previewState !== 'streaming') return;
+    dispatchPreviewViewer('ext:dom-overlay', payload);
 
     // Update glow rect
     if (payload.glow && payload.glow.state === 'active' && previewGlow) {
@@ -3334,6 +3263,7 @@
 
   function handleDOMDialog(payload) {
     if (!shouldAcceptPreviewMessage(payload, 'ext:dom-dialog')) return;
+    dispatchPreviewViewer('ext:dom-dialog', payload);
     var dialog = payload.dialog || payload;
     if (!dialog) return;
 
