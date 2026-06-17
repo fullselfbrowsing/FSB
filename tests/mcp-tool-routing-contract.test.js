@@ -51,7 +51,11 @@ const requiredPublicRoutes = [
   'get_memory_stats',
   'read_page',
   'get_dom_snapshot',
-  'get_page_snapshot'
+  'get_page_snapshot',
+  'trigger',
+  'stop_trigger',
+  'get_trigger_status',
+  'list_triggers'
 ];
 
 const requiredMessageRoutes = [
@@ -70,7 +74,11 @@ const requiredMessageRoutes = [
   'mcp:get-logs',
   'mcp:search-memory',
   'mcp:get-memory',
-  'mcp:go-back'
+  'mcp:go-back',
+  'mcp:trigger',
+  'mcp:stop-trigger',
+  'mcp:get-trigger-status',
+  'mcp:list-triggers'
 ];
 
 // Phase 199 left fill_credential / fill_payment_method out of the route-contract
@@ -152,13 +160,27 @@ const groupDefinitions = {
       'mcp:get-dom',
       'mcp:get-page-snapshot'
     ]
+  },
+  trigger: {
+    tools: [
+      'trigger',
+      'stop_trigger',
+      'get_trigger_status',
+      'list_triggers'
+    ],
+    messages: [
+      'mcp:trigger',
+      'mcp:stop-trigger',
+      'mcp:get-trigger-status',
+      'mcp:list-triggers'
+    ]
   }
 };
 
 function selectedGroups() {
   const groupArg = process.argv.find(arg => arg.startsWith('--group='));
   if (!groupArg) {
-    return ['browser', 'visual', 'autopilot', 'observability', 'read'];
+    return ['browser', 'visual', 'autopilot', 'observability', 'read', 'trigger'];
   }
 
   const group = groupArg.slice('--group='.length);
@@ -211,6 +233,10 @@ function runRegistryChecks() {
     .map(tool => tool.name);
 
   for (const required of groupDefinitions.browser.tools) {
+    assert(backgroundToolNames.includes(required), `background TOOL_REGISTRY includes ${required}`);
+  }
+
+  for (const required of groupDefinitions.trigger.tools) {
     assert(backgroundToolNames.includes(required), `background TOOL_REGISTRY includes ${required}`);
   }
 

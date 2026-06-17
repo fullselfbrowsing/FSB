@@ -11,6 +11,7 @@ let failed = 0;
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKGROUND_PATH = path.join(ROOT, 'extension', 'background.js');
+const MCP_DISPATCHER_PATH = path.join(ROOT, 'extension', 'ws', 'mcp-tool-dispatcher.js');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
 const MCP_MANUAL_PATH = path.join(ROOT, 'mcp', 'src', 'tools', 'manual.ts');
 const MCP_QUEUE_PATH = path.join(ROOT, 'mcp', 'src', 'queue.ts');
@@ -188,6 +189,19 @@ async function caseMcpQueueCompanionsBypassPendingMutation() {
     assert.strictEqual(result, `${toolName}:direct`, `${toolName} bypasses pending mutation queue work`);
     assert.strictEqual(ran, true, `${toolName} callback ran immediately`);
   }
+}
+
+async function caseMcpDispatcherTriggerRoutesDelegateToBackground() {
+  const src = readSource(MCP_DISPATCHER_PATH);
+  for (const messageType of ['mcp:trigger', 'mcp:stop-trigger', 'mcp:get-trigger-status', 'mcp:list-triggers']) {
+    assert.ok(src.includes(messageType), `dispatcher declares ${messageType}`);
+  }
+  for (const toolName of ['trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers']) {
+    assert.ok(src.includes(toolName), `dispatcher declares ${toolName}`);
+  }
+  assert.ok(src.includes("routeFamily: 'trigger'"), 'dispatcher trigger routes use trigger route family');
+  assert.ok(src.includes('fsbTriggerDispatchToolRequest'), 'dispatcher delegates trigger messages to background dispatch helper');
+  assert.strictEqual(src.includes('FsbTriggerManager.armTrigger'), false, 'dispatcher does not arm triggers directly');
 }
 
 async function caseStorageSourceContracts() {
@@ -628,6 +642,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('MCP runtime registers trigger tools before manual tools', caseMcpRuntimeRegistersTriggerTools);
   await runCase('MCP TaskQueue derives read-only names from registry', caseMcpQueueDerivesReadOnlyTools);
   await runCase('MCP TaskQueue trigger companions bypass pending mutation', caseMcpQueueCompanionsBypassPendingMutation);
+  await runCase('MCP dispatcher trigger routes delegate to background helper', caseMcpDispatcherTriggerRoutesDelegateToBackground);
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
