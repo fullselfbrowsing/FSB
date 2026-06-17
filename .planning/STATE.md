@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 18-02-PLAN.md
-last_updated: "2026-06-17T00:38:56.126Z"
+stopped_at: Completed 18-03-PLAN.md
+last_updated: "2026-06-17T00:51:11.102Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 18
-  completed_plans: 18
+  completed_plans: 19
   percent: 100
 ---
 
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 18 (shared-tool-registry-dispatcher-wiring) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-17
 
@@ -83,6 +83,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 17 P04 | 7 min | 2 tasks | 5 files |
 | Phase 18-shared-tool-registry-dispatcher-wiring P01 | 6min | 2 tasks | 5 files |
 | Phase 18-shared-tool-registry-dispatcher-wiring P02 | 10min | 3 tasks | 3 files |
+| Phase 18-shared-tool-registry-dispatcher-wiring P03 | 9min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: stop_trigger is idempotent for missing or terminal snapshots but rejects cross-agent access before cleanup side effects.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: autopilot trigger arms derive legacy:autopilot and ownershipToken from fsbAgentRegistryInstance instead of trusting caller-supplied identity.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger returns a bounded arm result after validation, baseline read, persistence, and watcher startup; Phase 19 owns blocking/detached reporting.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: MCP trigger tools are registered by a trigger-specific registrar from TOOL_REGISTRY rather than through manual visual-session actions.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: trigger returns a bounded arm response through mcp:trigger; Phase 19 owns blocking wait, heartbeat, detached mode, and fire/timeout envelopes.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: stop_trigger, get_trigger_status, and list_triggers dispatch directly and are also proven to bypass TaskQueue when a mutation is pending.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -165,8 +169,8 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T00:38:56.123Z
-Stopped at: Completed 18-02-PLAN.md
+Last session: 2026-06-17T00:51:11.099Z
+Stopped at: Completed 18-03-PLAN.md
 Resume file: None
 
 ## Next Actions
