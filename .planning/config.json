@@ -12,7 +12,5 @@
     "auto_advance": true,
     "discuss_mode": "assumptions"
   },
-  "granularity": "fine",
-  "milestone_version": "v0.10.0",
-  "milestone_name": "Autopilot via Lattice SDK (attempt 2)"
+  "granularity": "fine"
 }

@@ -6,7 +6,7 @@
 - **v0.11.0 Trigger Tool (Reactive DOM Monitoring)** — Phases 14-20, completed 2026-06-17; release actions and browser UAT remain user-gated.
 - **v0.12.0 PhantomStream Package Migration** — Phases 21-25 (active).
 
-## Overview (v0.12.0)
+## Overview v0.12.0 PhantomStream Package Migration
 
 v0.12.0 replaces FSB's in-house Phantom Stream implementation with the extracted `fullselfbrowsing/PhantomStream` package. The existing code already has a working DOM-native live preview: content-side snapshot/diff capture, extension WebSocket routing, server relay, dashboard renderer, side channels, remote control, recovery watchdogs, and defensive stream-state diagnostics. The new milestone does not redesign the product surface; it moves ownership of the generic browser-mirroring engine into the reusable package while preserving FSB-specific pairing, task lifecycle, overlay identity, remote-control ownership, and dashboard state behavior.
 
