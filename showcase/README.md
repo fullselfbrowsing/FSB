@@ -7,7 +7,7 @@
 | Path | Purpose |
 |------|---------|
 | `angular/` | Angular 20 app with static prerender for `/`, `/about`, `/privacy`, and `/support`. |
-| `server/` | Express + better-sqlite3 + ws backend for pairing, auth, relay, and dashboard data. |
+| `server/` | Express + better-sqlite3 + ws backend for pairing, auth, PhantomStream-compatible relay, and dashboard data. |
 | `assets/` | Images, logos, icons, and provider artwork copied into the Angular build. |
 | `css/`, `js/`, `*.html` | Legacy static surfaces still kept beside the Angular app. |
 | `dist/` | Build output, populated as `showcase/dist/showcase-angular/`. |
@@ -68,9 +68,11 @@ The Express backend handles:
 
 - dashboard pairing
 - authenticated dashboard routes
-- WebSocket relay behavior
+- WebSocket relay behavior, including PhantomStream-compatible stream frame classification and limits
 - SQLite persistence for paired dashboard state
 - serving prerendered Angular assets in production
+
+The static and Angular dashboard preview surfaces use the shared PhantomStream viewer wrapper for snapshot rendering and mutation application. FSB host code still owns dashboard state, pairing, task/status traffic, progress/client badges, frozen overlays, and remote-control affordances.
 
 Post-deploy crawler checks:
 

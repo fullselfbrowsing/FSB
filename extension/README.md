@@ -20,10 +20,10 @@ After code changes, reload the extension from `chrome://extensions` and refresh 
 | `manifest.json` | MV3 manifest, permissions, entry points, and web-accessible resources. |
 | `background.js` | Service worker for sessions, model calls, MCP bridge handling, storage, and orchestration. |
 | `canvas-interceptor.js` | MAIN-world content script loaded at `document_start`. |
-| `content/` | DOM analysis, action execution, messaging, lifecycle, visual feedback, and DOM streaming. |
+| `content/` | DOM analysis, action execution, messaging, lifecycle, visual feedback, and PhantomStream-backed DOM streaming. |
 | `ui/` | Popup, side panel, control panel, unlock screens, and shared UI behavior. |
 | `ai/` | Provider integration, model discovery, tool registry, agent loop, transcripts, and state emitters. |
-| `ws/` | WebSocket bridge client and MCP tool dispatcher. |
+| `ws/` | WebSocket bridge client, PhantomStream protocol bridge, remote-control mapping, and MCP tool dispatcher. |
 | `lib/` | Vendored libraries plus memory and visualization subsystems. |
 | `site-guides/` | Domain and category-specific automation guidance. |
 | `config/` | Defaults, migration, and secure encrypted configuration. |
@@ -39,6 +39,10 @@ npm test
 ```
 
 `validate:extension` checks manifest sanity and JavaScript syntax across the extension tree. The Node test suite covers extension modules that can run outside Chrome, including analytics, costs, transcript storage, tool routing, MCP bridge contracts, and regression cases.
+
+## DOM Streaming Boundary
+
+FSB uses `@full-self-browsing/phantom-stream@0.1.0` for generic browser mirroring. `content/dom-stream.js` is an FSB adapter around the bundled PhantomStream capture bridge; `ws/ws-client.js` uses the PhantomStream protocol bridge for stream/control envelopes while preserving FSB task/status traffic and remote-control ownership diagnostics.
 
 ## Debugging
 

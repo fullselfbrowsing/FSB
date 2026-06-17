@@ -97,7 +97,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 **Plans**: 4 plans
 - [x] 25-01-PLAN.md — Remove duplicated in-house stream engines and dead code.
 - [x] 25-02-PLAN.md — Differential parity and security regression suite.
-- [ ] 25-03-PLAN.md — Documentation, provenance, package pin record, and release notes.
+- [x] 25-03-PLAN.md — Documentation, provenance, package pin record, and release notes.
 - [ ] 25-04-PLAN.md — Final automated gates plus browser UAT evidence.
 
 ## Progress (v0.12.0)
@@ -111,7 +111,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 23. Dashboard Renderer Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 2/4 | In Progress | - |
+| 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 3/4 | In Progress | - |
 
 ## Research Flags (v0.12.0)
 

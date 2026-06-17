@@ -109,6 +109,7 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
 | Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, and restricted-tab recovery messaging. |
 | Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
+| DOM live preview | PhantomStream-backed capture, renderer, protocol, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
 
@@ -122,7 +123,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
 | [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md) | OpenClaw skill: doctor + stdio printer + consent-gated multi-host install. |
 | [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
-| `showcase/server/` | Node/Express deploy backend for pairing, relay, auth, and dashboard data. |
+| `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
 | `tests/` | Node tests for extension modules, MCP contracts, bridge behavior, and regression coverage. |
 | `scripts/` | Repo maintenance and validation scripts. |
@@ -362,7 +363,7 @@ graph TB
 ### Main Runtime Pieces
 
 - **Background worker** (`extension/background.js`): owns sessions, model calls, tool execution, MCP routing, and storage orchestration.
-- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, stream DOM state, wait for stable state, and render visual feedback.
+- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, stream DOM state through the PhantomStream capture adapter, wait for stable state, and render visual feedback.
 - **AI layer** (`extension/ai/`): universal OpenAI-compatible request engine, provider settings, model discovery, tool definitions, transcripts, and action history.
 - **Memory** (`extension/lib/memory/`): stores episodic, semantic, and procedural records, then retrieves relevant prior context for later tasks.
 - **Visualization** (`extension/lib/visualization/`): D3/site graph views for guide and memory exploration.

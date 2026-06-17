@@ -46,7 +46,7 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 - [x] **PARITY-01**: All existing stream-focused tests are updated to assert package-backed behavior rather than in-house implementation details, while preserving current behavioral coverage.
 - [x] **PARITY-02**: A differential parity test compares FSB's current in-house stream behavior against PhantomStream for representative snapshots, mutations, side channels, stale messages, and security sanitization.
 - [x] **PARITY-03**: In-house stream logic that is now owned by PhantomStream is removed or reduced to adapters, with no duplicate capture/renderer/relay engines left behind.
-- [ ] **PARITY-04**: Documentation names PhantomStream as the stream implementation, records the package pin/source/provenance, and explains any FSB-specific adapters that remain.
+- [x] **PARITY-04**: Documentation names PhantomStream as the stream implementation, records the package pin/source/provenance, and explains any FSB-specific adapters that remain.
 - [ ] **PARITY-05**: Milestone close requires automated gates plus explicit browser UAT for dashboard live preview, remote control, navigation/reconnect recovery, restricted tabs, large pages, and security masking.
 
 ## Future Requirements (deferred -- tracked, not in this roadmap)
@@ -101,7 +101,7 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | PARITY-01 | Phase 25 | Complete |
 | PARITY-02 | Phase 25 | Complete |
 | PARITY-03 | Phase 25 | Complete |
-| PARITY-04 | Phase 25 | Pending |
+| PARITY-04 | Phase 25 | Complete |
 | PARITY-05 | Phase 25 | Pending |
 
 **Coverage:**
@@ -118,4 +118,4 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 
 ---
 *Requirements defined: 2026-06-17*
-*Last updated: 2026-06-17 -- Phase 25 Plan 02 added differential package-backed stream parity and security regression coverage*
+*Last updated: 2026-06-17 -- Phase 25 Plan 03 documented PhantomStream provenance and FSB-specific adapter boundaries*

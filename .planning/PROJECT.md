@@ -34,20 +34,20 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Goal:** Replace FSB's in-house dashboard DOM streaming engine with the extracted PhantomStream package while preserving the current live preview, recovery, side-channel, relay, and remote-control behavior.
 
-**Why this matters:** Phantom Stream began inside FSB and now exists as a standalone `fullselfbrowsing/PhantomStream` framework. Keeping the generic browser-mirroring engine duplicated inside FSB creates drift: fixes to capture, renderer, relay, security masking, and protocol behavior need to land twice. v0.12.0 makes PhantomStream the source of truth and leaves FSB with only product-specific adapters.
+**Why this matters:** Phantom Stream began inside FSB and now exists as a standalone `fullselfbrowsing/PhantomStream` framework. Keeping the generic browser-mirroring engine duplicated inside FSB creates drift: fixes to capture, renderer, relay, security masking, and protocol behavior need to land twice. v0.12.0 makes the published PhantomStream package the source of truth and leaves FSB with only product-specific adapters.
 
 **Target features:**
-- **Package intake gate:** install `@fullselfbrowsing/phantom-stream` from npm with exact pin/integrity, or explicitly block/decide on an immutable GitHub/tarball fallback if npm remains unavailable.
-- **Capture adapter:** replace `extension/content/dom-stream.js` snapshot/diff internals with PhantomStream capture primitives while preserving FSB control messages, readiness probe, overlay exclusion, scroll/dialog/overlay side channels, diagnostics, and watchdog behavior.
-- **Renderer adapter:** route static and Angular dashboard snapshot rendering and diff application through PhantomStream renderer behavior, keeping the existing preview state machine and visual controls.
-- **Transport/relay alignment:** adopt PhantomStream-compatible protocol/envelope/relay helpers where available while preserving FSB hash-key rooms, task/status WS traffic, compression, backpressure, and recovery.
-- **Remote-control parity:** preserve click/type/scroll reverse mapping, debugger ownership reporting, retarget-required handling, and stale-frame safety.
+- **Package intake gate:** use the exact npm dependency `@full-self-browsing/phantom-stream@0.1.0` with package-lock integrity recorded in `.planning/PHANTOMSTREAM-PIN.md`; the stale `@fullselfbrowsing/phantom-stream` name is rejected and documented only as historical correction.
+- **Capture adapter:** `extension/content/dom-stream.js` delegates snapshot/diff internals to PhantomStream capture while preserving FSB control messages, readiness probe, overlay exclusion, scroll/dialog/overlay side channels, diagnostics, and watchdog behavior.
+- **Renderer adapter:** static and Angular dashboards route snapshot rendering and diff application through the shared PhantomStream viewer wrapper, keeping the existing preview state machine and visual controls.
+- **Transport/relay alignment:** stream envelopes use PhantomStream-compatible protocol helpers and relay classification/limits, while FSB keeps hash-key rooms, task/status WS traffic, compression-size guards, backpressure diagnostics, and recovery.
+- **Remote-control parity:** FSB preserves click/type/key/scroll CDP dispatch, debugger ownership reporting, retarget-required handling, and stale-frame safety while accepting PhantomStream remote-control frame shapes.
 - **Removal and proof:** remove duplicate in-house stream engines, update docs/provenance, and close with automated parity plus real browser UAT.
 
 **Architecture notes:**
-- Upstream currently declares `@fullselfbrowsing/phantom-stream@0.1.0` with `./protocol`, `./capture`, and `./renderer` exports. The README describes relay/transport/adapters too, so Phase 21 must verify actual exports before implementation.
-- npm registry lookup returned `E404` for `@fullselfbrowsing/phantom-stream` on 2026-06-17. This milestone intentionally starts with a source/provenance gate instead of assuming the package can be installed.
-- FSB has two dashboard surfaces (`showcase/js/dashboard.js` and Angular dashboard). The migration should prefer a shared viewer wrapper to prevent drift.
+- Installed package: `@full-self-browsing/phantom-stream@0.1.0` from npm. Verified exports include `./protocol`, `./capture`, `./renderer`, `./relay`, `./transport/websocket`, and adapters listed in `.planning/phases/21-package-intake-contract-mapping/21-PACKAGE-SURFACE.md`.
+- Rejected package: `@fullselfbrowsing/phantom-stream` returned `E404` on 2026-06-17. Do not use it in active docs or code except to explain the correction.
+- FSB has two dashboard surfaces (`showcase/js/dashboard.js` and Angular dashboard). Both consume the shared `window.FSBPhantomStreamViewer` wrapper to prevent renderer drift.
 
 **Carried-forward invariants (apply to this milestone):**
 - **INV-01** existing MCP wire contracts stay byte-identical; DOM streaming internals are not a schema change.
@@ -641,4 +641,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-17 -- v0.12.0 PhantomStream Package Migration initialized. Requirements are mapped to Phases 21-25; Phase 21 package intake and provenance verification are next.*
+*Last updated: 2026-06-17 -- Phase 25 Plan 03 documents PhantomStream package provenance and the remaining FSB-specific adapter boundaries.*
