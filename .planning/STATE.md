@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
 status: phase_in_progress
-stopped_at: Completed 25-01-PLAN.md
-last_updated: "2026-06-17T19:22:02.000Z"
-last_activity: 2026-06-17 - Completed Phase 25 Plan 01 stream adapter cleanup
+stopped_at: Completed 25-02-PLAN.md
+last_updated: "2026-06-17T19:29:41.000Z"
+last_activity: 2026-06-17 - Completed Phase 25 Plan 02 differential parity tests
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 19
-  completed_plans: 16
-  percent: 84
+  completed_plans: 17
+  percent: 89
 ---
 
 # Project State
@@ -29,12 +29,12 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 ## Current Position
 
-Phase: 25 (Parity Removal, Docs & Browser UAT) — PENDING
-Plan: 25-02 — Differential parity and security regression suite
-Status: Phase 25 Plan 01 complete; differential parity, docs, and final UAT remain
-Last activity: 2026-06-17 - Completed Phase 25 Plan 01 stream adapter cleanup
+Phase: 25 (Parity Removal, Docs & Browser UAT) — IN PROGRESS
+Plan: 25-03 — Documentation, provenance, package pin record, and release notes
+Status: Phase 25 Plan 02 complete; docs/provenance and final browser UAT remain
+Last activity: 2026-06-17 - Completed Phase 25 Plan 02 differential parity tests
 
-Progress: [████████░░] 84% (16/19 milestone plans)
+Progress: [█████████░] 89% (17/19 milestone plans)
 
 ## Roadmap At A Glance (v0.12.0)
 
@@ -52,7 +52,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 16 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 4/4, Phase 24: 4/4, Phase 25: 1/4)
+- Total plans completed (this milestone): 17 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 4/4, Phase 24: 4/4, Phase 25: 2/4)
 - Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
@@ -63,7 +63,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 | 22 | 4/4 | - | - |
 | 23 | 4/4 | - | - |
 | 24 | 4/4 | - | - |
-| 25 | 1/4 | - | - |
+| 25 | 2/4 | - | - |
 
 *Updated after each plan completion.*
 
@@ -87,6 +87,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - **Phase 24 Plan 03:** The service-worker watchdog now sends `STREAM.REQUEST_SNAPSHOT` through the PhantomStream protocol bridge when available, and both static and Angular dashboards consume `ext:request-snapshot` by routing through the existing resync path while preserving frozen-complete state. Recovery parity now has automated coverage for extension reconnect snapshots, dashboard reconnect recovery requests, late `domStreamReady` re-arm, page-ready recovery, and stale-flush stream-state diagnostics.
 - **Phase 24 Plan 04:** `ws-client.js` now accepts PhantomStream `REMOTE_CONTROL` frames while preserving legacy dashboard `dash:remote-*` frames. Click/text/key/scroll payloads normalize through `validateRemoteControlMessage`, diagnostics use content-free `summarizeRemoteControlAction`, and state broadcasts preserve FSB `ext:remote-control-state` while adding PhantomStream `ext:ps-control-state`. Automated coverage verifies coordinate mapping source contracts, stale stream/session gates, safe text summaries, and debugger/retarget/no-tab ownership states; live browser remote-control UAT remains Phase 25 debt in `24-VALIDATION.md`.
 - **Phase 25 Plan 01:** Removed the temporary legacy `data-fsb-nid` stamping bridge from `extension/content/dom-stream.js`. The capture adapter now preserves PhantomStream `nodeIds` sidecars without rewriting mirrored HTML, while keeping FSB background action names, identity tracking, stale flush diagnostics, overlay exclusion, side-channel forwarding, and resume-as-fresh-snapshot behavior. Tests now assert the absence of legacy stamping and the presence of sidecar identity.
+- **Phase 25 Plan 02:** Added a deterministic differential PhantomStream parity guard covering package-backed adapter source boundaries, snapshot sanitizer behavior, mutation ADD/ATTR/TEXT/VALUE/REMOVE handling, stale mutation resync thresholds, stream identity rejection, compressed envelope encode/decode, relay classification, relay frame caps, and security masking coverage. The test is wired into `npm test`; browser visual fidelity and remote-control usability remain Phase 25 Plan 04 UAT debt.
 - [Phase ?]: Phase 14 Plan 01: trigger-store.js is a verbatim clone of mcp-task-store.js (6 enumerated changes only; code body byte-identical after inverse-rename). chrome.storage.session direct per D-12; agent_id stored faithfully (V4); only behavioral change is listArmedSnapshots filtering status==='armed'.
 - [Phase ?]: Phase 14 Plan 02: trigger-lifecycle.js clones mcp-visual-session-lifecycle.js with overlay STRIPPED, over FsbTriggerStore (storage-is-truth, re-read every tick). handleTriggerAlarm adds a noop_terminal idempotent fire-guard (D-09); restoreTriggersFromStorage adds the getAll() orphan sweep scoped to fsbTrigger: (D-08); three reap paths via absolute deadline_at (LIFE-05). FSB_TRIGGER_DEFAULT_TTL_MS=21600000 (6h, D-11) + 30s alarm-floor declared for Phase 17. evaluated_noop + armTrigger/clearTrigger are the fire-free Phase 15 seam.
 - [Phase ?]: Phase 14 Plan 03: wired the two trigger modules into background.js at four ADDITIVE glue points (importScripts store-before-lifecycle, bootstrap restoreTriggersFromStorage, onAlarm fsbTrigger: branch with early return, new tabs.onRemoved sibling), each mirroring its verified visual-lifecycle sibling. SURV-01/SURV-03/LIFE-05 now live in the SW; INV-04 held (agent-loop.js byte-untouched, setTimeout=8).
@@ -188,10 +189,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 
 ## Session Continuity
 
-Last session: 2026-06-17T19:22:02.000Z
-Stopped at: Completed 25-01-PLAN.md
+Last session: 2026-06-17T19:29:41.000Z
+Stopped at: Completed 25-02-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Continue with Phase 25 Parity Removal, Docs & Browser UAT, starting `25-02-PLAN.md`: differential parity and security regression suite. Existing v0.11 live-browser UAT/release actions and Phase 24 remote-control browser UAT remain carried-forward, user-gated debt.
+Continue with Phase 25 Parity Removal, Docs & Browser UAT, starting `25-03-PLAN.md`: documentation, provenance, package pin record, and release notes. Existing v0.11 live-browser UAT/release actions and Phase 24 remote-control browser UAT remain carried-forward, user-gated debt.

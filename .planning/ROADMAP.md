@@ -96,7 +96,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
   4. Automated gates pass, and browser UAT records live preview, navigation, reconnect, restricted-tab, large-page, masking, and remote-control results without fabricating human evidence.
 **Plans**: 4 plans
 - [x] 25-01-PLAN.md — Remove duplicated in-house stream engines and dead code.
-- [ ] 25-02-PLAN.md — Differential parity and security regression suite.
+- [x] 25-02-PLAN.md — Differential parity and security regression suite.
 - [ ] 25-03-PLAN.md — Documentation, provenance, package pin record, and release notes.
 - [ ] 25-04-PLAN.md — Final automated gates plus browser UAT evidence.
 
@@ -111,7 +111,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 23. Dashboard Renderer Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 1/4 | In Progress | - |
+| 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 2/4 | In Progress | - |
 
 ## Research Flags (v0.12.0)
 

@@ -43,8 +43,8 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 
 ### PARITY -- Removal, tests, docs, and release gates
 
-- [ ] **PARITY-01**: All existing stream-focused tests are updated to assert package-backed behavior rather than in-house implementation details, while preserving current behavioral coverage.
-- [ ] **PARITY-02**: A differential parity test compares FSB's current in-house stream behavior against PhantomStream for representative snapshots, mutations, side channels, stale messages, and security sanitization.
+- [x] **PARITY-01**: All existing stream-focused tests are updated to assert package-backed behavior rather than in-house implementation details, while preserving current behavioral coverage.
+- [x] **PARITY-02**: A differential parity test compares FSB's current in-house stream behavior against PhantomStream for representative snapshots, mutations, side channels, stale messages, and security sanitization.
 - [x] **PARITY-03**: In-house stream logic that is now owned by PhantomStream is removed or reduced to adapters, with no duplicate capture/renderer/relay engines left behind.
 - [ ] **PARITY-04**: Documentation names PhantomStream as the stream implementation, records the package pin/source/provenance, and explains any FSB-specific adapters that remain.
 - [ ] **PARITY-05**: Milestone close requires automated gates plus explicit browser UAT for dashboard live preview, remote control, navigation/reconnect recovery, restricted tabs, large pages, and security masking.
@@ -98,8 +98,8 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | CTRL-01 | Phase 24 | Complete |
 | CTRL-02 | Phase 24 | Complete |
 | CTRL-03 | Phase 24 | Complete |
-| PARITY-01 | Phase 25 | Pending |
-| PARITY-02 | Phase 25 | Pending |
+| PARITY-01 | Phase 25 | Complete |
+| PARITY-02 | Phase 25 | Complete |
 | PARITY-03 | Phase 25 | Complete |
 | PARITY-04 | Phase 25 | Pending |
 | PARITY-05 | Phase 25 | Pending |
@@ -118,4 +118,4 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 
 ---
 *Requirements defined: 2026-06-17*
-*Last updated: 2026-06-17 -- Phase 25 Plan 01 removed legacy stream adapter stamping residue and locked the package-backed adapter boundary*
+*Last updated: 2026-06-17 -- Phase 25 Plan 02 added differential package-backed stream parity and security regression coverage*
