@@ -4573,6 +4573,46 @@ function fsbTriggerReadResultValue(readResult) {
   return null;
 }
 
+const FSB_TRIGGER_TAB_WATCH_CONFLICT_ACTIVE_STATUSES = {
+  armed: true,
+  needs_attention: true,
+  blocked: true
+};
+
+async function fsbTriggerFindTabWatchConflict(targetTabId, requestedWatch, ownerContext) {
+  const normalizedRequestedWatch = fsbTriggerNormalizeToolWatch(requestedWatch);
+  const normalizedTabId = Number(targetTabId);
+  if (!Number.isFinite(normalizedTabId) || !normalizedRequestedWatch) return null;
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.hydrate !== 'function') {
+    return null;
+  }
+
+  let envelope = null;
+  try {
+    envelope = await FsbTriggerStore.hydrate();
+  } catch (_err) {
+    return null;
+  }
+  const records = envelope && envelope.records && typeof envelope.records === 'object'
+    ? envelope.records
+    : {};
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const snap = records[keys[i]];
+    if (!snap || typeof snap !== 'object') continue;
+    if (!FSB_TRIGGER_TAB_WATCH_CONFLICT_ACTIVE_STATUSES[snap.status]) continue;
+    if (Number(snap.target_tab_id) !== normalizedTabId) continue;
+    if (!fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) continue;
+
+    const existingWatch = fsbTriggerNormalizeToolWatch(snap.watch || snap.mode);
+    if (!existingWatch || existingWatch === normalizedRequestedWatch) continue;
+    return snap;
+  }
+  return null;
+}
+
 async function fsbTriggerHandleToolArm(params, context) {
   const safeParams = (params && typeof params === 'object') ? params : {};
   const sender = context && context.sender;
@@ -4611,6 +4651,20 @@ async function fsbTriggerHandleToolArm(params, context) {
   const watch = fsbTriggerNormalizeToolWatch(safeParams.watch || safeParams.mode);
   if (!watch) {
     return { success: false, errorCode: 'TRIGGER_WATCH_INVALID' };
+  }
+
+  const watchConflict = await fsbTriggerFindTabWatchConflict(Number(tabId), watch, ownerContext);
+  if (watchConflict) {
+    return {
+      success: false,
+      error: 'TRIGGER_TAB_WATCH_CONFLICT',
+      code: 'TRIGGER_TAB_WATCH_CONFLICT',
+      errorCode: 'TRIGGER_TAB_WATCH_CONFLICT',
+      target_tab_id: Number(tabId),
+      existing_trigger_id: watchConflict.trigger_id || watchConflict.id || null,
+      existing_watch: watchConflict.watch || watchConflict.mode || null,
+      requested_watch: watch
+    };
   }
 
   const extract = fsbTriggerToolExtract(safeParams, condition);
