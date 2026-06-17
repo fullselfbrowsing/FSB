@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
 status: phase_in_progress
-stopped_at: Completed 23-04-PLAN.md
-last_updated: "2026-06-17T18:38:20.000Z"
-last_activity: 2026-06-17 - Completed Phase 23 Plan 04 dashboard renderer closeout
+stopped_at: Completed 24-01-PLAN.md
+last_updated: "2026-06-17T18:52:17.000Z"
+last_activity: 2026-06-17 - Completed Phase 24 Plan 01 protocol/envelope adapter
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 19
-  completed_plans: 11
-  percent: 58
+  completed_plans: 12
+  percent: 63
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 24 (Transport, Relay & Remote Control Integration) — READY
-Plan: 24-01 — Protocol/envelope adapter for extension/dashboard stream messages
-Status: Phase 23 dashboard renderer migration complete; transport/relay and remote-control reverse mapping remain
-Last activity: 2026-06-17 - Completed Phase 23 Plan 04 dashboard renderer closeout
+Plan: 24-02 — Relay compatibility or package-backed relay integration
+Status: Phase 24 Plan 01 complete; relay compatibility, recovery parity, and remote-control reverse mapping remain
+Last activity: 2026-06-17 - Completed Phase 24 Plan 01 protocol/envelope adapter
 
-Progress: [██████░░░░] 58% (11/19 milestone plans)
+Progress: [██████░░░░] 63% (12/19 milestone plans)
 
 ## Roadmap At A Glance (v0.12.0)
 
@@ -43,7 +43,7 @@ Progress: [██████░░░░] 58% (11/19 milestone plans)
 | 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
 | 22 | Capture Adapter Migration | CAP-01..04 (4) | Complete |
 | 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Complete |
-| 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
+| 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | In Progress |
 | 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Pending |
 
 Coverage: 24/24 v1 requirements mapped, 0 orphaned.
@@ -52,7 +52,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 11 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 4/4, Phase 24: 0/4, Phase 25: 0/4)
+- Total plans completed (this milestone): 12 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 4/4, Phase 24: 1/4, Phase 25: 0/4)
 - Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
@@ -62,7 +62,7 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 | 21 | 3/3 | - | - |
 | 22 | 4/4 | - | - |
 | 23 | 4/4 | - | - |
-| 24 | 0/4 | - | - |
+| 24 | 1/4 | - | - |
 | 25 | 0/4 | - | - |
 
 *Updated after each plan completion.*
@@ -82,6 +82,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - **INV-03:** provider parity remains unchanged; stream internals are provider-agnostic.
 - **INV-04:** MV3-survivability and stream recovery paths stay preserved; package migration is additive runtime adaptation.
 - **INV-06:** Lattice public package stays pinned and audited (`.planning/LATTICE-PIN.md` + `package-lock.json` + tests agree).
+- **Phase 24 Plan 01:** `ws-client.js` now uses a classic-service-worker PhantomStream protocol bridge for stream/control constants and envelope encode/decode. The bridge is generated from `@full-self-browsing/phantom-stream/protocol` into `extension/ws/phantom-stream-protocol.js`, loaded after LZString and before `ws-client.js`. FSB keeps the stateless `_lz` shape and sends compressed frames only when the full encoded wire string is smaller than raw JSON; non-stream task/status messages still use the same `FSBWebSocket.send(type, payload)` surface.
 - [Phase ?]: Phase 14 Plan 01: trigger-store.js is a verbatim clone of mcp-task-store.js (6 enumerated changes only; code body byte-identical after inverse-rename). chrome.storage.session direct per D-12; agent_id stored faithfully (V4); only behavioral change is listArmedSnapshots filtering status==='armed'.
 - [Phase ?]: Phase 14 Plan 02: trigger-lifecycle.js clones mcp-visual-session-lifecycle.js with overlay STRIPPED, over FsbTriggerStore (storage-is-truth, re-read every tick). handleTriggerAlarm adds a noop_terminal idempotent fire-guard (D-09); restoreTriggersFromStorage adds the getAll() orphan sweep scoped to fsbTrigger: (D-08); three reap paths via absolute deadline_at (LIFE-05). FSB_TRIGGER_DEFAULT_TTL_MS=21600000 (6h, D-11) + 30s alarm-floor declared for Phase 17. evaluated_noop + armTrigger/clearTrigger are the fire-free Phase 15 seam.
 - [Phase ?]: Phase 14 Plan 03: wired the two trigger modules into background.js at four ADDITIVE glue points (importScripts store-before-lifecycle, bootstrap restoreTriggersFromStorage, onAlarm fsbTrigger: branch with early return, new tabs.onRemoved sibling), each mirroring its verified visual-lifecycle sibling. SURV-01/SURV-03/LIFE-05 now live in the SW; INV-04 held (agent-loop.js byte-untouched, setTimeout=8).

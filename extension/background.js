@@ -95,6 +95,7 @@ armMcpBridge('service-worker-evaluated');
 
 // Dashboard relay WebSocket client (auto-connects to full-selfbrowsing.com)
 try { importScripts('lib/lz-string.min.js'); } catch (e) { console.error('[FSB] Failed to load lz-string.min.js:', e.message); }
+try { importScripts('ws/phantom-stream-protocol.js'); } catch (e) { console.error('[FSB] Failed to load phantom-stream-protocol.js:', e.message); }
 // Phase 211-03 diagnostic logging: load the ring buffer BEFORE redactForLog so
 // that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. Both load
 // BEFORE ws-client.js so the WebSocket layer can use the helpers.

@@ -80,7 +80,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
   3. Recovery paths remain green: dashboard reconnect, extension reconnect, service-worker alarm, content late readiness, parked stream-start re-arm, and watchdog snapshot request.
   4. Remote-control click/type/scroll remains safe across stale frames, stream-tab changes, navigation, debugger contention, and ownership retargeting.
 **Plans**: 4 plans
-- [ ] 24-01-PLAN.md — Protocol/envelope adapter for extension/dashboard stream messages.
+- [x] 24-01-PLAN.md — Protocol/envelope adapter for extension/dashboard stream messages.
 - [ ] 24-02-PLAN.md — Relay compatibility or package-backed relay integration.
 - [ ] 24-03-PLAN.md — Recovery, readiness, watchdog, and reconnect parity.
 - [ ] 24-04-PLAN.md — Remote-control reverse mapping and debugger ownership parity.
@@ -110,7 +110,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 23. Dashboard Renderer Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
+| 24. Transport, Relay & Remote Control Integration | v0.12.0 | 1/4 | In Progress | - |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
 
 ## Research Flags (v0.12.0)

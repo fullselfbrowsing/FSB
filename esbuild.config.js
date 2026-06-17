@@ -183,6 +183,18 @@ const ENTRIES = [
     allowOverwrite: true,
   },
   {
+    name: 'ws-phantom-stream-protocol',
+    entryPoints: [path.join(SRC_ROOT, 'ws', 'phantom-stream-protocol-entry.js')],
+    outfile: path.join(SRC_ROOT, 'ws', 'phantom-stream-protocol.js'),
+    format: 'iife',
+    sourcemap: false,
+    platform: 'browser',
+    target: ['chrome120'],
+    bundle: true,
+    legalComments: 'none',
+    allowOverwrite: true,
+  },
+  {
     name: 'showcase-phantom-stream-viewer',
     entryPoints: [path.join(SHOWCASE_ROOT, 'js', 'phantom-stream-viewer-entry.js')],
     outfile: path.join(SHOWCASE_ROOT, 'js', 'phantom-stream-viewer.js'),

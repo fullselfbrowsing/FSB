@@ -6,18 +6,173 @@
 
 const FSB_SERVER_URL = 'https://full-selfbrowsing.com';
 var FSB_TRANSPORT_DIAGNOSTIC_LIMIT = 100;
-var FSB_TRANSPORT_TRACKED_TYPES = {
-  'dash:request-status': true,
-  'dash:dom-stream-start': true,
-  'ext:snapshot': true,
-  'ext:page-ready': true,
-  'ext:stream-state': true,
-  'ext:dom-snapshot': true,
-  'ext:dom-mutations': true,
-  'ext:dom-scroll': true,
-  'ext:dom-overlay': true,
-  'ext:dom-dialog': true
+var FSB_PHANTOMSTREAM_STREAM_FALLBACK = {
+  SNAPSHOT: 'ext:dom-snapshot',
+  MUTATIONS: 'ext:dom-mutations',
+  SCROLL: 'ext:dom-scroll',
+  OVERLAY: 'ext:dom-overlay',
+  DIALOG: 'ext:dom-dialog',
+  READY: 'ext:dom-ready',
+  REQUEST_SNAPSHOT: 'ext:request-snapshot',
+  STATE: 'ext:stream-state',
+  SUBTREE_RESPONSE: 'ext:ps-subtree-response'
 };
+var FSB_PHANTOMSTREAM_CONTROL_FALLBACK = {
+  START: 'dash:dom-stream-start',
+  STOP: 'dash:dom-stream-stop',
+  PAUSE: 'dash:dom-stream-pause',
+  RESUME: 'dash:dom-stream-resume',
+  SUBTREE_REQUEST: 'dash:ps-subtree-request'
+};
+var FSB_TRANSPORT_TRACKED_TYPES = {};
+FSB_TRANSPORT_TRACKED_TYPES['dash:request-status'] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.START] = true;
+FSB_TRANSPORT_TRACKED_TYPES['ext:snapshot'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['ext:page-ready'] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.STATE] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.SNAPSHOT] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.MUTATIONS] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.SCROLL] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.OVERLAY] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.DIALOG] = true;
+
+function getFSBPhantomStreamProtocol() {
+  var bridge = globalThis.FSBPhantomStreamProtocol;
+  return bridge && typeof bridge === 'object' ? bridge : {};
+}
+
+function getFSBProtocolGroup(name, fallback) {
+  var bridge = getFSBPhantomStreamProtocol();
+  var group = bridge && bridge[name];
+  return group && typeof group === 'object' ? group : fallback;
+}
+
+function getFSBStreamTypes() {
+  return getFSBProtocolGroup('STREAM', FSB_PHANTOMSTREAM_STREAM_FALLBACK);
+}
+
+function getFSBControlTypes() {
+  return getFSBProtocolGroup('CONTROL', FSB_PHANTOMSTREAM_CONTROL_FALLBACK);
+}
+
+function getFSBLZStringCodec() {
+  return (typeof LZString !== 'undefined' && LZString) ? LZString : null;
+}
+
+function isFSBCompressedEnvelope(envelope) {
+  var protocol = getFSBPhantomStreamProtocol();
+  if (typeof protocol.isCompressedEnvelope === 'function') {
+    return protocol.isCompressedEnvelope(envelope);
+  }
+  return !!envelope && envelope._lz === true && typeof envelope.d === 'string';
+}
+
+function encodeFSBWebSocketEnvelope(message) {
+  var raw = JSON.stringify(message);
+  var lz = getFSBLZStringCodec();
+  if (raw.length <= 1024 || !lz || typeof lz.compressToBase64 !== 'function') {
+    return {
+      wire: raw,
+      rawLength: raw.length,
+      encodedLength: raw.length,
+      compressed: false
+    };
+  }
+
+  var protocol = getFSBPhantomStreamProtocol();
+  var encoded = typeof protocol.encodeEnvelope === 'function'
+    ? protocol.encodeEnvelope(message, lz, 1024)
+    : JSON.stringify({ _lz: true, d: lz.compressToBase64(raw) });
+
+  var encodedEnvelope = null;
+  try {
+    encodedEnvelope = JSON.parse(encoded);
+  } catch (_e) {
+    encodedEnvelope = null;
+  }
+
+  if (isFSBCompressedEnvelope(encodedEnvelope) && encoded.length < raw.length) {
+    return {
+      wire: encoded,
+      rawLength: raw.length,
+      encodedLength: encoded.length,
+      compressed: true
+    };
+  }
+
+  return {
+    wire: raw,
+    rawLength: raw.length,
+    encodedLength: encoded ? encoded.length : raw.length,
+    compressed: false
+  };
+}
+
+function decodeFSBWebSocketEnvelope(wire) {
+  var protocol = getFSBPhantomStreamProtocol();
+  var lz = getFSBLZStringCodec();
+  if (typeof protocol.decodeEnvelope === 'function') {
+    return protocol.decodeEnvelope(wire, lz);
+  }
+
+  var outer;
+  try {
+    outer = JSON.parse(wire);
+  } catch (_e) {
+    return { ok: false, error: 'json-parse-failed' };
+  }
+
+  if (!isFSBCompressedEnvelope(outer)) {
+    return { ok: true, msg: outer };
+  }
+
+  if (!lz || typeof lz.decompressFromBase64 !== 'function') {
+    return { ok: false, error: 'decompress-unavailable' };
+  }
+  var decoded = lz.decompressFromBase64(outer.d);
+  if (!decoded) {
+    return { ok: false, error: 'decompress-failed' };
+  }
+  try {
+    return { ok: true, msg: JSON.parse(decoded) };
+  } catch (_err) {
+    return { ok: false, error: 'inner-json-parse-failed' };
+  }
+}
+
+function inspectFSBWireEnvelope(wire) {
+  var detail = {
+    compressed: false,
+    len: typeof wire === 'string' ? wire.length : 0
+  };
+  try {
+    var outer = JSON.parse(wire);
+    if (isFSBCompressedEnvelope(outer)) {
+      detail.compressed = true;
+      detail.len = outer.d.length;
+    }
+  } catch (_e) { /* best-effort diagnostics only */ }
+  return detail;
+}
+
+function describeFSBEnvelopeDecodeError(error) {
+  if (error === 'decompress-unavailable') return 'LZString not loaded before ws-client.js';
+  if (error === 'decompress-failed') return 'LZString.decompressFromBase64 returned null/empty';
+  if (error === 'inner-json-parse-failed') return 'compressed payload decoded but inner JSON parse failed';
+  if (error === 'json-parse-failed') return 'WebSocket frame is not valid JSON';
+  return error || 'WebSocket envelope decode failed';
+}
+
+function recordFSBEnvelopeDecodeFailure(error, wire) {
+  var inspected = inspectFSBWireEnvelope(wire);
+  recordFSBTransportFailure(error || 'envelope-decode-failed', {
+    target: 'inbound',
+    type: inspected.compressed ? '_lz' : 'wire',
+    tabId: getCurrentTransportTabId(),
+    error: describeFSBEnvelopeDecodeError(error),
+    len: inspected.len
+  });
+}
 
 function getCurrentTransportTabId() {
   if (typeof _streamingTabId !== 'undefined' && typeof _streamingTabId === 'number') {
@@ -720,41 +875,14 @@ class FSBWebSocket {
     };
 
     this.ws.onmessage = (event) => {
-      try {
-        var raw = JSON.parse(event.data);
-        // Self-identifying _lz envelope: { _lz: true, d: <base64> }.
-        // Mirrors showcase/js/dashboard.js:3517-3528. Stateless per-frame.
-        // Do NOT introduce permessage-deflate or alternative deflate libraries
-        // (PITFALLS.md P9 -- sliding-window corruption on bad frame requires
-        // reconnect to recover).
-        if (raw && raw._lz === true && typeof raw.d === 'string') {
-          if (typeof LZString === 'undefined') {
-            recordFSBTransportFailure('decompress-unavailable', {
-              target: 'inbound',
-              type: '_lz',
-              tabId: getCurrentTransportTabId(),
-              error: 'LZString not loaded (importScripts may have failed at background.js:37)',
-              len: raw.d.length
-            });
-            return;
-          }
-          var decoded = LZString.decompressFromBase64(raw.d);
-          if (!decoded) {
-            recordFSBTransportFailure('decompress-failed', {
-              target: 'inbound',
-              type: '_lz',
-              tabId: getCurrentTransportTabId(),
-              error: 'LZString.decompressFromBase64 returned null/empty',
-              len: raw.d.length
-            });
-            return;
-          }
-          raw = JSON.parse(decoded);
-        }
-        this._handleMessage(raw);
-      } catch (err) {
-        console.warn('[FSB WS] Failed to parse message:', err && err.message ? err.message : err);
+      var decoded = decodeFSBWebSocketEnvelope(event.data);
+      if (!decoded || decoded.ok !== true) {
+        var decodeError = decoded && decoded.error ? decoded.error : 'envelope-decode-failed';
+        recordFSBEnvelopeDecodeFailure(decodeError, event.data);
+        console.warn('[FSB WS] Failed to parse message:', describeFSBEnvelopeDecodeError(decodeError));
+        return;
       }
+      this._handleMessage(decoded.msg);
     };
 
     this.ws.onclose = (event) => {
@@ -814,27 +942,19 @@ class FSBWebSocket {
     }
 
     // _lz envelope contract (round-trip):
-    //   Outbound: { _lz: true, d: LZString.compressToBase64(JSON.stringify({type, payload, ts})) }
-    //             emitted when raw > 1024 bytes AND compressed.length < raw.length.
-    //   Inbound:  symmetric branch in onmessage at lines 515-522 above. Self-identifying.
+    //   Outbound uses PhantomStream encodeEnvelope({type, payload, ts}, LZString, 1024)
+    //             and only sends the encoded envelope when the full wire string is smaller.
+    //   Inbound uses PhantomStream decodeEnvelope(wire, LZString). Self-identifying.
     //   Stateless per-frame. Do NOT replace LZString with stateful deflate compression
     //   -- per-connection stateful compression (RFC 7692 permessage-deflate) corrupts the
     //   sliding window on any bad frame and forces a full WebSocket reconnect to recover
     //   (PITFALLS.md P9).
     try {
-      var raw = JSON.stringify({ type, payload, ts: Date.now() });
-      // Compress payloads larger than 1KB to avoid relay message size limits
-      if (raw.length > 1024 && typeof LZString !== 'undefined') {
-        var compressed = LZString.compressToBase64(raw);
-        // Only use compression if it actually reduces size
-        if (compressed.length < raw.length) {
-          console.log('[FSB WS] Compressed ' + type + ': ' + raw.length + ' -> ' + compressed.length + ' bytes (' + Math.round(compressed.length / raw.length * 100) + '%)');
-          this.ws.send(JSON.stringify({ _lz: true, d: compressed }));
-          recordFSBTransportCount('sentByType', type);
-          return true;
-        }
+      var encoded = encodeFSBWebSocketEnvelope({ type, payload, ts: Date.now() });
+      if (encoded.compressed) {
+        console.log('[FSB WS] Compressed ' + type + ': ' + encoded.rawLength + ' -> ' + encoded.encodedLength + ' bytes (' + Math.round(encoded.encodedLength / encoded.rawLength * 100) + '%)');
       }
-      this.ws.send(raw);
+      this.ws.send(encoded.wire);
       recordFSBTransportCount('sentByType', type);
       return true;
     } catch (err) {
@@ -1093,6 +1213,7 @@ class FSBWebSocket {
   _emitStreamState(status, reason, details) {
     var payload = details || {};
     var source = payload.source || 'ws-client';
+    var streamTypes = getFSBStreamTypes();
 
     // Phase 212 / STREAM-06: enrich restricted-tab states with pageType so the
     // dashboard can render a friendly placeholder ("New Tab", "Chrome Settings",
@@ -1116,7 +1237,7 @@ class FSBWebSocket {
       _rememberStreamState(status, reason, payload.tabId, payload.url || '', source);
     }
 
-    this.send('ext:stream-state', {
+    this.send(streamTypes.STATE, {
       status: status,
       reason: reason || '',
       streamIntentActive: (typeof _streamingActive !== 'undefined') && !!_streamingActive,
@@ -1188,6 +1309,7 @@ class FSBWebSocket {
    */
   _handleMessage(msg) {
     recordFSBTransportCount('receivedByType', msg && msg.type);
+    var controlTypes = getFSBControlTypes();
 
     switch (msg.type) {
       case 'pong':
@@ -1206,18 +1328,18 @@ class FSBWebSocket {
       // case 'dash:agent-run-now':
       //   this._handleAgentRunNow(msg.payload);
       //   break;
-      case 'dash:dom-stream-start':
+      case controlTypes.START:
         if (typeof _streamingActive !== 'undefined') _streamingActive = true;
         this._handleDashboardStreamStart(msg.payload);
         break;
-      case 'dash:dom-stream-stop':
+      case controlTypes.STOP:
         if (typeof _streamingActive !== 'undefined') _streamingActive = false;
         this._forwardToContentScript('domStreamStop', msg.payload);
         break;
-      case 'dash:dom-stream-pause':
+      case controlTypes.PAUSE:
         this._forwardToContentScript('domStreamPause', msg.payload);
         break;
-      case 'dash:dom-stream-resume':
+      case controlTypes.RESUME:
         this._forwardToContentScript('domStreamResume', msg.payload);
         break;
       case 'dash:remote-control-start':
