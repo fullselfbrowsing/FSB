@@ -30,6 +30,8 @@ const defaultSettings = {
   autoRefineSiteMaps: true,
   // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, default 8).
   fsbAgentCap: 8,
+  // Max simultaneous trigger watches (range 1-64, default 8).
+  fsbTriggerCap: 8,
   // Phase 245 D-07: global toggle for action change_report emission. When
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
@@ -161,6 +163,12 @@ function cacheElements() {
   // Phase 243 Plan 04 / UI-03: validation hint + live current-active counter.
   elements.fsbAgentCapValidation = document.getElementById('fsbAgentCapValidation');
   elements.fsbAgentCapCurrentActive = document.getElementById('fsbAgentCapCurrentActive');
+  // Trigger Concurrency cap card.
+  elements.fsbTriggerCap = document.getElementById('fsbTriggerCap');
+  elements.fsbTriggerCapDisplay = document.getElementById('fsbTriggerCapDisplay');
+  elements.fsbTriggerCapReset = document.getElementById('fsbTriggerCapReset');
+  elements.fsbTriggerCapValidation = document.getElementById('fsbTriggerCapValidation');
+  elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
@@ -347,6 +355,44 @@ function setupEventListeners() {
     });
   }
 
+  // Trigger Concurrency cap input + reset. Mirrors Agent Concurrency while
+  // keeping trigger storage/counter keys separate.
+  if (elements.fsbTriggerCap) {
+    elements.fsbTriggerCap.addEventListener('input', (e) => {
+      const rawValue = e.target.value;
+      const validationEl = elements.fsbTriggerCapValidation;
+      if (validationEl && typeof isCapInputInvalid === 'function') {
+        validationEl.style.display = isCapInputInvalid(rawValue) ? 'block' : 'none';
+      }
+
+      let raw = parseInt(rawValue, 10);
+      if (!Number.isFinite(raw)) raw = 8;
+      if (raw < 1) raw = 1;
+      if (raw > 64) raw = 64;
+      if (e.target.value !== String(raw)) e.target.value = String(raw);
+      if (elements.fsbTriggerCapDisplay) {
+        elements.fsbTriggerCapDisplay.textContent = String(raw);
+      }
+      if (typeof refreshActiveTriggerCount === 'function') {
+        refreshActiveTriggerCount();
+      }
+      markUnsavedChanges();
+    });
+  }
+  if (elements.fsbTriggerCapReset) {
+    elements.fsbTriggerCapReset.addEventListener('click', () => {
+      if (elements.fsbTriggerCap) elements.fsbTriggerCap.value = '8';
+      if (elements.fsbTriggerCapDisplay) elements.fsbTriggerCapDisplay.textContent = '8';
+      if (elements.fsbTriggerCapValidation) {
+        elements.fsbTriggerCapValidation.style.display = 'none';
+      }
+      if (typeof refreshActiveTriggerCount === 'function') {
+        refreshActiveTriggerCount();
+      }
+      markUnsavedChanges();
+    });
+  }
+
   // Phase 245 D-07: Action Change Reports toggle. Mirror the cap-toggle
   // pattern: change handler marks unsaved; saveSettings/loadSettings handle
   // persistence below.
@@ -369,6 +415,10 @@ function setupEventListeners() {
         scheduleRefreshActiveAgentCount();
       } else if (area === 'local' && changes && changes.fsbAgentCap) {
         scheduleRefreshActiveAgentCount();
+      } else if (area === 'session' && changes && changes.fsbTriggerRegistry) {
+        scheduleRefreshActiveTriggerCount();
+      } else if (area === 'local' && changes && changes.fsbTriggerCap) {
+        scheduleRefreshActiveTriggerCount();
       }
     });
   }
@@ -890,6 +940,25 @@ function loadSettings() {
       refreshActiveAgentCount();
     }
 
+    // Trigger Concurrency cap. Re-clamp on read in case storage was tampered
+    // with or set by an older build.
+    if (elements.fsbTriggerCap) {
+      let triggerCapValue = (typeof settings.fsbTriggerCap === 'number' && Number.isFinite(settings.fsbTriggerCap))
+        ? settings.fsbTriggerCap
+        : 8;
+      if (triggerCapValue < 1) triggerCapValue = 1;
+      if (triggerCapValue > 64) triggerCapValue = 64;
+      triggerCapValue = Math.floor(triggerCapValue);
+      elements.fsbTriggerCap.value = String(triggerCapValue);
+      if (elements.fsbTriggerCapDisplay) {
+        elements.fsbTriggerCapDisplay.textContent = String(triggerCapValue);
+      }
+    }
+
+    if (typeof refreshActiveTriggerCount === 'function') {
+      refreshActiveTriggerCount();
+    }
+
     if (elements.prioritizeViewport) {
       elements.prioritizeViewport.checked = settings.prioritizeViewport ?? true;
     }
@@ -984,6 +1053,47 @@ function refreshActiveAgentCount() {
   }
 }
 
+let _triggerCapCounterDebounceHandle = null;
+
+function scheduleRefreshActiveTriggerCount() {
+  if (_triggerCapCounterDebounceHandle !== null) {
+    clearTimeout(_triggerCapCounterDebounceHandle);
+  }
+  _triggerCapCounterDebounceHandle = setTimeout(() => {
+    _triggerCapCounterDebounceHandle = null;
+    refreshActiveTriggerCount();
+  }, 100);
+}
+
+function refreshActiveTriggerCount() {
+  const counterEl = elements.fsbTriggerCapCurrentActive;
+  if (!counterEl) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.session
+      || typeof chrome.storage.session.get !== 'function') {
+    return;
+  }
+  try {
+    chrome.storage.session.get('fsbTriggerRegistry', (result) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        return;
+      }
+      const envelope = result && result.fsbTriggerRegistry;
+      const active = (typeof computeActiveTriggerCount === 'function')
+        ? computeActiveTriggerCount(envelope)
+        : 0;
+      let cap = parseInt(elements.fsbTriggerCap && elements.fsbTriggerCap.value, 10);
+      if (!Number.isFinite(cap)) cap = 8;
+      const text = (typeof formatCounterText === 'function')
+        ? formatCounterText(active, cap)
+        : (active + ' of ' + cap + ' active');
+      counterEl.textContent = text;
+    });
+  } catch (_e) {
+    // Swallow — counter is purely informational and must never throw into
+    // the options page.
+  }
+}
+
 function saveSettings() {
   const settings = {
     modelProvider: elements.modelProvider?.value || 'xai',
@@ -1016,6 +1126,13 @@ function saveSettings() {
     // persist out-of-range cap values to chrome.storage.local.
     fsbAgentCap: (function() {
       var raw = parseInt(elements.fsbAgentCap?.value, 10);
+      if (!Number.isFinite(raw)) return 8;
+      if (raw < 1) return 1;
+      if (raw > 64) return 64;
+      return raw;
+    })(),
+    fsbTriggerCap: (function() {
+      var raw = parseInt(elements.fsbTriggerCap?.value, 10);
       if (!Number.isFinite(raw)) return 8;
       if (raw < 1) return 1;
       if (raw > 64) return 64;

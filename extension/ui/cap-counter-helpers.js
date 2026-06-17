@@ -39,6 +39,22 @@ function computeActiveAgentCount(envelope) {
   return count;
 }
 
+function computeActiveTriggerCount(envelope) {
+  if (!envelope || typeof envelope !== 'object') return 0;
+  var records = envelope.records;
+  if (!records || typeof records !== 'object') return 0;
+  var keys = Object.keys(records);
+  var count = 0;
+  for (var i = 0; i < keys.length; i++) {
+    var record = records[keys[i]];
+    if (!record || typeof record !== 'object') continue;
+    if (record.status === 'armed' || record.status === 'needs_attention' || record.status === 'blocked') {
+      count++;
+    }
+  }
+  return count;
+}
+
 function formatCounterText(active, cap) {
   var a = (typeof active === 'number' && Number.isFinite(active)) ? active : 0;
   var c = (typeof cap === 'number' && Number.isFinite(cap)) ? cap : 8;
@@ -58,6 +74,7 @@ function isCapInputInvalid(raw) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     computeActiveAgentCount: computeActiveAgentCount,
+    computeActiveTriggerCount: computeActiveTriggerCount,
     formatCounterText: formatCounterText,
     isCapInputInvalid: isCapInputInvalid
   };
@@ -65,6 +82,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
 if (typeof globalThis !== 'undefined') {
   globalThis.computeActiveAgentCount = computeActiveAgentCount;
+  globalThis.computeActiveTriggerCount = computeActiveTriggerCount;
   globalThis.formatCounterText = formatCounterText;
   globalThis.isCapInputInvalid = isCapInputInvalid;
 }

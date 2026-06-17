@@ -449,6 +449,42 @@
               </div>
             </div>
 
+            <!-- Trigger Concurrency cap (range 1-64, default 8) -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-bolt"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>Trigger Concurrency</h3>
+                  <p>Maximum simultaneous trigger watches</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <div class="setting-label">
+                    <span>Concurrency Cap</span>
+                    <span class="setting-value-display" id="fsbTriggerCapDisplay">8</span>
+                  </div>
+                  <input type="number" id="fsbTriggerCap" class="form-input"
+                         min="1" max="64" step="1" value="8">
+                  <button type="button" class="form-secondary-btn" id="fsbTriggerCapReset" style="margin-top: 8px;">
+                    Reset to default (8)
+                  </button>
+                  <div class="setting-hint">
+                    Default 8. Range 1 to 64. Lower = predictable resource use; higher = more parallel watches. Lowering this value while triggers are active does not stop existing watches; new triggers past the new cap are rejected.
+                  </div>
+                  <div class="setting-hint" id="fsbTriggerCapValidation"
+                       style="color: #ff6b6b; display: none; margin-top: 4px;">
+                    Must be between 1 and 64
+                  </div>
+                  <div class="setting-hint" id="fsbTriggerCapCurrentActive" style="margin-top: 4px;">
+                    0 of 8 active
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Phase 245 D-07: Action Change Reports global toggle (default ON) -->
             <div class="settings-card">
               <div class="settings-card-header">
