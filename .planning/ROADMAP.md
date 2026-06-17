@@ -10,7 +10,7 @@
 
 v0.12.0 replaces FSB's in-house Phantom Stream implementation with the extracted `fullselfbrowsing/PhantomStream` package. The existing code already has a working DOM-native live preview: content-side snapshot/diff capture, extension WebSocket routing, server relay, dashboard renderer, side channels, remote control, recovery watchdogs, and defensive stream-state diagnostics. The new milestone does not redesign the product surface; it moves ownership of the generic browser-mirroring engine into the reusable package while preserving FSB-specific pairing, task lifecycle, overlay identity, remote-control ownership, and dashboard state behavior.
 
-The crux is package intake and parity. Upstream declares `@fullselfbrowsing/phantom-stream@0.1.0`, but npm registry lookup returned 404 on 2026-06-17. Phase 21 therefore gates implementation on an approved immutable source and an exact surface map. The rest of the milestone proceeds layer by layer: capture first, renderer second, transport/relay/remote-control third, then removal, docs, and real browser UAT.
+The crux is package intake and parity. Initial planning referenced the stale unhyphenated package scope `@fullselfbrowsing/phantom-stream`, which returned npm 404 on 2026-06-17. Phase 21 Plan 01 corrected the approved source to the published `@full-self-browsing/phantom-stream@0.1.0` package with exact lockfile integrity. The rest of the milestone proceeds layer by layer: capture first, renderer second, transport/relay/remote-control third, then removal, docs, and real browser UAT.
 
 ## Phases
 
@@ -31,12 +31,12 @@ The crux is package intake and parity. Upstream declares `@fullselfbrowsing/phan
 **Depends on**: v0.11.0 complete; current Phantom Stream implementation green.
 **Requirements**: PKG-01, PKG-02, PKG-03, PKG-04
 **Success Criteria**:
-  1. `@fullselfbrowsing/phantom-stream` is either installable from npm with exact version/integrity or the milestone records an explicit decision to use a temporary immutable GitHub/tarball pin.
+  1. `@full-self-browsing/phantom-stream` is installable from npm with exact version/integrity, and the stale unhyphenated `@fullselfbrowsing/phantom-stream` source is rejected.
   2. Package exports are verified in code/tests, not assumed from README: protocol, capture, renderer, and any relay/transport/adapters are listed with supported import paths.
   3. A stream-contract map documents every current FSB behavior that must survive: snapshot, mutation diffs, scroll, overlays, dialogs, stale-session rejection, compression, relay, recovery, and remote control.
   4. The phase blocks further migration if package availability, ESM/MV3 compatibility, or missing exports make a safe replacement impossible.
 **Plans**: 3 plans
-- [ ] 21-01-PLAN.md — Package availability/provenance gate, lockfile strategy, and install-source decision.
+- [x] 21-01-PLAN.md — Package availability/provenance gate, lockfile strategy, and install-source decision.
 - [ ] 21-02-PLAN.md — Export/API smoke tests and ESM/MV3 bundling feasibility check.
 - [ ] 21-03-PLAN.md — FSB-to-PhantomStream contract map and migration invariants.
 
@@ -107,7 +107,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 21. Package Intake & Contract Mapping | v0.12.0 | 0/3 | Not started | - |
+| 21. Package Intake & Contract Mapping | v0.12.0 | 1/3 | In Progress | - |
 | 22. Capture Adapter Migration | v0.12.0 | 0/4 | Pending | - |
 | 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | Pending | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
