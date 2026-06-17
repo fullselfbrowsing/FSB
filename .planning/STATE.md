@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-06-17T04:07:16.627Z"
+stopped_at: Completed 20-03-PLAN.md
+last_updated: "2026-06-17T04:15:27.187Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 26
-  completed_plans: 25
-  percent: 96
+  completed_plans: 26
+  percent: 100
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-06-17
 
@@ -91,6 +91,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 19 P03 | 20min | 3 tasks | 9 files |
 | Phase 20 P01 | 22 min | 3 tasks | 5 files |
 | Phase 20 P02 | 13 min | 3 tasks | 2 files |
+| Phase 20 P03 | 29 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 20]: Active trigger count includes armed, needs_attention, and blocked while excluding terminal trigger records.
 - [Phase 20]: Cross-watch conflicts are rejected in background before read, persistence, observe startup, or pulse startup.
 - [Phase 20]: Conflict scans filter snapshots through owner visibility to avoid leaking another owner's trigger metadata.
+- [Phase 20]: Same-tab refresh-poll alarms now join a per-tab lock and share one explicit tab reload per due batch.
+- [Phase 20]: Refresh-poll batches still validate ownership and blocked-page state before reload, then re-read each snapshot before per-trigger lifecycle evaluation.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -189,9 +192,9 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T04:07:16.624Z
-Stopped at: Completed 20-02-PLAN.md
-Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-03-PLAN.md
+Last session: 2026-06-17T04:15:27.184Z
+Stopped at: Completed 20-03-PLAN.md
+Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-04-PLAN.md
 
 ## Next Actions
 
