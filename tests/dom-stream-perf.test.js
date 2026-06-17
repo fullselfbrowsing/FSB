@@ -29,7 +29,8 @@ const bundleSource = fs.readFileSync(
 console.log('--- Phase 22 package-backed capture invariants ---');
 assert(dsSource.includes('window.FSBPhantomStreamCapture'), 'dom-stream adapter consumes PhantomStream capture bridge');
 assert(dsSource.includes('bridge.createCapture'), 'dom-stream adapter constructs package capture');
-assert(dsSource.includes('stampLegacyNodeIds'), 'legacy dashboard nid bridge present');
+assert(!dsSource.includes('stampLegacyNodeIds'), 'legacy dashboard nid bridge removed');
+assert(!dsSource.includes('data-fsb-nid'), 'dom-stream adapter no longer stamps legacy nid attributes');
 assert(dsSource.includes('getStaleFlushCount: function()'), 'FSB.domStream.getStaleFlushCount accessor present');
 assert(!/function serializeDOM\s*\(/.test(dsSource), 'local serializeDOM implementation removed');
 assert(!/function processMutationBatch\s*\(/.test(dsSource), 'local mutation diff implementation removed');

@@ -3,8 +3,7 @@
 /**
  * Phase 22 capture adapter migration.
  *
- * Static guard for the package-backed dom-stream adapter and the temporary
- * legacy dashboard identity bridge.
+ * Static guard for the package-backed dom-stream adapter.
  *
  * Run: node tests/phantom-stream-capture-adapter.test.js
  */
@@ -62,12 +61,12 @@ ok(domStreamSource.includes("action: 'domStreamDialog'"),
 ok(domStreamSource.includes("action: 'domStreamReady'"),
   'adapter forwards ready ping to existing background action');
 
-ok(domStreamSource.includes('stampLegacyNodeIds'),
-  'adapter has temporary legacy identity stamping bridge');
-ok(domStreamSource.includes("node.setAttribute('data-fsb-nid'"),
-  'legacy bridge stamps data-fsb-nid for current dashboards');
-ok(domStreamSource.includes('next.html = stampLegacyNodeIds(next.html, next.nodeIds)'),
-  'legacy bridge stamps add-op HTML from PhantomStream nodeIds');
+ok(!domStreamSource.includes('stampLegacyNodeIds'),
+  'temporary legacy identity stamping bridge removed');
+ok(!domStreamSource.includes('data-fsb-nid'),
+  'adapter no longer stamps data-fsb-nid into mirrored HTML');
+ok(!domStreamSource.includes('_stampLegacyNodeIdsForTest'),
+  'adapter no longer exposes legacy nid stamping test hook');
 
 ok(domStreamSource.includes('resumeWithFreshSnapshot'),
   'adapter preserves FSB resume-as-fresh-snapshot behavior');
@@ -241,14 +240,14 @@ function runAdapterSimulation() {
 
   const snapshot = sent.find((message) => message.action === 'domStreamSnapshot');
   assert(snapshot, 'snapshot forwarded');
-  assert(snapshot.snapshot.html.includes('data-fsb-nid="1"'), 'snapshot root stamped with legacy nid');
-  assert(snapshot.snapshot.html.includes('data-fsb-nid="2"'), 'snapshot child stamped with legacy nid');
+  assert.deepEqual(snapshot.snapshot.nodeIds, ['1', '2'], 'snapshot nodeIds sidecar preserved');
+  assert(!snapshot.snapshot.html.includes('data-fsb-nid='), 'snapshot HTML is not legacy-stamped');
 
   const mutations = sent.find((message) => message.action === 'domStreamMutations');
   assert(mutations, 'mutations forwarded');
   assert.equal(mutations.staleFlushCount, 2, 'staleFlushCount forwarded at background action level');
-  assert(mutations.mutations[0].html.includes('data-fsb-nid="3"'), 'add-op root stamped with legacy nid');
-  assert(mutations.mutations[0].html.includes('data-fsb-nid="4"'), 'add-op child stamped with legacy nid');
+  assert.deepEqual(mutations.mutations[0].nodeIds, ['3', '4'], 'add-op nodeIds sidecar preserved');
+  assert(!mutations.mutations[0].html.includes('data-fsb-nid='), 'add-op HTML is not legacy-stamped');
 
   assert(sent.some((message) => message.action === 'domStreamReady'), 'ready ping forwarded');
   assert(sent.some((message) => message.action === 'domStreamScroll' && message.scrollY === 6), 'scroll forwarded');

@@ -79,53 +79,17 @@
     if (typeof payload.snapshotId === 'number') lastSnapshotId = payload.snapshotId;
   }
 
-  function stampLegacyNodeIds(html, nodeIds) {
-    if (!html || !Array.isArray(nodeIds) || nodeIds.length === 0) return html || '';
-    try {
-      var template = document.createElement('template');
-      template.innerHTML = html;
-      var walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
-      var index = 0;
-      var node;
-      while ((node = walker.nextNode())) {
-        var nid = nodeIds[index];
-        if (nid !== undefined && nid !== null && String(nid) !== '') {
-          node.setAttribute('data-fsb-nid', String(nid));
-        }
-        index += 1;
-      }
-      return template.innerHTML;
-    } catch (err) {
-      logWarn('[DOM Stream] legacy nid stamping failed', {
-        error: err && err.message ? err.message : String(err)
-      });
-      return html || '';
-    }
-  }
-
   function adaptSnapshotPayload(payload) {
     var next = Object.assign({}, payload || {});
-    if (next.html && Array.isArray(next.nodeIds)) {
-      next.html = stampLegacyNodeIds(next.html, next.nodeIds);
-    }
     rememberIdentity(next);
     lastSnapshot = next;
-    return next;
-  }
-
-  function adaptMutationOp(op) {
-    if (!op || Object(op) !== op) return op;
-    var next = Object.assign({}, op);
-    if (next.op === 'add' && next.html && Array.isArray(next.nodeIds)) {
-      next.html = stampLegacyNodeIds(next.html, next.nodeIds);
-    }
     return next;
   }
 
   function adaptMutationPayload(payload) {
     var next = Object.assign({}, payload || {});
     next.mutations = Array.isArray(next.mutations)
-      ? next.mutations.map(adaptMutationOp)
+      ? next.mutations.slice()
       : [];
     if (typeof next.staleFlushCount === 'number') {
       lastStaleFlushCount = next.staleFlushCount;
@@ -386,8 +350,7 @@
     isStreaming: function() { return streaming; },
     isPaused: function() { return paused; },
     getLastSnapshot: function() { return lastSnapshot; },
-    getCapture: function() { return capture; },
-    _stampLegacyNodeIdsForTest: stampLegacyNodeIds
+    getCapture: function() { return capture; }
   };
 
   FSB._modules = FSB._modules || {};
