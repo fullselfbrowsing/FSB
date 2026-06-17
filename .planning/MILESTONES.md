@@ -1,5 +1,29 @@
 # Project Milestones: FSB (Full Self-Browsing)
 
+## v0.12.0 PhantomStream Package Migration (Shipped: 2026-06-17)
+
+**Phases completed:** 5 phases (21-25), 19 plans, 24/24 requirements satisfied.
+
+**Archive:** `.planning/milestones/v0.12.0-ROADMAP.md`, `.planning/milestones/v0.12.0-REQUIREMENTS.md`, `.planning/milestones/v0.12.0-MILESTONE-AUDIT.md`, and `.planning/milestones/v0.12.0-phases/`.
+
+**Audit status:** `tech_debt` -- automated gates passed, with live Chrome-extension dashboard preview and remote-control UAT explicitly recorded as `human_needed` in Phase 25.
+
+**Key accomplishments:**
+
+- Pinned the published npm package `@full-self-browsing/phantom-stream@0.1.0`, rejected the stale unhyphenated package source, and documented package provenance, tarball integrity, verified export surface, and FSB-to-PhantomStream contract mapping.
+- Replaced content-side generic capture ownership with a thin `extension/content/dom-stream.js` adapter around the bundled PhantomStream capture bridge while preserving FSB-specific actions, readiness pings, overlay/dialog/scroll side channels, stale-flush diagnostics, and resume-as-fresh-snapshot behavior.
+- Moved static and Angular dashboard preview rendering to the shared `window.FSBPhantomStreamViewer` wrapper so snapshot assembly, mutation application, viewport mapping, and renderer sanitizer behavior are package-backed rather than duplicated across dashboards.
+- Aligned stream transport, compression envelopes, relay classification/frame limits, recovery watchdogs, and remote-control frame handling with PhantomStream-compatible helpers while preserving FSB hash-key rooms, task/status traffic, debugger ownership reporting, and legacy dashboard frame compatibility.
+- Removed the legacy `data-fsb-nid` stamping bridge, added deterministic differential parity coverage, and wired PhantomStream package/protocol/capture/renderer/relay/security/dashboard/recovery tests into the root `npm test` gate.
+- Completed final automated gates: `npm run validate:extension`, `npm test`, `npm run showcase:build`, and `git diff --check`.
+
+**Accepted closeout caveats:**
+
+- Live Chrome-extension UAT remains user-gated and is not marked passed. Required scenarios are recorded in `.planning/milestones/v0.12.0-phases/25-parity-removal-docs-browser-uat/25-HUMAN-UAT.md`: live preview, mutation fidelity, side channels, dialogs, remote click/type/scroll, navigation/retargeting, reconnect/reinject recovery, restricted/no-tab states, large pages, masking, and external debugger contention.
+- The milestone audit status is `tech_debt` rather than clean `passed` solely because of the recorded human-needed UAT. No critical requirement, integration, or automated gate blocker remains.
+
+---
+
 ## v0.10.0 Autopilot via Lattice SDK (Shipped: 2026-06-15)
 
 **Phases completed:** 13 phases, 52 plans, 123 tasks

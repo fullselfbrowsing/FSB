@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
-status: phases_complete
-stopped_at: Completed 25-04-PLAN.md
+status: milestone_archived
+stopped_at: Archived v0.12.0 milestone
 last_updated: "2026-06-17T19:40:06.000Z"
-last_activity: 2026-06-17 - Completed Phase 25 Plan 04 final gates and UAT record
+last_activity: 2026-06-17 - Archived v0.12.0 PhantomStream Package Migration
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,22 +18,22 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-17 -- v0.12.0 PhantomStream Package Migration active; invariants INV-01..06)
-See: .planning/ROADMAP.md (v0.12.0 = Phases 21-25; v0.11.0 summarized under completed milestones)
-See: .planning/REQUIREMENTS.md (24 v1 requirements, all mapped to Phases 21-25)
+See: .planning/PROJECT.md (updated 2026-06-17 -- v0.12.0 archived; no active milestone)
+See: .planning/ROADMAP.md (v0.12.0 archived under completed milestones)
+See: .planning/milestones/v0.12.0-REQUIREMENTS.md (24 v1 requirements, all satisfied)
 See: .planning/research/PHANTOMSTREAM-PACKAGE.md (package intake facts, npm 404, migration risks)
 See: .planning/PHANTOMSTREAM-PIN.md (active package source, provenance, adapter boundaries, and release-note language)
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The dashboard preview must preserve that value while PhantomStream owns the generic DOM-mirroring engine.
-**Current focus:** v0.12.0 phase execution is complete. Next step is milestone audit/closeout; live Chrome-extension UAT remains recorded as `human_needed`, not passed.
+**Current focus:** No active milestone. Start the next milestone with `$gsd-new-milestone`; live Chrome-extension UAT remains recorded as `human_needed`, not passed.
 
 ## Current Position
 
-Phase: 25 (Parity Removal, Docs & Browser UAT) — COMPLETE
-Plan: All Phase 25 plans complete
-Status: v0.12.0 phase execution complete; milestone audit/closeout next
-Last activity: 2026-06-17 - Completed Phase 25 Plan 04 final gates and UAT record
+Phase: None active
+Plan: None active
+Status: v0.12.0 archived with tech_debt audit status
+Last activity: 2026-06-17 - Archived v0.12.0 PhantomStream Package Migration
 
 Progress: [██████████] 100% (19/19 milestone plans)
 
@@ -183,8 +183,9 @@ Items acknowledged and deferred at v0.10.0 milestone close on 2026-06-15 (Chrome
 | verification_gap | Phase 12 / 12-VERIFICATION.md | human_needed | v0.10.0 close |
 | uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 Phase 16 close |
 | uat_gap | Phase 20 / 20-HUMAN-UAT.md | human_needed; 12 live-browser/composed trigger scenarios | v0.11.0 Phase 20 close |
+| uat_gap | Phase 25 / 25-HUMAN-UAT.md | human_needed; 12 live Chrome-extension PhantomStream scenarios | v0.12.0 close |
 
-Carry-forward publish/tag gates (pre-existing and current, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items.
+Carry-forward publish/tag gates (pre-existing and current, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items; 12 Phase 25 live Chrome-extension PhantomStream UAT items.
 
 ## Lattice Integration State (carried, INV-06)
 
@@ -193,9 +194,9 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 ## Session Continuity
 
 Last session: 2026-06-17T19:40:06.000Z
-Stopped at: Completed 25-04-PLAN.md
+Stopped at: Archived v0.12.0 milestone
 Resume file: None
 
 ## Next Actions
 
-Run milestone audit/closeout for v0.12.0. Existing v0.11 live-browser UAT/release actions and v0.12.0 Chrome-extension browser UAT remain carried-forward, user-gated debt.
+Start the next milestone with `$gsd-new-milestone` when ready. Existing v0.11 live-browser UAT/release actions and v0.12.0 Chrome-extension browser UAT remain carried-forward, user-gated debt.

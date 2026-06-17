@@ -10,9 +10,10 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17. FSB now has a storage-backed trigger tool family across autopilot and MCP: live-observe, refresh-poll, fire-condition evaluation, value extraction, blocking/detached reporting, companion status/stop/list tools, trigger-cap UI, and documentation. Live-browser/composed trigger UAT and release actions remain user-gated.
+**Last completed:** v0.12.0 PhantomStream Package Migration -- completed 2026-06-17. FSB now delegates generic dashboard DOM live-preview capture, renderer, protocol, relay classification, compression, stale-frame, sanitizer, and remote-control frame behavior to the pinned `@full-self-browsing/phantom-stream@0.1.0` package while keeping FSB-specific pairing, task/status traffic, dashboard state, overlay identity, and debugger ownership adapters. Live Chrome-extension UAT remains user-gated and recorded as `human_needed`.
 
 **Recent shipping cadence:**
+- v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
 - v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
 - v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
 - v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
@@ -30,33 +31,20 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone: v0.12.0 PhantomStream Package Migration
+## Current Milestone
 
-**Goal:** Replace FSB's in-house dashboard DOM streaming engine with the extracted PhantomStream package while preserving the current live preview, recovery, side-channel, relay, and remote-control behavior.
+No active milestone is currently planned. Start the next milestone with `$gsd-new-milestone`.
 
-**Why this matters:** Phantom Stream began inside FSB and now exists as a standalone `fullselfbrowsing/PhantomStream` framework. Keeping the generic browser-mirroring engine duplicated inside FSB creates drift: fixes to capture, renderer, relay, security masking, and protocol behavior need to land twice. v0.12.0 makes the published PhantomStream package the source of truth and leaves FSB with only product-specific adapters.
+## Last Milestone: v0.12.0 PhantomStream Package Migration
 
-**Target features:**
-- **Package intake gate:** use the exact npm dependency `@full-self-browsing/phantom-stream@0.1.0` with package-lock integrity recorded in `.planning/PHANTOMSTREAM-PIN.md`; the stale `@fullselfbrowsing/phantom-stream` name is rejected and documented only as historical correction.
-- **Capture adapter:** `extension/content/dom-stream.js` delegates snapshot/diff internals to PhantomStream capture while preserving FSB control messages, readiness probe, overlay exclusion, scroll/dialog/overlay side channels, diagnostics, and watchdog behavior.
-- **Renderer adapter:** static and Angular dashboards route snapshot rendering and diff application through the shared PhantomStream viewer wrapper, keeping the existing preview state machine and visual controls.
-- **Transport/relay alignment:** stream envelopes use PhantomStream-compatible protocol helpers and relay classification/limits, while FSB keeps hash-key rooms, task/status WS traffic, compression-size guards, backpressure diagnostics, and recovery.
-- **Remote-control parity:** FSB preserves click/type/key/scroll CDP dispatch, debugger ownership reporting, retarget-required handling, and stale-frame safety while accepting PhantomStream remote-control frame shapes.
-- **Removal and proof:** remove duplicate in-house stream engines, update docs/provenance, and close with automated parity plus real browser UAT.
+**Status:** Completed on 2026-06-17. Automated gates passed; live Chrome-extension UAT remains `human_needed`.
+
+**Outcome:** FSB replaced duplicate in-house generic DOM stream engines with the pinned PhantomStream package. The content-side capture adapter, shared static/Angular dashboard viewer wrapper, service-worker protocol bridge, server relay compatibility adapter, and remote-control mapping now preserve FSB product behavior while delegating generic browser mirroring to PhantomStream.
 
 **Architecture notes:**
 - Installed package: `@full-self-browsing/phantom-stream@0.1.0` from npm. Verified exports include `./protocol`, `./capture`, `./renderer`, `./relay`, `./transport/websocket`, and adapters listed in `.planning/phases/21-package-intake-contract-mapping/21-PACKAGE-SURFACE.md`.
 - Rejected package: `@fullselfbrowsing/phantom-stream` returned `E404` on 2026-06-17. Do not use it in active docs or code except to explain the correction.
 - FSB has two dashboard surfaces (`showcase/js/dashboard.js` and Angular dashboard). Both consume the shared `window.FSBPhantomStreamViewer` wrapper to prevent renderer drift.
-
-**Carried-forward invariants (apply to this milestone):**
-- **INV-01** existing MCP wire contracts stay byte-identical; DOM streaming internals are not a schema change.
-- **INV-02** autopilot and MCP continue sharing the same browser-control/tool registry where relevant; no stream-only control fork.
-- **INV-03** provider parity remains unchanged; stream internals are provider-agnostic.
-- **INV-04** MV3-survivability preserved; stream recovery continues to survive service-worker wake/reconnect paths.
-- **INV-06** public package pins stay audited. Lattice remains pinned separately; PhantomStream gets its own package/source pin record during Phase 21.
-
-**Knock-on version:** likely extension/showcase/dashboard implementation change, but no MCP package version bump unless a later phase changes exposed MCP contracts.
 
 ## Last Milestone: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
 
@@ -641,4 +629,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-17 -- Phase 25 Plan 03 documents PhantomStream package provenance and the remaining FSB-specific adapter boundaries.*
+*Last updated: 2026-06-17 -- v0.12.0 PhantomStream Package Migration archived; no active milestone is currently planned.*
