@@ -4,8 +4,8 @@ milestone: v0.10.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 20 UI-SPEC approved
-last_updated: "2026-06-17T03:54:17.411Z"
-last_activity: 2026-06-17 -- Phase 20 planning complete
+last_updated: "2026-06-17T03:55:26.353Z"
+last_activity: 2026-06-17 -- Phase 20 execution started
 progress:
   total_phases: 8
   completed_phases: 6
@@ -25,14 +25,14 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 20 — integration-cap-ui-docs-edge-cases
+**Current focus:** Phase 20 — Integration, Cap UI, Docs & Edge Cases
 
 ## Current Position
 
-Phase: 20 (integration-cap-ui-docs-edge-cases) — READY
-Plan: TBD
-Status: Ready to execute
-Last activity: 2026-06-17 -- Phase 20 planning complete
+Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 20
+Last activity: 2026-06-17 -- Phase 20 execution started
 
 Progress: [███████···] 75% (6/8 phases)
 
