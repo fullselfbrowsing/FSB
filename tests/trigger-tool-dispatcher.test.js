@@ -229,6 +229,53 @@ async function caseToolExecutorTriggerRoutesDelegateToBackground() {
   assert.strictEqual(src.includes('triggerObserveStart'), false, 'tool executor does not own live-observe startup');
 }
 
+async function caseToolExecutorRuntimeStripsUntrustedAutopilotFields() {
+  const { executeTool } = require(path.join(ROOT, 'extension', 'ai', 'tool-executor.js'));
+  const previousDispatch = global.fsbTriggerDispatchToolRequest;
+  const calls = [];
+  global.fsbTriggerDispatchToolRequest = async function(toolName, params, context) {
+    calls.push({ toolName, params, context });
+    if (toolName === 'stop_trigger') return { success: true, stopped: false, trigger_id: params.trigger_id };
+    if (toolName === 'get_trigger_status') return { success: true, status: { trigger_id: params.trigger_id } };
+    return { success: true, trigger_id: 'trg_runtime', status: { status: 'armed' } };
+  };
+
+  try {
+    const triggerResult = await executeTool('trigger', {
+      selector: '#price',
+      condition: { kind: 'changed' },
+      targetTabId: 99,
+      agent_id: 'spoof_snake',
+      agentId: 'spoof_camel',
+      ownership_token: 'tok_snake',
+      ownershipToken: 'tok_camel'
+    }, 55);
+    assert.strictEqual(triggerResult.success, true, 'runtime trigger execution succeeds through dispatch helper');
+    assert.strictEqual(triggerResult.hadEffect, true, 'successful trigger arm is effectful');
+    assert.strictEqual(calls[0].toolName, 'trigger', 'runtime trigger dispatch uses trigger tool name');
+    assert.strictEqual(calls[0].params.agent_id, undefined, 'runtime trigger params strip agent_id');
+    assert.strictEqual(calls[0].params.agentId, undefined, 'runtime trigger params strip agentId');
+    assert.strictEqual(calls[0].params.ownership_token, undefined, 'runtime trigger params strip ownership_token');
+    assert.strictEqual(calls[0].params.ownershipToken, undefined, 'runtime trigger params strip ownershipToken');
+    assert.strictEqual(calls[0].params.target_tab_id, 99, 'runtime trigger params normalize targetTabId to target_tab_id');
+    assert.deepStrictEqual(calls[0].context, { tabId: 55, source: 'autopilot' }, 'runtime trigger context is trusted autopilot tab context only');
+
+    const statusResult = await executeTool('get_trigger_status', { trigger_id: 'trg_runtime' }, 55);
+    assert.strictEqual(statusResult.success, true, 'runtime get_trigger_status succeeds through dispatch helper');
+    assert.strictEqual(statusResult.hadEffect, false, 'get_trigger_status is never effectful');
+
+    const idempotentStop = await executeTool('stop_trigger', { trigger_id: 'trg_runtime' }, 55);
+    assert.strictEqual(idempotentStop.success, true, 'runtime stop_trigger succeeds through dispatch helper');
+    assert.strictEqual(idempotentStop.hadEffect, false, 'idempotent stop_trigger is not effectful when nothing stopped');
+  } finally {
+    if (previousDispatch === undefined) {
+      delete global.fsbTriggerDispatchToolRequest;
+    } else {
+      global.fsbTriggerDispatchToolRequest = previousDispatch;
+    }
+  }
+}
+
 async function caseStorageSourceContracts() {
   const src = readSource(BACKGROUND_PATH);
   const statusSrc = functionSource(src, 'fsbTriggerHandleToolStatus');
@@ -669,6 +716,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('MCP TaskQueue trigger companions bypass pending mutation', caseMcpQueueCompanionsBypassPendingMutation);
   await runCase('MCP dispatcher trigger routes delegate to background helper', caseMcpDispatcherTriggerRoutesDelegateToBackground);
   await runCase('tool executor trigger routes delegate to background helper', caseToolExecutorTriggerRoutesDelegateToBackground);
+  await runCase('tool executor runtime strips untrusted autopilot trigger fields', caseToolExecutorRuntimeStripsUntrustedAutopilotFields);
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
