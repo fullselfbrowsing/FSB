@@ -66,7 +66,7 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 ### REG -- Registry parity & contract safety
 
 - [x] **REG-01**: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` are registered once in the shared tool registry and exposed to BOTH FSB autopilot and the MCP server (INV-02).
-- [ ] **REG-02**: The companion tools (`stop_trigger` / `get_trigger_status` / `list_triggers`) are in the MCP read-only bypass set, and the long-running watcher runs in `background.js` (not the MCP handler), so a blocking `trigger()` never starves the single-slot task queue or deadlocks its own `stop_trigger`.
+- [x] **REG-02**: The companion tools (`stop_trigger` / `get_trigger_status` / `list_triggers`) are in the MCP read-only bypass set, and the long-running watcher runs in `background.js` (not the MCP handler), so a blocking `trigger()` never starves the single-slot task queue or deadlocks its own `stop_trigger`.
 - [x] **REG-03**: All existing MCP tool schemas remain byte-identical; the trigger family is purely additive (INV-01), verified by the existing schema-lock CI gate.
 - [x] **REG-04**: The trigger tools behave identically across all 7 AI providers when driven by autopilot (INV-03; trigger logic is provider-agnostic).
 
@@ -145,7 +145,7 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | VIS-03 | Phase 16 | Complete |
 | VIS-04 | Phase 16 | Complete |
 | REG-01 | Phase 18 | Complete |
-| REG-02 | Phase 18 | Pending |
+| REG-02 | Phase 18 | Complete |
 | REG-03 | Phase 18 | Complete |
 | REG-04 | Phase 18 | Complete |
 

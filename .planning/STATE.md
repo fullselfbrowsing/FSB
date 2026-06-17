@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-06-16T21:22:53.860Z"
-last_activity: 2026-06-16
+stopped_at: Completed 18-02-PLAN.md
+last_updated: "2026-06-17T00:38:56.126Z"
+last_activity: 2026-06-17
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 18
-  completed_plans: 17
-  percent: 94
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 18 (shared-tool-registry-dispatcher-wiring) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-06-16
+Last activity: 2026-06-17
 
 Progress: [█████·····] 50% (4/8 phases)
 
@@ -82,6 +82,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 17 P03 | 8 min | 3 tasks | 2 files |
 | Phase 17 P04 | 7 min | 2 tasks | 5 files |
 | Phase 18-shared-tool-registry-dispatcher-wiring P01 | 6min | 2 tasks | 5 files |
+| Phase 18-shared-tool-registry-dispatcher-wiring P02 | 10min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,10 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger tools are plain background-routed registry entries, not visual-session action tools.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: stop_trigger, get_trigger_status, and list_triggers are _readOnly:true so queue bypass can derive from the shared registry.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger.condition stays a JSON Schema object; nested condition validation remains in the trigger runtime.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger status/list responses project from FsbTriggerStore snapshots, not activeSessions or alarm names.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: stop_trigger is idempotent for missing or terminal snapshots but rejects cross-agent access before cleanup side effects.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: autopilot trigger arms derive legacy:autopilot and ownershipToken from fsbAgentRegistryInstance instead of trusting caller-supplied identity.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger returns a bounded arm result after validation, baseline read, persistence, and watcher startup; Phase 19 owns blocking/detached reporting.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -160,8 +165,8 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-16T21:22:53.856Z
-Stopped at: Completed 18-01-PLAN.md
+Last session: 2026-06-17T00:38:56.123Z
+Stopped at: Completed 18-02-PLAN.md
 Resume file: None
 
 ## Next Actions
