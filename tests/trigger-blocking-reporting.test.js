@@ -203,6 +203,7 @@ function buildBridgeHarness(options = {}) {
   const snapshots = { ...(options.snapshots || {}) };
   const dispatchCalls = [];
   const progressCalls = [];
+  const markTimedOutCalls = [];
 
   const triggerStore = {
     async readSnapshot(triggerId) {
@@ -256,6 +257,27 @@ function buildBridgeHarness(options = {}) {
   };
   context.globalThis = context;
   context.FsbTriggerStore = triggerStore;
+  context.fsbTriggerMarkTimedOutForMcp = options.fsbTriggerMarkTimedOutForMcp || (async (triggerId, timeoutContext) => {
+    markTimedOutCalls.push({ triggerId, context: timeoutContext });
+    const prior = snapshots[triggerId] || { trigger_id: triggerId };
+    const next = {
+      ...prior,
+      trigger_id: triggerId,
+      status: 'timed_out',
+      outcome: 'timed_out',
+      timed_out_at: clock.now(),
+      terminal_reason: 'timeout',
+      last_event: null,
+    };
+    snapshots[triggerId] = next;
+    return {
+      success: true,
+      outcome: 'timed_out',
+      trigger_id: triggerId,
+      status: next,
+      cleanup: { markTriggerTimedOut: true },
+    };
+  });
   context.fsbAutomationLifecycleBus = new EventTarget();
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
@@ -281,6 +303,7 @@ this.__phase19 = {
     client,
     dispatchCalls,
     progressCalls,
+    markTimedOutCalls,
     snapshots,
     triggerStore,
     exports: context.__phase19,
@@ -427,7 +450,43 @@ async function safety_ceiling_auto_detaches() {
   check(result && result.detached === true, 'safety ceiling marks detached true');
   check(result && result.reason === 'safety_ceiling', 'safety ceiling reason is safety_ceiling');
   check(harness.snapshots.trg_safety && harness.snapshots.trg_safety.status === 'armed', 'safety ceiling keeps snapshot armed');
+  check(harness.markTimedOutCalls.length === 0, 'safety ceiling does not call markTriggerTimedOut cleanup');
   check(harness.clock.activeIntervalCount() === 0, 'safety ceiling clears heartbeat interval');
+}
+
+async function blocking_timeout_marks_timed_out() {
+  console.log('\n--- blocking_timeout_marks_timed_out ---');
+  const harness = buildBridgeHarness({
+    snapshots: {
+      trg_timeout: {
+        trigger_id: 'trg_timeout',
+        status: 'armed',
+        current_value: { text: '$10.00' },
+        target_tab_id: 77,
+      },
+    },
+  });
+  const promise = harness.client._routeMessage('mcp:trigger', {
+    trigger_id: 'trg_timeout',
+    selector: '#price',
+    condition: { kind: 'changed' },
+    watch: 'live-observe',
+    target_tab_id: 77,
+    timeout_ms: 120_000,
+  }, 'msg-timeout');
+
+  await flushMicrotasks();
+  await harness.clock.advance(120_000);
+  const result = await promise;
+  check(result && result.outcome === 'timed_out', 'blocking timeout settles as timed_out');
+  check(result && result.success === true, 'blocking timeout is a successful non-error outcome');
+  check(harness.markTimedOutCalls.length === 1, 'blocking timeout calls markTriggerTimedOut cleanup once');
+  check(harness.markTimedOutCalls[0] && harness.markTimedOutCalls[0].triggerId === 'trg_timeout', 'timeout cleanup receives trigger_id');
+  check(harness.markTimedOutCalls[0] && harness.markTimedOutCalls[0].context && harness.markTimedOutCalls[0].context.source === 'mcp', 'timeout cleanup context is MCP-scoped');
+  check(harness.snapshots.trg_timeout && harness.snapshots.trg_timeout.status === 'timed_out', 'timeout cleanup persists timed_out snapshot');
+  check(result && result.status && result.status.status === 'timed_out', 'timeout result returns timed_out status');
+  check(result && result.cleanup && result.cleanup.markTriggerTimedOut === true, 'timeout result carries cleanup marker');
+  check(harness.clock.activeIntervalCount() === 0, 'timeout settlement clears heartbeat interval');
 }
 
 async function bridge_disconnect_partial() {
@@ -474,6 +533,7 @@ async function run() {
   await detached_returns_immediately();
   await blocking_heartbeat_30s();
   await safety_ceiling_auto_detaches();
+  await blocking_timeout_marks_timed_out();
   await bridge_disconnect_partial();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

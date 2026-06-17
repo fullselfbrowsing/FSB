@@ -376,29 +376,31 @@ async function caseG() {
 }
 
 // ------------------------------------------------------------------
-// Case H: restore drops fired/stopped/expired (delete + clear)
+// Case H: restore drops fired/stopped/timed_out/expired (delete + clear)
 // ------------------------------------------------------------------
 
 async function caseH() {
-  console.log('\n--- Case H: restore drops fired/stopped/expired (SURV-03 / LIFE-05 b) ---');
+  console.log('\n--- Case H: restore drops fired/stopped/timed_out/expired (SURV-03 / LIFE-05 b) ---');
   const { chromeMock, store, lc } = setupHarness();
   const now = Date.now();
 
   await store.writeSnapshot('trg_fired', makeSnapshot({ trigger_id: 'trg_fired', status: 'fired', deadline_at: now + 3600000 }));
   await store.writeSnapshot('trg_stopped', makeSnapshot({ trigger_id: 'trg_stopped', status: 'stopped', deadline_at: now + 3600000 }));
+  await store.writeSnapshot('trg_timeout', makeSnapshot({ trigger_id: 'trg_timeout', status: 'timed_out', deadline_at: now + 3600000 }));
   await store.writeSnapshot('trg_expired', makeSnapshot({ trigger_id: 'trg_expired', status: 'armed', deadline_at: now - 1000 }));
 
   const r = await lc.restoreTriggersFromStorage();
   check(r && r.ok === true, 'H.1 restore returned ok=true');
-  check(r.reaped === 3, 'H.2 all three terminal/expired snapshots reaped');
+  check(r.reaped === 4, 'H.2 all terminal/expired snapshots reaped');
   check(r.restored === 0, 'H.3 nothing re-armed');
 
   check((await store.readSnapshot('trg_fired')) === null, 'H.4 fired snapshot deleted');
   check((await store.readSnapshot('trg_stopped')) === null, 'H.5 stopped snapshot deleted');
-  check((await store.readSnapshot('trg_expired')) === null, 'H.6 expired-armed snapshot deleted (LIFE-05 restore-reap)');
+  check((await store.readSnapshot('trg_timeout')) === null, 'H.6 timed_out snapshot deleted');
+  check((await store.readSnapshot('trg_expired')) === null, 'H.7 expired-armed snapshot deleted (LIFE-05 restore-reap)');
 
   const cleared = chromeMock.alarms._cleared();
-  check(cleared.includes('fsbTrigger:trg_fired') && cleared.includes('fsbTrigger:trg_stopped') && cleared.includes('fsbTrigger:trg_expired'), 'H.7 all three alarms cleared');
+  check(cleared.includes('fsbTrigger:trg_fired') && cleared.includes('fsbTrigger:trg_stopped') && cleared.includes('fsbTrigger:trg_timeout') && cleared.includes('fsbTrigger:trg_expired'), 'H.8 all terminal/expired alarms cleared');
 }
 
 // ------------------------------------------------------------------
@@ -533,6 +535,7 @@ function caseN() {
   const hasFloor = (typeof lc.TRIGGER_ALARM_MIN_PERIOD_MS === 'number' && lc.TRIGGER_ALARM_MIN_PERIOD_MS === 30000)
     || (typeof lc.TRIGGER_ALARM_MIN_PERIOD_MINUTES === 'number' && lc.TRIGGER_ALARM_MIN_PERIOD_MINUTES === 0.5);
   check(hasFloor, 'N.11 a 30s alarm-floor constant is exported for Phase 17 (D-03)');
+  check(typeof lc.markTriggerTimedOut === 'function', 'N.12 exports markTriggerTimedOut');
 }
 
 // ==================================================================
@@ -830,6 +833,40 @@ async function caseV() {
 }
 
 // ------------------------------------------------------------------
+// Case W: Phase 19 timeout terminal transition.
+// ------------------------------------------------------------------
+
+async function caseW() {
+  console.log('\n--- Case W: Phase 19 markTriggerTimedOut terminal cleanup ---');
+  const { chromeMock, store, lc } = setupHarness();
+
+  await store.writeSnapshot('trg_timeout', makeSnapshot({
+    trigger_id: 'trg_timeout',
+    status: 'armed',
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.markTriggerTimedOut('trg_timeout', { timed_out_at: 123456, last_event: null });
+  const after = await store.readSnapshot('trg_timeout');
+  check(r && r.ok === true && r.action === 'timed_out', 'W.1 timeout transition returns timed_out');
+  check(after && after.status === 'timed_out', 'W.2 status:timed_out persisted');
+  check(after && after.timed_out_at === 123456, 'W.3 timed_out_at persisted');
+  check(after && after.terminal_reason === 'timeout', 'W.4 terminal_reason persisted');
+  check(after && after.outcome === 'timed_out', 'W.5 outcome persisted');
+  check(after && after.last_event === null, 'W.6 last_event null persisted');
+  check(chromeMock.alarms._cleared().includes('fsbTrigger:trg_timeout'), 'W.7 timeout clears trigger alarm');
+
+  const armed = await store.listArmedSnapshots();
+  check(Array.isArray(armed) && armed.filter((snap) => snap && snap.trigger_id === 'trg_timeout').length === 0, 'W.8 timed_out snapshot is not counted as armed');
+
+  const duplicate = await lc.markTriggerTimedOut('trg_timeout', { timed_out_at: 999999 });
+  check(duplicate && duplicate.ok === true && duplicate.action === 'noop_terminal' && duplicate.status === 'timed_out', 'W.9 duplicate timeout is terminal no-op');
+
+  const tick = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_timeout' });
+  check(tick && tick.ok === true && tick.action === 'noop_terminal', 'W.10 timed_out alarm tick is terminal no-op');
+}
+
+// ------------------------------------------------------------------
 // Case U: background.js Phase 16 source invariants for value-report ingress.
 // ------------------------------------------------------------------
 
@@ -888,6 +925,7 @@ function caseU() {
   await caseS();
   await caseT();
   await caseV();
+  await caseW();
   caseU();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');

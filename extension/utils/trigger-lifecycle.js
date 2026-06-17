@@ -310,6 +310,39 @@
     return { ok: true, cleared: true };
   }
 
+  async function markTriggerTimedOut(triggerId, patch) {
+    if (!triggerId || typeof triggerId !== 'string') {
+      return { ok: false, reason: 'invalid_trigger_id' };
+    }
+    var store = _getStore();
+    if (!store) {
+      return { ok: false, reason: 'store_unavailable', trigger_id: triggerId };
+    }
+
+    var snap = await store.readSnapshot(triggerId);
+    if (!snap) {
+      return { ok: true, action: 'noop_no_entry', trigger_id: triggerId };
+    }
+
+    if (snap.status === 'fired' || snap.status === 'stopped' || snap.status === 'timed_out') {
+      return { ok: true, action: 'noop_terminal', trigger_id: triggerId, status: snap.status, snapshot: snap };
+    }
+
+    var timeoutPatch = (patch && typeof patch === 'object') ? patch : {};
+    snap.status = 'timed_out';
+    snap.timed_out_at = timeoutPatch.timed_out_at || Date.now();
+    snap.terminal_reason = 'timeout';
+    snap.outcome = 'timed_out';
+    if (Object.prototype.hasOwnProperty.call(timeoutPatch, 'last_event')) {
+      snap.last_event = timeoutPatch.last_event;
+    } else {
+      snap.last_event = null;
+    }
+    await store.writeSnapshot(triggerId, snap);
+    await clearAlarm(TRIGGER_ALARM_PREFIX + triggerId);
+    return { ok: true, action: 'timed_out', trigger_id: triggerId, snapshot: snap };
+  }
+
   var _buildFireEvent = function buildTriggerFireEvent(triggerId, snap, outcome, now) {
     return {
       trigger_id: triggerId,
@@ -385,7 +418,7 @@
     // Idempotent fire-guard: a terminal snapshot is never re-fired or re-reaped
     // (D-09 / Pitfall #16). Do NOT delete the entry or clear the alarm here --
     // the terminal transition's own clear path owns that.
-    if (snap.status === 'fired' || snap.status === 'stopped') {
+    if (snap.status === 'fired' || snap.status === 'stopped' || snap.status === 'timed_out') {
       return { ok: true, action: 'noop_terminal' };
     }
 
@@ -636,6 +669,7 @@
     scheduleNextRefreshPollAlarm: scheduleNextRefreshPollAlarm,
     armTrigger: armTrigger,
     clearTrigger: clearTrigger,
+    markTriggerTimedOut: markTriggerTimedOut,
     handleTriggerAlarm: handleTriggerAlarm,
     handleTriggerTabRemoved: handleTriggerTabRemoved,
     restoreTriggersFromStorage: restoreTriggersFromStorage

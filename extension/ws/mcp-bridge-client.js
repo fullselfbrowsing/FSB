@@ -1040,6 +1040,58 @@ class MCPBridgeClient {
     return null;
   }
 
+  _triggerTimeoutContext(payload = {}, snapshot = null) {
+    const tabId = this._triggerTargetTabId(payload, snapshot);
+    return {
+      source: 'mcp',
+      agentId: payload.agentId || payload.agent_id,
+      ownershipToken: payload.ownershipToken || payload.ownership_token,
+      tabId,
+      target_tab_id: tabId
+    };
+  }
+
+  async _markTriggerTimedOut(triggerId, payload = {}, startedAt = Date.now()) {
+    const helper = (typeof globalThis !== 'undefined') ? globalThis.fsbTriggerMarkTimedOutForMcp : null;
+    if (typeof helper === 'function') {
+      try {
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        const result = await helper(triggerId, this._triggerTimeoutContext(payload, snapshot));
+        if (result && result.success !== false) {
+          return {
+            ...result,
+            success: true,
+            outcome: result.outcome || 'timed_out',
+            trigger_id: result.trigger_id || triggerId
+          };
+        }
+        return {
+          success: true,
+          outcome: 'timed_out',
+          trigger_id: triggerId,
+          status: { status: 'timed_out', trigger_id: triggerId },
+          cleanup: { ok: false, result }
+        };
+      } catch (err) {
+        return {
+          success: true,
+          outcome: 'timed_out',
+          trigger_id: triggerId,
+          status: { status: 'timed_out', trigger_id: triggerId },
+          cleanup: { ok: false, error: err && err.message ? err.message : String(err) }
+        };
+      }
+    }
+    const snapshot = await this._readTriggerSnapshot(triggerId);
+    return {
+      success: true,
+      outcome: 'timed_out',
+      trigger_id: triggerId,
+      status: snapshot || this._triggerHeartbeatPayload(triggerId, payload, null, startedAt),
+      cleanup: { skipped: true }
+    };
+  }
+
   async _handleTrigger(payload = {}, mcpMsgId) {
     const armResponse = await dispatchMcpMessageRoute({
       type: 'mcp:trigger',
@@ -1149,12 +1201,9 @@ class MCPBridgeClient {
       if (shouldUseTimeout) {
         timeoutTimer = setTimeout(async () => {
           const snapshot = await this._readTriggerSnapshot(triggerId);
-          settle({
-            success: true,
-            outcome: 'timed_out',
-            trigger_id: triggerId,
-            status: snapshot || this._triggerHeartbeatPayload(triggerId, payload, null, startedAt)
-          });
+          if (settleFromSnapshot(snapshot)) return;
+          const result = await this._markTriggerTimedOut(triggerId, payload, startedAt);
+          settle(result);
         }, timeoutMs);
       }
 

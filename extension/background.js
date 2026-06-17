@@ -4160,6 +4160,8 @@ function fsbTriggerProjectTriggerStatus(snap, now) {
     last_event: fsbTriggerProjectLastEvent(snap),
     fire_count: fsbTriggerProjectFireCount(snap),
     last_fired_at: snap && snap.last_fired_at,
+    timed_out_at: snap && snap.timed_out_at,
+    terminal_reason: snap && snap.terminal_reason,
     armed_at: snap && snap.armed_at,
     elapsed_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
     remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
@@ -4184,6 +4186,8 @@ function fsbTriggerProjectTriggerSummary(snap, now) {
     last_event: fsbTriggerProjectLastEvent(snap),
     fire_count: fsbTriggerProjectFireCount(snap),
     last_fired_at: snap && snap.last_fired_at,
+    timed_out_at: snap && snap.timed_out_at,
+    terminal_reason: snap && snap.terminal_reason,
     last_evaluated_at: snap && snap.last_evaluated_at,
     last_reported_at: snap && snap.last_reported_at,
     attention_reason: snap && snap.attention_reason
@@ -4372,6 +4376,89 @@ async function fsbTriggerHandleToolStop(params, context) {
   }
 
   return { success: true, stopped: true, trigger_id: triggerId, cleanup };
+}
+
+async function fsbTriggerMarkTimedOutForMcp(triggerId, context) {
+  const safeTriggerId = fsbTriggerFirstString(triggerId);
+  if (!safeTriggerId) {
+    return { success: false, errorCode: 'INVALID_TRIGGER_ID' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', trigger_id: safeTriggerId };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(safeTriggerId);
+  if (!snap) {
+    return {
+      success: true,
+      outcome: 'timed_out',
+      trigger_id: safeTriggerId,
+      status: { trigger_id: safeTriggerId, status: 'timed_out', outcome: 'timed_out' },
+      cleanup: { missing: true }
+    };
+  }
+
+  const ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(Object.assign({}, context || {}, { trigger_id: safeTriggerId, target_tab_id: snap.target_tab_id }), context),
+    context && context.sender
+  );
+  if ((ownerContext && ownerContext.accessDenied) || !fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: safeTriggerId };
+  }
+
+  const cleanup = {
+    observe: { ok: true, skipped: true },
+    watchdog: { ok: false, skipped: true },
+    lifecycle: { ok: false, skipped: true }
+  };
+  const terminal = snap.status === 'fired' || snap.status === 'stopped' || snap.status === 'timed_out';
+
+  if (!terminal) {
+    try {
+      const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
+      cleanup.observe = { ok: fsbTriggerCleanupOk(observeResult), result: observeResult };
+    } catch (err) {
+      cleanup.observe = { ok: false, error: fsbTriggerCleanupError(err) };
+    }
+  }
+
+  try {
+    const watchdogResult = await fsbTriggerClearObserveWatchdog(safeTriggerId);
+    cleanup.watchdog = { ok: fsbTriggerCleanupOk(watchdogResult), result: watchdogResult };
+  } catch (err) {
+    cleanup.watchdog = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  let lifecycleResult = null;
+  try {
+    if (typeof FsbTriggerLifecycle !== 'undefined'
+        && FsbTriggerLifecycle
+        && typeof FsbTriggerLifecycle.markTriggerTimedOut === 'function') {
+      lifecycleResult = await FsbTriggerLifecycle.markTriggerTimedOut(safeTriggerId, {
+        timed_out_at: Date.now(),
+        last_event: null
+      });
+      cleanup.lifecycle = { ok: fsbTriggerCleanupOk(lifecycleResult), result: lifecycleResult };
+    } else {
+      cleanup.lifecycle = { ok: false, reason: 'lifecycle_unavailable' };
+    }
+  } catch (err) {
+    cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  const latestSnap = (lifecycleResult && lifecycleResult.snapshot)
+    || (await FsbTriggerStore.readSnapshot(safeTriggerId))
+    || snap;
+  return {
+    success: true,
+    outcome: latestSnap && latestSnap.status === 'fired' ? 'fired' : 'timed_out',
+    trigger_id: safeTriggerId,
+    status: fsbTriggerProjectTriggerStatus(latestSnap, Date.now()),
+    cleanup
+  };
 }
 
 function fsbTriggerValidateToolCondition(condition, nested) {
@@ -4603,7 +4690,8 @@ async function fsbTriggerDispatchToolRequest(toolName, params, context) {
   }
 }
 
-globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerValidateToolCondition: fsbTriggerValidateToolCondition, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList, fsbTriggerHandleToolStop: fsbTriggerHandleToolStop, fsbTriggerHandleToolArm: fsbTriggerHandleToolArm, fsbTriggerDispatchToolRequest: fsbTriggerDispatchToolRequest };
+globalThis.fsbTriggerMarkTimedOutForMcp = fsbTriggerMarkTimedOutForMcp;
+globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerValidateToolCondition: fsbTriggerValidateToolCondition, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList, fsbTriggerHandleToolStop: fsbTriggerHandleToolStop, fsbTriggerMarkTimedOutForMcp: fsbTriggerMarkTimedOutForMcp, fsbTriggerHandleToolArm: fsbTriggerHandleToolArm, fsbTriggerDispatchToolRequest: fsbTriggerDispatchToolRequest };
 
 async function fsbTriggerArmLiveObserveForTest(spec) {
   const safeSpec = spec && typeof spec === 'object' ? spec : {};
