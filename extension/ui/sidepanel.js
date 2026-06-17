@@ -2682,16 +2682,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
       
       
-    case 'automationError':
-      if (!isRunning) return; // Already idle, ignore duplicate
-      if (request.sessionId === currentSessionId) {
-        // QT-93i-regression (Strategy B) -- route by originating tab; mirror
-        // the automationComplete routing pattern at line ~2358. Falls back to
-        // _resolveTabIdForSession when request.tabId is missing.
-        var errorTabId = (typeof request.tabId === 'number')
-          ? request.tabId
-          : _resolveTabIdForSession(request.sessionId);
-        setErrorState(errorTabId);
+    case 'automationError': {
+      var errorSessionKnown = (request.sessionId === currentSessionId && isRunning);
+      if (!errorSessionKnown) {
+        var _errorIter = _tabRunningMap.values();
+        var _errorNext = _errorIter.next();
+        while (!_errorNext.done) {
+          if (_errorNext.value && _errorNext.value.sessionId === request.sessionId && _errorNext.value.isRunning === true) {
+            errorSessionKnown = true;
+            break;
+          }
+          _errorNext = _errorIter.next();
+        }
+      }
+      if (!errorSessionKnown) return;
+
+      // QT-93i-regression (Strategy B) -- route by originating tab; mirror
+      // the automationComplete routing pattern at line ~2358. Falls back to
+      // _resolveTabIdForSession when request.tabId is missing.
+      var errorTabId = (typeof request.tabId === 'number')
+        ? request.tabId
+        : _resolveTabIdForSession(request.sessionId);
+      setErrorState(errorTabId);
+
+      var isErrorOriginatingActive = (typeof errorTabId === 'number' && errorTabId === _activeTabIdSnapshot);
+      if (isErrorOriginatingActive) {
         completeStatusMessage(`Error: ${request.error}`, 'error');
 
         // Provide specific guidance for stuck scenarios
@@ -2735,6 +2750,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // since stuck sessions send automationComplete with partial flag, not automationError.
       }
       break;
+    }
 
     case 'loginDetected':
       if (request.sessionId === currentSessionId) {

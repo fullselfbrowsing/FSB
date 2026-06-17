@@ -32,7 +32,11 @@
  *   _renderCompletionDomOnly called exactly once; currentStatusMessage.remove()
  *   called for manual loader cleanup.
  *
- *   Part 4 -- pre-Task-1 sanity comment block (informational only). The
+ *   Part 4: A background tab's session errors while user is on Tab A.
+ *   Post-fix: Tab B's per-tab entry flips isRunning:false; Tab A's entry
+ *   and visible error UI stay untouched.
+ *
+ *   Part 5 -- pre-Task-1 sanity comment block (informational only). The
  *   assertions in Part 2 would have FAILED against pre-Task-1 sidepanel.js
  *   because the outer bail + strict-match `if (request.sessionId === currentSessionId)`
  *   dropped the entire body for background-tab completions. Assertion 3.1
@@ -113,6 +117,22 @@ ok(autoCompleteBody.match(/completeStatusMessage\s*\(/) === null,
 ok(autoCompleteBody.indexOf('isOriginatingActive') !== -1,
    'Part 1.8 -- isOriginatingActive flag gates DOM render only');
 
+var automationErrorIdx = spSrc.indexOf("case 'automationError'");
+ok(automationErrorIdx > 0,
+   'Part 1.9 -- case automationError anchor located');
+
+var automationErrorBody = extractAfterAnchor(spSrc, "case 'automationError'", automationErrorIdx);
+ok(automationErrorBody !== null,
+   'Part 1.10 -- case automationError body extractable');
+if (automationErrorBody) {
+  ok(automationErrorBody.indexOf('errorSessionKnown') !== -1,
+     'Part 1.11 -- automationError uses relaxed session-known guard');
+  ok(automationErrorBody.indexOf('_tabRunningMap.values()') !== -1,
+     'Part 1.12 -- automationError scans _tabRunningMap for background-tab session match');
+  ok(automationErrorBody.indexOf('isErrorOriginatingActive') !== -1,
+     'Part 1.13 -- automationError gates active-tab UI rendering');
+}
+
 // =====================================================================
 // Anchor the outer chrome.runtime.onMessage handler for sandbox eval
 // =====================================================================
@@ -127,7 +147,7 @@ var switchIdx = spSrc.indexOf(switchAnchor);
 var bigHandlerIdx = spSrc.lastIndexOf(onMessageAnchor, switchIdx);
 var onMessageBody = extractAfterAnchor(spSrc, onMessageAnchor, bigHandlerIdx);
 ok(onMessageBody !== null && onMessageBody.indexOf('switch (request.action)') !== -1,
-   'Part 1.9 -- big chrome.runtime.onMessage handler body extractable for sandbox eval');
+   'Part 1.14 -- big chrome.runtime.onMessage handler body extractable for sandbox eval');
 
 if (!onMessageBody) {
   console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');
@@ -210,6 +230,7 @@ function makeInjection(opts) {
     moduleConversationId: (opts && opts.moduleConversationId) || null,
     sendBtnDisabled: !!(opts && opts.sendBtnDisabled),
     setIdleCalls: [],
+    setErrorCalls: [],
     persistCalls: [],
     renderCalls: [],
     completeStatusCalls: [],
@@ -265,6 +286,7 @@ function makeInjection(opts) {
   }
   function setErrorState(tabId) {
     var t = (typeof tabId === 'number') ? tabId : activeTabIdSnapshot;
+    state.setErrorCalls.push({ tabId: t });
     if (typeof t === 'number') {
       var e = getTabRunningEntry(t);
       e.isRunning = false;
@@ -568,7 +590,86 @@ ok(tabB3 && tabB3.isRunning === true && tabB3.sessionId === 'sess_B',
    'Part 3.9 -- Tab B per-tab entry UNCHANGED (sess_B still running on its own tab)');
 
 // =====================================================================
-// Part 4 -- pre-Task-1 regression sanity (informational comment)
+// Part 4 -- background-tab automationError routing
+// =====================================================================
+//
+// Setup: Tab A active, sess_A running; Tab B has sess_B running in the
+// background. Dispatch automationError for sess_B. The handler must flip
+// Tab B's per-tab running state without rendering retry/error UI into Tab A.
+
+console.log('\nPart 4 -- background-tab automationError routes to owning tab only:');
+
+var inj4 = makeInjection({
+  tabEntries: [
+    { tabId: 100, isRunning: true, sessionId: 'sess_A' },
+    { tabId: 200, isRunning: true, sessionId: 'sess_B' }
+  ],
+  activeTabId: 100,
+  moduleIsRunning: true,
+  moduleCurrentSessionId: 'sess_A',
+  moduleConversationId: 'conv_A',
+  sendBtnDisabled: true,
+  currentStatusMessage: true,
+  currentActionGroup: { fake: 'group' }
+});
+
+var dispatch4 = buildDispatcher(inj4);
+try {
+  dispatch4({
+    action: 'automationError',
+    sessionId: 'sess_B',
+    tabId: 200,
+    error: 'B failed',
+    task: 'retry B'
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: Part 4 dispatch threw:', err && err.message);
+}
+
+var tabB4 = inj4.tabRunningMap.get(200);
+ok(tabB4 && tabB4.isRunning === false && tabB4.sessionId === 'sess_B',
+   'Part 4.1 -- Tab B per-tab entry flipped to isRunning:false and keeps sessionId for error resolution');
+
+var tabA4 = inj4.tabRunningMap.get(100);
+ok(tabA4 && tabA4.isRunning === true && tabA4.sessionId === 'sess_A',
+   'Part 4.2 -- Tab A per-tab entry UNCHANGED (active session still running)');
+
+ok(inj4.state.setErrorCalls.length === 1 && inj4.state.setErrorCalls[0].tabId === 200,
+   'Part 4.3 -- setErrorState called exactly once with tabId=200');
+
+ok(inj4.state.moduleIsRunning === true,
+   'Part 4.4a -- moduleIsRunning still true (active-tab UI not disturbed by background error)');
+ok(inj4.state.moduleCurrentSessionId === 'sess_A',
+   'Part 4.4b -- moduleCurrentSessionId still sess_A');
+ok(inj4.state.sendBtnDisabled === true,
+   'Part 4.4c -- sendBtn stays disabled for active session_A');
+
+ok(inj4.state.completeStatusCalls.length === 0,
+   'Part 4.5 -- completeStatusMessage NOT called for background-tab error');
+ok(inj4.state.addMessageCalls.length === 0,
+   'Part 4.6 -- addMessage NOT called for background-tab error');
+ok(inj4.statusStubRef && inj4.statusStubRef.removeCount === 0,
+   'Part 4.7 -- active currentStatusMessage.remove() NOT called for background-tab error');
+
+try {
+  dispatch4({
+    action: 'automationError',
+    sessionId: 'sess_B',
+    tabId: 200,
+    error: 'B failed again',
+    task: 'retry B'
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: Part 4 duplicate dispatch threw:', err && err.message);
+}
+
+ok(inj4.state.setErrorCalls.length === 1,
+   'Part 4.8 -- duplicate background-tab automationError is ignored after the tab is no longer running');
+
+// =====================================================================
+// Part 5 -- pre-Task-1 regression sanity (informational comment)
 // =====================================================================
 //
 // The assertions in Part 2 would have FAILED against pre-Task-1 sidepanel.js
@@ -589,7 +690,7 @@ ok(tabB3 && tabB3.isRunning === true && tabB3.sessionId === 'sess_B',
 // the regression coverage. The presence of the assertions above in green
 // state proves the fix is in place.
 
-console.log('\nPart 4 -- pre-Task-1 regression coverage (informational):');
+console.log('\nPart 5 -- pre-Task-1 regression coverage (informational):');
 console.log('  Part 2 assertions would have FAILED against pre-Task-1 sidepanel.js');
 console.log('  (outer bail + strict-match dropped entire body for background tabs).');
 console.log('  Part 3.1 would have FAILED -- pre-fix double-persist via');
