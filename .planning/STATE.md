@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
-status: phase_complete
-stopped_at: Reviewed Phase 22
-last_updated: "2026-06-17T18:05:32.000Z"
-last_activity: 2026-06-17 - Reviewed Phase 22 capture adapter migration
+status: phase_in_progress
+stopped_at: Planned Phase 23
+last_updated: "2026-06-17T18:07:34.000Z"
+last_activity: 2026-06-17 - Planned Phase 23 dashboard renderer migration
 progress:
   total_phases: 5
   completed_phases: 2
@@ -29,10 +29,10 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 ## Current Position
 
-Phase: 22 (Capture Adapter Migration) — COMPLETE
-Plan: Phase 23 — Dashboard Renderer Migration
-Status: Phase 22 review clean; capture adapter migration complete with package-backed dom-stream, legacy dashboard identity bridge, side channels, diagnostics, and masking/sanitization guarded
-Last activity: 2026-06-17 - Reviewed Phase 22 capture adapter migration
+Phase: 23 (Dashboard Renderer Migration) — IN PROGRESS
+Plan: 23-01 — Shared dashboard viewer wrapper around PhantomStream renderer
+Status: Phase 23 planned; static and Angular dashboards will migrate through a shared PhantomStream viewer wrapper
+Last activity: 2026-06-17 - Planned Phase 23 dashboard renderer migration
 
 Progress: [████░░░░░░] 37% (7/19 milestone plans)
 
@@ -42,7 +42,7 @@ Progress: [████░░░░░░] 37% (7/19 milestone plans)
 |-------|------|--------------|--------|
 | 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
 | 22 | Capture Adapter Migration | CAP-01..04 (4) | Complete |
-| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Pending |
+| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | In progress (0/4 plans complete) |
 | 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
 | 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Pending |
 
@@ -183,10 +183,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 
 ## Session Continuity
 
-Last session: 2026-06-17T18:05:32.000Z
-Stopped at: Reviewed Phase 22
+Last session: 2026-06-17T18:07:34.000Z
+Stopped at: Planned Phase 23
 Resume file: None
 
 ## Next Actions
 
-Continue autonomous execution with Phase 23 Dashboard Renderer Migration. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
+Continue Phase 23 Dashboard Renderer Migration with `23-01-PLAN.md`: build the shared PhantomStream viewer wrapper and bundle/load seam. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.

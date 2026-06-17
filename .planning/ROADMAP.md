@@ -109,7 +109,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 |-------|-----------|----------------|--------|-----------|
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | Pending | - |
+| 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | In Progress | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
 
