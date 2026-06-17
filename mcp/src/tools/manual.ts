@@ -26,6 +26,8 @@ type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; isError?
 const CHANGE_REPORT_DESCRIPTION_SUFFIX =
   ' RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.';
 
+const TRIGGER_MANUAL_EXCLUSIONS = new Set(['trigger']); function isManualTool(t: ToolDefinition): boolean { return !t._readOnly && !TRIGGER_MANUAL_EXCLUSIONS.has(t.name); }
+
 /**
  * Phase 255 Plan 03: visual-session field-bundle validator.
  *
@@ -211,7 +213,7 @@ export function registerManualTools(
   agentScope: AgentScope,
 ): void {
   // Filter to non-read-only tools from canonical registry
-  const manualTools = TOOL_REGISTRY.filter((t: ToolDefinition) => !t._readOnly);
+  const manualTools = TOOL_REGISTRY.filter(isManualTool);
 
   for (const tool of manualTools) {
     const zodShape = jsonSchemaToZod(tool.inputSchema);

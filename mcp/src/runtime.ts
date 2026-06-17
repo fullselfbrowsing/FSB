@@ -5,6 +5,7 @@ import { TaskQueue } from './queue.js';
 import { AgentScope } from './agent-scope.js';
 import { registerAutopilotTools } from './tools/autopilot.js';
 import { registerVisualSessionTools } from './tools/visual-session.js';
+import { registerTriggerTools } from './tools/triggers.js';
 import { registerManualTools } from './tools/manual.js';
 import { registerReadOnlyTools } from './tools/read-only.js';
 import { registerObservabilityTools } from './tools/observability.js';
@@ -33,6 +34,7 @@ export function createRuntime(options: RuntimeOptions = {}): FSBRuntime {
   const server = createServer();
 
   registerVisualSessionTools(server, bridge, queue, agentScope);
+  registerTriggerTools(server, bridge, queue, agentScope);
   registerManualTools(server, bridge, queue, agentScope);
   registerReadOnlyTools(server, bridge, queue, agentScope);
   registerObservabilityTools(server, bridge, queue, agentScope);

@@ -146,7 +146,8 @@ async function caseMcpManualExcludesTrigger() {
   const registerSrc = functionSource(src, 'registerManualTools');
   assert.ok(src.includes('TRIGGER_MANUAL_EXCLUSIONS'), 'manual tool source declares trigger exclusion set');
   assert.ok(src.includes("'trigger'") || src.includes('"trigger"'), 'manual exclusion set includes trigger');
-  assert.ok(registerSrc.includes('!TRIGGER_MANUAL_EXCLUSIONS.has(t.name)'), 'manual tool filter excludes trigger by name');
+  assert.ok(src.includes('!TRIGGER_MANUAL_EXCLUSIONS.has(t.name)'), 'manual tool predicate excludes trigger by name');
+  assert.ok(registerSrc.includes('TOOL_REGISTRY.filter(isManualTool)'), 'manual tool filter uses the trigger-aware predicate');
   assertOrdered(src, 'TRIGGER_MANUAL_EXCLUSIONS', 'TOOL_REGISTRY.filter', 'trigger exclusion set is declared before manual filtering');
 }
 
