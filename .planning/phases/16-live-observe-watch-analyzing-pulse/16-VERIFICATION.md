@@ -4,6 +4,7 @@ verified: 2026-06-16T16:54:39Z
 status: human_needed
 score: 6/6 requirements verified by automated/source checks; 4 live-browser UAT items deferred
 overrides_applied: 0
+carry_forward_evidence: "../20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md"
 human_verification:
   - test: "Live React/Vue/Angular ticker fires with no reload"
     expected: "Arm a live-observe trigger on a real SPA ticker; confirm the MutationObserver report drives the lifecycle seam and fires without page reload."
@@ -84,7 +85,7 @@ These items are deferred per `16-VALIDATION.md` and `16-CONTEXT.md` D-12, matchi
 3. Busy-ticker frame budget remains acceptable.
 4. Pulse is visually gentle/distinct and reduced-motion uses a static cue.
 
-Saved to `16-HUMAN-UAT.md`.
+Saved to `16-HUMAN-UAT.md` and carried forward to `../20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md`.
 
 ## Gaps Summary
 

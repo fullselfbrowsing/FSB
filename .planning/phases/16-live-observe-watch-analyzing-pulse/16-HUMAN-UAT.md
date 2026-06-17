@@ -3,14 +3,18 @@ status: partial
 phase: 16-live-observe-watch-analyzing-pulse
 source: [16-VERIFICATION.md, 16-VALIDATION.md]
 started: 2026-06-16T16:54:39Z
-updated: 2026-06-16T16:54:39Z
+updated: 2026-06-17T05:55:00Z
 ---
 
 # Phase 16 Human UAT
 
 ## Current Test
 
-Awaiting Phase 20 live-browser UAT.
+Carried forward to Phase 20 live-browser UAT.
+
+Carry-forward evidence location: `../20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md`.
+
+Current status remains `human_needed`; no live browser evidence has been captured yet.
 
 ## Tests
 

@@ -7,7 +7,7 @@ overrides_applied: 0
 deferred:
   - truth: "Real installed-Chrome inactive-tab refresh-poll reload does not steal focus"
     addressed_in: "Phase 20"
-    evidence: "17-HUMAN-UAT.md records status deferred_to_phase_20; ROADMAP Phase 20 composes integration and edge cases after the trigger system is end-to-end."
+    evidence: "17-HUMAN-UAT.md records status deferred_to_phase_20 and carries forward to ../20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md; ROADMAP Phase 20 composes integration and edge cases after the trigger system is end-to-end."
 ---
 
 # Phase 17: Refresh-Poll Watch Verification Report
@@ -39,7 +39,7 @@ Items not yet met by live human evidence but explicitly carried forward.
 
 | # | Item | Addressed In | Evidence |
 |---|------|--------------|----------|
-| 1 | Real installed-Chrome inactive-tab refresh-poll reload does not steal focus | Phase 20 | `17-HUMAN-UAT.md` is `deferred_to_phase_20` and includes the expected result text `background tab remains background`; Phase 17 verifies deterministic Chrome API shape. |
+| 1 | Real installed-Chrome inactive-tab refresh-poll reload does not steal focus | Phase 20 | `17-HUMAN-UAT.md` is `deferred_to_phase_20`, points to `../20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md`, and includes the expected result text `background tab remains background`; Phase 17 verifies deterministic Chrome API shape. |
 
 ### Required Artifacts
 
