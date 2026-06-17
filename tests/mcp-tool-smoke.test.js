@@ -257,6 +257,25 @@ async function run() {
     'stop_task routes through mcp:stop-automation with agentId payload (Phase 238 includes agentId; Phase 240 strengthens with ownershipToken)',
   );
 
+  const getLogsCall = await invokeTool(harness, 'get_logs', { sessionId: 'smoke-session', count: 10 });
+  assertDeepEqual(
+    getLogsCall && getLogsCall.message,
+    { type: 'mcp:get-logs', payload: { sessionId: 'smoke-session', count: 10 } },
+    'get_logs routes through mcp:get-logs with observability payload',
+  );
+
+  // Phase 242 plan 02: 'back' routes through mcp:go-back. Bridge response
+  // surfaces the canonical 5-status envelope; agentScope captures the
+  // (optional) ownershipToken via captureOwnershipToken on success.
+  const backCall = await invokeTool(harness, 'back');
+  assertDeepEqual(
+    backCall && backCall.message,
+    { type: 'mcp:go-back', payload: { agentId: 'agent_test_smoke', ownershipToken: 'token_test_smoke' } },
+    'back routes through mcp:go-back with agentId + ownershipToken (Phase 242 D-01)',
+  );
+
+  console.log('\n--- explicit tab_id uses tab-specific ownership token ---');
+  agentScope.captureOwnershipToken(77, 'token_tab_77');
   const triggerCall = await invokeTool(harness, 'trigger', {
     selector: '#price',
     condition: { kind: 'changed' },
@@ -344,25 +363,6 @@ async function run() {
     'list_triggers uses bounded 5s bridge timeout',
   );
 
-  const getLogsCall = await invokeTool(harness, 'get_logs', { sessionId: 'smoke-session', count: 10 });
-  assertDeepEqual(
-    getLogsCall && getLogsCall.message,
-    { type: 'mcp:get-logs', payload: { sessionId: 'smoke-session', count: 10 } },
-    'get_logs routes through mcp:get-logs with observability payload',
-  );
-
-  // Phase 242 plan 02: 'back' routes through mcp:go-back. Bridge response
-  // surfaces the canonical 5-status envelope; agentScope captures the
-  // (optional) ownershipToken via captureOwnershipToken on success.
-  const backCall = await invokeTool(harness, 'back');
-  assertDeepEqual(
-    backCall && backCall.message,
-    { type: 'mcp:go-back', payload: { agentId: 'agent_test_smoke', ownershipToken: 'token_test_smoke' } },
-    'back routes through mcp:go-back with agentId + ownershipToken (Phase 242 D-01)',
-  );
-
-  console.log('\n--- explicit tab_id uses tab-specific ownership token ---');
-  agentScope.captureOwnershipToken(77, 'token_tab_77');
   const explicitReadPageCall = await invokeTool(harness, 'read_page', { full: true, tab_id: 77 });
   assertDeepEqual(
     explicitReadPageCall && explicitReadPageCall.message,

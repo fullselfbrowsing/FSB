@@ -10,6 +10,10 @@ export type MCPMessageType =
   | 'mcp:stop-automation'     // Cancel running task
   | 'mcp:get-status'          // Query task status
   | 'mcp:get-task-snapshot'   // Phase 239 plan 03: D-05 SW-wake snapshot lookup (server-side sw_evicted catch)
+  | 'mcp:trigger'             // Arm a background-owned DOM trigger
+  | 'mcp:stop-trigger'        // Cancel a background-owned DOM trigger
+  | 'mcp:get-trigger-status'  // Query one persisted trigger status
+  | 'mcp:list-triggers'       // List persisted trigger snapshots
   | 'mcp:start-visual-session' // MCP-owned visible lifecycle start
   | 'mcp:end-visual-session'   // MCP-owned visible lifecycle end
   | 'mcp:execute-action'      // Manual: execute a single browser action
