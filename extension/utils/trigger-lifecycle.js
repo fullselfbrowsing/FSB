@@ -474,13 +474,11 @@
       ? outcome.next_state : {};
 
     if (outcome.outcome === 'fired') {
-      // ATOMIC terminal write-back: stamp the terminal status + fire time, fold in
-      // the edge-state patch, then persist in a single writeSnapshot, then disarm.
+      // ATOMIC fire write-back: stamp fire metadata, fold in the edge-state
+      // patch, then either keep watching (rearm_on_fire) or terminally disarm.
       var event = _buildFireEvent(triggerId, snap, outcome, now);
       var priorFireCount = Number(snap.fire_count || 0);
-      snap.status = 'fired';
       snap.outcome = 'fired';
-      snap.fired_at = now;
       snap.last_event = event;
       snap.last_fire_event = event;
       snap.fire_count = (Number.isFinite(priorFireCount) ? priorFireCount : 0) + 1;
@@ -488,6 +486,25 @@
       if (nextState.last_value !== undefined) snap.last_value = nextState.last_value;
       if (nextState.was_satisfied !== undefined) snap.was_satisfied = nextState.was_satisfied;
       if (nextState.last_evaluated_at !== undefined) snap.last_evaluated_at = nextState.last_evaluated_at;
+      if (snap.rearm_on_fire === true) {
+        snap.status = 'armed';
+        if (isRefreshPollSnapshot(snap)) {
+          var rearmScheduled = await scheduleNextRefreshPollAlarm(snap, now);
+          await store.writeSnapshot(triggerId, snap);
+          return {
+            ok: true,
+            action: 'fired_rearmed',
+            outcome: outcome,
+            event: event,
+            armed: rearmScheduled && rearmScheduled.armed === true,
+            next_poll_at: snap.next_poll_at
+          };
+        }
+        await store.writeSnapshot(triggerId, snap);
+        return { ok: true, action: 'fired_rearmed', outcome: outcome, event: event };
+      }
+      snap.status = 'fired';
+      snap.fired_at = now;
       await store.writeSnapshot(triggerId, snap);
       await clearAlarm(alarm.name);
       return { ok: true, action: 'fired', outcome: outcome };

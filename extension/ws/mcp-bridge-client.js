@@ -1125,6 +1125,9 @@ class MCPBridgeClient {
     const timeoutMs = this._triggerTimeoutMs(payload);
     const safetyMs = this._triggerSafetyCeilingMs(payload);
     const shouldUseTimeout = timeoutMs <= safetyMs;
+    const initialSnapshot = await this._readTriggerSnapshot(triggerId);
+    const initialFireCount = Number(initialSnapshot && initialSnapshot.fire_count);
+    const fireCountAtArm = Number.isFinite(initialFireCount) ? initialFireCount : 0;
 
     return new Promise((resolve) => {
       let settled = false;
@@ -1162,6 +1165,19 @@ class MCPBridgeClient {
             outcome: 'fired',
             trigger_id: triggerId,
             event: snapshot.last_event || snapshot.last_fire_event || null,
+            status: snapshot
+          });
+          return true;
+        }
+        const fireCount = Number(snapshot.fire_count || 0);
+        const rearmedEvent = snapshot.last_event || snapshot.last_fire_event || null;
+        if (snapshot.status === 'armed' && Number.isFinite(fireCount) && fireCount > fireCountAtArm && rearmedEvent) {
+          settle({
+            success: true,
+            outcome: 'fired',
+            trigger_id: triggerId,
+            event: rearmedEvent,
+            still_armed: true,
             status: snapshot
           });
           return true;

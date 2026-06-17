@@ -490,6 +490,49 @@ async function blocking_timeout_marks_timed_out() {
   check(harness.clock.activeIntervalCount() === 0, 'timeout settlement clears heartbeat interval');
 }
 
+async function blocking_rearm_fire_resolves_still_armed() {
+  console.log('\n--- blocking_rearm_fire_resolves_still_armed ---');
+  const harness = buildBridgeHarness({
+    snapshots: {
+      trg_rearm: {
+        trigger_id: 'trg_rearm',
+        status: 'armed',
+        fire_count: 0,
+        current_value: { text: '$10.00' },
+        target_tab_id: 77,
+      },
+    },
+  });
+  const promise = harness.client._routeMessage('mcp:trigger', {
+    trigger_id: 'trg_rearm',
+    selector: '#price',
+    condition: { kind: 'changed' },
+    watch: 'live-observe',
+    target_tab_id: 77,
+    rearm_on_fire: true,
+  }, 'msg-rearm');
+
+  await flushMicrotasks();
+  harness.snapshots.trg_rearm = {
+    ...harness.snapshots.trg_rearm,
+    status: 'armed',
+    fire_count: 1,
+    last_event: {
+      trigger_id: 'trg_rearm',
+      matched_condition: { kind: 'changed' },
+      old_value: '$10.00',
+      new_value: '$12.00',
+    },
+  };
+  await harness.clock.advance(30_000);
+  const result = await promise;
+  check(result && result.outcome === 'fired', 'rearmed blocking trigger returns fired outcome');
+  check(result && result.still_armed === true, 'rearmed blocking trigger returns still_armed true');
+  check(result && result.event && result.event.new_value === '$12.00', 'rearmed blocking trigger returns last_event');
+  check(result && result.status && result.status.status === 'armed', 'rearmed blocking trigger returns armed snapshot');
+  check(harness.clock.activeIntervalCount() === 0, 'rearmed fired settlement clears heartbeat interval');
+}
+
 async function bridge_disconnect_partial() {
   console.log('\n--- bridge_disconnect_partial ---');
   const triggersModule = await loadBuildModule(path.join('tools', 'triggers.js'));
@@ -535,6 +578,7 @@ async function run() {
   await blocking_heartbeat_30s();
   await safety_ceiling_auto_detaches();
   await blocking_timeout_marks_timed_out();
+  await blocking_rearm_fire_resolves_still_armed();
   await bridge_disconnect_partial();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

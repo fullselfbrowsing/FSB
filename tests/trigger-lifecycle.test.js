@@ -867,6 +867,81 @@ async function caseW() {
 }
 
 // ------------------------------------------------------------------
+// Case X: Phase 19 rearm_on_fire keeps live-observe armed after fire.
+// ------------------------------------------------------------------
+
+async function caseX() {
+  console.log('\n--- Case X: Phase 19 rearm_on_fire live-observe stays armed ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  await store.writeSnapshot('trg_rearm_live', makeSnapshot({
+    trigger_id: 'trg_rearm_live',
+    status: 'armed',
+    watch: 'live-observe',
+    condition: { kind: 'changed' },
+    baseline: 'before',
+    last_value: 'before',
+    reported_value: 'after',
+    reported_url: 'https://example.test/rearm-live',
+    target_tab_id: 91,
+    was_satisfied: false,
+    rearm_on_fire: true,
+    fire_count: 0,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_rearm_live' });
+  check(r && r.ok === true && r.action === 'fired_rearmed', 'X.1 rearm_on_fire returns fired_rearmed');
+  check(r && r.event && r.event.url === 'https://example.test/rearm-live', 'X.2 fired_rearmed returns event');
+
+  const after = await store.readSnapshot('trg_rearm_live');
+  check(after && after.status === 'armed', 'X.3 rearm_on_fire snapshot stays armed');
+  check(after && after.fire_count === 1, 'X.4 rearm_on_fire increments fire_count');
+  check(after && after.last_event && after.last_event.new_value === 'after', 'X.5 rearm_on_fire persists last_event');
+  check(after && after.last_fire_event && after.last_fire_event.url === 'https://example.test/rearm-live', 'X.6 rearm_on_fire persists last_fire_event alias');
+  check(after && after.was_satisfied === true, 'X.7 rearm_on_fire persists was_satisfied=true for de-dup');
+  check(after && after.last_value === 'after', 'X.8 rearm_on_fire merges next_state last_value');
+  check(chromeMock.alarms._cleared().filter((name) => name === 'fsbTrigger:trg_rearm_live').length === 0, 'X.9 rearm_on_fire live-observe does not clear trigger alarm on fire');
+}
+
+// ------------------------------------------------------------------
+// Case Y: Phase 19 rearm_on_fire refresh-poll schedules next poll.
+// ------------------------------------------------------------------
+
+async function caseY() {
+  console.log('\n--- Case Y: Phase 19 rearm_on_fire refresh-poll schedules next poll ---');
+  const { chromeMock, store, lc } = setupSeamHarness();
+
+  await store.writeSnapshot('trg_rearm_poll', makeSnapshot({
+    trigger_id: 'trg_rearm_poll',
+    status: 'armed',
+    watch: 'refresh-poll',
+    condition: { kind: 'changed' },
+    baseline: 'before',
+    last_value: 'before',
+    reported_value: 'after',
+    target_tab_id: 92,
+    was_satisfied: false,
+    rearm_on_fire: true,
+    fire_count: 0,
+    poll_interval_ms: 60000,
+    poll_jitter_ms: 0,
+    deadline_at: Date.now() + 3600000
+  }));
+
+  const r = await lc.handleTriggerAlarm({ name: 'fsbTrigger:trg_rearm_poll' });
+  check(r && r.ok === true && r.action === 'fired_rearmed', 'Y.1 refresh-poll rearm returns fired_rearmed');
+  check(r && r.armed === true, 'Y.2 refresh-poll rearm creates next alarm');
+
+  const after = await store.readSnapshot('trg_rearm_poll');
+  check(after && after.status === 'armed', 'Y.3 refresh-poll rearm snapshot stays armed');
+  check(after && after.fire_count === 1, 'Y.4 refresh-poll rearm increments fire_count');
+  check(after && Number.isFinite(Number(after.next_poll_at)), 'Y.5 refresh-poll rearm persists next_poll_at');
+  check(chromeMock.alarms._created().some((alarm) => alarm && alarm.name === 'fsbTrigger:trg_rearm_poll'), 'Y.6 refresh-poll rearm schedules fsbTrigger alarm');
+  check(chromeMock.alarms._cleared().filter((name) => name === 'fsbTrigger:trg_rearm_poll').length === 0, 'Y.7 refresh-poll rearm does not clear trigger alarm on fire');
+}
+
+// ------------------------------------------------------------------
 // Case U: background.js Phase 16 source invariants for value-report ingress.
 // ------------------------------------------------------------------
 
@@ -926,6 +1001,8 @@ function caseU() {
   await caseT();
   await caseV();
   await caseW();
+  await caseX();
+  await caseY();
   caseU();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');
