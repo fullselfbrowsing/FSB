@@ -406,6 +406,12 @@ class MCPBridgeClient {
       case 'mcp:read-page':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
+      case 'mcp:trigger':
+      case 'mcp:stop-trigger':
+      case 'mcp:get-trigger-status':
+      case 'mcp:list-triggers':
+        return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
+
       case 'mcp:start-visual-session':
         return this._handleStartVisualSession(payload);
 
