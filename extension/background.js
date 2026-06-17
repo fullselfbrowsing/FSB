@@ -277,6 +277,8 @@ const CONTENT_SCRIPT_FILES = [
   'content/selectors.js',
   'content/badge-combine.js',
   'content/visual-feedback.js',
+  'content/phantom-stream-capture.js',
+  'content/dom-stream.js',
   'content/trigger-observe.js',
   'content/accessibility.js',
   'content/actions.js',

@@ -169,6 +169,18 @@ const ENTRIES = [
     allowOverwrite: true,
     optional: true, // canvas-interceptor.js is small + may not always be present
   },
+  {
+    name: 'content-phantom-stream-capture',
+    entryPoints: [path.join(SRC_ROOT, 'content', 'phantom-stream-capture-entry.js')],
+    outfile: path.join(SRC_ROOT, 'content', 'phantom-stream-capture.js'),
+    format: 'iife',
+    sourcemap: false,
+    platform: 'browser',
+    target: ['chrome120'],
+    bundle: true,
+    legalComments: 'none',
+    allowOverwrite: true,
+  },
 ];
 
 /**
