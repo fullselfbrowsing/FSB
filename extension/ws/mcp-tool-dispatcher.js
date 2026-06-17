@@ -1585,13 +1585,24 @@ async function handleTriggerToolMessageRoute({ type, payload = {}, route }) {
   }
 
   const requestPayload = payload || {};
+  const normalizedPayload = {
+    ...requestPayload,
+    tabId: requestPayload.tabId ?? requestPayload.tab_id ?? requestPayload.target_tab_id
+  };
+  const gateResult = checkOwnershipGate({
+    tool: toolName,
+    params: normalizedPayload,
+    payload: normalizedPayload
+  });
+  if (gateResult) return gateResult;
+
   const context = {
-    agentId: requestPayload.agentId,
-    ownershipToken: requestPayload.ownershipToken,
-    tabId: requestPayload.tabId || requestPayload.tab_id,
+    agentId: normalizedPayload.agentId,
+    ownershipToken: normalizedPayload.ownershipToken,
+    tabId: normalizedPayload.tabId,
     source: 'mcp'
   };
-  return dispatch(toolName, requestPayload, context);
+  return dispatch(toolName, normalizedPayload, context);
 }
 
 async function handleStartVisualSessionRoute({ payload, client }) {
