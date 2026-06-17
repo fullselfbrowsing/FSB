@@ -34,9 +34,9 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 
 ### REPORT -- Reporting & fire semantics
 
-- [ ] **REPORT-01**: `trigger()` is blocking by default -- the call holds open with ~30s heartbeats and returns when the condition fires or the timeout elapses (mirrors the `run_task` lifecycle-return contract).
-- [ ] **REPORT-02**: User can arm a trigger in detached mode -- `trigger()` returns a `trigger_id` immediately and the caller polls for status.
-- [ ] **REPORT-03**: A blocking trigger auto-converts to detached past a configurable safety ceiling (returns the `trigger_id`) so it never holds an MCP request open indefinitely.
+- [x] **REPORT-01**: `trigger()` is blocking by default -- the call holds open with ~30s heartbeats and returns when the condition fires or the timeout elapses (mirrors the `run_task` lifecycle-return contract).
+- [x] **REPORT-02**: User can arm a trigger in detached mode -- `trigger()` returns a `trigger_id` immediately and the caller polls for status.
+- [x] **REPORT-03**: A blocking trigger auto-converts to detached past a configurable safety ceiling (returns the `trigger_id`) so it never holds an MCP request open indefinitely.
 - [ ] **REPORT-04**: A fire returns a structured event -- matched condition, old value, new value, URL, timestamp -- as notify-only output; the caller/AI decides any follow-up action.
 - [ ] **REPORT-05**: Triggers fire once (edge-fire) by default and become terminal after firing.
 - [ ] **REPORT-06**: A timeout returns a distinct `timed_out` outcome (not an error, not a fire) so the AI can choose to re-arm.
@@ -125,9 +125,9 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | EXTRACT-02 | Phase 15 | Complete |
 | EXTRACT-03 | Phase 15 | Complete |
 | EXTRACT-04 | Phase 15 | Complete |
-| REPORT-01 | Phase 19 | Pending |
-| REPORT-02 | Phase 19 | Pending |
-| REPORT-03 | Phase 19 | Pending |
+| REPORT-01 | Phase 19 | Complete |
+| REPORT-02 | Phase 19 | Complete |
+| REPORT-03 | Phase 19 | Complete |
 | REPORT-04 | Phase 19 | Pending |
 | REPORT-05 | Phase 19 | Pending |
 | REPORT-06 | Phase 19 | Pending |
