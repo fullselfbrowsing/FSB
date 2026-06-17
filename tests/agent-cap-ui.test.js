@@ -236,9 +236,13 @@ console.log('--- Test 8: options.js wiring patterns present ---');
   assert.ok(/elements\.fsbAgentCapReset\s*\.addEventListener\(\s*['"]click['"]/.test(src),
     'setupEventListeners attaches click listener to fsbAgentCapReset');
 
-  // saveSettings: serialises fsbAgentCap.
-  assert.ok(/fsbAgentCap\s*:\s*parseInt\(elements\.fsbAgentCap/.test(src),
-    'saveSettings includes fsbAgentCap: parseInt(elements.fsbAgentCap...)');
+  // saveSettings: serialises fsbAgentCap. Current production code uses a
+  // clamped IIFE so DevTools-tampered values cannot persist out of range.
+  assert.ok(
+    /fsbAgentCap\s*:\s*parseInt\(elements\.fsbAgentCap/.test(src)
+      || /fsbAgentCap\s*:\s*\(function\(\)[\s\S]{0,180}parseInt\(elements\.fsbAgentCap/.test(src),
+    'saveSettings includes fsbAgentCap serialization from elements.fsbAgentCap'
+  );
 
   // loadSettings: reads data.fsbAgentCap (or settings.fsbAgentCap).
   assert.ok(/(?:data|settings)\.fsbAgentCap/.test(src),
