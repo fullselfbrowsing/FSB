@@ -226,6 +226,9 @@ function createRefreshPollVmHarness(seedRecords, options) {
       async reload(tabId) {
         calls.events.push('reload:' + tabId);
         calls.reloads.push(tabId);
+        if (typeof opts.onReloadStart === 'function') {
+          opts.onReloadStart(tabId, records, calls);
+        }
         if (opts.deferReload) {
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
@@ -325,6 +328,7 @@ function createRefreshPollVmHarness(seedRecords, options) {
       async scheduleNextRefreshPollAlarm(snap, now) {
         calls.events.push('schedule:' + snap.trigger_id);
         calls.schedules.push({ triggerId: snap.trigger_id, now });
+        snap.next_poll_at = now + Number(opts.nextPollOffsetMs || 60000);
         return { ok: true };
       }
     }
@@ -621,6 +625,56 @@ async function caseRefreshPollSameTabBatchCoalesces() {
   });
 }
 
+async function caseRefreshPollSameTabPendingAlarmRescans() {
+  console.log('\n--- Case N2: same-tab alarm due after batch snapshot scan is rescanned ---');
+  const now = 6500000;
+  await withFixedNow(now, async () => {
+    let h = null;
+    let secondPromise = null;
+    h = createRefreshPollVmHarness({
+      trg_race_a: makeRefreshPollSnapshot({
+        trigger_id: 'trg_race_a',
+        selector: '#a',
+        target_tab_id: 322,
+        next_poll_at: undefined,
+        agent_id: 'agent_a'
+      }),
+      trg_race_b: makeRefreshPollSnapshot({
+        trigger_id: 'trg_race_b',
+        selector: '#b',
+        target_tab_id: 322,
+        next_poll_at: now + 60000,
+        agent_id: 'agent_b'
+      })
+    }, {
+      deferReload: true,
+      onReloadStart(tabId, records) {
+        if (Number(tabId) !== 322 || secondPromise) return;
+        records.trg_race_b.next_poll_at = now - 1;
+        secondPromise = h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_race_b'));
+      }
+    });
+
+    await h.context.fsbTriggerHandleRefreshPollForTest(h.alarm('trg_race_a'));
+    if (secondPromise) await secondPromise;
+
+    const readSelectors = h.calls.reads.map((entry) => entry.payload.selector).sort();
+    const handled = h.calls.handles.slice().sort();
+    check(!!secondPromise,
+      'N2.1 second same-tab alarm fires while the first batch still owns the tab lock');
+    check(h.calls.reloads.length === 2
+      && h.calls.reloads[0] === 322
+      && h.calls.reloads[1] === 322,
+      'N2.2 late-due same-tab alarm is picked up by a follow-up rescan reload');
+    check(readSelectors.join(',') === '#a,#b',
+      'N2.3 original and late-due triggers are each read exactly once');
+    check(handled.join(',') === 'fsbTrigger:trg_race_a,fsbTrigger:trg_race_b',
+      'N2.4 lifecycle evaluation runs once per trigger across original and rescan batches');
+    check(h.calls.pulses.length === 2 && h.calls.schedules.length === 2,
+      'N2.5 both armed evaluated snapshots get independent pulse and next-poll scheduling');
+  });
+}
+
 async function caseRefreshPollOtherTabsReloadIndependently() {
   console.log('\n--- Case O: other-tab refresh-poll batches reload independently ---');
   const now = 7000000;
@@ -745,12 +799,16 @@ async function caseRefreshPollCoalescingSourceGuards() {
     'Q.3 tab batch helper exists');
   check(/fsbTriggerRefreshPollTabLocks\.get/.test(block) && /fsbTriggerRefreshPollTabLocks\.set/.test(block),
     'Q.4 batch helper joins and records in-flight per-tab work');
+  check(/const\s+fsbTriggerRefreshPollPendingTabRescans\s*=\s*new\s+Map\s*\(\s*\)/.test(src)
+      && /fsbTriggerRefreshPollPendingTabRescans\.set/.test(block)
+      && /fsbTriggerRunRefreshPollTabBatchUnlocked\s*\(\s*Number\s*\(\s*tabId\s*\)\s*,\s*null\s*,\s*null\s*\)/.test(block),
+    'Q.5 concurrent same-tab alarms request a fresh post-lock due scan');
   check(validateIdx >= 0 && reloadIdx >= 0 && validateIdx < reloadIdx,
-    'Q.5 batch ownership validation appears before shared tab reload');
+    'Q.6 batch ownership validation appears before shared tab reload');
   check(/chrome\.tabs\.reload\s*\(\s*tabId\s*\)/.test(block),
-    'Q.6 batch reload remains explicit by tabId');
+    'Q.7 batch reload remains explicit by tabId');
   check(handleIdx >= 0,
-    'Q.7 batch path preserves per-trigger lifecycle evaluation');
+    'Q.8 batch path preserves per-trigger lifecycle evaluation');
 }
 
 async function caseOwnershipSourceGuards() {
@@ -896,6 +954,7 @@ async function caseAlarmBranchSourceGuards() {
   await caseRestoreRecomputesUnsafeNextPoll();
   await caseJitterAndDeadlineFloor();
   await caseRefreshPollSameTabBatchCoalesces();
+  await caseRefreshPollSameTabPendingAlarmRescans();
   await caseRefreshPollOtherTabsReloadIndependently();
   await caseRefreshPollBatchPreservesAttentionAndPulseGuards();
   await caseRefreshPollCoalescingSourceGuards();

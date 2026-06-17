@@ -3414,6 +3414,7 @@ function fsbTriggerIsRefreshPollSnapshot(snap) {
 }
 
 const fsbTriggerRefreshPollTabLocks = new Map();
+const fsbTriggerRefreshPollPendingTabRescans = new Map();
 
 function fsbTriggerValidateRefreshPollOwnership(snap) {
   const tabId = Number(snap && snap.target_tab_id);
@@ -3724,13 +3725,24 @@ async function fsbTriggerReadRefreshPollRecords() {
 async function fsbTriggerWithRefreshPollTabLock(tabId, task) {
   const key = String(Number(tabId));
   const existing = fsbTriggerRefreshPollTabLocks.get(key);
-  if (existing) return existing;
+  if (existing) {
+    fsbTriggerRefreshPollPendingTabRescans.set(key, true);
+    return existing;
+  }
   const promise = Promise.resolve()
-    .then(task)
+    .then(async () => {
+      const result = await task();
+      while (fsbTriggerRefreshPollPendingTabRescans.get(key)) {
+        fsbTriggerRefreshPollPendingTabRescans.delete(key);
+        await fsbTriggerRunRefreshPollTabBatchUnlocked(Number(tabId), null, null);
+      }
+      return result;
+    })
     .finally(() => {
       if (fsbTriggerRefreshPollTabLocks.get(key) === promise) {
         fsbTriggerRefreshPollTabLocks.delete(key);
       }
+      fsbTriggerRefreshPollPendingTabRescans.delete(key);
     });
   fsbTriggerRefreshPollTabLocks.set(key, promise);
   return promise;

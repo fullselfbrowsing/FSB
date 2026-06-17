@@ -14760,12 +14760,10 @@ console.log(HOST_TAG, "boot: Plan 05-04 offscreen Lattice host loaded");
 var survivability = createNoopSurvivabilityAdapter({ id: "fsb-offscreen-noop" });
 console.log(HOST_TAG, "survivability adapter id:", survivability.id, "kind:", survivability.kind);
 var signer = null;
-var pipeline = null;
 (async () => {
   const { privateKeyJwk, publicKeyJwk } = await generateEd25519KeyPairJwk();
   signer = createInMemorySigner(privateKeyJwk, { kid: "fsb-offscreen-ephemeral", publicKeyJwk });
-  pipeline = createHookPipeline();
-  console.log(HOST_TAG, "ephemeral signer + hook pipeline ready");
+  console.log(HOST_TAG, "ephemeral signer ready");
 })().catch((err) => {
   console.error(HOST_TAG, "boot init failed:", err && err.message ? err.message : err);
 });
@@ -14777,7 +14775,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
       return false;
     }
     if (message.type !== "lattice-step-transition") return false;
-    if (!signer || !pipeline) {
+    if (!signer) {
       console.warn(HOST_TAG, "boot init not complete; dropping step-transition message");
       return false;
     }
@@ -14823,6 +14821,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
         }
       }
     });
+    const pipeline = createHookPipeline();
     pipeline.register("AFTER_TOOL", handler, { band: DEFAULT_CHECKPOINT_BAND });
     const ctx = {
       stepName,

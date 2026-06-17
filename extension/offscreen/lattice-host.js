@@ -263,14 +263,12 @@ console.log(HOST_TAG, "survivability adapter id:", survivability.id, "kind:", su
  *   - createCheckpointHook() returns a HookHandler that mints receipts
  */
 let signer = null;
-let pipeline = null;
 
 (async () => {
   const { privateKeyJwk, publicKeyJwk } = await generateEd25519KeyPairJwk();
   signer = createInMemorySigner(privateKeyJwk, { kid: "fsb-offscreen-ephemeral", publicKeyJwk });
 
-  pipeline = createHookPipeline();
-  console.log(HOST_TAG, "ephemeral signer + hook pipeline ready");
+  console.log(HOST_TAG, "ephemeral signer ready");
 })().catch((err) => {
   console.error(HOST_TAG, "boot init failed:", err && err.message ? err.message : err);
 });
@@ -293,7 +291,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
     }
     if (message.type !== "lattice-step-transition") return false;
 
-    if (!signer || !pipeline) {
+    if (!signer) {
       console.warn(HOST_TAG, "boot init not complete; dropping step-transition message");
       return false;
     }
@@ -349,6 +347,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
     // Compose with Phase 2's hook pipeline + register on AFTER_TOOL band
     // OBSERVABILITY (DEFAULT_CHECKPOINT_BAND === 1). Then RUN the
     // pipeline against the synthesized context built from the message.
+    const pipeline = createHookPipeline();
     pipeline.register("AFTER_TOOL", handler, { band: DEFAULT_CHECKPOINT_BAND });
 
     const ctx = {

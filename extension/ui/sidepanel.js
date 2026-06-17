@@ -43,10 +43,10 @@ var _tabRunningMap = new Map();
 var _activeTabIdSnapshot = null;
 
 function _getTabRunningEntry(tabId) {
-  if (typeof tabId !== 'number') return { isRunning: false, sessionId: null };
+  if (typeof tabId !== 'number') return { isRunning: false, sessionId: null, startedAt: null };
   var entry = _tabRunningMap.get(tabId);
   if (!entry) {
-    entry = { isRunning: false, sessionId: null };
+    entry = { isRunning: false, sessionId: null, startedAt: null };
     _tabRunningMap.set(tabId, entry);
   }
   return entry;
@@ -54,7 +54,7 @@ function _getTabRunningEntry(tabId) {
 
 function getCurrentTabRunningState() {
   if (typeof _activeTabIdSnapshot !== 'number') {
-    return { isRunning: false, sessionId: null };
+    return { isRunning: false, sessionId: null, startedAt: null };
   }
   return _getTabRunningEntry(_activeTabIdSnapshot);
 }
@@ -486,6 +486,54 @@ const historyBtn = document.getElementById('historyBtn');
 const micBtn = document.getElementById('micBtn');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
+const automationRunner = document.getElementById('automationRunner');
+const automationTimer = document.getElementById('automationTimer');
+const automationRunnerLabel = document.getElementById('automationRunnerLabel');
+
+let automationTimerInterval = null;
+let automationTimerStartedAt = null;
+
+function formatAutomationElapsed(startedAt) {
+  if (typeof startedAt !== 'number') return '0s';
+  var seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  return seconds + 's';
+}
+
+function updateAutomationTimer() {
+  if (!automationTimer) return;
+  automationTimer.textContent = formatAutomationElapsed(automationTimerStartedAt);
+}
+
+function setAutomationRunnerText(text) {
+  if (!automationRunnerLabel) return;
+  automationRunnerLabel.textContent = text || 'Automation running';
+}
+
+function showAutomationRunner(startedAt, text) {
+  automationTimerStartedAt = (typeof startedAt === 'number') ? startedAt : Date.now();
+  setAutomationRunnerText(text);
+  if (automationRunner) {
+    automationRunner.classList.remove('hidden');
+    automationRunner.setAttribute('aria-hidden', 'false');
+  }
+  updateAutomationTimer();
+  if (automationTimerInterval) clearInterval(automationTimerInterval);
+  automationTimerInterval = setInterval(updateAutomationTimer, 1000);
+}
+
+function hideAutomationRunner() {
+  if (automationTimerInterval) {
+    clearInterval(automationTimerInterval);
+    automationTimerInterval = null;
+  }
+  automationTimerStartedAt = null;
+  if (automationRunner) {
+    automationRunner.classList.add('hidden');
+    automationRunner.setAttribute('aria-hidden', 'true');
+  }
+  if (automationTimer) automationTimer.textContent = '0s';
+  setAutomationRunnerText('Ready');
+}
 
 // Apply theme based on settings
 function applyTheme() {
@@ -1470,18 +1518,25 @@ function setRunningState(tabId, sessionId) {
 
   if (typeof targetTabId === 'number') {
     var entry = _getTabRunningEntry(targetTabId);
+    var previousSessionId = entry.sessionId;
+    var shouldResetStartedAt = !entry.isRunning ||
+      previousSessionId !== resolvedSessionId ||
+      typeof entry.startedAt !== 'number';
     entry.isRunning = true;
     entry.sessionId = resolvedSessionId;
+    if (shouldResetStartedAt) entry.startedAt = Date.now();
   }
 
   var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
   if (isActiveTab) {
+    var activeEntry = _getTabRunningEntry(targetTabId);
     isRunning = true;
     if (resolvedSessionId) currentSessionId = resolvedSessionId;
     sendBtn.disabled = true;
     stopBtn.classList.remove('hidden');
     statusDot.classList.add('running');
     statusText.textContent = 'Working';
+    if (typeof showAutomationRunner === 'function') showAutomationRunner(activeEntry.startedAt, 'Working');
     updateSendButtonState();
     livenessFailCount = 0;
     if (livenessInterval) clearInterval(livenessInterval);
@@ -1500,6 +1555,7 @@ function setIdleState(tabId) {
     var entry = _getTabRunningEntry(targetTabId);
     entry.isRunning = false;
     entry.sessionId = null;
+    entry.startedAt = null;
   }
 
   var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
@@ -1512,11 +1568,10 @@ function setIdleState(tabId) {
     stopBtn.classList.add('hidden');
     statusDot.classList.remove('running', 'error');
     statusText.textContent = 'Ready';
+    if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
 
     // Clean up any remaining status message with loader (active-tab only).
     if (currentStatusMessage) {
-      var loaderDots = currentStatusMessage.querySelector('.typing-dots');
-      if (loaderDots) loaderDots.remove();
       currentStatusMessage = null;
     }
     currentActionGroup = null;
@@ -1546,6 +1601,7 @@ function setErrorState(tabId) {
   if (typeof targetTabId === 'number') {
     var entry = _getTabRunningEntry(targetTabId);
     entry.isRunning = false;
+    entry.startedAt = null;
     // sessionId left as-is so error reporting can still resolve it.
   }
 
@@ -1556,6 +1612,7 @@ function setErrorState(tabId) {
     stopBtn.classList.add('hidden');
     statusDot.classList.add('error');
     statusText.textContent = 'Error';
+    if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
     updateSendButtonState();
   }
 }
@@ -1665,7 +1722,7 @@ function addActionMessage(text) {
   scrollToBottom();
 }
 
-// Add dynamic status message with integrated loader
+// Add dynamic status message anchor for progress/completion updates
 function addStatusMessage(text, type = 'ai') {
   // Remove any existing status message (and its embedded action group)
   if (currentStatusMessage) {
@@ -1674,21 +1731,16 @@ function addStatusMessage(text, type = 'ai') {
   }
   
   const messageDiv = document.createElement('div');
-  messageDiv.className = `message status-message status-dots-only new`;
+  messageDiv.className = `message status-message status-anchor`;
   
-  // Create message content with integrated loader
   const messageContent = document.createElement('div');
   messageContent.className = 'message-content';
   
-  // Create loader dots
-  const loaderDots = document.createElement('div');
-  loaderDots.className = 'typing-dots';
-  loaderDots.innerHTML = '<span></span><span></span><span></span>';
-  
   // Create status text
-  const statusText = document.createElement('span');
-  statusText.className = 'status-text';
-  statusText.textContent = text;
+  const statusTextEl = document.createElement('span');
+  statusTextEl.className = 'status-text';
+  statusTextEl.textContent = text;
+  setAutomationRunnerText(text);
   
   // Progress container (hidden until progress data arrives)
   const progressContainer = document.createElement('div');
@@ -1704,8 +1756,7 @@ function addStatusMessage(text, type = 'ai') {
   progressContainer.appendChild(progressLabel);
 
   // Assemble the message
-  messageContent.appendChild(loaderDots);
-  messageContent.appendChild(statusText);
+  messageContent.appendChild(statusTextEl);
   if (showSidepanelProgressEnabled) {
     messageContent.appendChild(progressContainer);
   }
@@ -1716,17 +1767,13 @@ function addStatusMessage(text, type = 'ai') {
   // Store reference for updates
   currentStatusMessage = messageDiv;
 
-  // Remove the 'new' class after animation
-  setTimeout(() => {
-    messageDiv.classList.remove('new');
-  }, 400);
-
   scrollToBottom();
   return messageDiv;
 }
 
 // Update existing status message with optional progress data
 function updateStatusMessage(text, progressData) {
+  setAutomationRunnerText(text);
   if (currentStatusMessage) {
     const statusText = currentStatusMessage.querySelector('.status-text');
     if (statusText) {
