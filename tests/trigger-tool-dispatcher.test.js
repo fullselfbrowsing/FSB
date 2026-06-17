@@ -324,6 +324,8 @@ async function caseStatusProjectionMath() {
   assert.strictEqual(status.current_value, '12', 'reported_value projected as current_value');
   assert.strictEqual(status.elapsed_ms, 1500, 'elapsed_ms derived from armed_at');
   assert.strictEqual(status.remaining_ms, 2500, 'remaining_ms derived from deadline_at');
+  assert.strictEqual(status.deadline_at, 5000, 'deadline_at projected');
+  assert.strictEqual(status.detached, false, 'detached defaults false');
 }
 
 async function caseFiredProjectionIncludesEventOutcome() {
@@ -365,7 +367,9 @@ async function caseListDefaultsToActiveAttentionStates() {
     active: makeSnapshot({ trigger_id: 'active', status: 'armed' }),
     attention: makeSnapshot({ trigger_id: 'attention', status: 'needs_attention' }),
     blocked: makeSnapshot({ trigger_id: 'blocked', status: 'blocked' }),
-    fired: makeSnapshot({ trigger_id: 'fired', status: 'fired' })
+    fired: makeSnapshot({ trigger_id: 'fired', status: 'fired' }),
+    timeout: makeSnapshot({ trigger_id: 'timeout', status: 'timed_out' }),
+    stopped: makeSnapshot({ trigger_id: 'stopped', status: 'stopped' })
   };
   const handlers = loadToolHandlers({
     FsbTriggerStore: {
@@ -379,11 +383,61 @@ async function caseListDefaultsToActiveAttentionStates() {
   assert.deepStrictEqual(Array.from(result.triggers.map(t => t.trigger_id).sort()), ['active', 'attention', 'blocked'], 'default list returns active and attention states only');
 }
 
+async function caseListCanIncludeTerminalStates() {
+  const lastEvent = {
+    trigger_id: 'fired',
+    matched_condition: { kind: 'changed' },
+    old_value: 'before',
+    new_value: 'after',
+    url: 'https://example.test/private',
+    timestamp: 2400,
+    target_tab_id: 42,
+    watch: 'live-observe'
+  };
+  const records = {
+    active: makeSnapshot({ trigger_id: 'active', status: 'armed' }),
+    fired: makeSnapshot({ trigger_id: 'fired', status: 'fired', outcome: 'fired', last_event: lastEvent, fire_count: 1, last_fired_at: 2400 }),
+    timeout: makeSnapshot({ trigger_id: 'timeout', status: 'timed_out', outcome: 'timed_out', timed_out_at: 2600, terminal_reason: 'timeout', last_event: null }),
+    stopped: makeSnapshot({ trigger_id: 'stopped', status: 'stopped', outcome: 'stopped' })
+  };
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async hydrate() {
+        return { v: 1, records };
+      }
+    }
+  });
+
+  const withTerminal = await handlers.fsbTriggerHandleToolList({ include_terminal: true }, {});
+  assert.strictEqual(withTerminal.success, true, 'include_terminal list succeeds');
+  assert.deepStrictEqual(Array.from(withTerminal.triggers.map(t => t.trigger_id).sort()), ['active', 'fired', 'stopped', 'timeout'], 'include_terminal adds terminal snapshots to default list');
+  const fired = withTerminal.triggers.find((entry) => entry.trigger_id === 'fired');
+  assert.deepStrictEqual(fired.last_event, lastEvent, 'terminal fired summary includes last_event');
+  assert.strictEqual(fired.fire_count, 1, 'terminal fired summary includes fire_count');
+  const timeout = withTerminal.triggers.find((entry) => entry.trigger_id === 'timeout');
+  assert.strictEqual(timeout.outcome, 'timed_out', 'terminal timeout summary includes outcome');
+  assert.strictEqual(timeout.timed_out_at, 2600, 'terminal timeout summary includes timed_out_at');
+  assert.strictEqual(timeout.terminal_reason, 'timeout', 'terminal timeout summary includes terminal_reason');
+
+  const explicitTimeout = await handlers.fsbTriggerHandleToolList({ status: 'timed_out' }, {});
+  assert.strictEqual(explicitTimeout.success, true, 'explicit timed_out list succeeds');
+  assert.deepStrictEqual(Array.from(explicitTimeout.triggers.map(t => t.trigger_id)), ['timeout'], 'explicit timed_out status returns only timed_out snapshots');
+}
+
 async function caseCrossAgentStatusRejected() {
   const handlers = loadToolHandlers({
     FsbTriggerStore: {
       async readSnapshot() {
-        return makeSnapshot({ agent_id: 'agent_a', ownership_token: 'tok_a' });
+        return makeSnapshot({
+          agent_id: 'agent_a',
+          ownership_token: 'tok_a',
+          status: 'fired',
+          last_event: {
+            trigger_id: 'trg_status',
+            url: 'https://example.test/private',
+            new_value: 'secret'
+          }
+        });
       }
     }
   });
@@ -394,6 +448,7 @@ async function caseCrossAgentStatusRejected() {
   assert.strictEqual(result.success, false, 'cross-agent status fails');
   assert.strictEqual(result.errorCode, 'TRIGGER_ACCESS_DENIED', 'cross-agent status returns typed access denial');
   assert.strictEqual(result.status, undefined, 'cross-agent status does not return snapshot data');
+  assert.strictEqual(JSON.stringify(result).includes('https://example.test/private'), false, 'cross-agent status does not leak last_event');
 }
 
 async function caseStopMissingIsIdempotent() {
@@ -800,6 +855,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('status projection derives elapsed and remaining time', caseStatusProjectionMath);
   await runCase('fired status/list projection includes event outcome', caseFiredProjectionIncludesEventOutcome);
   await runCase('list defaults to armed and attention states', caseListDefaultsToActiveAttentionStates);
+  await runCase('list can include terminal trigger states', caseListCanIncludeTerminalStates);
   await runCase('cross-agent status is rejected without snapshot data', caseCrossAgentStatusRejected);
   await runCase('missing stop returns idempotent success', caseStopMissingIsIdempotent);
   await runCase('cross-agent stop is rejected before cleanup', caseStopRejectsCrossAgentBeforeCleanup);

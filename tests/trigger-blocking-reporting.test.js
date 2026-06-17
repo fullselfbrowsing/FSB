@@ -420,6 +420,7 @@ async function blocking_heartbeat_30s() {
   await harness.clock.advance(30_000);
   const result = await promise;
   check(result && result.outcome === 'fired', 'blocking trigger settles on fired snapshot');
+  check(result && result.event && result.event.matched_condition && result.event.matched_condition.kind === 'changed', 'blocking trigger returns fired event');
   check(harness.clock.activeIntervalCount() === 0, 'fired settlement clears heartbeat interval');
 }
 

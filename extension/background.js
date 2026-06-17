@@ -4145,6 +4145,10 @@ function fsbTriggerProjectFireCount(snap) {
   return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
+function fsbTriggerIsTerminalStatus(status) {
+  return status === 'fired' || status === 'timed_out' || status === 'stopped';
+}
+
 function fsbTriggerProjectTriggerStatus(snap, now) {
   const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
   return {
@@ -4162,7 +4166,10 @@ function fsbTriggerProjectTriggerStatus(snap, now) {
     last_fired_at: snap && snap.last_fired_at,
     timed_out_at: snap && snap.timed_out_at,
     terminal_reason: snap && snap.terminal_reason,
+    detached: snap && snap.detached === true,
+    detached_at: snap && snap.detached_at,
     armed_at: snap && snap.armed_at,
+    deadline_at: snap && snap.deadline_at,
     elapsed_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
     remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
     last_evaluated_at: snap && snap.last_evaluated_at,
@@ -4172,8 +4179,10 @@ function fsbTriggerProjectTriggerStatus(snap, now) {
   };
 }
 
-function fsbTriggerProjectTriggerSummary(snap, now) {
+function fsbTriggerProjectTriggerSummary(snap, now, options) {
   const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const includeEvent = (options && options.include_events === true)
+    || fsbTriggerIsTerminalStatus(snap && snap.status);
   return {
     trigger_id: snap && snap.trigger_id,
     status: snap && snap.status,
@@ -4183,11 +4192,12 @@ function fsbTriggerProjectTriggerSummary(snap, now) {
     target_tab_id: snap && snap.target_tab_id,
     age_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
     remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
-    last_event: fsbTriggerProjectLastEvent(snap),
+    last_event: includeEvent ? fsbTriggerProjectLastEvent(snap) : null,
     fire_count: fsbTriggerProjectFireCount(snap),
     last_fired_at: snap && snap.last_fired_at,
     timed_out_at: snap && snap.timed_out_at,
     terminal_reason: snap && snap.terminal_reason,
+    detached: snap && snap.detached === true,
     last_evaluated_at: snap && snap.last_evaluated_at,
     last_reported_at: snap && snap.last_reported_at,
     attention_reason: snap && snap.attention_reason
@@ -4202,7 +4212,13 @@ function fsbTriggerNormalizeListStatuses(params) {
   }
   const one = fsbTriggerFirstString(input);
   if (one) return new Set([one]);
-  return new Set(['armed', 'needs_attention', 'blocked']);
+  const defaults = new Set(['armed', 'needs_attention', 'blocked']);
+  if (params && params.include_terminal === true) {
+    defaults.add('fired');
+    defaults.add('timed_out');
+    defaults.add('stopped');
+  }
+  return defaults;
 }
 
 function fsbTriggerMergeParamsAndContext(params, context) {
@@ -4267,6 +4283,7 @@ async function fsbTriggerHandleToolList(params, context) {
   }
 
   const wanted = fsbTriggerNormalizeListStatuses(params);
+  const summaryOptions = { include_events: params && params.include_events === true };
   const envelope = await FsbTriggerStore.hydrate();
   const records = (envelope && envelope.records && typeof envelope.records === 'object') ? envelope.records : {};
   const now = Date.now();
@@ -4289,7 +4306,7 @@ async function fsbTriggerHandleToolList(params, context) {
     }
 
     if (fsbTriggerSnapshotVisibleToContext(snap, perSnapshotContext)) {
-      triggers.push(fsbTriggerProjectTriggerSummary(snap, now));
+      triggers.push(fsbTriggerProjectTriggerSummary(snap, now, summaryOptions));
     }
   }
   return { success: true, triggers };
