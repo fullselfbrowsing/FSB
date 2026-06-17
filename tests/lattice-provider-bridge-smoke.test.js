@@ -461,6 +461,49 @@ async function loadOffscreenHandlerSource(chromeMock) {
   } catch (e) { thrown3f = e; }
   passAssertEqual(thrown3f && thrown3f.code, 'aborted', 'pre-aborted signal throws synchronously with code:aborted');
 
+  // (d) timeoutMs rejects a hung sendMessage and emits the companion abort.
+  const timeoutMessages = [];
+  const timeoutChrome = {
+    runtime: {
+      id: 'fsb-test-extension-id',
+      sendMessage(message) {
+        timeoutMessages.push(message);
+        return new Promise(() => {});
+      }
+    }
+  };
+  globalThis.chrome = timeoutChrome;
+  let thrown3g = null;
+  try {
+    await bridgeMod.executeViaBridge('xai', { apiKey: 'k', model: 'm' }, {}, { mode: 'autopilot', timeoutMs: 5 });
+  } catch (e) { thrown3g = e; }
+  passAssertEqual(thrown3g && thrown3g.code, 'timeout', 'timeoutMs rejects hung provider bridge call with code:timeout');
+  passAssert(timeoutMessages.some(m => m && m.type === 'lattice-provider-abort'), 'timeoutMs sends lattice-provider-abort companion message');
+
+  // (e) ensureOffscreen is called before dispatch and again before a host retry.
+  let ensureCalls = 0;
+  let sendCalls = 0;
+  const recoverChrome = {
+    runtime: {
+      id: 'fsb-test-extension-id',
+      sendMessage(message) {
+        sendCalls++;
+        if (sendCalls === 1 && message && message.type === 'lattice-provider-execute') {
+          return Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
+        }
+        return Promise.resolve({ ok: true, response: { rawResponse: { recovered: true } } });
+      }
+    }
+  };
+  globalThis.chrome = recoverChrome;
+  const recovered = await bridgeMod.executeViaBridge('xai', { apiKey: 'k', model: 'm' }, {}, {
+    mode: 'autopilot',
+    ensureOffscreen: async function () { ensureCalls++; }
+  });
+  passAssertEqual(recovered && recovered.recovered, true, 'host_unreachable retry returns recovered provider response');
+  passAssertEqual(ensureCalls, 2, 'ensureOffscreen called before initial send and host_unreachable retry');
+  passAssertEqual(sendCalls, 2, 'host_unreachable retry sends provider execute twice');
+
   // Restore the original chrome mock with the offscreen handler so Part 4 abort tests continue to work.
   globalThis.chrome = part1Chrome;
 
@@ -608,6 +651,7 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssertEqual((alSource.match(/FSB_LATTICE_PROVIDER_BRIDGE_ENABLED/g) || []).length, 0, 'agent-loop.js has ZERO token occurrences of FSB_LATTICE_PROVIDER_BRIDGE_ENABLED (Phase 7 FINT-09: flag fully stripped)');
   passAssertEqual((alSource.match(/executeViaBridge\(/g) || []).length, 1, 'agent-loop.js has exactly 1 executeViaBridge invocation (Phase 7 FINT-09: unconditional call site)');
   passAssertEqual((alSource.match(/providerInstance\.sendRequest\(requestBody\)/g) || []).length, 0, 'agent-loop.js has ZERO providerInstance.sendRequest(requestBody) calls (Phase 7 FINT-09: legacy fallback deleted)');
+  passAssert(/timeoutMs:\s*timeoutMs/.test(alSource), 'agent-loop.js passes adaptive timeoutMs into executeViaBridge');
   passAssertEqual((alSource.match(/setTimeout/g) || []).length, 8, 'agent-loop.js setTimeout count = 8 (Phase 7 FINT-09: INV-04 count invariant preserved across flag-strip)');
 
   const bridgeSource = require('fs').readFileSync('extension/ai/lattice-provider-bridge.js', 'utf8');
@@ -616,6 +660,7 @@ async function loadOffscreenHandlerSource(chromeMock) {
   passAssert(/module\.exports\s*=\s*\{\s*executeViaBridge/.test(bridgeSource), 'bridge module.exports executeViaBridge');
   passAssert(/globalScope\.executeViaBridge\s*=\s*executeViaBridge/.test(bridgeSource), 'bridge globalScope.executeViaBridge assigned (classic SW)');
   passAssert(/removeEventListener\(['"]abort['"]/.test(bridgeSource), 'bridge cleans up abort listener in finally (Pitfall 3)');
+  passAssert(/timeoutMs/.test(bridgeSource), 'bridge accepts timeoutMs for bounded provider calls');
 
   // Plan 06-04 fill: options.js saveSettings trim + checkApiConnection rewrite
   const optionsSrc = require('fs').readFileSync('extension/ui/options.js', 'utf8');

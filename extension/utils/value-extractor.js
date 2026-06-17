@@ -204,7 +204,7 @@
     var mode = (descriptor && descriptor.extract) ? descriptor.extract : 'text';
 
     if (mode === 'attribute') {
-      var name = descriptor ? descriptor.attribute : undefined;
+      var name = descriptor ? (descriptor.attribute || descriptor.attrName || descriptor.attr_name) : undefined;
       var attrs = (reportedValue && reportedValue.attributes) ? reportedValue.attributes : {};
       var attrVal = (typeof name === 'string') ? attrs[name] : undefined;
       return (typeof attrVal === 'string') ? attrVal.trim() : '';

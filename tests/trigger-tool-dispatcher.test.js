@@ -867,6 +867,49 @@ async function caseArmReadsBaselineBeforeManagerAndStartsLiveObserve() {
   assert.strictEqual(receivedSpec.trigger_id, 'test-random-uuid', 'missing trigger id uses crypto.randomUUID');
 }
 
+async function caseArmNormalizesTopLevelAttributeAliasIntoCondition() {
+  let receivedSpec = null;
+  let receivedReadShape = null;
+  const callerCondition = { kind: 'changed' };
+  const handlers = loadToolHandlers({
+    async fsbTriggerSendRefreshPollRead(_tabId, readShape) {
+      receivedReadShape = readShape;
+      return { success: true, value: { text: 'Price', attributes: { title: 'Price' } } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        receivedSpec = spec;
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot(Object.assign({}, receivedSpec || {}, { status: 'armed' }));
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      return { ok: true };
+    }
+  });
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition: callerCondition,
+    extract: 'attribute',
+    attrName: 'title',
+    watch: 'live-observe'
+  }, {});
+
+  assert.strictEqual(result.success, true, 'top-level attrName arm succeeds');
+  assert.strictEqual(callerCondition.attribute, undefined, 'caller condition is not mutated');
+  assert.strictEqual(receivedReadShape.extract, 'attribute', 'read shape uses attribute extraction');
+  assert.strictEqual(receivedReadShape.attrName, 'title', 'read shape receives attrName alias');
+  assert.strictEqual(receivedSpec.extract, 'attribute', 'spec preserves extract mode');
+  assert.strictEqual(receivedSpec.attrName, 'title', 'spec preserves attrName alias');
+  assert.strictEqual(receivedSpec.condition.attribute, 'title', 'persisted condition receives attribute name for evaluation');
+}
+
 async function caseArmAutopilotLegacySpec() {
   let receivedSpec = null;
   const handlers = loadToolHandlers({
@@ -1062,6 +1105,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('invalid arm condition rejects before read or arm', caseInvalidConditionRejectedBeforeArm);
   await runCase('arm normalizes delta_percent alias before manager persistence', caseArmNormalizesDeltaPercentAlias);
   await runCase('arm reads baseline before manager and starts live observe', caseArmReadsBaselineBeforeManagerAndStartsLiveObserve);
+  await runCase('arm normalizes top-level attribute alias into condition', caseArmNormalizesTopLevelAttributeAliasIntoCondition);
   await runCase('autopilot arm spec binds legacy owner and token', caseArmAutopilotLegacySpec);
   await runCase('autopilot arm rejects foreign-owned tabs before side effects', caseArmAutopilotForeignRejectsBeforeArm);
   await runCase('dispatch helper maps trigger companion tools', caseDispatchHelperMapsTriggerTools);

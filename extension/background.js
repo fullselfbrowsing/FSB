@@ -4924,7 +4924,7 @@ async function fsbTriggerHandleToolArm(params, context) {
     return { success: false, errorCode: 'INVALID_TAB_ID' };
   }
 
-  const condition = fsbTriggerNormalizeToolCondition(safeParams.condition);
+  let condition = fsbTriggerNormalizeToolCondition(safeParams.condition);
   const conditionValidation = fsbTriggerValidateToolCondition(condition);
   if (!conditionValidation.ok) {
     return Object.assign({ success: false }, conditionValidation);
@@ -4951,6 +4951,10 @@ async function fsbTriggerHandleToolArm(params, context) {
 
   const extract = fsbTriggerToolExtract(safeParams, condition);
   const attrName = fsbTriggerToolAttrName(safeParams) || fsbTriggerAttrName({ condition });
+  if (extract === 'attribute' && attrName && condition && typeof condition === 'object'
+      && !fsbTriggerFirstString(condition.attribute, condition.attrName, condition.attr_name)) {
+    condition = Object.assign({}, condition, { attribute: attrName });
+  }
   const readShape = { selector, condition, extract, attrName };
   const readResult = await fsbTriggerSendRefreshPollRead(Number(tabId), readShape);
   if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
@@ -15251,6 +15255,7 @@ async function ensureLatticeOffscreen() {
     console.error('[FSB Lattice] offscreen createDocument failed:', err && err.message ? err.message : err);
   }
 }
+globalThis.ensureLatticeOffscreen = ensureLatticeOffscreen;
 
 // Set up side panel behavior
 chrome.runtime.onInstalled.addListener(async () => {

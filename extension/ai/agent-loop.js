@@ -101,6 +101,28 @@ var _extractUsage = (typeof extractUsage !== 'undefined') ? extractUsage : (_al_
 var _executeTool = (typeof executeTool !== 'undefined') ? executeTool : (_al_executor?.executeTool || (async () => ({ success: false, error: 'executeTool not available' })));
 var _UniversalProvider = (typeof UniversalProvider !== 'undefined') ? UniversalProvider : (_al_provider?.UniversalProvider || null);
 var _PROVIDER_CONFIGS = (typeof PROVIDER_CONFIGS !== 'undefined') ? PROVIDER_CONFIGS : (_al_provider?.PROVIDER_CONFIGS || {});
+var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefined')
+  ? calculateAdaptiveTimeout
+  : (_al_provider?.calculateAdaptiveTimeout || function(requestBody, modelName, attempt) {
+      var isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName || '');
+      var baseTimeout = isReasoning ? 45000 : 30000;
+      var maxTimeout = isReasoning ? 90000 : 60000;
+      var retryMultiplier = 1 + (Math.min(attempt || 0, 2) * 0.5);
+      try {
+        var estimatedChars = 0;
+        if (requestBody && Array.isArray(requestBody.messages)) {
+          for (var i = 0; i < requestBody.messages.length; i++) {
+            estimatedChars += String(requestBody.messages[i] && requestBody.messages[i].content || '').length;
+          }
+        } else {
+          estimatedChars = JSON.stringify(requestBody || {}).length;
+        }
+        var extra = Math.floor((estimatedChars / 4) / 5000) * 5000;
+        return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
+      } catch (_e) {
+        return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
+      }
+    });
 
 // Phase 156-158 module references
 var _al_estimateCost = (typeof estimateCost !== 'undefined') ? estimateCost : (_al_costTracker?.estimateCost || function() { return 0; });
@@ -1058,13 +1080,14 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
   // llm-proxy, etc.), it must be added to computeUrl in a follow-on phase.
   var _cfg = providerInstance.config || {};
   var _settings = providerInstance.settings || {};
+  var timeoutMs = _al_calculateAdaptiveTimeout(requestBody, providerInstance.model, 0);
   return executeViaBridge(providerKey, {
     apiKey: _settings[_cfg.keyField] || '',
     model: providerInstance.model,
     baseUrl: providerKey === 'custom' ? _settings.customEndpoint
            : providerKey === 'lmstudio' ? ((_settings.lmstudioBaseUrl || 'http://localhost:1234').replace(/\/+$/, '') + '/v1')
            : undefined,
-  }, requestBody, { mode: 'autopilot' });
+  }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
 }
 
 

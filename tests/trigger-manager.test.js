@@ -238,6 +238,9 @@ function reported(text, attributes) {
     // text equals mismatch no_fire
     var te2 = evaluate(snap({ kind: 'equals', value: 'Available' }, '', '', false), reported('available'), NOW);
     check(te2.outcome === 'no_fire', 'equals(text): exact match is case-sensitive, "available" does not equal "Available"');
+    // attribute alias extraction
+    var ae = evaluate(snap({ kind: 'equals', extract: 'attribute', attrName: 'data-price', value: '42' }, '', '', false), reported('', { 'data-price': '42' }), NOW);
+    check(ae.outcome === 'fired', 'equals(attribute): attrName alias extracts reported attribute value');
     // numeric equals parse_error
     var ee = evaluate(snap({ kind: 'equals', numeric: true, value: '100' }, '0', '0', false), reported('not-a-number'), NOW);
     check(ee.outcome === 'parse_error', 'equals(numeric): non-numeric value -> parse_error');

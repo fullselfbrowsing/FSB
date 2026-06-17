@@ -725,6 +725,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     UniversalProvider,
     PROVIDER_CONFIGS,
+    calculateAdaptiveTimeout,
     normalizeProviderBaseUrl,
     buildProviderModelsEndpoint,
     parseOpenAICompatibleModelList
