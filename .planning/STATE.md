@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 19 complete; Phase 20 ready
-last_updated: "2026-06-17T02:59:25Z"
+status: planning
+stopped_at: Phase 20 context gathered (assumptions mode)
+last_updated: "2026-06-17T03:08:57.441Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 21
-  completed_plans: 21
+  completed_plans: 23
   percent: 100
 ---
 
@@ -183,9 +183,9 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T02:59:25Z
-Stopped at: Phase 19 complete; Phase 20 ready
-Resume file: .planning/ROADMAP.md#phase-20-integration-cap-ui-docs--edge-cases
+Last session: 2026-06-17T03:08:57.438Z
+Stopped at: Phase 20 context gathered (assumptions mode)
+Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-CONTEXT.md
 
 ## Next Actions
 
