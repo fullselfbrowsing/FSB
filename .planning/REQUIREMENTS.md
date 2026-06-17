@@ -40,7 +40,7 @@ Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see 
 - [x] **REPORT-04**: A fire returns a structured event -- matched condition, old value, new value, URL, timestamp -- as notify-only output; the caller/AI decides any follow-up action.
 - [x] **REPORT-05**: Triggers fire once (edge-fire) by default and become terminal after firing.
 - [x] **REPORT-06**: A timeout returns a distinct `timed_out` outcome (not an error, not a fire) so the AI can choose to re-arm.
-- [ ] **REPORT-07**: User can opt a trigger into re-arm-on-fire -- after firing it re-arms and keeps watching, with de-dup / hysteresis so it does not fire repeatedly on the same crossing.
+- [x] **REPORT-07**: User can opt a trigger into re-arm-on-fire -- after firing it re-arms and keeps watching, with de-dup / hysteresis so it does not fire repeatedly on the same crossing.
 
 ### LIFE -- Lifecycle & concurrency (companion tools)
 
@@ -131,7 +131,7 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 | REPORT-04 | Phase 19 | Complete |
 | REPORT-05 | Phase 19 | Complete |
 | REPORT-06 | Phase 19 | Complete |
-| REPORT-07 | Phase 19 | Pending |
+| REPORT-07 | Phase 19 | Complete |
 | LIFE-01 | Phase 18 | Complete |
 | LIFE-02 | Phase 18 | Complete |
 | LIFE-03 | Phase 18 | Complete |
@@ -165,4 +165,4 @@ Which phase covers which requirement. Phase numbering continues from v0.10.0 (Ph
 
 ---
 *Requirements defined: 2026-06-15*
-*Last updated: 2026-06-15 after roadmap creation for milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- all 39 v1 requirements mapped to Phases 14-20*
+*Last updated: 2026-06-17 after Phase 19 completion -- all 39 v1 requirements mapped to Phases 14-20 and completed through Phase 19*

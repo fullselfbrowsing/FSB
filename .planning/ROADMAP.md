@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 16: Live-Observe Watch & Analyzing Pulse** — In-place single-element MutationObserver (no reload) with SPA/BF-cache re-arm, plus the gentle "analyzing" pulse on the watched element.
 - [x] **Phase 17: Refresh-Poll Watch (Tab-Owning Background Reload)** — Alarm-driven background reload of the trigger's own tab with a 30s floor, no focus theft. (completed 2026-06-16)
 - [x] **Phase 18: Shared Tool Registry & Dispatcher Wiring** — Register `trigger` + 3 companions once for autopilot AND MCP; companions in the read-only bypass; watcher in background.js; INV-01 schema-lock stays green. (completed 2026-06-17)
-- [ ] **Phase 19: MCP Tools & Blocking/Detached Reporting** — The 4 MCP `server.tool()` registrations with blocking-by-default (heartbeats + auto-convert-to-detached) and detached opt-in, returning structured notify-only fire events.
+- [x] **Phase 19: MCP Tools & Blocking/Detached Reporting** — The 4 MCP `server.tool()` registrations with blocking-by-default (heartbeats + auto-convert-to-detached) and detached opt-in, returning structured notify-only fire events. (completed 2026-06-17)
 - [ ] **Phase 20: Integration, Cap UI, Docs & Edge Cases** — Compose the full system: trigger-cap control, watch-mode conflict + reload coalescing, CHANGELOG/README docs, `fsb-mcp-server@0.10.0` bump.
 
 ## Phase Details
@@ -115,7 +115,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans (1 per wave)
 - [x] 19-01-PLAN.md — blocking/detached trigger envelope: additive schema fields, generated trigger_id, heartbeats, safety auto-detach, bridge-disconnect partial recovery [REPORT-01, REPORT-02, REPORT-03]
 - [x] 19-02-PLAN.md — runtime outcome settlement: persisted fire events, terminal timed_out cleanup, status/list projection [REPORT-04, REPORT-05, REPORT-06]
-- [ ] 19-03-PLAN.md — re-arm-on-fire, hysteresis reset, detached owner cleanup and TTL/reconnect grace [REPORT-02, REPORT-03, REPORT-07]
+- [x] 19-03-PLAN.md — re-arm-on-fire, hysteresis reset, detached owner cleanup and TTL/reconnect grace [REPORT-02, REPORT-03, REPORT-07]
 
 ### Phase 20: Integration, Cap UI, Docs & Edge Cases
 **Goal**: Compose the full trigger system end-to-end — surface the concurrency cap in the UI, resolve the cross-watch-mode edge cases that need the whole system, document the new surface, and ship the knock-on version bump.
@@ -141,7 +141,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete    | 2026-06-16 |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 4/4 | Complete    | 2026-06-17 |
-| 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 1/3 | In Progress|  |
+| 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 3/3 | Complete | 2026-06-17 |
 | 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 0/TBD | Not started | - |
 
 ## Research Flags (v0.11.0)

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 19 Plan 02 complete; Plan 03 ready
-last_updated: "2026-06-17T02:45:42Z"
+stopped_at: Phase 19 complete; Phase 20 ready
+last_updated: "2026-06-17T02:59:25Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 21
-  completed_plans: 20
-  percent: 95
+  completed_plans: 21
+  percent: 100
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase b
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 19 — mcp-tools-blocking-detached-reporting
+**Current focus:** Phase 20 — integration-cap-ui-docs-edge-cases
 
 ## Current Position
 
-Phase: 19 (mcp-tools-blocking-detached-reporting) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute Plan 03
+Phase: 20 (integration-cap-ui-docs-edge-cases) — READY
+Plan: TBD
+Status: Ready to plan Phase 20
 Last activity: 2026-06-17
 
-Progress: [██████····] 62% (5/8 phases)
+Progress: [███████···] 75% (6/8 phases)
 
 ## Roadmap At A Glance (v0.11.0)
 
@@ -45,8 +45,8 @@ Progress: [██████····] 62% (5/8 phases)
 | 16 | Live-Observe Watch & Analyzing Pulse | WATCH-01, WATCH-05, VIS-01..04 (6) | Complete |
 | 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | Complete |
 | 18 | Shared Tool Registry & Dispatcher Wiring | TRIG-01, REG-01..04, LIFE-01..03 (8) | Complete |
-| 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Executing (Plans 01-02 complete) |
-| 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Not started |
+| 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Complete |
+| 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Ready to plan |
 
 Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
@@ -54,7 +54,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 20 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4, Phase 19: 2)
+- Total plans completed (this milestone): 21 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4, Phase 19: 3)
 - Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
 
 **By Phase:**
@@ -88,6 +88,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 18-shared-tool-registry-dispatcher-wiring P04 | 9min | 3 tasks | 4 files |
 | Phase 19 P01 | 12min | 3 tasks | 9 files |
 | Phase 19 P02 | 15min | 3 tasks | 6 files |
+| Phase 19 P03 | 20min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-01: MCP trigger calls are blocking by default with 30s heartbeats, generated trigger_id correlation, detached opt-in, safety auto-detach at 240s, and bridge-disconnect partial recovery from persisted status.
 - [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: fire events are flat notify-only records persisted atomically with status:'fired'; blocking timeouts become terminal status:'timed_out' via runtime cleanup; safety auto-detach remains non-terminal and keeps the watcher armed.
 - [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: get_trigger_status/list_triggers expose terminal fired/timed_out fields after ownership filtering; default list remains armed/needs_attention/blocked, while include_terminal adds fired/timed_out/stopped.
+- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: rearm_on_fire keeps snapshots armed after fire with fire_count/last_event evidence; blocking waiters settle on that first rearmed fire with still_armed:true.
+- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: numeric hysteresis reset is pure manager logic for threshold and percent_change conditions, preserving edge-fire until the reset band is crossed.
+- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: reconnect grace expiry calls FsbTriggerLifecycle.handleTriggerOwnerReleased(agentId) best-effort after registry release; fast reconnect cancellation suppresses trigger reap.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -179,10 +183,10 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T02:45:42Z
-Stopped at: Phase 19 Plan 02 complete; Plan 03 ready
-Resume file: .planning/phases/19-mcp-tools-blocking-detached-reporting/19-03-PLAN.md
+Last session: 2026-06-17T02:59:25Z
+Stopped at: Phase 19 complete; Phase 20 ready
+Resume file: .planning/ROADMAP.md#phase-20-integration-cap-ui-docs--edge-cases
 
 ## Next Actions
 
-Proceed to Phase 19 Plan 03: re-arm-on-fire, hysteresis reset, and detached owner cleanup.
+Plan Phase 20: integration, trigger-cap UI, docs, version prep, watch-mode conflict/coalescing, and live-browser UAT capture.
