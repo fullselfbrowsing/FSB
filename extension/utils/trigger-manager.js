@@ -357,6 +357,46 @@
     };
   }
 
+  function hysteresisMargin(condition) {
+    var hysteresis = Number(condition && condition.hysteresis);
+    return Number.isFinite(hysteresis) && hysteresis > 0 ? hysteresis : 0;
+  }
+
+  function applyHysteresis(condition, safeSnap, reportedValue, result, opts) {
+    var satisfiedNow = result && result.satisfied === true;
+    var margin = hysteresisMargin(condition);
+    if (safeSnap.was_satisfied !== true || margin === 0) return satisfiedNow;
+
+    var kind = condition && condition.kind === 'delta_percent' ? 'percent_change' : condition && condition.kind;
+    var extractor = _getExtractor();
+    if (!extractor) return satisfiedNow;
+
+    if (kind === 'threshold') {
+      var raw = extractor.extractValue(reportedValue, condition);
+      var current = extractor.parseLocaleNumber(raw, opts);
+      var target = extractor.parseLocaleNumber(String(condition.target), opts);
+      if (current.error || target.error) return satisfiedNow;
+      if (condition.operator === '>' || condition.operator === '>=') {
+        return current.value >= target.value - margin;
+      }
+      if (condition.operator === '<' || condition.operator === '<=') {
+        return current.value <= target.value + margin;
+      }
+      return satisfiedNow;
+    }
+
+    if (kind === 'percent_change') {
+      var rawPct = extractor.extractValue(reportedValue, condition);
+      var currentPct = extractor.parseLocaleNumber(rawPct, opts);
+      var basePct = extractor.parseLocaleNumber(String(safeSnap.baseline), opts);
+      if (currentPct.error || basePct.error || basePct.value === 0) return satisfiedNow;
+      var pct = Math.abs((currentPct.value - basePct.value) / basePct.value * 100);
+      return pct >= Math.max(0, Math.abs(Number(condition.percent)) - margin);
+    }
+
+    return satisfiedNow;
+  }
+
   // ---- Public entry: evaluate() (D-02, PURE) -------------------------------
   //
   // Computes the per-tick satisfied boolean (single or compound condition), then
@@ -408,16 +448,9 @@
       };
     }
 
-    var satisfiedNow = result.satisfied === true;
+    var satisfiedNow = applyHysteresis(condition, safeSnap, reportedValue, result, opts);
     var wasSatisfied = safeSnap.was_satisfied === true;
     var isEdge = (!wasSatisfied && satisfiedNow); // false -> true transition only
-
-    // Hysteresis margin is read for parity with the re-arm recipe (Pattern 4).
-    // For the fire-once default it does not change the edge decision; it is
-    // surfaced so a future re-arm path can require the value to clear the
-    // boundary by this margin before was_satisfied resets to false.
-    var _hysteresis = (typeof condition.hysteresis === 'number') ? condition.hysteresis : 0;
-    void _hysteresis;
 
     var newValue = (result.new_value === undefined) ? null : result.new_value;
 

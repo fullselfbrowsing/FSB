@@ -182,6 +182,46 @@ function reported(text, attributes) {
   }
 
   // ====================================================================
+  // HYSTERESIS: numeric reset boundary for re-arm de-dup (Phase 19)
+  // ====================================================================
+  console.log('--- HYSTERESIS: threshold + percent_change reset ---');
+  {
+    var hGt = { kind: 'threshold', operator: '>=', target: '100', hysteresis: 5 };
+    var hGtFire = evaluate(snap(hGt, '90', '90', false), reported('101'), NOW);
+    check(hGtFire.outcome === 'fired', 'hysteresis threshold >=: first 101 fires');
+    var hGtHold1 = evaluate(snap(hGt, '90', '101', true), reported('103'), NOW);
+    check(hGtHold1.outcome === 'no_fire' && hGtHold1.next_state.was_satisfied === true, 'hysteresis threshold >=: 103 remains satisfied and does not re-fire');
+    var hGtHold2 = evaluate(snap(hGt, '90', '103', true), reported('96'), NOW);
+    check(hGtHold2.outcome === 'no_fire' && hGtHold2.next_state.was_satisfied === true, 'hysteresis threshold >=: 96 remains satisfied above target-margin');
+    var hGtReset = evaluate(snap(hGt, '90', '96', true), reported('94'), NOW);
+    check(hGtReset.outcome === 'no_fire' && hGtReset.next_state.was_satisfied === false, 'hysteresis threshold >=: 94 resets below target-margin');
+    var hGtRefire = evaluate(snap(hGt, '90', '94', false), reported('101'), NOW);
+    check(hGtRefire.outcome === 'fired', 'hysteresis threshold >=: after reset, 101 fires again');
+
+    var hLt = { kind: 'threshold', operator: '<=', target: '100', hysteresis: 5 };
+    var hLtFire = evaluate(snap(hLt, '110', '110', false), reported('99'), NOW);
+    check(hLtFire.outcome === 'fired', 'hysteresis threshold <=: first 99 fires');
+    var hLtHold1 = evaluate(snap(hLt, '110', '99', true), reported('97'), NOW);
+    check(hLtHold1.outcome === 'no_fire' && hLtHold1.next_state.was_satisfied === true, 'hysteresis threshold <=: 97 remains satisfied and does not re-fire');
+    var hLtHold2 = evaluate(snap(hLt, '110', '97', true), reported('104'), NOW);
+    check(hLtHold2.outcome === 'no_fire' && hLtHold2.next_state.was_satisfied === true, 'hysteresis threshold <=: 104 remains satisfied below target+margin');
+    var hLtReset = evaluate(snap(hLt, '110', '104', true), reported('106'), NOW);
+    check(hLtReset.outcome === 'no_fire' && hLtReset.next_state.was_satisfied === false, 'hysteresis threshold <=: 106 resets above target+margin');
+    var hLtRefire = evaluate(snap(hLt, '110', '106', false), reported('99'), NOW);
+    check(hLtRefire.outcome === 'fired', 'hysteresis threshold <=: after reset, 99 fires again');
+
+    var hPct = { kind: 'percent_change', percent: 10, hysteresis: 2 };
+    var hPctFire = evaluate(snap(hPct, '100', '100', false), reported('112'), NOW);
+    check(hPctFire.outcome === 'fired', 'hysteresis percent_change: 112 fires at 12% change');
+    var hPctHold = evaluate(snap(hPct, '100', '112', true), reported('111'), NOW);
+    check(hPctHold.outcome === 'no_fire' && hPctHold.next_state.was_satisfied === true, 'hysteresis percent_change: 111 remains satisfied above percent-margin');
+    var hPctReset = evaluate(snap(hPct, '100', '111', true), reported('107'), NOW);
+    check(hPctReset.outcome === 'no_fire' && hPctReset.next_state.was_satisfied === false, 'hysteresis percent_change: 107 resets below percent-margin');
+    var hPctRefire = evaluate(snap(hPct, '100', '107', false), reported('112'), NOW);
+    check(hPctRefire.outcome === 'fired', 'hysteresis percent_change: after reset, 112 fires again');
+  }
+
+  // ====================================================================
   // KIND 5: equals (numeric with tolerance + text exact)
   // ====================================================================
   console.log('--- KIND: equals ---');
