@@ -1353,7 +1353,7 @@ const TOOL_REGISTRY = [
       properties: {
         status: {
           type: 'string',
-          enum: ['armed', 'blocked', 'fired', 'stopped'],
+          enum: ['armed', 'needs_attention', 'blocked', 'fired', 'timed_out', 'stopped'],
           description: 'Optional status filter.'
         },
         include_terminal: {

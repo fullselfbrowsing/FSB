@@ -169,6 +169,17 @@ TRIGGER_COMPANION_TOOL_NAMES.forEach(function(name) {
     name + ' is read-only/bypass class (_readOnly: true)');
 });
 
+const listTriggersTool = td.getToolByName('list_triggers');
+if (listTriggersTool) {
+  const statusEnum = (((listTriggersTool.inputSchema || {}).properties || {}).status || {}).enum || [];
+  ['armed', 'needs_attention', 'blocked', 'fired', 'timed_out', 'stopped'].forEach(function(status) {
+    check(statusEnum.indexOf(status) >= 0,
+      'list_triggers status enum accepts persisted status ' + status);
+  });
+  check(new Set(statusEnum).size === statusEnum.length,
+    'list_triggers status enum has no duplicate values');
+}
+
 const publicTools = agentLoop.getPublicTools();
 PROVIDER_KEYS.forEach(function(provider) {
   const formatted = formatToolsForProvider(publicTools, provider);
