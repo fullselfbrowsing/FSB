@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-06-17T04:01:10.287Z"
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-06-17T04:07:16.627Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 26
-  completed_plans: 24
-  percent: 92
+  completed_plans: 25
+  percent: 96
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-06-17
 
@@ -90,6 +90,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 19 P02 | 15min | 3 tasks | 6 files |
 | Phase 19 P03 | 20min | 3 tasks | 9 files |
 | Phase 20 P01 | 22 min | 3 tasks | 5 files |
+| Phase 20 P02 | 13 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: reconnect grace expiry calls FsbTriggerLifecycle.handleTriggerOwnerReleased(agentId) best-effort after registry release; fast reconnect cancellation suppresses trigger reap.
 - [Phase 20]: Trigger Concurrency UI clones Agent Concurrency and uses fsbTriggerCap with clamp-on-input/load/save.
 - [Phase 20]: Active trigger count includes armed, needs_attention, and blocked while excluding terminal trigger records.
+- [Phase 20]: Cross-watch conflicts are rejected in background before read, persistence, observe startup, or pulse startup.
+- [Phase 20]: Conflict scans filter snapshots through owner visibility to avoid leaking another owner's trigger metadata.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -186,9 +189,9 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T04:01:10.284Z
-Stopped at: Completed 20-01-PLAN.md
-Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-02-PLAN.md
+Last session: 2026-06-17T04:07:16.624Z
+Stopped at: Completed 20-02-PLAN.md
+Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-03-PLAN.md
 
 ## Next Actions
 
