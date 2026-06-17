@@ -1,168 +1,121 @@
-# Requirements: FSB v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+# Requirements: FSB v0.12.0 PhantomStream Package Migration
 
-**Defined:** 2026-06-15
-**Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely. The trigger family extends this to *reactive* watching: FSB reliably watches one element and reports exactly what happened; the AI decides any follow-up.
+**Defined:** 2026-06-17
+**Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely. The dashboard preview must preserve that value while delegating DOM mirroring mechanics to the extracted PhantomStream package instead of FSB-owned duplicate stream code.
 
 ## v1 Requirements
 
-Requirements for milestone v0.11.0. Each maps to exactly one roadmap phase (see Traceability). Research basis: `.planning/research/{STACK,FEATURES,ARCHITECTURE,PITFALLS,SUMMARY}.md`.
+Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see Traceability). Research basis: `.planning/research/PHANTOMSTREAM-PACKAGE.md` plus upstream `fullselfbrowsing/PhantomStream`.
 
-### TRIG -- Core trigger tool & fire conditions
+### PKG -- Package intake, pinning, and source-of-truth
 
-- [x] **TRIG-01**: User can arm a trigger on one targeted DOM element (via FSB's uniqueness-scored selector) by specifying a fire condition.
-- [x] **TRIG-02**: A trigger supports the `changed` condition -- fires when the element's value differs from the baseline captured at arm time.
-- [x] **TRIG-03**: A trigger supports the `threshold` condition with operators `>=`, `<=`, `>`, `<` against a numeric target.
-- [x] **TRIG-04**: A trigger supports the `equals` / `regex` condition -- exact value match or a caller-supplied regular expression (compiled once, guarded against catastrophic backtracking).
-- [x] **TRIG-05**: A trigger supports the `contains` condition -- fires when the extracted text contains a substring (case-insensitive by default).
-- [x] **TRIG-06**: A trigger supports the `percent_change` condition -- fires when the value moves +/- N% from the arm-time baseline.
-- [x] **TRIG-07**: A trigger supports compound conditions -- multiple conditions on the same element combined with explicit AND / OR semantics in a single trigger.
+- [ ] **PKG-01**: FSB can install PhantomStream from an approved source with an exact version or immutable reference, lockfile integrity/provenance recorded, and no floating dependency.
+- [ ] **PKG-02**: The migration records the upstream package surface actually available to FSB (`protocol`, `capture`, `renderer`, and any relay/transport/adapters) before production code imports it.
+- [ ] **PKG-03**: If `@fullselfbrowsing/phantom-stream` is not available from npm, the milestone blocks implementation until publication or an explicit decision authorizes a temporary GitHub/tarball pin.
+- [ ] **PKG-04**: Existing FSB stream contracts are mapped to PhantomStream equivalents before replacement: snapshot, mutation diffs, scroll, overlays, dialogs, stream-state recovery, stale-message rejection, compression, relay, and remote-control reverse path.
 
-### WATCH -- Watch mechanisms
+### CAP -- Capture-side replacement
 
-- [x] **WATCH-01**: User can choose `live-observe` mode -- the trigger watches the element in place via MutationObserver and fires with no page reload (for live pages / SPAs / tickers).
-- [x] **WATCH-02**: User can choose `refresh-poll` mode -- the trigger periodically reloads the element's tab and re-reads the value (for static, server-rendered pages).
-- [x] **WATCH-03**: Refresh-poll interval is configurable with a hard floor of 30s (Chrome `chrome.alarms` minimum) and a ~60s default; a sub-floor interval is rejected with guidance to use live-observe.
-- [x] **WATCH-04**: Refresh-poll reloads target the trigger's OWN tab and never steal focus from the user or other agents (reuses v0.9.60 agent-scoped tab resolution / background-tab defaults).
-- [x] **WATCH-05**: Live-observe re-establishes its observer and baseline after in-page navigation / BF-cache restore / SPA soft-navigation so a watched element keeps firing correctly (re-resolve the selector via uniqueness scoring on re-attach).
+- [ ] **CAP-01**: `extension/content/dom-stream.js` no longer owns bespoke snapshot and MutationObserver diff logic; it becomes a thin adapter around PhantomStream capture primitives.
+- [ ] **CAP-02**: Capture preserves FSB behavior for stable node identity, curated computed-style capture, budgeted snapshots, rAF-batched mutations, scroll side channel, dialog mirroring, automation overlay side channel, session stamping, and stale flush diagnostics.
+- [ ] **CAP-03**: Capture continues to respect FSB overlay exclusion, reduced page impact, content-script reinjection, pause/resume/stop semantics, and `pingDomStream` readiness probing.
+- [ ] **CAP-04**: Sensitive content handling is explicitly configured: password masking, dangerous URL/script stripping, event-handler removal, `srcdoc`/embed handling, and any custom masking hooks required by FSB.
 
-### EXTRACT -- Value extraction
+### VIEW -- Dashboard renderer replacement
 
-- [x] **EXTRACT-01**: For `threshold` / `equals` / `percent_change`, the trigger auto-parses a number from the element (strips currency symbols, thousands separators, whitespace) with locale-aware decimal/group handling.
-- [x] **EXTRACT-02**: For `changed` / `contains`, the trigger compares raw extracted text.
-- [x] **EXTRACT-03**: User can override extraction with `extract: text | number | attribute` (plus an attribute name) to read a specific source (e.g. `data-price`, `aria-valuenow`).
-- [x] **EXTRACT-04**: A failed numeric parse yields a distinct `parse_error` outcome and never fires the trigger (no firing on NaN).
+- [ ] **VIEW-01**: The static showcase dashboard viewer delegates snapshot rendering and diff application to PhantomStream renderer primitives while preserving FSB preview states and controls.
+- [ ] **VIEW-02**: The Angular dashboard viewer delegates to the same PhantomStream renderer behavior or a shared wrapper, eliminating drift between static and Angular diff application logic.
+- [ ] **VIEW-03**: Viewer behavior remains unchanged for iframe sandboxing, scaling/layout modes, stale stream/session rejection, resync on divergence, frozen-disconnect/frozen-complete states, restricted-page placeholders, and diagnostic tooltip counters.
+- [ ] **VIEW-04**: Side-channel rendering remains intact: scroll position, action glow, progress badge/client identity, native dialogs, remote-control affordances, and final/frozen overlay state.
 
-### REPORT -- Reporting & fire semantics
+### RELAY -- Transport and relay integration
 
-- [x] **REPORT-01**: `trigger()` is blocking by default -- the call holds open with ~30s heartbeats and returns when the condition fires or the timeout elapses (mirrors the `run_task` lifecycle-return contract).
-- [x] **REPORT-02**: User can arm a trigger in detached mode -- `trigger()` returns a `trigger_id` immediately and the caller polls for status.
-- [x] **REPORT-03**: A blocking trigger auto-converts to detached past a configurable safety ceiling (returns the `trigger_id`) so it never holds an MCP request open indefinitely.
-- [x] **REPORT-04**: A fire returns a structured event -- matched condition, old value, new value, URL, timestamp -- as notify-only output; the caller/AI decides any follow-up action.
-- [x] **REPORT-05**: Triggers fire once (edge-fire) by default and become terminal after firing.
-- [x] **REPORT-06**: A timeout returns a distinct `timed_out` outcome (not an error, not a fire) so the AI can choose to re-arm.
-- [x] **REPORT-07**: User can opt a trigger into re-arm-on-fire -- after firing it re-arms and keeps watching, with de-dup / hysteresis so it does not fire repeatedly on the same crossing.
+- [ ] **RELAY-01**: `extension/ws/ws-client.js` uses PhantomStream-compatible protocol/envelope helpers for stream payloads without regressing existing dashboard WebSocket task/status traffic.
+- [ ] **RELAY-02**: `showcase/server/src/ws/handler.js` either adopts PhantomStream relay primitives or keeps a documented compatibility adapter, preserving hash-key room routing, dashboard/extension roles, 1 MiB message cap, and 16 MiB backpressure drop behavior.
+- [ ] **RELAY-03**: Compression remains stateless and self-identifying (`{ _lz: true, d }`) for large stream payloads, with symmetric decompression and clear diagnostics on malformed or unsupported frames.
+- [ ] **RELAY-04**: Stream recovery still works across dashboard reconnect, extension reconnect, service-worker wake, content-script late readiness, and parked `dash:dom-stream-start` intent re-arm.
 
-### LIFE -- Lifecycle & concurrency (companion tools)
+### CTRL -- Remote control and reverse mapping
 
-- [x] **LIFE-01**: User can stop an active trigger with `stop_trigger`, which tears down the observer / cancels the poll alarm and clears the visual pulse.
-- [x] **LIFE-02**: User can query a trigger with `get_trigger_status` -- state, current vs initial value, condition, watch mode, elapsed / remaining, last-check time.
-- [x] **LIFE-03**: User can list all active triggers with `list_triggers`.
-- [x] **LIFE-04**: Multiple triggers can be active concurrently under a configurable cap (mirrors the v0.9.60 agent cap, 1-64); exceeding the cap fails loudly with a typed error.
-- [x] **LIFE-05**: A trigger has a maximum lifetime (TTL); orphaned / expired triggers are reaped and their resources (observer, alarm, pulse, registry entry) released.
+- [ ] **CTRL-01**: Dashboard click/type/scroll remote-control events map through PhantomStream-compatible target metadata while preserving FSB's CDP/input behavior and ownership/debugger-state reporting.
+- [ ] **CTRL-02**: Remote-control retargeting remains safe across stream-tab changes, page navigation, reconnects, and stale frames.
+- [ ] **CTRL-03**: Remote-control user-visible states remain authoritative: attached, blocked by external debugger, retarget-required, user-stop, and ownership diagnostics.
 
-### SURV -- MV3 survivability (session-scoped)
+### PARITY -- Removal, tests, docs, and release gates
 
-- [x] **SURV-01**: An armed trigger survives service-worker eviction -- trigger state persists in `chrome.storage.session` and the watch re-arms on SW wake via `chrome.alarms` (no keepalive antipatterns; the load-bearing `setTimeout` agent-loop iterator is untouched, INV-04).
-- [x] **SURV-02**: Fire evaluation (compare + fire decision) happens in the service worker against persisted state, so an eviction between read and decision cannot drop or duplicate a fire.
-- [x] **SURV-03**: On SW wake, the trigger registry reconciles persisted triggers (re-attach observers / reschedule polls) without duplicate fires or orphaned watchers.
-
-### VIS -- Visual feedback
-
-- [x] **VIS-01**: While a trigger is active, its watched element shows a gentle "analyzing" pulse -- visually distinct from the steady `run_task` glow -- reusing FSB's Shadow DOM overlay.
-- [x] **VIS-02**: The visual monitor explicitly labels itself as "watching a trigger" while one or more triggers are active.
-- [x] **VIS-03**: The pulse clears when the trigger fires, is stopped, times out, or is reaped (no stuck glow, including across a refresh-poll reload).
-- [x] **VIS-04**: The analyzing pulse respects the user's reduced-motion preference.
-
-### REG -- Registry parity & contract safety
-
-- [x] **REG-01**: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` are registered once in the shared tool registry and exposed to BOTH FSB autopilot and the MCP server (INV-02).
-- [x] **REG-02**: The companion tools (`stop_trigger` / `get_trigger_status` / `list_triggers`) are in the MCP read-only bypass set, and the long-running watcher runs in `background.js` (not the MCP handler), so a blocking `trigger()` never starves the single-slot task queue or deadlocks its own `stop_trigger`.
-- [x] **REG-03**: All existing MCP tool schemas remain byte-identical; the trigger family is purely additive (INV-01), verified by the existing schema-lock CI gate.
-- [x] **REG-04**: The trigger tools behave identically across all 7 AI providers when driven by autopilot (INV-03; trigger logic is provider-agnostic).
+- [ ] **PARITY-01**: All existing stream-focused tests are updated to assert package-backed behavior rather than in-house implementation details, while preserving current behavioral coverage.
+- [ ] **PARITY-02**: A differential parity test compares FSB's current in-house stream behavior against PhantomStream for representative snapshots, mutations, side channels, stale messages, and security sanitization.
+- [ ] **PARITY-03**: In-house stream logic that is now owned by PhantomStream is removed or reduced to adapters, with no duplicate capture/renderer/relay engines left behind.
+- [ ] **PARITY-04**: Documentation names PhantomStream as the stream implementation, records the package pin/source/provenance, and explains any FSB-specific adapters that remain.
+- [ ] **PARITY-05**: Milestone close requires automated gates plus explicit browser UAT for dashboard live preview, remote control, navigation/reconnect recovery, restricted tabs, large pages, and security masking.
 
 ## Future Requirements (deferred -- tracked, not in this roadmap)
 
-### COND-FUTURE -- Advanced conditions
+### PSTR-FUTURE -- Upstream enhancements
 
-- **COND-FUTURE-01**: Compound conditions across DIFFERENT elements in one trigger (e.g. "price < X AND stock = In Stock" spanning two elements). v0.11.0 compounds on a single element only.
+- **PSTR-FUTURE-01**: Contribute any FSB-only adapters or missing relay/transport exports back to PhantomStream after FSB validates them in production.
+- **PSTR-FUTURE-02**: Adopt PhantomStream's planned CSSOM capture mode, WeakMap node identity, shadow DOM capture, and evaluation harness when upstream ships them.
+- **PSTR-FUTURE-03**: Publish benchmark results comparing DOM streaming against WebRTC, CDP screencast, screenshots, and rrweb baselines from FSB's real workloads.
 
-### SURV-FUTURE -- Cross-restart persistence
+### DASH-FUTURE -- Dashboard consolidation
 
-- **SURV-FUTURE-01**: Armed triggers persist to `chrome.storage.local` and auto-resume when Chrome relaunches after a full quit. v0.11.0 is session-only by decision (watch lives while Chrome stays open).
-
-### NOTIFY-FUTURE -- Delivery & action
-
-- **NOTIFY-FUTURE-01**: Desktop / Chrome push notification on fire (relaxes the notify-only boundary deliberately).
-- **NOTIFY-FUTURE-02**: Auto-act-on-fire workflows with explicit human-in-the-loop guardrails.
-
-### HIST-FUTURE -- History
-
-- **HIST-FUTURE-01**: Change history / diff timeline for a trigger (a storage + UI product surface).
+- **DASH-FUTURE-01**: Remove the static dashboard implementation once Angular dashboard parity is fully accepted and deployed.
 
 ## Out of Scope
 
-Explicitly excluded for v0.11.0. Anti-features carried from `FEATURES.md` with rationale.
+Explicitly excluded for v0.12.0.
 
 | Feature | Reason |
 |---------|--------|
-| Server-side / cloud hosting | FSB is a local in-browser MV3 extension; a monitoring backend is a different product and contradicts the privacy/local model. Watch lives while Chrome is open ("browser must be open" is an honest, documented limitation). |
-| Own notification channel (email / SMS / desktop push / Slack) | Notify-only by design -- the trigger reports the fire to the driving AI/MCP caller, which already has its own surfacing. Building delivery is a whole product surface. (Push deferred to NOTIFY-FUTURE-01.) |
-| Auto-act-on-fire (auto-buy, auto-add-to-cart, auto-submit) | Destroys the Core Value ("the AI decides") and is a dangerous autonomous-action footgun. The AI decides the follow-up after a notify-only fire. (Deferred with guardrails to NOTIFY-FUTURE-02.) |
-| Whole-page visual / screenshot diffing | FSB targets ONE element via precise selectors; full-page pixel diff is noisy (ads, timestamps, carousels) and heavy. Uniqueness-scored targeting is more precise. |
-| Macro / multi-step pre-check on every poll | Re-running a multi-step macro per poll is fragile and conflates monitoring with automation. Caller uses existing action tools to navigate/auth/reveal the element first, then arms a trigger. |
-| Sub-30s refresh-poll cadence | Chrome 120+ `chrome.alarms` minimum period is 30s; sub-minute hammering risks rate-limiting / IP bans. For truly live data use `live-observe` (fires instantly). |
-| Cross-browser-restart auto-resume | Session-only chosen for v0.11.0 (simpler, honest limit). Tracked as SURV-FUTURE-01 for a later milestone. |
+| Redesigning the dashboard product UI | This milestone is a dependency migration and behavior-preservation effort, not a visual redesign. |
+| Replacing task/status WebSocket traffic | PhantomStream owns browser mirroring only; dashboard task lifecycle, metrics, and pairing traffic remain FSB-owned. |
+| Changing MCP tool schemas | DOM stream internals are not an MCP wire-contract change. Existing MCP schemas remain byte-identical unless a later milestone explicitly adds stream tools. |
+| Switching to pixel/video streaming | The goal is to replace FSB's in-house DOM stream with PhantomStream, not change the mirroring model. |
+| Publishing PhantomStream itself | FSB may block on upstream package publication, but the publish action belongs to the PhantomStream repo/package owner. |
 
 ## Traceability
 
-Which phase covers which requirement. Phase numbering continues from v0.10.0 (Phases 01-13); this milestone is Phases 14-20.
+Which phase covers which requirement. Phase numbering continues from v0.11.0 (Phases 14-20); this milestone is Phases 21-25.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRIG-01 | Phase 18 | Complete |
-| TRIG-02 | Phase 15 | Complete |
-| TRIG-03 | Phase 15 | Complete |
-| TRIG-04 | Phase 15 | Complete |
-| TRIG-05 | Phase 15 | Complete |
-| TRIG-06 | Phase 15 | Complete |
-| TRIG-07 | Phase 15 | Complete |
-| WATCH-01 | Phase 16 | Complete |
-| WATCH-02 | Phase 17 | Complete |
-| WATCH-03 | Phase 17 | Complete |
-| WATCH-04 | Phase 17 | Complete |
-| WATCH-05 | Phase 16 | Complete |
-| EXTRACT-01 | Phase 15 | Complete |
-| EXTRACT-02 | Phase 15 | Complete |
-| EXTRACT-03 | Phase 15 | Complete |
-| EXTRACT-04 | Phase 15 | Complete |
-| REPORT-01 | Phase 19 | Complete |
-| REPORT-02 | Phase 19 | Complete |
-| REPORT-03 | Phase 19 | Complete |
-| REPORT-04 | Phase 19 | Complete |
-| REPORT-05 | Phase 19 | Complete |
-| REPORT-06 | Phase 19 | Complete |
-| REPORT-07 | Phase 19 | Complete |
-| LIFE-01 | Phase 18 | Complete |
-| LIFE-02 | Phase 18 | Complete |
-| LIFE-03 | Phase 18 | Complete |
-| LIFE-04 | Phase 15 | Complete |
-| LIFE-05 | Phase 14 | Complete |
-| SURV-01 | Phase 14 | Complete |
-| SURV-02 | Phase 14 | Complete |
-| SURV-03 | Phase 14 | Complete |
-| VIS-01 | Phase 16 | Complete |
-| VIS-02 | Phase 16 | Complete |
-| VIS-03 | Phase 16 | Complete |
-| VIS-04 | Phase 16 | Complete |
-| REG-01 | Phase 18 | Complete |
-| REG-02 | Phase 18 | Complete |
-| REG-03 | Phase 18 | Complete |
-| REG-04 | Phase 18 | Complete |
+| PKG-01 | Phase 21 | Pending |
+| PKG-02 | Phase 21 | Pending |
+| PKG-03 | Phase 21 | Pending |
+| PKG-04 | Phase 21 | Pending |
+| CAP-01 | Phase 22 | Pending |
+| CAP-02 | Phase 22 | Pending |
+| CAP-03 | Phase 22 | Pending |
+| CAP-04 | Phase 22 | Pending |
+| VIEW-01 | Phase 23 | Pending |
+| VIEW-02 | Phase 23 | Pending |
+| VIEW-03 | Phase 23 | Pending |
+| VIEW-04 | Phase 23 | Pending |
+| RELAY-01 | Phase 24 | Pending |
+| RELAY-02 | Phase 24 | Pending |
+| RELAY-03 | Phase 24 | Pending |
+| RELAY-04 | Phase 24 | Pending |
+| CTRL-01 | Phase 24 | Pending |
+| CTRL-02 | Phase 24 | Pending |
+| CTRL-03 | Phase 24 | Pending |
+| PARITY-01 | Phase 25 | Pending |
+| PARITY-02 | Phase 25 | Pending |
+| PARITY-03 | Phase 25 | Pending |
+| PARITY-04 | Phase 25 | Pending |
+| PARITY-05 | Phase 25 | Pending |
 
 **Coverage:**
-- v1 requirements: 39 total
-- Mapped to phases: 39 (Phases 14-20; Phase 20 is the integration/composition phase carrying no net-new requirement)
+- v1 requirements: 24 total
+- Mapped to phases: 24 (Phases 21-25)
 - Unmapped: 0
 
 **Per-phase requirement counts:**
-- Phase 14 (Trigger Survivability Foundation): SURV-01, SURV-02, SURV-03, LIFE-05 (4)
-- Phase 15 (Fire-Condition Engine & Value Extraction): TRIG-02, TRIG-03, TRIG-04, TRIG-05, TRIG-06, TRIG-07, EXTRACT-01, EXTRACT-02, EXTRACT-03, EXTRACT-04, LIFE-04 (11)
-- Phase 16 (Live-Observe Watch & Analyzing Pulse): WATCH-01, WATCH-05, VIS-01, VIS-02, VIS-03, VIS-04 (6)
-- Phase 17 (Refresh-Poll Watch): WATCH-02, WATCH-03, WATCH-04 (3)
-- Phase 18 (Shared Tool Registry & Dispatcher Wiring): TRIG-01, REG-01, REG-02, REG-03, REG-04, LIFE-01, LIFE-02, LIFE-03 (8)
-- Phase 19 (MCP Tools & Blocking/Detached Reporting): REPORT-01, REPORT-02, REPORT-03, REPORT-04, REPORT-05, REPORT-06, REPORT-07 (7)
-- Phase 20 (Integration, Cap UI, Docs & Edge Cases): composition phase (0 net-new)
+- Phase 21 (Package Intake & Contract Mapping): PKG-01..04 (4)
+- Phase 22 (Capture Adapter Migration): CAP-01..04 (4)
+- Phase 23 (Dashboard Renderer Migration): VIEW-01..04 (4)
+- Phase 24 (Transport, Relay & Remote Control Integration): RELAY-01..04, CTRL-01..03 (7)
+- Phase 25 (Parity Removal, Docs & Browser UAT): PARITY-01..05 (5)
 
 ---
-*Requirements defined: 2026-06-15*
-*Last updated: 2026-06-17 after Phase 19 completion -- all 39 v1 requirements mapped to Phases 14-20 and completed through Phase 19*
+*Requirements defined: 2026-06-17*
+*Last updated: 2026-06-17 -- v0.12.0 PhantomStream Package Migration initialized*

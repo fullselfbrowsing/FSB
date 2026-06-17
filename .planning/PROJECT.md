@@ -10,9 +10,10 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last shipped:** v0.10.0 Autopilot via Lattice SDK -- 2026-06-15. FSB now consumes the public `@full-self-browsing/lattice@1.3.0` runtime through the stable `lattice` alias, with Lattice-owned receipt, checkpoint, tripwire, provider, survivability, and CLI surfaces wired through FSB's offscreen host, provider bridge, agent-loop step transitions, MV3 resume sidecars, autopilot visual-session metrics, and tab-aware side panel. Automated verification and phase execution completed across 13 phases / 52 plans; 11 human-gated Chrome MV3/UAT evidence items were acknowledged as deferred closeout debt rather than marked as passed.
+**Last completed:** v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17. FSB now has a storage-backed trigger tool family across autopilot and MCP: live-observe, refresh-poll, fire-condition evaluation, value extraction, blocking/detached reporting, companion status/stop/list tools, trigger-cap UI, and documentation. Live-browser/composed trigger UAT and release actions remain user-gated.
 
 **Recent shipping cadence:**
+- v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
 - v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
 - v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
 - v0.9.63 Showcase i18n -- shipped 2026-05-13
@@ -25,45 +26,43 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v0.9.47 Workspace Reorganization -- shipped 2026-05-02
 - v0.9.46 Site Discoverability (SEO + GEO) -- shipped 2026-05-02
 
-**Version:** MCP server package prepared at `fsb-mcp-server@0.9.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
+**Version:** MCP server package prepared at `fsb-mcp-server@0.10.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+## Current Milestone: v0.12.0 PhantomStream Package Migration
 
-**Goal:** Add a `trigger` tool family to FSB autopilot and the MCP server that watches a targeted DOM element and reports back when its value changes, crosses a threshold, equals a target, or contains text -- surviving service-worker eviction, with a gentle "analyzing" pulse on the watched element while the trigger is active.
+**Goal:** Replace FSB's in-house dashboard DOM streaming engine with the extracted PhantomStream package while preserving the current live preview, recovery, side-channel, relay, and remote-control behavior.
 
-**Progress:** Phases 14-18 are complete as of 2026-06-17. The trigger runtime now has storage-backed survivability, the fire-condition/value-extraction seam, live-observe with analyzing pulse, refresh-poll that reloads only the trigger-owned tab, and shared registry/dispatcher wiring that exposes `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` to both MCP and autopilot through background-owned handlers. Phase 19 is next: blocking/detached MCP reporting.
-
-**Why this matters:** FSB today executes a task and stops. A trigger turns FSB into a *reactive* watcher -- "tell me when this crypto/stock/product price crosses X" or "ping me when this changes." The AI still decides what to do on fire; the trigger only reports what happened, preserving FSB's core value (the AI decides, the mechanics execute).
+**Why this matters:** Phantom Stream began inside FSB and now exists as a standalone `fullselfbrowsing/PhantomStream` framework. Keeping the generic browser-mirroring engine duplicated inside FSB creates drift: fixes to capture, renderer, relay, security masking, and protocol behavior need to land twice. v0.12.0 makes PhantomStream the source of truth and leaves FSB with only product-specific adapters.
 
 **Target features:**
-- **`trigger()`** -- target one element via FSB's uniqueness-scored selector, define a fire condition, get notified when it fires.
-- **Fire conditions (all four):** `changed` (any delta from the initial value) - `threshold` (`>=`, `<=`, `>`, `<`, numeric) - `equals`/`regex` (exact value or text pattern) - `contains` (substring appears, e.g. "In Stock").
-- **Watch mechanism, selectable per-trigger:** `refresh-poll` (periodically reload the page and re-read the element -- for static pages like an Amazon listing) OR `live-observe` (watch the element in place via MutationObserver, no reload -- for live-updating pages like a crypto ticker).
-- **Reporting, dual-mode:** blocking by default (the `trigger()` call stays open with periodic heartbeats, returns on fire or timeout -- mirrors `run_task` lifecycle return); detached opt-in (returns a `trigger_id` immediately; the caller polls).
-- **Companion tools:** `stop_trigger`, `get_trigger_status`, `list_triggers` -- mirror the `run_task` / `stop_task` / `get_task_status` family.
-- **Multiple concurrent triggers** with a configurable cap (mirrors the v0.9.60 agent/tab cap: 1-64, sensible default).
-- **Smart value extraction:** auto-parse numbers (strip `$`, commas, whitespace) for `threshold`/`equals`; raw text for `changed`/`contains`; `extract: text | number | attribute` override (with attribute name).
-- **Visual feedback:** while a trigger is active the visual monitor stays on and labels itself as *watching a trigger*; the orange overlay shifts from the steady glow to a **gentle analyzing pulse** on the watched element.
+- **Package intake gate:** install `@fullselfbrowsing/phantom-stream` from npm with exact pin/integrity, or explicitly block/decide on an immutable GitHub/tarball fallback if npm remains unavailable.
+- **Capture adapter:** replace `extension/content/dom-stream.js` snapshot/diff internals with PhantomStream capture primitives while preserving FSB control messages, readiness probe, overlay exclusion, scroll/dialog/overlay side channels, diagnostics, and watchdog behavior.
+- **Renderer adapter:** route static and Angular dashboard snapshot rendering and diff application through PhantomStream renderer behavior, keeping the existing preview state machine and visual controls.
+- **Transport/relay alignment:** adopt PhantomStream-compatible protocol/envelope/relay helpers where available while preserving FSB hash-key rooms, task/status WS traffic, compression, backpressure, and recovery.
+- **Remote-control parity:** preserve click/type/scroll reverse mapping, debugger ownership reporting, retarget-required handling, and stale-frame safety.
+- **Removal and proof:** remove duplicate in-house stream engines, update docs/provenance, and close with automated parity plus real browser UAT.
 
-**Architecture notes (to confirm in research/planning):**
-- **MV3 survivability is the crux.** A price watch can run for hours; the MV3 service worker is evicted after ~30s idle. The monitor must outlive eviction via `chrome.alarms` + the resume-sidecar machinery already built for v0.10.0 (Lattice survivability adapter). This generalizes the SW-eviction `partial_state` pattern from `run_task` (Phase 239) into a standing watcher.
-- **Single shared registry (INV-02).** `trigger` and its companions are registered once and exposed to BOTH autopilot and MCP -- no autopilot-only tool stack.
-- **Refresh-poll must own its tab.** Periodic reloads target the trigger's own tab and must not steal focus or disrupt other agents/tabs (reuse v0.9.60 agent-scoped tab resolution + background-tab defaults).
-
-**Proposed defaults (tunable in planning):** refresh-poll interval default ~60s with a hard floor (avoid hammering sites); blocking-mode timeout configurable with a safety ceiling (recommend detached beyond a few minutes); concurrent-trigger cap mirrors the existing agent cap default.
-
-**Notify-only (by design / out of scope for v0.11.0):** the trigger reports *what happened*; the AI/caller decides any follow-up action. No auto-act-on-fire (e.g. auto-add-to-cart), no desktop/Chrome push notifications -- both deferrable to a later milestone.
+**Architecture notes:**
+- Upstream currently declares `@fullselfbrowsing/phantom-stream@0.1.0` with `./protocol`, `./capture`, and `./renderer` exports. The README describes relay/transport/adapters too, so Phase 21 must verify actual exports before implementation.
+- npm registry lookup returned `E404` for `@fullselfbrowsing/phantom-stream` on 2026-06-17. This milestone intentionally starts with a source/provenance gate instead of assuming the package can be installed.
+- FSB has two dashboard surfaces (`showcase/js/dashboard.js` and Angular dashboard). The migration should prefer a shared viewer wrapper to prevent drift.
 
 **Carried-forward invariants (apply to this milestone):**
-- **INV-01** existing MCP wire contracts stay byte-identical -- `trigger` and companions are purely additive new tools.
-- **INV-02** autopilot uses the SAME tool registry MCP exposes.
-- **INV-03** provider parity -- trigger is provider-agnostic DOM monitoring; autopilot integration works across all 7 providers.
-- **INV-04** MV3-survivability preserved -- the existing `setTimeout`-chained iterator stays load-bearing; trigger monitoring is additive runtime adaptation.
-- **INV-06** Lattice public package stays pinned and audited (`.planning/LATTICE-PIN.md` + `package-lock.json` + tests agree).
+- **INV-01** existing MCP wire contracts stay byte-identical; DOM streaming internals are not a schema change.
+- **INV-02** autopilot and MCP continue sharing the same browser-control/tool registry where relevant; no stream-only control fork.
+- **INV-03** provider parity remains unchanged; stream internals are provider-agnostic.
+- **INV-04** MV3-survivability preserved; stream recovery continues to survive service-worker wake/reconnect paths.
+- **INV-06** public package pins stay audited. Lattice remains pinned separately; PhantomStream gets its own package/source pin record during Phase 21.
 
-**Knock-on version:** new MCP tools -> likely `fsb-mcp-server@0.10.0` (minor bump). Extension/showcase version bump per existing milestone-close convention.
+**Knock-on version:** likely extension/showcase/dashboard implementation change, but no MCP package version bump unless a later phase changes exposed MCP contracts.
+
+## Last Milestone: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+
+**Status:** Completed on 2026-06-17. Release actions and live-browser/composed trigger UAT remain user-gated.
+
+**Outcome:** FSB gained a storage-backed trigger tool family across autopilot and MCP: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers`; live-observe and refresh-poll watch modes; fire-condition/value-extraction logic; blocking/detached reporting; trigger-cap UI; conflict/reload coalescing; and documentation. All 39 v1 requirements were mapped and completed across Phases 14-20, with browser UAT debt recorded rather than fabricated.
 
 ## Last Milestone: v0.10.0 Autopilot via Lattice SDK
 
@@ -391,7 +390,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.11.0 Trigger Tool (Reactive DOM Monitoring) in scoping -- requirements pending REQUIREMENTS.md generation.)
+(Milestone v0.12.0 PhantomStream Package Migration initialized -- requirements are complete, roadmap is mapped to Phases 21-25, and Phase 21 package intake is next.)
 
 ### Validated (v0.9.60)
 
@@ -642,4 +641,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-17 -- v0.11.0 Trigger Tool Phases 14-18 complete. Shared trigger registry and dispatcher wiring are implemented and verified; Phase 19 blocking/detached MCP reporting is next.*
+*Last updated: 2026-06-17 -- v0.12.0 PhantomStream Package Migration initialized. Requirements are mapped to Phases 21-25; Phase 21 package intake and provenance verification are next.*

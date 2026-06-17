@@ -1,101 +1,71 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.10.0
-milestone_name: milestone
-status: ready_for_milestone_close
-stopped_at: Completed 20-05-PLAN.md
-last_updated: "2026-06-17T16:38:28.000Z"
+milestone: v0.12.0
+milestone_name: PhantomStream Package Migration
+status: defining_requirements_complete
+stopped_at: New milestone initialized
+last_updated: "2026-06-17T17:20:00.000Z"
 last_activity: 2026-06-17
 progress:
-  total_phases: 8
-  completed_phases: 7
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 19
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-15 -- v0.11.0 Trigger Tool milestone active; invariants INV-01..06)
-See: .planning/ROADMAP.md (v0.11.0 = Phases 14-20; v0.10.0 archived under <details>)
-See: .planning/REQUIREMENTS.md (39 v1 requirements, all mapped to Phases 14-20)
-See: .planning/research/SUMMARY.md (synthesized research -- convergent 7-phase build order, MV3-survivability crux)
+See: .planning/PROJECT.md (updated 2026-06-17 -- v0.12.0 PhantomStream Package Migration active; invariants INV-01..06)
+See: .planning/ROADMAP.md (v0.12.0 = Phases 21-25; v0.11.0 summarized under completed milestones)
+See: .planning/REQUIREMENTS.md (24 v1 requirements, all mapped to Phases 21-25)
+See: .planning/research/PHANTOMSTREAM-PACKAGE.md (package intake facts, npm 404, migration risks)
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
-**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The trigger family extends this to reactive watching.
-**Current focus:** Phase 20 — complete from automated release-readiness gates; human/browser UAT remains explicit debt.
+**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The dashboard preview must preserve that value while PhantomStream owns the generic DOM-mirroring engine.
+**Current focus:** Phase 21 — package intake and contract mapping before replacing any in-house stream logic.
 
 ## Current Position
 
-Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — COMPLETE
-Plan: 5 of 5 complete
-Status: Ready for milestone close or user-gated release action decision; human/browser UAT remains `human_needed`
-Last activity: 2026-06-17 - Completed quick task 260617-g1w: Upgrade Lattice runtime and CLI packages to 1.4.0
+Phase: 21 (Package Intake & Contract Mapping) — NOT STARTED
+Plan: —
+Status: New milestone initialized; requirements and roadmap defined
+Last activity: 2026-06-17 - Started v0.12.0 PhantomStream Package Migration milestone
 
-Progress: [██████████] 100% (7/7 milestone phases)
+Progress: [░░░░░░░░░░] 0% (0/5 milestone phases)
 
-## Roadmap At A Glance (v0.11.0)
+## Roadmap At A Glance (v0.12.0)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 14 | Trigger Survivability Foundation | SURV-01..03, LIFE-05 (4) | Complete |
-| 15 | Fire-Condition Engine & Value Extraction | TRIG-02..07, EXTRACT-01..04, LIFE-04 (11) | Complete |
-| 16 | Live-Observe Watch & Analyzing Pulse | WATCH-01, WATCH-05, VIS-01..04 (6) | Complete |
-| 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | Complete |
-| 18 | Shared Tool Registry & Dispatcher Wiring | TRIG-01, REG-01..04, LIFE-01..03 (8) | Complete |
-| 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Complete |
-| 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Complete; human_needed UAT debt |
+| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Not started |
+| 22 | Capture Adapter Migration | CAP-01..04 (4) | Pending |
+| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Pending |
+| 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
+| 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Pending |
 
-Coverage: 39/39 v1 requirements mapped, 0 orphaned.
+Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed (this milestone): 26 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4, Phase 19: 3, Phase 20: 5)
-- Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
+- Total plans completed (this milestone): 0 (Phase 21: 0/3, Phase 22: 0/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
+- Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 14 | 3 | - | - |
-| 15 | 3 | - | - |
-| 16 | 4 | 12min | 3min |
-| 17 | 4 | - | - |
-| 18 | 4 | - | - |
-| 19 | 3 | 47min | 16min |
-| 20 | 5 | 106min | 21min |
+| 21 | 0/3 | - | - |
+| 22 | 0/4 | - | - |
+| 23 | 0/4 | - | - |
+| 24 | 0/4 | - | - |
+| 25 | 0/4 | - | - |
 
 *Updated after each plan completion.*
-| Phase 14 P01 | 5min | 2 tasks | 4 files |
-| Phase 14 P02 | 7min | 2 tasks | 3 files |
-| Phase 14 P03 | 5min | 1 tasks | 3 files |
-| Phase 15 P01 | 7min | 2 tasks | 3 files |
-| Phase 15 P02 | 9min | 3 tasks | 4 files |
-| Phase 15 P3 | 9min | 3 tasks | 4 files |
-| Phase 16 P01 | 3 min | 2 tasks | 3 files |
-| Phase 16 P02 | 3 min | 2 tasks | 4 files |
-| Phase 16 P03 | 1 min | 1 tasks | 1 files |
-| Phase 16 P04 | 5 min | 2 tasks | 3 files |
-| Phase 17 P01 | 8 min | 2 tasks | 4 files |
-| Phase 17 P02 | 2 min | 2 tasks | 2 files |
-| Phase 17 P03 | 8 min | 3 tasks | 2 files |
-| Phase 17 P04 | 7 min | 2 tasks | 5 files |
-| Phase 18-shared-tool-registry-dispatcher-wiring P01 | 6min | 2 tasks | 5 files |
-| Phase 18-shared-tool-registry-dispatcher-wiring P02 | 10min | 3 tasks | 3 files |
-| Phase 18-shared-tool-registry-dispatcher-wiring P03 | 9min | 2 tasks | 7 files |
-| Phase 18-shared-tool-registry-dispatcher-wiring P04 | 9min | 3 tasks | 4 files |
-| Phase 19 P01 | 12min | 3 tasks | 9 files |
-| Phase 19 P02 | 15min | 3 tasks | 6 files |
-| Phase 19 P03 | 20min | 3 tasks | 9 files |
-| Phase 20 P01 | 22 min | 3 tasks | 5 files |
-| Phase 20 P02 | 13 min | 3 tasks | 2 files |
-| Phase 20 P03 | 29 min | 3 tasks | 2 files |
-| Phase 20 P04 | 24 min | 3 tasks | 10 files |
-| Phase 20 P05 | 18 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -103,10 +73,14 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone:
 
-- **INV-01:** existing MCP tool schemas stay byte-identical; trigger family is purely additive (schema-lock CI must stay green).
-- **INV-02:** autopilot uses the SAME shared tool registry MCP exposes (no autopilot-only trigger stack).
-- **INV-03:** trigger logic is provider-agnostic; autopilot integration works across all 7 providers.
-- **INV-04:** the load-bearing `setTimeout`-chained agent-loop iterator stays byte-frozen; trigger machinery is a PARALLEL registry, never grafted onto run_task/activeSessions/agent-loop.js.
+- **PSTR-D-01:** v0.12.0 starts with a package intake gate because `@fullselfbrowsing/phantom-stream` returned npm `E404` on 2026-06-17 despite upstream package metadata declaring `0.1.0`.
+- **PSTR-D-02:** PhantomStream becomes the source of truth for generic DOM mirroring; FSB keeps product-specific adapters for pairing, task/status traffic, overlay identity, diagnostics, and remote-control ownership.
+- **PSTR-D-03:** Static and Angular dashboard viewers must share a wrapper or contract tests strong enough to prevent drift.
+- **PSTR-D-04:** Browser UAT is required before close; Node parity tests cannot prove live visual fidelity or remote-control usability alone.
+- **INV-01:** existing MCP tool schemas stay byte-identical; DOM-stream internals are not a schema change.
+- **INV-02:** autopilot uses the SAME shared tool registry MCP exposes where tool routing is involved.
+- **INV-03:** provider parity remains unchanged; stream internals are provider-agnostic.
+- **INV-04:** MV3-survivability and stream recovery paths stay preserved; package migration is additive runtime adaptation.
 - **INV-06:** Lattice public package stays pinned and audited (`.planning/LATTICE-PIN.md` + `package-lock.json` + tests agree).
 - [Phase ?]: Phase 14 Plan 01: trigger-store.js is a verbatim clone of mcp-task-store.js (6 enumerated changes only; code body byte-identical after inverse-rename). chrome.storage.session direct per D-12; agent_id stored faithfully (V4); only behavioral change is listArmedSnapshots filtering status==='armed'.
 - [Phase ?]: Phase 14 Plan 02: trigger-lifecycle.js clones mcp-visual-session-lifecycle.js with overlay STRIPPED, over FsbTriggerStore (storage-is-truth, re-read every tick). handleTriggerAlarm adds a noop_terminal idempotent fire-guard (D-09); restoreTriggersFromStorage adds the getAll() orphan sweep scoped to fsbTrigger: (D-08); three reap paths via absolute deadline_at (LIFE-05). FSB_TRIGGER_DEFAULT_TTL_MS=21600000 (6h, D-11) + 30s alarm-floor declared for Phase 17. evaluated_noop + armTrigger/clearTrigger are the fire-free Phase 15 seam.
@@ -215,4 +189,4 @@ Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-05-SUMMAR
 
 ## Next Actions
 
-Run milestone close/audit for v0.11.0, or execute the human browser UAT in `.planning/phases/20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md`. Release actions remain user-gated and have not been run.
+Start Phase 21 Package Intake & Contract Mapping with `$gsd-discuss-phase 21` or `$gsd-plan-phase 21`. First gate: verify PhantomStream package publication and provenance, because `@fullselfbrowsing/phantom-stream` returned npm 404 on 2026-06-17. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
