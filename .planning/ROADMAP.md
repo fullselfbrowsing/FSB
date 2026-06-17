@@ -37,7 +37,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
   4. The phase blocks further migration if package availability, ESM/MV3 compatibility, or missing exports make a safe replacement impossible.
 **Plans**: 3 plans
 - [x] 21-01-PLAN.md — Package availability/provenance gate, lockfile strategy, and install-source decision.
-- [ ] 21-02-PLAN.md — Export/API smoke tests and ESM/MV3 bundling feasibility check.
+- [x] 21-02-PLAN.md — Export/API smoke tests and ESM/MV3 bundling feasibility check.
 - [ ] 21-03-PLAN.md — FSB-to-PhantomStream contract map and migration invariants.
 
 ### Phase 22: Capture Adapter Migration
@@ -107,7 +107,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 21. Package Intake & Contract Mapping | v0.12.0 | 1/3 | In Progress | - |
+| 21. Package Intake & Contract Mapping | v0.12.0 | 2/3 | In Progress | - |
 | 22. Capture Adapter Migration | v0.12.0 | 0/4 | Pending | - |
 | 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | Pending | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |

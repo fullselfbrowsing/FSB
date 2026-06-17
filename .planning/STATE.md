@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
 status: phase_in_progress
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-06-17T17:32:23.209Z"
-last_activity: 2026-06-17 - Completed Phase 21 Plan 01 package source/provenance gate
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-06-17T17:35:45.684Z"
+last_activity: 2026-06-17 - Completed Phase 21 Plan 02 package export surface gate
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 19
-  completed_plans: 1
-  percent: 5
+  completed_plans: 2
+  percent: 11
 ---
 
 # Project State
@@ -30,17 +30,17 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 21 (Package Intake & Contract Mapping) — IN PROGRESS
-Plan: 21-02 — Export/API smoke tests and ESM/MV3 bundling feasibility check
-Status: Plan 21-01 complete; package source/provenance gate passed
-Last activity: 2026-06-17 - Completed Phase 21 Plan 01 package source/provenance gate
+Plan: 21-03 — FSB-to-PhantomStream contract map and migration invariants
+Status: Plans 21-01 and 21-02 complete; package source/provenance and export surface gates passed
+Last activity: 2026-06-17 - Completed Phase 21 Plan 02 package export surface gate
 
-Progress: [█░░░░░░░░░] 5% (1/19 milestone plans)
+Progress: [█░░░░░░░░░] 11% (2/19 milestone plans)
 
 ## Roadmap At A Glance (v0.12.0)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | In progress (1/3 plans complete) |
+| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | In progress (2/3 plans complete) |
 | 22 | Capture Adapter Migration | CAP-01..04 (4) | Pending |
 | 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Pending |
 | 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
@@ -52,14 +52,14 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 1 (Phase 21: 1/3, Phase 22: 0/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
+- Total plans completed (this milestone): 2 (Phase 21: 2/3, Phase 22: 0/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
 - Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 21 | 1/3 | - | - |
+| 21 | 2/3 | - | - |
 | 22 | 0/4 | - | - |
 | 23 | 0/4 | - | - |
 | 24 | 0/4 | - | - |
@@ -183,10 +183,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 
 ## Session Continuity
 
-Last session: 2026-06-17T17:32:23.206Z
-Stopped at: Completed 21-01-PLAN.md
+Last session: 2026-06-17T17:35:45.681Z
+Stopped at: Completed 21-02-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Continue Phase 21 Package Intake & Contract Mapping with `21-02-PLAN.md`: export/API smoke tests and ESM/MV3 feasibility. Package source/provenance is pinned in `.planning/PHANTOMSTREAM-PIN.md`; existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
+Continue Phase 21 Package Intake & Contract Mapping with `21-03-PLAN.md`: FSB-to-PhantomStream contract map and migration invariants. Package source/provenance and export surface are verified; existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
