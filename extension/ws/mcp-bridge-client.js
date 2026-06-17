@@ -16,6 +16,9 @@ const MCP_RECONNECT_BASE_MS = 2000;
 const MCP_RECONNECT_MAX_MS = 30000;
 const MCP_PING_INTERVAL_MS = 25000;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
+const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
+const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
+const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
 // Phase 241 D-07 / D-08 -- mirror of agent-registry.js RECONNECT_GRACE_MS.
 // On bridge _ws.onclose the bridge asks the registry to stage release for
 // every agent stamped with the current connection_id; that staged release
@@ -406,11 +409,13 @@ class MCPBridgeClient {
       case 'mcp:read-page':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
-      case 'mcp:trigger':
       case 'mcp:stop-trigger':
       case 'mcp:get-trigger-status':
       case 'mcp:list-triggers':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
+
+      case 'mcp:trigger':
+        return this._handleTrigger(payload, id);
 
       case 'mcp:start-visual-session':
         return this._handleStartVisualSession(payload);
@@ -979,6 +984,193 @@ class MCPBridgeClient {
         }
         resolve(response || {});
       });
+    });
+  }
+
+  _triggerFinitePositiveMs(value) {
+    return Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null;
+  }
+
+  _triggerSafetyCeilingMs(payload = {}) {
+    const requested = this._triggerFinitePositiveMs(payload.safety_ceiling_ms);
+    return Math.min(requested || TRIGGER_BLOCKING_SAFETY_CEILING_MS, TRIGGER_BLOCKING_SAFETY_CEILING_MS);
+  }
+
+  _triggerTimeoutMs(payload = {}) {
+    return this._triggerFinitePositiveMs(payload.timeout_ms) || TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS;
+  }
+
+  _triggerTargetTabId(payload = {}, snapshot = null) {
+    const fromSnapshot = snapshot && Number(snapshot.target_tab_id);
+    if (Number.isFinite(fromSnapshot)) return fromSnapshot;
+    const fromTarget = Number(payload && payload.target_tab_id);
+    if (Number.isFinite(fromTarget)) return fromTarget;
+    const fromTab = Number(payload && payload.tab_id);
+    return Number.isFinite(fromTab) ? fromTab : null;
+  }
+
+  _triggerCurrentValue(snapshot = null) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    if (snapshot.reported_value !== undefined && snapshot.reported_value !== null) return snapshot.reported_value;
+    if (snapshot.last_value !== undefined && snapshot.last_value !== null) return snapshot.last_value;
+    return snapshot.baseline !== undefined ? snapshot.baseline : null;
+  }
+
+  _triggerHeartbeatPayload(triggerId, payload = {}, snapshot = null, startedAt = Date.now()) {
+    const now = Date.now();
+    return {
+      trigger_id: triggerId,
+      alive: true,
+      elapsed_ms: Math.max(0, now - startedAt),
+      status: (snapshot && snapshot.status) || 'unknown',
+      current_value: this._triggerCurrentValue(snapshot),
+      last_evaluated_at: snapshot && snapshot.last_evaluated_at,
+      last_reported_at: snapshot && snapshot.last_reported_at,
+      target_tab_id: this._triggerTargetTabId(payload, snapshot)
+    };
+  }
+
+  async _readTriggerSnapshot(triggerId) {
+    try {
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbTriggerStore : null;
+      if (store && typeof store.readSnapshot === 'function') {
+        return await store.readSnapshot(triggerId);
+      }
+    } catch (_e) { /* best-effort */ }
+    return null;
+  }
+
+  async _handleTrigger(payload = {}, mcpMsgId) {
+    const armResponse = await dispatchMcpMessageRoute({
+      type: 'mcp:trigger',
+      payload,
+      client: this,
+      mcpMsgId
+    });
+
+    if (!armResponse || armResponse.success === false) {
+      return armResponse || { success: false, error: 'Failed to arm trigger' };
+    }
+
+    const triggerId = (typeof payload.trigger_id === 'string' && payload.trigger_id)
+      ? payload.trigger_id
+      : (typeof armResponse.trigger_id === 'string' ? armResponse.trigger_id : null);
+
+    if (payload.detached === true) {
+      return {
+        ...armResponse,
+        outcome: armResponse.outcome || 'detached',
+        detached: true,
+        trigger_id: triggerId || armResponse.trigger_id
+      };
+    }
+
+    if (!triggerId) {
+      return armResponse;
+    }
+
+    const startedAt = Date.now();
+    const timeoutMs = this._triggerTimeoutMs(payload);
+    const safetyMs = this._triggerSafetyCeilingMs(payload);
+    const shouldUseTimeout = timeoutMs <= safetyMs;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let heartbeatTimer = null;
+      let timeoutTimer = null;
+      let safetyTimer = null;
+
+      const cleanup = () => {
+        if (heartbeatTimer !== null) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+        if (timeoutTimer !== null) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = null;
+        }
+        if (safetyTimer !== null) {
+          clearTimeout(safetyTimer);
+          safetyTimer = null;
+        }
+      };
+
+      const settle = (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      const settleFromSnapshot = (snapshot) => {
+        if (!snapshot || typeof snapshot !== 'object') return false;
+        if (snapshot.status === 'fired') {
+          settle({
+            success: true,
+            outcome: 'fired',
+            trigger_id: triggerId,
+            event: snapshot.last_event || snapshot.last_fire_event || null,
+            status: snapshot
+          });
+          return true;
+        }
+        if (snapshot.status === 'timed_out') {
+          settle({
+            success: true,
+            outcome: 'timed_out',
+            trigger_id: triggerId,
+            status: snapshot
+          });
+          return true;
+        }
+        return false;
+      };
+
+      const checkSnapshot = async () => {
+        if (settled) return null;
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        if (settled) return snapshot;
+        settleFromSnapshot(snapshot);
+        return snapshot;
+      };
+
+      const fireHeartbeat = async () => {
+        if (settled) return;
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        if (settled) return;
+        const progressPayload = this._triggerHeartbeatPayload(triggerId, payload, snapshot, startedAt);
+        try { this._sendProgress(mcpMsgId, progressPayload); } catch (_e) { /* best-effort */ }
+        if (settled) return;
+        settleFromSnapshot(snapshot);
+      };
+
+      heartbeatTimer = setInterval(fireHeartbeat, TRIGGER_HEARTBEAT_INTERVAL_MS);
+
+      if (shouldUseTimeout) {
+        timeoutTimer = setTimeout(async () => {
+          const snapshot = await this._readTriggerSnapshot(triggerId);
+          settle({
+            success: true,
+            outcome: 'timed_out',
+            trigger_id: triggerId,
+            status: snapshot || this._triggerHeartbeatPayload(triggerId, payload, null, startedAt)
+          });
+        }, timeoutMs);
+      }
+
+      safetyTimer = setTimeout(async () => {
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        settle({
+          success: true,
+          outcome: 'detached',
+          detached: true,
+          reason: 'safety_ceiling',
+          trigger_id: triggerId,
+          status: snapshot || this._triggerHeartbeatPayload(triggerId, payload, null, startedAt)
+        });
+      }, safetyMs);
+
+      checkSnapshot().catch(() => { /* best-effort initial terminal check */ });
     });
   }
 
