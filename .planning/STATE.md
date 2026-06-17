@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.12.0
 milestone_name: PhantomStream Package Migration
-status: phase_in_progress
-stopped_at: Completed 21-02-PLAN.md
-last_updated: "2026-06-17T17:35:45.684Z"
-last_activity: 2026-06-17 - Completed Phase 21 Plan 02 package export surface gate
+status: phase_complete
+stopped_at: Completed 21-03-PLAN.md
+last_updated: "2026-06-17T17:39:00.000Z"
+last_activity: 2026-06-17 - Completed Phase 21 package intake and contract mapping
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 19
-  completed_plans: 2
-  percent: 11
+  completed_plans: 3
+  percent: 16
 ---
 
 # Project State
@@ -25,23 +25,23 @@ See: .planning/research/PHANTOMSTREAM-PACKAGE.md (package intake facts, npm 404,
 See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The dashboard preview must preserve that value while PhantomStream owns the generic DOM-mirroring engine.
-**Current focus:** Phase 21 — package intake and contract mapping before replacing any in-house stream logic.
+**Current focus:** Phase 22 — migrate content-side capture through a PhantomStream-backed adapter while preserving FSB control messages, overlays, diagnostics, masking, and readiness.
 
 ## Current Position
 
-Phase: 21 (Package Intake & Contract Mapping) — IN PROGRESS
-Plan: 21-03 — FSB-to-PhantomStream contract map and migration invariants
-Status: Plans 21-01 and 21-02 complete; package source/provenance and export surface gates passed
-Last activity: 2026-06-17 - Completed Phase 21 Plan 02 package export surface gate
+Phase: 22 (Capture Adapter Migration) — NEXT
+Plan: —
+Status: Phase 21 complete; package source/provenance, export surface, and stream contract map are verified
+Last activity: 2026-06-17 - Completed Phase 21 package intake and contract mapping
 
-Progress: [█░░░░░░░░░] 11% (2/19 milestone plans)
+Progress: [██░░░░░░░░] 16% (3/19 milestone plans)
 
 ## Roadmap At A Glance (v0.12.0)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | In progress (2/3 plans complete) |
-| 22 | Capture Adapter Migration | CAP-01..04 (4) | Pending |
+| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
+| 22 | Capture Adapter Migration | CAP-01..04 (4) | Next |
 | 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Pending |
 | 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Pending |
 | 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Pending |
@@ -52,14 +52,14 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 2 (Phase 21: 2/3, Phase 22: 0/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
+- Total plans completed (this milestone): 3 (Phase 21: 3/3, Phase 22: 0/4, Phase 23: 0/4, Phase 24: 0/4, Phase 25: 0/4)
 - Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 21 | 2/3 | - | - |
+| 21 | 3/3 | - | - |
 | 22 | 0/4 | - | - |
 | 23 | 0/4 | - | - |
 | 24 | 0/4 | - | - |
@@ -183,10 +183,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails rem
 
 ## Session Continuity
 
-Last session: 2026-06-17T17:35:45.681Z
-Stopped at: Completed 21-02-PLAN.md
+Last session: 2026-06-17T17:39:00.000Z
+Stopped at: Completed 21-03-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Continue Phase 21 Package Intake & Contract Mapping with `21-03-PLAN.md`: FSB-to-PhantomStream contract map and migration invariants. Package source/provenance and export surface are verified; existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.
+Start Phase 22 Capture Adapter Migration. Use `.planning/phases/21-package-intake-contract-mapping/21-PACKAGE-SURFACE.md` and `.planning/phases/21-package-intake-contract-mapping/21-STREAM-CONTRACT-MAP.md` as the mandatory intake artifacts. Existing v0.11 live-browser UAT and release actions remain carried-forward, user-gated debt.

@@ -12,7 +12,7 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 - [x] **PKG-01**: FSB can install PhantomStream from an approved source with an exact version or immutable reference, lockfile integrity/provenance recorded, and no floating dependency.
 - [x] **PKG-02**: The migration records the upstream package surface actually available to FSB (`protocol`, `capture`, `renderer`, and any relay/transport/adapters) before production code imports it.
 - [x] **PKG-03**: The stale `@fullselfbrowsing/phantom-stream` source is rejected, and FSB uses the published `@full-self-browsing/phantom-stream@0.1.0` package unless a later smoke test blocks it.
-- [ ] **PKG-04**: Existing FSB stream contracts are mapped to PhantomStream equivalents before replacement: snapshot, mutation diffs, scroll, overlays, dialogs, stream-state recovery, stale-message rejection, compression, relay, and remote-control reverse path.
+- [x] **PKG-04**: Existing FSB stream contracts are mapped to PhantomStream equivalents before replacement: snapshot, mutation diffs, scroll, overlays, dialogs, stream-state recovery, stale-message rejection, compression, relay, and remote-control reverse path.
 
 ### CAP -- Capture-side replacement
 
@@ -82,7 +82,7 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | PKG-01 | Phase 21 | Complete |
 | PKG-02 | Phase 21 | Complete |
 | PKG-03 | Phase 21 | Complete |
-| PKG-04 | Phase 21 | Pending |
+| PKG-04 | Phase 21 | Complete |
 | CAP-01 | Phase 22 | Pending |
 | CAP-02 | Phase 22 | Pending |
 | CAP-03 | Phase 22 | Pending |

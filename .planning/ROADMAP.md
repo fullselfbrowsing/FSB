@@ -18,7 +18,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - Integer phases continue from v0.11.0's Phase 20.
 - Decimal phases remain reserved for urgent insertions.
 
-- [ ] **Phase 21: Package Intake & Contract Mapping** — Verify/install the PhantomStream package or approved immutable source; map the current FSB stream contracts to package exports before replacing code.
+- [x] **Phase 21: Package Intake & Contract Mapping** — Verify/install the PhantomStream package or approved immutable source; map the current FSB stream contracts to package exports before replacing code.
 - [ ] **Phase 22: Capture Adapter Migration** — Replace in-house content-side snapshot/diff capture with a thin adapter around PhantomStream capture primitives.
 - [ ] **Phase 23: Dashboard Renderer Migration** — Replace static and Angular dashboard diff/render logic with PhantomStream renderer-backed behavior while preserving the current preview state machine.
 - [ ] **Phase 24: Transport, Relay & Remote Control Integration** — Align WebSocket envelopes, relay behavior, stream recovery, and reverse remote-control mapping with PhantomStream-compatible protocol helpers.
@@ -38,7 +38,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 **Plans**: 3 plans
 - [x] 21-01-PLAN.md — Package availability/provenance gate, lockfile strategy, and install-source decision.
 - [x] 21-02-PLAN.md — Export/API smoke tests and ESM/MV3 bundling feasibility check.
-- [ ] 21-03-PLAN.md — FSB-to-PhantomStream contract map and migration invariants.
+- [x] 21-03-PLAN.md — FSB-to-PhantomStream contract map and migration invariants.
 
 ### Phase 22: Capture Adapter Migration
 **Goal**: `extension/content/dom-stream.js` delegates generic capture mechanics to PhantomStream while retaining FSB-specific control messages, overlay exclusion, diagnostics, and readiness behavior.
@@ -107,7 +107,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 21. Package Intake & Contract Mapping | v0.12.0 | 2/3 | In Progress | - |
+| 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
 | 22. Capture Adapter Migration | v0.12.0 | 0/4 | Pending | - |
 | 23. Dashboard Renderer Migration | v0.12.0 | 0/4 | Pending | - |
 | 24. Transport, Relay & Remote Control Integration | v0.12.0 | 0/4 | Pending | - |
