@@ -4,6 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { pathToFileURL } = require('url');
 
 let passed = 0;
 let failed = 0;
@@ -11,6 +12,10 @@ let failed = 0;
 const ROOT = path.resolve(__dirname, '..');
 const BACKGROUND_PATH = path.join(ROOT, 'extension', 'background.js');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
+const MCP_MANUAL_PATH = path.join(ROOT, 'mcp', 'src', 'tools', 'manual.ts');
+const MCP_QUEUE_PATH = path.join(ROOT, 'mcp', 'src', 'queue.ts');
+const MCP_RUNTIME_PATH = path.join(ROOT, 'mcp', 'src', 'runtime.ts');
+const MCP_BUILD_QUEUE_PATH = path.join(ROOT, 'mcp', 'build', 'queue.js');
 
 function check(cond, msg) {
   if (cond) {
@@ -134,6 +139,54 @@ async function caseSourceSurface() {
   assert.ok(src.includes('function fsbTriggerHandleToolStatus'), 'status handler exists');
   assert.ok(src.includes('function fsbTriggerHandleToolList'), 'list handler exists');
   assert.ok(src.includes('globalThis.fsbTriggerToolHandlersForTest'), 'test-only handler bundle is exposed');
+}
+
+async function caseMcpManualExcludesTrigger() {
+  const src = readSource(MCP_MANUAL_PATH);
+  const registerSrc = functionSource(src, 'registerManualTools');
+  assert.ok(src.includes('TRIGGER_MANUAL_EXCLUSIONS'), 'manual tool source declares trigger exclusion set');
+  assert.ok(src.includes("'trigger'") || src.includes('"trigger"'), 'manual exclusion set includes trigger');
+  assert.ok(registerSrc.includes('!TRIGGER_MANUAL_EXCLUSIONS.has(t.name)'), 'manual tool filter excludes trigger by name');
+  assertOrdered(src, 'TRIGGER_MANUAL_EXCLUSIONS', 'TOOL_REGISTRY.filter', 'trigger exclusion set is declared before manual filtering');
+}
+
+async function caseMcpRuntimeRegistersTriggerTools() {
+  const src = readSource(MCP_RUNTIME_PATH);
+  assert.ok(src.includes("from './tools/triggers.js'"), 'runtime imports trigger registrar');
+  const calls = src.match(/registerTriggerTools\(server, bridge, queue, agentScope\)/g) || [];
+  assert.strictEqual(calls.length, 1, 'runtime calls registerTriggerTools exactly once');
+  assertOrdered(
+    src,
+    'registerTriggerTools(server, bridge, queue, agentScope)',
+    'registerManualTools(server, bridge, queue, agentScope)',
+    'runtime registers trigger tools before ordinary manual tools'
+  );
+}
+
+async function caseMcpQueueDerivesReadOnlyTools() {
+  const src = readSource(MCP_QUEUE_PATH);
+  assert.ok(src.includes('getReadOnlyTools().map'), 'TaskQueue derives read-only names from shared registry');
+  assert.ok(src.includes('...registryReadOnly'), 'TaskQueue read-only bypass set includes registry-derived names');
+}
+
+async function caseMcpQueueCompanionsBypassPendingMutation() {
+  const queueModule = await import(pathToFileURL(MCP_BUILD_QUEUE_PATH).href);
+  const queue = new queueModule.TaskQueue();
+  const never = queue.enqueue('click', () => new Promise(() => {}));
+  void never;
+
+  for (const toolName of ['stop_trigger', 'get_trigger_status', 'list_triggers']) {
+    let ran = false;
+    const result = await Promise.race([
+      queue.enqueue(toolName, async () => {
+        ran = true;
+        return `${toolName}:direct`;
+      }),
+      new Promise((resolve) => setTimeout(() => resolve(`${toolName}:blocked`), 25)),
+    ]);
+    assert.strictEqual(result, `${toolName}:direct`, `${toolName} bypasses pending mutation queue work`);
+    assert.strictEqual(ran, true, `${toolName} callback ran immediately`);
+  }
 }
 
 async function caseStorageSourceContracts() {
@@ -570,6 +623,10 @@ async function caseAutopilotRejectsForeignOwner() {
   console.log('--- trigger-tool dispatcher background handlers ---');
   await runCase('package wiring includes dispatcher test exactly once', casePackageWiring);
   await runCase('background exposes status/list helper surface', caseSourceSurface);
+  await runCase('MCP manual registrar excludes trigger from visual action path', caseMcpManualExcludesTrigger);
+  await runCase('MCP runtime registers trigger tools before manual tools', caseMcpRuntimeRegistersTriggerTools);
+  await runCase('MCP TaskQueue derives read-only names from registry', caseMcpQueueDerivesReadOnlyTools);
+  await runCase('MCP TaskQueue trigger companions bypass pending mutation', caseMcpQueueCompanionsBypassPendingMutation);
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
