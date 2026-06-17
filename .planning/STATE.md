@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 20 context gathered (assumptions mode)
-last_updated: "2026-06-17T03:08:57.441Z"
+stopped_at: Phase 20 UI-SPEC approved
+last_updated: "2026-06-17T03:17:01.847Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
@@ -183,9 +183,9 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T03:08:57.438Z
-Stopped at: Phase 20 context gathered (assumptions mode)
-Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-CONTEXT.md
+Last session: 2026-06-17T03:17:01.844Z
+Stopped at: Phase 20 UI-SPEC approved
+Resume file: .planning/phases/20-integration-cap-ui-docs-edge-cases/20-UI-SPEC.md
 
 ## Next Actions
 
