@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 17: Refresh-Poll Watch (Tab-Owning Background Reload)** — Alarm-driven background reload of the trigger's own tab with a 30s floor, no focus theft. (completed 2026-06-16)
 - [x] **Phase 18: Shared Tool Registry & Dispatcher Wiring** — Register `trigger` + 3 companions once for autopilot AND MCP; companions in the read-only bypass; watcher in background.js; INV-01 schema-lock stays green. (completed 2026-06-17)
 - [x] **Phase 19: MCP Tools & Blocking/Detached Reporting** — The 4 MCP `server.tool()` registrations with blocking-by-default (heartbeats + auto-convert-to-detached) and detached opt-in, returning structured notify-only fire events. (completed 2026-06-17)
-- [ ] **Phase 20: Integration, Cap UI, Docs & Edge Cases** — Compose the full system: trigger-cap control, watch-mode conflict + reload coalescing, CHANGELOG/README docs, `fsb-mcp-server@0.10.0` bump.
+- [x] **Phase 20: Integration, Cap UI, Docs & Edge Cases** — Compose the full system: trigger-cap control, watch-mode conflict + reload coalescing, CHANGELOG/README docs, `fsb-mcp-server@0.10.0` bump. (completed 2026-06-17; human UAT debt recorded)
 
 ## Phase Details
 
@@ -126,7 +126,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Arming a `refresh-poll` trigger on a tab that hosts a `live-observe` trigger (or vice-versa) is rejected with a typed `TRIGGER_TAB_WATCH_CONFLICT` and steered to a separate background tab; co-located refresh-poll triggers coalesce to one reload per tab per cadence (no reload storms at scale).
   3. CHANGELOG and `mcp/README` document the trigger family — the four tools, blocking-vs-detached guidance, the refresh-poll-vs-live-observe choice, and the honest "browser must be open" / notify-only limitations.
   4. `fsb-mcp-server` is prepared at `@0.10.0` (additive minor bump for the new tool surface; `dependencies` block unchanged), with the full CI suite (`ci / all-green` incl. schema-lock) green.
-**Plans**: TBD
+**Plans**: 5 plans
+- [x] 20-01-PLAN.md — Trigger Concurrency settings UI and active-trigger counter.
+- [x] 20-02-PLAN.md — Cross-watch conflict guard for same-tab live-observe vs refresh-poll triggers.
+- [x] 20-03-PLAN.md — Same-tab refresh-poll reload coalescing.
+- [x] 20-04-PLAN.md — MCP `0.10.0` version metadata and Trigger Watchers docs.
+- [x] 20-05-PLAN.md — Human UAT carry-forward, final gate record, release action boundaries, and source audit.
 **UI hint**: yes
 
 ## Progress (v0.11.0)
@@ -142,7 +147,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete    | 2026-06-16 |
 | 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 4/4 | Complete    | 2026-06-17 |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 3/3 | Complete | 2026-06-17 |
-| 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 4/5 | In Progress|  |
+| 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 5/5 | Complete   | 2026-06-17 |
 
 ## Research Flags (v0.11.0)
 
