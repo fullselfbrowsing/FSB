@@ -6,14 +6,14 @@ const path = require('node:path');
 const EXPECTED_PUBLIC_LATTICE = Object.freeze({
   alias: 'lattice',
   packageName: '@full-self-browsing/lattice',
-  packageVersion: '1.3.0',
-  packageSpec: 'npm:@full-self-browsing/lattice@1.3.0',
-  packageIntegrity: 'sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==',
+  packageVersion: '1.4.0',
+  packageSpec: 'npm:@full-self-browsing/lattice@1.4.0',
+  packageIntegrity: 'sha512-D0cS0YtpjMAkEl03kgg8th9mpUDVnOMJ6QmvW7e8iVIUWmtJ1cYVi7n+eKUmgo21v/waL/qjPBmJ8SlQcjOLww==',
   cliPackageName: '@full-self-browsing/lattice-cli',
-  cliPackageVersion: '1.3.0',
-  receiptVersion: 'lattice-receipt/v1.2',
-  sourceTag: 'v1.3.0',
-  sourceSha: '069c9aea4b5875393c96ad7e6ffeec4afbe70f34'
+  cliPackageVersion: '1.4.0',
+  receiptVersion: 'lattice-receipt/v1.3',
+  sourceTag: 'v1.4.0',
+  sourceSha: 'bb459f88217fc2925b242a49f03bf991d604d43e'
 });
 
 function parseFrontmatter(source) {
@@ -59,24 +59,24 @@ function validatePublicLatticePin(repoRoot) {
   expect(lockAlias && lockAlias.name === EXPECTED_PUBLIC_LATTICE.packageName,
     'package-lock node_modules/lattice must resolve to @full-self-browsing/lattice');
   expect(lockAlias && lockAlias.version === EXPECTED_PUBLIC_LATTICE.packageVersion,
-    'package-lock node_modules/lattice must resolve version 1.3.0');
+    'package-lock node_modules/lattice must resolve version ' + EXPECTED_PUBLIC_LATTICE.packageVersion);
   expect(lockAlias && lockAlias.integrity === EXPECTED_PUBLIC_LATTICE.packageIntegrity,
-    'package-lock node_modules/lattice integrity must match the 1.3.0 registry tarball');
+    'package-lock node_modules/lattice integrity must match the ' + EXPECTED_PUBLIC_LATTICE.packageVersion + ' registry tarball');
   expect(lockCli && lockCli.version === EXPECTED_PUBLIC_LATTICE.cliPackageVersion,
-    'package-lock must include @full-self-browsing/lattice-cli 1.3.0');
+    'package-lock must include @full-self-browsing/lattice-cli ' + EXPECTED_PUBLIC_LATTICE.cliPackageVersion);
 
   expect(pin.current_lattice_source === 'npm',
     'LATTICE-PIN current_lattice_source must be npm');
   expect(pin.current_lattice_package === EXPECTED_PUBLIC_LATTICE.packageName,
     'LATTICE-PIN current_lattice_package must be @full-self-browsing/lattice');
   expect(pin.current_lattice_version === EXPECTED_PUBLIC_LATTICE.packageVersion,
-    'LATTICE-PIN current_lattice_version must be 1.3.0');
+    'LATTICE-PIN current_lattice_version must be ' + EXPECTED_PUBLIC_LATTICE.packageVersion);
   expect(pin.current_lattice_alias === EXPECTED_PUBLIC_LATTICE.alias,
     'LATTICE-PIN current_lattice_alias must be lattice');
   expect(pin.current_lattice_sha === EXPECTED_PUBLIC_LATTICE.sourceSha,
-    'LATTICE-PIN current_lattice_sha must match v1.3.0 tag commit');
+    'LATTICE-PIN current_lattice_sha must match ' + EXPECTED_PUBLIC_LATTICE.sourceTag + ' tag commit');
   expect(pin.current_lattice_tag === EXPECTED_PUBLIC_LATTICE.sourceTag,
-    'LATTICE-PIN current_lattice_tag must be v1.3.0');
+    'LATTICE-PIN current_lattice_tag must be ' + EXPECTED_PUBLIC_LATTICE.sourceTag);
   expect(pin.current_lattice_integrity === EXPECTED_PUBLIC_LATTICE.packageIntegrity,
     'LATTICE-PIN current_lattice_integrity must match package-lock');
 

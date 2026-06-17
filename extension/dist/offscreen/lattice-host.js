@@ -1282,7 +1282,7 @@ var init_canonicalize = __esm({
   }
 });
 
-// node_modules/lattice/dist/runtime-BTi8lr_O.js
+// node_modules/lattice/dist/runtime-D25ehzCj.js
 function freezeContext(ctx) {
   let cloned;
   try {
@@ -1448,7 +1448,7 @@ async function createReceipt(input, signer2) {
   const receiptId = input.receiptId ?? crypto.randomUUID();
   const issuedAt = input.issuedAt ?? (/* @__PURE__ */ new Date()).toISOString();
   const { body } = redactReceiptBody({
-    version: "lattice-receipt/v1.2",
+    version: "lattice-receipt/v1.3",
     receiptId,
     runId: input.runId,
     issuedAt,
@@ -1457,6 +1457,7 @@ async function createReceipt(input, signer2) {
     route: input.route,
     ...input.modelClass !== void 0 ? { modelClass: input.modelClass } : {},
     ...input.parentReceiptCid !== void 0 ? { parentReceiptCid: input.parentReceiptCid } : {},
+    ...input.lineageMerkleRoot !== void 0 ? { lineageMerkleRoot: input.lineageMerkleRoot } : {},
     usage: usageToCanonical(input.usage),
     contractVerdict: input.contractVerdict,
     contractHash: input.contractHash,
@@ -1655,8 +1656,8 @@ function createNoopSurvivabilityAdapter(options = {}) {
   };
 }
 var textEncoder$1, BAND, BAND_ORDER, PIPELINE_FROZEN_ERROR_NAME, HOOK_TIMEOUT_EVENT_NAME, encoder, PAYLOAD_TYPE, textEncoder, DEFAULT_REDACTION_POLICY_ID, STEP_TRANSITION_EVENT_NAME, DEFAULT_CHECKPOINT_BAND, DEFAULT_MODEL, DEFAULT_ROUTE, DEFAULT_USAGE;
-var init_runtime_BTi8lr_O = __esm({
-  "node_modules/lattice/dist/runtime-BTi8lr_O.js"() {
+var init_runtime_D25ehzCj = __esm({
+  "node_modules/lattice/dist/runtime-D25ehzCj.js"() {
     init_src();
     init_canonicalize();
     textEncoder$1 = new TextEncoder();
@@ -1696,7 +1697,7 @@ var init_runtime_BTi8lr_O = __esm({
 });
 
 // node_modules/lattice/dist/index.js
-init_runtime_BTi8lr_O();
+init_runtime_D25ehzCj();
 init_canonicalize();
 function luhn(digits) {
   const cleaned = digits.replace(/\D/g, "");
@@ -1841,6 +1842,109 @@ function createInMemorySigner(privateKeyJwk, options) {
     }
   };
 }
+function packagedPlanForArtifact(request, artifactId) {
+  return request.providerPackaging?.artifacts.find((item) => item.artifactId === artifactId) ?? request.plan?.providerPackaging?.artifacts.find((item) => item.artifactId === artifactId);
+}
+function metadataString(artifact2, keys) {
+  const metadata = artifact2.metadata;
+  if (metadata === void 0) return;
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+}
+function artifactHttpUrl(artifact2) {
+  if (isHttpUrl$1(artifact2.value)) return artifact2.value;
+  const url = metadataString(artifact2, ["url"]);
+  return isHttpUrl$1(url) ? url : void 0;
+}
+function anthropicFileId(artifact2) {
+  return metadataString(artifact2, [
+    "anthropicFileId",
+    "providerFileId",
+    "fileId"
+  ]);
+}
+function geminiFileUri(artifact2) {
+  return metadataString(artifact2, [
+    "geminiFileUri",
+    "providerFileUri",
+    "fileUri"
+  ]);
+}
+function mediaTypeForArtifact(artifact2, fallback) {
+  if (artifact2.mediaType !== void 0) return artifact2.mediaType;
+  if (typeof artifact2.value === "string") {
+    const dataUrl = parseDataUrl(artifact2.value);
+    if (dataUrl?.mediaType !== void 0) return dataUrl.mediaType;
+  }
+  return fallback;
+}
+async function artifactBase64Data(artifact2) {
+  const metadataData = metadataString(artifact2, ["base64Data"]);
+  if (metadataData !== void 0) return metadataData;
+  const value = artifact2.value;
+  if (typeof value === "string") {
+    const dataUrl = parseDataUrl(value);
+    if (dataUrl !== void 0) return dataUrl.data;
+    if (artifact2.metadata?.encoding === "base64") return value;
+  }
+  if (isBlobLike$3(value)) return bufferToBase64(await value.arrayBuffer());
+  if (value instanceof ArrayBuffer) return bufferToBase64(value);
+  if (ArrayBuffer.isView(value)) return Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString("base64");
+}
+function parseDataUrl(value) {
+  const match = /^data:([^;,]+)?;base64,(.*)$/su.exec(value);
+  if (match === null) return;
+  const mediaType = match[1];
+  const data = match[2] ?? "";
+  return {
+    ...mediaType !== void 0 && mediaType.length > 0 ? { mediaType } : {},
+    data
+  };
+}
+function bufferToBase64(value) {
+  return Buffer.from(value).toString("base64");
+}
+function isHttpUrl$1(value) {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+function isBlobLike$3(value) {
+  return typeof Blob !== "undefined" && value instanceof Blob;
+}
+var NoPublicUrlEgressError = class extends Error {
+  constructor(providerId, artifactId, offendingUrl) {
+    super(`noPublicUrl policy violated: provider '${providerId}' artifact '${artifactId}' would leak public URL '${offendingUrl}'`);
+    this.providerId = providerId;
+    this.artifactId = artifactId;
+    this.offendingUrl = offendingUrl;
+    this.name = "NoPublicUrlEgressError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+};
+function assertNoPublicUrlEgress(request, providerId, serializedBody) {
+  if (request.policy?.noPublicUrl !== true) return;
+  const forbidden = [];
+  for (const artifact2 of request.artifacts) {
+    const artifactId = artifact2.id ?? "";
+    if (typeof artifact2.value === "string" && isHttpUrl$1(artifact2.value)) forbidden.push({
+      url: artifact2.value,
+      id: artifactId
+    });
+    const metadata = artifact2.metadata ?? {};
+    for (const v of Object.values(metadata)) if (typeof v === "string" && isHttpUrl$1(v)) forbidden.push({
+      url: v,
+      id: artifactId
+    });
+  }
+  for (const entry of forbidden) if (serializedBody.includes(entry.url)) throw new NoPublicUrlEgressError(providerId, entry.id, entry.url);
+}
 var GENERATED_PROFILES = [
   {
     id: "ai21/jamba-large-1.7",
@@ -1850,6 +1954,19 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000008"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -1861,6 +1978,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000004",
+      completion: "0.000008"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -1876,6 +2004,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000007",
+      completion: "0.0000014"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -1891,6 +2030,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.0000016",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -1906,6 +2057,15 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.0000016"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -1921,6 +2081,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -1936,6 +2116,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000025"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -1947,6 +2142,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 3e5,
+    pricing: {
+      prompt: "0.00000006",
+      completion: "0.00000024"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -1958,6 +2165,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000000035",
+      completion: "0.00000014"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -1969,6 +2188,19 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.0000125",
+      input_cache_read: "0.000000625"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -1980,6 +2212,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 3e5,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.0000032"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -1991,6 +2235,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 16384,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "top_a",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2006,6 +2271,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.00000125",
+      web_search: "0.01",
+      input_cache_read: "0.00000003",
+      input_cache_write: "0.0000003"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -2017,6 +2298,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.000004",
+      web_search: "0.01",
+      input_cache_read: "0.00000008",
+      input_cache_write: "0.000001"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -2028,6 +2325,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00001",
+      completion: "0.00005",
+      web_search: "0.01",
+      input_cache_read: "0.000001",
+      input_cache_write: "0.0000125"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "tool_choice",
+      "tools",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2039,6 +2355,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000005",
+      web_search: "0.01",
+      input_cache_read: "0.0000001",
+      input_cache_write: "0.00000125"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -2050,6 +2386,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000015",
+      completion: "0.000075",
+      web_search: "0.01",
+      input_cache_read: "0.0000015",
+      input_cache_write: "0.00001875"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2061,6 +2414,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000015",
+      completion: "0.000075",
+      web_search: "0.01",
+      input_cache_read: "0.0000015",
+      input_cache_write: "0.00001875"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2072,6 +2445,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.000025",
+      web_search: "0.01",
+      input_cache_read: "0.0000005",
+      input_cache_write: "0.00000625"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2083,6 +2476,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.000025",
+      web_search: "0.01",
+      input_cache_read: "0.0000005",
+      input_cache_write: "0.00000625"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2094,6 +2509,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00003",
+      completion: "0.00015",
+      web_search: "0.01",
+      input_cache_read: "0.000003",
+      input_cache_write: "0.0000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2105,6 +2540,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.000025",
+      web_search: "0.01",
+      input_cache_read: "0.0000005",
+      input_cache_write: "0.00000625"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "tool_choice",
+      "tools",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2116,6 +2569,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00003",
+      completion: "0.00015",
+      web_search: "0.01",
+      input_cache_read: "0.000003",
+      input_cache_write: "0.0000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "tool_choice",
+      "tools",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2127,6 +2598,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.000025",
+      web_search: "0.01",
+      input_cache_read: "0.0000005",
+      input_cache_write: "0.00000625"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "tool_choice",
+      "tools",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2138,6 +2627,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00001",
+      completion: "0.00005",
+      web_search: "0.01",
+      input_cache_read: "0.000001",
+      input_cache_write: "0.0000125"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "tool_choice",
+      "tools",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2149,6 +2656,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000015",
+      web_search: "0.01",
+      input_cache_read: "0.0000003",
+      input_cache_write: "0.00000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2160,6 +2685,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000015",
+      web_search: "0.01",
+      input_cache_read: "0.0000003",
+      input_cache_write: "0.00000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2171,6 +2716,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000015",
+      web_search: "0.01",
+      input_cache_read: "0.0000003",
+      input_cache_write: "0.00000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p",
+      "verbosity"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2182,6 +2749,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.0000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2197,6 +2780,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000022",
+      completion: "0.00000085",
+      input_cache_read: "0.00000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2212,6 +2818,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000045",
+      completion: "0.00000015"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2227,6 +2850,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000075",
+      completion: "0.0000012"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2242,6 +2883,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 123e3,
+    pricing: {
+      prompt: "0.00000042",
+      completion: "0.00000125"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2257,6 +2915,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2272,6 +2947,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.000000075",
+      completion: "0.0000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2287,6 +2979,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2302,6 +3011,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2317,6 +3043,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000002",
+      input_cache_read: "0.0000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2332,6 +3075,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2347,6 +3105,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2358,6 +3132,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2369,6 +3161,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2380,6 +3190,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000000375",
+      completion: "0.00000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2391,6 +3217,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00000125"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2406,6 +3252,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000002002",
+      completion: "0.0000008001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2420,7 +3287,29 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
-    contextWindow: 32768,
+    contextWindow: 163840,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.00000077",
+      input_cache_read: "0.000000135"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2436,6 +3325,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 163840,
+    pricing: {
+      prompt: "0.00000021",
+      completion: "0.00000079",
+      input_cache_read: "0.00000013"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2451,6 +3364,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "inlined_tags",
     toolCallSurface: "native_strict",
     contextWindow: 64e3,
+    pricing: {
+      prompt: "0.0000007",
+      completion: "0.0000025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2467,6 +3402,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "inlined_tags",
     toolCallSurface: "native_strict",
     contextWindow: 163840,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.00000215",
+      input_cache_read: "0.00000035"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2483,6 +3442,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "inlined_tags",
     toolCallSurface: "none",
     contextWindow: 8192,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.0000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2499,6 +3475,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "inlined_tags",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000029",
+      completion: "0.00000029"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2515,6 +3511,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 163840,
+    pricing: {
+      prompt: "0.00000027",
+      completion: "0.00000095",
+      input_cache_read: "0.00000013"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2530,6 +3550,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000002288",
+      completion: "0.0000003432"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2545,6 +3588,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 163840,
+    pricing: {
+      prompt: "0.00000027",
+      completion: "0.00000041"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2559,7 +3625,33 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
-    contextWindow: 1048576,
+    contextWindow: 1048575,
+    pricing: {
+      prompt: "0.000000098",
+      completion: "0.000000196",
+      input_cache_read: "0.00000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2575,6 +3667,32 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.000000435",
+      completion: "0.00000087",
+      input_cache_read: "0.000000003625"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2590,6 +3708,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.00000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2605,6 +3743,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000025",
+      image: "0.0000003",
+      audio: "0.000001",
+      web_search: "0.014",
+      internal_reasoning: "0.0000025",
+      input_cache_read: "0.00000003",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2616,6 +3777,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000025",
+      image: "0.0000003",
+      audio: "0.000001",
+      web_search: "0.014",
+      internal_reasoning: "0.0000025",
+      input_cache_read: "0.00000003",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2627,6 +3807,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000004",
+      image: "0.0000001",
+      audio: "0.0000003",
+      web_search: "0.014",
+      internal_reasoning: "0.0000004",
+      input_cache_read: "0.00000001",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2638,6 +3841,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000004",
+      image: "0.0000001",
+      audio: "0.0000003",
+      web_search: "0.014",
+      internal_reasoning: "0.0000004",
+      input_cache_read: "0.00000001",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2649,6 +3875,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      image: "0.00000125",
+      audio: "0.00000125",
+      web_search: "0.014",
+      internal_reasoning: "0.00001",
+      input_cache_read: "0.000000125",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2660,6 +3909,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      image: "0.00000125",
+      audio: "0.00000125",
+      web_search: "0.014",
+      internal_reasoning: "0.00001",
+      input_cache_read: "0.000000125",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2671,6 +3943,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      image: "0.00000125",
+      audio: "0.00000125",
+      web_search: "0.014",
+      internal_reasoning: "0.00001",
+      input_cache_read: "0.000000125",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2682,6 +3977,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.000003",
+      image: "0.0000005",
+      audio: "0.000001",
+      web_search: "0.014",
+      internal_reasoning: "0.000003",
+      input_cache_read: "0.00000005",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2693,6 +4011,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000012",
+      image: "0.000002",
+      audio: "0.000002",
+      web_search: "0.014",
+      internal_reasoning: "0.000012",
+      input_cache_read: "0.0000002",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2704,6 +4043,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.000003",
+      web_search: "0.014"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2715,6 +4070,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.0000015",
+      image: "0.00000025",
+      audio: "0.0000005",
+      web_search: "0.014",
+      internal_reasoning: "0.0000015",
+      input_cache_read: "0.000000025",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2726,6 +4104,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.0000015",
+      image: "0.00000025",
+      audio: "0.0000005",
+      web_search: "0.014",
+      internal_reasoning: "0.0000015",
+      input_cache_read: "0.000000025",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2737,6 +4138,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000012",
+      image: "0.000002",
+      audio: "0.000002",
+      web_search: "0.014",
+      internal_reasoning: "0.000012",
+      input_cache_read: "0.0000002",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2748,6 +4172,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000012",
+      image: "0.000002",
+      audio: "0.000002",
+      web_search: "0.014",
+      internal_reasoning: "0.000012",
+      input_cache_read: "0.0000002",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2759,6 +4206,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.0000015",
+      completion: "0.000009",
+      image: "0.0000015",
+      audio: "0.000003",
+      web_search: "0.014",
+      internal_reasoning: "0.000009",
+      input_cache_read: "0.00000015",
+      input_cache_write: "0.00000008333333333333334"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2770,6 +4240,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8192,
+    pricing: {
+      prompt: "0.00000065",
+      completion: "0.00000065"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2781,6 +4267,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.00000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2792,6 +4299,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000008",
+      completion: "0.00000016"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2803,6 +4331,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.0000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2814,6 +4361,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000006",
+      completion: "0.00000012"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2825,6 +4388,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000006",
+      completion: "0.00000033"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2836,6 +4424,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2847,6 +4455,32 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000012",
+      completion: "0.00000035",
+      input_cache_read: "0.00000009"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2858,6 +4492,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2869,6 +4519,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "seed",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2880,6 +4541,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "seed",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -2891,6 +4563,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 4096,
+    pricing: {
+      prompt: "0.00000006",
+      completion: "0.00000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_a",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2906,6 +4600,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131e3,
+    pricing: {
+      prompt: "0.000000017",
+      completion: "0.000000112"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2921,6 +4632,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.0000001",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2936,6 +4667,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.00000075",
+      input_cache_read: "0.000000025"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2951,6 +4698,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.000000075",
+      completion: "0.000000625",
+      input_cache_read: "0.000000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2966,6 +4733,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000001",
+      completion: "0.00000003",
+      input_cache_read: "0.000000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2981,6 +4768,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.000000075",
+      completion: "0.000000625",
+      input_cache_read: "0.000000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -2996,6 +4804,16 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3011,6 +4829,16 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3026,6 +4854,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000012",
+      input_cache_read: "0.00000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3041,6 +4891,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000003",
+      completion: "0.00000012"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3056,6 +4922,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3071,6 +4953,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3086,6 +4986,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8e3,
+    pricing: {
+      prompt: "0.00000075",
+      completion: "0.000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "top_a",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3101,6 +5022,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8192,
+    pricing: {
+      prompt: "0.00000051",
+      completion: "0.00000074"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3116,6 +5053,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8192,
+    pricing: {
+      prompt: "0.00000014",
+      completion: "0.00000014"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3131,6 +5084,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3146,6 +5120,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000002",
+      completion: "0.00000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3161,6 +5156,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000345",
+      completion: "0.000000345"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3176,6 +5189,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 6e4,
+    pricing: {
+      prompt: "0.000000027",
+      completion: "0.000000201"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3191,6 +5221,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8e4,
+    pricing: {
+      prompt: "0.0000000509",
+      completion: "0.000000335"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3206,6 +5253,19 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3221,6 +5281,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.00000032"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3236,6 +5317,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3251,6 +5347,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3266,21 +5383,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 327680,
-    knownFailureModes: [
-      "internal_envelope_leak",
-      "system_prompt_echo",
-      "malformed_tool_arguments"
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
     ],
-    recommendedPromptStrategy: "open_weight"
-  },
-  {
-    id: "meta-llama/llama-guard-3-8b",
-    adapter: "openrouter",
-    originFamily: "meta",
-    trainingClass: "open_weight_instruct",
-    reasoningSurface: "none",
-    toolCallSurface: "none",
-    contextWindow: 131072,
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3296,6 +5419,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 163840,
+    pricing: {
+      prompt: "0.00000018",
+      completion: "0.00000018"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3311,6 +5452,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 16384,
+    pricing: {
+      prompt: "0.000000065",
+      completion: "0.00000014"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3326,6 +5488,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000008",
+      completion: "0.00000035",
+      input_cache_read: "0.00000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3341,6 +5521,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 65535,
+    pricing: {
+      prompt: "0.00000062",
+      completion: "0.00000062"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3356,6 +5552,15 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 1000192,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.0000011"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3371,6 +5576,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.0000022"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3386,6 +5610,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 196608,
+    pricing: {
+      prompt: "0.000000255",
+      completion: "0.000001",
+      input_cache_read: "0.00000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3401,6 +5649,16 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000012",
+      input_cache_read: "0.00000003"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3416,6 +5674,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 196608,
+    pricing: {
+      prompt: "0.00000029",
+      completion: "0.00000095",
+      input_cache_read: "0.00000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3431,6 +5713,34 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 196608,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000009",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "parallel_tool_calls",
+      "presence_penalty",
+      "reasoning",
+      "reasoning_effort",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3445,7 +5755,33 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
-    contextWindow: 204800,
+    contextWindow: 196608,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.000001",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3459,8 +5795,34 @@ var GENERATED_PROFILES = [
     originFamily: "minimax",
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
-    toolCallSurface: "native_lenient",
+    toolCallSurface: "native_strict",
     contextWindow: 524288,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000012",
+      input_cache_read: "0.00000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3476,6 +5838,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000009",
+      input_cache_read: "0.00000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3491,6 +5871,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.000002",
+      input_cache_read: "0.00000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3506,6 +5904,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.0000002",
+      input_cache_read: "0.00000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3521,6 +5940,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000001",
+      input_cache_read: "0.00000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3536,6 +5976,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.00000015",
+      input_cache_read: "0.000000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3551,6 +6012,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000006",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3566,6 +6045,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000006",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3581,6 +6078,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.0000015",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3596,6 +6111,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.000002",
+      input_cache_read: "0.00000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3611,6 +6144,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000015",
+      completion: "0.0000075"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3626,6 +6178,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.000002",
+      input_cache_read: "0.00000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3641,6 +6211,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000002",
+      completion: "0.00000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3656,6 +6247,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.0000006",
+      input_cache_read: "0.00000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3671,6 +6280,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.00000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -3682,6 +6310,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006",
+      input_cache_read: "0.000000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -3693,6 +6342,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000000351",
+      completion: "0.000000555"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -3704,6 +6370,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000000075",
+      completion: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: ["system_prompt_echo"],
     recommendedPromptStrategy: "mid_tier"
   },
@@ -3715,6 +6402,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000006",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3730,6 +6435,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 32e3,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000003",
+      audio: "0.0001",
+      input_cache_read: "0.00000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3745,6 +6469,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000057",
+      completion: "0.0000023"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3760,6 +6501,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.0000025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3775,6 +6537,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.0000025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3789,7 +6574,32 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
-    contextWindow: 262144,
+    contextWindow: 256e3,
+    pricing: {
+      prompt: "0.000000375",
+      completion: "0.000002025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3805,6 +6615,75 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262142,
+    pricing: {
+      prompt: "0.00000068",
+      completion: "0.00000341",
+      input_cache_read: "0.00000034"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "parallel_tool_calls",
+      "presence_penalty",
+      "reasoning",
+      "reasoning_effort",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
+    knownFailureModes: [
+      "internal_envelope_leak",
+      "system_prompt_echo",
+      "malformed_tool_arguments"
+    ],
+    recommendedPromptStrategy: "open_weight"
+  },
+  {
+    id: "moonshotai/kimi-k2.7-code",
+    adapter: "openrouter",
+    originFamily: "moonshot",
+    trainingClass: "open_weight_instruct",
+    reasoningSurface: "none",
+    toolCallSurface: "native_strict",
+    contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000075",
+      completion: "0.0000035",
+      input_cache_read: "0.00000016"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3820,6 +6699,15 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 81920,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.0000012"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3835,6 +6723,15 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000009",
+      completion: "0.0000019"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3850,6 +6747,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3865,6 +6780,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3880,6 +6814,19 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3895,6 +6842,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000007",
+      completion: "0.0000007"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3910,6 +6876,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3925,6 +6907,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000013",
+      completion: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3940,6 +6938,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3953,8 +6973,31 @@ var GENERATED_PROFILES = [
     originFamily: "nvidia",
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
-    toolCallSurface: "native_lenient",
+    toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3970,6 +7013,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -3985,6 +7042,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4000,6 +7071,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000009",
+      completion: "0.00000045"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4015,6 +7111,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4030,6 +7142,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.0000025",
+      input_cache_read: "0.00000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4045,6 +7181,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4060,6 +7210,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "temperature",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4075,6 +7237,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4090,6 +7266,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4105,6 +7297,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 16385,
+    pricing: {
+      prompt: "0.0000005",
+      completion: "0.0000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4116,6 +7328,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4095,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4127,6 +7359,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 16385,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4138,6 +7391,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 4095,
+    pricing: {
+      prompt: "0.0000015",
+      completion: "0.000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4149,6 +7420,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 8191,
+    pricing: {
+      prompt: "0.00003",
+      completion: "0.00006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4160,6 +7452,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00001",
+      completion: "0.00003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4171,6 +7483,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00001",
+      completion: "0.00003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4182,6 +7514,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1047576,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000008",
+      web_search: "0.01",
+      input_cache_read: "0.0000005"
+    },
+    supportedParameters: [
+      "max_completion_tokens",
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4193,6 +7542,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1047576,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.0000016",
+      web_search: "0.01",
+      input_cache_read: "0.0000001"
+    },
+    supportedParameters: [
+      "max_completion_tokens",
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4204,6 +7570,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1047576,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000004",
+      web_search: "0.01",
+      input_cache_read: "0.000000025"
+    },
+    supportedParameters: [
+      "max_completion_tokens",
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4215,6 +7598,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4226,6 +7631,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4237,6 +7664,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001",
+      input_cache_read: "0.00000125"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4248,6 +7698,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001",
+      input_cache_read: "0.00000125"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4259,6 +7731,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006",
+      input_cache_read: "0.000000075"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4270,6 +7765,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006",
+      input_cache_read: "0.000000075"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4281,6 +7798,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006",
+      web_search: "0.0275"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "structured_outputs",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4292,6 +7820,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001",
+      web_search: "0.035"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "structured_outputs",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4303,6 +7842,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.000000125"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4314,6 +7870,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.000000125"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4325,6 +7893,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.000000125"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4336,6 +7920,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00001",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.00000125"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4347,6 +7953,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.000002",
+      web_search: "0.01",
+      input_cache_read: "0.00000025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4358,6 +7986,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.000002",
+      web_search: "0.01",
+      input_cache_read: "0.000000025"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4369,6 +8014,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.0000004",
+      web_search: "0.01",
+      input_cache_read: "0.00000001"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4380,6 +8042,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.000015",
+      completion: "0.00012",
+      web_search: "0.01"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4391,6 +8068,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.00000013"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4402,6 +8096,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.00000013"
+    },
+    supportedParameters: [
+      "max_completion_tokens",
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4413,6 +8122,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.00000013"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4424,6 +8150,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00001",
+      web_search: "0.01",
+      input_cache_read: "0.000000125"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4435,6 +8178,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000025",
+      completion: "0.000002",
+      web_search: "0.01",
+      input_cache_read: "0.000000025"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4446,6 +8206,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000175",
+      completion: "0.000014",
+      web_search: "0.01",
+      input_cache_read: "0.000000175"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4457,6 +8234,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000175",
+      completion: "0.000014",
+      web_search: "0.01",
+      input_cache_read: "0.000000175"
+    },
+    supportedParameters: [
+      "max_completion_tokens",
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4468,6 +8260,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000175",
+      completion: "0.000014",
+      web_search: "0.01",
+      input_cache_read: "0.000000175"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4479,6 +8288,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.000021",
+      completion: "0.000168",
+      web_search: "0.01"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4490,6 +8314,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000175",
+      completion: "0.000014",
+      web_search: "0.01",
+      input_cache_read: "0.000000175"
+    },
+    supportedParameters: [
+      "max_completion_tokens",
+      "max_tokens",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4501,6 +8340,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000175",
+      completion: "0.000014",
+      web_search: "0.01",
+      input_cache_read: "0.000000175"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4512,6 +8368,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 105e4,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.000015",
+      web_search: "0.01",
+      input_cache_read: "0.00000025"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4523,6 +8396,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 272e3,
+    pricing: {
+      prompt: "0.000008",
+      completion: "0.000015",
+      web_search: "0.01",
+      input_cache_read: "0.000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "top_logprobs"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4534,6 +8427,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.00000075",
+      completion: "0.0000045",
+      web_search: "0.01",
+      input_cache_read: "0.000000075"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4545,6 +8455,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.00000125",
+      web_search: "0.01",
+      input_cache_read: "0.00000002"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4556,6 +8483,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 105e4,
+    pricing: {
+      prompt: "0.00003",
+      completion: "0.00018",
+      web_search: "0.01"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4567,6 +8510,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 105e4,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.00003",
+      web_search: "0.01",
+      input_cache_read: "0.0000005"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_completion_tokens",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4578,6 +8538,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 105e4,
+    pricing: {
+      prompt: "0.00003",
+      completion: "0.00018",
+      web_search: "0.01"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4589,6 +8564,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000025",
+      completion: "0.00001",
+      audio: "0.000032"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4600,6 +8596,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.0000024",
+      audio: "0.0000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4611,6 +8628,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 4e5,
+    pricing: {
+      prompt: "0.000005",
+      completion: "0.00003",
+      web_search: "0.01",
+      input_cache_read: "0.0000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "tool_choice",
+      "tools",
+      "top_logprobs"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4622,6 +8659,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000039",
+      completion: "0.00000018"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4637,6 +8699,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4652,6 +8728,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000029",
+      completion: "0.00000014"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4665,8 +8766,29 @@ var GENERATED_PROFILES = [
     originFamily: "openai",
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
-    toolCallSurface: "native_lenient",
+    toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4682,6 +8804,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000075",
+      completion: "0.0000003",
+      input_cache_read: "0.000000037"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4697,6 +8836,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000015",
+      completion: "0.00006",
+      web_search: "0.01",
+      input_cache_read: "0.0000075"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4708,6 +8863,19 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "none",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.00015",
+      completion: "0.0006",
+      web_search: "0.01"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4719,6 +8887,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000008",
+      web_search: "0.01",
+      input_cache_read: "0.0000005"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4730,6 +8914,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.00001",
+      completion: "0.00004",
+      web_search: "0.01",
+      input_cache_read: "0.0000025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4741,6 +8949,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.0000011",
+      completion: "0.0000044",
+      web_search: "0.01",
+      input_cache_read: "0.00000055"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4752,6 +8976,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.0000011",
+      completion: "0.0000044",
+      web_search: "0.01",
+      input_cache_read: "0.00000055"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4763,6 +9003,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "hidden_cot",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.00002",
+      completion: "0.00008",
+      web_search: "0.01"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4774,6 +9029,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.0000011",
+      completion: "0.0000044",
+      web_search: "0.01",
+      input_cache_read: "0.000000275"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4785,6 +9056,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000008",
+      web_search: "0.01",
+      input_cache_read: "0.0000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4796,6 +9091,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.0000011",
+      completion: "0.0000044",
+      web_search: "0.01",
+      input_cache_read: "0.000000275"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4807,6 +9118,33 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e6,
+    pricing: {
+      prompt: "-1",
+      completion: "-1"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_completion_tokens",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4822,6 +9160,10 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "-1",
+      completion: "-1"
+    },
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4837,6 +9179,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4851,7 +9216,11 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "none",
-    contextWindow: 128e3,
+    contextWindow: 1e6,
+    pricing: {
+      prompt: "-1",
+      completion: "-1"
+    },
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4867,6 +9236,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048756,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4882,6 +9270,10 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 2e6,
+    pricing: {
+      prompt: "-1",
+      completion: "-1"
+    },
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4897,6 +9289,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4912,6 +9319,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 127072,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000001",
+      web_search: "0.005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "temperature",
+      "top_k",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4923,6 +9344,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000008",
+      web_search: "0.005",
+      internal_reasoning: "0.000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "temperature",
+      "top_k",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4934,6 +9372,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000015",
+      web_search: "0.005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "temperature",
+      "top_k",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4945,6 +9397,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 2e5,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000015",
+      web_search: "0.018"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4956,6 +9425,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.000002",
+      completion: "0.000008",
+      web_search: "0.005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "temperature",
+      "top_k",
+      "top_p",
+      "web_search_options"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -4967,6 +9452,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "temperature",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4982,6 +9479,18 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "temperature",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -4997,6 +9506,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.0000011"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5012,6 +9540,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000036",
+      completion: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5027,6 +9576,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000004",
+      completion: "0.0000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5042,6 +9608,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000066",
+      completion: "0.000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5057,6 +9640,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000026",
+      completion: "0.00000078",
+      input_cache_read: "0.000000052",
+      input_cache_write: "0.000000325"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5072,6 +9671,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000026",
+      completion: "0.00000078"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5087,6 +9701,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000026",
+      completion: "0.00000078",
+      input_cache_write: "0.000000325"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5101,7 +9733,26 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "none",
-    contextWindow: 32e3,
+    contextWindow: 128e3,
+    pricing: {
+      prompt: "0.0000008",
+      completion: "0.000001",
+      input_cache_read: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5117,6 +9768,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 40960,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.00000024"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5132,6 +9808,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000455",
+      completion: "0.00000182"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5147,6 +9839,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000009",
+      completion: "0.0000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5162,6 +9875,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000001",
+      input_cache_read: "0.0000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5177,6 +9914,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 40960,
+    pricing: {
+      prompt: "0.00000012",
+      completion: "0.0000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5192,6 +9954,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000004815",
+      completion: "0.00000019305"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5207,6 +9990,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000008",
+      completion: "0.0000004",
+      input_cache_read: "0.00000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5222,6 +10029,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 40960,
+    pricing: {
+      prompt: "0.00000008",
+      completion: "0.00000028"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5237,6 +10067,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 40960,
+    pricing: {
+      prompt: "0.00000005",
+      completion: "0.0000004",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5252,6 +10106,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000022",
+      completion: "0.0000018"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5267,6 +10142,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 16e4,
+    pricing: {
+      prompt: "0.00000007",
+      completion: "0.00000027"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5282,6 +10176,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000000195",
+      completion: "0.000000975",
+      input_cache_read: "0.000000039",
+      input_cache_write: "0.00000024375"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5297,6 +10207,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000011",
+      completion: "0.0000008",
+      input_cache_read: "0.00000007"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5312,6 +10244,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000065",
+      completion: "0.00000325",
+      input_cache_read: "0.00000013",
+      input_cache_write: "0.0000008125"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5327,6 +10276,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262e3,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5342,6 +10306,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000078",
+      completion: "0.0000039",
+      input_cache_read: "0.000000156",
+      input_cache_write: "0.000000975"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5357,6 +10337,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000078",
+      completion: "0.0000039"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5372,6 +10369,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000009",
+      completion: "0.0000011"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5387,6 +10407,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0",
+      completion: "0"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5402,6 +10439,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000000975",
+      completion: "0.00000078"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5417,6 +10477,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.00000088",
+      input_cache_read: "0.00000011"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5432,6 +10514,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000026",
+      completion: "0.0000026"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5447,6 +10549,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000013",
+      completion: "0.00000052"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5462,6 +10585,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000013",
+      completion: "0.00000156"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5477,6 +10621,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000104",
+      completion: "0.000000416"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5492,6 +10650,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000008",
+      completion: "0.0000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5507,6 +10686,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000117",
+      completion: "0.000001365"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5522,6 +10718,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000026",
+      completion: "0.00000208"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5537,6 +10758,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.000000195",
+      completion: "0.00000156"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5552,6 +10798,32 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000014",
+      completion: "0.000001",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5566,7 +10838,32 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
-    contextWindow: 262144,
+    contextWindow: 131072,
+    pricing: {
+      prompt: "0.000000385",
+      completion: "0.00000245"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5582,6 +10879,31 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.00000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5597,6 +10919,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000000065",
+      completion: "0.00000026"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5612,6 +10951,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000026",
+      completion: "0.00000156"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5627,6 +10983,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000018",
+      input_cache_write: "0.000000375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5641,7 +11015,32 @@ var GENERATED_PROFILES = [
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
-    contextWindow: 131072,
+    contextWindow: 262140,
+    pricing: {
+      prompt: "0.0000002885",
+      completion: "0.00000317"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5657,6 +11056,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.000001",
+      input_cache_read: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5672,6 +11095,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.0000001875",
+      completion: "0.000001125",
+      input_cache_write: "0.000000234375"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5687,6 +11128,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000104",
+      completion: "0.00000624",
+      input_cache_write: "0.0000013"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5702,6 +11163,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.000000325",
+      completion: "0.00000195",
+      input_cache_write: "0.00000040625"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5717,6 +11196,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.00000375",
+      input_cache_read: "0.00000025",
+      input_cache_write: "0.0000015625"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5732,6 +11232,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000032",
+      completion: "0.00000128",
+      input_cache_read: "0.000000064",
+      input_cache_write: "0.0000004"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5747,6 +11268,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 16384,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "max_tokens",
+      "presence_penalty",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5762,6 +11300,22 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5777,6 +11331,15 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.00000085",
+      completion: "0.00000125"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "seed",
+      "stop"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5792,6 +11355,19 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000003"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5807,6 +11383,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 8192,
+    pricing: {
+      prompt: "0.00000004",
+      completion: "0.00000005"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5822,6 +11417,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 16e3,
+    pricing: {
+      prompt: "0.000003",
+      completion: "0.000003"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5837,6 +11449,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000085",
+      completion: "0.00000085"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5852,6 +11485,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000065",
+      completion: "0.00000075"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5867,6 +11518,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.00000009",
+      completion: "0.0000003",
+      input_cache_read: "0.00000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5882,6 +11556,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.0000002",
+      completion: "0.00000115",
+      input_cache_read: "0.00000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5897,6 +11590,20 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000085",
+      completion: "0.0000034"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5912,6 +11619,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.00000014",
+      completion: "0.00000057"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "structured_outputs",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5927,6 +11649,25 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.000000063",
+      completion: "0.00000021",
+      input_cache_read: "0.000000021"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5942,6 +11683,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000005",
+      input_cache_read: "0.00000015"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5957,6 +11715,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000017",
+      completion: "0.00000043"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5972,6 +11753,23 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.00000055",
+      completion: "0.0000008",
+      input_cache_read: "0.00000025"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -5987,6 +11785,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 32768,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.0000004"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6002,6 +11820,28 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 6144,
+    pricing: {
+      prompt: "0.00000045",
+      completion: "0.00000065"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "top_a",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6017,6 +11857,21 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 128e3,
+    pricing: {
+      prompt: "0.00000015",
+      completion: "0.0000006",
+      input_cache_read: "0.000000015"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6032,6 +11887,17 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 104e4,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.000006"
+    },
+    supportedParameters: [
+      "max_tokens",
+      "stop",
+      "temperature",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6047,6 +11913,26 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 2e6,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.0000025",
+      web_search: "0.005",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -6058,6 +11944,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "none",
     contextWindow: 2e6,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.0000025",
+      web_search: "0.005",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "reasoning",
+      "response_format",
+      "seed",
+      "structured_outputs",
+      "temperature",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -6069,6 +11973,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1e6,
+    pricing: {
+      prompt: "0.00000125",
+      completion: "0.0000025",
+      web_search: "0.005",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -6080,6 +12007,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 256e3,
+    pricing: {
+      prompt: "0.000001",
+      completion: "0.000002",
+      web_search: "0.005",
+      input_cache_read: "0.0000002"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logprobs",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [],
     recommendedPromptStrategy: "frontier"
   },
@@ -6091,6 +12041,24 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000001",
+      completion: "0.0000003",
+      input_cache_read: "0.00000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6104,8 +12072,27 @@ var GENERATED_PROFILES = [
     originFamily: "unknown",
     trainingClass: "open_weight_instruct",
     reasoningSurface: "none",
-    toolCallSurface: "native_lenient",
+    toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.00000014",
+      completion: "0.00000028",
+      input_cache_read: "0.0000000028"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "response_format",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6121,6 +12108,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 1048576,
+    pricing: {
+      prompt: "0.000000435",
+      completion: "0.00000087",
+      input_cache_read: "0.0000000036"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6136,6 +12147,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.0000022",
+      input_cache_read: "0.00000011"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6151,6 +12183,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131070,
+    pricing: {
+      prompt: "0.000000125",
+      completion: "0.00000085",
+      input_cache_read: "0.00000006"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6166,6 +12219,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 65536,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.0000018",
+      input_cache_read: "0.00000011"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6181,6 +12255,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 202752,
+    pricing: {
+      prompt: "0.00000043",
+      completion: "0.00000174",
+      input_cache_read: "0.00000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6196,6 +12294,27 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 131072,
+    pricing: {
+      prompt: "0.0000003",
+      completion: "0.0000009",
+      input_cache_read: "0.000000055"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "max_tokens",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6211,6 +12330,32 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 202752,
+    pricing: {
+      prompt: "0.0000004",
+      completion: "0.00000175",
+      input_cache_read: "0.00000008"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6226,6 +12371,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 202752,
+    pricing: {
+      prompt: "0.00000006",
+      completion: "0.0000004",
+      input_cache_read: "0.00000001"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6241,6 +12410,30 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 202752,
+    pricing: {
+      prompt: "0.0000006",
+      completion: "0.00000192",
+      input_cache_read: "0.00000012"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6256,6 +12449,29 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_lenient",
     contextWindow: 262144,
+    pricing: {
+      prompt: "0.0000012",
+      completion: "0.000004",
+      input_cache_read: "0.00000024"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6271,6 +12487,32 @@ var GENERATED_PROFILES = [
     reasoningSurface: "none",
     toolCallSurface: "native_strict",
     contextWindow: 202752,
+    pricing: {
+      prompt: "0.00000098",
+      completion: "0.00000308",
+      input_cache_read: "0.000000182"
+    },
+    supportedParameters: [
+      "frequency_penalty",
+      "include_reasoning",
+      "logit_bias",
+      "logprobs",
+      "max_tokens",
+      "min_p",
+      "presence_penalty",
+      "reasoning",
+      "repetition_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "structured_outputs",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_k",
+      "top_logprobs",
+      "top_p"
+    ],
     knownFailureModes: [
       "internal_envelope_leak",
       "system_prompt_echo",
@@ -6499,7 +12741,7 @@ async function handleValidationError(error, onFailure, callback) {
   if (onFailure === "callback") await callback?.(error);
 }
 function findExtraFields(schema, value) {
-  if (!isRecord(value)) return [];
+  if (!isRecord$4(value)) return [];
   const allowedFields = getObjectSchemaKeys(schema);
   if (allowedFields === void 0) return [];
   const allowed = new Set(allowedFields);
@@ -6517,10 +12759,10 @@ function getObjectSchemaKeys(schema) {
 }
 function normalizeShape(shape) {
   const resolved = typeof shape === "function" ? shape() : shape;
-  if (!isRecord(resolved)) return;
+  if (!isRecord$4(resolved)) return;
   return Object.keys(resolved);
 }
-function isRecord(value) {
+function isRecord$4(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function createValidationMessage(reason, toolName, requestId) {
@@ -6543,9 +12785,203 @@ async function applyOutputSanitizers(rawOutputs, sanitizeOutput, context) {
   }));
   return Object.fromEntries(sanitizedEntries);
 }
+async function* readSseEvents(response) {
+  if (response.body === null) {
+    yield* parseFrames(await response.text(), true).events;
+    return;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parsed = parseFrames(buffer, false);
+      buffer = parsed.remaining;
+      yield* parsed.events;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  buffer += decoder.decode();
+  yield* parseFrames(buffer, true).events;
+}
+function parseFrames(input, flush) {
+  const events = [];
+  let remaining = input;
+  while (true) {
+    const match = /\r?\n\r?\n/u.exec(remaining);
+    if (match?.index === void 0) break;
+    const frame = remaining.slice(0, match.index);
+    remaining = remaining.slice(match.index + match[0].length);
+    const event = parseFrame(frame);
+    if (event !== void 0) events.push(event);
+  }
+  if (flush && remaining.trim().length > 0) {
+    const event = parseFrame(remaining);
+    if (event !== void 0) events.push(event);
+    remaining = "";
+  }
+  return {
+    events,
+    remaining
+  };
+}
+function parseFrame(frame) {
+  const data = [];
+  let event;
+  for (const line of frame.split(/\r?\n/u)) {
+    if (line.length === 0 || line.startsWith(":")) continue;
+    const separator = line.indexOf(":");
+    const field = separator === -1 ? line : line.slice(0, separator);
+    const rawValue = separator === -1 ? "" : line.slice(separator + 1);
+    const value = rawValue.startsWith(" ") ? rawValue.slice(1) : rawValue;
+    if (field === "event") event = value;
+    else if (field === "data") data.push(value);
+  }
+  if (data.length === 0) return;
+  return {
+    ...event !== void 0 ? { event } : {},
+    data: data.join("\n")
+  };
+}
+function isRecord$3(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isGatewayMetadataValue(value) {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null) return true;
+  if (Array.isArray(value)) return value.every(isGatewayMetadataValue);
+  if (isRecord$3(value)) return Object.values(value).every(isGatewayMetadataValue);
+  return false;
+}
+function isSecretMetadataKey(key) {
+  return /api[-_]?key|authorization|headers?|secret|token|password/iu.test(key);
+}
+function isSecretMetadataValue(value) {
+  if (typeof value === "string") return /^sk-[\w-]+/u.test(value);
+  if (Array.isArray(value)) return value.some(isSecretMetadataValue);
+  if (typeof value === "object" && value !== null) return Object.entries(value).some(([key, nested]) => isSecretMetadataKey(key) || isSecretMetadataValue(nested));
+  return false;
+}
+function sanitizeGatewayMetadata(metadata) {
+  if (metadata === void 0) return;
+  const sanitized = Object.fromEntries(Object.entries(metadata).filter(([key, value]) => !isSecretMetadataKey(key) && !isSecretMetadataValue(value)));
+  return Object.keys(sanitized).length > 0 ? sanitized : void 0;
+}
+function normalizeGatewayPolicy(value) {
+  if (!isRecord$3(value)) return {};
+  const routeTags = Array.isArray(value.routeTags) ? value.routeTags.filter((tag) => typeof tag === "string") : void 0;
+  const providerPreferences = Array.isArray(value.providerPreferences) ? value.providerPreferences.filter((provider) => typeof provider === "string") : void 0;
+  const gatewayMetadata = {};
+  if (isRecord$3(value.metadata)) {
+    for (const [key, metadataValue] of Object.entries(value.metadata)) if (isGatewayMetadataValue(metadataValue)) gatewayMetadata[key] = metadataValue;
+  }
+  const metadata = Object.keys(gatewayMetadata).length > 0 ? sanitizeGatewayMetadata(gatewayMetadata) : void 0;
+  const allowFallbacks = typeof value.allowFallbacks === "boolean" ? value.allowFallbacks : void 0;
+  return {
+    ...routeTags !== void 0 ? { routeTags } : {},
+    ...providerPreferences !== void 0 ? { providerPreferences } : {},
+    ...metadata !== void 0 ? { metadata } : {},
+    ...allowFallbacks !== void 0 ? { allowFallbacks } : {}
+  };
+}
+function readGatewayPolicy(policy) {
+  if (!isRecord$3(policy) || !isRecord$3(policy.gateway)) return;
+  return normalizeGatewayPolicy(policy.gateway);
+}
+function mergeGatewayPolicy$1(providerGateway, requestGateway) {
+  if (providerGateway === void 0 && requestGateway === void 0) return;
+  const providerMetadata = sanitizeGatewayMetadata(providerGateway?.metadata);
+  const requestMetadata = sanitizeGatewayMetadata(requestGateway?.metadata);
+  const metadata = {
+    ...providerMetadata ?? {},
+    ...requestMetadata ?? {}
+  };
+  return {
+    routeTags: [...providerGateway?.routeTags ?? [], ...requestGateway?.routeTags ?? []],
+    providerPreferences: [...providerGateway?.providerPreferences ?? [], ...requestGateway?.providerPreferences ?? []],
+    ...Object.keys(metadata).length > 0 ? { metadata } : {},
+    ...requestGateway?.allowFallbacks !== void 0 ? { allowFallbacks: requestGateway.allowFallbacks } : providerGateway?.allowFallbacks !== void 0 ? { allowFallbacks: providerGateway.allowFallbacks } : {}
+  };
+}
+function gatewayPolicyToMetadata(policy) {
+  if (policy === void 0) return;
+  const metadata = { ...sanitizeGatewayMetadata(policy.metadata) ?? {} };
+  const latticeGateway = {};
+  if (policy.routeTags !== void 0 && policy.routeTags.length > 0) latticeGateway.route_tags = [...policy.routeTags];
+  if (policy.providerPreferences !== void 0 && policy.providerPreferences.length > 0) latticeGateway.provider_preferences = [...policy.providerPreferences];
+  if (policy.allowFallbacks !== void 0) latticeGateway.allow_fallbacks = policy.allowFallbacks;
+  if (Object.keys(latticeGateway).length > 0) metadata.lattice_gateway = latticeGateway;
+  return Object.keys(metadata).length > 0 ? metadata : void 0;
+}
+function sanitizedGatewayPolicyForPlan(policy) {
+  if (policy === void 0) return;
+  const metadata = sanitizeGatewayMetadata(policy.metadata);
+  return {
+    ...policy.routeTags !== void 0 && policy.routeTags.length > 0 ? { routeTags: [...policy.routeTags] } : {},
+    ...policy.providerPreferences !== void 0 && policy.providerPreferences.length > 0 ? { providerPreferences: [...policy.providerPreferences] } : {},
+    ...metadata !== void 0 ? { metadata } : {},
+    ...policy.allowFallbacks !== void 0 ? { allowFallbacks: policy.allowFallbacks } : {}
+  };
+}
+function observedModelFromResponse(body) {
+  if (!isRecord$3(body)) return;
+  const model = body.model;
+  return typeof model === "string" ? model : void 0;
+}
+function createOpenAICompatibleRequestBody(input) {
+  return {
+    model: input.model,
+    ...input.metadata !== void 0 ? { metadata: input.metadata } : {},
+    messages: [{
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: input.request.task
+        },
+        {
+          type: "text",
+          text: JSON.stringify({ contextPack: input.request.contextPack === void 0 ? void 0 : {
+            id: input.request.contextPack.id,
+            tokenBudget: input.request.contextPack.tokenBudget,
+            estimatedTokens: input.request.contextPack.estimatedTokens,
+            included: input.request.contextPack.included,
+            summarized: input.request.contextPack.summarized,
+            archived: input.request.contextPack.archived,
+            omitted: input.request.contextPack.omitted,
+            warnings: input.request.contextPack.warnings
+          } })
+        },
+        ...input.request.artifacts.map((inputArtifact) => {
+          const resolvedTransport = input.request.providerPackaging?.artifacts.find((item) => item.artifactId === inputArtifact.id)?.transport ?? input.request.plan?.providerPackaging?.artifacts.find((item) => item.artifactId === inputArtifact.id)?.transport;
+          return {
+            type: "text",
+            text: JSON.stringify({
+              artifactId: inputArtifact.id,
+              kind: inputArtifact.kind,
+              mediaType: inputArtifact.mediaType,
+              privacy: inputArtifact.privacy,
+              transport: resolvedTransport,
+              value: typeof inputArtifact.value === "string" && inputArtifact.kind !== "url" && !(isHttpUrl$1(inputArtifact.value) && resolvedTransport !== "url") ? inputArtifact.value : void 0,
+              url: inputArtifact.kind === "url" && typeof inputArtifact.value === "string" && resolvedTransport === "url" ? inputArtifact.value : void 0
+            })
+          };
+        })
+      ]
+    }],
+    ...input.stream === true ? {
+      stream: true,
+      stream_options: { include_usage: true }
+    } : {}
+  };
+}
 function createOpenAICompatibleProvider(options) {
   const id = options.id ?? "openai-compatible";
   const fetchImpl = options.fetch ?? fetch;
+  const baseUrl = options.baseUrl.replace(/\/$/u, "");
   const negotiate = async (modelId) => {
     return synthesizeNegotiatedCapabilitiesFromRegistry(id, modelId, "registry");
   };
@@ -6570,57 +13006,31 @@ function createOpenAICompatibleProvider(options) {
         "base64",
         "extracted-text",
         "transcript"
-      ]
+      ],
+      streaming: true
     }],
     async execute(request) {
+      const mergedGatewayPolicy = mergeGatewayPolicy$1(options.gateway, readGatewayPolicy(request.policy));
+      const metadata = gatewayPolicyToMetadata(mergedGatewayPolicy);
+      const bodyStr = JSON.stringify(createOpenAICompatibleRequestBody({
+        model: options.model,
+        request,
+        ...metadata !== void 0 ? { metadata } : {}
+      }));
+      assertNoPublicUrlEgress(request, id, bodyStr);
       const init = {
         method: "POST",
         headers: {
           "content-type": "application/json",
           ...options.apiKey !== void 0 ? { authorization: `Bearer ${options.apiKey}` } : {}
         },
-        body: JSON.stringify({
-          model: options.model,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: request.task
-              },
-              {
-                type: "text",
-                text: JSON.stringify({ contextPack: request.contextPack === void 0 ? void 0 : {
-                  id: request.contextPack.id,
-                  tokenBudget: request.contextPack.tokenBudget,
-                  estimatedTokens: request.contextPack.estimatedTokens,
-                  included: request.contextPack.included,
-                  summarized: request.contextPack.summarized,
-                  archived: request.contextPack.archived,
-                  omitted: request.contextPack.omitted,
-                  warnings: request.contextPack.warnings
-                } })
-              },
-              ...request.artifacts.map((inputArtifact) => ({
-                type: "text",
-                text: JSON.stringify({
-                  artifactId: inputArtifact.id,
-                  kind: inputArtifact.kind,
-                  mediaType: inputArtifact.mediaType,
-                  privacy: inputArtifact.privacy,
-                  transport: request.providerPackaging?.artifacts.find((item) => item.artifactId === inputArtifact.id)?.transport ?? request.plan?.providerPackaging?.artifacts.find((item) => item.artifactId === inputArtifact.id)?.transport,
-                  value: typeof inputArtifact.value === "string" && inputArtifact.kind !== "url" ? inputArtifact.value : void 0,
-                  url: inputArtifact.kind === "url" && typeof inputArtifact.value === "string" ? inputArtifact.value : void 0
-                })
-              }))
-            ]
-          }]
-        }),
+        body: bodyStr,
         ...request.signal !== void 0 ? { signal: request.signal } : {}
       };
-      const response = await fetchImpl(`${options.baseUrl.replace(/\/$/u, "")}/chat/completions`, init);
+      const response = await fetchImpl(`${baseUrl}/chat/completions`, init);
       if (!response.ok) throw new Error(`OpenAI-compatible provider failed with ${response.status}.`);
       const body = await response.json();
+      const observedModel = observedModelFromResponse(body);
       const text = String(body.choices?.[0]?.message?.content ?? "");
       const sanitizedOutputs = await applyOutputSanitizers(Object.fromEntries(request.outputs.map((name) => [name, text])), options.sanitizeOutput, {
         providerId: id,
@@ -6630,15 +13040,162 @@ function createOpenAICompatibleProvider(options) {
       const toolCalls = parsedToolCalls === null ? void 0 : await validateToolCallRequests(parsedToolCalls, options.validateToolCalls);
       const usage = normalizeUsage(body.usage);
       const normalizedUsage = normalizeUsageToRunUsage(body.usage, options.pricing);
+      const sanitizedGatewayPolicy = sanitizedGatewayPolicyForPlan(mergedGatewayPolicy);
+      const gateway = id === "litellm" || mergedGatewayPolicy !== void 0 ? {
+        used: true,
+        requestedModel: options.model,
+        ...observedModel !== void 0 ? { observedModel } : {},
+        ...sanitizedGatewayPolicy !== void 0 ? { policy: sanitizedGatewayPolicy } : {}
+      } : void 0;
       return {
         rawOutputs: sanitizedOutputs,
         ...usage !== void 0 ? { usage } : {},
         normalizedUsage,
         ...toolCalls !== void 0 ? { toolCalls } : {},
+        ...gateway !== void 0 ? { gateway } : {},
         rawResponse: body
       };
+    },
+    executeStream(request) {
+      return streamOpenAICompatibleResponse({
+        id,
+        model: options.model,
+        baseUrl,
+        fetchImpl,
+        request,
+        ...options.apiKey !== void 0 ? { apiKey: options.apiKey } : {},
+        ...options.gateway !== void 0 ? { providerGateway: options.gateway } : {},
+        ...options.pricing !== void 0 ? { pricing: options.pricing } : {},
+        ...options.sanitizeOutput !== void 0 ? { sanitizeOutput: options.sanitizeOutput } : {},
+        ...options.validateToolCalls !== void 0 ? { validateToolCalls: options.validateToolCalls } : {}
+      });
     }
   };
+}
+async function* streamOpenAICompatibleResponse(input) {
+  const mergedGatewayPolicy = mergeGatewayPolicy$1(input.providerGateway, readGatewayPolicy(input.request.policy));
+  const metadata = gatewayPolicyToMetadata(mergedGatewayPolicy);
+  const streamBodyStr = JSON.stringify(createOpenAICompatibleRequestBody({
+    model: input.model,
+    request: input.request,
+    ...metadata !== void 0 ? { metadata } : {},
+    stream: true
+  }));
+  assertNoPublicUrlEgress(input.request, input.id, streamBodyStr);
+  const response = await input.fetchImpl(`${input.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...input.apiKey !== void 0 ? { authorization: `Bearer ${input.apiKey}` } : {}
+    },
+    body: streamBodyStr,
+    ...input.request.signal !== void 0 ? { signal: input.request.signal } : {}
+  });
+  if (!response.ok) throw new Error(`OpenAI-compatible provider failed with ${response.status}.`);
+  const textParts = [];
+  const rawChunks = [];
+  const nativeToolCalls = /* @__PURE__ */ new Map();
+  let usagePayload;
+  let observedModel;
+  for await (const event of readSseEvents(response)) {
+    const data = event.data.trim();
+    if (data.length === 0) continue;
+    if (data === "[DONE]") break;
+    const chunk = parseJsonObject$2(data);
+    rawChunks.push(chunk);
+    const chunkObservedModel = observedModelFromResponse(chunk);
+    if (chunkObservedModel !== void 0) observedModel = chunkObservedModel;
+    if (isRecord$3(chunk) && chunk.usage !== void 0) usagePayload = chunk.usage;
+    for (const choice of streamChoices(chunk)) {
+      const delta = isRecord$3(choice.delta) ? choice.delta : {};
+      const content = typeof delta.content === "string" ? delta.content : void 0;
+      if (content !== void 0 && content.length > 0) {
+        textParts.push(content);
+        for (const output of input.request.outputs) yield {
+          kind: "text-delta",
+          output,
+          text: content
+        };
+      }
+      accumulateOpenAIToolCalls(nativeToolCalls, delta.tool_calls);
+    }
+  }
+  const text = textParts.join("");
+  const sanitizedOutputs = await applyOutputSanitizers(Object.fromEntries(input.request.outputs.map((name) => [name, text])), input.sanitizeOutput, {
+    providerId: input.id,
+    modelId: input.model
+  });
+  const parsedToolCalls = parseToolUseEnvelope(text);
+  const promptToolCalls = parsedToolCalls === null ? void 0 : await validateToolCallRequests(parsedToolCalls, input.validateToolCalls);
+  const nativeToolRequests = openAIToolUseRequests(nativeToolCalls);
+  const nativeValidatedToolCalls = nativeToolRequests.length === 0 ? void 0 : await validateToolCallRequests(nativeToolRequests, input.validateToolCalls);
+  const toolCalls = [...promptToolCalls ?? [], ...nativeValidatedToolCalls ?? []];
+  const usage = normalizeUsage(usagePayload);
+  const normalizedUsage = normalizeUsageToRunUsage(usagePayload, input.pricing);
+  const sanitizedGatewayPolicy = sanitizedGatewayPolicyForPlan(mergedGatewayPolicy);
+  const gateway = input.id === "litellm" || input.id === "openrouter" || mergedGatewayPolicy !== void 0 ? {
+    used: true,
+    requestedModel: input.model,
+    ...observedModel !== void 0 ? { observedModel } : {},
+    ...sanitizedGatewayPolicy !== void 0 ? { policy: sanitizedGatewayPolicy } : {}
+  } : void 0;
+  yield {
+    kind: "complete",
+    rawOutputs: sanitizedOutputs,
+    ...usage !== void 0 ? { usage } : {},
+    normalizedUsage,
+    ...toolCalls.length > 0 ? { toolCalls } : {},
+    ...gateway !== void 0 ? { gateway } : {},
+    rawResponse: {
+      kind: "openai-compatible-stream",
+      chunks: rawChunks
+    }
+  };
+}
+function parseJsonObject$2(data) {
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`OpenAI-compatible stream returned invalid JSON: ${message}`);
+  }
+}
+function streamChoices(chunk) {
+  if (!isRecord$3(chunk) || !Array.isArray(chunk.choices)) return [];
+  return chunk.choices.filter(isRecord$3);
+}
+function accumulateOpenAIToolCalls(calls, deltas) {
+  if (!Array.isArray(deltas)) return;
+  for (const delta of deltas) {
+    if (!isRecord$3(delta) || typeof delta.index !== "number") continue;
+    const current = calls.get(delta.index) ?? { arguments: "" };
+    if (typeof delta.id === "string") current.id = delta.id;
+    if (isRecord$3(delta.function)) {
+      if (typeof delta.function.name === "string") current.name = `${current.name ?? ""}${delta.function.name}`;
+      if (typeof delta.function.arguments === "string") current.arguments += delta.function.arguments;
+    }
+    calls.set(delta.index, current);
+  }
+}
+function openAIToolUseRequests(calls) {
+  return [...calls.entries()].sort(([left], [right]) => left - right).flatMap(([index, call]) => {
+    if (call.name === void 0) return [];
+    return [{
+      id: call.id ?? `tool-call-${index}`,
+      name: call.name,
+      args: parseToolArguments(call.arguments)
+    }];
+  });
+}
+function parseToolArguments(value) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return {};
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`OpenAI-compatible stream returned invalid tool arguments: ${message}`);
+  }
 }
 function normalizeUsageToRunUsage(rawUsage, pricing) {
   let promptTokens = 0;
@@ -6815,6 +13372,80 @@ var MODELS_BACKOFF_MS = [
   200,
   1e3
 ];
+async function createAnthropicMessagesBody(input) {
+  const system = input.request.cacheSystemPrefix !== void 0 ? [{
+    type: "text",
+    text: input.request.cacheSystemPrefix,
+    cache_control: { type: "ephemeral" }
+  }] : "";
+  const content = await createAnthropicUserContent(input.request);
+  return {
+    body: {
+      model: input.model,
+      system,
+      messages: [{
+        role: "user",
+        content: content.blocks.length === 0 ? input.request.task : [...content.blocks, {
+          type: "text",
+          text: input.request.task
+        }]
+      }],
+      max_tokens: DEFAULT_MAX_TOKENS,
+      ...input.stream === true ? { stream: true } : {}
+    },
+    usesFilesApi: content.usesFilesApi
+  };
+}
+async function createAnthropicUserContent(request) {
+  const blocks = [];
+  let usesFilesApi = false;
+  for (const inputArtifact of request.artifacts) {
+    if (inputArtifact.kind !== "image") continue;
+    const packaged = packagedPlanForArtifact(request, inputArtifact.id);
+    if (packaged === void 0) continue;
+    if (packaged.transport === "file-id") {
+      const fileId = anthropicFileId(inputArtifact);
+      if (fileId === void 0) continue;
+      blocks.push({
+        type: "image",
+        source: {
+          type: "file",
+          file_id: fileId
+        }
+      });
+      usesFilesApi = true;
+      continue;
+    }
+    if (packaged.transport === "url") {
+      const url = artifactHttpUrl(inputArtifact);
+      if (url === void 0) continue;
+      blocks.push({
+        type: "image",
+        source: {
+          type: "url",
+          url
+        }
+      });
+      continue;
+    }
+    if (packaged.transport === "base64" || packaged.transport === "inline") {
+      const data = await artifactBase64Data(inputArtifact);
+      if (data === void 0) continue;
+      blocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: mediaTypeForArtifact(inputArtifact, "image/jpeg"),
+          data
+        }
+      });
+    }
+  }
+  return {
+    blocks,
+    usesFilesApi
+  };
+}
 function createAnthropicProvider(options) {
   const id = options.id ?? "anthropic";
   const fetchImpl = options.fetch ?? fetch;
@@ -6944,9 +13575,11 @@ function createAnthropicProvider(options) {
         "json",
         "url",
         "base64",
+        "file-id",
         "extracted-text",
         "transcript"
-      ]
+      ],
+      streaming: true
     }],
     quirks: {
       supportsToolChoice: true,
@@ -6960,27 +13593,21 @@ function createAnthropicProvider(options) {
     },
     negotiateCapabilities,
     async execute(request) {
-      const system = request.cacheSystemPrefix !== void 0 ? [{
-        type: "text",
-        text: request.cacheSystemPrefix,
-        cache_control: { type: "ephemeral" }
-      }] : "";
+      const messagesBody = await createAnthropicMessagesBody({
+        model: options.model,
+        request
+      });
+      const bodyStr = JSON.stringify(messagesBody.body);
+      assertNoPublicUrlEgress(request, id, bodyStr);
       const init = {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "x-api-key": options.apiKey,
-          "anthropic-version": anthropicVersion
+          "anthropic-version": anthropicVersion,
+          ...messagesBody.usesFilesApi ? { "anthropic-beta": "files-api-2025-04-14" } : {}
         },
-        body: JSON.stringify({
-          model: options.model,
-          system,
-          messages: [{
-            role: "user",
-            content: request.task
-          }],
-          max_tokens: DEFAULT_MAX_TOKENS
-        }),
+        body: bodyStr,
         ...request.signal !== void 0 ? { signal: request.signal } : {}
       };
       const response = await fetchImpl(`${baseUrl}/v1/messages`, init);
@@ -7002,8 +13629,174 @@ function createAnthropicProvider(options) {
         ...toolCalls !== void 0 ? { toolCalls } : {},
         rawResponse: body
       };
+    },
+    executeStream(request) {
+      return streamAnthropicResponse({
+        id,
+        model: options.model,
+        baseUrl,
+        apiKey: options.apiKey,
+        anthropicVersion,
+        fetchImpl,
+        request,
+        ...options.pricing !== void 0 ? { pricing: options.pricing } : {},
+        ...options.sanitizeOutput !== void 0 ? { sanitizeOutput: options.sanitizeOutput } : {},
+        ...options.validateToolCalls !== void 0 ? { validateToolCalls: options.validateToolCalls } : {}
+      });
     }
   };
+}
+async function* streamAnthropicResponse(input) {
+  const messagesBody = await createAnthropicMessagesBody({
+    model: input.model,
+    request: input.request,
+    stream: true
+  });
+  const streamBodyStr = JSON.stringify(messagesBody.body);
+  assertNoPublicUrlEgress(input.request, input.id, streamBodyStr);
+  const response = await input.fetchImpl(`${input.baseUrl}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": input.apiKey,
+      "anthropic-version": input.anthropicVersion,
+      ...messagesBody.usesFilesApi ? { "anthropic-beta": "files-api-2025-04-14" } : {}
+    },
+    body: streamBodyStr,
+    ...input.request.signal !== void 0 ? { signal: input.request.signal } : {}
+  });
+  if (!response.ok) throw new Error(`Anthropic provider failed with ${response.status}.`);
+  const textParts = [];
+  const rawChunks = [];
+  const toolBlocks = /* @__PURE__ */ new Map();
+  const nativeToolRequests = [];
+  let usagePayload;
+  for await (const event of readSseEvents(response)) {
+    const data = event.data.trim();
+    if (data.length === 0) continue;
+    if (data === "[DONE]") break;
+    const chunk = parseJsonObject$1(data, "Anthropic");
+    rawChunks.push(event.event === void 0 ? chunk : {
+      event: event.event,
+      data: chunk
+    });
+    usagePayload = mergeAnthropicUsage(usagePayload, usageFromAnthropicChunk(chunk));
+    const eventType = eventTypeFromAnthropicChunk(chunk) ?? event.event;
+    if (eventType === "content_block_start") {
+      startAnthropicToolBlock(toolBlocks, chunk);
+      continue;
+    }
+    if (eventType === "content_block_delta") {
+      const text2 = anthropicTextDelta(chunk);
+      if (text2 !== void 0 && text2.length > 0) {
+        textParts.push(text2);
+        for (const output of input.request.outputs) yield {
+          kind: "text-delta",
+          output,
+          text: text2
+        };
+      }
+      appendAnthropicToolInput(toolBlocks, chunk);
+      continue;
+    }
+    if (eventType === "content_block_stop") {
+      const request = completeAnthropicToolBlock(toolBlocks, chunk);
+      if (request !== void 0) nativeToolRequests.push(request);
+    }
+  }
+  const text = textParts.join("");
+  const sanitizedOutputs = await applyOutputSanitizers(Object.fromEntries(input.request.outputs.map((name) => [name, text])), input.sanitizeOutput, {
+    providerId: input.id,
+    modelId: input.model
+  });
+  const parsedToolCalls = parseToolUseEnvelope(text);
+  const promptToolCalls = parsedToolCalls === null ? void 0 : await validateToolCallRequests(parsedToolCalls, input.validateToolCalls);
+  const nativeToolCalls = nativeToolRequests.length === 0 ? void 0 : await validateToolCallRequests(nativeToolRequests, input.validateToolCalls);
+  const toolCalls = [...promptToolCalls ?? [], ...nativeToolCalls ?? []];
+  const usage = normalizeAnthropicUsage(usagePayload);
+  const normalizedUsage = normalizeAnthropicUsageToRunUsage(usagePayload, input.pricing);
+  yield {
+    kind: "complete",
+    rawOutputs: sanitizedOutputs,
+    ...usage !== void 0 ? { usage } : {},
+    normalizedUsage,
+    ...toolCalls.length > 0 ? { toolCalls } : {},
+    rawResponse: {
+      kind: "anthropic-stream",
+      chunks: rawChunks
+    }
+  };
+}
+function parseJsonObject$1(data, providerName) {
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`${providerName} stream returned invalid JSON: ${message}`);
+  }
+}
+function eventTypeFromAnthropicChunk(chunk) {
+  return isRecord$2(chunk) && typeof chunk.type === "string" ? chunk.type : void 0;
+}
+function usageFromAnthropicChunk(chunk) {
+  if (!isRecord$2(chunk)) return;
+  if (isRecord$2(chunk.usage)) return chunk.usage;
+  if (isRecord$2(chunk.message) && isRecord$2(chunk.message.usage)) return chunk.message.usage;
+}
+function mergeAnthropicUsage(current, next) {
+  if (!isRecord$2(next)) return current;
+  return {
+    ...current ?? {},
+    ...next
+  };
+}
+function anthropicIndex(chunk) {
+  return isRecord$2(chunk) && typeof chunk.index === "number" ? chunk.index : void 0;
+}
+function startAnthropicToolBlock(blocks, chunk) {
+  const index = anthropicIndex(chunk);
+  const contentBlock = isRecord$2(chunk) && isRecord$2(chunk.content_block) ? chunk.content_block : void 0;
+  if (index === void 0 || contentBlock === void 0 || contentBlock.type !== "tool_use" || typeof contentBlock.id !== "string" || typeof contentBlock.name !== "string") return;
+  blocks.set(index, {
+    id: contentBlock.id,
+    name: contentBlock.name,
+    jsonParts: []
+  });
+}
+function anthropicTextDelta(chunk) {
+  if (!isRecord$2(chunk) || !isRecord$2(chunk.delta)) return;
+  return chunk.delta.type === "text_delta" && typeof chunk.delta.text === "string" ? chunk.delta.text : void 0;
+}
+function appendAnthropicToolInput(blocks, chunk) {
+  const index = anthropicIndex(chunk);
+  if (index === void 0 || !isRecord$2(chunk) || !isRecord$2(chunk.delta)) return;
+  if (chunk.delta.type !== "input_json_delta" || typeof chunk.delta.partial_json !== "string") return;
+  blocks.get(index)?.jsonParts.push(chunk.delta.partial_json);
+}
+function completeAnthropicToolBlock(blocks, chunk) {
+  const index = anthropicIndex(chunk);
+  if (index === void 0) return;
+  const block = blocks.get(index);
+  if (block === void 0) return;
+  blocks.delete(index);
+  return {
+    id: block.id,
+    name: block.name,
+    args: parseAnthropicToolInput(block)
+  };
+}
+function parseAnthropicToolInput(block) {
+  const value = block.jsonParts.join("").trim();
+  if (value.length === 0) return {};
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`Anthropic stream returned invalid tool input JSON: ${message}`);
+  }
+}
+function isRecord$2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function normalizeAnthropicUsageToRunUsage(rawUsage, pricing) {
   let promptTokens = 0;
@@ -7069,6 +13862,75 @@ var GEMINI_QUIRKS = {
   safetySettingsConfigurable: true,
   systemInstructionSupported: true
 };
+async function createGeminiGenerateContentBody(request) {
+  return {
+    contents: [{
+      role: "user",
+      parts: await createGeminiUserParts(request)
+    }],
+    generationConfig: {
+      temperature: DEFAULT_TEMPERATURE,
+      topP: DEFAULT_TOP_P,
+      maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS
+    },
+    safetySettings: SAFETY_SETTINGS
+  };
+}
+async function createGeminiUserParts(request) {
+  const parts = [{ text: request.task }];
+  for (const inputArtifact of request.artifacts) {
+    if (!isGeminiMediaArtifact(inputArtifact.kind)) continue;
+    const packaged = packagedPlanForArtifact(request, inputArtifact.id);
+    if (packaged === void 0) continue;
+    if (packaged.transport === "file-id") {
+      const fileUri = geminiFileUri(inputArtifact);
+      if (fileUri === void 0) continue;
+      parts.push({ fileData: {
+        mimeType: mediaTypeForArtifact(inputArtifact, fallbackGeminiMimeType(inputArtifact.kind)),
+        fileUri
+      } });
+      continue;
+    }
+    if (packaged.transport === "url") {
+      const fileUri = artifactHttpUrl(inputArtifact);
+      if (fileUri === void 0) continue;
+      parts.push({ fileData: {
+        mimeType: mediaTypeForArtifact(inputArtifact, fallbackGeminiMimeType(inputArtifact.kind)),
+        fileUri
+      } });
+      continue;
+    }
+    if (packaged.transport === "base64" || packaged.transport === "inline") {
+      const data = await artifactBase64Data(inputArtifact);
+      if (data === void 0) continue;
+      parts.push({ inlineData: {
+        mimeType: mediaTypeForArtifact(inputArtifact, fallbackGeminiMimeType(inputArtifact.kind)),
+        data
+      } });
+    }
+  }
+  return parts;
+}
+function isGeminiMediaArtifact(kind) {
+  return kind === "image" || kind === "audio" || kind === "video";
+}
+function fallbackGeminiMimeType(kind) {
+  switch (kind) {
+    case "image":
+      return "image/jpeg";
+    case "audio":
+      return "audio/mpeg";
+    case "video":
+      return "video/mp4";
+  }
+}
+function geminiGenerateContentUrl(input) {
+  const method = input.stream === true ? "streamGenerateContent" : "generateContent";
+  const params = new URLSearchParams({ key: input.apiKey });
+  if (input.stream === true) params.set("alt", "sse");
+  const encodedModel = encodeURIComponent(input.model);
+  return `${input.baseUrl}/v1beta/models/${encodedModel}:${method}?${params.toString()}`;
+}
 function createGeminiProvider(options) {
   const id = options.id ?? "gemini";
   const fetchImpl = options.fetch ?? fetch;
@@ -7202,31 +14064,29 @@ function createGeminiProvider(options) {
         "json",
         "url",
         "base64",
+        "file-id",
         "extracted-text",
         "transcript"
-      ]
+      ],
+      streaming: true
     }],
     quirks: GEMINI_QUIRKS,
     negotiateCapabilities: negotiate,
     async execute(request) {
+      const requestBody = await createGeminiGenerateContentBody(request);
+      const bodyStr = JSON.stringify(requestBody);
+      assertNoPublicUrlEgress(request, id, bodyStr);
       const init = {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [{ text: request.task }]
-          }],
-          generationConfig: {
-            temperature: DEFAULT_TEMPERATURE,
-            topP: DEFAULT_TOP_P,
-            maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS
-          },
-          safetySettings: SAFETY_SETTINGS
-        }),
+        body: bodyStr,
         ...request.signal !== void 0 ? { signal: request.signal } : {}
       };
-      const response = await fetchImpl(`${baseUrl}/v1beta/models/${encodeURIComponent(options.model)}:generateContent?key=${encodeURIComponent(options.apiKey)}`, init);
+      const response = await fetchImpl(geminiGenerateContentUrl({
+        baseUrl,
+        model: options.model,
+        apiKey: options.apiKey
+      }), init);
       if (!response.ok) throw new Error(`Gemini provider failed with ${response.status}.`);
       const body = await response.json();
       if (!Array.isArray(body.candidates) || body.candidates.length === 0) throw new Error("Gemini provider returned no candidates.");
@@ -7246,8 +14106,122 @@ function createGeminiProvider(options) {
         ...toolCalls !== void 0 ? { toolCalls } : {},
         rawResponse: body
       };
+    },
+    executeStream(request) {
+      return streamGeminiResponse({
+        id,
+        model: options.model,
+        baseUrl,
+        apiKey: options.apiKey,
+        fetchImpl,
+        request,
+        ...options.pricing !== void 0 ? { pricing: options.pricing } : {},
+        ...options.sanitizeOutput !== void 0 ? { sanitizeOutput: options.sanitizeOutput } : {},
+        ...options.validateToolCalls !== void 0 ? { validateToolCalls: options.validateToolCalls } : {}
+      });
     }
   };
+}
+async function* streamGeminiResponse(input) {
+  const requestBody = await createGeminiGenerateContentBody(input.request);
+  const streamBodyStr = JSON.stringify(requestBody);
+  assertNoPublicUrlEgress(input.request, input.id, streamBodyStr);
+  const response = await input.fetchImpl(geminiGenerateContentUrl({
+    baseUrl: input.baseUrl,
+    model: input.model,
+    apiKey: input.apiKey,
+    stream: true
+  }), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: streamBodyStr,
+    ...input.request.signal !== void 0 ? { signal: input.request.signal } : {}
+  });
+  if (!response.ok) throw new Error(`Gemini provider failed with ${response.status}.`);
+  const textParts = [];
+  const rawChunks = [];
+  const nativeToolRequests = [];
+  let usagePayload;
+  for await (const event of readSseEvents(response)) {
+    const data = event.data.trim();
+    if (data.length === 0) continue;
+    if (data === "[DONE]") break;
+    const chunk = parseJsonObject(data, "Gemini");
+    rawChunks.push(chunk);
+    const usage2 = geminiUsageMetadata(chunk);
+    if (usage2 !== void 0) usagePayload = usage2;
+    for (const { part, candidateIndex, partIndex } of geminiParts(chunk)) {
+      if (typeof part.text === "string" && part.text.length > 0) {
+        textParts.push(part.text);
+        for (const output of input.request.outputs) yield {
+          kind: "text-delta",
+          output,
+          text: part.text
+        };
+      }
+      const toolRequest = geminiFunctionCallRequest(part, candidateIndex, partIndex);
+      if (toolRequest !== void 0) nativeToolRequests.push(toolRequest);
+    }
+  }
+  const text = textParts.join("");
+  const sanitizedOutputs = await applyOutputSanitizers(Object.fromEntries(input.request.outputs.map((name) => [name, text])), input.sanitizeOutput, {
+    providerId: input.id,
+    modelId: input.model
+  });
+  const parsedToolCalls = parseToolUseEnvelope(text);
+  const promptToolCalls = parsedToolCalls === null ? void 0 : await validateToolCallRequests(parsedToolCalls, input.validateToolCalls);
+  const nativeToolCalls = nativeToolRequests.length === 0 ? void 0 : await validateToolCallRequests(nativeToolRequests, input.validateToolCalls);
+  const toolCalls = [...promptToolCalls ?? [], ...nativeToolCalls ?? []];
+  const usage = normalizeGeminiUsage(usagePayload);
+  const normalizedUsage = normalizeGeminiUsageToRunUsage(usagePayload, input.pricing);
+  yield {
+    kind: "complete",
+    rawOutputs: sanitizedOutputs,
+    ...usage !== void 0 ? { usage } : {},
+    normalizedUsage,
+    ...toolCalls.length > 0 ? { toolCalls } : {},
+    rawResponse: {
+      kind: "gemini-stream",
+      chunks: rawChunks
+    }
+  };
+}
+function parseJsonObject(data, providerName) {
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid JSON.";
+    throw new Error(`${providerName} stream returned invalid JSON: ${message}`);
+  }
+}
+function geminiUsageMetadata(chunk) {
+  return isRecord$1(chunk) ? chunk.usageMetadata : void 0;
+}
+function geminiParts(chunk) {
+  if (!isRecord$1(chunk) || !Array.isArray(chunk.candidates)) return [];
+  return chunk.candidates.flatMap((candidate, candidateIndex) => {
+    if (!isRecord$1(candidate) || !isRecord$1(candidate.content)) return [];
+    const parts = candidate.content.parts;
+    if (!Array.isArray(parts)) return [];
+    return parts.flatMap((part, partIndex) => isRecord$1(part) ? [{
+      part,
+      candidateIndex,
+      partIndex
+    }] : []);
+  });
+}
+function geminiFunctionCallRequest(part, candidateIndex, partIndex) {
+  if (!isRecord$1(part.functionCall)) return;
+  const name = part.functionCall.name;
+  if (typeof name !== "string") return;
+  return {
+    id: `gemini-function-call-${candidateIndex}-${partIndex}`,
+    name,
+    args: part.functionCall.args ?? {}
+  };
+}
+function isRecord$1(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function normalizeGeminiUsageToRunUsage(rawUsage, pricing) {
   let promptTokens = 0;
@@ -7310,6 +14284,16 @@ function createLmStudioProvider(options) {
   };
 }
 var DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+function normalizeFallbackModels(models) {
+  if (models === void 0) return void 0;
+  const normalized = models.map((model) => model.trim()).filter((model) => model.length > 0);
+  return normalized.length > 0 ? normalized : void 0;
+}
+function observedModelFromRawResponse(rawResponse) {
+  if (typeof rawResponse !== "object" || rawResponse === null || Array.isArray(rawResponse)) return;
+  const model = rawResponse.model;
+  return typeof model === "string" ? model : void 0;
+}
 var OPENROUTER_QUIRKS = {
   supportsToolChoice: true,
   parallelToolCalls: true,
@@ -7323,6 +14307,7 @@ var OPENROUTER_QUIRKS = {
 function createOpenRouterProvider(options) {
   const baseUrl = (options.baseUrl ?? DEFAULT_OPENROUTER_BASE_URL).replace(/\/$/u, "");
   const fetchImpl = options.fetch ?? fetch;
+  const fallbackModels = normalizeFallbackModels(options.fallbackModels);
   const ttlMs = options.modelsCacheTtlMs ?? 3e5;
   const retryCount = options.modelsRetryCount ?? 2;
   const cache = /* @__PURE__ */ new Map();
@@ -7447,15 +14432,65 @@ function createOpenRouterProvider(options) {
     });
     options.runEventSink(event);
   }
+  const executeFetch = fallbackModels === void 0 ? fetchImpl : async (url, init) => {
+    if (typeof init?.body !== "string") return fetchImpl(url, init);
+    const body = JSON.parse(init.body);
+    return fetchImpl(url, {
+      ...init,
+      body: JSON.stringify({
+        ...body,
+        models: [...fallbackModels]
+      })
+    });
+  };
+  const baseAdapter = createOpenAICompatibleProvider({
+    ...options,
+    id: options.id ?? "openrouter",
+    baseUrl,
+    fetch: executeFetch
+  });
+  const baseExecuteStream = baseAdapter.executeStream;
   return {
-    ...createOpenAICompatibleProvider({
-      ...options,
-      id: options.id ?? "openrouter",
-      baseUrl
-    }),
+    ...baseAdapter,
+    async execute(request) {
+      const response = await baseAdapter.execute(request);
+      const observedModel = response.gateway?.observedModel ?? observedModelFromRawResponse(response.rawResponse);
+      return {
+        ...response,
+        gateway: {
+          ...response.gateway ?? { used: true },
+          used: true,
+          requestedModel: options.model,
+          ...fallbackModels !== void 0 ? { fallbackModels } : {},
+          ...observedModel !== void 0 ? { observedModel } : {}
+        }
+      };
+    },
+    ...baseExecuteStream !== void 0 ? { executeStream: async (request) => {
+      return withOpenRouterStreamGateway(await baseExecuteStream(request));
+    } } : {},
     quirks: OPENROUTER_QUIRKS,
     negotiateCapabilities: negotiate
   };
+  async function* withOpenRouterStreamGateway(stream) {
+    for await (const chunk of stream) {
+      if (chunk.kind !== "complete") {
+        yield chunk;
+        continue;
+      }
+      const observedModel = chunk.gateway?.observedModel ?? observedModelFromRawResponse(chunk.rawResponse);
+      yield {
+        ...chunk,
+        gateway: {
+          ...chunk.gateway ?? { used: true },
+          used: true,
+          requestedModel: options.model,
+          ...fallbackModels !== void 0 ? { fallbackModels } : {},
+          ...observedModel !== void 0 ? { observedModel } : {}
+        }
+      };
+    }
+  }
 }
 function stringifyErr$1(err) {
   return err instanceof Error ? err.message : String(err);
@@ -7572,9 +14607,10 @@ function createXaiProvider(options) {
     baseUrl: resolvedBaseUrl
   });
   const innerExecute = inner.execute;
+  const innerExecuteStream = inner.executeStream;
   const wrappedExecute = innerExecute === void 0 ? void 0 : async (request) => {
     const response = await innerExecute(request);
-    const reasoningTokens = response.rawResponse?.usage?.completion_tokens_details?.reasoning_tokens;
+    const reasoningTokens = reasoningTokensFromRawResponse(response.rawResponse);
     if (typeof reasoningTokens === "number" && response.usage !== void 0) {
       const inputTokens = response.usage.inputTokens ?? 0;
       const outputTokens = response.usage.outputTokens ?? 0;
@@ -7587,6 +14623,29 @@ function createXaiProvider(options) {
       };
     }
     return response;
+  };
+  const wrappedExecuteStream = innerExecuteStream === void 0 ? void 0 : async function* (request) {
+    const stream = await innerExecuteStream(request);
+    for await (const chunk of stream) {
+      if (chunk.kind !== "complete") {
+        yield chunk;
+        continue;
+      }
+      const reasoningTokens = reasoningTokensFromRawResponse(chunk.rawResponse);
+      if (typeof reasoningTokens === "number" && chunk.usage !== void 0) {
+        const inputTokens = chunk.usage.inputTokens ?? 0;
+        const outputTokens = chunk.usage.outputTokens ?? 0;
+        yield {
+          ...chunk,
+          usage: {
+            ...chunk.usage,
+            totalTokens: inputTokens + outputTokens + reasoningTokens
+          }
+        };
+        continue;
+      }
+      yield chunk;
+    }
   };
   return {
     id: inner.id,
@@ -7602,9 +14661,30 @@ function createXaiProvider(options) {
     },
     negotiateCapabilities: negotiate,
     ...inner.capabilities !== void 0 ? { capabilities: inner.capabilities } : {},
-    ...wrappedExecute !== void 0 ? { execute: wrappedExecute } : {}
+    ...wrappedExecute !== void 0 ? { execute: wrappedExecute } : {},
+    ...wrappedExecuteStream !== void 0 ? { executeStream: wrappedExecuteStream } : {}
   };
 }
+function reasoningTokensFromRawResponse(rawResponse) {
+  const direct = reasoningTokensFromUsage(rawResponse?.usage);
+  if (direct !== void 0) return direct;
+  if (!isRecord(rawResponse) || !Array.isArray(rawResponse.chunks)) return;
+  for (let index = rawResponse.chunks.length - 1; index >= 0; index -= 1) {
+    const chunk = rawResponse.chunks[index];
+    const fromChunk = reasoningTokensFromUsage(chunk?.usage);
+    if (fromChunk !== void 0) return fromChunk;
+  }
+}
+function reasoningTokensFromUsage(usage) {
+  if (!isRecord(usage) || !isRecord(usage.completion_tokens_details)) return;
+  const value = usage.completion_tokens_details.reasoning_tokens;
+  return typeof value === "number" ? value : void 0;
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+var MEDIA_INLINE_LIMIT_BYTES = 100 * 1024 * 1024;
+var PDF_INLINE_LIMIT_BYTES = 50 * 1024 * 1024;
 var textEncoder2 = new TextEncoder();
 
 // extension/offscreen/lattice-host.js

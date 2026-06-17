@@ -1,26 +1,26 @@
 ---
 current_lattice_source: npm
 current_lattice_package: "@full-self-browsing/lattice"
-current_lattice_version: "1.3.0"
+current_lattice_version: "1.4.0"
 current_lattice_alias: "lattice"
-current_lattice_integrity: "sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA=="
+current_lattice_integrity: "sha512-D0cS0YtpjMAkEl03kgg8th9mpUDVnOMJ6QmvW7e8iVIUWmtJ1cYVi7n+eKUmgo21v/waL/qjPBmJ8SlQcjOLww=="
 current_lattice_cli_package: "@full-self-browsing/lattice-cli"
-current_lattice_cli_version: "1.3.0"
-current_lattice_sha: 069c9aea4b5875393c96ad7e6ffeec4afbe70f34
-current_lattice_tag: "v1.3.0"
+current_lattice_cli_version: "1.4.0"
+current_lattice_sha: bb459f88217fc2925b242a49f03bf991d604d43e
+current_lattice_tag: "v1.4.0"
 current_branch: main
-last_updated: 2026-06-15
+last_updated: 2026-06-17
 schema_version: 2
 ---
 
 # Lattice Pin -- FSB <-> Lattice Cross-Repo Audit Trail
 
-This file is the SINGLE FSB-side index of the Lattice surface FSB consumes. Phases 1-12 recorded unpublished FSB-driven Lattice work from the local `./lattice/` clone. Phase 13 changes the active pin to the public npm package `@full-self-browsing/lattice@1.3.0`, consumed under the existing `lattice` alias.
+This file is the SINGLE FSB-side index of the Lattice surface FSB consumes. Phases 1-12 recorded unpublished FSB-driven Lattice work from the local `./lattice/` clone. Phase 13 changed the active pin to the public npm package `@full-self-browsing/lattice@1.3.0`, consumed under the existing `lattice` alias. Quick task `260617-g1w` updates the active public package pin to `@full-self-browsing/lattice@1.4.0`.
 
-**Current source:** npm package `@full-self-browsing/lattice@1.3.0` installed as alias `lattice`
-**Current source tag:** `v1.3.0` (`069c9aea4b5875393c96ad7e6ffeec4afbe70f34`)
-**Runtime tarball integrity:** `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`
-**Developer CLI:** `@full-self-browsing/lattice-cli@1.3.0`
+**Current source:** npm package `@full-self-browsing/lattice@1.4.0` installed as alias `lattice`
+**Current source tag:** `v1.4.0` (`bb459f88217fc2925b242a49f03bf991d604d43e`)
+**Runtime tarball integrity:** `sha512-D0cS0YtpjMAkEl03kgg8th9mpUDVnOMJ6QmvW7e8iVIUWmtJ1cYVi7n+eKUmgo21v/waL/qjPBmJ8SlQcjOLww==`
+**Developer CLI:** `@full-self-browsing/lattice-cli@1.4.0`
 **Historical local clone:** `./lattice/` on `fsb-integration-experiments`, last active SHA `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3`
 
 ## Per-FSB-Phase Log
@@ -42,6 +42,7 @@ Each row records one FSB phase's Lattice-side dependency state. For Phases 1-12,
 | Phase 11  | 2026-06-07 | `e95067bfa87ed1b75838fc3b3ef217a3b01acbd3` | `fsb-integration-experiments`   | (none -- Phase 11 is FSB-side UI only; zero Lattice-side commits per INV-06) | Phase 11 = tab-aware side panel surface (friendly owner-chip + foreign-owned input lockout + per-tab chat history). ZERO Lattice-side commits per 11-RESEARCH Section 2 binary INV-06 NO verdict -- all 4 surfaces (owner-chip lookupClientLabel helper, sidepanel+popup three-tier resolution, input lockout, per-tab conversation envelope) live in `extension/ui/*`; visual-session lifecycle `entry.client` field already shipped Phase 10 FSB-side; FSB host-runtime chrome.storage.session is not a Lattice contract surface. `current_lattice_sha` UNCHANGED at Phase 5 SHA `e95067b`; `cd lattice && git reflog \| grep -c push` = 0 carryforward holds. FSB-side: Plan 11-00 `a981dd31` + `8b7931b4` + `9a5d6b2b` Wave 0 sidecar + smoke scaffold + CSS baseline; Plan 11-01 `ae79049f` + `2efa3008` + `42742737` + `0b1ecb83` owner-chip lookupClientLabel + sidepanel/popup three-tier resolution; Plan 11-02 `fc283c89` + `ec5df3dd` + `55d6c9e3` + `ef5fe5ee` applyInputLockout + _isActiveTabForeignOwned + CSS + aria span; Plan 11-03 `6a499368` + `4a6daa08` initTabConversationStore + swapToTabConversation + dropTabConversation + ensureTabConversationForActiveTab + chrome.tabs.onRemoved listener; THIS commit (Plan 11-04) ceremony closure -- REQUIREMENTS.md FINT-19/20/21 narrative + traceability + Total v1 41 -> 44 + Last updated bumped; this LATTICE-PIN row appended; v0.10.0-MILESTONE-AUDIT.md status_history phase_11_shipped entry. Smoke `tests/sidepanel-tab-aware-smoke.test.js` >= 37 PASS / 0 FAIL across 7 Parts (Plan 11-00 scaffold + Plan 11-01 Parts 1+2 + Plan 11-02 Parts 3+4 + Plan 11-03 Parts 5+6 + Plan 11-04 Part 7 INV byte-freeze regression). INV-04 setTimeout count = 8 (Phase 7+8+9+10 baseline carryforward) + 4 iterator patterns intact; INV-06 SHA unchanged. UAT-11 deferred to consolidated UAT-08+09+10+11 session per CONTEXT D-22. |
 | 12 (side panel follows automation) | 2026-06-08 | e95067bfa87ed1b75838fc3b3ef217a3b01acbd3 | fsb-integration-experiments | UNCHANGED -- ZERO Lattice-side commits in Phase 12 (12-RESEARCH Section 2 binary NO determination; chrome.storage.local + chrome.sidePanel + chrome.runtime.sendMessage are all Chrome host APIs not Lattice contracts). Phase 5 HEAD preserved through Phases 6/7/8/9/10/11/12. | FSB-side only: FINT-22 (default-flip showSidepanelProgress + iteration_complete persist) + FINT-23 (sidecar envelope CRUD + LRU + debouncer factory + 3-tier hydrate + addMessage write-through chokepoint + EC-05 cancel-on-drop) + FINT-24 (chrome.sidePanel.setOptions + open as FIRST 2 awaits in handleStartAutomation). |
 | Phase 13 | 2026-06-15 | `069c9aea4b5875393c96ad7e6ffeec4afbe70f34` | `main` / npm `@full-self-browsing/lattice@1.3.0` | Public package replug: FSB now consumes `lattice` via npm alias `npm:@full-self-browsing/lattice@1.3.0`; developer verification installs `@full-self-browsing/lattice-cli@1.3.0`; root Node engine raised to >=24 to match the public runtime. | This is the first phase where INV-06 is package-pin based instead of local-clone byte-freeze based. Historical experiment SHA `e95067bf...` remains in the row history, but the active invariant is now package name + version + tarball integrity + v1.3.0 tag commit. `tests/lattice-public-package.test.js` verifies package.json, package-lock, LATTICE-PIN, runtime exports, and CLI availability. |
+| Quick 260617-g1w | 2026-06-17 | `bb459f88217fc2925b242a49f03bf991d604d43e` | `main` / npm `@full-self-browsing/lattice@1.4.0` | Public package upgrade: FSB now consumes `lattice` via npm alias `npm:@full-self-browsing/lattice@1.4.0`; developer verification installs `@full-self-browsing/lattice-cli@1.4.0`. | Updates the active package-pin invariant from 1.3.0 to 1.4.0. Receipt expectations move from `lattice-receipt/v1.2` to `lattice-receipt/v1.3`; `tests/lattice-public-package.test.js` also verifies the stamped `latticeVersion`, new LiteLLM/streaming/OpenTelemetry/remote-signer exports, and the expanded CLI command set. |
 
 ## How this file gets used
 

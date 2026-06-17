@@ -100,7 +100,7 @@ function passAssertEqual(actual, expected, msg) {
           capabilityId: 'fsb-smoke/round-trip',
           attemptNumber: 1
         },
-        // Receipt v1.2 training-lineage field (TrainingClass enum). Asserting
+        // Receipt training-lineage field (TrainingClass enum). Asserting
         // it round-trips proves the published runtime carries modelClass on the
         // signed body, not merely in its type surface.
         modelClass: 'frontier_rlhf',
@@ -148,7 +148,7 @@ function passAssertEqual(actual, expected, msg) {
     passAssertEqual(result.body.route.providerId, 'fsb-smoke', 'verified body.route.providerId round-trips');
     passAssertEqual(result.body.route.capabilityId, 'fsb-smoke/round-trip', 'verified body.route.capabilityId round-trips');
     passAssertEqual(result.body.route.attemptNumber, 1, 'verified body.route.attemptNumber round-trips');
-    passAssertEqual(result.body.modelClass, 'frontier_rlhf', 'verified body.modelClass round-trips (receipt v1.2 training-lineage field)');
+    passAssertEqual(result.body.modelClass, 'frontier_rlhf', 'verified body.modelClass round-trips (receipt training-lineage field)');
     passAssertEqual(result.keyState, 'active', 'verified keyState is active');
   } else {
     failed++;

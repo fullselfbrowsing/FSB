@@ -29,14 +29,15 @@ function ok(condition, message) {
 
   const repoRoot = path.resolve(__dirname, '..');
   const pinResult = validatePublicLatticePin(repoRoot);
-  ok(pinResult.ok, 'package.json, package-lock.json, and LATTICE-PIN agree on public Lattice 1.3.0: ' + pinResult.errors.join('; '));
+  ok(pinResult.ok, 'package.json, package-lock.json, and LATTICE-PIN agree on public Lattice ' + EXPECTED_PUBLIC_LATTICE.packageVersion + ': ' + pinResult.errors.join('; '));
 
   const installedPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'node_modules', 'lattice', 'package.json'), 'utf8'));
   ok(installedPkg.name === EXPECTED_PUBLIC_LATTICE.packageName, 'node_modules/lattice is the scoped public package');
-  ok(installedPkg.version === EXPECTED_PUBLIC_LATTICE.packageVersion, 'node_modules/lattice version is 1.3.0');
+  ok(installedPkg.version === EXPECTED_PUBLIC_LATTICE.packageVersion, 'node_modules/lattice version is ' + EXPECTED_PUBLIC_LATTICE.packageVersion);
   ok(installedPkg.engines && installedPkg.engines.node === '>=24', 'installed Lattice package declares Node >=24');
 
   const lattice = await import('lattice');
+  ok(lattice.latticeVersion === EXPECTED_PUBLIC_LATTICE.packageVersion, 'lattice.latticeVersion is stamped with ' + EXPECTED_PUBLIC_LATTICE.packageVersion);
   const expectedFunctions = [
     'createReceipt',
     'verifyReceipt',
@@ -61,7 +62,11 @@ function ok(condition, message) {
     'stripReasoningTags',
     'unwrapInternalEnvelope',
     'receiptCid',
-    'createRateLimitGroup'
+    'createRateLimitGroup',
+    'createLiteLLMProvider',
+    'collectStream',
+    'createOtelRunEventSink',
+    'createRemoteReceiptSigner'
   ];
   for (const key of expectedFunctions) {
     ok(typeof lattice[key] === 'function', 'lattice.' + key + ' is exported');
@@ -71,7 +76,7 @@ function ok(condition, message) {
 
   const cliPackagePath = path.join(repoRoot, 'node_modules', '@full-self-browsing', 'lattice-cli', 'package.json');
   const cliPkg = JSON.parse(fs.readFileSync(cliPackagePath, 'utf8'));
-  ok(cliPkg.version === EXPECTED_PUBLIC_LATTICE.cliPackageVersion, '@full-self-browsing/lattice-cli version is 1.3.0');
+  ok(cliPkg.version === EXPECTED_PUBLIC_LATTICE.cliPackageVersion, '@full-self-browsing/lattice-cli version is ' + EXPECTED_PUBLIC_LATTICE.cliPackageVersion);
   const cliBin = cliPkg.bin && cliPkg.bin.lattice ? cliPkg.bin.lattice.replace(/^\.\//, '') : '';
   ok(cliBin === 'dist/cli.js', 'Lattice CLI exposes lattice bin');
 
@@ -85,7 +90,7 @@ function ok(condition, message) {
   // banner with ANSI escape codes even when stdout is not a TTY (NO_COLOR is
   // not load-bearing on its own), so strip ANSI before matching the usage line.
   const cliStdout = (cli.stdout || '').replace(/\x1b\[[0-9;]*m/g, '');
-  ok(/USAGE lattice repro\|verify\|eval/.test(cliStdout), 'lattice CLI exposes repro|verify|eval commands');
+  ok(/USAGE lattice repro\|verify\|eval\|receipt\|diagnostics/.test(cliStdout), 'lattice CLI exposes repro|verify|eval|receipt|diagnostics commands');
 
   console.log('\nPublic Lattice package smoke: ' + passed + ' PASS / 0 FAIL');
 })().catch((err) => {
