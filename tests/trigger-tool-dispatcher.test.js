@@ -12,6 +12,7 @@ let failed = 0;
 const ROOT = path.resolve(__dirname, '..');
 const BACKGROUND_PATH = path.join(ROOT, 'extension', 'background.js');
 const MCP_DISPATCHER_PATH = path.join(ROOT, 'extension', 'ws', 'mcp-tool-dispatcher.js');
+const TOOL_EXECUTOR_PATH = path.join(ROOT, 'extension', 'ai', 'tool-executor.js');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
 const MCP_MANUAL_PATH = path.join(ROOT, 'mcp', 'src', 'tools', 'manual.ts');
 const MCP_QUEUE_PATH = path.join(ROOT, 'mcp', 'src', 'queue.ts');
@@ -202,6 +203,30 @@ async function caseMcpDispatcherTriggerRoutesDelegateToBackground() {
   assert.ok(src.includes("routeFamily: 'trigger'"), 'dispatcher trigger routes use trigger route family');
   assert.ok(src.includes('fsbTriggerDispatchToolRequest'), 'dispatcher delegates trigger messages to background dispatch helper');
   assert.strictEqual(src.includes('FsbTriggerManager.armTrigger'), false, 'dispatcher does not arm triggers directly');
+}
+
+async function caseToolExecutorTriggerRoutesDelegateToBackground() {
+  const src = readSource(TOOL_EXECUTOR_PATH);
+  const backgroundSrc = functionSource(src, 'executeBackgroundTool');
+  const paramsSrc = functionSource(src, 'buildAutopilotTriggerParams');
+  const effectSrc = functionSource(src, 'autopilotTriggerHadEffect');
+
+  for (const toolName of ['trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers']) {
+    assert.ok(backgroundSrc.includes(`case '${toolName}'`), `tool executor handles ${toolName}`);
+  }
+  assert.ok(backgroundSrc.includes('fsbTriggerDispatchToolRequest'), 'tool executor delegates trigger tools to background dispatch helper');
+  assert.ok(backgroundSrc.includes("source: 'autopilot'"), 'tool executor marks trigger dispatch context as autopilot');
+  assert.ok(paramsSrc.includes('agent_id') && paramsSrc.includes('agentId'), 'autopilot trigger params strip caller agent identity aliases');
+  assert.ok(paramsSrc.includes('ownership_token') && paramsSrc.includes('ownershipToken'), 'autopilot trigger params strip caller ownership token aliases');
+  assert.ok(paramsSrc.includes('delete cleaned[field]'), 'autopilot trigger params delete untrusted ownership fields');
+  assert.ok(paramsSrc.includes('tab_id') && paramsSrc.includes('tabId'), 'autopilot trigger params default tab aliases from executor tabId');
+  assert.ok(effectSrc.includes("toolName === 'trigger'"), 'trigger success is treated as effectful');
+  assert.ok(effectSrc.includes("toolName === 'stop_trigger'") && effectSrc.includes('response.stopped === true'), 'stop_trigger is effectful only when it stops an active trigger');
+  assert.strictEqual(src.includes('FsbTriggerManager.armTrigger'), false, 'tool executor does not arm triggers directly');
+  assert.strictEqual(src.includes('FsbTriggerStore'), false, 'tool executor does not inspect trigger storage directly');
+  assert.strictEqual(src.includes('FsbTriggerLifecycle'), false, 'tool executor does not call trigger lifecycle directly');
+  assert.strictEqual(src.includes('chrome.alarms'), false, 'tool executor does not own trigger alarms');
+  assert.strictEqual(src.includes('triggerObserveStart'), false, 'tool executor does not own live-observe startup');
 }
 
 async function caseStorageSourceContracts() {
@@ -643,6 +668,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('MCP TaskQueue derives read-only names from registry', caseMcpQueueDerivesReadOnlyTools);
   await runCase('MCP TaskQueue trigger companions bypass pending mutation', caseMcpQueueCompanionsBypassPendingMutation);
   await runCase('MCP dispatcher trigger routes delegate to background helper', caseMcpDispatcherTriggerRoutesDelegateToBackground);
+  await runCase('tool executor trigger routes delegate to background helper', caseToolExecutorTriggerRoutesDelegateToBackground);
   await runCase('status/list source contracts read trigger store', caseStorageSourceContracts);
   await runCase('stop source orders cleanup before lifecycle clear', caseStopSourceOrdering);
   await runCase('arm source validates reads and starts watchers in order', caseArmSourceContracts);
