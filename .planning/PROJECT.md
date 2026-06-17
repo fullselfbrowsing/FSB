@@ -33,7 +33,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Goal:** Add a `trigger` tool family to FSB autopilot and the MCP server that watches a targeted DOM element and reports back when its value changes, crosses a threshold, equals a target, or contains text -- surviving service-worker eviction, with a gentle "analyzing" pulse on the watched element while the trigger is active.
 
-**Progress:** Phases 14-17 are complete as of 2026-06-16. The trigger runtime now has storage-backed survivability, the fire-condition/value-extraction seam, live-observe with analyzing pulse, and refresh-poll that reloads only the trigger-owned tab, reads through `triggerRead`, handles missing/blocked pages as attention states, and delegates fired/no-fire decisions to the existing lifecycle seam. Phase 18 is next: shared trigger tool registry and dispatcher wiring.
+**Progress:** Phases 14-18 are complete as of 2026-06-17. The trigger runtime now has storage-backed survivability, the fire-condition/value-extraction seam, live-observe with analyzing pulse, refresh-poll that reloads only the trigger-owned tab, and shared registry/dispatcher wiring that exposes `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` to both MCP and autopilot through background-owned handlers. Phase 19 is next: blocking/detached MCP reporting.
 
 **Why this matters:** FSB today executes a task and stops. A trigger turns FSB into a *reactive* watcher -- "tell me when this crypto/stock/product price crosses X" or "ping me when this changes." The AI still decides what to do on fire; the trigger only reports what happened, preserving FSB's core value (the AI decides, the mechanics execute).
 
@@ -642,4 +642,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-16 -- v0.11.0 Trigger Tool Phases 14-17 complete. Refresh-poll watch is implemented and verified; Phase 18 shared tool registry + dispatcher wiring is next.*
+*Last updated: 2026-06-17 -- v0.11.0 Trigger Tool Phases 14-18 complete. Shared trigger registry and dispatcher wiring are implemented and verified; Phase 19 blocking/detached MCP reporting is next.*
