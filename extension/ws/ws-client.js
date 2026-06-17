@@ -24,9 +24,28 @@ var FSB_PHANTOMSTREAM_CONTROL_FALLBACK = {
   RESUME: 'dash:dom-stream-resume',
   SUBTREE_REQUEST: 'dash:ps-subtree-request'
 };
+var FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK = {
+  REQUEST: 'dash:ps-control-request',
+  STOP: 'dash:ps-control-stop',
+  CLICK: 'dash:ps-control-click',
+  TEXT: 'dash:ps-control-text',
+  KEY: 'dash:ps-control-key',
+  SCROLL: 'dash:ps-control-scroll',
+  STATE: 'ext:ps-control-state'
+};
+var FSB_PHANTOMSTREAM_REMOTE_CONTROL_STATE_FALLBACK = {
+  LOCKED: 'locked',
+  REQUESTING: 'requesting',
+  ACTIVE: 'active',
+  DENIED: 'denied',
+  STOPPED: 'stopped'
+};
 var FSB_TRANSPORT_TRACKED_TYPES = {};
 FSB_TRANSPORT_TRACKED_TYPES['dash:request-status'] = true;
 FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.START] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.STOP] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.PAUSE] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.RESUME] = true;
 FSB_TRANSPORT_TRACKED_TYPES['ext:snapshot'] = true;
 FSB_TRANSPORT_TRACKED_TYPES['ext:page-ready'] = true;
 FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.STATE] = true;
@@ -36,6 +55,18 @@ FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.MUTATIONS] = true;
 FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.SCROLL] = true;
 FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.OVERLAY] = true;
 FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.DIALOG] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.REQUEST] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.STOP] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.CLICK] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.TEXT] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.KEY] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.SCROLL] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.STATE] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-control-start'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-control-stop'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-click'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-key'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-scroll'] = true;
 
 function getFSBPhantomStreamProtocol() {
   var bridge = globalThis.FSBPhantomStreamProtocol;
@@ -54,6 +85,14 @@ function getFSBStreamTypes() {
 
 function getFSBControlTypes() {
   return getFSBProtocolGroup('CONTROL', FSB_PHANTOMSTREAM_CONTROL_FALLBACK);
+}
+
+function getFSBRemoteControlTypes() {
+  return getFSBProtocolGroup('REMOTE_CONTROL', FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK);
+}
+
+function getFSBRemoteControlStateTypes() {
+  return getFSBProtocolGroup('REMOTE_CONTROL_STATE', FSB_PHANTOMSTREAM_REMOTE_CONTROL_STATE_FALLBACK);
 }
 
 function getFSBLZStringCodec() {
@@ -389,17 +428,193 @@ function _getRemoteControlTabId() {
   return getCurrentTransportTabId();
 }
 
-function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId) {
+function normalizeFSBRemoteControlForValidation(type, payload) {
+  var remoteControlTypes = getFSBRemoteControlTypes();
+  var p = payload && Object(payload) === payload && !Array.isArray(payload) ? payload : {};
+
+  if (type === 'dash:remote-control-start') {
+    return { type: remoteControlTypes.REQUEST, payload: {} };
+  }
+  if (type === 'dash:remote-control-stop') {
+    return { type: remoteControlTypes.STOP, payload: {} };
+  }
+  if (type === 'dash:remote-click') {
+    return {
+      type: remoteControlTypes.CLICK,
+      payload: {
+        x: p.x,
+        y: p.y,
+        button: p.button || 'left',
+        clickCount: p.clickCount == null ? 1 : p.clickCount,
+        modifiers: typeof p.modifiers === 'number' ? p.modifiers : 0
+      }
+    };
+  }
+  if (type === 'dash:remote-key') {
+    if (p.type === 'insertText') {
+      return {
+        type: remoteControlTypes.TEXT,
+        payload: {
+          text: typeof p.text === 'string' ? p.text : (typeof p.key === 'string' ? p.key : ''),
+          modifiers: typeof p.modifiers === 'number' ? p.modifiers : 0
+        }
+      };
+    }
+    return {
+      type: remoteControlTypes.KEY,
+      payload: {
+        event: p.type,
+        key: typeof p.key === 'string' ? p.key : '',
+        code: typeof p.code === 'string' ? p.code : '',
+        text: typeof p.text === 'string' ? p.text : '',
+        modifiers: typeof p.modifiers === 'number' ? p.modifiers : 0
+      }
+    };
+  }
+  if (type === 'dash:remote-scroll') {
+    return {
+      type: remoteControlTypes.SCROLL,
+      payload: {
+        x: p.x,
+        y: p.y,
+        deltaX: p.deltaX == null ? 0 : p.deltaX,
+        deltaY: p.deltaY == null ? 0 : p.deltaY
+      }
+    };
+  }
+
+  return { type: type, payload: p };
+}
+
+function validateFSBRemoteControlFallback(type, payload) {
+  var remoteControlTypes = getFSBRemoteControlTypes();
+  var p = payload && Object(payload) === payload && !Array.isArray(payload) ? payload : {};
+  if (type === remoteControlTypes.REQUEST) return { ok: true, action: { type: type, kind: 'request' } };
+  if (type === remoteControlTypes.STOP) return { ok: true, action: { type: type, kind: 'stop' } };
+  if (type === remoteControlTypes.CLICK) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.y < 0) return { ok: false, error: 'remote-coordinate-invalid' };
+    var button = p.button == null ? 'left' : p.button;
+    if (button !== 'left' && button !== 'middle' && button !== 'right') return { ok: false, error: 'remote-button-invalid' };
+    var clickCount = p.clickCount == null ? 1 : p.clickCount;
+    if (!Number.isFinite(clickCount) || clickCount <= 0) return { ok: false, error: 'remote-coordinate-invalid' };
+    return { ok: true, action: { type: type, kind: 'click', x: p.x, y: p.y, button: button, clickCount: Math.max(1, Math.floor(clickCount)) } };
+  }
+  if (type === remoteControlTypes.TEXT) {
+    if (typeof p.text !== 'string') return { ok: false, error: 'remote-type-unsupported' };
+    if (p.text.length > 4096) return { ok: false, error: 'remote-text-too-long' };
+    return { ok: true, action: { type: type, kind: 'text', text: p.text } };
+  }
+  if (type === remoteControlTypes.KEY) {
+    var event = p.event === 'down' || p.event === 'keyDown' ? 'down' : (p.event === 'up' || p.event === 'keyUp' ? 'up' : null);
+    if (!event || typeof p.key !== 'string' || p.key.length === 0) return { ok: false, error: 'remote-key-event-invalid' };
+    return { ok: true, action: { type: type, kind: 'key', key: p.key, event: event } };
+  }
+  if (type === remoteControlTypes.SCROLL) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.y < 0) return { ok: false, error: 'remote-coordinate-invalid' };
+    var deltaX = p.deltaX == null ? 0 : p.deltaX;
+    var deltaY = p.deltaY == null ? 0 : p.deltaY;
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return { ok: false, error: 'remote-coordinate-invalid' };
+    return { ok: true, action: { type: type, kind: 'scroll', x: p.x, y: p.y, deltaX: deltaX, deltaY: deltaY } };
+  }
+  return { ok: false, error: 'remote-type-unsupported' };
+}
+
+function validateFSBRemoteControlMessage(type, payload) {
+  var normalized = normalizeFSBRemoteControlForValidation(type, payload);
+  var protocol = getFSBPhantomStreamProtocol();
+  var result = typeof protocol.validateRemoteControlMessage === 'function'
+    ? protocol.validateRemoteControlMessage(normalized.type, normalized.payload)
+    : validateFSBRemoteControlFallback(normalized.type, normalized.payload);
+
+  if (!result || result.ok !== true) {
+    return {
+      ok: false,
+      sourceType: type,
+      type: normalized.type,
+      payload: normalized.payload,
+      error: result && result.error ? result.error : 'remote-type-unsupported'
+    };
+  }
+  return {
+    ok: true,
+    sourceType: type,
+    type: normalized.type,
+    payload: normalized.payload,
+    action: result.action
+  };
+}
+
+function summarizeFSBRemoteControlAction(type, payload) {
+  var normalized = normalizeFSBRemoteControlForValidation(type, payload);
+  var protocol = getFSBPhantomStreamProtocol();
+  if (typeof protocol.summarizeRemoteControlAction === 'function') {
+    return protocol.summarizeRemoteControlAction(normalized.type, normalized.payload);
+  }
+  var result = validateFSBRemoteControlFallback(normalized.type, normalized.payload);
+  if (!result.ok) return { type: normalized.type || '', kind: 'unsupported', error: result.error };
+  var action = result.action;
+  if (action.kind === 'request' || action.kind === 'stop') return { type: action.type, kind: action.kind };
+  if (action.kind === 'click') return { type: action.type, kind: action.kind, x: action.x, y: action.y, button: action.button, clickCount: action.clickCount };
+  if (action.kind === 'text') return { type: action.type, kind: action.kind, chars: action.text.length };
+  if (action.kind === 'key') return { type: action.type, kind: action.kind, key: action.key, event: action.event };
+  if (action.kind === 'scroll') return { type: action.type, kind: action.kind, x: action.x, y: action.y, deltaX: action.deltaX, deltaY: action.deltaY };
+  return { type: action.type, kind: action.kind };
+}
+
+function createFSBRemoteControlStateEvent(enabled, reason, details) {
+  var remoteStateTypes = getFSBRemoteControlStateTypes();
+  var state = enabled
+    ? remoteStateTypes.ACTIVE
+    : (reason === 'user-stop' ? remoteStateTypes.STOPPED : remoteStateTypes.DENIED);
+  var protocol = getFSBPhantomStreamProtocol();
+  var event = typeof protocol.createRemoteControlStateEvent === 'function'
+    ? protocol.createRemoteControlStateEvent(state, reason || (enabled ? 'ready' : 'user-stop'), {})
+    : { state: state, reason: reason || (enabled ? 'ready' : 'user-stop') };
+  details = details || {};
+  if (typeof details.tabId === 'number') event.tabId = details.tabId;
+  if (typeof details.ownership === 'string') event.ownership = details.ownership;
+  return event;
+}
+
+function classifyFSBRemoteControlDispatchFailure(error) {
+  var message = '';
+  if (typeof error === 'string') message = error;
+  else if (error && typeof error.message === 'string') message = error.message;
+  if (/another debugger|debugger.*attached|debugger/i.test(message)) return 'debugger-blocked';
+  if (/no tab|tab.*closed|target.*closed|cannot access|restricted/i.test(message)) return 'retarget-required';
+  return 'dispatch-failed';
+}
+
+function recordFSBRemoteControlFailure(eventName, type, payload, error, reason, tabId) {
+  var summary = summarizeFSBRemoteControlAction(type, payload);
+  recordFSBTransportFailure(eventName, {
+    type: type,
+    target: 'remote-control',
+    tabId: typeof tabId === 'number' ? tabId : _getRemoteControlTabId(),
+    readyState: reason || 'dispatch-failed',
+    error: typeof error === 'string' ? error : (error && error.message ? error.message : String(error || 'remote control failed')),
+    action: summary
+  });
+}
+
+function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId, ownershipOverride) {
   var state = {
     enabled: !!enabled,
     attached: !!enabled,
     tabId: typeof tabId === 'number' ? tabId : null,
     reason: reason || (enabled ? 'ready' : 'user-stop'),
-    ownership: enabled ? 'dashboard' : 'none'
+    ownership: ownershipOverride || (enabled ? 'dashboard' : 'none')
   };
   _lastRemoteControlState = state;
   if (wsInstance && typeof wsInstance.send === 'function') {
     wsInstance.send('ext:remote-control-state', state);
+    var remoteControlTypes = getFSBRemoteControlTypes();
+    if (remoteControlTypes.STATE && remoteControlTypes.STATE !== 'ext:remote-control-state') {
+      wsInstance.send(remoteControlTypes.STATE, createFSBRemoteControlStateEvent(state.enabled, state.reason, {
+        tabId: state.tabId,
+        ownership: state.ownership
+      }));
+    }
   }
   // Phase 213 D-17: parallel runtime push so the Sync tab pill (and any
   // other extension contexts) can subscribe to live state changes.
@@ -547,6 +762,7 @@ async function handleRemoteClick(payload) {
   var tabId = _getRemoteControlTabId();
   if (!tabId) {
     console.warn('[FSB RC] Click failed: no active tab');
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
   // Decompose dashboard bitmask modifiers into boolean flags for cdpClickAt.
@@ -565,9 +781,29 @@ async function handleRemoteClick(payload) {
     }, tabId);
     if (!result || !result.success) {
       console.warn('[FSB RC] Click CDP dispatch failed:', result && result.error);
+      var clickReason = classifyFSBRemoteControlDispatchFailure(result && result.error);
+      _remoteControlActive = false;
+      _broadcastRemoteControlState(
+        globalThis.__fsbWsInstance,
+        false,
+        clickReason,
+        tabId,
+        clickReason === 'debugger-blocked' ? 'external-debugger' : undefined
+      );
+      recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-click', payload, result && result.error, clickReason, tabId);
     }
   } catch (err) {
     console.error('[FSB RC] Click error:', err && err.message ? err.message : err);
+    var clickErrReason = classifyFSBRemoteControlDispatchFailure(err);
+    _remoteControlActive = false;
+    _broadcastRemoteControlState(
+      globalThis.__fsbWsInstance,
+      false,
+      clickErrReason,
+      tabId,
+      clickErrReason === 'debugger-blocked' ? 'external-debugger' : undefined
+    );
+    recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-click', payload, err, clickErrReason, tabId);
   }
 }
 
@@ -583,6 +819,7 @@ async function handleRemoteKey(payload) {
   var tabId = _getRemoteControlTabId();
   if (!tabId) {
     console.warn('[FSB RC] Key failed: no active tab');
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
   var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
@@ -596,6 +833,16 @@ async function handleRemoteKey(payload) {
       }, tabId);
       if (!insertResult || !insertResult.success) {
         console.warn('[FSB RC] InsertText CDP dispatch failed:', insertResult && insertResult.error);
+        var insertReason = classifyFSBRemoteControlDispatchFailure(insertResult && insertResult.error);
+        _remoteControlActive = false;
+        _broadcastRemoteControlState(
+          globalThis.__fsbWsInstance,
+          false,
+          insertReason,
+          tabId,
+          insertReason === 'debugger-blocked' ? 'external-debugger' : undefined
+        );
+        recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, insertResult && insertResult.error, insertReason, tabId);
       }
     } else if (payload.type === 'keyDown' || payload.type === 'keyUp') {
       // executeCDPToolDirect does not expose a keyDown/keyUp verb, so we
@@ -610,8 +857,10 @@ async function handleRemoteKey(payload) {
           await chrome.debugger.attach({ tabId: tabId }, '1.3');
         } catch (attachErr) {
           if (attachErr && attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-            try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
-            await chrome.debugger.attach({ tabId: tabId }, '1.3');
+            _remoteControlActive = false;
+            _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'debugger-blocked', tabId, 'external-debugger');
+            recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, attachErr, 'debugger-blocked', tabId);
+            return;
           } else {
             throw attachErr;
           }
@@ -630,6 +879,16 @@ async function handleRemoteKey(payload) {
         debuggerAttached = false;
       } catch (keyErr) {
         console.warn('[FSB RC] Key', payload.type, 'CDP dispatch failed:', keyErr && keyErr.message ? keyErr.message : keyErr);
+        var keyReason = classifyFSBRemoteControlDispatchFailure(keyErr);
+        _remoteControlActive = false;
+        _broadcastRemoteControlState(
+          globalThis.__fsbWsInstance,
+          false,
+          keyReason,
+          tabId,
+          keyReason === 'debugger-blocked' ? 'external-debugger' : undefined
+        );
+        recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, keyErr, keyReason, tabId);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
@@ -655,6 +914,7 @@ async function handleRemoteScroll(payload) {
   var tabId = _getRemoteControlTabId();
   if (!tabId) {
     console.warn('[FSB RC] Scroll failed: no active tab');
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
   var deltaX = Number.isFinite(payload.deltaX) ? payload.deltaX : 0;
@@ -666,9 +926,102 @@ async function handleRemoteScroll(payload) {
     }, tabId);
     if (!result || !result.success) {
       console.warn('[FSB RC] Scroll CDP dispatch failed:', result && result.error);
+      var scrollReason = classifyFSBRemoteControlDispatchFailure(result && result.error);
+      _remoteControlActive = false;
+      _broadcastRemoteControlState(
+        globalThis.__fsbWsInstance,
+        false,
+        scrollReason,
+        tabId,
+        scrollReason === 'debugger-blocked' ? 'external-debugger' : undefined
+      );
+      recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-scroll', payload, result && result.error, scrollReason, tabId);
     }
   } catch (err) {
     console.error('[FSB RC] Scroll error:', err && err.message ? err.message : err);
+    var scrollErrReason = classifyFSBRemoteControlDispatchFailure(err);
+    _remoteControlActive = false;
+    _broadcastRemoteControlState(
+      globalThis.__fsbWsInstance,
+      false,
+      scrollErrReason,
+      tabId,
+      scrollErrReason === 'debugger-blocked' ? 'external-debugger' : undefined
+    );
+    recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-scroll', payload, err, scrollErrReason, tabId);
+  }
+}
+
+function handlePhantomRemoteControl(type, payload) {
+  var validated = validateFSBRemoteControlMessage(type, payload);
+  if (!validated.ok) {
+    console.warn('[FSB RC] Remote control rejected:', validated.error);
+    recordFSBRemoteControlFailure('remote-control-rejected', type, payload, validated.error, 'validation-failed', _getRemoteControlTabId());
+    return;
+  }
+
+  var action = validated.action || {};
+  var normalizedPayload = validated.payload || {};
+  var sourcePayload = payload && Object(payload) === payload && !Array.isArray(payload) ? payload : {};
+
+  recordFSBTransportEvent('remote-control-action', {
+    type: type,
+    action: summarizeFSBRemoteControlAction(type, payload),
+    tabId: _getRemoteControlTabId()
+  });
+
+  if (action.kind === 'request') {
+    handleRemoteControlStart();
+    return;
+  }
+  if (action.kind === 'stop') {
+    handleRemoteControlStop();
+    return;
+  }
+  if (action.kind === 'click') {
+    handleRemoteClick({
+      x: action.x,
+      y: action.y,
+      button: action.button || normalizedPayload.button || sourcePayload.button || 'left',
+      clickCount: action.clickCount || normalizedPayload.clickCount || sourcePayload.clickCount || 1,
+      modifiers: typeof normalizedPayload.modifiers === 'number'
+        ? normalizedPayload.modifiers
+        : (typeof sourcePayload.modifiers === 'number' ? sourcePayload.modifiers : 0)
+    });
+    return;
+  }
+  if (action.kind === 'text') {
+    handleRemoteKey({
+      type: 'insertText',
+      key: action.text,
+      text: action.text,
+      modifiers: typeof normalizedPayload.modifiers === 'number'
+        ? normalizedPayload.modifiers
+        : (typeof sourcePayload.modifiers === 'number' ? sourcePayload.modifiers : 0)
+    });
+    return;
+  }
+  if (action.kind === 'key') {
+    handleRemoteKey({
+      type: action.event === 'up' ? 'keyUp' : 'keyDown',
+      key: action.key,
+      code: typeof normalizedPayload.code === 'string' ? normalizedPayload.code : (sourcePayload.code || ''),
+      text: action.event === 'down'
+        ? (typeof normalizedPayload.text === 'string' ? normalizedPayload.text : (sourcePayload.text || ''))
+        : '',
+      modifiers: typeof normalizedPayload.modifiers === 'number'
+        ? normalizedPayload.modifiers
+        : (typeof sourcePayload.modifiers === 'number' ? sourcePayload.modifiers : 0)
+    });
+    return;
+  }
+  if (action.kind === 'scroll') {
+    handleRemoteScroll({
+      x: action.x,
+      y: action.y,
+      deltaX: action.deltaX,
+      deltaY: action.deltaY
+    });
   }
 }
 
@@ -1311,6 +1664,7 @@ class FSBWebSocket {
   _handleMessage(msg) {
     recordFSBTransportCount('receivedByType', msg && msg.type);
     var controlTypes = getFSBControlTypes();
+    var remoteControlTypes = getFSBRemoteControlTypes();
 
     switch (msg.type) {
       case 'pong':
@@ -1343,20 +1697,38 @@ class FSBWebSocket {
       case controlTypes.RESUME:
         this._forwardToContentScript('domStreamResume', msg.payload);
         break;
+      case remoteControlTypes.REQUEST:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.STOP:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.CLICK:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.TEXT:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.KEY:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.SCROLL:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
       case 'dash:remote-control-start':
-        handleRemoteControlStart();
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-control-stop':
-        handleRemoteControlStop();
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-click':
-        handleRemoteClick(msg.payload);
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-key':
-        handleRemoteKey(msg.payload);
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-scroll':
-        handleRemoteScroll(msg.payload);
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:navigate':
         handleRemoteNavigate(msg.payload);

@@ -37,9 +37,9 @@ Requirements for milestone v0.12.0. Each maps to exactly one roadmap phase (see 
 
 ### CTRL -- Remote control and reverse mapping
 
-- [ ] **CTRL-01**: Dashboard click/type/scroll remote-control events map through PhantomStream-compatible target metadata while preserving FSB's CDP/input behavior and ownership/debugger-state reporting.
-- [ ] **CTRL-02**: Remote-control retargeting remains safe across stream-tab changes, page navigation, reconnects, and stale frames.
-- [ ] **CTRL-03**: Remote-control user-visible states remain authoritative: attached, blocked by external debugger, retarget-required, user-stop, and ownership diagnostics.
+- [x] **CTRL-01**: Dashboard click/type/scroll remote-control events map through PhantomStream-compatible target metadata while preserving FSB's CDP/input behavior and ownership/debugger-state reporting.
+- [x] **CTRL-02**: Remote-control retargeting remains safe across stream-tab changes, page navigation, reconnects, and stale frames.
+- [x] **CTRL-03**: Remote-control user-visible states remain authoritative: attached, blocked by external debugger, retarget-required, user-stop, and ownership diagnostics.
 
 ### PARITY -- Removal, tests, docs, and release gates
 
@@ -95,9 +95,9 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 | RELAY-02 | Phase 24 | Complete |
 | RELAY-03 | Phase 24 | Complete |
 | RELAY-04 | Phase 24 | Complete |
-| CTRL-01 | Phase 24 | Pending |
-| CTRL-02 | Phase 24 | Pending |
-| CTRL-03 | Phase 24 | Pending |
+| CTRL-01 | Phase 24 | Complete |
+| CTRL-02 | Phase 24 | Complete |
+| CTRL-03 | Phase 24 | Complete |
 | PARITY-01 | Phase 25 | Pending |
 | PARITY-02 | Phase 25 | Pending |
 | PARITY-03 | Phase 25 | Pending |
@@ -118,4 +118,4 @@ Which phase covers which requirement. Phase numbering continues from v0.11.0 (Ph
 
 ---
 *Requirements defined: 2026-06-17*
-*Last updated: 2026-06-17 -- Phase 24 RELAY-04 completed via reconnect/readiness/watchdog recovery parity and dashboard request-snapshot handling*
+*Last updated: 2026-06-17 -- Phase 24 completed with PhantomStream remote-control mapping, payload validation, and debugger/retarget ownership state parity*

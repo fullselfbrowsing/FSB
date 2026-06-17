@@ -21,7 +21,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - [x] **Phase 21: Package Intake & Contract Mapping** — Verify/install the PhantomStream package or approved immutable source; map the current FSB stream contracts to package exports before replacing code.
 - [x] **Phase 22: Capture Adapter Migration** — Replace in-house content-side snapshot/diff capture with a thin adapter around PhantomStream capture primitives.
 - [x] **Phase 23: Dashboard Renderer Migration** — Replace static and Angular dashboard diff/render logic with PhantomStream renderer-backed behavior while preserving the current preview state machine.
-- [ ] **Phase 24: Transport, Relay & Remote Control Integration** — Align WebSocket envelopes, relay behavior, stream recovery, and reverse remote-control mapping with PhantomStream-compatible protocol helpers.
+- [x] **Phase 24: Transport, Relay & Remote Control Integration** — Align WebSocket envelopes, relay behavior, stream recovery, and reverse remote-control mapping with PhantomStream-compatible protocol helpers.
 - [ ] **Phase 25: Parity Removal, Docs & Browser UAT** — Remove duplicated in-house engines, update docs/tests, and close with automated plus live-browser stream verification.
 
 ## Phase Details
@@ -83,7 +83,7 @@ The crux is package intake and parity. Initial planning referenced the stale unh
 - [x] 24-01-PLAN.md — Protocol/envelope adapter for extension/dashboard stream messages.
 - [x] 24-02-PLAN.md — Relay compatibility or package-backed relay integration.
 - [x] 24-03-PLAN.md — Recovery, readiness, watchdog, and reconnect parity.
-- [ ] 24-04-PLAN.md — Remote-control reverse mapping and debugger ownership parity.
+- [x] 24-04-PLAN.md — Remote-control reverse mapping and debugger ownership parity.
 
 ### Phase 25: Parity Removal, Docs & Browser UAT
 **Goal**: FSB no longer carries duplicate stream engines; tests and docs prove the package-backed migration, and live-browser UAT confirms the dashboard stream remains usable under real conditions.
@@ -110,7 +110,7 @@ Phases execute in numeric order: 21 → 22 → 23 → 24 → 25
 | 21. Package Intake & Contract Mapping | v0.12.0 | 3/3 | Complete | 2026-06-17 |
 | 22. Capture Adapter Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 23. Dashboard Renderer Migration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
-| 24. Transport, Relay & Remote Control Integration | v0.12.0 | 3/4 | In Progress | - |
+| 24. Transport, Relay & Remote Control Integration | v0.12.0 | 4/4 | Complete | 2026-06-17 |
 | 25. Parity Removal, Docs & Browser UAT | v0.12.0 | 0/4 | Pending | - |
 
 ## Research Flags (v0.12.0)
@@ -121,7 +121,7 @@ Phases flagged as likely needing deeper per-phase research:
 - **Phase 22:** capture security/masking behavior may differ from current FSB `data-fsb-nid` live-DOM stamping and must be tested deliberately.
 - **Phase 23:** static dashboard and Angular dashboard must not drift; this phase should prefer a shared wrapper.
 - **Phase 24:** relay/transport exports may not exist in the currently declared package export map, despite README describing relay/transport surfaces.
-- **Phase 25:** real browser UAT is mandatory; Node tests cannot prove visual fidelity and remote-control usability alone.
+- **Phase 25:** real browser UAT is mandatory; Node tests cannot prove visual fidelity and remote-control usability alone. Phase 24 left explicit remote-control browser UAT debt in `24-VALIDATION.md`.
 
 ## Completed Milestones
 
