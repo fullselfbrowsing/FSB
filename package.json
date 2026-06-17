@@ -78,6 +78,7 @@
     "win32"
   ],
   "dependencies": {
+    "@full-self-browsing/phantom-stream": "0.1.0",
     "axios": "^1.6.0",
     "lattice": "npm:@full-self-browsing/lattice@1.4.0"
   },
@@ -85,8 +86,6 @@
     "@full-self-browsing/lattice-cli": "1.4.0",
     "esbuild": "^0.24.0"
   },
-  "peerDependencies": {},
-  "optionalDependencies": {},
   "manifest": {
     "version": 3,
     "permissions": [
