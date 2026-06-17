@@ -388,14 +388,14 @@ function fsbTriggerCollectDueRefreshPollSnapshots(records, tabId, nowMs, require
 | A2 | A new focused `tests/trigger-cap-settings-ui.test.js` is preferable to expanding an existing unrelated settings test. [ASSUMED] | Recommended Project Structure | Planner may instead extend `tests/change-report-settings-ui.test.js`; either approach is acceptable if coverage is equivalent. |
 | A3 | The exact human UAT artifact name can be `.planning/phases/20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md`. [ASSUMED] | Validation Architecture | Planner may choose a different artifact name while preserving required evidence. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `mcp/package-lock.json` be updated in Phase 20?** [VERIFIED: package.json]
+1. **Should `mcp/package-lock.json` be updated in Phase 20?** RESOLVED: yes, Plan 20-04 includes `mcp/package-lock.json` and instructs a root package metadata update to `0.10.0` without dependency version, range, resolved package, integrity, or dependency-block changes. [VERIFIED: package.json]
    - What we know: the lockfile currently reports `0.8.0`, while MCP package metadata reports `0.9.2` and the target is `0.10.0`. [VERIFIED: package.json]
    - What's unclear: the locked context names package metadata files but does not explicitly name `mcp/package-lock.json`. [VERIFIED: codebase]
    - Recommendation: include a package-lock-only refresh if it does not change dependency versions, because otherwise release metadata remains visibly inconsistent. [ASSUMED]
 
-2. **Who performs live-browser UAT?** [VERIFIED: codebase]
+2. **Who performs live-browser UAT?** RESOLVED: Plan 20-05 creates `.planning/phases/20-integration-cap-ui-docs-edge-cases/20-HUMAN-UAT.md` with explicit `passed`, `blocked`, or `human_needed` statuses. The executor records real evidence if a live browser session is available; unavailable browser-only checks remain `human_needed` with an evidence boundary rather than fabricated proof. [VERIFIED: codebase]
    - What we know: Phase 16 verification marked live-observe checks as human-needed and Phase 20 owns capturing the deferred evidence. [VERIFIED: codebase]
    - What's unclear: this research task cannot execute human/browser UAT. [ASSUMED]
    - Recommendation: planner should create a Phase 20 UAT artifact with pending checkboxes and require humans to record results before verification is closed. [ASSUMED]
