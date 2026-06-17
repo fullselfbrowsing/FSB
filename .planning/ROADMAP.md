@@ -100,7 +100,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 18-01-PLAN.md — shared trigger tool registry definitions, MCP mirror, parity/provider schema tests [REG-01, REG-03, REG-04, TRIG-01]
 - [x] 18-02-PLAN.md — background trigger arm/stop/status/list handlers and Wave 0 dispatcher tests [TRIG-01, LIFE-01, LIFE-02, LIFE-03, REG-02]
 - [x] 18-03-PLAN.md — MCP trigger registrar, runtime/manual queue-bypass wiring, smoke tests [REG-01, REG-02, LIFE-01, LIFE-02, LIFE-03]
-- [ ] 18-04-PLAN.md — extension MCP route contracts, autopilot executor wiring, full integration gate [REG-01, REG-02, REG-03, REG-04]
+- [x] 18-04-PLAN.md — extension MCP route contracts, autopilot executor wiring, full integration gate [REG-01, REG-02, REG-03, REG-04]
 
 ### Phase 19: MCP Tools & Blocking/Detached Reporting
 **Goal**: The MCP server exposes the trigger family end-to-end with blocking-by-default reporting (periodic heartbeats, auto-convert to detached past a safety ceiling) and detached opt-in, returning structured notify-only fire events — reusing the proven `run_task` blocking-return machinery as a parallel envelope.
@@ -137,7 +137,7 @@ Phases execute in numeric order: 14 → 15 → 16 → 17 → 18 → 19 → 20
 | 15. Fire-Condition Engine & Value Extraction | v0.11.0 | 3/3 | Complete    | 2026-06-16 |
 | 16. Live-Observe Watch & Analyzing Pulse | v0.11.0 | 4/4 | Complete   | 2026-06-16 |
 | 17. Refresh-Poll Watch (Tab-Owning Background Reload) | v0.11.0 | 4/4 | Complete    | 2026-06-16 |
-| 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 3/4 | In Progress|  |
+| 18. Shared Tool Registry & Dispatcher Wiring | v0.11.0 | 4/4 | Complete   | 2026-06-17 |
 | 19. MCP Tools & Blocking/Detached Reporting | v0.11.0 | 0/TBD | Not started | - |
 | 20. Integration, Cap UI, Docs & Edge Cases | v0.11.0 | 0/TBD | Not started | - |
 

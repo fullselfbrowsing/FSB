@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 18-03-PLAN.md
-last_updated: "2026-06-17T00:51:11.102Z"
+status: verifying
+stopped_at: Completed 18-04-PLAN.md
+last_updated: "2026-06-17T01:06:06.995Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 19
+  completed_plans: 20
   percent: 100
 ---
 
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 Phase: 18 (shared-tool-registry-dispatcher-wiring) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-17
 
 Progress: [█████·····] 50% (4/8 phases)
@@ -84,6 +84,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 18-shared-tool-registry-dispatcher-wiring P01 | 6min | 2 tasks | 5 files |
 | Phase 18-shared-tool-registry-dispatcher-wiring P02 | 10min | 3 tasks | 3 files |
 | Phase 18-shared-tool-registry-dispatcher-wiring P03 | 9min | 2 tasks | 7 files |
+| Phase 18-shared-tool-registry-dispatcher-wiring P04 | 9min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: MCP trigger tools are registered by a trigger-specific registrar from TOOL_REGISTRY rather than through manual visual-session actions.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: trigger returns a bounded arm response through mcp:trigger; Phase 19 owns blocking wait, heartbeat, detached mode, and fire/timeout envelopes.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: stop_trigger, get_trigger_status, and list_triggers dispatch directly and are also proven to bypass TaskQueue when a mutation is pending.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: MCP trigger messages delegate to fsbTriggerDispatchToolRequest instead of owning trigger runtime work in dispatcher routes.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot trigger execution strips caller supplied identity and ownership fields and uses background derived legacy autopilot ownership.
+- [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot targetTabId is normalized to target_tab_id before background trigger dispatch.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -169,8 +173,8 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T00:51:11.099Z
-Stopped at: Completed 18-03-PLAN.md
+Last session: 2026-06-17T01:05:59.419Z
+Stopped at: Completed 18-04-PLAN.md
 Resume file: None
 
 ## Next Actions
