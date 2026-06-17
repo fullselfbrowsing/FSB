@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.10.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 19 context gathered (assumptions mode)
-last_updated: "2026-06-17T02:31:04.668Z"
+stopped_at: Phase 19 Plan 02 complete; Plan 03 ready
+last_updated: "2026-06-17T02:45:42Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 21
-  completed_plans: 21
-  percent: 100
+  completed_plans: 20
+  percent: 95
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 ## Current Position
 
 Phase: 19 (mcp-tools-blocking-detached-reporting) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute
+Plan: 3 of 3
+Status: Ready to execute Plan 03
 Last activity: 2026-06-17
 
 Progress: [██████····] 62% (5/8 phases)
@@ -45,7 +45,7 @@ Progress: [██████····] 62% (5/8 phases)
 | 16 | Live-Observe Watch & Analyzing Pulse | WATCH-01, WATCH-05, VIS-01..04 (6) | Complete |
 | 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | WATCH-02..04 (3) | Complete |
 | 18 | Shared Tool Registry & Dispatcher Wiring | TRIG-01, REG-01..04, LIFE-01..03 (8) | Complete |
-| 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Not started |
+| 19 | MCP Tools & Blocking/Detached Reporting | REPORT-01..07 (7) | Executing (Plans 01-02 complete) |
 | 20 | Integration, Cap UI, Docs & Edge Cases | composition (0 net-new) | Not started |
 
 Coverage: 39/39 v1 requirements mapped, 0 orphaned.
@@ -54,7 +54,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 
 **Velocity:**
 
-- Total plans completed (this milestone): 18 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4)
+- Total plans completed (this milestone): 20 (Phase 14: 3, Phase 15: 3, Phase 16: 4, Phase 17: 4, Phase 18: 4, Phase 19: 2)
 - Most recent shipped milestone: v0.10.0 (13 phases, 52 plans, 123 tasks; audit `acknowledged closeout debt`).
 
 **By Phase:**
@@ -87,6 +87,7 @@ Coverage: 39/39 v1 requirements mapped, 0 orphaned.
 | Phase 18-shared-tool-registry-dispatcher-wiring P03 | 9min | 2 tasks | 7 files |
 | Phase 18-shared-tool-registry-dispatcher-wiring P04 | 9min | 3 tasks | 4 files |
 | Phase 19 P01 | 12min | 3 tasks | 9 files |
+| Phase 19 P02 | 15min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: MCP trigger messages delegate to fsbTriggerDispatchToolRequest instead of owning trigger runtime work in dispatcher routes.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot trigger execution strips caller supplied identity and ownership fields and uses background derived legacy autopilot ownership.
 - [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot targetTabId is normalized to target_tab_id before background trigger dispatch.
+- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-01: MCP trigger calls are blocking by default with 30s heartbeats, generated trigger_id correlation, detached opt-in, safety auto-detach at 240s, and bridge-disconnect partial recovery from persisted status.
+- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: fire events are flat notify-only records persisted atomically with status:'fired'; blocking timeouts become terminal status:'timed_out' via runtime cleanup; safety auto-detach remains non-terminal and keeps the watcher armed.
+- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: get_trigger_status/list_triggers expose terminal fired/timed_out fields after ownership filtering; default list remains armed/needs_attention/blocked, while include_terminal adds fired/timed_out/stopped.
 
 ### Top Risks (from research -- bake into phase planning)
 
@@ -175,10 +179,10 @@ Runtime remains `@full-self-browsing/lattice@1.3.0` via `lattice`; pin/guardrail
 
 ## Session Continuity
 
-Last session: 2026-06-17T02:04:12.493Z
-Stopped at: Phase 19 context gathered (assumptions mode)
-Resume file: .planning/phases/19-mcp-tools-blocking-detached-reporting/19-CONTEXT.md
+Last session: 2026-06-17T02:45:42Z
+Stopped at: Phase 19 Plan 02 complete; Plan 03 ready
+Resume file: .planning/phases/19-mcp-tools-blocking-detached-reporting/19-03-PLAN.md
 
 ## Next Actions
 
-Proceed to Phase 18 shared trigger tool registry planning/execution.
+Proceed to Phase 19 Plan 03: re-arm-on-fire, hysteresis reset, and detached owner cleanup.

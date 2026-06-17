@@ -112,7 +112,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A fire returns a structured event — matched condition, old value, new value, URL, timestamp — as notify-only output (the caller/AI decides any follow-up; no auto-act), and a timeout returns a distinct `timed_out` outcome (not an error, not a fire) so the AI can choose to re-arm.
   4. Triggers fire once (edge-fire) by default and become terminal after firing; a caller can opt into re-arm-on-fire, after which the trigger keeps watching with de-dup / hysteresis so it does not re-fire on the same crossing.
   5. A detached trigger is bound to its owner with a TTL and is auto-reaped on owner disconnect (past reconnect grace), tab close, or TTL expiry so it cannot zombie a cap slot.
-**Plans**: TBD
+**Plans**: 3 plans (1 per wave)
+- [x] 19-01-PLAN.md — blocking/detached trigger envelope: additive schema fields, generated trigger_id, heartbeats, safety auto-detach, bridge-disconnect partial recovery [REPORT-01, REPORT-02, REPORT-03]
+- [x] 19-02-PLAN.md — runtime outcome settlement: persisted fire events, terminal timed_out cleanup, status/list projection [REPORT-04, REPORT-05, REPORT-06]
+- [ ] 19-03-PLAN.md — re-arm-on-fire, hysteresis reset, detached owner cleanup and TTL/reconnect grace [REPORT-02, REPORT-03, REPORT-07]
 
 ### Phase 20: Integration, Cap UI, Docs & Edge Cases
 **Goal**: Compose the full trigger system end-to-end — surface the concurrency cap in the UI, resolve the cross-watch-mode edge cases that need the whole system, document the new surface, and ship the knock-on version bump.
