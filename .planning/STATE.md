@@ -4,7 +4,7 @@ milestone: v0.10.0
 milestone_name: milestone
 status: ready_for_milestone_close
 stopped_at: Completed 20-05-PLAN.md
-last_updated: "2026-06-17T15:16:31.000Z"
+last_updated: "2026-06-17T15:35:13.000Z"
 last_activity: 2026-06-17
 progress:
   total_phases: 8
@@ -32,7 +32,7 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 Phase: 20 (Integration, Cap UI, Docs & Edge Cases) — COMPLETE
 Plan: 5 of 5 complete
 Status: Ready for milestone close or user-gated release action decision; human/browser UAT remains `human_needed`
-Last activity: 2026-06-17 - Completed quick task 260617-e2w: Fix review findings: provider bridge timeout/offscreen recovery and trigger attribute extraction
+Last activity: 2026-06-17 - Completed quick task 260617-eic: Fix trigger manager to persist live-observe watch metadata and trigger extraction fields
 
 Progress: [██████████] 100% (7/7 milestone phases)
 
@@ -178,6 +178,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260617-e2w | Fix review findings: provider bridge timeout/offscreen recovery and trigger attribute extraction | 2026-06-17 | 3052e794 | [260617-e2w-fix-review-findings-provider-bridge-time](./quick/260617-e2w-fix-review-findings-provider-bridge-time/) |
+| 260617-eic | Fix trigger manager to persist live-observe watch metadata and trigger extraction fields | 2026-06-17 | 2d3b6979 | [260617-eic-fix-trigger-manager-to-persist-live-obse](./quick/260617-eic-fix-trigger-manager-to-persist-live-obse/) |
 
 ## Deferred Items
 
