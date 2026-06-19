@@ -383,20 +383,20 @@ body {
 
 .pixel-loader {
   position: relative;
-  width: 34px;
-  height: 46px;
-  flex: 0 0 34px;
+  width: 8.5px;
+  height: 11.5px;
+  flex: 0 0 8.5px;
 }
 
 .pixel-letter {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: repeat(3, 8px);
-  grid-auto-rows: 8px;
-  gap: 3px;
+  grid-template-columns: repeat(3, 2px);
+  grid-auto-rows: 2px;
+  gap: 0.75px;
   opacity: 0;
-  transform: translateY(2px);
+  transform: translateY(0.5px);
   animation: fsb-letter-cycle 2.7s infinite ease-in-out;
 }
 
@@ -411,14 +411,19 @@ body {
 .pixel-letter span,
 .pixel-letter i {
   display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: 2px;
+  height: 2px;
+  border-radius: 0.5px;
 }
 
 .pixel-letter span {
+  opacity: 0;
   background: var(--primary-color);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 72%, transparent);
+  box-shadow: 0 0 0 0.25px color-mix(in srgb, var(--primary-color) 72%, transparent);
+}
+
+.pixel-letter span.pixel-lit {
+  opacity: 1;
 }
 
 .pixel-letter i {
@@ -437,7 +442,7 @@ body {
 @keyframes fsb-letter-cycle {
   0% {
     opacity: 0;
-    transform: translateY(3px);
+    transform: translateY(0.75px);
   }
   12%, 28% {
     opacity: 1;
@@ -445,7 +450,7 @@ body {
   }
   40%, 100% {
     opacity: 0;
-    transform: translateY(-3px);
+    transform: translateY(-0.75px);
   }
 }
 

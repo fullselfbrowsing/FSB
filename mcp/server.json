@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.lakshmanturlapati/fsb-mcp-server",
+  "name": "io.github.fullselfbrowsing/fsb-mcp-server",
   "title": "FSB MCP Server",
   "description": "Control the FSB browser extension from any MCP client using a local stdio or Streamable HTTP companion runtime.",
   "version": "0.10.0",

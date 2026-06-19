@@ -108,6 +108,21 @@ function resolveErrorKey(
     return explicitCode;
   }
 
+  // Surface trigger-tool errorCodes verbatim. The arm-side failure shapes in
+  // extension/background.js (TRIGGER_READ_FAILED, TRIGGER_ARM_FAILED,
+  // TRIGGER_PAGE_BLOCKED, TRIGGER_WATCH_INVALID, TRIGGER_ACCESS_DENIED,
+  // TRIGGER_SELECTOR_INVALID, TRIGGER_CONDITION_INVALID,
+  // TRIGGER_MANAGER_UNAVAILABLE, TRIGGER_TAB_WATCH_CONFLICT,
+  // TRIGGER_STORE_UNAVAILABLE, TRIGGER_NOT_FOUND, TRIGGER_CAP_REACHED,
+  // INVALID_TRIGGER_ID, INVALID_TAB_ID, LIFECYCLE_UNAVAILABLE,
+  // REFRESH_POLL_INTERVAL_TOO_LOW) set errorCode without error, so the
+  // substring fallthrough below cannot match and they would otherwise collapse
+  // to 'action_rejected'. Returning them verbatim lets buildLayeredDetail's
+  // default arm surface the specific code to the caller.
+  if (explicitCode && /^(TRIGGER_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
+    return explicitCode;
+  }
+
   const lower = errorMsg.toLowerCase();
   if (lower.includes('version mismatch') || lower.includes('package.json') || lower.includes('server.json')) {
     return 'package_version_mismatch';
@@ -356,7 +371,11 @@ function buildLayeredDetail(
     default:
       return {
         detected: LAYER_LABELS.pageNavigation,
-        why: errorMsg || 'The current page state did not allow the requested tool call to complete.',
+        why: errorMsg
+          ? errorMsg
+          : (errorKey && errorKey !== 'action_rejected'
+            ? `Tool returned error code: ${errorKey}.`
+            : 'The current page state did not allow the requested tool call to complete.'),
         nextAction: 'Refresh page state with read_page or get_dom_snapshot, then retry.',
       };
   }

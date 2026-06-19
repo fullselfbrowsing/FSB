@@ -9,10 +9,10 @@
       "name": "OpenAI Codex"
     }
   ],
-  "mcpName": "io.github.lakshmanturlapati/fsb-mcp-server",
+  "mcpName": "io.github.fullselfbrowsing/fsb-mcp-server",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lakshmanturlapati/FSB.git",
+    "url": "https://github.com/fullselfbrowsing/FSB.git",
     "directory": "mcp"
   },
   "keywords": [

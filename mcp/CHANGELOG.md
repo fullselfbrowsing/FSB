@@ -16,6 +16,10 @@ Milestone: FSB v0.9.90 trigger watchers. Minor release that adds the public trig
 - **Rearm, hysteresis, and cleanup.** `rearm_on_fire:true` keeps a watch armed after a fire, with numeric hysteresis to avoid repeated fires on the same satisfied edge. Trigger snapshots clean up on TTL expiry, tab close, explicit stop, timeout, and owner release after reconnect grace.
 - **Trigger runtime composition.** Same-tab opposite watch modes reject with `TRIGGER_TAB_WATCH_CONFLICT`; restricted or blocked pages write structured attention state instead of staging page text. Trigger concurrency is configurable in the extension control panel through `fsbTriggerCap` (default 8, range 1-64).
 
+### Changed
+
+- **Reverse-DNS rebrand.** `mcpName` / `server.json` `name` updated from `io.github.lakshmanturlapati/fsb-mcp-server` to `io.github.fullselfbrowsing/fsb-mcp-server` to match the GitHub org transfer (repository moved to `fullselfbrowsing/FSB`). The npm package name `fsb-mcp-server` is **unchanged**, so `npx -y fsb-mcp-server` and the bundled `fsb-mcp-server` / `fsb-mcp` bins keep working without modification. MCP clients that pin the reverse-DNS name in their config (e.g., `mcpServers["io.github.lakshmanturlapati/fsb-mcp-server"]` blocks) MUST update the key to `io.github.fullselfbrowsing/fsb-mcp-server`.
+
 ### Anti-scope (NOT in 0.10.0)
 
 - No dependency bumps; `@modelcontextprotocol/sdk`, `ws`, `zod`, `strip-json-comments`, `smol-toml`, and `yaml` are unchanged from 0.9.2.

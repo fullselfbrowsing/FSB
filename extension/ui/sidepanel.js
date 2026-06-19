@@ -492,16 +492,135 @@ const automationRunnerLabel = document.getElementById('automationRunnerLabel');
 
 let automationTimerInterval = null;
 let automationTimerStartedAt = null;
+let automationPixelCycleTimeout = null;
+let automationPixelTimeouts = [];
+let automationPixelRevealIndex = 0;
+
+const AUTOMATION_PIXEL_REVEAL_DIRECTIONS = ['bottom-up', 'left-right', 'top-bottom', 'right-left'];
+const AUTOMATION_PIXEL_CYCLE_MS = 2700;
+const AUTOMATION_PIXEL_LETTER_SLOT_MS = 900;
+const AUTOMATION_PIXEL_VISIBLE_OFFSET_MS = 320;
+const AUTOMATION_PIXEL_STEP_MS = 34;
 
 function formatAutomationElapsed(startedAt) {
-  if (typeof startedAt !== 'number') return '0s';
-  var seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-  return seconds + 's';
+  if (typeof startedAt !== 'number') return '0.000s';
+  var elapsedMs = Math.max(0, Date.now() - startedAt);
+  var hours = Math.floor(elapsedMs / 3600000);
+  var minutes = Math.floor((elapsedMs % 3600000) / 60000);
+  var seconds = Math.floor((elapsedMs % 60000) / 1000);
+  var milliseconds = Math.floor(elapsedMs % 1000);
+  var secondText = String(seconds).padStart(hours > 0 || minutes > 0 ? 2 : 1, '0');
+  var millisecondText = String(milliseconds).padStart(3, '0');
+
+  if (hours > 0) {
+    return hours + ':' + String(minutes).padStart(2, '0') + ':' + secondText + '.' + millisecondText;
+  }
+  if (minutes > 0) {
+    return minutes + ':' + secondText + '.' + millisecondText;
+  }
+  return secondText + '.' + millisecondText + 's';
 }
 
 function updateAutomationTimer() {
   if (!automationTimer) return;
   automationTimer.textContent = formatAutomationElapsed(automationTimerStartedAt);
+}
+
+function getAutomationPixelLetters() {
+  if (!automationRunner) return [];
+  return Array.from(automationRunner.querySelectorAll('.pixel-letter'));
+}
+
+function clearAutomationPixelClasses() {
+  getAutomationPixelLetters().forEach(function (letter) {
+    Array.from(letter.querySelectorAll('span.pixel-lit')).forEach(function (pixel) {
+      pixel.classList.remove('pixel-lit');
+    });
+  });
+}
+
+function clearAutomationPixelTimeouts() {
+  automationPixelTimeouts.forEach(function (timeoutId) {
+    clearTimeout(timeoutId);
+  });
+  automationPixelTimeouts = [];
+  if (automationPixelCycleTimeout) {
+    clearTimeout(automationPixelCycleTimeout);
+    automationPixelCycleTimeout = null;
+  }
+}
+
+function queueAutomationPixelTimeout(fn, delay) {
+  var timeoutId = setTimeout(function () {
+    automationPixelTimeouts = automationPixelTimeouts.filter(function (id) {
+      return id !== timeoutId;
+    });
+    fn();
+  }, delay);
+  automationPixelTimeouts.push(timeoutId);
+  return timeoutId;
+}
+
+function getAutomationPixelOrder(letter, direction) {
+  return Array.from(letter.children)
+    .map(function (pixel, index) {
+      return {
+        pixel: pixel,
+        row: Math.floor(index / 3),
+        col: index % 3
+      };
+    })
+    .filter(function (entry) {
+      return entry.pixel && entry.pixel.tagName === 'SPAN';
+    })
+    .sort(function (a, b) {
+      if (direction === 'bottom-up') return (b.row - a.row) || (a.col - b.col);
+      if (direction === 'left-right') return (a.col - b.col) || (a.row - b.row);
+      if (direction === 'right-left') return (b.col - a.col) || (a.row - b.row);
+      return (a.row - b.row) || (a.col - b.col);
+    })
+    .map(function (entry) {
+      return entry.pixel;
+    });
+}
+
+function revealAutomationLetterPixels(letter, direction) {
+  clearAutomationPixelClasses();
+  getAutomationPixelOrder(letter, direction).forEach(function (pixel, index) {
+    queueAutomationPixelTimeout(function () {
+      pixel.classList.add('pixel-lit');
+    }, index * AUTOMATION_PIXEL_STEP_MS);
+  });
+}
+
+function startAutomationPixelReveal() {
+  clearAutomationPixelTimeouts();
+  clearAutomationPixelClasses();
+  automationPixelRevealIndex = 0;
+
+  var letters = getAutomationPixelLetters();
+  if (!letters.length) return;
+
+  function runCycle() {
+    letters.forEach(function (letter, letterIndex) {
+      var directionIndex = (automationPixelRevealIndex + letterIndex) % AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
+      var direction = AUTOMATION_PIXEL_REVEAL_DIRECTIONS[directionIndex];
+      queueAutomationPixelTimeout(function () {
+        revealAutomationLetterPixels(letter, direction);
+      }, AUTOMATION_PIXEL_VISIBLE_OFFSET_MS + (letterIndex * AUTOMATION_PIXEL_LETTER_SLOT_MS));
+    });
+
+    automationPixelRevealIndex = (automationPixelRevealIndex + letters.length) % AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
+    automationPixelCycleTimeout = setTimeout(runCycle, AUTOMATION_PIXEL_CYCLE_MS);
+  }
+
+  runCycle();
+}
+
+function stopAutomationPixelReveal() {
+  clearAutomationPixelTimeouts();
+  clearAutomationPixelClasses();
+  automationPixelRevealIndex = 0;
 }
 
 function setAutomationRunnerText(text) {
@@ -518,7 +637,8 @@ function showAutomationRunner(startedAt, text) {
   }
   updateAutomationTimer();
   if (automationTimerInterval) clearInterval(automationTimerInterval);
-  automationTimerInterval = setInterval(updateAutomationTimer, 1000);
+  automationTimerInterval = setInterval(updateAutomationTimer, 100);
+  startAutomationPixelReveal();
 }
 
 function hideAutomationRunner() {
@@ -531,7 +651,8 @@ function hideAutomationRunner() {
     automationRunner.classList.add('hidden');
     automationRunner.setAttribute('aria-hidden', 'true');
   }
-  if (automationTimer) automationTimer.textContent = '0s';
+  if (automationTimer) automationTimer.textContent = '0.000s';
+  stopAutomationPixelReveal();
   setAutomationRunnerText('Ready');
 }
 
