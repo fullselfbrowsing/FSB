@@ -22,7 +22,7 @@
 
 *Pure structural intelligence. Zero vision. Zero guessing.*
 
-[Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
+[What's New](#whats-new) · [Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
 
 </div>
 
@@ -112,6 +112,16 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | DOM live preview | PhantomStream-backed capture, renderer, protocol, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
+
+---
+
+## What's New
+
+**v0.12.0 — PhantomStream Package Migration.** Dashboard DOM live preview and remote control now run on the published `@full-self-browsing/phantom-stream` package instead of FSB-owned stream engines. The change is internal: MCP tool schemas, pairing, auth, and the dashboard's look are unchanged.
+
+**v0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
+
+Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its own log in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ---
 

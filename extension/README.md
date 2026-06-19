@@ -44,6 +44,18 @@ npm test
 
 FSB uses `@full-self-browsing/phantom-stream@0.1.0` for generic browser mirroring. `content/dom-stream.js` is an FSB adapter around the bundled PhantomStream capture bridge; `ws/ws-client.js` uses the PhantomStream protocol bridge for stream/control envelopes while preserving FSB task/status traffic and remote-control ownership diagnostics.
 
+## Trigger Watchers
+
+FSB can arm a reactive watch on one page element and report when a condition is met. MCP clients drive this through the `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` tools; the extension owns the watch lifecycle:
+
+- **`live-observe`** runs an in-page mutation observer in the content script and reports changes without reloading the tab.
+- **`refresh-poll`** reloads the owned tab in the background, reads the selector once the page is ready, and coalesces same-tab due watches into a single reload.
+- Watches persist in `chrome.storage` and re-arm after MV3 service-worker eviction; they clean up on TTL expiry, tab close, explicit stop, timeout, or owner release.
+- Conditions support `changed`, `threshold`, `delta_percent`, `equals`, `contains`, `regex`, and compound AND/OR, with hysteresis on numeric edges. A watch moves through the statuses `armed`, `needs_attention`, `blocked`, `fired`, `timed_out`, and `stopped`.
+- Concurrency is bounded by `fsbTriggerCap` in the control panel (default 8, range 1–64). Armed and attention states count toward the cap; terminal states do not.
+
+Triggers are local and notify-only: the browser and extension must stay open, and FSB sends no desktop/email/SMS push. See the [MCP server README](../mcp/README.md#trigger-watchers) for the full tool contract.
+
 ## Debugging
 
 - Inspect the service worker from `chrome://extensions` with **Inspect views: service worker**.
