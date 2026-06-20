@@ -1,183 +1,322 @@
-# Technology Stack — v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+# Technology Stack — v0.9.99 Native Capability Catalog (FSB API Execution)
 
 **Project:** FSB (Full Self-Browsing)
-**Milestone:** v0.11.0 — `trigger` tool family (reactive DOM monitoring)
-**Domain:** Reactive DOM-monitoring tool family for an AI Chrome MV3 extension + MCP server
-**Researched:** 2026-06-15
+**Milestone:** v0.9.99 — Native Capability Catalog (authenticated-API execution as a fast path alongside DOM automation)
+**Domain:** MV3 Chrome-extension capability runtime — call a service's real web API through the user's authenticated browser session (the OpenTabs idea), with zero plugin installs and no MCP tool bloat.
+**Researched:** 2026-06-19
 **Confidence:** HIGH
 
-> **Note:** This file supersedes the prior v0.9.69 STACK research (telemetry pipeline). The earlier
-> v0.9.69 notes are recoverable from git history / the v0.9.69 milestone archive.
+> **Note:** This file supersedes the prior v0.11.0 STACK research (Trigger Tool). The earlier
+> v0.11.0 notes are recoverable from git history / the v0.11.0 milestone archive.
 
 ---
 
 ## Executive Summary
 
-> **TL;DR — Zero new runtime dependencies.** Every capability the `trigger` tool family needs is
-> already satisfied by APIs FSB ships with (MV3 platform APIs, the MCP SDK, vanilla JS) or by
-> machinery FSB already built (the `run_task` lifecycle, the resume-sidecar, `chrome.alarms`, the
-> Lattice survivability adapter, the orange-glow Shadow-DOM overlay). The "additions" in this
-> milestone are **new source files that compose existing primitives**, not new packages.
+> **TL;DR for the roadmapper.** This milestone needs **almost no new heavyweight stack.** FSB already
+> has the authenticated-fetch primitive (`chrome.scripting.executeScript({world:'MAIN'})` running
+> `new Function`), the CDP attach (`chrome.debugger` @ proto `1.3`), a JSON-Schema→Zod bridge, and a
+> `chrome.storage.local` memory store with inverted indices. The additions are **three small,
+> eval-free, zero-dependency libraries** vendored into the service worker exactly the way
+> `lib/lz-string.min.js` already is, plus use of the **`Network` CDP domain** (a permission you
+> already hold — **no manifest change**). Reach for `minisearch` (capability search), `jmespath`
+> (response extraction), and `@cfworker/json-schema` (in-SW recipe validation). **Do NOT add
+> embeddings/ML runtimes, Ajv in its default mode, or JSONata.** Recipes are **declarative data
+> interpreted by a fixed bundled interpreter — never `eval`'d** — to stay inside the Chrome Web Store
+> "no remotely hosted code" line.
 
-The only genuinely new building blocks are two platform built-ins FSB does not yet use in a watcher
-role — `MutationObserver` (already imported by content scripts for other purposes) and a tiny pure-JS
-numeric/currency parser (`Intl.NumberFormat().formatToParts()` + regex). Neither has an install
-footprint. The MCP SDK (`^1.29.0`), `zod` (`^3.24.0`), and `@full-self-browsing/lattice` (`1.3.0`)
-are all already present **and current** — `npm view` confirms 1.29.0 is still `latest` as of
-2026-06, so the milestone requires **no SDK upgrade** (protects INV-01). The extension runtime has
-only two dependencies today (`axios`, `lattice`); this milestone keeps it that way.
+**Net package.json delta:** three new browser-targeted runtime deps (`minisearch`, `jmespath`,
+`@cfworker/json-schema`), all zero-dependency; one optional (`url-template`). **Nothing new on the
+MCP-server side** — `@modelcontextprotocol/sdk@^1.29.0` + `zod@^3.24.0` already cover the two new
+dispatcher tools. The interpreter and auth-strategy handlers are **FSB-authored code**, by design, so
+they ship inside the package (RHC-safe).
 
-The blocking-mode reporting, SW-eviction survival, and shared-registry plumbing are all
-**generalizations of patterns already shipped for `run_task`** (Phase 239) and the v0.10.0 Lattice
-survivability work — not new infrastructure.
+---
+
+## The one hard constraint that shapes every choice: MV3 eval-CSP × "no remotely hosted code"
+
+Two *different* rules collide here and **both** must be satisfied. This section is load-bearing for
+the recipe-schema and interpreter phases.
+
+1. **MV3 runtime CSP (technical).** The default extension-pages / service-worker CSP is
+   `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'`. **No `'unsafe-eval'`** → `eval()` and
+   `new Function()` **throw in the service-worker / extension-page context.** (Verified against Chrome
+   "Manifest – Content Security Policy" docs; reproduced in the wild by
+   [MCP-SuperAssistant #171](https://github.com/srbhptl39/MCP-SuperAssistant/issues/171), where Ajv's
+   `new Function` schema-compile breaks "Available Tools" on MV3.)
+   - **Why FSB's existing `execute_js` is fine anyway:** it runs `new Function(userCode)` *inside*
+     `chrome.scripting.executeScript({world:'MAIN'})`, which executes in the **page's** JS realm under
+     the **page's** CSP, not the extension SW realm. That is the authenticated-fetch primitive and it
+     stays exactly as-is. **The lesson for this milestone: the fetch executes in MAIN world; the
+     recipe interpreter executes in the SW.** Everything that runs in the SW (search index, schema
+     validation, JSONPath/JMESPath extraction, the recipe interpreter itself) **must be eval-free.**
+
+2. **Chrome Web Store program policy (legal/review).** RHC = "anything executed by the browser loaded
+   from outside the extension's own files… It *does not* include data or things like JSON or CSS."
+   The policy *explicitly* prohibits: *"Building an interpreter to run **complex commands** fetched
+   from a remote source, **even if those commands are fetched as data**."* (Verified:
+   developer.chrome.com remote-hosted-code + program-policies/mv3-requirements.)
+   - **The line you must not cross:** a recipe must be **declarative configuration the interpreter
+     *binds*** (this endpoint, this auth-strategy id, this param→field map, this read-only extraction),
+     **not a mini-language of imperative commands.** A fixed interpreter that selects among a
+     **closed, bundled set of behaviors keyed by enum** and substitutes data into templates is
+     "config-driven" and allowed. An interpreter that executes arbitrary server-authored expressions
+     (arithmetic, conditionals, loops, string ops) is the exact pattern the policy names. This is why
+     **JSONata is rejected** and **JMESPath is constrained to response *read* extraction only**.
+
+Everything below is chosen to sit on the safe side of *both* rules.
 
 ---
 
 ## Recommended Stack
 
-### Core Technologies
+### Core Technologies (already in the repo — reused, not added)
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Chrome MV3 platform APIs (`chrome.alarms`, `chrome.storage.session`/`local`, `chrome.tabs`, `chrome.scripting`) | Chrome >=120 (manifest declares `>=88`; the alarms-floor + SW-revival behavior is a Chrome 120 guarantee) | Survival + scheduling + tab-ownership + script-injection substrate for both watch mechanisms | Built into the runtime and **already permissioned** in `extension/manifest.json` (`alarms`, `storage`, `tabs`, `scripting`, `offscreen`). No new permission. The 30s alarm floor (Chrome 120, Dec 2023) was explicitly introduced to align with the SW idle-eviction window — it is the canonical MV3-survival timer. |
-| `MutationObserver` (Web API) | Built-in (all MV3 Chrome) | `live-observe` watch mechanism — observe ONE element in place on live-updating pages (crypto ticker) with no reload | Standard, push-based (no polling CPU cost). FSB content scripts already import it (`dom-stream.js`, `dom-state.js`, `actions.js`, `visual-feedback.js`), so observe-options, teardown discipline, and isolated-world considerations are already proven in-tree. |
-| `@modelcontextprotocol/sdk` | **^1.29.0 — current `latest`, NO bump** | Register `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`; emit `notifications/progress` heartbeats in blocking mode | Already pinned in `mcp/package.json`. `npm view @modelcontextprotocol/sdk version` → `1.29.0` (latest dist-tag) as of 2026-06, so no upgrade is needed — directly protects INV-01. The blocking heartbeat + return-on-fire pattern reuses the SAME `notifications/progress` + `_meta` envelope `run_task` already emits (`mcp/src/tools/autopilot.ts`). |
-| Vanilla JS (ES2021+) + JSON-Schema shared tool registry | n/a (existing convention) | Trigger tool defs live in `extension/ai/tool-definitions.js`; autopilot + MCP both consume it | INV-02 mandates one shared registry. `tool-definitions.js` is the canonical source (copied to `ai/tool-definitions.cjs` at MCP build time, bridged via `mcp/src/tools/schema-bridge.ts`). Appending tools here is purely additive and gives both surfaces parity automatically. |
-| `chrome.storage.session` (+ `chrome.storage.local` only for cross-restart durability) | Built-in | Persist per-trigger state so the watcher survives SW eviction | This IS the resume-sidecar substrate FSB already uses for `run_task` (`extension/utils/mcp-task-store.js`) and the Lattice survivability adapter (`extension/ai/lattice-runtime-adapter.js`). Reuse the same versioned-envelope pattern (see Integration Points). |
+| Technology | Version (in repo) | Purpose for this milestone | Why it's the right base |
+|------------|-------------------|----------------------------|--------------------------|
+| Chrome MV3 + classic service worker | manifest_version 3; `extension/background.js` byte-frozen, 160× `importScripts` | Hosts the capability runtime, recipe interpreter, search index, consent gate | Already the platform. The SW-survivability pattern (`setTimeout`-chained iterator, INV-04) is load-bearing and must wrap any long capability run. |
+| `chrome.scripting.executeScript({world:'MAIN'})` + `new Function` | existing (`extension/ws/mcp-bridge-client.js` `_handleExecuteJS`; `extension/ai/tool-executor.js`) | **The authenticated same-origin fetch primitive.** Recipe execution issues `fetch()` / CSRF-scrape *in the page realm* → carries the user's cookies/session, exactly like OpenTabs `fetchFromPage` | Runs under the *page* CSP, the one place dynamic code is legal in MV3. No new primitive needed; the capability runtime composes this. |
+| `chrome.debugger` @ protocol `1.3` | existing (`debugger` perm + `<all_urls>`; used today only for the `Input` domain) | **Discovery:** enable the `Network` domain on a tab to observe real API calls (endpoint, method, headers, postData, response body) | Permission already granted; **manifest unchanged**. Only the *domain* used expands (`Input` → `Input`+`Network`). |
+| `@modelcontextprotocol/sdk` | `^1.29.0` (mcp/) | Register the **small** new dispatcher tools (`search_capabilities`, `invoke_capability`) without touching the 55-tool byte-stable registry (INV-01/02) | Progressive disclosure (search → schema → invoke) is the documented way to expose a large catalog behind 2 tools. |
+| `zod` + existing `jsonSchemaToZod()` bridge | zod `^3.24.0`; `mcp/src/tools/schema-bridge.ts` | Validate the **two new MCP tool** input schemas (server side, Node — `eval` is fine here) | The converter already exists and already coerces Claude-Code's stringified numbers. Reuse verbatim; do **not** add a second MCP-side validation stack. **Stay on zod 3** (4.x exists; mixing risks coercion drift → INV-01). |
+| `chrome.storage.local` + inverted-index memory store | existing `extension/lib/memory/memory-storage.js` (`getAll`, `MEMORY_INDEX_KEY`, 10s-TTL cache) | Persist **learned recipes** as a new procedural-memory record type; persist the serialized search-index snapshot | Already the FSB persistence + keyword-index idiom. "Learned recipe" is just another memory `type`, matching the milestone's "promote successful calls into procedural memory." `unlimitedStorage` is already granted. |
+| esbuild | `^0.24.0` (root) | Bundle any **MCP-side** TS and (optionally) one new content/offscreen bundle, per-entrypoint | Already the bundler; integration is "add an entry," not a toolchain change. **NB: it does NOT bundle `background.js`** (D-17 byte-freeze), so SW-side libs are vendored, not esbuilt — see Integration Points. |
 
-### Supporting Libraries
+### Supporting Libraries (the actual *new* dependencies — three small, eval-free, zero-dep libs)
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| **(new in-tree module, 0 deps)** `extension/utils/value-extractor.js` | new file | Smart value extraction + numeric/currency parsing (`$1,234.56`, `1.234,56 €`, `₿0.05`, `45%`) → comparable numbers | New file but **no npm package**. Use `Intl.NumberFormat().formatToParts()` to *discover* locale group/decimal separators, then normalize-then-`parseFloat`. Pure JS, ~60 lines. See "Numeric/Currency Extraction." |
-| `@full-self-browsing/lattice` | 1.3.0 (pinned, **do not touch** — INV-06) | `SurvivabilityAdapter<TState>` contract, step markers, Capability Receipts | Already consumed via the `lattice` alias. `createFsbLatticeRuntimeAdapter()` (`extension/ai/lattice-runtime-adapter.js`) implements the contract over `chrome.storage.session`. Trigger state *can* ride this adapter, but a thinner dedicated sidecar (clone of `mcp-task-store.js`) is the lower-coupling default — see "MV3 Survival." |
-| `zod` | ^3.24.0 (installed 3.25.76 — **stay on v3**) | MCP-side input validation for the new tool params | Already in `mcp/package.json`. `schema-bridge.ts` `jsonSchemaToZod()` (which the new tools' JSON Schemas flow through automatically) uses zod-3 APIs (`z.preprocess`, `z.coerce.number().finite()`, `z.enum`). **Do NOT introduce zod 4** (4.4.3 exists) — forking the validation layer risks the byte-identical wire contract. |
+| Library | Version (verified 2026-06-19) | Purpose | Where it runs | Why this one |
+|---------|-------------------------------|---------|---------------|--------------|
+| **`minisearch`** | **7.2.0** (MIT) | **(a) Capability search/index** for `search_capabilities` — BM25-ranked keyword/prefix/fuzzy over capability `{title, description, service, tags, host}` | **Service worker** (in-memory inverted index; `toJSON`/`loadJSON` snapshot persisted to `chrome.storage.local`) | ~**7 kB gzipped, zero deps, pure JS, no DOM** → SW-safe; explicitly documents SW/PWA use and `loadJSON` restore. Real BM25 + prefix + fuzzy + **field boosting** (the clean lever for **tab-origin biasing** — boost docs whose `host` matches the active tab). Far better recall than `String.includes()`, far lighter than embeddings. ESM (`dist/es`) bundles clean; UMD (`dist/umd`) is `importScripts`-able. |
+| **`jmespath`** | **0.16.0** (Apache-2.0; canonical `jmespath.js`) | **(e) Response extraction** — declarative path/projection from a JSON API response to the fields a recipe returns. Recipe stores a JMESPath *string*; the interpreter runs it **read-only** over the parsed response | **Service worker** | **Pure tree-walking interpreter — verified: no `eval`, no `Function`, no deps, no DOM** (read source). **Formally specified, side-effect-free read query language** → stays on the safe side of the RHC "no complex-command interpreter" rule because it can only *project/filter* an existing JSON value (no I/O, no behavior authoring). Tiny runtime; mature/frozen spec. |
+| **`@cfworker/json-schema`** | **4.1.1** (MIT) | **(b/e) In-SW recipe & param validation** — validate a server-delivered recipe against the bundled recipe JSON Schema *before* interpreting it, and validate user-supplied `invoke_capability` args against the recipe's declared param schema | **Service worker** | Purpose-built for **strict-CSP runtimes with no `eval`/`new Function`** (README literally cites "Cloudflare workers do not have… `eval` or `new Function`"). **Interpreted validator** (drafts 4/7/2019-09/2020-12), **zero deps**. This is the MV3-safe replacement for Ajv. ESM + CJS exports → bundles clean / `importScripts`-able. |
+
+> Combined added weight ≈ **7 kB (minisearch, gz) + a few kB jmespath runtime + ~10–20 kB cfworker
+> (gz)**. All three are **zero-dependency** → no transitive-tree surprises and no `node:*` shims
+> (unlike the Lattice offscreen bundle, which needed node-builtin stubs in `esbuild.config.js`). This
+> is well within "no heavy deps."
+
+### The interpreter itself: hand-rolled, NOT a library (by design)
+
+The "fixed bundled interpreter" that turns a declarative recipe into an authenticated call is
+**FSB-authored code compiled into the extension** — there is no dependency for it, deliberately. It is
+a small dispatcher that:
+
+1. **Validates** the recipe + user params (`@cfworker/json-schema`).
+2. **Resolves the endpoint** by substituting validated params into a URI template (`url-template`
+   *optional*, or a 10-line hand-rolled replacer).
+3. **Resolves the auth strategy** by **enum** → one of a *closed, bundled* set of handlers
+   (`same-origin-cookie`, `csrf-header-scrape`, `bearer-from-storage`, …). The strategy id selects
+   bundled code; **the recipe never ships auth code.**
+4. **Builds the request** (method/headers/body from validated data) and executes it through the
+   **existing MAIN-world fetch primitive**.
+5. **Extracts the result** with the recipe's **JMESPath** string (`jmespath`, read-only).
+
+Keeping step (3) a **finite bundled set keyed by enum** is what makes the whole thing "config-driven,"
+not "an interpreter for remote commands." Document this explicitly in the recipe-schema phase.
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| `tsc` + `esbuild` | Build the MCP server (`tsc`) and the offscreen Lattice host (`esbuild`) | No change. Extension runtime stays build-free (raw JS via `importScripts`). New trigger content logic ships as plain JS like every other content module. |
-| `cp ../extension/ai/tool-definitions.js ai/tool-definitions.cjs` (existing `mcp build` step) | Propagates the shared registry into the MCP build | Already wired in `mcp/package.json` `build`. Adding trigger tools to `tool-definitions.js` flows through automatically — no new build wiring. |
-| Node test harness (`node tests/*.test.js`) | Contract / lifecycle / parity tests | Mirror `tests/tool-definitions-parity.test.js` (registry parity), `tests/mcp-tool-routing-contract.test.js`, `tests/mcp-in-flight-session-lookup.test.js` (sidecar lookup), `tests/lattice-survivability-smoke.test.js`, `tests/mcp-numeric-param-coercion.test.js`. New trigger tests slot into the same `npm test` chain. |
+| `tsc` (`mcp/`) | Build the new `mcp/src/tools/capabilities.ts` (two new tools) | No change; `cp ../extension/ai/tool-definitions.js ai/tool-definitions.cjs` step already wires the shared registry into the MCP build. |
+| esbuild (`^0.24.0`) | (PATH B) emit a single `capability-runtime.js` IIFE (libs + interpreter) into `extension/dist/`, or one-off bundle `@cfworker/json-schema` to UMD for vendoring (PATH A) | `platform: browser`, `target: chrome120`, like existing content bundles. Does **not** touch `background.js`. |
+| Node test harness (`node tests/*.test.js`) | Recipe-schema validation, interpreter unit tests, search-ranking tests, CDP-capture parsing, dispatch parity | Slots into the existing `npm test` chain; mirror `tests/tool-definitions-parity.test.js` + `tests/mcp-tool-routing-contract.test.js`. |
 
 ## Installation
 
 ```bash
-# Core
-# (nothing — MCP SDK / zod / lattice already present AND current)
+# --- New runtime libs for the capability runtime ---
+# Consumed INSIDE THE EXTENSION (service worker), which is NOT an esbuild input
+# (background.js is byte-frozen, D-17). Two valid integration paths:
+#
+#   PATH A (recommended; matches existing precedent in extension/lib/):
+#     vendor a UMD/min build into extension/lib/ and load via importScripts(),
+#     exactly like lib/lz-string.min.js.
+#       - minisearch ships a UMD build (dist/umd/index.js)
+#       - jmespath's jmespath.js is already a single browser-friendly UMD file
+#       - @cfworker/json-schema is ESM/CJS -> produce a self-contained IIFE via a
+#         one-off:  esbuild node_modules/@cfworker/json-schema --bundle \
+#                     --format=iife --global-name=CfworkerJsonSchema \
+#                     --outfile=extension/lib/cfworker-json-schema.min.js
+#         (build-time bundling of a LOCAL file = NOT remotely hosted code.)
+#
+#   PATH B: add one new esbuild entry that emits a single "capability-runtime"
+#     IIFE bundle (minisearch + jmespath + cfworker + interpreter) to
+#     extension/dist/, then importScripts() that one file. Cleaner dependency
+#     management; one new importScripts line in background.js.
+npm install minisearch@7.2.0 jmespath@0.16.0 @cfworker/json-schema@4.1.1
 
-# Supporting
-# (nothing — MutationObserver, chrome.alarms, chrome.storage are platform built-ins)
+# Optional endpoint templating (RFC 6570). Add only if the long tail needs
+# query-param/explode semantics; otherwise hand-roll trivial {var} substitution.
+npm install url-template@3.1.1
 
-# Dev dependencies
-# (nothing — tsc / esbuild / node-test harness already configured)
-
-# The ONLY filesystem additions are NEW SOURCE FILES (no package.json change):
-#   extension/utils/value-extractor.js     # pure-JS numeric/currency parser
-#   extension/utils/trigger-store.js        # chrome.storage.session sidecar (clone of mcp-task-store.js)
-#   extension/content/trigger-observer.js   # per-trigger MutationObserver wrapper, isolated world
-#   mcp/src/tools/trigger.ts                # registers the 4 new MCP tools (mirrors autopilot.ts)
-#   + trigger entries appended to extension/ai/tool-definitions.js (shared registry)
+# NOTHING new on the MCP-server side:
+#   @modelcontextprotocol/sdk@^1.29.0 + zod@^3.24.0 already cover the two new tools.
+#   Do not add a second validator. fsb-mcp-server still bumps for the new tool
+#   surface, but its dependencies block is unchanged.
 ```
 
-> **Net package.json delta for this milestone: ZERO.** `fsb-mcp-server` still bumps (likely
-> `@0.10.0`) for the new tool surface, but its `dependencies` block is unchanged.
+> Either path keeps the **"no remotely hosted code"** invariant: every byte of executable code (libs
+> + interpreter) ships *inside* the extension package. Recipes streaming from FSB's server are
+> **JSON data** validated and *bound* by that bundled code — never fetched-and-executed.
+
+## Answers to the five specific questions
+
+**(a) Capability search inside an MV3 SW.** Use **`minisearch` (BM25 + prefix + fuzzy)** — *not*
+embeddings, *not* hand-rolled. The catalog is tiny structured text (a few thousand
+`{title, description, tags, service, host}` rows at most), so the win is *ranking + recall*, not
+semantic ML. MiniSearch is ~7 kB gz, zero-dep, pure-JS/no-DOM (SW-safe), and provides **field
+boosting** — the clean lever for **tab-origin biasing** (boost rows whose `host` == active tab's host;
+this matches OpenTabs' "tools available on this tab"). Persist the index via `toJSON`/`loadJSON` into
+`chrome.storage.local` so cold SW starts don't re-index. *Reject embeddings:* an in-extension
+embedding model (transformers.js / ONNX-WASM) is tens of MB, needs `wasm-unsafe-eval`, and burns
+SW CPU/RAM for zero benefit at this corpus size. *Reject pure Fuse.js:* no inverted index, scans every
+doc per query (fine for hundreds, poor as the learned-recipe tail grows); MiniSearch's fuzzy/prefix
+already covers Fuse's typo tolerance.
+
+**(b) Declarative recipe schema/DSL.** **JSON, validated by a bundled JSON Schema (draft 2020-12),
+interpreted by a fixed bundled interpreter — expressly NOT Turing-complete.** A recipe encodes, as
+*data*: `endpoint` (URI-template string), `method`, `authStrategy` (an **enum** selecting one bundled
+handler — the auth *code* is never in the recipe), `params` (a JSON-Schema object the interpreter
+validates user input against), `request` mapping (which params → query/header/body, as a static map),
+and `extract` (a **JMESPath read-only** string). Keep every "behavior" choice an **enum into a closed
+bundled set**; keep every "value" choice **data substituted into a template**. That combination is
+expressive enough for the long-tail REST/GraphQL services OpenTabs targets while staying firmly inside
+the RHC line (no server-authored arithmetic/conditionals/loops). Validate with
+`@cfworker/json-schema` in the SW.
+
+**(c) MV3-compliant delivery of server recipes as DATA.** Stream recipes from FSB's server as **JSON
+over `fetch`** into `chrome.storage.local`; the **fixed bundled interpreter** (shipped in the
+extension) consumes them. Allowed because RHC "does not include data or things like JSON," and the
+interpreter is **not** a general command runner — it binds config and dispatches to bundled
+enum-selected handlers. **The bright line to hold:** never `eval`/`new Function` a recipe field in the
+SW; never let a recipe carry JS/auth code; never let the "interpreter" grow server-authored control
+flow. (Fallback narrative if review ever pushes back: "config-driven feature data," the standard
+accepted pattern.) Persist learned recipes the same way (procedural memory) so discovery and
+server-delivery share one storage + interpreter path.
+
+**(d) CDP Network capture for discovery.** With the debugger already attached at `1.3`:
+`Network.enable` (set `maxPostDataSize` so POST bodies are retained), listen on
+`Network.requestWillBeSent` (URL, method, headers, **postData**, initiator, resourceType),
+`Network.responseReceived` (status, headers, mimeType), then `Network.getResponseBody({requestId})`
+**after** `Network.loadingFinished` to read the body. Use the experimental
+`requestWillBeSentExtraInfo` / `responseReceivedExtraInfo` for *raw* headers + cookie info when needed.
+**Caveats to design around:** `getResponseBody` returns `null` for bodies > ~1 MB and only while the
+response is still buffered; the MV3 SW can be evicted mid-capture, so **register
+`chrome.debugger.onEvent` listeners synchronously at SW top-level** (the discipline FSB already uses)
+and stash partial captures in storage. You already share the debugger with the `Input` domain —
+enabling `Network` on the same attachment is fine; be deliberate about detach/restore so
+input-emulation flows aren't disrupted (and note Chrome shows the "started debugging this browser"
+banner — already true for FSB).
+
+**(e) Small SW-safe libs vs hand-rolled.** **Mixed, and the split is deliberate:**
+- **JSON Schema validation → library (`@cfworker/json-schema`); do NOT hand-roll, do NOT use Ajv.**
+  Ajv compiles validators with `new Function` → **blocked by MV3 SW CSP** (confirmed real-world
+  breakage). cfworker is the eval-free, zero-dep, spec-compliant validator built for exactly this.
+- **Response extraction → library (`jmespath`), read-only.** Verified eval-free pure interpreter;
+  gives non-trivial projection/filtering as *data* without you maintaining a path engine. (Avoid
+  `jsonpath-plus` — it historically exposes script-expression evaluation; unnecessary code-exec
+  surface inside an extension handling authenticated sessions.)
+- **HAR-style request modeling → hand-rolled.** Don't add a HAR library. The CDP
+  `requestWillBeSent`/`responseReceived` params *are* the model; capture the handful of fields you
+  need (method, url, headers, postData, status, body) into a small plain object.
+- **Endpoint templating → hand-rolled OR tiny `url-template`.** Trivial `{var}` = 10 lines; full
+  RFC 6570 (query explosion) = the 8 kB `url-template`. Pick per long-tail need.
+- **The interpreter → hand-rolled** (see "The interpreter itself").
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| `MutationObserver` for `live-observe` | `setInterval` re-read of the element in the page | Only as a *fallback* when a value updates via `<canvas>` repaint or a property that fires no DOM mutation (rare). For `live-observe`, MutationObserver is correct; for `refresh-poll` the interval lives in the SW (`chrome.alarms`), not the page. |
-| `chrome.alarms` (>=30s) for the refresh-poll loop | `setTimeout`/`setInterval` chain in the SW | Use `setTimeout` ONLY for sub-30s sequencing *while the SW is provably alive* (e.g. fan-out within a single alarm wake). For the standing hours-long poll loop, alarms are mandatory — `setTimeout` dies with the SW at 30s idle (exactly why `mcp-bridge-client.js:24` notes "the alarms API minimum delay is 30s"). |
-| Dedicated `trigger-store.js` sidecar (clone of `mcp-task-store.js`) | Route trigger state through Lattice `createFsbLatticeRuntimeAdapter()` | Use the Lattice adapter if you also want the ResumePolicy taxonomy (`SAFE`/`ON_ERROR_*`/`RECOVERY_AMBIGUOUS`) + step markers for free. For a notify-only watcher whose "recovery" is just "re-read the element," the lighter dedicated sidecar is less coupling and matches the proven `run_task` pattern. **Recommend the dedicated sidecar; flag the adapter as an option in the roadmap.** |
-| `Intl.NumberFormat().formatToParts()` separator discovery + regex normalize | A currency-parsing npm package (`currency.js`, `numeral`, `dinero.js`) | Never, this milestone — see "What NOT to Use." The built-in covers `$`, `€`, `£`, `¥`, `%`, and locale-swapped `.`/`,` grouping. Crypto glyphs (`₿`, `Ξ`) are not ISO-4217 currencies and fall to the generic symbol-strip path, not `Intl`. |
-| `server.tool(name, desc, zodShape, handler)` (SDK 1.x classic signature) | `server.registerTool(name, {description, inputSchema}, handler)` (newer docs form) | The newer `registerTool` form appears in current SDK docs, but **FSB's entire MCP surface uses the classic `server.tool()` form** (`autopilot.ts`, `manual.ts`, `visual-session.ts`). Match the existing form for consistency and an additive diff. Both are supported in 1.29.0. |
+| `minisearch` 7.2.0 | `flexsearch` 0.8.x | If the catalog grew to *hundreds of thousands* of rows and raw query throughput dominated. FlexSearch is faster at huge scale but ~2.3 MB unpacked, has had ESM/build friction, and is overkill for a few-thousand-row catalog. |
+| `minisearch` 7.2.0 | `fuse.js` 7.4.2 | If you wanted *only* small-N fuzzy matching with zero index management and the corpus stayed in the low hundreds. MiniSearch already provides fuzzy+prefix, scales better, and supports field boosting for tab-origin bias — so it dominates here. |
+| `minisearch` 7.2.0 | local embeddings (transformers.js / ONNX) | Only if discovery needed *semantic* matching of free-form intent against descriptions AND the corpus were large/ambiguous. Cost (tens of MB, `wasm-unsafe-eval`, SW CPU) is unjustified at this corpus size; revisit only if keyword recall measurably fails. |
+| `jmespath` (read-only extract) | `jsonata` 2.2.1 | **Do not.** JSONata is a full expression language (arithmetic, string ops, conditionals, user functions). Even though it's a JS interpreter (no `eval`), shipping *server-authored JSONata in recipes* is the textbook "interpreter for complex commands fetched as data" the Chrome policy prohibits. JMESPath's read-only projection stays on the safe side. |
+| `@cfworker/json-schema` | `ajv` 8.x **standalone/precompiled** | Only viable if every recipe schema were known at *build time* and precompiled with `ajv-cli` (BETA, limited `$ref`/keyword support). Recipes are server-delivered/learned at *runtime*, so runtime compilation is required → cfworker's interpreted validator is the correct fit. |
+| `@cfworker/json-schema` | `jsonschema` 1.5.0 (`node-jsonschema`) | If you needed an even smaller validator and could accept draft-4-era coverage. cfworker's modern-draft support + explicit CSP-safe positioning make it the safer pick; keep `jsonschema` as a backup if bundle size ever becomes critical. |
+| Reuse `chrome.storage.local` + MiniSearch snapshot | IndexedDB (raw) | If recipe + capture volume outgrew `chrome.storage.local` practical limits. FSB has `unlimitedStorage` and the memory layer standardizes on `chrome.storage.local`; stay consistent unless volume forces IndexedDB. |
+| `url-template` 3.1.1 (optional) | hand-rolled `{var}` replacer | Use `url-template` only if you need RFC 6570 query-param/explode (`{?state,labels}`); otherwise a 10-line replacer avoids the dep. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **Any npm currency/number-parsing lib** (`currency.js`, `numeral.js`, `dinero.js`, `accounting.js`) | Violates the zero-dep bias for a ~60-line problem; adds supply-chain + weight to a runtime with only 2 deps (`axios`, `lattice`). FSB has NO existing currency helper (confirmed: no `formatToParts`/`Intl.NumberFormat` usage anywhere in `extension/`), so there is no precedent to extend. | New pure-JS `value-extractor.js` using `Intl.NumberFormat().formatToParts()` + regex. |
-| **SW keepalive antipatterns** — long-lived `chrome.runtime.connect` heartbeat ports, dummy `setInterval` API pings to dodge eviction, `getPlatformInfo()` spam, "offscreen doc kept open solely to stay alive" | Google explicitly discourages these; they drain battery, can trip Web Store review, and Chrome actively closes long-lived ports. The MV3 design intent is *let the SW die and be revived by events* — FSB's `run_task` survival already proves the event-revival model works. | Let the SW die. Re-arm a `chrome.alarms` period (>=30s); the alarm event revives the SW, the handler re-reads trigger state from `chrome.storage.session`, runs one poll tick, persists, and lets the SW idle out again. |
-| **`setTimeout`/`setInterval` as the *standing* watch loop in the SW** | Cleared when the SW is evicted at 30s idle — the watcher silently dies after ~30s. | `chrome.alarms` for the periodic loop; `setTimeout` only for transient within-wake sequencing. (INV-04 keeps the `agent-loop.js` setTimeout *iterator* frozen — that's a different, in-flight-only use and is untouched.) |
-| **Alarm periods < 0.5 min** | Chrome 120+ ignores `periodInMinutes`/`delayInMinutes` below 0.5 and logs a warning; the alarm fires no sooner than 30s regardless. | Treat 30s as the hard floor for refresh-poll. PROJECT.md's ~60s default is well clear of it. Document the floor in the tool schema so callers don't expect 5s polling. |
-| **`chrome.storage.local` for hot per-tick trigger state** | `local` persists across restart (good for the durable *definition*) but shares a 10MB quota with everything and is slower; churning per-tick heartbeats there wastes quota. | `chrome.storage.session` for live/hot state (mirrors `mcp-task-store.js`, `mcpBridgeState`, agent registry). Optionally mirror only the durable *definition* to `local` if triggers must survive a full browser restart (a roadmap decision, not a default requirement). |
-| **`zod@4.x`** (4.4.3 is published) | `schema-bridge.ts` and all existing tool registrations are written against zod-3 (`z.preprocess`, `z.coerce.number().finite()`, `z.enum`). Mixing zod 4 risks number-coercion drift → INV-01 wire-contract risk. | Stay on `^3.24.0`. |
-| **Re-implementing receipts / checkpoints / step-markers inside FSB** | INV-06 — those primitives belong to Lattice. | Consume `lattice-runtime-adapter.js` / the Lattice step emitter if wanted; otherwise the dedicated sidecar is sufficient. |
-| **`MutationObserver` in the MAIN world for value reads** | FSB's only MAIN-world script is `canvas-interceptor.js`; a MAIN-world observer is exposed to page tampering and breaks isolation. | Run the trigger observer in the **isolated world** (default content-script world), reading `textContent`/`.value`/attribute via the same selector machinery FSB already uses. |
-| **Relying on `chrome.alarms` `persistAcrossSessions: true`** | The flag is Chrome 150+ only and unsupported in other browsers. | Use the recommended pattern: recreate the trigger alarm(s) on SW startup from the persisted sidecar definitions. |
+| **`ajv` (default codegen mode) in the service worker** | Compiles validators with `new Function` → **throws under MV3 SW CSP** (`script-src 'self' 'wasm-unsafe-eval'`, no `unsafe-eval`). Confirmed real-world failure ([MCP-SuperAssistant #171](https://github.com/srbhptl39/MCP-SuperAssistant/issues/171)). | `@cfworker/json-schema` (interpreted, eval-free). Ajv only if precompiled at build time. |
+| **JSONata in recipes** | Full server-authorable expression language → matches the Chrome policy's prohibited "interpreter to run complex commands fetched as data." Review/RHC risk, not just size. | `jmespath` for read-only response extraction; bundled enum-selected handlers for any actual logic. |
+| **`eval`/`new Function` on any recipe field in the SW** | (1) Throws under MV3 SW CSP; (2) turns "data" into "remotely hosted code" → store rejection. | A fixed bundled interpreter that *binds* declarative data and dispatches to bundled handlers. (Page-realm `execute_js` is the *only* place dynamic code is legal, and only for FSB's own fetch primitive.) |
+| **Local embedding/ML runtime (transformers.js, onnxruntime-web, tfjs)** for capability search | Tens of MB, needs `wasm-unsafe-eval`, heavy SW CPU/RAM, slow cold start — for a few-thousand-row text corpus where BM25 is already excellent. | `minisearch` keyword/BM25 + field boosting. |
+| **`jsonpath-plus`** for extraction | Historically supports script-expression evaluation in paths → unnecessary code-exec surface + audit burden inside an extension handling authenticated sessions. | `jmespath` (no expression-eval, formally specified). |
+| **A HAR library** for request modeling | Pure overhead; CDP event params already give you the request/response shape. | Hand-rolled plain-object capture of the few fields you need. |
+| **A second MCP-side validation/schema stack** | Duplicates the working `jsonSchemaToZod()` bridge; risks INV-01 wire-contract drift. | Reuse `mcp/src/tools/schema-bridge.ts` + zod for the two new tool schemas. |
+| **`zod@4.x`** for the new tools | `schema-bridge.ts` + every existing tool registration are zod-3 (`z.preprocess`, `z.coerce.number().finite()`, `z.enum`); mixing zod 4 risks coercion drift → INV-01. | Stay on `^3.24.0`. |
+| **Routing the authenticated fetch through the SW `fetch()` directly** | SW `fetch` does **not** automatically carry the page's first-party cookie/session context the way a page-realm `fetch` does, and loses the CSRF-token-on-page trick OpenTabs relies on. | Keep executing recipe HTTP calls in **MAIN world** via the existing `execute_js` primitive (FSB's `fetchFromPage` equivalent). |
+| **Cloning OpenTabs' npm-per-plugin model** (already ruled out in PROJECT.md; restated for stack hygiene) | 100+ npm packages of imperative TS per service = exactly the tool-bloat + install-friction this milestone avoids; each is remotely-installed *code*. | Bundled imperative handlers for the head + server-delivered **declarative data** recipes for the tail, one interpreter. |
 
 ## Stack Patterns by Variant
 
-**If watch mechanism = `live-observe` (crypto ticker, live page):**
-- Inject (or reuse the already-injected) content script in the **isolated world**; create one `MutationObserver` scoped to the single resolved element (or its closest stable ancestor when the element itself gets replaced).
-- `observe(target, { childList: true, characterData: true, subtree: true, attributes: <only when extract=attribute> })`. `characterData` + `subtree` is required to catch text-node value changes (a price `<span>` whose text node mutates); `attributes` only when watching an attribute, with `attributeFilter: [attrName]` to cut noise.
-- **Debounce** the callback (trailing, ~150–300ms via in-page `setTimeout`) — tickers fire dozens of mutations/sec; debounce coalesces them into one value read + one fire-condition evaluation.
-- On fire, message the SW (the existing content↔SW dispatcher) so the SW resolves the blocking `trigger()` call or updates the detached sidecar. **The SW, not the page, owns the trigger result** — the page can be evicted/navigated.
-- **Teardown discipline (leak avoidance):** always `observer.disconnect()` on `stop_trigger`, on navigation (`pagehide`/`beforeunload`), on tab close, and when a one-shot condition fires. Track observers in a per-tab map so re-injection doesn't orphan a prior observer (mirrors `dom-stream.js`).
+**If the capability is in the popular/hard HEAD (e.g. GitHub GraphQL with persisted-query-hash
+discovery, like OpenTabs' `github-api.ts`):**
+- Ship a **bundled imperative handler** (FSB-authored JS compiled into the extension). It may do CSRF
+  scraping, JS-bundle hash extraction, multi-step transport — all *inside the extension package*, so
+  it's not RHC and not size-constrained by the recipe schema.
+- Register it behind `invoke_capability` via the enum/`authStrategy` dispatch, **not** as a new MCP
+  tool (INV-01/02).
 
-**If watch mechanism = `refresh-poll` (Amazon listing, static page):**
-- The loop lives in the **SW driven by `chrome.alarms`** (NOT a page observer). Period default ~60s, hard floor 30s.
-- On each alarm wake: resolve the trigger's **own tab** via the v0.9.60 agent-scoped tab resolver (never `tabs.query({active:true})` — must not steal focus, per PROJECT.md "Refresh-poll must own its tab"); reload that tab in the background; await load; re-read the element via the selector; evaluate the fire condition; persist the new snapshot to `chrome.storage.session`; re-arm / idle.
-- Because the alarm *revives the evicted SW*, this loop survives indefinitely with zero keepalive. This is the generalization of the `run_task` SW-eviction `partial_state` pattern (Phase 239) into a standing watcher, exactly as PROJECT.md describes.
+**If the capability is in the easy long TAIL (a plain authenticated REST endpoint):**
+- Encode it as a **declarative JSON recipe** (endpoint template + method + auth-strategy enum + param
+  schema + request map + JMESPath extract).
+- Deliver from FSB's server as data; validate with `@cfworker/json-schema`; interpret with the fixed
+  bundled interpreter. Zero new code ships per service.
 
-**If reporting mode = blocking (default):**
-- Mirror `run_task` exactly (`mcp/src/tools/autopilot.ts`): the `trigger()` handler holds open, emits `notifications/progress` heartbeats (~30s, matching the existing cadence) carrying trigger state under `params._meta`, and returns on fire OR timeout. On SW eviction mid-watch, resolve with the documented `sw_evicted` + `partial_state` envelope read back from the sidecar (same recovery path as `run_task`).
-- Apply a configurable timeout with a safety ceiling; recommend auto-suggesting detached mode beyond a few minutes (PROJECT.md guidance).
+**If discovering a brand-new service at runtime:**
+- Use **CDP `Network` capture** to record the real call, synthesize a draft recipe, validate it, run
+  it once to confirm, then **promote into procedural memory** (`chrome.storage.local`) so it
+  auto-grows the catalog and feeds the MiniSearch index.
 
-**If reporting mode = detached (opt-in):**
-- Return `{ trigger_id }` immediately; the caller polls `get_trigger_status`. State lives in the sidecar so polling survives SW evictions and reconnects (mirrors `get_task_status`).
-
-## Integration Points (where the new code attaches to existing FSB machinery)
-
-| Need | Existing FSB asset to reuse | File |
-|------|------------------------------|------|
-| Shared tool registry (INV-02) | `TOOL_REGISTRY` + `withVisualSessionFields()`; tools are plain JSON-Schema objects with `_route`/`_readOnly` metadata | `extension/ai/tool-definitions.js` |
-| MCP registration (INV-01 additive) | `server.tool()` calls + `jsonSchemaToZod()` auto-conversion + `PARAM_TRANSFORMS` | `mcp/src/tools/autopilot.ts` (template), `mcp/src/tools/schema-bridge.ts` |
-| Blocking lifecycle + heartbeats + `sw_evicted` recovery | `run_task` onProgress → `notifications/progress` with `_meta`; `Bridge disconnected` → `mcp:get-task-snapshot` → `partial_state` | `mcp/src/tools/autopilot.ts`; `extension/ws/mcp-bridge-client.js` (30s heartbeat ticker ~line 1007) |
-| SW-survivable periodic loop | `chrome.alarms.onAlarm` dispatcher with named-alarm routing (`mcpVisualDeath:<tabId>`, `fsb-telemetry-beat`, `fsb-domstream-watchdog`) | `extension/background.js:13284` |
-| Per-trigger persisted state (resume sidecar) | Versioned `{v, records:{[id]:{...}}}` envelope, best-effort try/catch, empty-map-removes-key discipline | `extension/utils/mcp-task-store.js` (clone → `trigger-store.js`) |
-| Optional Lattice survivability adapter | `createFsbLatticeRuntimeAdapter({sessionId})` over `chrome.storage.session`; ResumePolicy taxonomy | `extension/ai/lattice-runtime-adapter.js` |
-| Own-tab resolution without focus theft | v0.9.60 agent-scoped tab resolver + background-tab default | `mcp/src/agent-scope.ts`; `extension/utils/agent-tab-resolver.js` |
-| "Analyzing pulse" visual feedback | `HighlightManager` orange-glow box-shadow + Shadow-DOM overlay (`attachShadow`), `@keyframes`, reduced-motion compliance, `ViewportGlow` state machine (`state-thinking`) | `extension/content/visual-feedback.js` (glow ~line 72, keyframes ~line 552, viewport-glow states ~line 1100) |
-| MCP numeric param coercion (caller passes threshold as a string) | `z.preprocess(v => v===''?NaN:v, z.coerce.number().finite())` already handles Claude-Code's stringified numbers | `mcp/src/tools/schema-bridge.ts` (covered by `tests/mcp-numeric-param-coercion.test.js`) |
-
-## Numeric/Currency Extraction — pure-JS recipe (no dependency)
-
-For `extract: number` (and `threshold`/`equals` auto-parse), the robust zero-dep approach:
-
-1. **Discover locale separators** with the built-in: `new Intl.NumberFormat(locale).formatToParts(12345.6)` yields parts whose `type:'group'` value is the thousands separator and `type:'decimal'` value is the decimal separator. This disambiguates `1,234.56` (en-US: group `,`, decimal `.`) vs `1.234,56` (de-DE: group `.`, decimal `,`).
-2. **Strip non-numeric noise:** remove currency symbols/letters/whitespace (`$ € £ ¥ ₿ Ξ`, `USD`/`EUR`, spaces, non-breaking spaces). Crypto glyphs are NOT ISO-4217 and won't appear in `Intl` currency parts — the generic symbol-strip catches them.
-3. **Normalize to a JS-parseable form:** delete the discovered group separator, replace the discovered decimal separator with `.`, then `parseFloat`.
-4. **Percentages:** detect a trailing `%`, parse the number, keep it raw (e.g. `45` for `45%`) and document it; do NOT silently divide by 100.
-
-**Locale pitfalls to encode in tests:** ambiguous `1.234` (1234 in de-DE vs 1.234 in en-US — resolve via the trigger's locale, defaulting to the page's `document` locale or `navigator.language`); `1,234` symmetry; thin/non-breaking-space group separators (fr-FR uses `U+202F`/`U+00A0`); leading vs trailing symbol position; parenthesized negatives (`($1,234.56)`); signed deltas. For `changed`/`contains`, **do not parse** — compare raw `textContent` (PROJECT.md: raw text for `changed`/`contains`).
-
-**Reading the element's "value" reliably (incl. after reload):**
-- Read precedence by element type: form controls (`<input>`/`<textarea>`/`<select>`) → `.value`; everything else → `textContent` (trimmed); explicit `extract: attribute` → `getAttribute(name)`. Honor the `extract` override first when supplied.
-- After a refresh-poll reload, **re-resolve the selector** (the prior element reference is dead post-navigation) using FSB's uniqueness-scored selector machinery before reading. Wait for load/stability (FSB already has `read_page` auto-stability + DOM-completion detection) so you don't read a pre-hydration placeholder.
+**If a recipe breaks (endpoint moved, schema drift):**
+- Self-healing fallback to FSB's existing **DOM automation** (unchanged) — the recipe path is a *fast
+  path*, never the only path (per milestone goal + invariants).
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `@modelcontextprotocol/sdk@^1.29.0` | `zod@^3.24.0` | Current FSB pin; both stable as of 2026-06. The SDK's `server.tool()` third arg is a zod-3 shape record. Do not cross to zod 4. |
-| `@modelcontextprotocol/sdk@1.29.0` | Node `>=18.20.0` (mcp pkg engine) / repo `>=24` | `schema-bridge.ts` uses `createRequire` + `fileURLToPath` fallback for Node 18 compat — already handled. |
-| `chrome.alarms` 30s floor + SW revival | Chrome `>=120` | Manifest declares `chrome >= 88`, but the 30s floor + event-revival semantics are a Chrome 120 (Dec 2023) guarantee; by 2026 the install base is effectively all >=120. `persistAcrossSessions` is Chrome 150+ — do NOT rely on it; recreate alarms on SW startup. |
-| `@full-self-browsing/lattice@1.3.0` | Node `>=24`, the `lattice` alias | Pinned + audited (INV-06). Not modified by this milestone. |
-| New `trigger` tools in `tool-definitions.js` | autopilot loop + MCP server simultaneously | Additive-only — appending tools cannot alter existing tool schemas → satisfies INV-01. `tests/tool-definitions-parity.test.js` enforces both surfaces stay in sync. |
+| Package | Verified version (2026-06-19) | Compatible with | Notes |
+|---------|-------------------------------|------------------|-------|
+| `minisearch` | 7.2.0 (MIT) | esbuild `^0.24.0`; SW via UMD `importScripts` or ESM bundle; `target: chrome120` | Zero deps. CJS/UMD/ESM exports → bundles or vendors cleanly. SW/PWA use documented. |
+| `jmespath` | 0.16.0 (Apache-2.0) | SW directly (single UMD `jmespath.js`) | Zero deps, no DOM, verified eval-free tree-walking interpreter. Low churn is fine — it's a frozen spec. |
+| `@cfworker/json-schema` | 4.1.1 (MIT) | esbuild `^0.24.0`; SW via bundled IIFE/UMD | Zero deps; ESM+CJS exports. Built for no-`eval` runtimes. Drafts 4/7/2019-09/2020-12. |
+| `url-template` (optional) | 3.1.1 (BSD-3) | SW via bundle | Zero deps, `type:module`, ~8 kB unpacked. RFC 6570. |
+| `@modelcontextprotocol/sdk` | `^1.29.0` (existing) | `zod@^3.24.0`, Node `>=18.20` (mcp engines) | No change; new tools register through existing `server.tool()` + `jsonSchemaToZod()`. |
+| Chrome `debugger`/CDP | protocol `1.3` (existing attach) | `Network` + `Input` domains on one attachment | `getResponseBody` ≤ ~1 MB; register `onEvent` synchronously (MV3 SW eviction). |
+
+**Engine note:** root `engines.node` is `>=24.0.0`; mcp `engines.node` is `>=18.20.0`. The three new
+libs are browser-targeted runtime deps consumed by the *extension*, not the Node CLIs, so they move
+neither Node floor. If vendoring via PATH B, they pass through esbuild (`platform: browser`,
+`target: chrome120`) like the existing content bundles.
+
+## Integration Points (exact, for the roadmapper)
+
+| Need | Existing FSB asset to reuse / extend | File(s) |
+|------|--------------------------------------|---------|
+| Two new MCP tools, nothing else on the wire (INV-01/02) | New `mcp/src/tools/capabilities.ts` registering `search_capabilities` + `invoke_capability` via `server.tool(...)` in `index.ts`; schemas built with existing `jsonSchemaToZod()`. The 55 existing `TOOL_REGISTRY` entries stay byte-stable. | `mcp/src/tools/*.ts`, `mcp/src/index.ts`, `mcp/src/tools/schema-bridge.ts`, `extension/ai/tool-definitions.js` |
+| Enforce ownership/agent-scoping on the new tools | Route both through the **existing dispatch chokepoint** (`MCP_PHASE199_TOOL_ROUTES` map) so the gate runs in the same microtask as every other tool. | `extension/ws/mcp-tool-dispatcher.js` |
+| Capability runtime in the SW, vendored like `lz-string` | The SW is **byte-frozen, NOT an esbuild input** (D-17) and loads vendored libs via `importScripts('lib/lz-string.min.js')`. Drop `minisearch`/`jmespath`/`@cfworker/json-schema` (UMD/IIFE) into `extension/lib/` (PATH A) **or** emit one `capability-runtime.js` IIFE via a new esbuild entry into `extension/dist/` (PATH B), then add the corresponding `importScripts(...)` line(s). Interpreter + auth-strategy handlers are new FSB SW modules loaded the same way. | `extension/background.js`, `extension/lib/*.min.js`, `esbuild.config.js` |
+| Authenticated fetch = reuse the MAIN-world primitive | Recipe HTTP execution composes the existing `chrome.scripting.executeScript({world:'MAIN'})` path. Do **not** build a parallel fetch path. This is the page-realm, cookie-carrying, CSRF-scrape-capable equivalent of OpenTabs' `fetchFromPage`. | `extension/ws/mcp-bridge-client.js` (`_handleExecuteJS`), `extension/ai/tool-executor.js` |
+| Discovery = new `Network` CDP usage on the existing attachment | Extend FSB's `chrome.debugger` usage (today only `Input.*`) with `Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody`. No manifest/permission change. Register `chrome.debugger.onEvent` synchronously at SW top-level for MV3 survivability. | `extension/background.js` (CDP attach @ `1.3`) |
+| Persistence = new procedural-memory record type | Store learned/server-delivered recipes and the serialized MiniSearch snapshot in `chrome.storage.local` via the existing memory layer (inverted-index + 10s-TTL cache). "Learned recipe" is a new memory `type`. | `extension/lib/memory/memory-storage.js` |
+| Consent gate (per-origin Off/Ask/Auto + audit log + default-off) | FSB-authored SW/UI code; **no new dependency**. Wraps `invoke_capability` *before* the MAIN-world fetch fires. | new SW/UI modules |
 
 ## Sources
 
-- `/modelcontextprotocol/typescript-sdk` (Context7, v1.29.0) — `server.tool`/`registerTool`, `notifications/progress`, `_meta.progressToken`, long-running tool + `resetTimeoutOnProgress`/`maxTotalTimeout`. **HIGH**
-- `npm view @modelcontextprotocol/sdk version` → `1.29.0`; `dist-tags.latest = 1.29.0`; `npm view zod version` → `4.4.3` — confirms FSB's SDK pin is current and zod 4 exists but is not the FSB line. **HIGH**
-- https://developer.chrome.com/docs/extensions/reference/api/alarms — 30s/0.5-min minimum honored from Chrome 120; "at most once every 30 seconds but may delay"; no documented max-alarm count; `persistAcrossSessions` (Chrome 150+); "an alarm will not wake up a device." **HIGH**
-- https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle — SW terminates "After 30 seconds of inactivity"; "Receiving an event or calling an extension API resets this timer"; "if the service worker has gone dormant, an incoming event will revive them." **HIGH**
-- https://developer.chrome.com/blog/chrome-120-beta-whats-new-for-extensions — Chrome 120 lowered the alarm minimum to 30s specifically to align with the SW lifecycle. **HIGH**
-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/formatToParts — `formatToParts()` exposes locale `group`/`decimal`/`currency` part types for reverse-parsing. **HIGH**
-- FSB codebase (primary, authoritative for integration): `extension/ai/tool-definitions.js` (shared registry + `withVisualSessionFields`), `mcp/src/tools/autopilot.ts` (run_task lifecycle template), `mcp/src/tools/schema-bridge.ts` (JSON-Schema→zod + numeric coercion), `extension/utils/mcp-task-store.js` (resume-sidecar pattern), `extension/ai/lattice-runtime-adapter.js` (Lattice survivability adapter), `extension/background.js:13284` (alarm dispatcher), `extension/ws/mcp-bridge-client.js:24,1007` (30s heartbeat + "alarms minimum delay is 30s"), `extension/content/visual-feedback.js` (orange-glow Shadow-DOM overlay), `extension/manifest.json` (alarms/storage/scripting/offscreen already permissioned), root `package.json` (only `axios` + `lattice` runtime deps → zero-dep baseline). **HIGH**
+- This repo (read directly, HIGH): `.planning/PROJECT.md` (milestone + INV-01..04), `extension/manifest.json` (perms: `debugger`, `<all_urls>`, `unlimitedStorage`), `extension/background.js` (160× `importScripts`; `chrome.debugger.attach(...,'1.3')` Input-only; `importScripts('lib/lz-string.min.js')`), `esbuild.config.js` (D-17 SW byte-freeze; per-entry browser bundles; node-builtin-stub plugin precedent), `mcp/src/tools/schema-bridge.ts` (`jsonSchemaToZod`, zod coercion), `mcp/src/tools/*.ts` + `mcp/src/index.ts` (`server.tool` registration), `extension/ws/mcp-tool-dispatcher.js` (dispatch chokepoint), `extension/ws/mcp-bridge-client.js` + `extension/ai/tool-executor.js` (`world:'MAIN'` + `new Function`/`eval` fetch primitive), `extension/lib/memory/memory-storage.js` (inverted-index storage), `extension/lib/*.min.js` (vendored-lib precedent), `package.json` / `mcp/package.json` (current deps + Node engines).
+- npm registry (versions verified 2026-06-19, HIGH): `minisearch@7.2.0`, `jmespath@0.16.0`, `@cfworker/json-schema@4.1.1`, `url-template@3.1.1`, `fuse.js@7.4.2`, `flexsearch@0.8.212`, `jsonata@2.2.1`, `ajv@8.20.0`.
+- Chrome for Developers — Manifest Content Security Policy + remote-hosted-code + program-policies/mv3-requirements (HIGH): default SW/extension-pages CSP `script-src 'self' 'wasm-unsafe-eval'`; RHC excludes data/JSON/CSS; explicit prohibition on "an interpreter to run complex commands fetched… as data." https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy , https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code , https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements
+- Ajv-in-MV3 breakage (MEDIUM→HIGH; corroborates the eval-CSP constraint with a real bug): MCP-SuperAssistant #171; ajv #2527. https://github.com/srbhptl39/MCP-SuperAssistant/issues/171 , https://github.com/ajv-validator/ajv/issues/2527
+- `@cfworker/json-schema` README — explicitly built for runtimes without `eval`/`new Function`; drafts 4/7/2019-09/2020-12; zero deps (HIGH). https://github.com/cfworker/cfworker/tree/main/packages/json-schema
+- `jmespath.js` source — verified eval-free pure lexer/parser/tree-interpreter, zero deps, SW-safe (HIGH). https://github.com/jmespath/jmespath.js/
+- MiniSearch — ~7 kB gz, zero deps, pure JS/no-DOM, documents SW/PWA use + `loadJSON`/`toJSON` snapshots, field boosting (HIGH for capabilities; size figure MEDIUM from author blog). https://github.com/lucaong/minisearch , https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html
+- Chrome DevTools Protocol — Network domain (HIGH): `Network.enable`/`requestWillBeSent`/`responseReceived`/`getResponseBody`/`loadingFinished` + extraInfo events; `maxPostDataSize`; `getResponseBody` ~1 MB cap; call after `loadingFinished`. https://chromedevtools.github.io/devtools-protocol/tot/Network/ , https://chromedevtools.github.io/devtools-protocol/1-3/Network/
+- OpenTabs reference (MEDIUM, for the auth/transport pattern being matched): repo README + `plugins/github/src/github-api.ts` — same-origin `fetchFromPage`, `<input name="authenticity_token">` CSRF scrape, persisted-query-hash extraction from JS bundles; imperative TS, no declarative schema (so FSB's declarative-tail approach is a deliberate divergence). https://github.com/opentabs-dev/opentabs
 
 ---
-*Stack research for: reactive DOM-monitoring `trigger` tool family (FSB MV3 extension + MCP server)*
-*Researched: 2026-06-15*
+*Stack research for: MV3 capability-runtime / authenticated-API execution layered on FSB.*
+*Researched: 2026-06-19*

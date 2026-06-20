@@ -1,221 +1,295 @@
 # Feature Research
 
-**Domain:** Reactive DOM-monitoring / change-trigger tool for an AI browser-automation extension (FSB `trigger` family, v0.11.0)
-**Researched:** 2026-06-15
-**Milestone:** v0.11.0 Trigger Tool (Reactive DOM Monitoring)
-**Confidence:** HIGH (prior-art behaviors verified against official docs / source: Distill.io docs, Visualping blog, changedetection.io source + issues, Playwright API docs, Binance/Coinbase help, Chrome MV3 lifecycle docs)
+**Domain:** Authenticated-API-through-the-session agent capabilities (MV3 Chrome extension + MCP), parity-plus vs OpenTabs, for FSB v0.9.99 Native Capability Catalog
+**Researched:** 2026-06-19
+**Milestone:** v0.9.99 Native Capability Catalog (FSB API Execution)
+**Confidence:** HIGH (OpenTabs feature surface, Claude Code Tool Search mechanics, CSRF/session-replay security, self-healing fallback benchmarks all verified against primary/multiple sources; exact live plugin/tool counts are point-in-time and noted as such)
 
-## Scope Note (read first)
+> **Note:** This file replaces the earlier v0.11.0 Trigger Tool FEATURES research, which is archived in the v0.11.0 milestone snapshot.
 
-This research surveys prior art ONLY to extract the feature vocabulary and user expectations for the NEW `trigger` tool. The full FSB action/read toolset (~36 action + 15 read-only tools), `run_task` autopilot lifecycle, multi-agent tab ownership, change_report, visual sessions, and uniqueness-scored targeting already exist and are NOT re-evaluated here — they appear only as *dependencies* the trigger tool reuses.
+## Context: What This Milestone Is
 
-(Note: this file replaces the earlier v0.9.69 telemetry FEATURES research, which is archived in the v0.9.69 milestone snapshot.)
+FSB already does DOM-based AI browser automation (55 canonical / 63 MCP tools, autopilot, memory, vault, site guides). The new capability is a **fast path**: have the AI call a service's *real web API* through the user's already-authenticated browser session (the "OpenTabs idea") instead of clicking the UI — while keeping the DOM engine as a self-healing fallback.
 
-The ecosystem splits into three prior-art families, each contributing vocabulary:
+The decided architecture is the spec to validate against:
+- **Lean MCP dispatcher** — `search_capabilities` + `invoke_capability` (progressive disclosure) so a catalog of thousands of capabilities never bloats the MCP tool list.
+- **In-extension capability runtime** — authenticated *same-origin* `fetch` (FSB already holds `debugger` + `<all_urls>` + `execute_js` MAIN-world), plus a fixed bundled interpreter.
+- **MV3-safe code/data split** — bundled imperative handlers for the hard/popular head; **server-delivered DECLARATIVE recipes (data, not code)** for the long tail (MV3 bans remotely-hosted code).
+- **CDP network-capture discovery** — observe a page's real API calls to learn capabilities.
+- **Learned recipes** promoted into procedural memory; auto-growing per-origin catalog.
+- **API→DOM self-healing fallback.**
+- **Per-origin Off/Ask/Auto consent + audit log + default-off.**
 
-| Family | Examples | What FSB borrows |
-|--------|----------|------------------|
-| Web change monitors | Visualping, Distill.io, Browse AI, Wachete, Hexowatch, Fluxguard, changedetection.io | Condition vocabulary (any-change, contains, regex, numeric threshold, % change), check-interval tiers, element targeting UX, notification *semantics* |
-| Price/stock/crypto trackers | Keepa, CamelCamelCamel, Honey, Binance/Coinbase alerts | Threshold direction (above/below), % change, price parsing, edge-vs-level fire expectations |
-| Programmatic "wait-until" primitives | Playwright `waitForFunction`/`waitForSelector`, browser-use wait/extract, uptime/synthetic monitors (Cronitor, UptimeRobot, Uptime.com) | Condition + timeout + poll-interval grammar, blocking-return semantics, assertion operators |
+The headline strategy: **do everything OpenTabs does AND be better** (self-healing, learned/auto-growing catalog, standalone-capable, zero-install).
+
+This document classifies the feature surface into table-stakes / differentiators / anti-features, notes complexity, maps dependencies onto existing FSB subsystems, and gives an explicit OpenTabs parity matrix.
+
+---
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features any credible "watch this and tell me when X" tool has. Missing these = the trigger tool looks half-built next to Distill/Visualping/changedetection.io.
+These define the category. An "authenticated-API agent" that lacks any of these feels broken or unsafe. OpenTabs has all of them; FSB must match to claim parity.
 
 | Feature | Why Expected | Complexity | Notes / FSB dependency |
-|---------|--------------|------------|-------|
-| **Any-change condition** (`changed`) | The baseline of every monitor — Distill, Visualping, Browse AI, changedetection.io all start here ("notify on any difference from baseline") | LOW | Compare current extracted value vs stored initial value. Reuses FSB read-tool extraction + change_report diffing (EXISTING). |
-| **Contains / keyword condition** (`contains`) | Universal. Distill `has`/`contains`, changedetection.io "Trigger on text", Visualping keyword, UptimeRobot keyword monitor. Canonical use: restock ("In Stock"), status text | LOW | Substring match on extracted text. Document the case-sensitivity default (recommend case-insensitive — matches "In Stock" intuition). |
-| **Numeric threshold** (`>=`, `<=`, `>`, `<`) | Core of every price tracker (Keepa/CamelCamel "below my price", Binance "Rises Above"/"Drops To") and Distill (`number less/more than`) | LOW-MED | Requires reliable number extraction (see Smart value extraction). PROJECT.md's four operators exactly match the Distill/Binance vocabulary — well-grounded. |
-| **Exact-value / regex match** (`equals`/`regex`) | Distill `matches regular expression`, changedetection.io regex filters, synthetic-monitor assertions. Needed when "any change" is too noisy but a specific target matters | MED | Cheap once `equals` exists. Compile-once; guard against catastrophic backtracking (ReDoS) on caller-supplied patterns. |
-| **Element-scoped targeting** (watch ONE element, not whole page) | Distill visual selector, Visualping region highlight, changedetection.io CSS/XPath/JSONPath. Users expect to point at "the price," not diff the whole page | LOW (for FSB) | Dependency reuse: FSB uniqueness-scored selectors (EXISTING, v0.9) are *more precise* than most monitors' raw CSS/XPath. Not new work. |
-| **Configurable check / refresh interval** | Every monitor exposes cadence tiers (Visualping 2/5/15/60 min; synthetic 30s/1/5/15 min; Browse AI hourly/daily/custom) | LOW-MED | PROJECT.md's ~60s default + hard floor is correct. Chrome 120+ `chrome.alarms` minimum period is 30s (verified) — the natural hard floor for refresh-poll. |
-| **Stop / cancel a watch** (`stop_trigger`) | Every monitor lets you delete/pause; an un-stoppable watcher is a leak and a footgun | LOW | Mirrors existing `stop_task`. Must tear down the MutationObserver / cancel the `chrome.alarms` poll AND clear the visual pulse. |
-| **Status / introspection** (`get_trigger_status`, `list_triggers`) | Users + the driving AI need "is it still watching? last value? time left?" — mirrors task-status tooling and monitor dashboards | LOW | Mirrors existing `get_task_status` / agent listing. Per-trigger: state, current vs initial value, condition, watch mode, elapsed/remaining, last-check time. |
-| **Timeout on a watch** | Playwright `waitForFunction` timeout, synthetic max-wait — every "wait until" primitive has a ceiling. Unbounded blocking waits are an anti-pattern | LOW | PROJECT.md's configurable blocking timeout + safety ceiling is correct. On timeout return a distinct `timed_out` outcome (not error, not fire) so the AI can re-arm. |
-| **Fires once, reports cleanly** (terminal fire) | A fire should return *what* fired + the matched value, then stop — same shape as a completed task. Synthetic/Playwright waits resolve once | LOW | Default to one-shot edge fire — see PITFALL. Firing repeatedly while a condition stays true is the documented changedetection.io complaint. |
+|---------|--------------|------------|------------------------|
+| **Authenticated same-session API call** ("call the API the frontend calls, no API keys, no OAuth") | The entire value prop. If you're logged in, the agent should reuse the session. | HIGH | Core primitive. Build on `execute_js` MAIN-world `fetch` (confirmed: `tool-executor.js:374` runs `chrome.scripting.executeScript({world:'MAIN'})`). Same-origin fetch in the page context inherits cookies + CSRF tokens + custom auth headers automatically. **This is the safer subset** of OpenTabs' model (see anti-features). |
+| **Lean tool surface / progressive disclosure** (`search_capabilities` → `invoke_capability`) | A catalog of ~2,000–2,800 tools cannot be front-loaded into MCP context; loading 167 tools already costs ~60K tokens. Tool-selection accuracy collapses (43%→<14%) when the menu is too long. | HIGH | The defining constraint. Maps to INV-01/INV-02 (keep ~63 tools byte-stable, add ~2). Mirrors Claude Code's Tool Search: lazy schema loading, search returns schema-on-hit, 3–5 tools/query. See "Search→Invoke Pattern" section. Dependency: MCP dispatcher (`ws/mcp-tool-dispatcher.js`), tool registry. |
+| **Schema-on-hit** (search returns the callable schema, not just a name) | A search that returns only tool names forces a second "describe" round-trip; agents need the parameter schema to invoke. | MEDIUM | Return the invoke schema in the `search_capabilities` hit payload (Anthropic Tool Search loads "3–5 relevant tools (~3K tokens) per query"). Avoids an extra round-trip. |
+| **Per-origin / per-capability permission model (Off / Ask / Auto)** | Replaying a user's auth against real APIs is a write-capable, money-capable action. Users must gate it. OpenTabs ships exactly this 3-tier model. | MEDIUM | Maps to FSB's "consent governance" requirement. New per-origin permission store in `chrome.storage.local`. Reuse the consent/confirmation UX already used by `use_payment_method`. |
+| **Default-off / nothing runs until enabled** | "Everything starts off. No tool executes until you explicitly enable it." Safety baseline for the whole category. | LOW | Default state = Off for every origin. Aligns with FSB's "supervised/safe" positioning and INV-04. |
+| **Audit log** ("what ran, when, whether it succeeded") | Users replaying auth need a record. OpenTabs: "Every tool call is logged." | LOW–MEDIUM | FSB already has session logs + `get_logs` + observability tools (`list_sessions`, `get_session_detail`). Extend to record capability invocations (origin, capability, args-redacted, outcome). |
+| **Runs locally / no cloud for execution** | Trust requirement: the session and secrets never leave the machine. OpenTabs: "Runs locally. No cloud." | LOW | FSB already executes in-browser; only recipe *definitions* stream from FSB's server (data, not secrets). Make this boundary explicit in docs. |
+| **Built-in browser tools available without a plugin** (read/click/type/screenshot/network) | OpenTabs ships these so any tab works even with no plugin. Without a universal fallback the catalog has dead zones. | NONE (already shipped) | **FSB already exceeds this** — 55/63 tools incl. `click`, `type_text`, `read_page`, `get_dom_snapshot`, `execute_js`, CDP coordinate tools. This is FSB's existing moat, not new work. |
+| **Capability/plugin discovery** ("point the AI at a site, it finds the API") | OpenTabs' growth engine. Users expect the catalog to expand to sites you didn't pre-build. | HIGH | Maps to FSB's "CDP network-capture discovery." Dependency: `chrome.debugger` (already attached for CDP Input — confirmed `background.js:13811`). Add `Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody` capture. |
+| **Works with any MCP client** | OpenTabs and FSB both target the MCP ecosystem. | NONE (already shipped) | FSB MCP server already supports 21 client targets. New tools inherit this. |
+| **Result returns structured data, not a screenshot** | The whole point of API path vs DOM path: clean JSON back to the agent. | LOW | `invoke_capability` returns the parsed API response. Trivial once the fetch primitive exists. |
 
 ### Differentiators (Competitive Advantage)
 
-Where FSB's trigger stands out against standalone monitors. These align with FSB's Core Value ("the AI decides, the mechanics execute") and its existing autopilot+MCP architecture.
+These are where FSB beats OpenTabs. They map 1:1 to the milestone's stated "be better" goals. Each should be called out explicitly in positioning.
 
 | Feature | Value Proposition | Complexity | Notes / FSB dependency |
-|---------|-------------------|------------|-------|
-| **AI-decides-on-fire (notify-only into an agent loop)** | Standalone monitors fire into a *dumb* channel (email/Slack/webhook) where a human must act. FSB fires back into a *reasoning* agent that decides the follow-up (re-check, buy, escalate, re-arm). This is the entire point of the milestone | LOW (a return contract, not new infra) | Trigger returns the fire event to autopilot or the MCP caller; the AI takes over. Strictly notify-only (see Anti-Features). Depends on the `run_task`/MCP lifecycle-return contract (Phase 239). |
-| **Autopilot + MCP parity (single shared registry)** | Same `trigger` tool usable by FSB's own autopilot loop AND any external MCP client (Claude Code, Cursor, etc.). Standalone monitors are siloed products; FSB triggers compose with the full action toolset | MED | INV-02 mandates one registry. Trigger + 3 companions register once. Structural moat — no competitor exposes change-monitoring as an MCP primitive alongside a full automation toolset. |
-| **Live-observe vs refresh-poll, selectable per-trigger** | Monitors are almost universally server-side *poll-only* (re-fetch on a schedule). FSB can watch a live element *in place* via MutationObserver for instant fire on SPA/ticker updates (crypto, live scores) with zero reloads, OR refresh-poll for static server-rendered pages (Amazon). Caller picks the mechanism | MED-HIGH | Genuinely differentiated — sub-second reaction on live pages that poll-based monitors structurally cannot match. MutationObserver lives in the content script (page-lifetime, survives SW eviction — verified), SW as survivable coordinator. |
-| **In-page "analyzing" gentle pulse on the watched element** | Visible, trustworthy feedback that *this specific element* is being watched, reusing FSB's orange overlay. Standalone monitors give zero on-page indication. Reinforces FSB's "trusted, visible automation" identity | LOW-MED | Reuses existing visual-session overlay + trusted-badge machinery (v0.9.36/v0.9.62); shifts steady glow to a gentle pulse. Pure presentation layer. |
-| **Real browser context (auth, JS, SPA) for free** | Keepa/CamelCamel are Amazon-specific; most monitors struggle with logged-in / JS-heavy pages. FSB watches inside the user's actual authenticated, JS-executing tab — works on gated dashboards, internal tools, SPAs out of the box | LOW (inherent) | Inherited from FSB being an in-browser extension, not a server-side fetcher. State explicitly as positioning; no new work. |
-| **Smart value extraction with override** (`extract: text \| number \| attribute`) | Auto-parse numbers (strip `$`, commas, whitespace) for threshold/equals; raw text for changed/contains; explicit override for edge cases (read `data-price`, `aria-valuenow`) | MED | Distill auto-detects "numeric type"; FSB makes it explicit + overridable = more robust. Attribute extraction handles cases where visible text lies but an attribute holds the true value. |
-| **Detached + blocking dual-mode reporting** | Blocking-by-default with heartbeats (mirrors `run_task`, good for short waits + conversational flows) AND detached opt-in returning a `trigger_id` for long watches the caller polls. Standalone monitors are detach-only; pure programmatic waits (Playwright) are block-only — FSB offers both | MED | Mirrors the proven `run_task` lifecycle-return + `get_task_status` pattern (Phase 239 / v0.9.60). Detached recommended beyond a few minutes. Heartbeat interval should mirror the existing 30s task heartbeat. |
-| **Multiple concurrent triggers with a cap** | Watch several elements/pages at once (e.g. 3 product prices) under one configurable cap, reusing the agent/tab concurrency model | MED | Mirrors v0.9.60 agent cap (1-64, default 8). Each trigger agent/tab-scoped so refresh-poll reloads target the trigger's OWN tab without focus-stealing (reuse agent-scoped tab resolution). |
-| **% change condition** (stretch / NOT in v1 scope) | Binance "Change is Over", Distill "increased/decreased more than %", crypto alerts. Common in price/crypto monitoring | MED | NOT in the v0.11.0 condition list (changed/threshold/equals/contains). Flag as likely v0.11.x follow-on — needs baseline-vs-current delta + reopens edge-vs-level questions. Defer unless cheap to fold into threshold. |
+|---------|-------------------|------------|------------------------|
+| **API→DOM self-healing fallback** | When a recipe breaks (endpoint changed, schema drift, 4xx), FSB silently drops to DOM automation + site guides and still completes the task. OpenTabs has **no UI fallback** — when its API call breaks, the tool is simply dead until someone re-builds the plugin. Industry data: locator fallback heals 40–70% of failures, intent-based healing 75–90%+. FSB already owns both layers. | MEDIUM | **The single biggest differentiator.** Dependency: existing DOM engine + 17-category site guides + autopilot `run_task`. The capability runtime needs a typed "recipe failed → escalate to DOM" path. Detection: HTTP status, response-shape mismatch, empty/error payloads. |
+| **Learned / auto-growing catalog via procedural memory** | Successful discovered calls get promoted into FSB procedural memory as reusable per-origin recipes. The catalog grows *automatically from real use* on the user's own machine, including private/internal tools, with **zero authoring**. OpenTabs auto-builds plugins too, but they're code artifacts a human reviews/publishes; FSB's learned recipes are declarative data that self-populate. | HIGH | Dependency: 3-type memory system (`lib/memory/`, `PROCEDURAL` type confirmed in `memory-schemas.js`) + memory consolidator + `search_memory`. Learned recipe = declarative record {origin, endpoint, method, param-mapping, auth-mode}. Feeds `search_capabilities`. |
+| **Zero-install / out-of-box catalog** | Popular capabilities ship **bundled in the extension**. No `npm install <plugin>` per service, no per-plugin toolchain. OpenTabs requires `opentabs plugin install <name>` (npm package per plugin) for anything beyond built-ins. FSB users get the head of the catalog on day one. | MEDIUM | Bundled imperative handlers compiled into the extension (the "hard/popular head"). Long tail streams as declarative recipes on demand. No per-capability install step. Optional explicit install via MCP command/control panel for power users. |
+| **MV3-safe declarative-recipe long tail (data, not code)** | The long-tail catalog ships as **declarative recipes interpreted by a fixed bundled interpreter** — legal under MV3 (which bans remotely-hosted code). OpenTabs' npm-package-per-plugin model is fundamentally a desktop/Node distribution; it cannot ship arbitrary new code into an MV3 extension. This is *how* FSB gets a big catalog while staying Web-Store-compliant. | HIGH | Dependency: a deterministic recipe interpreter (allowlisted ops: build URL, set headers from a fixed set, map params, parse response). The interpreter is fixed code; recipes are pure data. Carries INV-04 (MV3-survivability) directly. |
+| **Standalone-capable (catalog usable without external MCP host)** | FSB's own autopilot can drive capabilities via the same registry (INV-02 parity). OpenTabs is fundamentally a bridge that needs an external AI/MCP client (or its CLI) to do anything. FSB works as a self-contained agent *and* as an MCP server. | LOW–MEDIUM | Dependency: autopilot loop already shares the canonical tool registry. `search_capabilities`/`invoke_capability` must be callable from the internal loop, not only MCP. |
+| **Unified consent across API + DOM + vault** | One coherent per-origin Off/Ask/Auto governance surface spanning API replay, DOM automation, and the credential/payment vault. OpenTabs governs plugins only; DOM-level browser tools are separate and ungoverned by the plugin permission model. | MEDIUM | Dependency: existing vault confirmation flow + new per-origin store. Single audit log across both paths. |
+| **Same-origin-fetch safety posture** | FSB executes the API call *in the page's own origin context* via MAIN-world fetch, so it only ever sends auth the page itself could send (no cross-origin credential exfiltration primitive). Positioned as a deliberately narrower, safer capability than generic cross-origin session replay. | LOW (design choice) | This is a *constraint sold as a feature*. See anti-features for the cross-origin replay trap it avoids. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features adjacent monitors have that FSB should explicitly NOT build for v0.11.0. PROJECT.md already calls several out; this section makes the rationale durable for REQUIREMENTS.md.
+Things that look like obvious parity items but should be **intentionally skipped or constrained**. Documenting these prevents scope creep and security regressions.
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Server-side hosting / cloud monitoring** | Visualping, Distill, Browse AI, Wachete run on their servers so watches persist when your machine is off | FSB is a local in-browser extension; standing up a monitoring backend is a different product, contradicts the privacy/local model, and is enormous scope | Run inside the user's browser via MV3 survivability (`chrome.alarms` + resume sidecars). Watch lives while Chrome is open. State the "browser must be open" limitation honestly. |
-| **Building our own notification channel** (email/SMS/desktop push/Slack) | Every monitor ships delivery channels; users ask "can it text me?" | Notification delivery is a whole product surface (deliverability, templates, opt-in, rate limits, spam). Duplicates what the *driving AI client* already does | Notify-only: the trigger reports the fire to the agent/MCP caller, which already has its own surfacing. PROJECT.md explicitly defers desktop/Chrome push to a later milestone. |
-| **Auto-act-on-fire** (auto-add-to-cart, auto-buy, auto-submit) | "When price drops, just buy it for me" | Destroys FSB's Core Value ("the AI decides") and creates a dangerous autonomous-action footgun (irreversible/financial actions with no judgment) | The AI/caller decides the follow-up after the notify-only fire, then *may* invoke action tools. Explicitly out of scope per PROJECT.md. |
-| **Level-triggered re-firing** (fire on every check while condition stays true) | "Tell me every time the price is still below X" | changedetection.io #2715 shows users get confused EITHER way; repeated firing into an agent loop = notification storm + token burn + duplicate agent actions | Default to one-shot edge fire (fire once on crossing, then terminal). If re-arming is wanted, the AI re-invokes `trigger`. Make one-shot semantics explicit in the tool description. |
-| **Whole-page visual-diff / screenshot diffing** | Visualping's headline feature (Visual/All mode); pixel-diff catches layout changes | FSB targets ONE element via precise selectors; full-page visual diffing is noisy (ads, timestamps, carousels), heavy (screenshot + image compare), and contradicts the element-scoped design | Element-scoped text/number/attribute extraction. FSB's uniqueness-scored targeting is more precise than visual diff for "watch this value." |
-| **Macro / multi-step pre-check interactions** (log in, click through, dismiss modal, THEN read) | Distill macro recording, changedetection.io browser-steps — needed when the value is behind interaction | Re-running a multi-step macro on every poll is fragile + expensive; conflates "monitoring" with "automation." FSB already HAS a full automation loop for setup | Caller uses existing FSB action tools to navigate/auth/reveal the element FIRST, then arms a `trigger` on the now-visible element. Keep trigger to read-and-compare. |
-| **Change history / diff timeline UI** | Distill/Visualping keep a versioned change log with highlighted diffs | A persistent history store is its own product surface (storage, retention, UI); out of scope for a notify-only primitive | Report the fire event + matched value at fire time. `get_trigger_status` exposes current vs initial value. Rich history is a future candidate, not v1. |
-| **Sub-30s refresh-poll cadence** | "Check every 5 seconds" for fast-moving prices | Chrome 120+ `chrome.alarms` minimum period is 30s (verified); sub-minute hammering risks rate-limiting / IP bans and burns the SW lifecycle | For truly live data, use **live-observe** (MutationObserver fires instantly, no polling). Refresh-poll keeps a hard floor (~60s default; never below the 30s alarms floor). This is exactly why the two-mechanism design exists. |
+| Feature | Why Requested | Why Problematic | Alternative (FSB approach) |
+|---------|---------------|-----------------|----------------------------|
+| **npm-package-per-plugin distribution** (clone OpenTabs' model) | It's how OpenTabs ships ~2,000 tools; "just do what they do." | MV3 prohibits remotely-hosted/eval'd code — you cannot load an npm plugin's JS into the extension at runtime. Per-plugin toolchains (`tsc + build`, lint, type-check) are a desktop-Node assumption. Reproducing ~2,769 tools by hand is a content treadmill. | **Port + learn, not re-derive.** Bundle the head as compiled handlers; stream the tail as declarative recipes; grow the rest via CDP-capture learning. Explicitly a milestone constraint. |
+| **Generic cross-origin authenticated session replay** | "Let the agent call ANY domain's API using my cookies from anywhere." Maximally powerful. | This is the CSRF/session-hijack threat model. Browsers auto-attach session cookies; a primitive that issues arbitrary cross-origin authenticated requests is a credential-exfiltration and forgery engine. `HttpOnly`/`SameSite`/CSRF-token protections exist precisely to stop this. | **Same-origin fetch only**, executed in the target page's own context. The agent can only send what that page could already send. Narrower by design. |
+| **Remote code execution of server-delivered logic** | "Stream the plugin code from the server so the catalog updates instantly." | Direct MV3 violation; also makes the server a supply-chain RCE vector into every user's browser. | **Declarative recipes (data) + fixed local interpreter.** Server ships parameters, never executable logic. |
+| **Auto-enable discovered capabilities** | "When FSB learns a new API, just use it." Frictionless. | Silent auto-trust of a freshly-captured, write-capable endpoint replaying user auth is the worst-case safety failure for this category. | **Default-off + Ask on first use.** Learned recipe lands in catalog as *discovered, not trusted*; first invocation requires explicit consent (mirrors OpenTabs "disabled by default even the ones I ship"). |
+| **AI source-code review as the trust gate** (copy OpenTabs literally) | OpenTabs markets "your AI reviews the plugin source before you enable it." | For FSB the long tail is **declarative data, not source code**, so "review the source" is largely a category error — there is no adapter source to audit. Over-investing here misframes the model. | Show the user the **recipe in plain terms** (origin, endpoint, method, what data it sends) + per-origin consent + audit log. Trust the *data preview*, not a code-review ritual. Optional: surface the captured request for inspection. |
+| **Background / unattended API execution** | "Run my API workflows while I'm away." | FSB is supervised-by-design; background agents were explicitly sunset (v0.9.45rc1 → OpenClaw/Claude Routines). Unattended auth-replay amplifies blast radius. | Keep capabilities **session-bound and supervised**, consistent with trigger watchers being "local and notify-only." External runtimes handle unattended. |
+| **Desktop/email/SMS/Slack push on capability events** | "Notify me when the API call finishes." | FSB already drew this line for triggers (notify-only to the caller, no push). Re-litigating it here is scope creep. | Return structured results to the caller; let the orchestrating agent decide. |
+| **Cloud-hosted capability execution** | "Run capabilities server-side so my browser doesn't need to be open." | Breaks the local-trust model and the authenticated-session premise (the session lives in the user's browser). Also contradicts OpenTabs' own "no cloud" promise. | **Local execution only.** Only recipe definitions (non-secret data) come from FSB's server. |
+
+---
+
+## The Search→Invoke (Progressive Disclosure) Pattern — Detailed Findings
+
+This is the load-bearing mechanism (table-stakes #2) and deserves its own treatment because the roadmap must get it right.
+
+**The problem it solves (verified):**
+- Loading ~167 tools from 4 servers ≈ 60K tokens (~30% of a 200K window) *before any work*. Standard MCP setups can consume up to ~72% of context on tool defs.
+- Tool-selection accuracy *collapses* with menu size: 43% → under 14% (wrong tool ~7/8 times) when overloaded.
+- A 2,000–2,800-tool catalog is a non-starter as a flat MCP tool list.
+
+**How Claude Code's Tool Search does it (the reference implementation):**
+- **Lazy schema loading.** Detects when MCP tool descriptions exceed ~10K tokens, marks tools `defer_loading: true`, and replaces full defs with a single search tool. Discovery (a tool *exists*) is separated from schema fetch (how to *call* it).
+- **Two search modes:** regex (precise, when the name is roughly known) and BM25 (natural-language/semantic, exploratory). Implication: FSB should index capabilities on origin + service + action verbs + synonyms.
+- **Schema-on-hit:** "3–5 relevant tools (~3K tokens) get loaded per query." The hit carries enough to invoke — no separate describe call.
+- **Overhead:** ~500 tokens for the search tool itself; net reduction ~85% (e.g. ~77K→~8.7K with 50+ tools). The extra round-trip (search, then invoke) is real but cheap relative to the savings.
+- **Accuracy with search ON:** Opus 4 49%→74%; Opus 4.5 79.5%→88.1%. So search *improves* selection accuracy, not just token cost.
+
+**Contested data point (flag for validation):** Stacklok's "MCP Optimizer" benchmark claims 94% selection accuracy vs Anthropic Tool Search "34%" — a vendor comparison that contradicts Anthropic's own 74–88% figures. Treat the 34% as adversarial marketing; the mechanism (search→invoke + lazy schema) is sound regardless of whose router scores highest. **Recommendation:** adopt the *pattern*, keep the ranking implementation swappable.
+
+**FSB-specific design implications:**
+- `search_capabilities(query, [origin])` should **bias on the active/owned tab's origin** — a major opportunity Claude Code's generic Tool Search does *not* exploit (no context/tab biasing found in its docs). FSB knows the agent's owned tab; rank same-origin capabilities first. This is a concrete parity-plus.
+- Return schema-on-hit (avoid a describe round-trip).
+- Keep results small (≤5) to preserve the accuracy gains.
+- Index both **bundled** capabilities and **learned** (procedural-memory) recipes in one search.
+- Carries INV-01/INV-02: existing ~63 tools stay byte-stable; only `search_capabilities` + `invoke_capability` are added.
+
+---
+
+## OpenTabs Parity Matrix
+
+Explicit map of **what FSB matches, what it exceeds, and what it intentionally skips.** Baseline = OpenTabs as of 2026-06 (github.com/opentabs-dev/opentabs).
+
+> **On the numbers:** OpenTabs' own site says "100+ plugins, ~2,000 tools." The live `plugins/` directory currently shows ~136 plugin folders (counted 2026-06-19), and the milestone brief cites "119 plugins / ~2,769 tools." These are all consistent: the catalog is **auto-growing via AI-built plugins** ("most plugins in this repo were built by AI in minutes"), so any single number is a point-in-time snapshot. FSB should not chase the absolute count — it should match the *mechanism* (auto-grow) and beat it on resilience.
+
+| Capability | OpenTabs | FSB v0.9.99 plan | Verdict |
+|------------|----------|------------------|---------|
+| Authenticated API call via session, no API keys/OAuth | Yes — calls the app's internal API the frontend calls | Yes — MAIN-world same-origin `fetch` via existing `execute_js` primitive | **MATCH** |
+| Lean tool surface for huge catalog | Implicit (MCP client + plugin enable); not a documented search→invoke router | `search_capabilities` + `invoke_capability`, schema-on-hit, tab-origin biasing | **EXCEED** (explicit progressive disclosure + tab biasing) |
+| Permission model Off/Ask/Auto | Yes — per-plugin or per-tool; resets on plugin update | Yes — per-origin (+ per-capability) Off/Ask/Auto; default-off | **MATCH** |
+| Default-off, nothing runs until enabled | Yes — "everything starts off… even the ones I ship" | Yes — default Off per origin | **MATCH** |
+| Audit log | Yes — "every tool call is logged (what ran, when, succeeded)" | Yes — extend existing session logs/observability to capability invocations | **MATCH** |
+| Local execution, no cloud | Yes | Yes — execution in-browser; only recipe *data* from server | **MATCH** |
+| Built-in browser tools (screenshot/click/type/network), no plugin needed | Yes — works on any tab | Yes, and far deeper — 55/63 DOM+CDP tools already shipped | **EXCEED** (mature DOM engine pre-exists) |
+| Plugin/capability discovery from a live site | Yes — AI analyzes page, discovers APIs, scaffolds code, registers plugin (3-step, self-improving skill) | Yes — CDP `Network.*` capture of real requests → declarative recipe | **MATCH** (different mechanism: capture vs scaffold-code) |
+| AI code review before enable | Yes — reviews adapter source; user decides | Intentionally reframed — long tail is *data*, not code; show recipe preview + consent instead | **INTENTIONAL SKIP** (category mismatch; replaced by data-preview consent) |
+| Plugin distribution | npm package per plugin; `opentabs plugin install <name>`; publishable | Bundled head (zero-install) + server-streamed declarative recipes; optional explicit install | **EXCEED** (zero-install, MV3-legal) — and **SKIP** the npm-per-plugin model |
+| CLI mode (non-MCP) | Yes — "don't want MCP? use CLI mode" | FSB has its own standalone autopilot + control panel; not shipping a separate CLI for capabilities | **PARTIAL / SKIP** (standalone-via-autopilot instead of a dedicated CLI) |
+| Self-healing API→DOM fallback | **No** — broken API tool is dead until re-built | **Yes** — drops to DOM + site guides, completes task | **EXCEED** (unique) |
+| Learned/auto-growing catalog from real use | Partial — AI *builds* plugins (code artifacts, human-reviewed/published) | Yes — successful calls auto-promote to procedural-memory recipes (data, zero authoring) | **EXCEED** (auto-learn into memory, incl. private/internal tools) |
+| Standalone usable without external MCP host | Limited — bridge needs an MCP client or its CLI | Yes — internal autopilot shares the same capability registry | **EXCEED** |
+| Same-origin-only safety constraint | Not emphasized (model is plugin-mediated API access) | Yes — deliberately same-origin fetch only | **EXCEED** (narrower, safer primitive) |
+| Anonymous telemetry, opt-out | Yes | FSB already has anonymous opt-out telemetry (v0.9.69) | **MATCH** |
+
+**Summary:** FSB **matches** every table-stakes item, **exceeds** on six axes (self-healing fallback, learned/auto-grow, zero-install, standalone, tab-biased search, same-origin safety), and **intentionally skips** three (npm-per-plugin distribution, generic cross-origin replay, code-review-as-trust-gate) — each skip is a deliberate safety/MV3 posture, not a gap.
+
+---
 
 ## Feature Dependencies
 
 ```
-trigger()  [the core tool]
-   |
-   |--requires--> Uniqueness-scored element targeting        [EXISTING — v0.9]
-   |--requires--> Element value extraction (read tools /     [EXISTING — change_report diffing, v0.9.60]
-   |              change_report diff machinery)
-   |--requires--> Smart value extraction (number/text/attr)  [NEW — small, builds on read tools]
-   |
-   |--branches on watch mechanism-->
-   |       |--refresh-poll--> chrome.alarms scheduler        [EXISTING infra — MCP reconnect / stream watchdog]
-   |       |                --> agent-scoped tab resolution   [EXISTING — v0.9.60, no focus-stealing]
-   |       |                --> page reload + re-read         [EXISTING — refresh tool]
-   |       |
-   |       |--live-observe--> MutationObserver in content     [NEW — content-script-side, page-lifetime]
-   |                          script (survives SW eviction)
-   |
-   |--requires--> MV3 survivability (chrome.alarms +          [EXISTING — v0.10.0 Lattice survivability adapter;
-   |              resume-sidecar / partial_state pattern)      generalizes Phase 239 partial_state]
-   |
-   |--reporting branches-->
-   |       |--blocking (default)--> lifecycle-return +        [EXISTING — run_task pattern, Phase 239]
-   |       |                        30s heartbeats
-   |       |--detached (opt-in)--> trigger_id + poll          [EXISTING — get_task_status pattern]
-   |
-   |--requires--> Visual session + trusted badge overlay      [EXISTING — v0.9.36/v0.9.62];
-   |              (steady glow -> gentle analyzing pulse)       pulse variant is NEW presentation
-   |
-   |--registered in--> single shared tool registry           [EXISTING constraint — INV-02]
-                       (autopilot + MCP parity)
+[search_capabilities + invoke_capability]   (lean MCP dispatcher, INV-01/02)
+        |
+        +--requires--> [Capability registry/index] (bundled head + learned recipes)
+        |                      |
+        |                      +--requires--> [Authenticated same-origin fetch primitive]
+        |                      |                      └─builds on─> execute_js MAIN-world (EXISTS)
+        |                      |
+        |                      +--requires--> [Declarative recipe interpreter] (MV3-safe, fixed code)
+        |                                             └─fed by─> server-delivered recipe data
+        |
+        +--enhanced-by--> [Tab-origin biasing] (rank owned-tab origin first)  <- parity-plus
 
-Companion tools (mirror the run_task / stop_task / get_task_status family):
-   stop_trigger          ──requires──> trigger() registry + teardown (observer/alarm/pulse)
-   get_trigger_status    ──requires──> trigger() registry + per-trigger state
-   list_triggers         ──requires──> trigger() registry + concurrency cap accounting
+[CDP network-capture discovery]
+        └─requires─> chrome.debugger Network.* (debugger already attached, EXISTS)
+        └─produces─> candidate recipe -> [Learned recipe in procedural memory]
+                                              └─requires─> 3-type memory + consolidator (EXISTS)
+                                              └─feeds─> Capability registry/index
 
-Concurrency:
-   Multiple concurrent triggers ──requires──> agent/tab concurrency cap model  [EXISTING — v0.9.60, 1-64 default 8]
+[Per-origin Off/Ask/Auto consent]  --gates--> [invoke_capability]
+        └─reuses─> vault confirmation UX (EXISTS)
+        └─requires─> per-origin permission store (chrome.storage.local) (NEW)
+
+[Audit log] --records--> every [invoke_capability] + every API->DOM fallback
+        └─extends─> session logs / get_logs / observability tools (EXISTS)
+
+[API->DOM self-healing fallback]  --depends-on--> DOM engine + 17-category site guides + run_task (ALL EXIST)
+        └─triggered-by─> recipe failure detection (HTTP status / shape mismatch / empty payload)
+
+[Default-off] --conflicts-with--> [Auto-enable discovered capabilities] (ANTI-FEATURE — keep default-off)
+[Generic cross-origin replay] --conflicts-with--> [Same-origin-only safety] (ANTI-FEATURE — keep same-origin)
 ```
 
 ### Dependency Notes
 
-- **trigger requires existing element targeting + value extraction:** The hardest parts (reliably finding and reading ONE element) are already solved by FSB's uniqueness-scored selectors and change_report diffing. The NEW work is the comparison/condition layer, the live-observe MutationObserver path, and the per-trigger lifecycle — NOT element identification.
-- **Refresh-poll reuses chrome.alarms + agent-scoped tab resolution:** Both already exist (alarms drive MCP reconnect and the DOM-stream watchdog; agent-scoped resolution from v0.9.60 prevents focus-stealing). The trigger's reload-and-re-read must target the trigger's OWN tab — an INV from PROJECT.md and a direct reuse, not new infra.
-- **Live-observe is the main genuinely-new runtime piece:** MutationObserver runs in the content script (page-lifetime, NOT subject to the SW 30s eviction — verified), with the SW as survivable coordinator. Most likely to need dedicated phase research (re-injection after BF-cache/navigation, debouncing high-frequency mutations, fire delivery from content script back to SW after eviction).
-- **MV3 survivability is the crux and already has a template:** PROJECT.md correctly identifies this generalizes the Phase 239 `partial_state` pattern and the v0.10.0 Lattice survivability adapter into a *standing watcher*. The watch must re-arm after SW eviction via `chrome.alarms`.
-- **Blocking/detached reporting is a direct clone of run_task lifecycle:** Phase 239 already proved lifecycle-return + 30s heartbeats + `partial_state` on eviction, plus the `get_task_status` poll path. The trigger family mirrors `run_task`/`stop_task`/`get_task_status` 1:1 — low conceptual risk; the contract shape is battle-tested.
-- **Companion tools are thin wrappers over a shared registry:** `stop_trigger`/`get_trigger_status`/`list_triggers` are the `stop_task`/`get_task_status`/agent-listing analogues. The only new state is the per-trigger registry entry; teardown must cancel the observer/alarm AND clear the visual pulse.
-- **Concurrency reuses the agent cap, not a new limiter:** PROJECT.md ties the concurrent-trigger cap to the v0.9.60 agent/tab cap (1-64, default 8). Reuse that accounting.
+- **search/invoke requires the registry, which requires the fetch primitive + the interpreter:** you cannot expose capabilities you can't execute. Build order: fetch primitive → interpreter → registry → search/invoke tools.
+- **Discovery requires CDP network capture, which is unlocked by the existing `debugger` attach** (confirmed live in `background.js`). The new work is `Network.enable` + request/response/getResponseBody handling, not acquiring the permission.
+- **Learned recipes require procedural memory** — the `PROCEDURAL` type, consolidator, and `search_memory` already exist; the new work is the recipe *shape* and the promote-on-success path.
+- **Consent gates invoke, and reuses the vault confirmation pattern** — don't build a second confirmation UX; extend the one `use_payment_method` already uses.
+- **Self-healing depends entirely on pre-existing FSB subsystems** (DOM engine, site guides, autopilot) — this differentiator is cheap *because FSB already owns both halves*; OpenTabs would have to build a whole DOM engine to match it.
+- **Two hard conflicts are the anti-features:** default-off vs auto-enable, and same-origin vs cross-origin replay. The roadmap must keep the safe side of both; they should never land in the same phase as "make it frictionless."
+
+---
 
 ## MVP Definition
 
-### Launch With (v1 = v0.11.0)
+### Launch With (v1 of the capability catalog)
 
-The complete, credible trigger primitive per PROJECT.md scope.
+The thinnest slice that proves "FSB calls authenticated APIs through the session, safely, behind a lean dispatcher."
 
-- [ ] `trigger()` core tool — target one element, define a fire condition, get notified — *essential; the milestone*
-- [ ] All four fire conditions: `changed`, `threshold` (`>=`/`<=`/`>`/`<`), `equals`/`regex`, `contains` — *table stakes; the condition vocabulary every monitor has*
-- [ ] Both watch mechanisms: `refresh-poll` AND `live-observe` — *the differentiating dual-mechanism design; live-observe is the moat*
-- [ ] Smart value extraction (auto number-parse; raw text; `extract: text|number|attribute` override) — *required for threshold/equals to be reliable*
-- [ ] Dual-mode reporting: blocking-by-default (heartbeats, return on fire/timeout) + detached opt-in (`trigger_id` + poll) — *mirrors proven run_task contract*
-- [ ] Companion tools: `stop_trigger`, `get_trigger_status`, `list_triggers` — *table stakes; un-stoppable/opaque watchers are footguns*
-- [ ] Multiple concurrent triggers with configurable cap — *reuses existing agent cap*
-- [ ] MV3 survivability (survive SW eviction via chrome.alarms + resume sidecar) — *the crux; a watch that dies on eviction is broken*
-- [ ] Configurable refresh interval with hard floor (~60s default, never below 30s alarms floor) + blocking timeout with safety ceiling — *table stakes cadence control + anti-DoS*
-- [ ] One-shot edge-fire semantics, documented explicitly — *avoids the changedetection.io #2715 notification-storm pitfall*
-- [ ] In-page gentle "analyzing" pulse on the watched element via existing visual session — *differentiator; trusted visible feedback*
-- [ ] Single shared registry (autopilot + MCP parity, INV-02) — *structural requirement*
+- [ ] **Authenticated same-origin fetch primitive** — the executable core; nothing works without it.
+- [ ] **`search_capabilities` + `invoke_capability` (schema-on-hit, ≤5 results, tab-origin biasing)** — the lean surface; satisfies INV-01/INV-02 and the no-bloat mandate.
+- [ ] **Bundled head: a handful of hard/popular services as compiled handlers** — proves zero-install + the imperative path. (Pick 5–10 high-value services.)
+- [ ] **Per-origin Off/Ask/Auto consent + default-off** — non-negotiable safety; reuses vault confirm UX.
+- [ ] **Audit log of capability invocations** — extends existing observability.
+- [ ] **API→DOM self-healing fallback (basic: on failure, escalate to `run_task`/DOM)** — the flagship differentiator; even a simple version is the headline.
 
-### Add After Validation (v0.11.x)
+### Add After Validation (v1.x)
 
-- [ ] **% change condition** (above/below by N%) — *Binance/Distill have it; defer because it reopens edge-vs-level baseline questions and isn't in the v1 condition list*
-- [ ] **Compound conditions** (AND/OR multiple conditions on one element, e.g. Distill's compound rules) — *add once single conditions are proven; combinational fire logic is extra surface*
-- [ ] **Re-arm-on-fire option** (explicit opt-in to level/repeat semantics with de-dup) — *only if users genuinely need it; default stays one-shot*
+- [ ] **Declarative recipe interpreter + server-delivered long-tail recipes** — scales the catalog the MV3-legal way. *Trigger: head proves out and demand for the tail is real.*
+- [ ] **CDP network-capture discovery** — "point FSB at a site, it learns the API." *Trigger: interpreter exists to hold the captured recipe.*
+- [ ] **Learned recipes auto-promoted into procedural memory** — the auto-grow flywheel. *Trigger: discovery + interpreter both shipped.*
+- [ ] **Capability-discovered UX surface** ("FSB found a faster way to do X here — save it? trust it?") with recipe-data preview. *Trigger: learning path exists to surface.*
+- [ ] **Per-capability (not just per-origin) consent granularity.** *Trigger: users want finer control after living with per-origin.*
 
-### Future Consideration (v0.12+)
+### Future Consideration (v2+)
 
-- [ ] **Desktop / Chrome push notification on fire** — *PROJECT.md explicitly defers; needs the notify-only boundary to relax deliberately*
-- [ ] **Auto-act-on-fire workflows** — *deliberately deferred; reconsider only with strong human-in-the-loop guardrails*
-- [ ] **Change history / diff timeline** — *a storage + UI product surface, not a primitive*
-- [ ] **Cross-element / multi-condition watches in one trigger** — *e.g. "fire when price < X AND stock = In Stock"; compound across elements*
+- [ ] **Optional explicit install of long-tail capability packs via MCP command / control panel** — power-user curation. *Defer: auto-grow + streamed tail covers most needs first.*
+- [ ] **Capability sharing/export between users or machines** (declarative recipes are portable data). *Defer: needs a trust/provenance model; until PMF, learned-local is enough.*
+- [ ] **Richer fallback intelligence** (intent-based DOM healing using the captured API's semantic intent to guide the DOM path). *Defer: basic escalation first; 75–90% intent-based healing is a later optimization.*
+
+---
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| `trigger()` core + 4 conditions | HIGH | MEDIUM | P1 |
-| Refresh-poll mechanism | HIGH | MEDIUM (reuses alarms + agent-tab) | P1 |
-| Live-observe mechanism (MutationObserver) | HIGH | HIGH (main new runtime piece) | P1 |
-| Smart value extraction (text/number/attr) | HIGH | MEDIUM | P1 |
-| MV3 survivability (alarms + resume sidecar) | HIGH | MEDIUM-HIGH (generalizes existing pattern) | P1 |
-| Blocking + detached reporting | HIGH | MEDIUM (clones run_task) | P1 |
-| stop_trigger / get_trigger_status / list_triggers | HIGH | LOW | P1 |
-| One-shot edge-fire semantics (documented) | HIGH | LOW | P1 |
-| Concurrency cap | MEDIUM | LOW (reuses agent cap) | P1 |
-| In-page analyzing pulse | MEDIUM | LOW-MEDIUM | P1 |
-| AI-decides-on-fire (notify-only return) | HIGH | LOW (return contract) | P1 |
-| Autopilot + MCP parity (shared registry) | HIGH | MEDIUM | P1 |
-| % change condition | MEDIUM | MEDIUM | P2 |
-| Compound conditions | MEDIUM | MEDIUM | P2 |
-| Re-arm-on-fire opt-in | LOW-MEDIUM | LOW-MEDIUM | P3 |
-| Push notifications | MEDIUM | HIGH | P3 |
-| Change history UI | LOW | HIGH | P3 |
+| Authenticated same-origin fetch primitive | HIGH | MEDIUM | P1 |
+| `search_capabilities` + `invoke_capability` (lean dispatcher) | HIGH | HIGH | P1 |
+| Schema-on-hit + tab-origin biasing | HIGH | MEDIUM | P1 |
+| Per-origin Off/Ask/Auto + default-off | HIGH (safety) | MEDIUM | P1 |
+| Audit log of invocations | MEDIUM | LOW | P1 |
+| Bundled head (compiled handlers, zero-install) | HIGH | MEDIUM | P1 |
+| API→DOM self-healing fallback (basic) | HIGH (differentiator) | MEDIUM | P1 |
+| Declarative recipe interpreter (MV3-safe) | HIGH | HIGH | P2 |
+| Server-delivered long-tail recipes | MEDIUM | MEDIUM | P2 |
+| CDP network-capture discovery | HIGH (differentiator) | HIGH | P2 |
+| Learned recipes → procedural memory (auto-grow) | HIGH (differentiator) | HIGH | P2 |
+| Capability-discovered "save/trust" UX | MEDIUM | MEDIUM | P2 |
+| Per-capability consent granularity | MEDIUM | LOW | P2 |
+| Optional explicit install of capability packs | LOW | MEDIUM | P3 |
+| Capability sharing/export | LOW | HIGH | P3 |
+| Intent-based DOM healing (advanced fallback) | MEDIUM | HIGH | P3 |
 
-**Priority key:** P1 = must have for v0.11.0 launch · P2 = should have, v0.11.x · P3 = future
+**Priority key:** P1 = must have for the v1 capability slice · P2 = add after the core path validates · P3 = future / PMF-gated.
+
+---
 
 ## Competitor Feature Analysis
 
-| Feature | Web change monitors (Distill / Visualping / changedetection.io) | Price/crypto trackers (Keepa / Binance / Coinbase) | Programmatic waits (Playwright / synthetic monitors) | FSB `trigger` approach |
-|---------|--------------|--------------|--------------|--------------|
-| Any-change | Yes (baseline) | n/a (price-specific) | n/a (condition-based) | `changed` condition |
-| Contains / keyword | Yes (`has`, "Trigger on text", keyword monitor) | Restock text | Body-content assertion | `contains` (case-insensitive default) |
-| Numeric threshold | Yes (`number less/more than`) | Yes (above/below; "Rises Above"/"Drops To") | Response-time/value assertions | `threshold` (`>=`/`<=`/`>`/`<`) + smart number parse |
-| Regex / exact | Yes (`matches regex`) | n/a | Assertion operators | `equals`/`regex` |
-| % change | Yes (Distill increased/decreased %) | Yes (Binance "Change is Over"; 24H change) | n/a | Deferred to P2 |
-| Element targeting | Visual selector + CSS/XPath/JSONPath | Product-page specific (Amazon ASIN) | CSS/text/role selectors | Uniqueness-scored selectors (EXISTING, more precise) |
-| Watch mechanism | Server-side poll (re-fetch on schedule) | Server-side poll | In-page poll (`waitForFunction` raf/interval) OR event | **Both**: refresh-poll (server-style) + live-observe (in-page MutationObserver) — selectable |
-| Check interval | 2/5/15/60 min tiers (server) | Backend polling | 30s+ schedule (synthetic); ms polling (Playwright) | ~60s default refresh-poll, 30s hard floor; instant on live-observe |
-| Reporting / delivery | Email/SMS/Slack/Discord/webhook (detach) | Email/push/SMS/Twitter | Blocking promise resolve (Playwright); alert channel (synthetic) | **Notify-only** into agent/MCP: blocking-return + detached poll. NO own delivery channel |
-| Fire semantics | Edge-ish; #2715 shows level/edge confusion | Threshold crossing | One-shot resolve | **One-shot edge fire**, documented; AI re-arms if needed |
-| Acts on fire | No (notifies human) | No (notifies human) | No (test continues) | **No — AI decides** (notify-only by design) |
-| Runs when machine off | Yes (cloud) | Yes (cloud) | No (in-process) | **No — browser must be open** (local MV3, honest limitation) |
-| Authenticated/JS/SPA pages | Often struggles / needs macros | Site-specific | Full browser context | **Full real-browser context** inherited from extension (advantage) |
+| Feature | OpenTabs | Claude Code Tool Search (pattern reference) | FSB v0.9.99 approach |
+|---------|----------|---------------------------------------------|----------------------|
+| Big-catalog tool exposure | MCP + per-plugin enable; flat-ish surface | Lazy schema load, `defer_loading`, search→invoke, 3–5 tools/query, ~500-tok overhead | `search_capabilities`/`invoke_capability` + schema-on-hit + **tab-origin biasing** (beyond Claude's generic search) |
+| Auth API execution | Plugin calls app's internal API via session | N/A (general tool router) | MAIN-world same-origin fetch via `execute_js` |
+| Discovery / catalog growth | AI scaffolds a code plugin (self-improving skill) | N/A | CDP network capture → declarative recipe → procedural memory |
+| Distribution | npm package per plugin | N/A | Bundled head + streamed declarative tail; no per-plugin install |
+| Permissions | Off/Ask/Auto per plugin/tool, reset on update | N/A | Off/Ask/Auto per origin (+per capability), default-off |
+| Trust gate | AI reviews adapter *source* | N/A | Recipe *data* preview + consent + audit (no source to review) |
+| Failure when API breaks | Tool dead until re-built | N/A | **Self-heal to DOM + site guides** |
+| Standalone | Needs MCP client or its CLI | Lives inside Claude Code | Standalone via FSB autopilot **and** MCP |
+| Safety scope | Plugin-mediated API access | N/A | **Same-origin only** (no cross-origin credential replay) |
 
-## Key Pitfall Flags for REQUIREMENTS / PITFALLS
+---
 
-**Edge-trigger vs level-trigger ambiguity (HIGH confidence, real-world verified).** changedetection.io issue #2715 documents users confused when a threshold fires once on crossing then goes silent on subsequent qualifying values. For FSB this is sharper because firing repeatedly into an *agent loop* = notification storm + token burn + duplicate actions. **Recommendation:** default to one-shot edge fire (fire once when the condition first becomes true, then terminal), document it explicitly in the tool description, and offer re-arm only as an explicit P2/P3 opt-in. Make this an explicit requirement, not implicit.
+## Open Questions / Flags for Roadmap
 
-**Sub-interval / cadence floor (HIGH confidence, verified).** Chrome 120+ enforces a 30s minimum `chrome.alarms` period, matching the MV3 SW lifecycle. Refresh-poll must enforce this floor; truly live data routes to live-observe instead. Already reflected in PROJECT.md's ~60s default + hard floor.
+- **Ranking implementation is swappable, but pick one for v1.** BM25 + regex (Claude Code's choice) is a sane default; vendor accuracy claims conflict (Anthropic 74–88% vs Stacklok's adversarial 34%/94% framing). Don't over-engineer the router in v1 — keep it replaceable.
+- **Recipe schema is the crux of the MV3-safe split.** The declarative recipe format must be expressive enough for the long tail (URL templating, header set from a fixed allowlist, param mapping, response extraction, pagination?) yet provably non-Turing-complete so the interpreter stays "fixed code, data-only input." This is the highest-risk design artifact → likely needs a dedicated research/spike phase. (PITFALLS will cover MV3 remote-code boundaries in depth.)
+- **Failure-detection taxonomy for self-healing** needs definition: which signals (HTTP 4xx/5xx, auth-redirect HTML instead of JSON, empty/shape-mismatched payload, CSRF-token rejection) trigger the DOM fallback, and how to avoid false-fallbacks that mask real "no results" answers.
+- **CSRF/same-origin nuance:** even same-origin fetch can trip CSRF defenses if the page's real requests carry a per-request token the agent didn't capture. Capture-then-replay must record token-bearing headers; flag as a discovery-fidelity requirement.
+- **Counting expectations:** do not set a "match OpenTabs' N tools" success metric. Match the *auto-grow mechanism* and win on resilience; the absolute count is a moving, AI-generated target.
 
-**MutationObserver fire delivery across SW eviction (MEDIUM confidence — flag for phase research).** The observer lives in the content script (page-lifetime, survives eviction), but delivering a fire event back to an evicted SW, and re-establishing the observer after BF-cache restore / SPA navigation, is the trickiest runtime path and the most likely to need dedicated phase-level investigation.
+---
 
 ## Sources
 
-- Distill.io — [Conditions / Optimizing Alerts](https://distill.io/docs/web-monitor/using-conditions-to-get-alert-on-important-changes/), [What is Distill](https://distill.io/docs/web-monitor/what-is-distill/), [Features](https://distill.io/features/) (condition operators, visual selector, notification channels) — HIGH
-- Visualping — [How Visualping Uses AI to Monitor Web Changes](https://visualping.io/blog/visualping-ai), [How to Monitor Website Changes](https://visualping.io/blog/how-to-monitor-website-changes) (visual/text/all modes, 2/5/15/60-min intervals, region selection) — MEDIUM (vendor blog)
-- Browse AI — [Monitor](https://www.browse.ai/monitor), [How to use monitors](https://help.browse.ai/en/articles/10453923-how-to-use-monitors-to-automate-data-extraction) (scheduled runs, change sensitivity, webhook/API delivery) — MEDIUM (vendor docs)
-- changedetection.io — [GitHub project](https://github.com/dgtlmoon/changedetection.io), [Restock & price detection tutorial](https://changedetection.io/tutorial/how-get-product-re-stock-or-back-stock-alerts-and-notifications), [Issue #2715 edge-vs-level fire](https://github.com/dgtlmoon/changedetection.io/issues/2715) (trigger-on-text, threshold, CSS/XPath/JSONPath, restock keyword rules, edge/level pitfall) — HIGH (source + issue tracker)
-- Keepa / CamelCamelCamel — [Best Amazon Price Trackers 2026 (HARPA)](https://harpa.ai/blog/best-amazon-price-trackers-and-drop-alerts), [CamelCamelCamel vs Keepa (goaura)](https://goaura.com/blog/camelcamelcamel-vs-keepa) (below-threshold price alerts, per-condition thresholds, push/SMS/email/Twitter delivery) — MEDIUM
-- Binance / Coinbase alerts — [Binance.US price alerts](https://support.binance.us/en/articles/9842911-how-to-set-up-price-alerts-on-the-binance-us-app), [Coinbase price alerts (Gadget Hacks)](https://smartphones.gadgethacks.com/how-to/coinbase-101-enable-price-alerts-buy-sell-perfect-time-0181842/) (Price Rises Above / Drops To / Change is Over / 24H Change, percentage + timeframe) — MEDIUM-HIGH (official help center for Binance)
-- Playwright — [Page API: waitForFunction / waitForSelector](https://playwright.dev/docs/api/class-page) (polling `'raf' | number`, timeout, condition-based waits) — HIGH (official docs)
-- browser-use — [System prompt / wait + extract](https://github.com/browser-use/browser-use/blob/main/browser_use/agent/system_prompt.md), [Structured output](https://docs.browser-use.com/cloud/agent/structured-output) (wait for element/text/url/ms; typed extraction) — MEDIUM-HIGH (source + official docs)
-- Synthetic/uptime monitors — [Cronitor Synthetic Monitoring](https://cronitor.io/guides/synthetic-monitoring), [UptimeRobot monitoring types](https://uptimerobot.com/knowledge-hub/monitoring/ultimate-guide-to-uptime-monitoring-types/), [Google Cloud uptime checks](https://docs.cloud.google.com/monitoring/uptime-checks/introduction) (assertion grammar `{assertion} {operator} {value}`, status/keyword/response-time checks, 30s/1/5/15-min intervals) — MEDIUM-HIGH
-- Chrome MV3 — [Service worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle), [chrome.alarms reference](https://developer.chrome.com/docs/extensions/reference/api/alarms) (30s SW idle eviction, Chrome 120+ 30s minimum alarm period) — HIGH (official docs)
-- MDN — [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver) (content-script page-lifetime observation) — HIGH (official docs)
+OpenTabs feature surface and parity baseline:
+- [github.com/opentabs-dev/opentabs (README + plugins directory, ~136 plugin folders counted 2026-06-19)](https://github.com/opentabs-dev/opentabs)
+- [opentabs.dev (landing — plugin/tool counts, discovery flow, "disabled by default," AI code review, audit log)](https://opentabs.dev/)
+- [OpenTabs on mcpmarket.com](https://mcpmarket.com/server/opentabs)
+- [OpenTabs on mcpservers.org](https://mcpservers.org/servers/opentabs-dev/opentabs)
+
+Search→invoke / progressive disclosure (Claude Code Tool Search + MCP context-bloat):
+- [What is MCP Tool Search — Claude Code context-pollution guide (lazy schema, defer_loading, regex/BM25, accuracy numbers)](https://www.atcyrus.com/stories/mcp-tool-search-claude-code-context-pollution-guide)
+- [Claude Code MCP Tool Search: lazy loading cut token usage 85% (Software Thug)](https://www.softwarethug.com/posts/claude-code-mcp-tool-search-lazy-loading/)
+- [MCP context-bloat crisis — accuracy collapse 43%→14% (AgentMarketCap)](https://agentmarketcap.ai/blog/2026/04/08/mcp-context-bloat-enterprise-scale-tool-definitions-agent-context-budget)
+- [Stacklok MCP Optimizer vs Anthropic Tool Search head-to-head (contested accuracy figures)](https://dev.to/stacklok/stackloks-mcp-optimizer-vs-anthropics-tool-search-tool-a-head-to-head-comparison-2f32)
+- [RAG-MCP: when too many tools become too much context (Medium)](https://medium.com/@pankaj_pandey/when-too-many-tools-become-too-much-context-a-deep-dive-into-rag-mcp-9b628c8476d3)
+
+Self-healing API→DOM fallback (differentiator grounding):
+- [Browser Harness — self-healing browser automation for AI agents](https://openflows.org/currency/currents/browser-harness/)
+- [Best self-healing test automation tools 2026 — locator-fallback 40–70% vs intent-based 75–90%+ (Shiplight)](https://www.shiplight.ai/blog/best-self-healing-test-automation-tools)
+- [The State of AI & Browser Automation in 2026 (Browserless)](https://www.browserless.io/blog/state-of-ai-browser-automation-2026)
+
+Consent / session-replay security (default-off + same-origin grounding):
+- [CSRF — OWASP Cheat Sheet (cookie auto-attach, SameSite, tokens)](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [CSRF — MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/CSRF)
+- [Towards Browser Controls to Protect Cookies from Malicious Extensions (arXiv)](https://arxiv.org/html/2405.06830v3)
+
+Capture-then-replay UX precedent:
+- [NetReplay — capture & replay network requests, local-only (Chrome Web Store)](https://chromewebstore.google.com/detail/netreplay-%E2%80%93-capture-repla/elfmodpnblbidnigceioaffjdadpgjko)
+- [Trustworthy AI agents: deterministic replay (Sakura Sky)](https://www.sakurasky.com/blog/missing-primitives-for-trustworthy-ai-part-8/)
+
+FSB-internal (read directly, not cited as web sources): `extension/ai/tool-executor.js` (`execute_js` MAIN-world), `extension/background.js` (`chrome.debugger` attach for CDP), `extension/lib/memory/memory-schemas.js` (`PROCEDURAL` memory type), `mcp/README.md` (63-tool surface), `.planning/PROJECT.md` (milestone goal + invariants INV-01..04).
 
 ---
-*Feature research for: FSB v0.11.0 Trigger Tool (Reactive DOM Monitoring)*
-*Researched: 2026-06-15*
+*Feature research for: authenticated-API-through-the-session agent capabilities (FSB v0.9.99 Native Capability Catalog)*
+*Researched: 2026-06-19*

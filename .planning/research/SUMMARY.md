@@ -1,200 +1,193 @@
 # Project Research Summary
 
 **Project:** FSB (Full Self-Browsing)
-**Milestone:** v0.11.0 Trigger Tool (Reactive DOM Monitoring)
-**Domain:** Long-running reactive DOM-monitoring tool family for an AI Chrome MV3 extension + MCP server
-**Researched:** 2026-06-15
+**Milestone:** v0.9.99 Native Capability Catalog (FSB API Execution)
+**Domain:** MV3 Chrome-extension capability runtime — call a service's real web API through the user's authenticated browser session (the OpenTabs idea) as a fast path alongside DOM automation, behind a lean MCP dispatcher, with zero plugin installs and no MCP tool bloat
+**Researched:** 2026-06-19
 **Confidence:** HIGH
 
-> This SUMMARY synthesizes four research files written for THIS milestone (they replaced stale v0.9.69 telemetry content at the canonical paths): [STACK.md](STACK.md), [FEATURES.md](FEATURES.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PITFALLS.md](PITFALLS.md). Prior-milestone telemetry pitfalls are preserved at [PITFALLS-v0.9.69-TELEMETRY.md](PITFALLS-v0.9.69-TELEMETRY.md).
+> This SUMMARY synthesizes the four research files written for THIS milestone, which replaced their prior-milestone content at the canonical paths: [STACK.md](STACK.md), [FEATURES.md](FEATURES.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PITFALLS.md](PITFALLS.md). Prior-milestone pitfalls are preserved at [PITFALLS-v0.9.69-TELEMETRY.md](PITFALLS-v0.9.69-TELEMETRY.md), [PITFALLS-EXCALIDRAW.md](PITFALLS-EXCALIDRAW.md), [PITFALLS-MODULARIZATION.md](PITFALLS-MODULARIZATION.md). The prior v0.11.0 SUMMARY this file supersedes is recoverable from git history.
 
 ## Executive Summary
 
-The `trigger` tool family turns FSB from a "do a task and stop" automaton into a *reactive watcher*: arm a watch on one DOM element, get notified when its value changes / crosses a threshold / equals a target / contains text, and let the AI decide what to do on fire (notify-only by design). The dominant, cross-cutting conclusion from all four researchers is that **this milestone requires ZERO new runtime dependencies and ZERO new architectural primitives.** Every need is met by MV3 platform built-ins (`chrome.alarms`, `chrome.storage.session/local`, `MutationObserver`, `chrome.tabs`/`chrome.scripting`), already-pinned packages (`@modelcontextprotocol/sdk@1.29.0` -- confirmed still `latest`, NO bump; `zod@^3.24.0`; `@full-self-browsing/lattice@1.3.0`), and machinery FSB already shipped. The work is *new source files that compose existing patterns* (NEW 5 / MODIFIED 8, **no `manifest.json` change, no `package.json` dependency delta**). There is an explicit "do NOT add" list: currency.js/numeral/dinero (a ~60-line `Intl.NumberFormat().formatToParts()` parser replaces them), zod@4 (number-coercion drift risks INV-01), and any MCP SDK bump.
+This milestone gives FSB **authenticated-API execution as a fast path** beside its existing DOM engine: the agent calls the *same* internal web API the page's frontend calls, riding the user's already-authenticated session, instead of clicking the UI — and silently self-heals back to DOM automation when the API path breaks. The decisive research finding is that **FSB already ships the hard primitive.** Three live code paths inject JS into the page **MAIN world** via `chrome.scripting.executeScript`, where a `fetch('/api', {credentials:'include'})` runs *as the site's own origin* and the browser attaches the user's cookies (HttpOnly included) automatically. FSB also already holds `debugger` + `<all_urls>` + `unlimitedStorage`, attaches CDP at protocol `1.3`, and has an inverted-index memory store. So this is **not greenfield infrastructure** — it is a structured, governed, learnable wrapper around primitives that already exist, plus **three small eval-free libraries** (`minisearch`, `jmespath`, `@cfworker/json-schema`) vendored the way `lz-string` already is. **No manifest or permission change is required.**
 
-The recommended approach is to build the trigger registry as a **third sibling** to the existing v0.9.36 visual-session lifecycle and v0.9.60 `run_task` tracking -- a parallel-but-analogous lifecycle (`fsbTriggerRegistry`), NOT a graft onto `run_task`/`activeSessions` and explicitly NOT touching the `agent-loop.js` `setTimeout` iterator (INV-04). Three subsystems already in-tree solve every hard sub-problem and are copied "change the constants, not the shape": `mcp-visual-session-lifecycle.js` (per-entity `chrome.alarms` + storage + SW-startup restore + tab-close cleanup) is the survival template; `mcp-task-store.js` (versioned `{v,records}` envelope) is the snapshot-store template; `mcp-bridge-client.js:_handleStartAutomation` (30s heartbeats, `settle()` single-resolve guard, 600s safety net, `partial_state`) is the blocking-return template; `dom-stream.js` (MutationObserver + rAF debounce + `chrome.runtime.sendMessage`) is the live-observe template. **MV3 survivability is the crux and is already solved in-tree:** the SW dies after 30s idle, but `chrome.alarms` persists across eviction and its 30s floor (Chrome 120) was deliberately aligned to that window -- an alarm tick revives the SW, which re-hydrates trigger state from `chrome.storage.session` and re-evaluates. Fire evaluation lives in the SW (durable authority), never the content script (which dies on navigation).
+Two hard walls shape every phase and must be treated as architectural invariants, not mitigations. **Wall 1 (MV3 "no remotely hosted code"):** server-delivered recipes must be **CLOSED-vocabulary DATA** (endpoint template + method + an auth-strategy *enum* + param schema + static request map + a read-only JMESPath extract) bound by a **fixed bundled interpreter** — never `eval`'d, never grown into a mini-language of server-authored control flow. Google explicitly prohibits "an interpreter to run complex commands fetched as data," so a CI guard must fail the build on any `eval`/`new Function`/`import(` reachable from the recipe path and reject any recipe opcode outside the enum. **Wall 2 (execution context):** the authenticated fetch **MUST run in the page MAIN world** (via the existing `execute_js` seam) so the user's first-party HttpOnly/SameSite cookies attach; a **background-SW `fetch()` is the anti-pattern** (it is extension-origin, cross-origin to the site, hits CORS, and silently drops SameSite cookies → 401/403 or a logged-out 200). CDP `Network` is **discovery-only**, never the invoke transport.
 
-The risks are concentrated and well-characterized. **The #1 risk is MCP queue starvation:** a blocking `trigger()` registered like a normal mutation tool parks the single `TaskQueue` slot for hours and deadlocks every other tool -- including its own `stop_trigger`. The mitigation is structural: the watcher loop runs in `background.js` (never the MCP handler), and `stop_trigger`/`get_trigger_status`/`list_triggers` go in the read-only bypass set. Blocking mode must also auto-convert to detached past a safety ceiling because MCP hosts time out long calls regardless of progress notifications (and Chrome kills any single request >5 min). The genuine *moat* is `live-observe` (in-place MutationObserver) versus competitors' server-side poll-only monitors -- but it is also the highest-cost / highest-risk piece (re-injection after BF-cache/SPA nav, debouncing fire-storms, fire delivery to an evicted SW). Refresh-poll has a hard ~30s Chrome alarm floor (PROJECT.md's ~60s default sits safely above it) and must own its tab + reload in the background (no focus theft, reuse v0.9.60 agent-scoped tab resolution). Cross-cutting safety: one-shot edge-fire default + hysteresis (avoid flapping), locale-aware numeric normalization with NaN -> `parse_error` (never fire on a parse failure), and additive-only tool registration (INV-01 schema-lock stays green).
+The biggest risk is that this feature is, definitionally, **automated replay of the user's credentials against private endpoints** — the exact capability a stealth credential-stealer wants — bolted onto a product whose entire brand is "supervised/safe." That is why the posture is **default-OFF per origin, Off/Ask/Auto consent, origin-pinning (a recipe for an origin may only target that origin), recipe integrity (sign/verify, reusing FSB's Lattice Ed25519/JCS receipts), mutation gating, auth-strictly-local (no cookie/token ever leaves the device or persists), and a complete audit log.** The second structural risk is **capability boundary**: signed/HMAC/nonce/ephemeral-token/persisted-query-hash requests **cannot be captured-and-replayed generically** (the secret + signer live in page JS and recompute per request), which makes the **DOM self-healing fallback mandatory, not optional** — it is the universal floor that catches recipe rot, the hard auth classes, and no-UI-path gaps. The right competitive posture is **parity-plus**: match OpenTabs' *auto-grow mechanism* (do NOT chase its moving ~2,769 AI-generated tool count), and win on self-healing fallback, learned/auto-growing recipes, zero-install, standalone-via-autopilot, tab-biased search, and the same-origin-only safety constraint.
 
 ## Key Findings
 
 ### Recommended Stack
 
-**Zero new runtime dependencies -- the headline conclusion.** Every capability is satisfied by APIs FSB already ships with or machinery FSB already built; the "additions" are new source files composing existing primitives, not new packages. The extension runtime keeps exactly its two deps (`axios`, `lattice`). `fsb-mcp-server` still bumps (likely `@0.10.0`) for the new tool surface, but its `dependencies` block is unchanged. (See [STACK.md](STACK.md).)
+The stack delta is deliberately tiny and **eval-free by mandate**. FSB reuses what it already has (MV3 SW, the MAIN-world `executeScript`+`new Function` fetch primitive, `chrome.debugger`@`1.3`, the `jsonSchemaToZod` bridge, the `chrome.storage.local` inverted-index memory store, esbuild, `@modelcontextprotocol/sdk@^1.29.0` + `zod@^3.24.0`). It adds **three small, zero-dependency, SW-safe libraries** vendored into the service worker like `lib/lz-string.min.js` (PATH A) or emitted as one `capability-runtime.js` IIFE via a new esbuild entry (PATH B) — `background.js` is byte-frozen (D-17) so the SW is **not** an esbuild input. **Nothing new on the MCP-server side**; the two new tools register through the existing `server.tool()` + `jsonSchemaToZod()`. The interpreter and auth-strategy handlers are **FSB-authored code shipped in the package** by design (RHC-safe). See [STACK.md](STACK.md).
 
-**Core technologies:**
-- **Chrome MV3 platform APIs** (`chrome.alarms`, `chrome.storage.session/local`, `chrome.tabs`, `chrome.scripting`, `chrome.webNavigation`): survival + scheduling + tab-ownership substrate -- built-in and **already permissioned** in `manifest.json` (no new permission). The 30s alarm floor (Chrome 120) is the canonical MV3-survival timer.
-- **`MutationObserver`** (Web API): the `live-observe` mechanism, observing ONE element in place -- push-based (no polling cost), already imported by FSB content scripts, isolated-world.
-- **`@modelcontextprotocol/sdk@^1.29.0` (NO bump -- confirmed current `latest`)**: registers the 4 tools and emits `notifications/progress` heartbeats via the same `_meta` envelope `run_task` uses -- keeping it pinned protects INV-01.
-- **`zod@^3.24.0` (stay on v3)**: MCP input validation through `schema-bridge.ts` `jsonSchemaToZod()`; zod@4 risks number-coercion drift (INV-01).
-- **`@full-self-browsing/lattice@1.3.0` (pinned, do NOT touch -- INV-06)**: available as a survivability-adapter option, but the lighter dedicated sidecar is the recommended default.
-- **New in-tree, 0-dep modules**: `value-extractor.js` (`Intl.NumberFormat().formatToParts()` separator discovery + regex normalize), `trigger-store.js` (clone of `mcp-task-store.js`), `content/trigger-observe.js`, `mcp/src/tools/trigger.ts`.
+**Core technologies (the actual new deps — all zero-dependency, eval-free, SW-safe):**
+- **`minisearch@7.2.0`** (capability search, in the SW) — ~7 kB gz BM25 + prefix + fuzzy with **field boosting** (the clean lever for **tab-origin biasing**); `toJSON`/`loadJSON` snapshot persists to `chrome.storage.local`. Far better recall than `String.includes`, far lighter than embeddings.
+- **`jmespath@0.16.0`** (response extraction, read-only, in the SW) — verified pure tree-walking interpreter, **no `eval`/`Function`**, a formally-specified side-effect-free *read* query language → stays on the safe side of the RHC "no complex-command interpreter" rule because it can only project/filter existing JSON.
+- **`@cfworker/json-schema@4.1.1`** (in-SW recipe + param validation) — purpose-built for strict-CSP runtimes with **no `eval`/`new Function`** (the MV3-safe replacement for Ajv), drafts 4/7/2019-09/2020-12.
+- **`url-template@3.1.1`** (optional) — only if the long tail needs RFC 6570 query/explode; otherwise a 10-line hand-rolled `{var}` replacer.
 
-**Explicit "do NOT add" list:** any npm currency/number lib (currency.js/numeral/dinero/accounting); `zod@4.x`; any MCP SDK bump; SW keepalive antipatterns; `setTimeout`/`setInterval` as the standing watch loop; alarm periods <30s; reliance on `chrome.alarms persistAcrossSessions` (Chrome 150+ only).
+**Hard stack exclusions (load-bearing):** **Ajv in default codegen mode** (compiles validators with `new Function` → throws under MV3 SW CSP; confirmed real-world breakage, MCP-SuperAssistant #171); **JSONata in recipes** (a full server-authorable expression language = the textbook prohibited "interpreter for complex commands fetched as data"); **any `eval`/`new Function` on a recipe field in the SW**; **local embedding/ML runtimes** (tens of MB, needs `wasm-unsafe-eval`, pointless at this corpus size); **`jsonpath-plus`** (script-expression eval surface); **`zod@4.x`** (coercion drift risk vs the zod-3 bridge → INV-01); and **routing the authenticated fetch through SW `fetch()`** (Wall 2).
 
 ### Expected Features
 
-The full FSB toolset (~36 action + 15 read-only tools, `run_task`, multi-agent tab ownership, uniqueness-scored targeting, visual sessions) already exists and is reused as *dependencies*. Prior art (Distill / Visualping / changedetection.io; Keepa / Binance; Playwright `waitForFunction` / synthetic monitors) supplies only the feature vocabulary. (See [FEATURES.md](FEATURES.md).)
+FSB **matches every table-stakes item, exceeds on six axes, and intentionally skips three** (each skip a deliberate MV3/safety posture, not a gap). See [FEATURES.md](FEATURES.md) and its OpenTabs parity matrix.
 
-**Must have (table stakes -- P1, the v0.11.0 launch set):**
-- All four fire conditions: `changed`, `threshold` (`>=`/`<=`/`>`/`<`), `equals`/`regex`, `contains` -- the vocabulary every monitor has.
-- Both watch mechanisms, selectable per-trigger: `refresh-poll` (static pages) AND `live-observe` (live/SPA pages).
-- Smart value extraction (auto number-parse; raw text for `changed`/`contains`; `extract: text|number|attribute` override).
-- Dual-mode reporting: blocking-by-default (30s heartbeats, return on fire/timeout) + detached opt-in (`trigger_id` + poll).
-- Companion tools `stop_trigger`, `get_trigger_status`, `list_triggers`; multiple concurrent triggers with a configurable cap (mirrors the v0.9.60 agent cap, 1-64, default 8).
-- MV3 survivability (survive SW eviction via `chrome.alarms` + resume sidecar) -- the crux.
-- Refresh interval with a hard floor (~60s default, never below the 30s alarm floor) + blocking timeout with safety ceiling.
-- One-shot edge-fire semantics, documented explicitly; in-page gentle "analyzing" pulse on the watched element; single shared registry (INV-02).
+**Must have (table stakes — the category definition):**
+- **Authenticated same-session API call** — the whole value prop; built on the existing MAIN-world `fetch`.
+- **Lean tool surface / progressive disclosure** (`search_capabilities` → `invoke_capability`, **schema-on-hit**, ≤5 results, **tab-origin biasing**) — a 2,000–2,800-tool catalog cannot be a flat MCP list (loading ~167 tools already costs ~60K tokens; selection accuracy collapses 43%→<14% when overloaded). Search ON *improves* accuracy (Opus 4.5: 79.5%→88.1%), not just token cost.
+- **Per-origin Off/Ask/Auto consent + default-off + audit log** — replaying real auth is write/money-capable; nothing runs until explicitly enabled.
+- **Local execution / no cloud; structured-data result; works with any MCP client** — mostly already true for FSB.
+- **Capability discovery** (point FSB at a site, it learns the API) — via CDP `Network` capture.
 
-**Should have (competitive differentiators):**
-- **AI-decides-on-fire (notify-only into an agent loop)** -- competitors fire into a dumb channel; FSB fires into a reasoning agent. The point of the milestone.
-- **Live-observe vs refresh-poll selectable per-trigger** -- sub-second reaction on live pages that poll-based monitors structurally cannot match. **FSB's genuine moat.**
-- **Autopilot + MCP parity (single shared registry)** -- no competitor exposes change-monitoring as an MCP primitive alongside a full automation toolset.
-- **Real-browser context (auth/JS/SPA) for free**; smart extraction with attribute override; blocking+detached dual mode.
+**Should have (the differentiators where FSB beats OpenTabs):**
+- **API→DOM self-healing fallback** — *the single biggest differentiator*; when a recipe breaks FSB drops to its DOM engine + 17-category site guides + `run_task` and still completes. OpenTabs has **no** fallback (a broken API tool is dead until re-built).
+- **Learned / auto-growing catalog via procedural memory** — successful discovered calls auto-promote to per-origin recipes (declarative data, zero authoring), incl. private/internal tools.
+- **Zero-install bundled head + MV3-safe declarative-recipe long tail** — popular capabilities ship in the extension; the tail streams as *data*; no `npm install <plugin>` per service.
+- **Standalone-via-autopilot, unified consent across API+DOM+vault, same-origin-fetch safety** (a constraint sold as a feature).
 
-**Defer (v0.11.x / v0.12+):**
-- `% change` condition (reopens edge-vs-level baseline questions; not in the v1 condition list) -- P2.
-- Compound conditions (AND/OR); explicit re-arm-on-fire opt-in -- P2/P3.
-- Desktop/Chrome push notifications; auto-act-on-fire; change-history/diff-timeline UI -- P3 / explicitly out of scope.
+**Defer (v1.x / v2+):** server-delivered long-tail recipes + CDP discovery + learned-recipe promotion are an **add-after-validation** tranche (gate: head proves out); per-capability (vs per-origin) consent granularity; optional explicit capability-pack install; capability sharing/export (needs a trust/provenance model); intent-based DOM healing (the 75–90% optimization after basic escalation works).
 
-**Anti-features (explicitly NOT built):** server-side/cloud hosting (FSB is local -- "browser must be open" is the honest limitation); own notification channel (notify-only); auto-act-on-fire (destroys the "AI decides" core value); level-triggered re-firing (notification storm); whole-page visual-diff; macro/multi-step pre-check; sub-30s refresh-poll.
+**Intentional skips (anti-features):** npm-package-per-plugin distribution (MV3-illegal as runtime code); **generic cross-origin authenticated replay** (the CSRF/credential-exfiltration engine — same-origin only); RCE of server-delivered logic; auto-enable of discovered capabilities; AI-source-code-review as the trust gate (the tail is *data*, not code → show a recipe preview instead); background/unattended execution; push notifications; cloud execution.
 
 ### Architecture Approach
 
-`trigger` bolts onto FSB's existing SW / content-script / MCP-bridge architecture as a **parallel trigger registry** -- copy the shape of four shipping subsystems, change the constants. NEW files (5) + MODIFIED files (8), no existing schema changes, no manifest changes. Fire evaluation lives in the SW (durable, re-hydratable) backed by `chrome.storage.session`; content scripts only read-and-report. The Lattice survivability adapter is evaluated and **deliberately NOT used** for trigger snapshots (lower risk, flat record not a Lattice `TState`, keeps the offscreen doc off the hot path -- the offscreen page evicts *before* the SW). (See [ARCHITECTURE.md](ARCHITECTURE.md).)
+The capability layer is **new SW source files composing existing primitives** (mirroring the v0.11.0 `trigger` precedent), with **two thin front doors converging on one engine**. MCP reaches it via `search_capabilities`/`invoke_capability` registered **OUTSIDE `TOOL_REGISTRY`** (the `vault.ts` precedent — keeps INV-01 untouched and the surface lean); autopilot reaches it via a `tool-executor.js` branch; **both call one `capability-router.js`** (INV-02 parity at the *runtime* layer, not by sharing a tool schema). The router selects a tier (T0 model-prior public APIs → T1a bundled imperative handlers (code, shipped) → T1b bundled/server declarative recipes (data) → T2 learned recipes (memory) → T3 DOM fallback), **biased by the owned tab's origin**, and on break/empty/4xx-5xx/shape-mismatch routes to the DOM fallback. The **consent gate sits immediately after `checkOwnershipGate` inside `dispatchMcpToolRoute`** (single chokepoint; `Off` hard-refuses before any side effect). See [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Major components -- NEW (5):**
-1. `extension/utils/trigger-store.js` -- `chrome.storage.session` snapshot envelope `{v:1, records:{[id]:snapshot}}`, key `fsbTriggerRegistry` (clone of `mcp-task-store.js`).
-2. `extension/utils/trigger-lifecycle.js` -- per-trigger `chrome.alarms` (`fsbTrigger:<id>`), arm/clear/re-arm, SW-startup restore, tab-close cleanup (clone of `mcp-visual-session-lifecycle.js`).
-3. `extension/utils/trigger-manager.js` -- arm/stop/evaluate/fire, the four fire conditions, smart value extraction, cap enforcement (mirrors `agent-registry.js`), tab binding.
-4. `extension/content/trigger-observe.js` -- single-element debounced `MutationObserver` (live-observe), reports raw value deltas to the SW.
-5. `mcp/src/tools/trigger.ts` -- 4 `server.tool()` registrations (1 blocking + 3 read-only/mutation).
-
-**Major components -- MODIFIED (8):** `ai/tool-definitions.js` (TOOL_REGISTRY += 4 additive defs + `.cjs` mirror); `ws/mcp-tool-dispatcher.js` (route tables + `mcp:trigger-*` messages + ownership gate); `ws/mcp-bridge-client.js` (blocking `trigger()` heartbeat/settle handler); `background.js` (onAlarm branch + SW-startup restore + `chrome.tabs.onRemoved` cleanup); `content/messaging.js` (observe/read/pulse router cases); `content/visual-feedback.js` (analyzing-pulse glow variant + "watching" label); `mcp/src/runtime.ts` (call `registerTriggerTools`); `mcp/src/queue.ts` (`readOnlyTools` += `get_trigger_status`, `list_triggers`). **NO CHANGE:** `manifest.json`, all existing tool schemas (INV-01), `agent-loop.js` iterator (INV-04), Lattice package/adapter (INV-06).
+**Major components (NEW unless noted):**
+1. **MCP capability tools** (`mcp/src/tools/capabilities.ts`) — `search_capabilities` (read-only, queue-bypass) + `invoke_capability` (queued); registered via `server.tool()`, **not** in `TOOL_REGISTRY`.
+2. **Dispatch chokepoint** (`ws/mcp-tool-dispatcher.js`, MODIFIED) — existing ownership gate **+ new per-origin consent gate** + new `mcp:capabilities-*` routes.
+3. **Capability runtime** (`utils/capability-{catalog,router,interpreter,fetch,discovery,consent,audit}.js`) — catalog/tiering, origin-biased routing + fallback decision, declarative-recipe→templated-fetch interpreter (SW), the **fixed bundled MAIN-world fetch fn** + CSRF scrape/extract helpers, CDP `Network` capture→recipe synthesis, per-origin store, append-only audit (no secrets).
+4. **Authenticated fetch boundary** — `chrome.scripting.executeScript({world:'MAIN', func: <bundled fn>, args:[spec]})`; the recipe supplies *parameters to a bundled function*, never executable strings (the MV3-safe code/data split).
+5. **Learned-recipe store** (`lib/memory/*`, REUSE+extend) — recipes as `createProceduralMemory` records (extend `typeData` with `{endpoint, method, headerMap, csrfSource, extractPath, origin}`); **store shape, never response bodies/PII**.
+6. **DOM fallback** (`tool-executor.js executeTool()`, REUSE) — the universal floor.
 
 ### Critical Pitfalls
 
-(Top 5 of 16 critical pitfalls; full catalog + recovery strategies in [PITFALLS.md](PITFALLS.md).)
+Top items from [PITFALLS.md](PITFALLS.md). The first two are the architectural walls; the rest are high-severity.
 
-1. **MCP TaskQueue starvation (the #1 risk).** A blocking `trigger()` in `queue.enqueue()` parks the single serialized mutation slot for hours, deadlocking every other tool incl. its own `stop_trigger`. **Avoid:** the watch loop runs in `background.js`, NOT the MCP handler; the blocking wait awaits a fire/timeout event without occupying the slot; `stop_trigger`/`get_trigger_status`/`list_triggers` MUST be in the read-only bypass set (mirror `get_task_status`). Non-negotiable: a caller must always be able to cancel a trigger it is blocked on.
-2. **Service-worker eviction silently kills the watch (~30s idle).** A naive in-SW `setInterval`/closure loses the watch the moment the SW evicts -- "works in devtools, dies in the field" (INV-04's whole reason). **Avoid:** state lives in `chrome.storage`; the wake mechanism is `chrome.alarms` (survives eviction, revives the SW); on wake the SW rehydrates and re-evaluates. Floor refresh-poll at/above the ~30s alarm granularity. (No keepalive antipatterns -- those get the extension store-flagged and drain battery.)
-3. **Blocking forever when the MCP transport can't sustain it.** Even with the queue fixed, hosts time out long calls (~60s default) despite progress notifications, and Chrome kills any single request >5 min. **Avoid:** emit 30s heartbeats (best-effort `resetTimeoutOnProgress`) AND auto-convert blocking -> detached past a safety ceiling, returning a `trigger_id` the caller polls -- the watcher never dies, only the blocking wait ends.
-4. **Live-observe MutationObserver hazards** (leak / broad-subtree perf collapse / SPA re-render miss). Never-disconnected observers leak across navigation/re-injection; observing `document.body` on a ticker floods thousands of callbacks/sec; framework re-renders *replace* the watched node so a bound observer sees nothing. **Avoid:** pair every `.observe()` with guaranteed `.disconnect()` (on fire/stop/`beforeunload`/`pagehide`/re-injection, idempotent start, leak test); observe the narrowest node with `characterData`+`childList` (or `attributeFilter` for attributes), coalesce per batch; observe a stable container ancestor and **re-resolve the element by its uniqueness-scored selector each batch** (hook FSB's existing SPA-nav signals).
-5. **Flapping / fire-storm + wrong numeric parse + INV-01 drift.** Level-trigger fires on every qualifying tick (storm into an agent loop); `parseFloat("1,234.56")` -> `1` and locale-blind parsing causes off-by-1000 false fires; editing shared `run_task` code in place risks byte-level wire drift. **Avoid:** edge-trigger + hysteresis + fire-once default; locale-aware normalize-then-parse, parse BOTH sides to Number before any comparison, NaN -> `parse_error` (never fire on a parse failure, never treat not-found as unchanged); register the 4 tools as purely *additive* new names/schemas (keep the schema-lock CI green, construct parallel envelopes -- never mutate `run_task`'s).
+1. **Recipe interpreter drifts into "code fetched as data" → Web Store ban (WALL 1).** The format grows an `if`, a `map(expr)`, an inline transform string, then `eval`. Because FSB holds `debugger`+`<all_urls>` (max-scrutiny perms) this is a *takedown of an extension with an install base*, not a warning. **Avoid:** freeze a **closed opcode/enum vocabulary** with a versioned JSON Schema; **CI guard fails on `eval`/`new Function`/`import(`** reachable from the recipe path and rejects unknown opcodes; treat the hardest/most-popular services as **bundled imperative handlers**, never recipes. Watch for a recipe field named `script`/`expr`/`transform`/`code`/`fn`/`js`.
+2. **Replay fetch from the wrong context (extension origin) → auth silently absent (WALL 2).** A SW `fetch(url,{credentials:'include'})` sends the *extension's* cookie jar, not the user's session → 401/403 or a logged-out 200; the recipe gets blamed for "rot." **Avoid:** issue same-origin authenticated calls from the **page MAIN world** (existing `execute_js` seam); a smoke test must assert the **logged-in data shape** (not logged-out) from the chosen context against a real HttpOnly site.
+3. **Credential-replay weapon / "safe brand" inversion.** A malicious/poisoned recipe with `<all_urls>` could drive the user's session to read DMs / send messages / move money on any logged-in site. **Avoid:** **default-OFF per origin**, Off/Ask/Auto (Auto is explicit per-origin opt-in, never global); **origin-pinning** enforced *in the interpreter* (request origin ≠ consented origin → reject); **sign/verify server recipes** (Ed25519/JCS via Lattice receipts) before execute; **mutation gating** (POST/PUT/PATCH/DELETE = higher consent + shown in the Ask prompt); sensitive-origin friction (banking/email/gov) even in Auto.
+4. **Auth or recipe-template data routed back to FSB's server → exfiltration + Limited-Use violation.** The captured call *is* the auth; POSTing it for "learning"/telemetry ships cookies/tokens off-device. **Avoid:** **auth strictly local**; redact auth fields **at capture time before persist/promote/egress**; learned recipes store **shape only**; a tested redactor asserts no `cookie`/`authorization`/`token`/`x-csrf` substring survives.
+5. **Recipe rot — APIs change, hashes/endpoints break, no expiry detection → confidently-wrong/empty results.** Vendors ship new bundles weekly; a persisted-query hash 404s (`PersistedQueryNotFound`); a changed filter silently returns everything/nothing. **Avoid:** stamp recipes with captured-at + schema hash; **validate each response against an expected-shape assertion** → typed `RECIPE_EXPIRED`; for APQ keep the **full query body** alongside the hash (or re-scan the JS bundle); on `RECIPE_EXPIRED` **self-heal to DOM and re-learn**; quarantine repeat failures. This is the *designed steady state*, not an edge case.
+6. **Capability-search recall/precision failure.** Low recall → the model never finds the tool (whole fast-path investment wasted on DOM fallback); low precision → a fuzzy match auto-fires the *wrong destructive* call with real credentials. **Avoid:** index on **intent-phrased synonyms + service + action verb + side-effect class**, not endpoint names; return scored/ranked/origin-scoped results with side-effect class visible; **disambiguate before any mutating invoke**; build an **eval harness** (recall@k + wrong-invoke rate) and gate the milestone on it (FSB has the 50-prompt precedent).
+7. **MV3 SW eviction mid-API-call → lost in-flight request, ambiguous mutation state.** An in-flight `fetch` counts as idle; the SW dies at ~30s; a naive retry duplicates a POST (two issues/messages). **Avoid:** **reuse FSB's proven survival machinery** from `run_task` Phase 239 (`mcp-task-store.js` resume-sidecar, `chrome.storage.session` hot-state, `partial_state`/`sw_evicted`) + Lattice ResumePolicy (`SAFE`/`ON_ERROR`/`RECOVERY_AMBIGUOUS`); treat ambiguous mid-mutation as `RECOVERY_AMBIGUOUS` (idempotency key / read-back / surface to user — **never blind-retry**).
 
 ## Implications for Roadmap
 
-**Two researchers (ARCHITECTURE, PITFALLS) independently proposed nearly the SAME phase decomposition.** This convergent build order is dependency-ordered (survivability/storage primitives FIRST because they are the crux and everything else needs them) and matches FSB's prior milestone discipline (lifecycle/ownership primitives before the MCP surface, as in v0.9.60 / v0.9.69). The blocking-return machinery reuses the most existing code (`_handleStartAutomation`) and is therefore lowest-risk *last*, after the watcher is proven.
+Based on combined research, the suggested phase structure **continues integer phases from Phase 25** (per PROJECT.md). This sequence **reconciles the four researchers' orderings into one**: it honors PITFALLS' insistence that the **recipe schema + CI guard is a day-one invariant (P-A)** and that the **fetch primitive carries resume-sidecar + origin-pinning from the start (P-B)**; it follows ARCHITECTURE's dependency-driven "prove the cookie/CORS/CSRF fetch FIRST, then surface, then tier, then govern, then discover, then harden self-heal"; and it lands FEATURES' P1 MVP slice across the first four phases with the P2 discovery/learning tranche after. **Net: 7 phases** (Phase 25–31).
 
-### Phase 1: Storage + lifecycle primitives (the survivability foundation)
-**Rationale:** MV3 survivability is the stated crux; nothing can be tested for eviction-survival until these exist. Both researchers put this first.
-**Delivers:** `utils/trigger-store.js` (clone `mcp-task-store.js`, key `fsbTriggerRegistry`) + `utils/trigger-lifecycle.js` (clone `mcp-visual-session-lifecycle.js`: `fsbTrigger:<id>` alarm, restore, tab-close cleanup). Pure modules, Node-testable with mocked `chrome`; no behavior wired yet.
-**Uses:** `chrome.alarms` + `chrome.storage.session` + the two proven sidecar templates.
-**Avoids:** Pitfall 2 (SW eviction), Pitfall 3 (keepalive antipattern) -- designs for eviction from the start.
+> Ordering principle (all four agents agree): the **riskiest unknown is the page-context authenticated fetch (cookies/CORS/CSRF/SameSite)** — de-risk it first against ONE hardcoded recipe; **discovery-first is wrong** because a learned recipe is useless until invoke + routing exist to consume it and dangerous until consent gates it.
 
-### Phase 2: Trigger manager + fire-condition engine + value extraction + cap
-**Rationale:** The comparison/condition layer is the genuinely-new logic; it depends only on the storage primitives and is unit-testable in isolation.
-**Delivers:** `utils/trigger-manager.js` -- arm/stop/evaluate/fire; the four conditions (changed/threshold/equals/contains); `value-extractor.js` smart extraction (`Intl.NumberFormat().formatToParts()` locale normalize; raw text for changed/contains; `extract` override); cap enforcement mirroring `agent-registry.js` (1-64, default 8, fail-loud `TRIGGER_CAP_REACHED`).
-**Implements:** the trigger-manager component; the zero-dep numeric parser.
-**Avoids:** Pitfall 9 (locale numeric parse -- parse both sides, NaN -> `parse_error`), Pitfall 10 (flapping -- edge-trigger + hysteresis + fire-once default), Pitfall 16 (duplicate fires -- atomic fire/disarm + dedupe key).
+### Phase 25: Recipe schema + bundled interpreter + MV3 CI guard
+**Rationale:** Wall 1 is a day-one invariant — the schema's *closedness* and the CI guard must exist before any recipe is interpreted, or the design drifts into a ban. (PITFALLS P-A; foundational for everything downstream.)
+**Delivers:** versioned JSON Schema for recipes (endpoint template, method, auth-strategy **enum**, param schema, static request map, JMESPath extract); the **fixed bundled interpreter** dispatching to a closed enum of bundled auth-strategy handlers; `@cfworker/json-schema` validation in the SW; **CI guard** failing on `eval`/`new Function`/`import(` reachable from the recipe path + rejection of unknown opcodes; homepage Limited-Use/compliance note.
+**Uses:** `@cfworker/json-schema`, `jmespath` (vendored PATH A/B); the FSB-authored interpreter.
+**Avoids:** Pitfall 1 (WALL 1 ban).
+**Invariant watch:** MV3 (no server code; closed vocabulary).
 
-### Phase 3: SW glue -- onAlarm branch + SW-startup restore + tab-close cleanup
-**Rationale:** This is the point at which refresh-poll *survives eviction* -- the milestone crux -- verifiable via alarm-tick tests. Depends on Phases 1-2.
-**Delivers:** `background.js` -- the `fsbTrigger:` branch in the single `chrome.alarms.onAlarm` listener (before existing branches), `restoreTriggersFromStorage()` in the bootstrap pipeline, `chrome.tabs.onRemoved` trigger cleanup.
-**Avoids:** Pitfall 2 (eviction survival, now end-to-end), Pitfall 15 (browser-restart reconcile -- rehydrate registry, reconcile vs `chrome.alarms.getAll()`, drop fired/expired, fail loud if tab gone).
+### Phase 26: Authenticated fetch primitive (page MAIN-world) + execution-context contract + resume-sidecar + origin-pin
+**Rationale:** Wall 2 — the spine. Prove a same-origin credentialed `fetch` (incl. CSRF scrape) works through the `execute_js` seam against ONE hardcoded recipe; everything authenticated depends on this. Build SW-eviction survival and origin-pinning in from the start (cheaper than retrofitting; origin-pin must hold even on an un-governed path). (PITFALLS P-B + Pitfall 7; ARCHITECTURE P1.)
+**Delivers:** `capability-fetch.js` (the bundled MAIN-world fetch fn + CSRF/extract helpers) + minimal `capability-interpreter.js` wiring; resume-sidecar reuse (`mcp-task-store.js` / `chrome.storage.session`, `RECOVERY_AMBIGUOUS` for mid-mutation); origin-pin enforcement.
+**Uses:** existing `executeScript({world:'MAIN'})` seam, `run_task`/Lattice survival machinery.
+**Avoids:** Pitfalls 2, 7 (and 3's cross-origin leg at the primitive level).
+**Invariant watch:** INV-04 (no iterator change; invoke is a single bounded async op).
 
-### Phase 4: Content live-observe + read + pulse
-**Rationale:** The genuine moat and the highest-risk runtime piece; needs the SW side (Phases 2-3) to receive its reports and drive pulses.
-**Delivers:** `content/trigger-observe.js` (single-element debounced MutationObserver) + `content/messaging.js` router cases (`triggerObserveStart/Stop`, `triggerRead`, `triggerPulseStart/Stop`) + `content/visual-feedback.js` analyzing-pulse glow variant + `ViewportGlow` "watching" label.
-**Uses:** `MutationObserver`, the `dom-stream.js` start/stop/debounce template, the `HighlightManager` glow.
-**Avoids:** Pitfall 4 (observer leak -- disconnect everywhere + leak test), Pitfall 5 (broad-subtree perf -- narrowest node + `attributeFilter` + coalesce), Pitfall 6 (SPA re-render -- stable container + selector re-resolve each batch), Pitfall 8 (stale selector -- re-resolve via uniqueness scoring), UX overlay pitfalls (reduced-motion, guaranteed clear, no double-glow with `run_task`).
+### Phase 27: Lean MCP surface — `search_capabilities` + `invoke_capability` (outside TOOL_REGISTRY) + dispatcher routes + search/index
+**Rationale:** Once invoke works internally, expose the lean wire surface through the single chokepoint, and stand up the search/index the whole progressive-disclosure model depends on (search quality is the catalog's ceiling). (ARCHITECTURE P2; PITFALLS P-C; FEATURES P1.)
+**Delivers:** `mcp/src/tools/capabilities.ts` (schema-on-hit, ≤5 results, tab-origin biasing); `minisearch` index in the SW (`toJSON`/`loadJSON` snapshot); MODIFIED `runtime.ts`, `queue.ts` (`search_capabilities` read-only bypass), `mcp-tool-dispatcher.js`, `mcp-bridge-client.js`; **eval harness** (recall@k + wrong-invoke gate).
+**Uses:** `minisearch`, existing `jsonSchemaToZod()` + zod-3.
+**Addresses:** lean dispatcher / progressive disclosure (table stakes #2).
+**Avoids:** Pitfall 6 (recall/precision); INV-01 drift.
+**Invariant watch:** **INV-01** (existing ~63 tool schemas byte-identical; only 2 added; `.cjs` mirror untouched).
 
-### Phase 5: Refresh-poll mechanism (tab-owning background reload)
-**Rationale:** The server-style mechanism for static pages; depends on the SW glue (Phase 3) and the selector re-resolution shared with Phase 4.
-**Delivers:** alarm-driven reload of the trigger's OWN tab in the background + re-read + evaluate; per-tab reload coalescing; interval floor + jitter; challenge-page detection.
-**Uses:** `chrome.alarms`, v0.9.60 agent-scoped tab resolver (`resolveAgentTabOrError`), the existing `refresh`/page-stability path.
-**Avoids:** Pitfall 7 (anti-bot -- hard floor + jitter + challenge detection -> `blocked`, never fire on a CAPTCHA page), Pitfall 14 (focus-steal -- own the tab, background reload, NEVER `tabs.query({active:true})`, `TAB_NOT_OWNED` on cross-agent), Pitfall 8 (stale selector -- not-found escalation, never silent unchanged).
+### Phase 28: Catalog registry + router + tiers (T0/T1a/T1b) + autopilot path
+**Rationale:** With one front door proven, add tiering and the **autopilot branch** so both surfaces share the engine (INV-02 at the runtime layer). Bundled head (T1a) proves zero-install + the imperative path. (ARCHITECTURE P3; FEATURES P1 bundled head.)
+**Delivers:** `capability-catalog.js`, `capability-router.js` (origin-biased tier selection + fallback decision), `catalog/recipes/*.json` (T1b data), `catalog/handlers/*.js` (T1a code, 5–10 high-value services); MODIFIED `tool-executor.js` (autopilot branch).
+**Implements:** the "two front doors, one engine" + tiering pattern.
+**Avoids:** Anti-Pattern 1 (adding to `TOOL_REGISTRY`).
+**Invariant watch:** **INV-02** (shared runtime, no parallel autopilot stack); MV3 (data vs bundled-code split).
 
-### Phase 6: Tool registry + dispatcher routing (INV-01 / INV-02 verification point)
-**Rationale:** Registration is meaningless until the watcher works; this is where the additive-only schema discipline is verified and where autopilot gains trigger access.
-**Delivers:** `ai/tool-definitions.js` += 4 additive defs (regenerate `.cjs` mirror); `ws/mcp-tool-dispatcher.js` route tables += trigger aliases + `mcp:trigger-*` messages with the ownership gate.
-**Avoids:** Pitfall 11 (INV-01 wire drift -- keep schema-lock CI green, only additions; INV-02 -- one registry feeds autopilot + MCP).
+### Phase 29: Consent governance — per-origin Off/Ask/Auto + origin-pin + recipe integrity + audit log
+**Rationale:** Governance must wrap invoke **before** any learning/auto behavior ships; default-off keeps FSB supervised. This is the safety gate the whole "credential-replay" risk hinges on. (PITFALLS P-D; ARCHITECTURE P4; FEATURES P1.)
+**Delivers:** `capability-consent.js` (per-origin store, default Off, hydrate-on-load like `fsbChangeReportsEnabled`) + `capability-audit.js` (append-only; origin/slug/method/side-effect/consent/outcome; **no secrets**); recipe **signature verification** (Ed25519/JCS via Lattice receipts) before execute; mutation gating + disambiguation-before-mutate; control-panel UI; consent gate placed **right after `checkOwnershipGate`** in `dispatchMcpToolRoute`. Folds in the **legal-posture + denylist/ToS-respect** disclosure (PITFALLS P-H — low-code, high-leverage).
+**Avoids:** Pitfalls 3, 4 (policy half), 6 (disambiguation half).
+**Invariant watch:** supervised-safety; auth-local.
 
-### Phase 7: MCP server tools + blocking return
-**Rationale:** Reuses the most existing code (`_handleStartAutomation`) so it is lowest-risk last; closes the end-to-end MCP path. Depends on Phase 6.
-**Delivers:** `mcp/src/tools/trigger.ts` (4 `server.tool()`), `runtime.ts` registration, `queue.ts` read-only set += `get_trigger_status`/`list_triggers`; `ws/mcp-bridge-client.js` blocking `trigger()` heartbeat/settle handler (clone the `_handleStartAutomation` shape with a trigger-specific timeout ceiling + `partial_state`/`sw_evicted` on eviction).
-**Avoids:** Pitfall 1 (queue starvation -- read-only bypass for companions, watcher in background), Pitfall 13 (transport timeout -- 30s heartbeats + auto-convert blocking -> detached past the ceiling), Pitfall 12 (detached orphan -- owner binding + TTL + reap on disconnect/tab-close).
+### Phase 30: CDP Network discovery → recipe synthesis → learned recipes (T2) in procedural memory + capture-time redaction
+**Rationale:** Auto-growth is the highest-novelty layer; it depends on consent (only learn on Ask/Auto origins), the memory schema, and the router (to consume learned recipes). Last of the "build" tranche because it stacks on all prior layers. (ARCHITECTURE P5; PITFALLS P-F; FEATURES P2.)
+**Delivers:** `capability-discovery.js` (extend the existing `chrome.debugger.attach({tabId},'1.3')` block with `Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody`; register `onEvent` **synchronously at SW top-level**); recipe synthesis → `createProceduralMemory` promotion (per-origin, **shape not PII**); **redact-before-persist** (tested redactor); feed the `minisearch` index.
+**Uses:** existing `debugger`@`1.3` (no manifest change); `lib/memory/*`.
+**Avoids:** Pitfall 4 (capture-time leg); persisting PII/bodies (Anti-Pattern 5).
+**Invariant watch:** MV3 (no server code); INV-04 (no iterator change); CDP banner UX is a known quantity but capture windows must be minimized.
 
-### Phase 8: Cap UI + polish + docs + edge cases
-**Rationale:** Final composition + the conflict/coalescing edge cases that need the full system; the knock-on version bump.
-**Delivers:** `control_panel.html` trigger-cap control next to the agent cap; CHANGELOG + mcp/README trigger docs; refresh-poll-vs-live-observe same-tab conflict (`TRIGGER_TAB_WATCH_CONFLICT`), co-located reload coalescing; `fsb-mcp-server@0.10.0` minor bump.
-**Avoids:** the same-tab watch-mode conflict (Anti-Pattern 3), reload storms at scale.
+### Phase 31: Self-healing fallback hardening + recipe-rot detection + re-learn loop + tests/UAT
+**Rationale:** Tie recipe-break detection to the existing DOM tools so a broken recipe still completes the task — the flagship differentiator and the catch-all for Wall-2's un-replayable auth classes. Depends on everything. (ARCHITECTURE P6; PITFALLS P-G + Pitfall 7's ambiguity policy; FEATURES self-healing differentiator.)
+**Delivers:** typed `RECIPE_EXPIRED`/`RECOVERY_AMBIGUOUS` taxonomy + expected-shape assertions; `capability-router.js` fallback to `executeTool()` (DOM + site guides + `run_task`) that **completes the task then re-learns**; recipe quarantine/demote; mutation-ambiguity policy (no blind retry); schema-lock / parity / consent / provider tests across the 7 providers; UAT (live Chrome-extension UAT user-gated per FSB norm).
+**Uses:** existing DOM engine, 17-category site guides, `run_task`.
+**Avoids:** Pitfalls 5, 7 (recovery leg).
+**Invariant watch:** **INV-03** (provider parity); **INV-01** (schema-lock test green).
 
 ### Phase Ordering Rationale
 
-- **Dependency chain:** survivability primitives (1-3) must exist before eviction-survival can be tested (the crux); the condition engine (2) feeds the SW glue (3); content (4) and refresh-poll (5) both need the SW to receive reports and share the selector re-resolution layer; registration (6) and MCP (7) are meaningless until the watcher works; blocking-return (7) reuses the most code and is lowest-risk last.
-- **Grouping by architecture:** the three NEW `utils/` modules cluster (1-3) because that is where every SW-survivable lifecycle helper already lives; content (4) is a separate module by design (not bolted onto `dom-stream.js`, to avoid the locked streaming watchdog/wire shape); the two watch mechanisms (4-5) share a selector layer; the MCP surface (6-7) is the thin additive cap.
-- **Pitfall placement:** the crux pitfalls (2, 3, 15) land in the survivability phases; the moat pitfalls (4, 5, 6, 8) in live-observe; anti-bot/focus (7, 14) in refresh-poll; the MCP-contract pitfalls (1, 11, 12, 13) in registration + MCP.
+- **Dependencies (all four agents converge):** schema/CI-guard (Wall 1) and the page-context fetch (Wall 2) are the two foundations; search needs invoke to exist; tiering + the autopilot path need one front door proven; consent must precede any auto/learning; discovery needs consent + memory + router to consume what it learns; self-heal needs the full stack. Hence 25→31.
+- **Risk-first:** the riskiest unknown (cookie/CORS/CSRF/SameSite of the page fetch) is de-risked in Phase 26 against a hardcoded recipe; the ban-risk (recipe-as-code) is fenced in Phase 25 before any recipe runs.
+- **Invariant-respecting throughout:** no phase touches the `agent-loop.js` `setTimeout`-chained iterator (INV-04); the two new MCP tools are additive-only outside `TOOL_REGISTRY` (INV-01); parity is enforced at the runtime layer (INV-02); the cross-provider test gate is Phase 31 (INV-03).
+- **Avoids the two hard conflicts:** default-off vs auto-enable, and same-origin vs cross-origin replay — the safe side of both is locked in Phases 25/26/29 and never co-lands with a "make it frictionless" change.
+- **Posture, not count:** the sequence matches OpenTabs' *auto-grow mechanism* (Phase 30) and the *resilience* win (Phase 31); it sets **no "match N tools" metric** (the ~2,769 figure is a moving, AI-generated target).
 
 ### Research Flags
 
-Phases likely needing deeper research during planning (`/gsd:plan-phase --research-phase <N>`):
-- **Phase 4 (content live-observe):** the highest-cost / highest-risk piece. Flagged open questions: **live-observe re-arm after navigation** (BF-cache/SPA-nav re-injection + observer re-attach + fire delivery to an evicted SW); the stable-container + per-batch selector re-resolution detail.
-- **Phase 7 (MCP blocking return):** flagged open questions: the **blocking safety-ceiling value + detached TTL value** (concrete numbers -- "a few minutes" -> what); whether the `fire_envelope` is a flat record or borrows the Lattice Capability-Receipt shape.
-- **Phase 3 / Phase 5 (survivability + refresh-poll):** flagged open question: **cross-browser-restart resume semantics** (auto-resume refresh-poll if tab/URL re-establishable vs `needs_attention`; live-observe needs the tab present).
+Phases likely needing a deeper `--research-phase` spike during planning:
+- **Phase 25 (recipe schema):** *the highest-risk design artifact in the milestone.* The closed vocabulary must be expressive enough for long-tail REST/GraphQL (URL templating, header allowlist, param mapping, response extraction, pagination?) yet provably non-Turing-complete. Needs a dedicated schema-design + RHC-line spike.
+- **Phase 26 (fetch primitive):** spike **capture/replay fidelity for CSRF/ephemeral tokens** (per-session vs per-request nonce, Slack `xoxc`+`xoxd` split, persisted-query hash) and the **`getResponseBody` > ~1 MB** discovery limit — these define the head/tail/DOM-fallback split sizing.
+- **Phase 30 (discovery):** spike CDP `Network` capture details (`maxPostDataSize`, `extraInfo` raw-header/cookie events, detach/restore so the existing `Input` emulation isn't disrupted) and the redactor's completeness test.
+- **Phase 31 (self-heal):** spike the **failure-detection taxonomy** (which signals → DOM fallback without masking legitimate "no results") and the mutation-ambiguity recovery policy.
 
-Phases with well-documented in-tree patterns (skip research-phase):
-- **Phase 1 (storage + lifecycle primitives):** near byte-for-byte clones of `mcp-task-store.js` + `mcp-visual-session-lifecycle.js`.
-- **Phase 2 (cap + manager skeleton):** cap machinery mirrors `agent-registry.js`; condition logic is pure and well-specified (the locale-parse recipe is fully written in STACK.md).
-- **Phase 6 (tool registry + dispatcher):** additive registration is the exact pattern every prior tool family used; guarded by existing schema-lock CI.
-
-Deferred-feature research (NOT v0.11.0, but flagged for later milestones): **`% change` condition** (reopens edge-vs-level baseline); **K/M/B magnitude suffixes** in numeric extraction (support or explicitly reject -- a v1 decision but a v0.11.x expansion candidate).
+Phases with well-documented patterns (lighter research):
+- **Phase 27 (MCP surface):** strong in-repo precedents (`vault.ts` out-of-registry registration, `search_memory` progressive disclosure, `jsonSchemaToZod` bridge); `minisearch` is well-documented.
+- **Phase 28 (catalog/router) & Phase 29 (consent):** mirror the v0.11.0 `trigger` dual-path + the existing vault confirmation UX + `fsbChangeReportsEnabled` hydration; mostly composition of known patterns.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | `npm view` confirmed SDK `1.29.0` is current `latest` and zod `4.4.3` exists but is off FSB's line; MV3/`Intl` behaviors verified against official Chrome + MDN docs; zero-dep baseline read from `package.json`. |
-| Features | HIGH | Prior-art behaviors verified against official docs/source (Distill docs, changedetection.io source + issue #2715, Playwright API, Binance help, Chrome MV3 lifecycle); v1 scope traced 1:1 to PROJECT.md target features. |
-| Architecture | HIGH | Every named file/line verified against the working tree on `automation-worktree`; each new piece maps to a shipping precedent; integration points read directly from source. |
-| Pitfalls | HIGH/MEDIUM | HIGH for MV3 lifecycle / MCP contract / MutationObserver / FSB integration (Chrome docs + MCP spec + source this session); MEDIUM for anti-bot reload thresholds and locale-parse edge tables (community + site-specific). |
+| Stack | HIGH | All integration seams read directly from on-disk FSB source on `automation-worktree`; the three new libs' versions + zero-dep/eval-free status verified against npm + source (2026-06-19); MV3 CSP + RHC line verified against developer.chrome.com; Ajv breakage corroborated by a real bug. |
+| Features | HIGH | OpenTabs surface, Claude Code Tool Search mechanics, CSRF/session-replay security, self-healing benchmarks verified against primary/multiple sources. *One contested data point flagged* (Stacklok's adversarial 34% vs Anthropic's 74–88%) — the *pattern* is sound regardless; keep the ranker swappable. Exact live OpenTabs plugin/tool counts are point-in-time. |
+| Architecture | HIGH | Every integration point verified against on-disk source (file:line anchors); the execution-context decision is grounded in three already-shipping `world:'MAIN'` seams; phase order is dependency-derived and INV-preserving. |
+| Pitfalls | HIGH | Chrome policy, MV3 lifecycle, fetch-origin semantics, auth mechanics all verified against official docs + primary sources. *One MEDIUM:* OpenTabs `github-api.ts` was **not on disk** — its CSRF/persisted-query patterns are reconstructed from GraphQL/Slack/persisted-query primary sources (the *mechanics* are HIGH; the specific file is a proxy). |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-These are the researcher-flagged open questions that need resolution during planning/execution (they are *tuning/edge* decisions, not foundational risks):
-
-- **Live-observe re-arm after navigation** (Phase 4): exact mechanism for re-attaching the observer + redelivering a fire after BF-cache restore / SPA route change to a possibly-evicted SW. Handle via dedicated phase research; the low-freq watchdog alarm is the proposed backstop.
-- **Blocking safety-ceiling + detached TTL values** (Phase 7): PROJECT.md says "a few minutes" / "recommend detached beyond a few minutes" -- convert to concrete numbers (blocking ceiling, detached absolute TTL, reconnect grace). Decide during phase planning, document in REQUIREMENTS.
-- **Cross-browser-restart resume semantics** (Phase 3/5): do triggers auto-resume from storage or require re-creation? Recommend refresh-poll auto-resume if tab/URL re-establishable; live-observe -> `needs_attention` if the tab is gone. Decide + document.
-- **`% change` in v1** (deferred): out of the v0.11.0 condition list; confirm it stays P2 (reopens edge-vs-level baseline math).
-- **K/M/B magnitude suffixes** (Phase 2): support `$1.2K`/`1.2M`/`1.2B` or explicitly reject -> `parse_error`. Pick a v1 stance and test it.
-- **`fire_envelope` shape** (Phase 7): flat "what happened" record (old->new value, url, timestamp) vs a Lattice Capability-Receipt-shaped payload. Recommend flat for v0.11.0; receipt is a deferred candidate.
+- **Recipe schema expressiveness vs RHC line** — the central unknown; resolve in the Phase 25 spike (closed enum that still covers the realistic long tail). Hold the bright line: never `eval` a recipe field, never let a recipe carry JS/auth code, never grow server-authored control flow.
+- **Capture fidelity for CSRF / ephemeral / signed / persisted-query auth** — determines what is generically replayable vs **must** fall to DOM. Resolve in the Phase 26 spike; it directly sizes the head/tail/DOM split. (Hard boundary per Wall 2: per-request nonces, HMAC/signed params, short-TTL tokens are **not** generically replayable.)
+- **`getResponseBody` > ~1 MB returns null / only while buffered** — design discovery around it (call after `loadingFinished`, set `maxPostDataSize`, stash partials); Phase 30.
+- **Head/tail split sizing** — which services are bundled imperative handlers (T1a) vs declarative recipes (T1b) follows directly from the two capture/expressiveness spikes above; left to planning, informed by Phases 25/26.
+- **Ranker choice** — BM25 + regex (Claude Code's choice via `minisearch`) is the v1 default; keep it replaceable. Don't over-engineer the router in v1.
+- **Integration path A vs B** — vendor UMD/IIFE into `extension/lib/` (matches `lz-string` precedent) **or** emit one `capability-runtime.js` IIFE via a new esbuild entry; either keeps every executable byte inside the package (RHC-safe). Decide in Phase 25/26.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- **FSB codebase (authoritative for integration)** -- `extension/ai/tool-definitions.js` (shared registry, INV-01/02 surface), `mcp/src/tools/autopilot.ts` (`run_task` lifecycle template), `mcp/src/queue.ts` (TaskQueue serialization + read-only bypass), `mcp/src/tools/schema-bridge.ts` (JSON-Schema->zod + numeric coercion), `extension/utils/mcp-task-store.js` (snapshot store template), `extension/utils/mcp-visual-session-lifecycle.js` (alarm+storage+restore template), `extension/ws/mcp-bridge-client.js:979-1158` (blocking heartbeat/settle/600s/partial_state), `extension/content/dom-stream.js` (MutationObserver template), `extension/content/visual-feedback.js` (orange-glow + reduced-motion + beforeunload disconnect), `extension/utils/agent-registry.js` + `agent-tab-resolver.js` (cap + tab ownership), `extension/ai/lattice-runtime-adapter.js` (adapter -- evaluated, deliberately not used), `extension/background.js:13284` (onAlarm dispatcher), `extension/manifest.json` (permissions already granted), root `package.json` (zero-dep baseline), `.planning/PROJECT.md` (milestone scope + INV-01/02/03/04/06).
-- **Chrome MV3 official docs** -- service-worker lifecycle (30s idle eviction, 5-min request ceiling, event-revival); `chrome.alarms` reference (30s/0.5-min floor from Chrome 120, `persistAcrossSessions` Chrome 150+); Chrome 120 beta notes (alarm floor aligned to SW lifecycle).
-- **MDN** -- `MutationObserver` (page-lifetime observation), `disconnect()` (leak if never disconnected), `attributeFilter`/`takeRecords`; `Intl.NumberFormat().formatToParts()` (locale group/decimal reverse-parse).
-- **MCP TypeScript SDK (Context7, v1.29.0)** + `modelcontextprotocol.io` Tasks overview -- `server.tool`, `notifications/progress`, `_meta.progressToken`, `resetTimeoutOnProgress`/`maxTotalTimeout`, durable-handle-vs-blocking direction (SEP-1391, 2025-11-25 Tasks primitive).
-- **`npm view`** -- `@modelcontextprotocol/sdk` `latest = 1.29.0` (no bump needed); `zod = 4.4.3` (off FSB's v3 line).
-- **changedetection.io** -- source + issue #2715 (edge-vs-level fire confusion, real-world verified); Playwright Page API (`waitForFunction`/`waitForSelector`).
+- **FSB on-disk source** (`automation-worktree`, read directly): `extension/ai/tool-executor.js` + `extension/ws/mcp-bridge-client.js` (`world:'MAIN'`+`new Function`/`eval` fetch primitive), `extension/ws/mcp-tool-dispatcher.js` (single chokepoint, ownership gate, route tables, consent-hydration precedent), `extension/ai/tool-definitions.js` (55-tool `TOOL_REGISTRY`), `extension/ai/agent-loop.js` (`getPublicTools`, `setTimeout` iterator INV-04), `mcp/src/runtime.ts` + `mcp/src/tools/{vault,manual,read-only,observability,schema-bridge}.ts` (out-of-registry `server.tool()`, `search_memory` progressive disclosure, `jsonSchemaToZod`), `extension/lib/memory/memory-{schemas,storage}.js` (`createProceduralMemory`, inverted index, `MAX_MEMORIES`), `extension/background.js` (`chrome.debugger.attach(...,'1.3')` Input-only; `importScripts('lib/lz-string.min.js')`), `extension/manifest.json` (`debugger`/`<all_urls>`/`unlimitedStorage`/`scripting`), `esbuild.config.js` (D-17 SW byte-freeze), `extension/config/secure-config.js` (local-only secret pattern), `.planning/PROJECT.md` (v0.9.99 goal + INV-01..04, `run_task` Phase 239 survival, Lattice receipts/ResumePolicy).
+- **Chrome for Developers** — Manifest CSP (`script-src 'self' 'wasm-unsafe-eval'`), remote-hosted-code (RHC excludes data/JSON; prohibits "an interpreter to run complex commands fetched as data"), Limited-Use / User-Data (auth cookies = sensitive data; no third-party transfer), SW lifecycle (in-flight `fetch` counts as idle; ~30s idle kill), `chrome.debugger` (un-suppressable banner), CDP Network domain (`getResponseBody` ~1 MB cap, call after `loadingFinished`).
+- **Library sources** — `@cfworker/json-schema` README (built for no-`eval` runtimes), `jmespath.js` source (verified eval-free), MiniSearch (zero-dep, SW-safe, field boosting, `loadJSON`/`toJSON`); npm versions verified 2026-06-19.
+- **Security/standards** — OWASP CSRF Cheat Sheet + MDN CSRF (per-request vs per-session token replayability), MDN Using Fetch + SameSite (web.dev / PortSwigger), Same-origin / CORS (Wikipedia), GraphQL APQ (Apollo / Crawlee / Doyensec), Slack `xoxc`/`xoxd` mechanics, `hiQ v. LinkedIn` / CFAA analyses.
 
 ### Secondary (MEDIUM confidence)
-- Web change monitors -- Distill.io docs, Visualping blog, Browse AI docs (condition vocabulary, interval tiers, region selection, webhook delivery).
-- Price/crypto trackers -- Keepa/CamelCamelCamel comparisons, Binance/Coinbase price-alert help (above/below, "Change is Over", 24H change).
-- Synthetic/uptime monitors -- Cronitor, UptimeRobot, Google Cloud uptime (assertion grammar, 30s/1/5/15-min intervals).
-- Flapping/hysteresis literature -- Splunk Lantern, Datadog recovery thresholds, Prometheus `keep_firing_for`, Grafana #6202.
-- MutationObserver perf/leak -- whatwg/dom#482, fsjs.dev, nolanlawson.com, dev.to "every observer disconnected" test pattern.
-- MCP transport timeouts -- modelcontextprotocol/inspector#880, anthropics/claude-code#58687 (hosts time out long calls despite progress).
-- chromium-extensions group (alarms wake the SW; ~30s/1min minimum reality).
+- **Claude Code Tool Search / MCP context-bloat** — lazy schema / `defer_loading` / regex+BM25 / 3–5 tools-per-query / accuracy figures (atcyrus, Software Thug, AgentMarketCap, RAG-MCP).
+- **Self-healing benchmarks** — locator-fallback 40–70% vs intent-based 75–90% (Shiplight, Browserless, Browser Harness).
+- **Ajv-in-MV3 breakage** — MCP-SuperAssistant #171 / ajv #2527 (corroborates the eval-CSP constraint with a real bug).
+- **OpenTabs reference** — repo README + `plugins/` directory (counts point-in-time; `fetchFromPage` / CSRF scrape / persisted-query-hash pattern being matched).
 
-### Tertiary (LOW confidence -- needs validation during planning)
-- arxiv 2311.10911 (reCAPTCHAv2 study -- quick-succession reloads -> CAPTCHA ~14 tries human / immediate for automation) and ScraperAPI anti-bot blog -- anti-bot reload thresholds are site-specific; use to justify the floor + jitter + challenge-detection posture, not exact numbers.
-- xjavascript.com locale-parsing posts -- confirm `parseFloat` is locale-blind; the concrete locale edge table (DE/FR/NBSP/parens/`%`) should be validated via tests during Phase 2.
+### Tertiary (LOW confidence — flagged for validation)
+- **Stacklok "MCP Optimizer" 34%/94% vs Anthropic 74–88%** — adversarial vendor framing; treat the pattern as sound, keep the ranker swappable.
+- **OpenTabs `github-api.ts` specifics** — file not on disk; CSRF/persisted-query patterns reconstructed from primary GraphQL/Slack sources (mechanics HIGH, the specific file MEDIUM).
 
 ---
-*Research completed: 2026-06-15*
+*Research completed: 2026-06-19*
 *Ready for roadmap: yes*
