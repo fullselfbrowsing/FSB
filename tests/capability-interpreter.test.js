@@ -182,6 +182,39 @@ const badMethod = I.interpretRecipe(Object.assign({}, valid, { method: 'CONNECT'
 check(badMethod && badMethod.success === false && badMethod.code === 'RECIPE_OPCODE_INVALID',
   'recipe with bad method enum -> RECIPE_OPCODE_INVALID via validateRecipe (got ' + (badMethod && badMethod.code) + ')');
 
+// ---- 6b. HI-01: a SCHEMA-VALID recipe whose intentionally-open params carries
+//          an unresolvable $ref (the cfworker Validator constructor THROWS on it)
+//          must RETURN a typed RECIPE_SCHEMA_INVALID -- interpretRecipe must NEVER
+//          throw on hostile recipe data (D-15 "The public API never throws").
+//          Each params shape passes validateRecipe (params is just {type:object})
+//          but would crash the param-validator construction without the try/catch.
+const HOSTILE_PARAMS = [
+  ['remote $ref', { '$ref': 'https://evil.example/x.json' }],
+  ['broken local pointer $ref', { type: 'object', properties: { id: { '$ref': '#/does/not/exist' } } }],
+  ['$dynamicRef', { '$dynamicRef': '#meta' }],
+  ['$ref inside allOf array', { allOf: [{ '$ref': 'https://evil.example/y.json' }] }]
+];
+HOSTILE_PARAMS.forEach(function(entry) {
+  const label = entry[0];
+  const params = entry[1];
+  // endpoint with no {var} + empty request so the params gate is the unit under test.
+  const recipe = Object.assign({}, valid, { params: params, endpoint: '/api/things', request: {} });
+  // Sanity: the recipe is still schema-valid (params is only asserted {type:object}).
+  check(globalThis.FsbCapabilityRecipeSchema.validateRecipe(recipe).success === true,
+    'HI-01 precondition: recipe with ' + label + ' params is schema-valid');
+  let result;
+  let threw = false;
+  try {
+    result = I.interpretRecipe(recipe, { id: 'x' });
+  } catch (e) {
+    threw = true;
+  }
+  check(!threw,
+    'interpretRecipe does NOT throw on hostile params (' + label + ') -- never-throws contract');
+  check(!threw && result && result.success === false && result.code === 'RECIPE_SCHEMA_INVALID',
+    'interpretRecipe returns RECIPE_SCHEMA_INVALID on hostile params (' + label + ') (got ' + (result && result.code) + ')');
+});
+
 // ---- 7. CAP-02 NO-NETWORK PROOF: recorders never fired. --------------------
 // This is the load-bearing Phase 26/27 boundary assertion.
 check(executeScriptCalls.length === 0,

@@ -92,6 +92,33 @@
     return out;
   }
 
+  // ---- $ref / $dynamicRef pre-scan for the untrusted params sub-schema -----
+  //
+  // recipe.params is an intentionally-open JSON-Schema sub-document (D-06). A
+  // recipe must NOT be able to pull a remote schema or reach an out-of-document
+  // pointer: an unresolvable $ref makes the cfworker Validator constructor throw
+  // (handled by the HI-01 try/catch), and a $dynamicRef is silently lenient. As
+  // defense-in-depth (HI-01, the "encouraged" half) we reject ANY $ref/$dynamicRef
+  // anywhere in the params sub-schema up front, so a recipe can only ever describe
+  // a self-contained shape. Walks own enumerable keys with a hasOwnProperty guard;
+  // arrays and nested objects are recursed.
+
+  function paramsHasRemoteRef(node) {
+    if (!node || typeof node !== 'object') { return false; }
+    if (Array.isArray(node)) {
+      for (var i = 0; i < node.length; i++) {
+        if (paramsHasRemoteRef(node[i])) { return true; }
+      }
+      return false;
+    }
+    for (var key in node) {
+      if (!Object.prototype.hasOwnProperty.call(node, key)) { continue; }
+      if (key === '$ref' || key === '$dynamicRef') { return true; }
+      if (paramsHasRemoteRef(node[key])) { return true; }
+    }
+    return false;
+  }
+
   // ---- Hand-rolled {var} endpoint templater (D-04) ------------------------
   //
   // Substitute ONLY validated params; reject leftover/unknown placeholders. Each
@@ -218,13 +245,37 @@
     var safeArgs = (args && typeof args === 'object') ? args : {};
 
     // 2. Invoke-args gate: validate against the recipe's params sub-schema.
-    //    recipe.params is an optional, intentionally-open JSON-Schema document.
+    //    recipe.params is an optional, intentionally-open JSON-Schema document
+    //    (D-06) accepted verbatim from the untrusted recipe -- validateRecipe only
+    //    asserts it is {type:'object'} and lets any shape through. The cfworker
+    //    Validator constructor THROWS (uncaught) when the supplied schema carries
+    //    an unresolvable $ref (e.g. params:{ "$ref":"https://evil/x.json" } or a
+    //    "#/does/not/exist" pointer), and .validate() can throw on other hostile
+    //    sub-schemas. D-15 promises "The public API never throws", so BOTH the
+    //    construction AND the validate call are wrapped and converted to a typed
+    //    RECIPE_SCHEMA_INVALID return (HI-01).
     if (recipe.params && typeof recipe.params === 'object') {
-      var paramValidator = getFSBRecipeValidator(recipe.params, '2020-12');
-      if (!paramValidator) {
-        return createRecipeError('RECIPE_SCHEMA_INVALID', { error: 'validator unavailable' });
+      // Defense-in-depth: refuse a params sub-schema that tries to pull a remote
+      // or out-of-document schema via $ref/$dynamicRef (HI-01). The try/catch
+      // below is still the load-bearing no-throw guarantee for anything this
+      // pre-scan does not catch.
+      if (paramsHasRemoteRef(recipe.params)) {
+        return createRecipeError('RECIPE_SCHEMA_INVALID', { reason: 'invoke-params-ref' });
       }
-      var paramResult = paramValidator.validate(safeArgs);
+      var paramValidator;
+      var paramResult;
+      try {
+        paramValidator = getFSBRecipeValidator(recipe.params, '2020-12');
+        if (!paramValidator) {
+          return createRecipeError('RECIPE_SCHEMA_INVALID', { error: 'validator unavailable' });
+        }
+        paramResult = paramValidator.validate(safeArgs);
+      } catch (e) {
+        return createRecipeError('RECIPE_SCHEMA_INVALID', {
+          reason: 'invoke-params-schema',
+          error: (e && e.message) ? e.message : String(e)
+        });
+      }
       if (!paramResult || paramResult.valid !== true) {
         return createRecipeError('RECIPE_SCHEMA_INVALID', {
           reason: 'invoke-params',
