@@ -215,6 +215,32 @@ HOSTILE_PARAMS.forEach(function(entry) {
     'interpretRecipe returns RECIPE_SCHEMA_INVALID on hostile params (' + label + ') (got ' + (result && result.code) + ')');
 });
 
+// ---- 6c. NI-01: prototype-shaped placement keys (__proto__ / constructor)
+//          round-trip as plain OWN data in the bound spec instead of silently
+//          vanishing (fillPlacementMap builds on Object.create(null)), and they
+//          do NOT pollute Object.prototype. The request.query map is built via
+//          JSON.parse so __proto__ is a GENUINE own key, exactly as a real
+//          catalog recipe (parsed from JSON) would deliver it.
+const protoRecipe = Object.assign({}, valid, {
+  params: { type: 'object' },        // open params so any args bind
+  endpoint: '/api/things',           // no {var} -> templater is not the gate
+  request: { query: JSON.parse('{"__proto__":"x","constructor":"c","normal":"n"}') }
+});
+const protoResult = I.interpretRecipe(protoRecipe, {});
+check(protoResult && protoResult.success === true,
+  'NI-01: recipe with prototype-shaped placement keys still binds (got ' + (protoResult && protoResult.code) + ')');
+if (protoResult && protoResult.success) {
+  const q = protoResult.spec.query;
+  check(Object.prototype.hasOwnProperty.call(q, '__proto__') && q['__proto__'] === 'x',
+    'NI-01: __proto__ placement key round-trips as own data (got ' + JSON.stringify(q && q['__proto__']) + ')');
+  check(Object.prototype.hasOwnProperty.call(q, 'constructor') && q['constructor'] === 'c',
+    'NI-01: constructor placement key round-trips as own data');
+  check(Object.prototype.hasOwnProperty.call(q, 'normal') && q['normal'] === 'n',
+    'NI-01: a normal sibling key is unaffected');
+  check(Object.prototype['x'] === undefined,
+    'NI-01: Object.prototype is NOT polluted by the __proto__ placement value');
+}
+
 // ---- 7. CAP-02 NO-NETWORK PROOF: recorders never fired. --------------------
 // This is the load-bearing Phase 26/27 boundary assertion.
 check(executeScriptCalls.length === 0,

@@ -179,7 +179,13 @@
   }
 
   function fillPlacementMap(map, params, encode) {
-    var out = {};
+    // NI-01: build the output on a NULL prototype so prototype-shaped keys
+    // (__proto__ / constructor / prototype) round-trip as plain own data instead
+    // of silently vanishing. With a normal {} object, out['__proto__'] = x sets
+    // the prototype rather than an own key, dropping the field from the result.
+    // (A recipe with such a placement key does not pollute Object.prototype --
+    // the value is a string -- but the silent data-drop confuses debugging.)
+    var out = Object.create(null);
     if (!map || typeof map !== 'object') {
       return { ok: true, value: out };
     }
