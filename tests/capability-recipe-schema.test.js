@@ -124,6 +124,64 @@ const sample = M.validateRecipe(readFixture('reject-field-script.json'));
 check(sample && sample.code === sample.errorCode && typeof sample.errorCode === 'string',
   'rejection sets both code and errorCode (errors.ts resolveErrorKey contract)');
 
+// ---- 10. ME-01: non-object input is normalized to a typed RECIPE_SCHEMA_INVALID
+//          and NEVER throws (D-15 "RETURNS (never throws)"). The literal
+//          `undefined` previously reached cfworker and threw; now it is gated up
+//          front along with null / primitive / array. -------------------------
+[
+  ['undefined', undefined],
+  ['null', null],
+  ['number 42', 42],
+  ['string', 'str'],
+  ['array', []],
+  ['boolean', true]
+].forEach(function(entry) {
+  const label = entry[0];
+  const value = entry[1];
+  let result;
+  let threw = false;
+  try {
+    result = M.validateRecipe(value);
+  } catch (e) {
+    threw = true;
+  }
+  check(!threw,
+    'validateRecipe(' + label + ') does NOT throw (no-throw contract)');
+  check(!threw && result && result.success === false && result.code === 'RECIPE_SCHEMA_INVALID',
+    'validateRecipe(' + label + ') -> RECIPE_SCHEMA_INVALID (got ' + (result && result.code) + ')');
+});
+
+// ---- 11. ME-02: origin is gated to a scheme+authority pattern. A javascript:
+//          pseudo-scheme, an ftp: scheme, and a full URL with a path/query are
+//          all rejected; a bare https origin is still accepted (valid fixture). -
+[
+  ['javascript:alert(1)', 'javascript: pseudo-scheme'],
+  ['ftp://x', 'ftp: scheme'],
+  ['https://example.com/path?x=1', 'https URL with path+query (not a bare origin)']
+].forEach(function(entry) {
+  const badOrigin = entry[0];
+  const desc = entry[1];
+  const r = M.validateRecipe(Object.assign({}, valid, { origin: badOrigin }));
+  check(r && r.success === false,
+    'origin "' + badOrigin + '" (' + desc + ') -> REJECTED (got ' + JSON.stringify(r && r.code) + ')');
+});
+
+// ---- 12. ME-03: endpoint is gated to a single leading slash that is not
+//          protocol-relative and forbids '..' traversal. A protocol-relative
+//          //evil.com and a /a/../b traversal are rejected; the valid fixture's
+//          /api/{id} is still accepted. ------------------------------------
+[
+  ['//evil.com/x', 'protocol-relative endpoint'],
+  ['/a/../b', "single '..' traversal segment"],
+  ['/a/../../b', "multi '..' traversal"]
+].forEach(function(entry) {
+  const badEndpoint = entry[0];
+  const desc = entry[1];
+  const r = M.validateRecipe(Object.assign({}, valid, { endpoint: badEndpoint }));
+  check(r && r.success === false,
+    'endpoint "' + badEndpoint + '" (' + desc + ') -> REJECTED (got ' + JSON.stringify(r && r.code) + ')');
+});
+
 // ---- report ----------------------------------------------------------------
 console.log('  passed:', passed);
 console.log('  failed:', failed);

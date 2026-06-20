@@ -229,6 +229,16 @@
   // would be mis-reported as RECIPE_UNKNOWN_FIELD.
 
   function validateRecipe(recipe) {
+    // 0. Normalize non-object input up front, BEFORE the validator is touched
+    //    (ME-01). null / 42 / "str" / [] / {} are all handled downstream, but the
+    //    literal `undefined` slips through findForbiddenField's guard and then
+    //    makes cfworker throw "Instances of \"undefined\" type are not supported."
+    //    -- breaking the D-15 "RETURNS (never throws)" contract. Reject every
+    //    non-plain-object (undefined/null/array/primitive) with a typed result.
+    if (recipe === null || recipe === undefined || typeof recipe !== 'object' || Array.isArray(recipe)) {
+      return createRecipeError('RECIPE_SCHEMA_INVALID', { error: 'recipe is not an object' });
+    }
+
     // 1. Defense-in-depth: forbidden script-like names -> name the field.
     var forbidden = findForbiddenField(recipe);
     if (forbidden) {
