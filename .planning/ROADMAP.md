@@ -60,7 +60,7 @@
   4. A smoke test asserts the logged-in (not logged-out) data shape is returned from the chosen execution context against a real HttpOnly-cookie site.
 **Plans**: 3 plans
 - [x] 27-01-PLAN.md — Foundations: interpreter query-fold + origin-pin (RECIPE_ORIGIN_MISMATCH), RECOVERY_AMBIGUOUS errors.ts registration, capability-fetch.js allowlist entry (FETCH-03, FETCH-04)
-- [ ] 27-02-PLAN.md — capability-fetch.js primitive (in-page func + SW wrapper + active-tab pin + resume-sidecar + SW-side extract + classifyOnWake), hardcoded github recipe, FETCH-01..05 CI suite (FETCH-01..05)
+- [x] 27-02-PLAN.md — capability-fetch.js primitive (in-page func + SW wrapper + active-tab pin + resume-sidecar + SW-side extract + classifyOnWake), hardcoded github recipe, FETCH-01..05 CI suite (FETCH-01..05)
 - [ ] 27-03-PLAN.md — Live FETCH-05 logged-in-shape closeout: 27-HUMAN-UAT.md (human_needed) + human-gated checkpoint (FETCH-05)
 **UI hint**: yes
 
@@ -128,7 +128,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 3/3 | Complete    | 2026-06-20 |
-| 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 1/3 | In Progress|  |
+| 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 2/3 | In Progress|  |
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 0/TBD | Not started | - |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 0/TBD | Not started | - |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 0/TBD | Not started | - |
