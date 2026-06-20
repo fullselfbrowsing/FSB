@@ -103,6 +103,24 @@ try { importScripts('utils/diagnostics-ring-buffer.js'); } catch (e) { console.e
 try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB] Failed to load redactForLog.js:', e.message); }
 try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
 
+// Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
+// data spine. The three vendored libraries load FIRST so their classic-script
+// globals (lowercase `jmespath`, `MiniSearch`, `CfworkerJsonSchema`) exist
+// before the recipe-schema module's typeof-guarded accessors read them; the
+// recipe-schema module loads AFTER (it calls CfworkerJsonSchema.Validator only
+// at validateRecipe runtime). Concrete order: jmespath -> minisearch ->
+// cfworker-json-schema -> capability-recipe-schema. minisearch is vendored now
+// per CAP-05 but not wired until Phase 28 (search). cfworker-json-schema is the
+// eval-free IIFE-bundled JSON Schema validator (a top-level import/export is a
+// SyntaxError under importScripts in a classic service worker, so it MUST be
+// IIFE-bundled, not vendored raw). Each wrapped in try/catch mirroring the
+// lz-string precedent above; D-05 keeps these edits additive (manifest and
+// permissions unchanged; background.js is byte-frozen as an esbuild input).
+try { importScripts('lib/jmespath.min.js'); } catch (e) { console.error('[FSB] Failed to load jmespath.min.js:', e.message); }
+try { importScripts('lib/minisearch.min.js'); } catch (e) { console.error('[FSB] Failed to load minisearch.min.js:', e.message); }
+try { importScripts('lib/cfworker-json-schema.min.js'); } catch (e) { console.error('[FSB] Failed to load cfworker-json-schema.min.js:', e.message); }
+try { importScripts('utils/capability-recipe-schema.js'); } catch (e) { console.error('[FSB] Failed to load capability-recipe-schema.js:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 
