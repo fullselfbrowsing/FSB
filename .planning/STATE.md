@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: planning
+status: executing
 stopped_at: Phase 27 context gathered (assumptions mode)
-last_updated: "2026-06-20T06:51:56.951Z"
-last_activity: 2026-06-20
+last_updated: "2026-06-20T07:37:17.793Z"
+last_activity: 2026-06-20 -- Phase 27 planning complete
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 3
+  total_plans: 6
   completed_plans: 5
   percent: 13
 ---
@@ -31,8 +31,8 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 27 of 32 (Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar) — next phase of this milestone
 Plan: — (none yet)
-Status: Ready to plan
-Last activity: 2026-06-20
+Status: Ready to execute
+Last activity: 2026-06-20 -- Phase 27 planning complete
 
 Progress: [█░░░░░░░░░] 14%
 
