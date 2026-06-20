@@ -46,7 +46,7 @@
   4. The interpreter plus the three new libraries (minisearch, jmespath, @cfworker/json-schema) ship inside the extension package with no remotely-hosted code and no manifest/permission change.
 **Plans**: 3 plans
 - [x] 26-01-PLAN.md — Vendor the 3 libraries + closed-vocabulary recipe schema + fixtures (CAP-01, CAP-05)
-- [ ] 26-02-PLAN.md — Bundled interpreter (validate-bind-emit-spec, no network) + auth-strategy stubs + RECIPE_ error passthrough (CAP-02, CAP-03)
+- [x] 26-02-PLAN.md — Bundled interpreter (validate-bind-emit-spec, no network) + auth-strategy stubs + RECIPE_ error passthrough (CAP-02, CAP-03)
 - [ ] 26-03-PLAN.md — Recipe-path CI guard (allowlist grep + fixture run) wired into validate:extension (CAP-04)
 
 ### Phase 27: Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar

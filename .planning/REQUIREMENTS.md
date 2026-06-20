@@ -10,8 +10,8 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 ### CAP — Capability Runtime & Recipe Interpreter
 
 - [x] **CAP-01**: A versioned JSON Schema defines a recipe as pure data — endpoint template, method, an auth-strategy enum, parameter schema, static request/header map, and a read-only JMESPath extract — with no executable/script fields.
-- [ ] **CAP-02**: A fixed, bundled interpreter executes a recipe by binding its data to a closed enum of bundled auth-strategy handlers, never via `eval`/`new Function`/`import()`.
-- [ ] **CAP-03**: Recipes and invocation parameters are validated in the service worker by an eval-free JSON Schema validator before execution; invalid or unknown-opcode recipes are rejected with a typed error.
+- [x] **CAP-02**: A fixed, bundled interpreter executes a recipe by binding its data to a closed enum of bundled auth-strategy handlers, never via `eval`/`new Function`/`import()`.
+- [x] **CAP-03**: Recipes and invocation parameters are validated in the service worker by an eval-free JSON Schema validator before execution; invalid or unknown-opcode recipes are rejected with a typed error.
 - [ ] **CAP-04**: A CI guard fails the build on any `eval`/`new Function`/`import(` reachable from the recipe path and on any recipe field outside the closed vocabulary.
 - [x] **CAP-05**: The interpreter and the three new libraries (minisearch, jmespath, @cfworker/json-schema) ship inside the extension package; no remotely-hosted code and no manifest/permission change is introduced.
 
@@ -111,8 +111,8 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CAP-01 | Phase 26 | Complete |
-| CAP-02 | Phase 26 | Pending |
-| CAP-03 | Phase 26 | Pending |
+| CAP-02 | Phase 26 | Complete |
+| CAP-03 | Phase 26 | Complete |
 | CAP-04 | Phase 26 | Pending |
 | CAP-05 | Phase 26 | Complete |
 | FETCH-01 | Phase 27 | Pending |
