@@ -65,6 +65,10 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'BADGE_NOT_ALLOWED',
   // v0.9.62 removal of explicit visual-session tools (Phase 258 Plan 01)
   'TOOL_REMOVED',
+  // v0.9.99 Native Capability Catalog (Phase 27 FETCH-04): mid-mutation SW-eviction
+  // ambiguity. Surfaced verbatim so the MCP host can distinguish "ambiguous -- ask
+  // the user" from a generic action_rejected. INV-01-safe (no MCP tool schema touched).
+  'RECOVERY_AMBIGUOUS',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];

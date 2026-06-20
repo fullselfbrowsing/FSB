@@ -53,6 +53,7 @@
 
 import { readFileSync } from 'node:fs';
 import { readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -85,6 +86,12 @@ const RECIPE_PATH_ALLOWLIST = [
   'extension/utils/capability-recipe-schema.js',
   'extension/utils/capability-interpreter.js',
   'extension/utils/capability-auth-strategies.js',
+  // Phase 27 (FETCH-01, D-02): registered AHEAD of the file's creation (Plan 02
+  // creates capability-fetch.js). Safe -- Check 1 skips a not-yet-existent path
+  // (safeRead null -> continue) and Check 4 only FAILS on a DISK file ABSENT from
+  // the allowlist, so naming it now keeps the guard green and pre-arms the drift
+  // check for when the file lands.
+  'extension/utils/capability-fetch.js',
   'extension/lib/cfworker-json-schema.min.js',
   'extension/lib/jmespath.min.js',
   'extension/lib/minisearch.min.js',
@@ -120,6 +127,15 @@ const SCAN_LIST = RECIPE_PATH_ALLOWLIST.concat(EXTRA);
 for (const rel of SCAN_LIST) {
   // EXTRA paths may be absolute (temp dirs); allowlist paths are repo-relative.
   const abs = rel.startsWith('/') ? rel : resolve(ROOT, rel);
+  // A recipe-path module may be REGISTERED on the allowlist ahead of its creation
+  // (e.g. Phase 27 names extension/utils/capability-fetch.js before Plan 02 writes
+  // it) so the disk-drift check (Check 4) is pre-armed and never silently skips a
+  // capability module once it lands. An absent file trivially contains no forbidden
+  // construct, so skip it here WITHOUT recording a failure (existsSync pre-check --
+  // safeRead would otherwise push an ENOENT failure and fail the build). Check 4
+  // independently FAILS on any on-disk capability module missing from the allowlist,
+  // so this skip cannot mask an unscanned file that actually exists.
+  if (!existsSync(abs)) continue;
   const text = safeRead(abs, `recipe-path allowlist (${rel})`);
   if (text === null) continue;
   for (const f of FORBIDDEN) {
