@@ -116,8 +116,14 @@ check(okResult && okResult.success === true,
   'valid recipe + valid args -> { success:true } (got ' + JSON.stringify(okResult && okResult.code) + ')');
 if (okResult && okResult.success) {
   const spec = okResult.spec;
-  check(spec.url === '/api/abc%20123',
-    'spec.url has the {id} substituted and encodeURIComponent-escaped (got ' + spec.url + ')');
+  // Phase 27 (FETCH-03, D-09): spec.url is now the EFFECTIVE post-query-fold URL.
+  // valid-recipe.json carries request.query {id:"{id}"}, so the built query map
+  // folds onto the templated path: the {id} endpoint placement is substituted +
+  // encodeURIComponent-escaped (/api/abc%20123) AND the same id is appended as a
+  // query pair (?id=abc%20123, value NOT double-encoded -- already escaped by
+  // buildRequest). The bare templated path is no longer the bound spec.url.
+  check(spec.url === '/api/abc%20123?id=abc%20123',
+    'spec.url is the effective folded URL: {id} substituted+escaped in the path AND appended as ?id (no double-encode) (got ' + spec.url + ')');
   check(spec.method === 'GET', 'spec.method carried from recipe');
   check(spec.origin === 'https://example.com', 'spec.origin carried from recipe');
   check(spec.extract === 'data.items[*].name', 'spec.extract carried (unevaluated) from recipe');
@@ -240,6 +246,81 @@ if (protoResult && protoResult.success) {
   check(Object.prototype['x'] === undefined,
     'NI-01: Object.prototype is NOT polluted by the __proto__ placement value');
 }
+
+// ---- 6d. FETCH-03 (Phase 27): query-fold into spec.url + origin-pin re-assertion.
+// interpretRecipe now folds the built query map into spec.url BEFORE re-asserting
+// the origin against the EFFECTIVE (post-fold) target (D-09 then D-08 part 1). A
+// cross-origin OR protocol-relative effective target is rejected with the typed
+// RECIPE_ORIGIN_MISMATCH (dual code+errorCode) before any side effect.
+//
+// Reachability note: the recipe schema gates `endpoint` to a single-leading-slash,
+// non-protocol-relative path and rejects an absolute/`//`-leading endpoint, and
+// buildRequest encodeURIComponent-escapes every query VALUE -- so a `{var}`-injected
+// absolute query value cannot survive to re-target the origin. The most reachable
+// construction that still drives a SCHEMA-VALID recipe to a foreign EFFECTIVE origin
+// is a single-leading-slash endpoint whose SECOND character is a backslash
+// (`/\evil.com`): the schema's `^/(?!/)` guard permits it, but the WHATWG URL parser
+// normalizes the backslash to a slash for special schemes, so
+// `new URL('/\evil.com', origin)` re-targets to https://evil.com. This is exactly the
+// effective-target escape the interpreter's pin exists to catch beyond the schema.
+
+// (a) same-origin query folds into spec.url (value not double-encoded).
+const foldRecipe = Object.assign({}, valid, {
+  endpoint: '/api/{id}',
+  params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+  request: { query: { id: '{id}' } }
+});
+const foldOk = I.interpretRecipe(foldRecipe, { id: 'a b' });
+check(foldOk && foldOk.success === true,
+  'FETCH-03(a): same-origin recipe with a request.query placement binds (got ' + (foldOk && foldOk.code) + ')');
+check(foldOk && foldOk.success === true && foldOk.spec.url === '/api/a%20b?id=a%20b',
+  'FETCH-03(a): query folds onto spec.url with a ?key=value suffix, value escaped once not twice (got ' + (foldOk && foldOk.spec && foldOk.spec.url) + ')');
+// fold uses & when the templated path already contains a ?.
+const foldAmp = I.interpretRecipe(Object.assign({}, valid, {
+  endpoint: '/api/things?fixed=1',
+  params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+  request: { query: { id: '{id}' } }
+}), { id: 'z' });
+check(foldAmp && foldAmp.success === true && foldAmp.spec.url === '/api/things?fixed=1&id=z',
+  'FETCH-03(a): a templated path that already has ? gets the folded pair joined with & (got ' + (foldAmp && foldAmp.spec && foldAmp.spec.url) + ')');
+
+// (b) cross-origin EFFECTIVE target -> RECIPE_ORIGIN_MISMATCH (no side effect).
+const esBefore_xorigin = executeScriptCalls.length;
+const fBefore_xorigin = fetchCalls.length;
+const crossOrigin = I.interpretRecipe(Object.assign({}, valid, {
+  origin: 'https://github.com',
+  endpoint: '/\\evil.com',            // schema-valid single leading slash; URL parser -> https://evil.com
+  params: { type: 'object' },
+  request: {}
+}), {});
+check(crossOrigin && crossOrigin.success === false
+  && crossOrigin.code === 'RECIPE_ORIGIN_MISMATCH' && crossOrigin.errorCode === 'RECIPE_ORIGIN_MISMATCH',
+  'FETCH-03(b): cross-origin effective target -> RECIPE_ORIGIN_MISMATCH on both code and errorCode (got ' + (crossOrigin && crossOrigin.code) + ')');
+check(executeScriptCalls.length === esBefore_xorigin && fetchCalls.length === fBefore_xorigin,
+  'FETCH-03(b): cross-origin rejection fired NO executeScript and NO fetch (recorders unchanged at rejection)');
+
+// (c) protocol-relative EFFECTIVE target -> RECIPE_ORIGIN_MISMATCH (no side effect).
+// A leading slash + two backslashes normalizes to //evil.com under the URL parser.
+const esBefore_proto = executeScriptCalls.length;
+const fBefore_proto = fetchCalls.length;
+const protoRelative = I.interpretRecipe(Object.assign({}, valid, {
+  origin: 'https://github.com',
+  endpoint: '/\\\\evil.com',          // -> new URL normalizes to //evil.com -> https://evil.com
+  params: { type: 'object' },
+  request: {}
+}), {});
+check(protoRelative && protoRelative.success === false && protoRelative.code === 'RECIPE_ORIGIN_MISMATCH',
+  'FETCH-03(c): protocol-relative effective target -> RECIPE_ORIGIN_MISMATCH (got ' + (protoRelative && protoRelative.code) + ')');
+check(executeScriptCalls.length === esBefore_proto && fetchCalls.length === fBefore_proto,
+  'FETCH-03(c): protocol-relative rejection fired NO executeScript and NO fetch (recorders unchanged at rejection)');
+
+// (d) a same-origin recipe with an EMPTY query map leaves spec.url == the bare
+// templated path (effectiveUrl == templated.url; fold is a no-op).
+const emptyQuery = I.interpretRecipe(Object.assign({}, valid, {
+  endpoint: '/api/list', params: { type: 'object' }, request: {}
+}), {});
+check(emptyQuery && emptyQuery.success === true && emptyQuery.spec.url === '/api/list',
+  'FETCH-03(d): empty query map -> spec.url equals the bare templated path, success (got ' + (emptyQuery && emptyQuery.spec && emptyQuery.spec.url) + ')');
 
 // ---- 7. CAP-02 NO-NETWORK PROOF: recorders never fired. --------------------
 // This is the load-bearing Phase 26/27 boundary assertion.
