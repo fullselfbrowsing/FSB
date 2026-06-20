@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: ready_to_plan
-stopped_at: Phase 26 complete (3/3) — ready to plan Phase 27
-last_updated: 2026-06-20T05:27:57.361Z
+status: planning
+stopped_at: Phase 27 context gathered (assumptions mode)
+last_updated: "2026-06-20T06:51:56.951Z"
 last_activity: 2026-06-20
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 1
   total_plans: 3
-  completed_plans: 3
-  percent: 14
+  completed_plans: 5
+  percent: 13
 ---
 
 # Project State
@@ -149,9 +149,9 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-20T05:01:09.429Z
-Stopped at: Phase 26 Plan 03 complete (recipe-path CI guard wired into validate:extension; CAP-04). Phase 26 done (CAP-01..05); ready for verification.
-Resume file: None
+Last session: 2026-06-20T06:51:56.945Z
+Stopped at: Phase 27 context gathered (assumptions mode)
+Resume file: .planning/phases/27-authenticated-fetch-primitive-main-world-origin-pin-resume-s/27-CONTEXT.md
 
 ## Next Actions
 
