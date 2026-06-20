@@ -4744,7 +4744,7 @@ async function fsbTriggerHandleToolStop(params, context) {
   };
 
   const terminal = fsbTriggerIsTerminalStatus(snap.status);
-  if (!terminal) {
+  if (!terminal || snap.status === 'timed_out') {
     try {
       const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
       cleanup.observe = { ok: fsbTriggerCleanupOk(observeResult), result: observeResult };
