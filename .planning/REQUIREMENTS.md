@@ -21,7 +21,7 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 - [x] **FETCH-02**: The fetch primitive scrapes and sends per-form CSRF tokens and the required headers declared by the recipe's auth-strategy.
 - [x] **FETCH-03**: Origin-pinning is enforced inside the interpreter — a recipe bound to origin X may only issue requests to origin X; cross-origin targets are rejected before any side effect.
 - [x] **FETCH-04**: An in-flight capability call survives MV3 service-worker eviction via the existing `run_task` resume-sidecar; mid-mutation ambiguity is treated as `RECOVERY_AMBIGUOUS` and never blind-retried.
-- [x] **FETCH-05**: A smoke test asserts the logged-in (not logged-out) data shape is returned from the chosen execution context against a real HttpOnly-cookie site.
+- [x] **FETCH-05**: A smoke test asserts the logged-in (not logged-out) data shape is returned from the chosen execution context against a real HttpOnly-cookie site. _(Automated/CI half satisfied: the smoke test through the chosen execution context is green in Plan 02, `tests/capability-fetch.test.js`. The irreducibly-LIVE half -- real GitHub HttpOnly cookies actually attach in the page MAIN world against a real signed-in session -- is recorded as **human_needed** debt in `27-HUMAN-UAT.md` UAT-27-01, NOT a fabricated pass; it cannot run in CI without shipping a real credential, GOV-06.)_
 
 ### SURF — Lean MCP Surface & Capability Search
 
@@ -119,7 +119,7 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | FETCH-02 | Phase 27 | Complete |
 | FETCH-03 | Phase 27 | Complete |
 | FETCH-04 | Phase 27 | Complete |
-| FETCH-05 | Phase 27 | Complete |
+| FETCH-05 | Phase 27 | Complete (CI half); live half human_needed (27-HUMAN-UAT.md UAT-27-01) |
 | SURF-01 | Phase 28 | Pending |
 | SURF-02 | Phase 28 | Pending |
 | SURF-03 | Phase 28 | Pending |
