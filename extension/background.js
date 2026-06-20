@@ -3550,6 +3550,90 @@ async function fsbTriggerSendTabMessage(tabId, payload) {
   }
 }
 
+// Build a short human-readable caption from a trigger snapshot for the
+// on-page progress overlay. Auto-derived (no caller input) so the trigger tool
+// schema stays free of visual_reason. Output is single-line, ~80 chars max.
+function fsbTriggerBuildCaption(snap) {
+  if (!snap || typeof snap !== 'object') return 'Watching DOM for change';
+  const selector = typeof snap.selector === 'string' && snap.selector ? snap.selector : 'element';
+  const condition = (snap.condition && typeof snap.condition === 'object') ? snap.condition : {};
+  const watch = snap.watch || snap.mode || 'live-observe';
+  const watchSuffix = watch === 'refresh-poll'
+    ? (Number.isFinite(Number(snap.poll_interval_ms))
+        ? ' (poll ' + Math.round(Number(snap.poll_interval_ms) / 1000) + 's)'
+        : ' (poll)')
+    : ' (live)';
+
+  let detail = 'changed';
+  if (condition.combinator) {
+    const kids = Array.isArray(condition.conditions) ? condition.conditions.length : 0;
+    detail = String(condition.combinator).toUpperCase() + ' of ' + kids + ' conditions';
+  } else {
+    const kind = String(condition.kind || '').toLowerCase();
+    if (kind === 'threshold') {
+      const op = condition.operator || '>=';
+      const target = condition.target != null ? String(condition.target) : '?';
+      const hyst = Number.isFinite(Number(condition.hysteresis)) && Number(condition.hysteresis) > 0
+        ? ' ±' + condition.hysteresis
+        : '';
+      detail = op + ' ' + target + hyst;
+    } else if (kind === 'equals') {
+      detail = '= ' + (condition.value != null ? String(condition.value) : '?');
+    } else if (kind === 'contains') {
+      const v = condition.value != null ? String(condition.value) : '';
+      detail = 'contains "' + (v.length > 24 ? v.slice(0, 21) + '...' : v) + '"';
+    } else if (kind === 'regex') {
+      const p = condition.pattern != null ? String(condition.pattern) : '';
+      detail = '/' + (p.length > 24 ? p.slice(0, 21) + '...' : p) + '/';
+    } else if (kind === 'percent_change' || kind === 'delta_percent') {
+      detail = '±' + (condition.percent != null ? String(condition.percent) : '?') + '%';
+    } else if (kind === 'changed' || !kind) {
+      detail = 'changed';
+    } else {
+      detail = kind;
+    }
+  }
+  const caption = 'Watching ' + selector + ' ' + detail + watchSuffix;
+  return caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
+}
+
+// Count active vs terminal triggers on a given tab. Used to drive the
+// in-page TriggerBadge tally. Reads from FsbTriggerStore.hydrate() which is
+// the same source of truth list_triggers exposes, so badge stays consistent
+// with the MCP-visible state.
+async function fsbTriggerCountsForTab(tabId) {
+  const numericTabId = Number(tabId);
+  if (!Number.isFinite(numericTabId)
+      || typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.hydrate !== 'function') {
+    return { watching: 0, fired: 0 };
+  }
+  let envelope = null;
+  try {
+    envelope = await FsbTriggerStore.hydrate();
+  } catch (_e) {
+    return { watching: 0, fired: 0 };
+  }
+  const records = envelope && envelope.records && typeof envelope.records === 'object'
+    ? envelope.records
+    : {};
+  let watching = 0;
+  let fired = 0;
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const snap = records[keys[i]];
+    if (!snap || typeof snap !== 'object') continue;
+    if (Number(snap.target_tab_id) !== numericTabId) continue;
+    if (snap.status === 'armed' || snap.status === 'needs_attention' || snap.status === 'blocked') {
+      watching++;
+    } else if (snap.status === 'fired') {
+      fired++;
+    }
+  }
+  return { watching, fired };
+}
+
 async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   const triggerId = fsbTriggerSnapshotId(snap);
   const tabId = Number(snap && snap.target_tab_id);
@@ -3558,10 +3642,16 @@ async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   }
   await ensureContentScriptInjected(tabId);
   const observeResult = await fsbTriggerSendTabMessage(tabId, fsbTriggerObserveMessage(snap));
+  const caption = fsbTriggerBuildCaption(snap);
+  const counts = await fsbTriggerCountsForTab(tabId);
   const pulseResult = await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStart',
     selector: snap.selector,
-    reason: reason || 'trigger-watch'
+    reason: reason || 'trigger-watch',
+    trigger_id: triggerId,
+    caption: caption,
+    watch_mode: snap.watch || snap.mode || 'live-observe',
+    counts: counts
   });
   await fsbTriggerArmObserveWatchdog(triggerId);
   return { ok: observeResult.ok !== false, observe: observeResult, pulse: pulseResult };
@@ -3572,7 +3662,12 @@ async function fsbTriggerStopObserveForSnapshot(snap) {
   const tabId = Number(snap && snap.target_tab_id);
   if (!triggerId || !Number.isFinite(tabId)) return;
   await fsbTriggerSendTabMessage(tabId, { action: 'triggerObserveStop', trigger_id: triggerId });
-  await fsbTriggerSendTabMessage(tabId, { action: 'triggerPulseStop', trigger_id: triggerId });
+  const counts = await fsbTriggerCountsForTab(tabId);
+  await fsbTriggerSendTabMessage(tabId, {
+    action: 'triggerPulseStop',
+    trigger_id: triggerId,
+    counts: counts
+  });
 }
 
 function fsbTriggerCopyReportedAttributes(attributes) {

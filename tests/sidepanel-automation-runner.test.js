@@ -65,6 +65,7 @@ function extractCssRule(source, selector) {
 }
 
 const repoRoot = path.resolve(__dirname, '..');
+const sidepanelHtml = fs.readFileSync(path.join(repoRoot, 'extension/ui/sidepanel.html'), 'utf8');
 const sidepanelJs = fs.readFileSync(path.join(repoRoot, 'extension/ui/sidepanel.js'), 'utf8');
 const sidepanelCss = fs.readFileSync(path.join(repoRoot, 'extension/ui/sidepanel.css'), 'utf8');
 
@@ -101,11 +102,15 @@ const pixelLetterSRule = extractCssRule(sidepanelCss, '.pixel-letter-s') || '';
 const pixelLetterBRule = extractCssRule(sidepanelCss, '.pixel-letter-b') || '';
 const activePixelRule = extractCssRule(sidepanelCss, '.pixel-letter span') || '';
 const litPixelRule = extractCssRule(sidepanelCss, '.pixel-letter span.pixel-lit') || '';
+const bLetterStart = sidepanelHtml.indexOf('<div class="pixel-letter pixel-letter-b">');
+const bLetterBlock = bLetterStart === -1 ? '' : sidepanelHtml.slice(bLetterStart, sidepanelHtml.indexOf('</div>', bLetterStart));
+const bPixelMask = Array.from(bLetterBlock.matchAll(/<(span|i)>/g)).map(function (match) { return match[1]; }).join(' ');
 ok(/position:\s*relative;/.test(pixelLoaderRule), 'pixel loader keeps the original stacked letter container');
 ok(/width:\s*8\.5px;/.test(pixelLoaderRule) && /height:\s*11\.5px;/.test(pixelLoaderRule) && /flex:\s*0 0 8\.5px;/.test(pixelLoaderRule), 'pixel loader dimensions are reduced by another 50 percent');
 ok(/position:\s*absolute;/.test(pixelLetterRule) && /animation:\s*fsb-letter-cycle 2\.7s infinite ease-in-out;/.test(pixelLetterRule), 'letters are overlaid and cycle one at a time');
 ok(/grid-template-columns:\s*repeat\(3,\s*2px\);/.test(pixelLetterRule) && /grid-auto-rows:\s*2px;/.test(pixelLetterRule) && /gap:\s*0\.75px;/.test(pixelLetterRule), 'pixel cells and gaps are reduced by another 50 percent');
 ok(/animation-delay:\s*0\.9s;/.test(pixelLetterSRule) && /animation-delay:\s*1\.8s;/.test(pixelLetterBRule), 'original letter timing offsets are preserved');
+ok(bPixelMask === 'span span span span i span span span span span i span span span span', 'B pixel mask uses a boxy 8-style shape');
 ok(!/display:\s*flex;/.test(pixelLoaderRule), 'pixel loader does not lay out all three letters side by side');
 ok(/opacity:\s*0;/.test(activePixelRule) && /background:\s*var\(--primary-color\);/.test(activePixelRule), 'active pixels keep original color styling but start hidden');
 ok(/opacity:\s*1;/.test(litPixelRule), 'pixel-lit class reveals active pixels');

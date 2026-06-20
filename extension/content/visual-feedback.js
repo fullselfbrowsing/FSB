@@ -751,7 +751,18 @@
 
       var bar = this.container.querySelector('.fsb-progress-bar');
       var fill = this.container.querySelector('.fsb-progress-fill');
-      if (progress.mode === 'determinate' && progress.percent !== null) {
+      // Trigger watchers don't have progress -- they sit and observe. The
+      // indeterminate sweep implies forward motion, which misreads as
+      // "something is happening". Hide the bar entirely; the breathing
+      // edge-glow + static caption carry the "armed and waiting" signal.
+      var isTriggerWatch = overlayState.phase === 'trigger-watch'
+        || overlayState.mode === 'trigger-watch';
+      if (isTriggerWatch) {
+        fill.style.transform = '';
+        fill.style.transformOrigin = '';
+        bar.classList.add('hidden');
+        bar.classList.remove('indeterminate');
+      } else if (progress.mode === 'determinate' && progress.percent !== null) {
         bar.classList.remove('indeterminate');
         bar.classList.remove('hidden');
         fill.style.width = '100%';
@@ -894,7 +905,7 @@
     constructor() {
       this.host = null;
       this.shadow = null;
-      this.state = null; // 'thinking' or 'acting'
+      this.state = null; // 'thinking' | 'acting' | 'watching'
       this._rafId = null;
       this._startTime = null;
       this._bars = null; // cached DOM references: { top, right, bottom, left }
@@ -939,13 +950,15 @@
       }
       const root = this.shadow.querySelector('.viewport-glow-root');
       if (root) {
-        root.classList.remove('state-thinking', 'state-acting');
+        root.classList.remove('state-thinking', 'state-acting', 'state-watching');
         root.classList.add(`state-${state}`);
       }
     }
 
     _getDuration() {
-      return this.state === 'acting' ? 4000 : 6000;
+      if (this.state === 'acting') return 4000;
+      if (this.state === 'watching') return 5000;
+      return 6000;
     }
 
     /**
@@ -1113,6 +1126,14 @@
         --ambient-inner: rgba(255, 140, 0, 0.51);
         --ambient-outer: rgba(255, 102, 0, 0.26);
       }
+      .viewport-glow-root.state-watching {
+        --glow-color-1: #ff8c00;
+        --glow-color-2: #ffa500;
+        --glow-opacity: 0.85;
+        --glow-brightness: 1.4;
+        --ambient-inner: rgba(255, 140, 0, 0.27);
+        --ambient-outer: rgba(255, 166, 0, 0.13);
+      }
 
       /* Ambient inset glow */
       .viewport-ambient {
@@ -1189,6 +1210,176 @@
 
   // Singleton instance for viewport glow
   const viewportGlow = new ViewportGlow();
+
+  /**
+   * TriggerBadge - Compact pill in the top-right viewport that tallies armed
+   * trigger watchers and their fire counts. Mirrors the visual language of the
+   * other overlays (Shadow DOM + Popover top-layer + orange palette) and stays
+   * deliberately quiet: no animation while idle, soft fade when counts shift.
+   *
+   * API:
+   *   show({watching, fired}) — show or update; pass {watching:0, fired:0} to fade out
+   *   hide()                  — fade and remove
+   *   destroy()               — synchronous teardown
+   */
+  class TriggerBadge {
+    constructor() {
+      this.host = null;
+      this.shadow = null;
+      this.root = null;
+      this.watchingEl = null;
+      this.firedEl = null;
+      this.lastWatching = 0;
+      this.lastFired = 0;
+      this._inTopLayer = false;
+    }
+
+    _create() {
+      this.host = markOverlayElement(document.createElement('div'), 'trigger-badge-host');
+      this.host.id = 'fsb-trigger-badge-host';
+      this.host.style.cssText = 'all:initial!important;position:fixed!important;bottom:0!important;right:0!important;z-index:2147483647!important;pointer-events:none!important;margin:0!important;padding:0!important;border:none!important;background:none!important;';
+
+      this.shadow = this.host.attachShadow({ mode: 'closed' });
+
+      const style = document.createElement('style');
+      style.textContent = `
+        :host { all: initial !important; }
+        .badge-root {
+          position: fixed;
+          bottom: 14px;
+          right: 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 10px;
+          font: 500 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          color: #fff5e6;
+          background: rgba(20, 16, 12, 0.88);
+          border: 1px solid rgba(255, 140, 0, 0.55);
+          border-radius: 999px;
+          box-shadow: 0 4px 16px rgba(255, 140, 0, 0.18), 0 0 0 1px rgba(255, 140, 0, 0.10);
+          opacity: 0;
+          transform: translateY(4px);
+          transition: opacity 220ms ease-out, transform 220ms ease-out;
+          pointer-events: none;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+        }
+        .badge-root.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        .badge-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: rgba(255, 166, 0, 0.95);
+          box-shadow: 0 0 8px rgba(255, 140, 0, 0.75);
+          animation: fsb-trigger-badge-dot 2.4s ease-in-out infinite;
+        }
+        @keyframes fsb-trigger-badge-dot {
+          0%, 100% { opacity: 0.55; transform: scale(1); }
+          50%      { opacity: 1;    transform: scale(1.15); }
+        }
+        .badge-text {
+          white-space: nowrap;
+        }
+        .badge-sep {
+          opacity: 0.45;
+          margin: 0 2px;
+        }
+        .badge-fired {
+          color: rgba(255, 220, 180, 0.75);
+        }
+        .badge-fired.zero { display: none; }
+        @media (prefers-reduced-motion: reduce) {
+          .badge-root { transition: opacity 80ms linear; transform: none; }
+          .badge-root.visible { transform: none; }
+          .badge-dot { animation: none; opacity: 0.85; }
+        }
+      `;
+      this.shadow.appendChild(style);
+
+      this.root = document.createElement('div');
+      this.root.className = 'badge-root';
+      this.root.innerHTML = `
+        <span class="badge-dot"></span>
+        <span class="badge-text"><span class="badge-watching">0 watching</span><span class="badge-sep badge-fired-sep"> · </span><span class="badge-fired zero">0 fired</span></span>
+      `;
+      this.shadow.appendChild(this.root);
+
+      this.watchingEl = this.root.querySelector('.badge-watching');
+      this.firedEl = this.root.querySelector('.badge-fired');
+      this.firedSepEl = this.root.querySelector('.badge-fired-sep');
+
+      this._inTopLayer = promoteToTopLayer(this.host);
+      if (!this._inTopLayer) {
+        document.documentElement.appendChild(this.host);
+      }
+    }
+
+    show(counts) {
+      const watching = Math.max(0, Number((counts && counts.watching) || 0));
+      const fired = Math.max(0, Number((counts && counts.fired) || 0));
+      this.lastWatching = watching;
+      this.lastFired = fired;
+
+      if (watching === 0 && fired === 0) {
+        this.hide();
+        return;
+      }
+
+      if (!this.host) {
+        this._create();
+        requestAnimationFrame(() => {
+          if (this.root) this.root.classList.add('visible');
+        });
+      } else {
+        this.root.classList.add('visible');
+      }
+
+      if (this.watchingEl) {
+        this.watchingEl.textContent = watching + (watching === 1 ? ' watching' : ' watching');
+      }
+      if (this.firedEl) {
+        this.firedEl.textContent = fired + ' fired';
+        this.firedEl.classList.toggle('zero', fired === 0);
+      }
+      if (this.firedSepEl) {
+        this.firedSepEl.style.display = fired > 0 ? '' : 'none';
+      }
+    }
+
+    hide() {
+      if (!this.root) {
+        this.destroy();
+        return;
+      }
+      this.root.classList.remove('visible');
+      setTimeout(() => {
+        if (this.lastWatching === 0 && this.lastFired === 0) {
+          this.destroy();
+        }
+      }, 250);
+    }
+
+    destroy() {
+      if (this.host) {
+        try { demoteFromTopLayer(this.host); } catch (_e) { /* best-effort */ }
+        try { this.host.remove(); } catch (_e) { /* best-effort */ }
+      }
+      this.host = null;
+      this.shadow = null;
+      this.root = null;
+      this.watchingEl = null;
+      this.firedEl = null;
+      this.firedSepEl = null;
+      this._inTopLayer = false;
+    }
+  }
+
+  // Singleton instance for trigger badge
+  const triggerBadge = new TriggerBadge();
 
   /**
    * ActionGlowOverlay - Animated target-aware highlight that persists during action execution
@@ -1552,10 +1743,14 @@
         0%, 100% {
           opacity: 0.55;
           transform: scale(1);
+          border-color: rgba(255, 140, 0, 0.55);
+          background: rgba(255, 140, 0, 0.03);
         }
         50% {
           opacity: 0.92;
           transform: scale(1.025);
+          border-color: rgba(255, 166, 0, 0.85);
+          background: rgba(255, 140, 0, 0.08);
         }
       }
       @keyframes fsbTextGlow {
@@ -1598,10 +1793,10 @@
       .box-overlay.trigger-pulse,
       .box-overlay.trigger-pulse.active {
         opacity: 1;
-        border-color: rgba(0, 188, 212, 0.95);
-        background: rgba(0, 188, 212, 0.07);
+        border-color: rgba(255, 140, 0, 0.65);
+        background: rgba(255, 140, 0, 0.05);
         animation: fsb-trigger-pulse 2.4s ease-in-out infinite;
-        will-change: opacity, transform;
+        will-change: opacity, transform, border-color, background;
       }
       .text-highlight {
         border-radius: 6px;
@@ -1631,8 +1826,8 @@
           animation: none;
           opacity: 1;
           transform: none;
-          border-color: rgba(0, 188, 212, 0.95);
-          background: rgba(0, 188, 212, 0.10);
+          border-color: rgba(255, 140, 0, 0.75);
+          background: rgba(255, 140, 0, 0.08);
         }
       }
     `;
@@ -2329,6 +2524,7 @@
   FSB.ProgressOverlay = ProgressOverlay;
   FSB.ViewportGlow = ViewportGlow;
   FSB.ActionGlowOverlay = ActionGlowOverlay;
+  FSB.TriggerBadge = TriggerBadge;
   FSB.ElementInspector = ElementInspector;
   FSB.CrawlProgressOverlay = CrawlProgressOverlay;
 
@@ -2337,6 +2533,7 @@
   FSB.progressOverlay = progressOverlay;
   FSB.viewportGlow = viewportGlow;
   FSB.actionGlowOverlay = actionGlowOverlay;
+  FSB.triggerBadge = triggerBadge;
   FSB.elementInspector = elementInspector;
   FSB.crawlProgressOverlay = crawlProgressOverlay;
 

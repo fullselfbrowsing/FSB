@@ -1361,6 +1361,43 @@
             const el = FSB.querySelectorWithShadow(request.selector);
             if (el) {
               FSB.actionGlowOverlay.showPulse(el);
+
+              // Drive the broader trigger-watch chrome: viewport-edge glow,
+              // labeled progress caption, and badge tally. Each guarded so a
+              // concurrent action tool's overlay state is not stomped.
+              try {
+                if (FSB.viewportGlow && typeof FSB.viewportGlow.show === 'function') {
+                  if (FSB.viewportGlow.state !== 'acting') {
+                    FSB.viewportGlow.show('watching');
+                  }
+                }
+              } catch (_e) { /* best-effort */ }
+
+              try {
+                if (FSB.progressOverlay && typeof FSB.progressOverlay.update === 'function') {
+                  FSB.progressOverlay.update({
+                    lifecycle: 'running',
+                    phase: 'trigger-watch',
+                    mode: 'trigger-watch',
+                    display: {
+                      title: 'FSB Trigger',
+                      subtitle: '',
+                      detail: request.caption || 'Watching DOM for change'
+                    },
+                    progress: { mode: 'indeterminate', percent: null, label: 'Watching', eta: null }
+                  });
+                }
+              } catch (_e) { /* best-effort */ }
+
+              try {
+                if (FSB.triggerBadge && typeof FSB.triggerBadge.show === 'function') {
+                  const counts = (request.counts && typeof request.counts === 'object')
+                    ? request.counts
+                    : { watching: 1, fired: 0 };
+                  FSB.triggerBadge.show(counts);
+                }
+              } catch (_e) { /* best-effort */ }
+
               sendResponse({ success: true });
             } else {
               sendResponse({ success: false, error: 'Element not found' });
@@ -1379,6 +1416,46 @@
               return;
             }
             FSB.actionGlowOverlay.clearPulse();
+
+            const counts = (request.counts && typeof request.counts === 'object')
+              ? request.counts
+              : { watching: 0, fired: 0 };
+            const stillWatching = Number(counts.watching) > 0;
+
+            // Badge always reflects the latest counts; hides itself when both
+            // tallies are zero (handled inside TriggerBadge.show).
+            try {
+              if (FSB.triggerBadge && typeof FSB.triggerBadge.show === 'function') {
+                FSB.triggerBadge.show(counts);
+              }
+            } catch (_e) { /* best-effort */ }
+
+            if (!stillWatching) {
+              // Last watcher gone -> tear down trigger-only chrome but leave
+              // any ongoing action overlay alone.
+              try {
+                if (FSB.viewportGlow && FSB.viewportGlow.state === 'watching'
+                    && typeof FSB.viewportGlow.destroy === 'function') {
+                  FSB.viewportGlow.destroy();
+                }
+              } catch (_e) { /* best-effort */ }
+
+              try {
+                if (FSB.progressOverlay && typeof FSB.progressOverlay.update === 'function') {
+                  const cur = FSB.overlayState || null;
+                  if (!cur || cur.mode === 'trigger-watch' || cur.phase === 'trigger-watch') {
+                    FSB.progressOverlay.update({
+                      lifecycle: 'cleared',
+                      phase: 'cleared',
+                      mode: 'trigger-watch',
+                      display: { title: '', subtitle: '', detail: '' },
+                      progress: null
+                    });
+                  }
+                }
+              } catch (_e) { /* best-effort */ }
+            }
+
             sendResponse({ success: true });
           } catch (error) {
             sendResponse({ success: false, error: error.message });

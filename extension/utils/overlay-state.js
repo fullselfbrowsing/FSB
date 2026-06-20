@@ -96,6 +96,13 @@
         return 'writing';
       case 'tab_switch':
         return 'switching_tab';
+      case 'watching':
+      case 'trigger-watch':
+        // Trigger watcher arm phase. Distinct from action phases so the overlay
+        // can render a static caption + breathing edge-glow instead of the
+        // sweep used during active mutations. See visual-feedback.js
+        // progressOverlay.update() for the rendering branch.
+        return 'trigger-watch';
       case 'complete':
       case 'error':
       case 'analyzing':
@@ -174,6 +181,9 @@
         return 'Updating page';
       case 'switching_tab':
         return 'Switching to another tab';
+      case 'trigger-watch':
+      case 'watching':
+        return 'Watching DOM for change';
       default:
         return 'Working';
     }

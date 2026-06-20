@@ -60,6 +60,26 @@ function ensureTriggerId(params: Record<string, unknown>): Record<string, unknow
   };
 }
 
+// Claude Code's MCP stdio transport JSON-stringifies object-valued tool args
+// (the same way it stringifies numbers; see schema-bridge.ts numeric preprocess).
+// The trigger tool's `condition` is untyped in the input schema (zod z.any()),
+// so it passes through verbatim — the extension's
+// fsbTriggerValidateToolCondition then rejects the string with reason
+// 'condition_required' (typeof !== 'object'). Parse it here so the extension
+// receives a real object. Idempotent: leaves already-parsed objects untouched.
+function parseTriggerConditionIfStringified(params: Record<string, unknown>): Record<string, unknown> {
+  const raw = params.condition;
+  if (typeof raw !== 'string') return params;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed[0] !== '{' && trimmed[0] !== '[') return params;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return { ...params, condition: parsed };
+  } catch {
+    return params;
+  }
+}
+
 function isDetached(params: Record<string, unknown>): boolean {
   return params.detached === true;
 }
@@ -200,7 +220,7 @@ export function registerTriggerTools(
           return mapFSBError(result);
         }
 
-        const triggerPayload = ensureTriggerId(params);
+        const triggerPayload = ensureTriggerId(parseTriggerConditionIfStringified(params));
         const triggerId = triggerPayload.trigger_id as string;
         const targetTabId = triggerTargetTabId(triggerPayload);
         const detached = isDetached(triggerPayload);
