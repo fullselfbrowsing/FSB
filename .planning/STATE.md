@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
-stopped_at: Phase 26 context gathered (assumptions mode)
-last_updated: "2026-06-20T04:26:31.252Z"
-last_activity: 2026-06-20 -- Phase 26 planning complete
+stopped_at: Phase 26 Plan 01 complete (recipe schema + vendored libs)
+last_updated: "2026-06-20T04:42:00.000Z"
+last_activity: 2026-06-20 -- Phase 26 Plan 01 executed (CAP-01, CAP-05)
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,22 +25,22 @@ See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase
 See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
-**Current focus:** Phase 26 — Recipe Schema + Bundled Interpreter + MV3 CI Guard (the Wall-1 day-one invariant). Ready to plan.
+**Current focus:** Phase 26 — Recipe Schema + Bundled Interpreter + MV3 CI Guard
 
 ## Current Position
 
-Phase: 26 of 32 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) — first phase of this milestone
-Plan: — (none yet)
-Status: Ready to execute
-Last activity: 2026-06-20 -- Phase 26 planning complete
+Phase: 26 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) — EXECUTING
+Plan: 2 of 3 (Plan 01 complete)
+Status: Ready to execute Plan 02 (bundled interpreter)
+Last activity: 2026-06-20 -- Plan 01 complete: recipe schema + 3 vendored libs (CAP-01, CAP-05)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33% (Phase 26: 1 of 3 plans)
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | CAP-01..05 (5) | Not started |
+| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | CAP-01..05 (5) | In progress (Plan 01/03 done: CAP-01, CAP-05) |
 | 27 | Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar | FETCH-01..05 (5) | Not started |
 | 28 | Lean MCP Surface + Capability Search + Eval Harness | SURF-01..06 (6) | Not started |
 | 29 | Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | CAT-01..05 (5) | Not started |
@@ -68,14 +68,14 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 
 **Velocity:**
 
-- Total plans completed (this milestone): 0
+- Total plans completed (this milestone): 1
 - Most recent completed milestone: v0.12.0 PhantomStream Package Migration (5 phases, 19 plans; live Chrome-extension UAT user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 26 | 0/TBD | - | - |
+| 26 | 1/3 | 8min | 8min |
 
 *Updated after each plan completion.*
 
@@ -83,7 +83,14 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 
 ### Decisions
 
-Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone are INV-01..04 (above) plus the two architectural walls. No v0.9.99 phase-level decisions logged yet.
+Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone are INV-01..04 (above) plus the two architectural walls.
+
+**Phase 26 Plan 01 (CAP-01, CAP-05):**
+- `@cfworker/json-schema` IIFE-bundled (not vendored raw) because a top-level import/export is a SyntaxError under `importScripts` in a classic service worker — the durable runtime reason, independent of the Node-version-fragile `node --check` rationale in D-02. `minisearch`/`jmespath` vendor as-is (already UMD).
+- `validateRecipe` error-mapping order classifies `schemaVersion` const and `method`/`authStrategy` enum failures BEFORE the generic `additionalProperties` check, because `@cfworker/json-schema@4.1.1` emits a root `additionalProperties` error alongside enum/const failures (verified live). The RESEARCH example's order would mis-report a bad enum as `RECIPE_UNKNOWN_FIELD`.
+- Forbidden script-like names (script/expr/transform/code/fn/js) rejected by a top-level pre-scan that names the offending field (additionalProperties:false alone yields a generic location — Pitfall 2).
+- `authStrategy` enum locked at four members (D-08); `format:'uri'` on `origin` only, leading-slash `pattern` on `endpoint` (Pitfall 4). Fixtures live at repo-root `catalog/recipes/_fixtures/` (not node --check'd; test data, not shipped runtime).
+- Recipe-path source files kept free of dynamic-code substrings even in comments, pre-satisfying the Plan 03 CI-guard allowlist scan.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -130,10 +137,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-20T03:39:03.855Z
-Stopped at: Phase 26 context gathered (assumptions mode)
-Resume file: .planning/phases/26-recipe-schema-bundled-interpreter-mv3-ci-guard/26-CONTEXT.md
+Last session: 2026-06-20T04:42:00.000Z
+Stopped at: Phase 26 Plan 01 complete (recipe schema + 3 vendored libs; CAP-01, CAP-05)
+Resume file: None (ready for Phase 26 Plan 02)
 
 ## Next Actions
 
-Plan Phase 26 with `/gsd:plan-phase 26`. Phase 26 is the Wall-1 foundation (recipe schema + bundled interpreter + CI guard) and is flagged as the highest-risk design artifact of the milestone — a schema-design + RHC-line spike at plan time is recommended. Existing v0.10/v0.11/v0.12 live-browser UAT and release/publish actions remain carried-forward, user-gated debt.
+Execute Phase 26 Plan 02 (the bundled interpreter: validate -> bind -> emit a bound request spec, stopping before the network) which builds on the `RECIPE_SCHEMA` + `validateRecipe` delivered by Plan 01. Plan 03 then adds the CI guard (allowlist grep + accept/reject fixture run); the `catalog/recipes/_fixtures/` set and the eval-free recipe-path files are already staged for it. `mcp/src/errors.ts` still needs the `RECIPE_*` family added to its verbatim-passthrough regex (errors.ts:122, downstream). Existing v0.10/v0.11/v0.12 live-browser UAT and release/publish actions remain carried-forward, user-gated debt.
