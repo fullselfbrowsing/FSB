@@ -121,6 +121,18 @@ try { importScripts('lib/minisearch.min.js'); } catch (e) { console.error('[FSB]
 try { importScripts('lib/cfworker-json-schema.min.js'); } catch (e) { console.error('[FSB] Failed to load cfworker-json-schema.min.js:', e.message); }
 try { importScripts('utils/capability-recipe-schema.js'); } catch (e) { console.error('[FSB] Failed to load capability-recipe-schema.js:', e.message); }
 
+// Phase 26 Plan 02 (v0.9.99 CAP-02/CAP-03): the bundled interpreter family.
+// Loaded AFTER the Plan 01 lib + schema block (the libs and the recipe-schema
+// module are already on the global). Concrete order: capability-auth-strategies
+// (the frozen enum->handler registry) BEFORE capability-interpreter (which reads
+// FsbCapabilityAuthStrategies.bindAuthStrategy and FsbCapabilityRecipeSchema.
+// validateRecipe at interpretRecipe runtime). The interpreter validates + binds
+// and emits a bound request spec, stopping before the network (D-11; the
+// authenticated request is Phase 27). Additive only (D-05; background.js is
+// byte-frozen as an esbuild input).
+try { importScripts('utils/capability-auth-strategies.js'); } catch (e) { console.error('[FSB] Failed to load capability-auth-strategies.js:', e.message); }
+try { importScripts('utils/capability-interpreter.js'); } catch (e) { console.error('[FSB] Failed to load capability-interpreter.js:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 
