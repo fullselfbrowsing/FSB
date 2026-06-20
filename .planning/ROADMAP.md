@@ -44,7 +44,10 @@
   2. The bundled interpreter executes a valid recipe by binding its data to a closed enum of bundled auth-strategy handlers, and validates recipes + invocation parameters in the service worker via an eval-free JSON Schema validator (`@cfworker/json-schema`) before execution — never via `eval`/`new Function`/`import()`.
   3. The build fails (CI guard) on any `eval`/`new Function`/`import(` reachable from the recipe path and on any recipe field/opcode outside the closed vocabulary.
   4. The interpreter plus the three new libraries (minisearch, jmespath, @cfworker/json-schema) ship inside the extension package with no remotely-hosted code and no manifest/permission change.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 26-01-PLAN.md — Vendor the 3 libraries + closed-vocabulary recipe schema + fixtures (CAP-01, CAP-05)
+- [ ] 26-02-PLAN.md — Bundled interpreter (validate-bind-emit-spec, no network) + auth-strategy stubs + RECIPE_ error passthrough (CAP-02, CAP-03)
+- [ ] 26-03-PLAN.md — Recipe-path CI guard (allowlist grep + fixture run) wired into validate:extension (CAP-04)
 
 ### Phase 27: Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar
 **Goal**: Prove the riskiest unknown — a same-origin authenticated `fetch` (cookies/CORS/CSRF/SameSite) through the page MAIN world against ONE hardcoded recipe — and build origin-pinning and SW-eviction survival into the primitive from the start.
@@ -121,7 +124,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 0/TBD | Not started | - |
+| 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 0/3 | Not started | - |
 | 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 0/TBD | Not started | - |
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 0/TBD | Not started | - |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 0/TBD | Not started | - |
