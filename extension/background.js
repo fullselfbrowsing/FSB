@@ -4743,7 +4743,7 @@ async function fsbTriggerHandleToolStop(params, context) {
     lifecycle: { ok: false, skipped: true }
   };
 
-  const terminal = snap.status === 'fired' || snap.status === 'stopped';
+  const terminal = fsbTriggerIsTerminalStatus(snap.status);
   if (!terminal) {
     try {
       const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
@@ -5064,6 +5064,21 @@ async function fsbTriggerHandleToolArm(params, context) {
   if (extract === 'attribute' && attrName && condition && typeof condition === 'object'
       && !fsbTriggerFirstString(condition.attribute, condition.attrName, condition.attr_name)) {
     condition = Object.assign({}, condition, { attribute: attrName });
+  }
+  const locale = fsbTriggerFirstString(safeParams.locale);
+  const decimalSeparator = fsbTriggerFirstString(safeParams.decimal_separator);
+  if (condition && typeof condition === 'object' && (locale || decimalSeparator)) {
+    const parseCondition = Object.assign({}, condition);
+    let copiedParseOption = false;
+    if (locale && !Object.prototype.hasOwnProperty.call(parseCondition, 'locale')) {
+      parseCondition.locale = locale;
+      copiedParseOption = true;
+    }
+    if (decimalSeparator && !Object.prototype.hasOwnProperty.call(parseCondition, 'decimal_separator')) {
+      parseCondition.decimal_separator = decimalSeparator;
+      copiedParseOption = true;
+    }
+    if (copiedParseOption) condition = parseCondition;
   }
   const readShape = { selector, condition, extract, attrName };
   const readResult = await fsbTriggerSendRefreshPollRead(Number(tabId), readShape);

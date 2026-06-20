@@ -723,10 +723,11 @@ async function caseStopActiveCleanupOrder() {
 
 async function caseStopTerminalCleanupIdempotent() {
   const calls = [];
+  let status = 'fired';
   const handlers = loadToolHandlers({
     FsbTriggerStore: {
       async readSnapshot() {
-        return makeSnapshot({ status: 'fired', agent_id: null, ownership_token: null });
+        return makeSnapshot({ status, agent_id: null, ownership_token: null });
       }
     },
     async fsbTriggerStopObserveForSnapshot() {
@@ -744,11 +745,16 @@ async function caseStopTerminalCleanupIdempotent() {
       }
     }
   });
-  const result = await handlers.fsbTriggerHandleToolStop({ trigger_id: 'trg_status' }, {});
-  assert.strictEqual(result.success, true, 'terminal stop succeeds');
-  assert.strictEqual(result.idempotent, true, 'terminal stop is idempotent');
-  assert.strictEqual(result.status, 'fired', 'terminal stop reports prior status');
-  assert.deepStrictEqual(calls, ['watchdog', 'lifecycle'], 'terminal stop skips content cleanup and clears watchdog before lifecycle');
+  for (const terminalStatus of ['fired', 'timed_out']) {
+    status = terminalStatus;
+    calls.length = 0;
+    const result = await handlers.fsbTriggerHandleToolStop({ trigger_id: 'trg_status' }, {});
+    assert.strictEqual(result.success, true, terminalStatus + ' stop succeeds');
+    assert.strictEqual(result.stopped, false, terminalStatus + ' stop does not report a new stop');
+    assert.strictEqual(result.idempotent, true, terminalStatus + ' stop is idempotent');
+    assert.strictEqual(result.status, terminalStatus, terminalStatus + ' stop reports prior status');
+    assert.deepStrictEqual(calls, ['watchdog', 'lifecycle'], terminalStatus + ' stop skips content cleanup and clears watchdog before lifecycle');
+  }
 }
 
 async function caseInvalidConditionRejectedBeforeArm() {
@@ -908,6 +914,70 @@ async function caseArmNormalizesTopLevelAttributeAliasIntoCondition() {
   assert.strictEqual(receivedSpec.extract, 'attribute', 'spec preserves extract mode');
   assert.strictEqual(receivedSpec.attrName, 'title', 'spec preserves attrName alias');
   assert.strictEqual(receivedSpec.condition.attribute, 'title', 'persisted condition receives attribute name for evaluation');
+}
+
+async function caseArmCopiesTopLevelParseOptionsIntoCondition() {
+  let receivedSpec = null;
+  let receivedReadShape = null;
+  const callerCondition = { kind: 'threshold', operator: '>=', target: '1234,50' };
+  const handlers = loadToolHandlers({
+    async fsbTriggerSendRefreshPollRead(_tabId, readShape) {
+      receivedReadShape = readShape;
+      return { success: true, value: { text: '1.234,56' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        receivedSpec = spec;
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    FsbTriggerStore: {
+      async readSnapshot() {
+        return makeSnapshot(Object.assign({}, receivedSpec || {}, { status: 'armed' }));
+      }
+    },
+    async fsbTriggerStartObserveForSnapshot() {
+      return { ok: true };
+    }
+  });
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition: callerCondition,
+    locale: 'de-DE',
+    decimal_separator: ',',
+    watch: 'live-observe'
+  }, {});
+
+  assert.strictEqual(result.success, true, 'top-level parse option arm succeeds');
+  assert.strictEqual(callerCondition.locale, undefined, 'caller condition locale is not mutated');
+  assert.strictEqual(callerCondition.decimal_separator, undefined, 'caller condition decimal_separator is not mutated');
+  assert.strictEqual(receivedReadShape.condition.locale, 'de-DE', 'read condition receives locale');
+  assert.strictEqual(receivedReadShape.condition.decimal_separator, ',', 'read condition receives decimal_separator');
+  assert.strictEqual(receivedSpec.condition.locale, 'de-DE', 'persisted condition receives locale');
+  assert.strictEqual(receivedSpec.condition.decimal_separator, ',', 'persisted condition receives decimal_separator');
+
+  receivedSpec = null;
+  const existingCondition = {
+    kind: 'threshold',
+    operator: '>=',
+    target: '1234,50',
+    locale: 'fr-FR',
+    decimal_separator: '.'
+  };
+  const preserved = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 10,
+    condition: existingCondition,
+    locale: 'de-DE',
+    decimal_separator: ',',
+    watch: 'live-observe'
+  }, {});
+
+  assert.strictEqual(preserved.success, true, 'condition-level parse option arm succeeds');
+  assert.strictEqual(receivedSpec.condition.locale, 'fr-FR', 'condition-level locale is not overwritten');
+  assert.strictEqual(receivedSpec.condition.decimal_separator, '.', 'condition-level decimal_separator is not overwritten');
 }
 
 async function caseArmAutopilotLegacySpec() {
@@ -1106,6 +1176,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('arm normalizes delta_percent alias before manager persistence', caseArmNormalizesDeltaPercentAlias);
   await runCase('arm reads baseline before manager and starts live observe', caseArmReadsBaselineBeforeManagerAndStartsLiveObserve);
   await runCase('arm normalizes top-level attribute alias into condition', caseArmNormalizesTopLevelAttributeAliasIntoCondition);
+  await runCase('arm copies top-level parse options into condition', caseArmCopiesTopLevelParseOptionsIntoCondition);
   await runCase('autopilot arm spec binds legacy owner and token', caseArmAutopilotLegacySpec);
   await runCase('autopilot arm rejects foreign-owned tabs before side effects', caseArmAutopilotForeignRejectsBeforeArm);
   await runCase('dispatch helper maps trigger companion tools', caseDispatchHelperMapsTriggerTools);

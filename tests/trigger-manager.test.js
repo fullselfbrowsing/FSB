@@ -119,6 +119,8 @@ function reported(text, attributes) {
     // No string-vs-number coercion: '1,050' must PARSE to 1050 then compare, not JS-coerce.
     var coerce = evaluate(snap({ kind: 'threshold', operator: '>=', target: '1000' }, '1000', '1000', false), reported('1,050'), NOW);
     check(coerce.outcome === 'fired', 'threshold: "1,050" parses to 1050 then >= 1000 fires (no string coercion)');
+    var de = evaluate(snap({ kind: 'threshold', operator: '>=', target: '1234,50', locale: 'de-DE', decimal_separator: ',' }, '1234,00', '1234,00', false), reported('1.234,56'), NOW);
+    check(de.outcome === 'fired', 'threshold: de-DE persisted condition parses "1.234,56" then >= 1234,50 fires');
     // edge exactly-one-fire
     var t1 = evaluate(snap({ kind: 'threshold', operator: '>=', target: '1000' }, '1000', '999', false), reported('1050'), NOW);
     check(t1.outcome === 'fired', 'threshold: first edge fires');
