@@ -95,7 +95,17 @@
       origin: { type: 'string', pattern: '^https?://[^/?#\\s]+$' },
       // Relative endpoint template (e.g. /api/{id}). Pattern, NOT format:'uri'
       // (Pitfall 4: cfworker asserts uri format and a relative path is not a uri).
-      endpoint: { type: 'string', pattern: '^/' },
+      // ME-03: a SINGLE leading slash that is NOT protocol-relative (rejects
+      // //evil.com, which new URL("//evil.com", origin) would re-target to a
+      // different host) and forbids any '..' path segment (rejects /a/../../b
+      // traversal that would escape the declared path prefix). Phase 27 must
+      // STILL re-assert new URL(endpoint, origin).origin === recipe.origin; the
+      // schema just refuses to hand it an obviously hostile template.
+      endpoint: {
+        type: 'string',
+        pattern: '^/(?!/)(?:[^\\s]*)$',
+        not: { pattern: '(^|/)\\.\\.(/|$)' }
+      },
       // HTTP verb -- closed enum of the five v1 verbs (D-06).
       method: { enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
       // Auth strategy -- LOCKED at exactly the four D-08 members.
