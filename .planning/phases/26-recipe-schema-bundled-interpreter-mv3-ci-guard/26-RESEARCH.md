@@ -397,7 +397,7 @@ if (explicitCode && /^(TRIGGER_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UN
 
 **If this table looks short:** most Phase-26 claims were *verified*, not assumed — the libs were downloaded and exercised, and every integration anchor was read on disk.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `persisted-query-hash` and/or Slack-style split-token join the v1 `authStrategy` enum? (CONTEXT.md D-08)**
    - **What we know:** PITFALLS Wall-2 classifies persisted-query-hash as "conditionally replayable" (rots on the vendor's client-bundle deploy; needs the full query body as fallback or a JS-bundle re-scan) and split-token (`xoxc`+`xoxd`) as needing BOTH a JS-readable bearer AND an HttpOnly cookie attached from page context. Both involve **imperative, multi-step, page-JS-coupled** logic (bundle scraping, hash extraction, dual-token threading) that a *declarative* recipe cannot express without growing toward the Wall-1 line.
