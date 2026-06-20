@@ -31,9 +31,24 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone
+## Current Milestone: v0.9.99 Native Capability Catalog (FSB API Execution)
 
-No active milestone is currently planned. Start the next milestone with `$gsd-new-milestone`.
+**Goal:** Give FSB first-class authenticated-API execution as a fast path alongside DOM automation -- match OpenTabs' "call APIs through your authenticated session" capability with zero plugin installs and no MCP tool bloat, backed by FSB's DOM engine as a self-healing fallback.
+
+**Target features:**
+- Lean dispatcher surface: keep the existing ~63 MCP tools byte-stable; add a small handful (e.g. `search_capabilities` + `invoke_capability`) using progressive disclosure (search -> invoke) so the catalog never bloats the MCP context.
+- Capability runtime in the extension: authenticated same-origin fetch primitive (FSB already holds `debugger` + `<all_urls>` + `execute_js`) plus a fixed bundled interpreter that executes capability definitions.
+- MV3-safe code/data split: bundled imperative handlers compiled into the extension for the hard/popular head; server-delivered DECLARATIVE recipes (data, not code -- MV3 prohibits remotely-hosted code) interpreted locally for the easy long tail.
+- Network-capture discovery: use the existing CDP/`debugger` permission to observe a page's real API calls (endpoint, auth, headers, payload) to learn capabilities.
+- Learned recipes via memory: promote successful calls into FSB procedural memory as reusable per-origin recipes that auto-grow the catalog.
+- Self-healing fallback: when a recipe breaks, drop to DOM automation and still complete the task.
+- Consent governance: per-origin Off/Ask/Auto gating + audit log + default-off for authenticated API replay (FSB stays supervised/safe).
+- Out-of-box + optional install: popular capabilities ship bundled; long tail streams from FSB's server; optional explicit install via MCP command or control panel.
+
+**Key context:**
+- Carry hard invariants: INV-01 MCP wire contracts untouched, INV-02 autopilot/MCP tool-surface parity, INV-03 parity across all 7 providers, INV-04 MV3-survivability preserved.
+- Content strategy = port + learn, NOT re-derive ~2,769 service tools from scratch; do not clone OpenTabs' npm-per-plugin model.
+- DOM automation + site guides remain as the universal fallback -- not removed.
 
 ## Last Milestone: v0.12.0 PhantomStream Package Migration
 
@@ -378,7 +393,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.12.0 PhantomStream Package Migration initialized -- requirements are complete, roadmap is mapped to Phases 21-25, and Phase 21 package intake is next.)
+(Milestone v0.9.99 Native Capability Catalog started -- requirements being defined; roadmap continues integer phases from v0.12.0's Phase 25.)
 
 ### Validated (v0.9.60)
 
@@ -629,4 +644,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-17 -- v0.12.0 PhantomStream Package Migration archived; no active milestone is currently planned.*
+*Last updated: 2026-06-19 -- v0.9.99 Native Capability Catalog (FSB API Execution) milestone started; defining requirements.*

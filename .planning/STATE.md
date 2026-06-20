@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.12.0
-milestone_name: PhantomStream Package Migration
-status: milestone_archived
-stopped_at: Archived v0.12.0 milestone
-last_updated: "2026-06-17T19:40:06.000Z"
-last_activity: 2026-06-17 - Archived v0.12.0 PhantomStream Package Migration
+milestone: v0.9.99
+milestone_name: Native Capability Catalog (FSB API Execution)
+status: planning
+last_updated: "2026-06-20T02:38:54.072Z"
+last_activity: 2026-06-20
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -30,12 +29,10 @@ See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
 
 ## Current Position
 
-Phase: None active
-Plan: None active
-Status: v0.12.0 archived with tech_debt audit status
-Last activity: 2026-06-17 - Archived v0.12.0 PhantomStream Package Migration
-
-Progress: [██████████] 100% (19/19 milestone plans)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-20 — Milestone v0.9.99 started
 
 ## Roadmap At A Glance (v0.12.0)
 
