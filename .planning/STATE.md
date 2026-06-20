@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: executing
-stopped_at: Phase 26 Plan 02 complete (bundled interpreter + auth-strategy stubs + RECIPE_ passthrough)
-last_updated: "2026-06-20T04:53:00.000Z"
-last_activity: 2026-06-20 -- Phase 26 Plan 02 executed (CAP-02, CAP-03)
+status: verifying
+stopped_at: Phase 26 Plan 03 complete (recipe-path CI guard wired into validate:extension; CAP-04) -- Phase 26 done, ready for verification
+last_updated: "2026-06-20T05:01:40.513Z"
+last_activity: 2026-06-20
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -29,18 +29,18 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 ## Current Position
 
-Phase: 26 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) — EXECUTING
-Plan: 3 of 3 (Plans 01-02 complete)
-Status: Ready to execute Plan 03 (recipe-path CI guard)
-Last activity: 2026-06-20 -- Plan 02 complete: bundled interpreter + auth-strategy stubs + RECIPE_ passthrough (CAP-02, CAP-03)
+Phase: 26 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) — COMPLETE (ready for verification)
+Plan: 3 of 3 (all plans complete: CAP-01..05)
+Status: Phase complete — ready for verification
+Last activity: 2026-06-20 -- Plan 03 complete: recipe-path CI guard wired into validate:extension (CAP-04)
 
-Progress: [███████░░░] 67% (Phase 26: 2 of 3 plans)
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | CAP-01..05 (5) | In progress (Plans 01-02/03 done: CAP-01, CAP-02, CAP-03, CAP-05) |
+| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | CAP-01..05 (5) | Complete — all 3 plans done (CAP-01..05); ready for verification |
 | 27 | Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar | FETCH-01..05 (5) | Not started |
 | 28 | Lean MCP Surface + Capability Search + Eval Harness | SURF-01..06 (6) | Not started |
 | 29 | Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | CAT-01..05 (5) | Not started |
@@ -68,14 +68,14 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 
 **Velocity:**
 
-- Total plans completed (this milestone): 2
+- Total plans completed (this milestone): 3
 - Most recent completed milestone: v0.12.0 PhantomStream Package Migration (5 phases, 19 plans; live Chrome-extension UAT user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 26 | 2/3 | 15min | 7.5min |
+| 26 | 3/3 | 18min | 6min |
 
 *Updated after each plan completion.*
 
@@ -86,6 +86,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone are INV-01..04 (above) plus the two architectural walls.
 
 **Phase 26 Plan 01 (CAP-01, CAP-05):**
+
 - `@cfworker/json-schema` IIFE-bundled (not vendored raw) because a top-level import/export is a SyntaxError under `importScripts` in a classic service worker — the durable runtime reason, independent of the Node-version-fragile `node --check` rationale in D-02. `minisearch`/`jmespath` vendor as-is (already UMD).
 - `validateRecipe` error-mapping order classifies `schemaVersion` const and `method`/`authStrategy` enum failures BEFORE the generic `additionalProperties` check, because `@cfworker/json-schema@4.1.1` emits a root `additionalProperties` error alongside enum/const failures (verified live). The RESEARCH example's order would mis-report a bad enum as `RECIPE_UNKNOWN_FIELD`.
 - Forbidden script-like names (script/expr/transform/code/fn/js) rejected by a top-level pre-scan that names the offending field (additionalProperties:false alone yields a generic location — Pitfall 2).
@@ -93,11 +94,15 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - Recipe-path source files kept free of dynamic-code substrings even in comments, pre-satisfying the Plan 03 CI-guard allowlist scan.
 
 **Phase 26 Plan 02 (CAP-02, CAP-03):**
+
 - The interpreter REUSES Plan 01's `validateRecipe` as the recipe-schema gate (no re-implementation) and delegates step 1, inheriting the typed `RECIPE_*` codes (incl. the Plan 01 enum mapping-order fix); it focuses on bind+emit. Invoke args are validated against `recipe.params` only when that optional, intentionally-open sub-document is present, via a fresh `CfworkerJsonSchema.Validator(recipe.params,'2020-12',false)` -> `RECIPE_SCHEMA_INVALID` before binding.
 - Auth binding is a frozen `Object.freeze` registry keyed exactly by the four `authStrategy` enum members; each handler is a spec-shaping STUB returning a NEW spec (credentials / `_authNeed` / `csrfSource`) with zero I/O (D-12). `bindAuthStrategy` rejects an unknown strategy with `RECIPE_OPCODE_INVALID` (defense-in-depth beyond the schema enum).
 - The bound spec carries `extract` UNEVALUATED (D-14; jmespath reached only via `getFSBJmespath()`, never run in Phase 26) plus a resolved `query` placement map for Phase 27. The hand-rolled `{var}` templater (D-04) encodeURIComponent-escapes every param and rejects unfilled placeholders (no template injection).
 - The load-bearing Phase 26/27 boundary is proven at runtime: the interpreter test asserts `chrome.scripting.executeScript` AND `globalThis.fetch` are each called 0 times across the whole suite.
 - `mcp/src/errors.ts` gained `RECIPE_.+` in the verbatim-passthrough regex (one-line; INV-01 honored, no tool schema touched); the `RECIPE_*` codes surface verbatim (not `action_rejected`), proven against the built mcp module. The interpreter + auth-strategies files are free of `eval`/`new Function`/`import(`/`fetch`/`chrome.scripting` even in comments, pre-staging the Plan 03 allowlist.
+- [Phase ?]: Phase 26 Plan 03 (CAP-04): the recipe-path CI guard scans an EXPLICIT hardcoded six-file allowlist (the 3 capability modules + the 3 vendored libs) for eval/new Function/import(, NOT a whole-extension grep (D-17) -- a broad grep would false-positive on FSB's three sanctioned MAIN-world execute_js sites (tool-executor.js, mcp-bridge-client.js, lattice-runtime-adapter.js).
+- [Phase ?]: Phase 26 Plan 03 (CAP-04): the guard uses PRECISE word-boundary forbidden patterns so the minified vendored libs do not false-positive on innocent substrings (retrieval/evaluate/important); a NEGATIVE self-assertion proves the three sanctioned sites are NOT on the allowlist; a test-only FSB_RECIPE_GUARD_EXTRA_ALLOWLIST env seam lets the spawn test plant an eval file and assert exit non-zero.
+- [Phase ?]: Phase 26 Plan 03 (CAP-04): the guard is chained into npm run validate:extension per D-18 -- runs in the existing CI extension job before npm test and feeds ci/all-green with NO ci.yml edit (verified empty diff). It ALSO runs RECIPE_SCHEMA against catalog/recipes/_fixtures (valid-* accepted, reject-* rejected) as a build-time closed-vocabulary proof.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -144,10 +149,10 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-20T04:53:00.000Z
-Stopped at: Phase 26 Plan 02 complete (bundled interpreter + auth-strategy stubs + RECIPE_ passthrough; CAP-02, CAP-03)
-Resume file: None (ready for Phase 26 Plan 03)
+Last session: 2026-06-20T05:01:09.429Z
+Stopped at: Phase 26 Plan 03 complete (recipe-path CI guard wired into validate:extension; CAP-04). Phase 26 done (CAP-01..05); ready for verification.
+Resume file: None
 
 ## Next Actions
 
-Execute Phase 26 Plan 03 (the recipe-path CI guard: an allowlist grep for `eval`/`new Function`/`import(` over the explicit recipe-path file list + an accept/reject fixture run, wired into `validate:extension` and the `ci / all-green` gate) which closes CAP-04 and finishes Phase 26. The allowlist targets are already staged and clean: `extension/utils/capability-recipe-schema.js` (Plan 01), `extension/utils/capability-interpreter.js` + `extension/utils/capability-auth-strategies.js` (Plan 02), and the three vendored libs; the `catalog/recipes/_fixtures/` accept/reject set is the shared single source of truth. `mcp/src/errors.ts` now carries the `RECIPE_*` family verbatim-passthrough (done in Plan 02). Existing v0.10/v0.11/v0.12 live-browser UAT and release/publish actions remain carried-forward, user-gated debt.
+Phase 26 is complete (all three plans done; CAP-01..05 delivered): the closed-vocabulary recipe schema + three vendored libs (Plan 01), the eval-free bundled interpreter + auth-strategy stubs + RECIPE_ error passthrough (Plan 02), and the recipe-path CI guard wired into `validate:extension`/`ci/all-green` (Plan 03, CAP-04). The Wall-1 "no code fetched as data" line is now enforced at build time forever: `node scripts/verify-recipe-path-guard.mjs` greps the six-file recipe-path allowlist for `eval`/`new Function`/`import(`, runs the accept/reject fixtures, and asserts the three sanctioned execute_js sites are excluded. Next: run phase verification for Phase 26, then plan Phase 27 (Authenticated Fetch Primitive, MAIN-world, FETCH-01..05) which consumes the bound-spec contract from Plan 02 under the standing guard. Existing v0.10/v0.11/v0.12 live-browser UAT and release/publish actions remain carried-forward, user-gated debt.
