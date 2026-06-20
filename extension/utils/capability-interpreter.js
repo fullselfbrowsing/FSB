@@ -125,8 +125,9 @@
   // substituted param is encodeURIComponent-escaped (no template injection into
   // the URL -- ASVS V5.2). The internal replacer throws a typed marker on a
   // missing param; the wrapper catches it and converts to a typed RETURN so the
-  // public API never throws. Origin-pin (request origin == recipe.origin) is
-  // ENFORCED IN PHASE 27 (FETCH-03); here we only build the templated path.
+  // public API never throws. Origin-pin (request origin == recipe.origin) is now
+  // ENFORCED in interpretRecipe step 5c (FETCH-03) against the EFFECTIVE
+  // post-query-fold URL; templateEndpoint here only builds the templated path.
 
   function templateEndpoint(template, params) {
     var safeParams = (params && typeof params === 'object') ? params : {};
@@ -313,6 +314,51 @@
       origin: recipe.origin,
       extract: (typeof recipe.extract === 'string') ? recipe.extract : null
     };
+
+    // 5b. Query-fold (D-09, FETCH-03): fold the built query map into the URL
+    //     BEFORE the origin-pin so the pin guards the TRUE effective request
+    //     target. built.query VALUES are ALREADY encodeURIComponent-escaped by
+    //     buildRequest -> fillPlacementMap(..., true); encode ONLY the key here,
+    //     never the value (T-27-04: re-encoding the value would corrupt data, not
+    //     add safety -- an accepted non-issue). When the query map is empty,
+    //     effectiveUrl equals templated.url unchanged.
+    var effectiveUrl = templated.url;
+    var qkeys = Object.keys(built.query || {});
+    if (qkeys.length) {
+      var pairs = [];
+      for (var qi = 0; qi < qkeys.length; qi++) {
+        var qk = qkeys[qi];
+        pairs.push(encodeURIComponent(qk) + '=' + built.query[qk]);
+      }
+      effectiveUrl = templated.url +
+        (templated.url.indexOf('?') === -1 ? '?' : '&') +
+        pairs.join('&');
+    }
+
+    // 5c. Origin-pin re-assertion (D-08 part 1, FETCH-03): resolve the EFFECTIVE
+    //     (post-fold) URL against recipe.origin and reject any target whose origin
+    //     does not match. This rejects a cross-origin re-target AND a protocol-
+    //     relative effective target (new URL("//evil.com", origin) re-targets to a
+    //     foreign host; the URL parser also normalizes a leading backslash the
+    //     schema's leading-// guard does not catch) BEFORE any caller can act on
+    //     the spec. Resolution failure (catch) is also a mismatch. Typed RETURN
+    //     (never throw); BOTH code and errorCode are set by createRecipeError.
+    var resolvedTarget;
+    try {
+      resolvedTarget = new URL(effectiveUrl, recipe.origin);
+    } catch (urlErr) {
+      resolvedTarget = null;
+    }
+    if (!resolvedTarget || resolvedTarget.origin !== recipe.origin) {
+      return createRecipeError('RECIPE_ORIGIN_MISMATCH', {
+        url: effectiveUrl,
+        origin: recipe.origin
+      });
+    }
+
+    // The bound spec carries the TRUE effective request target (replacing the
+    // bare templated.url) so a downstream caller acts on exactly what was pinned.
+    spec.url = effectiveUrl;
 
     // 6. Auth-strategy binding (enum -> bundled spec-shaping stub).
     var shaped = authMod.bindAuthStrategy(recipe.authStrategy, spec, recipe);
