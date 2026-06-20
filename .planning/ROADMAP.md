@@ -124,7 +124,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 3/3 | Complete   | 2026-06-20 |
+| 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 3/3 | Complete    | 2026-06-20 |
 | 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 0/TBD | Not started | - |
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 0/TBD | Not started | - |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 0/TBD | Not started | - |

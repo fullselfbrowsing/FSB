@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: verifying
-stopped_at: Phase 26 Plan 03 complete (recipe-path CI guard wired into validate:extension; CAP-04) -- Phase 26 done, ready for verification
-last_updated: "2026-06-20T05:01:40.513Z"
+status: ready_to_plan
+stopped_at: Phase 26 complete (3/3) — ready to plan Phase 27
+last_updated: 2026-06-20T05:27:57.361Z
 last_activity: 2026-06-20
 progress:
-  total_phases: 8
-  completed_phases: 0
+  total_phases: 7
+  completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 0
+  percent: 14
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase
 See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
-**Current focus:** Phase 26 — Recipe Schema + Bundled Interpreter + MV3 CI Guard
+**Current focus:** Phase 27 — Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar
 
 ## Current Position
 
-Phase: 26 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) — COMPLETE (ready for verification)
-Plan: 3 of 3 (all plans complete: CAP-01..05)
-Status: Phase complete — ready for verification
-Last activity: 2026-06-20 -- Plan 03 complete: recipe-path CI guard wired into validate:extension (CAP-04)
+Phase: 27 of 32 (Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar) — next phase of this milestone
+Plan: — (none yet)
+Status: Ready to plan
+Last activity: 2026-06-20
 
-Progress: [██████████] 100%
+Progress: [█░░░░░░░░░] 14%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -75,7 +75,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 26 | 3/3 | 18min | 6min |
+| 26 | 3 | - | - |
 
 *Updated after each plan completion.*
 
