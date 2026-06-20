@@ -575,15 +575,20 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // utils/trigger-manager.js -- the fire-condition engine; load order
   // value-extractor -> trigger-store -> trigger-manager -> trigger-lifecycle).
   // Phase 24 Plan 24-01: 160 mentions (+1 new line for ws/phantom-stream-protocol.js).
+  // Phase 26 (v0.9.99 capability foundation): 167 mentions (+7 -- 3 vendored libs
+  // lib/{jmespath,minisearch,cfworker-json-schema}.min.js + 3 capability modules
+  // utils/capability-{recipe-schema,auth-strategies,interpreter}.js + 1 load-order comment).
+  // Phase 27 Plan 27-02: 168 mentions (+1 new line for utils/capability-fetch.js -- the MAIN-world fetch primitive).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 160, 'background.js importScripts count = 160 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 + Phase 24 +1 for ws/phantom-stream-protocol.js)');
+  passAssertEqual(importScriptsCount, 168, 'background.js importScripts count = 168 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
   // (value-extractor + trigger-manager) -> 156; Phase 24 adds 1
-  // (phantom-stream-protocol) -> 157.
+  // (phantom-stream-protocol) -> 157. Phase 26 adds 6 (3 vendored libs + 3 capability
+  // modules) -> 163; Phase 27 Plan 27-02 adds 1 (utils/capability-fetch.js) -> 164.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 157, 'background.js importScripts() call sites = 157 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 + Phase 24 +1 for phantom-stream-protocol.js)');
+  passAssertEqual(importScriptsCallSites, 164, 'background.js importScripts() call sites = 164 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
