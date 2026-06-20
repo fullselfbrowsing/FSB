@@ -119,7 +119,14 @@ function resolveErrorKey(
   // substring fallthrough below cannot match and they would otherwise collapse
   // to 'action_rejected'. Returning them verbatim lets buildLayeredDetail's
   // default arm surface the specific code to the caller.
-  if (explicitCode && /^(TRIGGER_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
+  // v0.9.99 Native Capability Catalog (Phase 26 Plan 02): the RECIPE_* family
+  // (RECIPE_SCHEMA_INVALID / RECIPE_UNKNOWN_FIELD / RECIPE_OPCODE_INVALID) is
+  // returned by the SW-side recipe schema/interpreter with `code`+`errorCode`
+  // set but no `error` string, so the substring fallthrough below cannot match
+  // and the codes would otherwise collapse to 'action_rejected'. Surfacing them
+  // verbatim lets buildLayeredDetail's default arm report the specific code. INV-01:
+  // no MCP tool schema is touched -- this is only the error passthrough regex.
+  if (explicitCode && /^(TRIGGER_.+|RECIPE_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
     return explicitCode;
   }
 
