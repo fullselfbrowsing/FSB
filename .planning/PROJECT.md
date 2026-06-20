@@ -393,7 +393,15 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.99 Native Capability Catalog started -- requirements being defined; roadmap continues integer phases from v0.12.0's Phase 25.)
+(Milestone v0.9.99 Native Capability Catalog in progress; Phase 26 complete. Next: Phase 27 Authenticated Fetch Primitive (FETCH-01..05). Roadmap continues integer phases from v0.12.0's Phase 25.)
+
+### Validated (v0.9.99)
+
+- [x] CAP-01: A versioned closed-vocabulary recipe JSON Schema defines a recipe as pure data; out-of-vocabulary/forbidden (script/expr/transform/code/fn/js) fields are rejected with a typed RECIPE_* error -- Phase 26
+- [x] CAP-02: The fixed bundled interpreter binds a validated recipe to a closed four-member auth-strategy enum and emits a bound request spec, never via eval/new Function/import(), and STOPS before any network call (the MAIN-world fetch is Phase 27) -- Phase 26
+- [x] CAP-03: Recipes + invocation params are validated in the service worker by the eval-free `@cfworker/json-schema` validator; invalid/unknown-opcode input is rejected with a typed error (interpreter never throws, even on hostile `$ref` params) -- Phase 26
+- [x] CAP-04: A Node CI guard (`scripts/verify-recipe-path-guard.mjs`, chained into `validate:extension` -> `ci/all-green`) fails the build on any eval/new Function/import( reachable from the six-file recipe-path allowlist, runs accept/reject fixtures, and self-asserts the three sanctioned `execute_js` sites are excluded; an allowlist-drift check forces new `capability-*.js` modules onto the list -- Phase 26
+- [x] CAP-05: The interpreter + three vendored eval-free libraries (`@cfworker/json-schema` IIFE, `minisearch`, `jmespath`) ship inside the extension via additive `importScripts`, with no remotely-hosted code and no manifest/permission change -- Phase 26
 
 ### Validated (v0.9.60)
 
@@ -644,4 +652,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-19 -- v0.9.99 Native Capability Catalog (FSB API Execution) milestone started; defining requirements.*
+*Last updated: 2026-06-20 -- v0.9.99 Phase 26 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) complete; CAP-01..05 validated. Next: Phase 27.*
