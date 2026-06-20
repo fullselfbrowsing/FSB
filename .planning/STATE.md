@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: verifying
-stopped_at: Phase 27 complete (3/3 plans) pending verification; live FETCH-05 logged-in-shape recorded as human_needed UAT debt (27-HUMAN-UAT.md)
-last_updated: "2026-06-20T08:21:46.690Z"
+status: ready_to_plan
+stopped_at: Phase 27 complete (3/3) — ready to discuss Phase 999.1
+last_updated: 2026-06-20T08:38:56.507Z
 last_activity: 2026-06-20
 progress:
   total_phases: 8
@@ -25,13 +25,13 @@ See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase
 See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
-**Current focus:** Phase 27 — Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar
+**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
 
 ## Current Position
 
-Phase: 27 (Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar) — COMPLETE (pending verification)
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-20
 
 Progress: [██████████] 100%
@@ -76,7 +76,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 26 | 3 | - | - |
-| 27 | 1 of 3 (27-01: 27min, 3 tasks, 4 files) | - | - |
+| 27 | 3 | - | - |
 
 *Updated after each plan completion.*
 | Phase 27 P02 | 7min | 3 tasks | 7 files |
