@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: planning
-last_updated: "2026-06-20T02:38:54.072Z"
-last_activity: 2026-06-20
+status: ready
+last_updated: "2026-06-19T00:00:00.000Z"
+last_activity: 2026-06-19
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,51 +17,64 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-17 -- v0.12.0 archived; no active milestone)
-See: .planning/ROADMAP.md (v0.12.0 archived under completed milestones)
-See: .planning/milestones/v0.12.0-REQUIREMENTS.md (24 v1 requirements, all satisfied)
-See: .planning/research/PHANTOMSTREAM-PACKAGE.md (package intake facts, npm 404, migration risks)
-See: .planning/PHANTOMSTREAM-PIN.md (active package source, provenance, adapter boundaries, and release-note language)
-See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
+See: .planning/PROJECT.md (v0.9.99 Native Capability Catalog milestone framing + INV-01..04)
+See: .planning/ROADMAP.md (active milestone v0.9.99, Phases 26-32)
+See: .planning/REQUIREMENTS.md (44 v1 requirements across 9 categories; 44/44 mapped, 0 unmapped)
+See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase ordering)
+See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
-**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The dashboard preview must preserve that value while PhantomStream owns the generic DOM-mirroring engine.
-**Current focus:** No active milestone. Start the next milestone with `$gsd-new-milestone`; live Chrome-extension UAT remains recorded as `human_needed`, not passed.
+**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
+**Current focus:** Phase 26 — Recipe Schema + Bundled Interpreter + MV3 CI Guard (the Wall-1 day-one invariant). Ready to plan.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-06-20 — Milestone v0.9.99 started
+Phase: 26 of 32 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) — first phase of this milestone
+Plan: — (none yet)
+Status: Ready to plan
+Last activity: 2026-06-19 — Roadmap created for v0.9.99; Phases 26-32 defined, 44/44 requirements mapped
 
-## Roadmap At A Glance (v0.12.0)
+Progress: [░░░░░░░░░░] 0%
+
+## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
-| 22 | Capture Adapter Migration | CAP-01..04 (4) | Complete |
-| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Complete |
-| 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Complete |
-| 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Complete |
+| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | CAP-01..05 (5) | Not started |
+| 27 | Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar | FETCH-01..05 (5) | Not started |
+| 28 | Lean MCP Surface + Capability Search + Eval Harness | SURF-01..06 (6) | Not started |
+| 29 | Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | CAT-01..05 (5) | Not started |
+| 30 | Consent Governance + Recipe Signature Verification + Audit + Legal Posture | GOV-01..08, SIGN-01..02 (10) | Not started |
+| 31 | Network-Capture Discovery + Recipe Synthesis + Learned Recipes | DISC-01..04, LEARN-01..04 (8) | Not started |
+| 32 | Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | HEAL-01..05 (5) | Not started |
 
-Coverage: 24/24 v1 requirements mapped, 0 orphaned.
+Coverage: 44/44 v1 requirements mapped, 0 orphaned.
+
+Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/CI guard) and Wall 2 (page-context fetch) are de-risked first; search needs invoke to exist; tiering + the autopilot path need one front door proven; consent must precede any auto/learning; discovery needs consent + memory + router to consume what it learns; self-heal needs the full stack.
+
+## Hard Invariants (bind every phase)
+
+- **INV-01:** existing ~63 MCP tool schemas stay byte-identical; the 2 new tools (`search_capabilities`, `invoke_capability`) register OUTSIDE `TOOL_REGISTRY` via `server.tool()`. (Schema-lock test green is the Phase 32 gate.)
+- **INV-02:** autopilot reaches the capability engine via a `tool-executor` branch hitting the SAME `capability-router`; no parallel autopilot-only stack (runtime-layer parity, Phase 29).
+- **INV-03:** capability + fallback paths work equally across all 7 `universal-provider.js` targets (cross-provider test gate is Phase 32).
+- **INV-04:** the `agent-loop.js` `setTimeout`-chained iterator is load-bearing and untouched; invoke is a single bounded async op.
+
+## Architectural Walls (non-negotiable, shape every phase)
+
+- **Wall 1 (MV3 no remotely-hosted code):** server-delivered recipes are CLOSED-vocabulary DATA bound by a fixed bundled interpreter — never `eval`'d, never grown into server-authored control flow. CI guard fails on `eval`/`new Function`/`import(` reachable from the recipe path.
+- **Wall 2 (execution context):** the authenticated fetch MUST run in the page MAIN world (existing `execute_js` seam) so first-party HttpOnly/SameSite cookies attach; a background-SW `fetch()` is the anti-pattern. CDP Network is discovery-only, never the invoke transport.
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed (this milestone): 19 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 4/4, Phase 24: 4/4, Phase 25: 4/4)
-- Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
+- Total plans completed (this milestone): 0
+- Most recent completed milestone: v0.12.0 PhantomStream Package Migration (5 phases, 19 plans; live Chrome-extension UAT user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 21 | 3/3 | - | - |
-| 22 | 4/4 | - | - |
-| 23 | 4/4 | - | - |
-| 24 | 4/4 | - | - |
-| 25 | 4/4 | - | - |
+| 26 | 0/TBD | - | - |
 
 *Updated after each plan completion.*
 
@@ -69,81 +82,24 @@ Coverage: 24/24 v1 requirements mapped, 0 orphaned.
 
 ### Decisions
 
-Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone:
+Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone are INV-01..04 (above) plus the two architectural walls. No v0.9.99 phase-level decisions logged yet.
 
-- **PSTR-D-01:** v0.12.0 starts with a package intake gate because `@fullselfbrowsing/phantom-stream` returned npm `E404` on 2026-06-17 despite upstream package metadata declaring `0.1.0`.
-- **PSTR-D-02:** PhantomStream becomes the source of truth for generic DOM mirroring; FSB keeps product-specific adapters for pairing, task/status traffic, overlay identity, diagnostics, and remote-control ownership.
-- **PSTR-D-03:** Static and Angular dashboard viewers must share a wrapper or contract tests strong enough to prevent drift.
-- **PSTR-D-04:** Browser UAT is required before close; Node parity tests cannot prove live visual fidelity or remote-control usability alone.
-- **INV-01:** existing MCP tool schemas stay byte-identical; DOM-stream internals are not a schema change.
-- **INV-02:** autopilot uses the SAME shared tool registry MCP exposes where tool routing is involved.
-- **INV-03:** provider parity remains unchanged; stream internals are provider-agnostic.
-- **INV-04:** MV3-survivability and stream recovery paths stay preserved; package migration is additive runtime adaptation.
-- **INV-06:** Lattice public package stays pinned and audited (`.planning/LATTICE-PIN.md` + `package-lock.json` + tests agree).
-- **Phase 24 Plan 01:** `ws-client.js` now uses a classic-service-worker PhantomStream protocol bridge for stream/control constants and envelope encode/decode. The bridge is generated from `@full-self-browsing/phantom-stream/protocol` into `extension/ws/phantom-stream-protocol.js`, loaded after LZString and before `ws-client.js`. FSB keeps the stateless `_lz` shape and sends compressed frames only when the full encoded wire string is smaller than raw JSON; non-stream task/status messages still use the same `FSBWebSocket.send(type, payload)` surface.
-- **Phase 24 Plan 02:** The showcase relay keeps FSB hash-key rooms, extension/dashboard role names, status broadcasts, and task/status traffic, but now routes frame classification and cap checks through a CommonJS compatibility adapter that matches `@full-self-browsing/phantom-stream/relay`. The relay enforces the 1 MiB frame cap with `message-too-large` diagnostics, preserves the 16 MiB backpressure drop counter, and classifies `_lz` frames as self-identifying compressed envelopes.
-- **Phase 24 Plan 03:** The service-worker watchdog now sends `STREAM.REQUEST_SNAPSHOT` through the PhantomStream protocol bridge when available, and both static and Angular dashboards consume `ext:request-snapshot` by routing through the existing resync path while preserving frozen-complete state. Recovery parity now has automated coverage for extension reconnect snapshots, dashboard reconnect recovery requests, late `domStreamReady` re-arm, page-ready recovery, and stale-flush stream-state diagnostics.
-- **Phase 24 Plan 04:** `ws-client.js` now accepts PhantomStream `REMOTE_CONTROL` frames while preserving legacy dashboard `dash:remote-*` frames. Click/text/key/scroll payloads normalize through `validateRemoteControlMessage`, diagnostics use content-free `summarizeRemoteControlAction`, and state broadcasts preserve FSB `ext:remote-control-state` while adding PhantomStream `ext:ps-control-state`. Automated coverage verifies coordinate mapping source contracts, stale stream/session gates, safe text summaries, and debugger/retarget/no-tab ownership states; live browser remote-control UAT remains Phase 25 debt in `24-VALIDATION.md`.
-- **Phase 25 Plan 01:** Removed the temporary legacy `data-fsb-nid` stamping bridge from `extension/content/dom-stream.js`. The capture adapter now preserves PhantomStream `nodeIds` sidecars without rewriting mirrored HTML, while keeping FSB background action names, identity tracking, stale flush diagnostics, overlay exclusion, side-channel forwarding, and resume-as-fresh-snapshot behavior. Tests now assert the absence of legacy stamping and the presence of sidecar identity.
-- **Phase 25 Plan 02:** Added a deterministic differential PhantomStream parity guard covering package-backed adapter source boundaries, snapshot sanitizer behavior, mutation ADD/ATTR/TEXT/VALUE/REMOVE handling, stale mutation resync thresholds, stream identity rejection, compressed envelope encode/decode, relay classification, relay frame caps, and security masking coverage. The test is wired into `npm test`; browser visual fidelity and remote-control usability remain Phase 25 Plan 04 UAT debt.
-- **Phase 25 Plan 03:** Active docs now name `@full-self-browsing/phantom-stream@0.1.0` as the stream implementation, record package provenance in `.planning/PHANTOMSTREAM-PIN.md`, and document the remaining FSB-specific adapters: capture action mapping, shared dashboard viewer wrapper, service-worker protocol bridge, server relay compatibility adapter, and remote-control ownership mapping. The stale unhyphenated package name is documented only as a rejected historical source; live-browser UAT remains Phase 25 Plan 04 debt.
-- **Phase 25 Plan 04:** Final automated gates passed: `npm run validate:extension`, `npm test`, `npm run showcase:build`, and `git diff --check`. The stale Lattice source-count invariant now includes the Phase 24 PhantomStream protocol bridge import. Live Chrome-extension UAT was not performed and is explicitly recorded as `human_needed` in `25-HUMAN-UAT.md`.
-- [Phase ?]: Phase 14 Plan 01: trigger-store.js is a verbatim clone of mcp-task-store.js (6 enumerated changes only; code body byte-identical after inverse-rename). chrome.storage.session direct per D-12; agent_id stored faithfully (V4); only behavioral change is listArmedSnapshots filtering status==='armed'.
-- [Phase ?]: Phase 14 Plan 02: trigger-lifecycle.js clones mcp-visual-session-lifecycle.js with overlay STRIPPED, over FsbTriggerStore (storage-is-truth, re-read every tick). handleTriggerAlarm adds a noop_terminal idempotent fire-guard (D-09); restoreTriggersFromStorage adds the getAll() orphan sweep scoped to fsbTrigger: (D-08); three reap paths via absolute deadline_at (LIFE-05). FSB_TRIGGER_DEFAULT_TTL_MS=21600000 (6h, D-11) + 30s alarm-floor declared for Phase 17. evaluated_noop + armTrigger/clearTrigger are the fire-free Phase 15 seam.
-- [Phase ?]: Phase 14 Plan 03: wired the two trigger modules into background.js at four ADDITIVE glue points (importScripts store-before-lifecycle, bootstrap restoreTriggersFromStorage, onAlarm fsbTrigger: branch with early return, new tabs.onRemoved sibling), each mirroring its verified visual-lifecycle sibling. SURV-01/SURV-03/LIFE-05 now live in the SW; INV-04 held (agent-loop.js byte-untouched, setTimeout=8).
-- [Phase ?]: Phase 14 Plan 03: live-Chrome MV3 SW-eviction survival (Task 2 checkpoint:human-verify) DEFERRED to milestone-end Chrome MV3 UAT per 14-VALIDATION.md Manual-Only Verifications + the v0.10.0 UAT-debt pattern; autonomous code 100% complete and committed (06a241e3), all trigger logic has deterministic Node-mock coverage.
-- [Phase ?]: Phase 15 Plan 01: value-extractor.js is a pure dual-export IIFE (FsbValueExtractor, no browser-API resolver) exposing exactly parseLocaleNumber + extractValue. parseLocaleNumber uses Intl.NumberFormat formatToParts separator discovery memoized per locale; literal split/join (never a separator-built RegExp); % kept raw with isPercent (never /100); NaN -> distinct parse_error (never 0, EXTRACT-04); decimal_separator override wins over locale (D-04). extractValue selects text|number|attribute over { text, attributes? } (EXTRACT-03/D-05) -- that shape is the Phase 16/17 watch-layer report contract.
-- [Phase ?]: Phase 15 Plan 02: trigger-manager.js evaluate(snapshot, reportedValue, now?) is STRUCTURALLY pure (D-02), proven by a brace-matched source-grep (no storage access / no chrome resolver in the evaluate() body even after the durable-local cap is added to the same file). Implements all 6 kinds + compound { combinator:'AND'|'OR', conditions[] } with error short-circuit (Pitfall 5) + edge-trigger/fire-once via persisted was_satisfied. Regex flag policy is default-flags-only (no /g lastIndex footgun); caps PATTERN_MAX_LEN=1000 / TEXT_MAX_LEN_ELEMENT=10000 / TEXT_MAX_LEN_PAGE=100000 are the hard CPU bound, EVIL_SHAPES heuristic is defense-in-depth. The inline cap (D-09) counts listArmedSnapshots() (storage-first, survives SW eviction) NOT a heap set, and serializes concurrent arms via a _withArmLock module-scope mutex (TOCTOU fix); Plan 03/Phase 18 inherit a serialized arm path.
-- [Phase ?]: Phase 15 Plan 03: the Phase-14 evaluated_noop SEAM in trigger-lifecycle.js is replaced with FsbTriggerManager.evaluate(snap, reportedValue, now) + an atomic terminal write-back -- on outcome 'fired' it sets status:'fired'+fired_at, folds next_state, writes in one writeSnapshot, then clearAlarm (disarm); on no_fire/parse_error/pattern_error it merges next_state and stays armed. The SEAM is the SOLE owner of fire-path storage I/O (D-02); evaluate() stays pure. parse_error/pattern_error NEVER write status:'fired' (EXTRACT-04). The preserved noop_terminal guard + the atomic write together give exactly-one-fire across SW eviction (D-07). reportedValue contract { text, attributes? } sourced from snap.reported_value ?? snap.last_value until Phase 16/17 supplies a live scrape. background.js loads value-extractor.js + trigger-manager.js in load-bearing order value-extractor->store->manager->lifecycle. Phase 15 closed with full automated coverage, no live-Chrome UAT. INV-01/INV-04 held.
-- [Phase ?]: Phase 16 wires live-observe end-to-end without adding public tool schemas: `content/trigger-observe.js` emits `triggerValueChanged` `{text, attributes?}` from a single stable-container MutationObserver; `messaging.js` exposes triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop; `background.js` validates and stages reports then delegates fire decisions to `FsbTriggerLifecycle.handleTriggerAlarm` (no duplicate fire writer). Re-arm is owned-tab only (`target_tab_id` + `ensureContentScriptInjected`), backed by `fsbTriggerObserveWatchdog:<id>` (1 min period, stale after 2 min). The in-memory observer registry is authoritative; stale DOM `data-fsb-trigger-armed` markers never block fresh-context re-arm (fixed in `87403c77`). Live-browser UAT is tracked in 16-HUMAN-UAT.md for Phase 20.
-- [Phase 17]: Plan 01: Refresh-poll interval validation runs before snapshot persistence or lifecycle delegation so invalid sub-floor requests cannot consume cap slots or create alarms.
-- [Phase 17]: Plan 01: Refresh-poll cadence uses next_poll_at while deadline_at remains the absolute TTL/reap boundary.
-- [Phase 17]: Plan 02: triggerRead returns ELEMENT_NOT_FOUND before the successful readValue extraction so refresh-poll can distinguish missing selectors from legitimate empty text.
-- [Phase 17]: Plan 02: the missing-module guard avoids a literal readValue token before the missing-element branch so the source-invariant test protects extraction order.
-- [Phase 17]: Plan 03: Refresh-poll ownership validation returns typed TAB_NOT_OWNED before any chrome.tabs.reload side effect.
-- [Phase 17]: Plan 03: Refresh-poll reads use direct frame-0 chrome.tabs.sendMessage instead of sendMessageWithRetry.
-- [Phase 17]: Plan 03: Background refresh-poll stages values and delegates fired/no-fire decisions to FsbTriggerLifecycle.handleTriggerAlarm.
-- [Phase 17]: Plan 04: triggerRead blocks obvious login/auth/challenge/verify/CAPTCHA pages before selector resolution or readValue extraction.
-- [Phase 17]: Plan 04: Refresh-poll blocked outcomes persist status blocked with attention_reason blocked and last_attention context instead of staging challenge text.
-- [Phase 17]: Plan 04: Refresh-poll restarts triggerPulseStart only after lifecycle evaluation and only if the latest snapshot remains armed refresh-poll.
-- [Phase 17]: Plan 04: Real inactive-tab focus retention is deferred_to_phase_20 live-browser UAT, not marked as automated proof.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger tools are plain background-routed registry entries, not visual-session action tools.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: stop_trigger, get_trigger_status, and list_triggers are _readOnly:true so queue bypass can derive from the shared registry.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger.condition stays a JSON Schema object; nested condition validation remains in the trigger runtime.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger status/list responses project from FsbTriggerStore snapshots, not activeSessions or alarm names.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: stop_trigger is idempotent for missing or terminal snapshots but rejects cross-agent access before cleanup side effects.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: autopilot trigger arms derive legacy:autopilot and ownershipToken from fsbAgentRegistryInstance instead of trusting caller-supplied identity.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger returns a bounded arm result after validation, baseline read, persistence, and watcher startup; Phase 19 owns blocking/detached reporting.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: MCP trigger tools are registered by a trigger-specific registrar from TOOL_REGISTRY rather than through manual visual-session actions.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: trigger returns a bounded arm response through mcp:trigger; Phase 19 owns blocking wait, heartbeat, detached mode, and fire/timeout envelopes.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: stop_trigger, get_trigger_status, and list_triggers dispatch directly and are also proven to bypass TaskQueue when a mutation is pending.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: MCP trigger messages delegate to fsbTriggerDispatchToolRequest instead of owning trigger runtime work in dispatcher routes.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot trigger execution strips caller supplied identity and ownership fields and uses background derived legacy autopilot ownership.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot targetTabId is normalized to target_tab_id before background trigger dispatch.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-01: MCP trigger calls are blocking by default with 30s heartbeats, generated trigger_id correlation, detached opt-in, safety auto-detach at 240s, and bridge-disconnect partial recovery from persisted status.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: fire events are flat notify-only records persisted atomically with status:'fired'; blocking timeouts become terminal status:'timed_out' via runtime cleanup; safety auto-detach remains non-terminal and keeps the watcher armed.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: get_trigger_status/list_triggers expose terminal fired/timed_out fields after ownership filtering; default list remains armed/needs_attention/blocked, while include_terminal adds fired/timed_out/stopped.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: rearm_on_fire keeps snapshots armed after fire with fire_count/last_event evidence; blocking waiters settle on that first rearmed fire with still_armed:true.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: numeric hysteresis reset is pure manager logic for threshold and percent_change conditions, preserving edge-fire until the reset band is crossed.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: reconnect grace expiry calls FsbTriggerLifecycle.handleTriggerOwnerReleased(agentId) best-effort after registry release; fast reconnect cancellation suppresses trigger reap.
-- [Phase 20]: Trigger Concurrency UI clones Agent Concurrency and uses fsbTriggerCap with clamp-on-input/load/save.
-- [Phase 20]: Active trigger count includes armed, needs_attention, and blocked while excluding terminal trigger records.
-- [Phase 20]: Cross-watch conflicts are rejected in background before read, persistence, observe startup, or pulse startup.
-- [Phase 20]: Conflict scans filter snapshots through owner visibility to avoid leaking another owner's trigger metadata.
-- [Phase 20]: Same-tab refresh-poll alarms now join a per-tab lock and share one explicit tab reload per due batch.
-- [Phase 20]: Refresh-poll batches still validate ownership and blocked-page state before reload, then re-read each snapshot before per-trigger lifecycle evaluation.
-- [Phase 20]: MCP release metadata, generated build version, server registry metadata, lockfile root metadata, and parity target now agree on 0.10.0.
-- [Phase 20]: Trigger Watchers docs describe local browser-open notify-only behavior and explicitly exclude push delivery, server monitoring, and auto-act workflows.
-- [Phase 20]: Phase 20 final automated release-readiness gates passed; live browser UAT remains human_needed and is recorded without fabricated proof. — 20-HUMAN-UAT.md carries Phase 16 and Phase 20 browser scenarios as human_needed, while 20-RELEASE-READINESS.md records the full automated gate set.
-- [Phase 20]: Release actions for fsb-mcp-server@0.10.0 remain user-gated and were not run. — npm publish, git tag creation/push, branch push, ClawHub publish, and public package publication require explicit user instruction.
+### Top Risks (from research — bake into phase planning)
 
-### Top Risks (from research -- bake into phase planning)
+- **Recipe interpreter drifts into "code fetched as data" → Web Store ban (Wall 1, Phase 26):** freeze a closed opcode/enum vocabulary; CI guard fails on `eval`/`new Function`/`import(`; treat the hardest/most-popular services as bundled imperative handlers, never recipes.
+- **Replay fetch from the wrong context (extension origin) → auth silently absent (Wall 2, Phase 27):** issue same-origin authenticated calls from the page MAIN world; a smoke test must assert the logged-in (not logged-out) data shape from a real HttpOnly site.
+- **Credential-replay weapon / "safe brand" inversion (Phase 30):** default-OFF per origin; Off/Ask/Auto (Auto explicit per-origin, never global); origin-pinning in the interpreter; sign/verify server recipes; mutation gating; sensitive-origin friction.
+- **Auth/recipe data routed off-device → exfiltration + Limited-Use violation (Phases 30/31):** auth strictly local; redact at capture time before persist/promote/egress; learned recipes store shape only; tested redactor asserts no auth substrings survive.
+- **Recipe rot → confidently-wrong/empty results (Phase 32, the designed steady state):** stamp captured-at + schema hash; validate each response against an expected-shape assertion → typed `RECIPE_EXPIRED`; self-heal to DOM and re-learn; quarantine repeat failures.
+- **Capability-search recall/precision failure (Phase 28):** index intent-phrased synonyms + service + action verb + side-effect class; disambiguate before any mutating invoke; eval harness (recall@k + wrong-invoke) gates the milestone.
+- **MV3 SW eviction mid-API-call → lost in-flight request, ambiguous mutation (Phase 27):** reuse the `run_task` Phase 239 resume-sidecar + Lattice ResumePolicy; treat ambiguous mid-mutation as `RECOVERY_AMBIGUOUS` — never blind-retry.
 
-- **REG-02 / MCP queue starvation (#1 risk):** the long-running watcher MUST run in background.js, NOT in the MCP tool handler; `stop_trigger`/`get_trigger_status`/`list_triggers` MUST be in the MCP read-only bypass set -- else a blocking `trigger()` deadlocks the single-slot task queue incl. its own `stop_trigger`. (Phase 18.)
-- **SW eviction kills the watch (Phase 14 crux):** state lives in `chrome.storage.session`; wake via `chrome.alarms`; no keepalive antipatterns.
-- **Live-observe re-arm after BF-cache/SPA nav (Phase 16):** highest-cost/highest-risk; flagged for phase-level research.
-- **Blocking transport timeout (Phase 19):** 30s heartbeats + auto-convert blocking->detached past a safety ceiling.
-- **Locale numeric parse / flapping / duplicate fires (Phase 15):** parse both sides to Number, NaN -> `parse_error`; edge-trigger + fire-once + hysteresis; atomic disarm + dedupe key.
+### Research Flags (phases likely needing a `--research-phase` spike at plan time)
+
+- **Phase 26 (recipe schema):** the highest-risk design artifact — the closed vocabulary must cover the realistic long tail yet be provably non-Turing-complete; needs a schema-design + RHC-line spike.
+- **Phase 27 (fetch primitive):** spike capture/replay fidelity for CSRF/ephemeral tokens (per-session vs per-request nonce, Slack xoxc/xoxd split, persisted-query hash) and the `getResponseBody` > ~1 MB limit — these size the head/tail/DOM-fallback split.
+- **Phase 31 (discovery):** spike CDP Network capture details (maxPostDataSize, extraInfo raw-header/cookie events, detach/restore so the existing Input emulation isn't disrupted) and the redactor's completeness test.
+- **Phase 32 (self-heal):** spike the failure-detection taxonomy (which signals → DOM fallback without masking legitimate "no results") and the mutation-ambiguity recovery policy.
 
 ### Pending Todos
 
@@ -153,47 +109,30 @@ None yet.
 
 None yet.
 
-### Quick Tasks Completed
-
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260617-e2w | Fix review findings: provider bridge timeout/offscreen recovery and trigger attribute extraction | 2026-06-17 | 3052e794 | [260617-e2w-fix-review-findings-provider-bridge-time](./quick/260617-e2w-fix-review-findings-provider-bridge-time/) |
-| 260617-eic | Fix trigger manager to persist live-observe watch metadata and trigger extraction fields | 2026-06-17 | 2d3b6979 | [260617-eic-fix-trigger-manager-to-persist-live-obse](./quick/260617-eic-fix-trigger-manager-to-persist-live-obse/) |
-| 260617-g1w | Upgrade Lattice runtime and CLI packages to 1.4.0 | 2026-06-17 | 2be7a4db | [260617-g1w-upgrade-lattice-runtime-and-cli-packages](./quick/260617-g1w-upgrade-lattice-runtime-and-cli-packages/) |
-
 ## Deferred Items
 
-Items acknowledged and deferred at v0.10.0 milestone close on 2026-06-15 (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/v0.10.0-phases/`):
+Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/`):
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | uat_gap | Phase 01 / 01-HUMAN-UAT.md | partial; 1 pending scenario | v0.10.0 close |
-| verification_gap | Phase 01 / 01-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 02 / 02-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 03 / 03-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 04 / 04-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 05 / 05-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 08 / 08-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 09 / 09-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 10 / 10-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 11 / 11-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 12 / 12-VERIFICATION.md | human_needed | v0.10.0 close |
-| uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 Phase 16 close |
-| uat_gap | Phase 20 / 20-HUMAN-UAT.md | human_needed; 12 live-browser/composed trigger scenarios | v0.11.0 Phase 20 close |
+| verification_gap | Phases 01-05, 08-12 / *-VERIFICATION.md | human_needed | v0.10.0 close |
+| uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 close |
+| uat_gap | Phase 20 / 20-HUMAN-UAT.md | human_needed; 12 live-browser/composed trigger scenarios | v0.11.0 close |
 | uat_gap | Phase 25 / 25-HUMAN-UAT.md | human_needed; 12 live Chrome-extension PhantomStream scenarios | v0.12.0 close |
 
-Carry-forward publish/tag gates (pre-existing and current, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items; 12 Phase 25 live Chrome-extension PhantomStream UAT items.
+Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items; 12 Phase 25 live Chrome-extension PhantomStream UAT items.
 
-## Lattice Integration State (carried, INV-06)
+## Lattice Integration State (carried, INV-06 from prior milestone)
 
-Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails remain `.planning/LATTICE-PIN.md`, package-lock integrity, and `tests/lattice-public-package.test.js`.
+Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guardrails remain `.planning/LATTICE-PIN.md`, `package-lock.json` integrity, and `tests/lattice-public-package.test.js`. v0.9.99 reuses Lattice Ed25519/JCS receipts for recipe signature verification (SIGN-01/02, Phase 30) and the `run_task`/Lattice ResumePolicy survival machinery for in-flight fetch resume (FETCH-04, Phase 27).
 
 ## Session Continuity
 
-Last session: 2026-06-17T19:40:06.000Z
-Stopped at: Archived v0.12.0 milestone
+Last session: 2026-06-19
+Stopped at: Created v0.9.99 roadmap (ROADMAP.md, STATE.md, REQUIREMENTS.md traceability) — Phases 26-32 defined, 44/44 requirements mapped
 Resume file: None
 
 ## Next Actions
 
-Start the next milestone with `$gsd-new-milestone` when ready. Existing v0.11 live-browser UAT/release actions and v0.12.0 Chrome-extension browser UAT remain carried-forward, user-gated debt.
+Plan Phase 26 with `/gsd:plan-phase 26`. Phase 26 is the Wall-1 foundation (recipe schema + bundled interpreter + CI guard) and is flagged as the highest-risk design artifact of the milestone — a schema-design + RHC-line spike at plan time is recommended. Existing v0.10/v0.11/v0.12 live-browser UAT and release/publish actions remain carried-forward, user-gated debt.

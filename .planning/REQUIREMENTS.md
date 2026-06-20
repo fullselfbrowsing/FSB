@@ -106,60 +106,69 @@ Explicitly excluded for v0.9.99. Documented to prevent scope creep. Anti-feature
 
 ## Traceability
 
-Which phase covers which requirement. Phase column populated during roadmap creation.
+Which phase covers which requirement. Phase column populated during roadmap creation (Phases 26–32).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAP-01 | TBD | Pending |
-| CAP-02 | TBD | Pending |
-| CAP-03 | TBD | Pending |
-| CAP-04 | TBD | Pending |
-| CAP-05 | TBD | Pending |
-| FETCH-01 | TBD | Pending |
-| FETCH-02 | TBD | Pending |
-| FETCH-03 | TBD | Pending |
-| FETCH-04 | TBD | Pending |
-| FETCH-05 | TBD | Pending |
-| SURF-01 | TBD | Pending |
-| SURF-02 | TBD | Pending |
-| SURF-03 | TBD | Pending |
-| SURF-04 | TBD | Pending |
-| SURF-05 | TBD | Pending |
-| SURF-06 | TBD | Pending |
-| CAT-01 | TBD | Pending |
-| CAT-02 | TBD | Pending |
-| CAT-03 | TBD | Pending |
-| CAT-04 | TBD | Pending |
-| CAT-05 | TBD | Pending |
-| GOV-01 | TBD | Pending |
-| GOV-02 | TBD | Pending |
-| GOV-03 | TBD | Pending |
-| GOV-04 | TBD | Pending |
-| GOV-05 | TBD | Pending |
-| GOV-06 | TBD | Pending |
-| GOV-07 | TBD | Pending |
-| GOV-08 | TBD | Pending |
-| HEAL-01 | TBD | Pending |
-| HEAL-02 | TBD | Pending |
-| HEAL-03 | TBD | Pending |
-| HEAL-04 | TBD | Pending |
-| HEAL-05 | TBD | Pending |
-| DISC-01 | TBD | Pending |
-| DISC-02 | TBD | Pending |
-| DISC-03 | TBD | Pending |
-| DISC-04 | TBD | Pending |
-| LEARN-01 | TBD | Pending |
-| LEARN-02 | TBD | Pending |
-| LEARN-03 | TBD | Pending |
-| LEARN-04 | TBD | Pending |
-| SIGN-01 | TBD | Pending |
-| SIGN-02 | TBD | Pending |
+| CAP-01 | Phase 26 | Pending |
+| CAP-02 | Phase 26 | Pending |
+| CAP-03 | Phase 26 | Pending |
+| CAP-04 | Phase 26 | Pending |
+| CAP-05 | Phase 26 | Pending |
+| FETCH-01 | Phase 27 | Pending |
+| FETCH-02 | Phase 27 | Pending |
+| FETCH-03 | Phase 27 | Pending |
+| FETCH-04 | Phase 27 | Pending |
+| FETCH-05 | Phase 27 | Pending |
+| SURF-01 | Phase 28 | Pending |
+| SURF-02 | Phase 28 | Pending |
+| SURF-03 | Phase 28 | Pending |
+| SURF-04 | Phase 28 | Pending |
+| SURF-05 | Phase 28 | Pending |
+| SURF-06 | Phase 28 | Pending |
+| CAT-01 | Phase 29 | Pending |
+| CAT-02 | Phase 29 | Pending |
+| CAT-03 | Phase 29 | Pending |
+| CAT-04 | Phase 29 | Pending |
+| CAT-05 | Phase 29 | Pending |
+| GOV-01 | Phase 30 | Pending |
+| GOV-02 | Phase 30 | Pending |
+| GOV-03 | Phase 30 | Pending |
+| GOV-04 | Phase 30 | Pending |
+| GOV-05 | Phase 30 | Pending |
+| GOV-06 | Phase 30 | Pending |
+| GOV-07 | Phase 30 | Pending |
+| GOV-08 | Phase 30 | Pending |
+| HEAL-01 | Phase 32 | Pending |
+| HEAL-02 | Phase 32 | Pending |
+| HEAL-03 | Phase 32 | Pending |
+| HEAL-04 | Phase 32 | Pending |
+| HEAL-05 | Phase 32 | Pending |
+| DISC-01 | Phase 31 | Pending |
+| DISC-02 | Phase 31 | Pending |
+| DISC-03 | Phase 31 | Pending |
+| DISC-04 | Phase 31 | Pending |
+| LEARN-01 | Phase 31 | Pending |
+| LEARN-02 | Phase 31 | Pending |
+| LEARN-03 | Phase 31 | Pending |
+| LEARN-04 | Phase 31 | Pending |
+| SIGN-01 | Phase 30 | Pending |
+| SIGN-02 | Phase 30 | Pending |
 
 **Coverage:**
 - v1 requirements: 44 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 44 (populated by roadmapper)
+- Mapped to phases: 44
+- Unmapped: 0
+
+Per-phase requirement counts:
+- Phase 26 (CAP): 5 — CAP-01..05
+- Phase 27 (FETCH): 5 — FETCH-01..05
+- Phase 28 (SURF): 6 — SURF-01..06
+- Phase 29 (CAT): 5 — CAT-01..05
+- Phase 30 (GOV + SIGN): 10 — GOV-01..08, SIGN-01..02
+- Phase 31 (DISC + LEARN): 8 — DISC-01..04, LEARN-01..04
+- Phase 32 (HEAL): 5 — HEAL-01..05
 
 ---
 *Requirements defined: 2026-06-19*
-*Last updated: 2026-06-19 after initial definition*
+*Last updated: 2026-06-19 — roadmap created; traceability populated for Phases 26–32, coverage 44/44 mapped, 0 unmapped.*
