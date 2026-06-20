@@ -133,6 +133,15 @@ try { importScripts('utils/capability-recipe-schema.js'); } catch (e) { console.
 try { importScripts('utils/capability-auth-strategies.js'); } catch (e) { console.error('[FSB] Failed to load capability-auth-strategies.js:', e.message); }
 try { importScripts('utils/capability-interpreter.js'); } catch (e) { console.error('[FSB] Failed to load capability-interpreter.js:', e.message); }
 
+// Phase 27 Plan 02 (v0.9.99 FETCH-01..05): the MAIN-world authenticated fetch
+// spine. Loaded LAST of the capability family -- AFTER capability-interpreter.js
+// (so FsbCapabilityInterpreter.getFSBJmespath exists for executeBoundSpec's
+// service-worker-side extract) and AFTER jmespath.min.js. mcp-task-store.js loads
+// far earlier (~line 34), so globalThis.FsbMcpTaskStore is already present for the
+// resume-sidecar write. Additive only (D-05; background.js is byte-frozen as an
+// esbuild input; no manifest/permission change).
+try { importScripts('utils/capability-fetch.js'); } catch (e) { console.error('[FSB] Failed to load capability-fetch.js:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 

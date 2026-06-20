@@ -219,28 +219,211 @@
     })();
   }
 
-  // ===========================================================================
-  // executeBoundSpec -- the service-worker wrapper (Task 2 of this plan).
-  // ===========================================================================
+  // ---- Mutating-method set (D-11) -------------------------------------------
   //
-  // Placeholder pending Task 2 -- the active-tab pin + resume-sidecar + MAIN-world
-  // injection + service-worker-side extract land in the next task of this plan.
-  // The export object below lists all three names so the module surface is stable.
+  // A request whose effect is non-idempotent. An in-flight snapshot for one of
+  // these is AMBIGUOUS after eviction (the request may or may not have reached the
+  // server) and is NEVER blind-retried. GET/HEAD are safely re-issuable.
 
-  async function executeBoundSpec(spec, tabId) {
-    return _typedError('RECIPE_EXEC_NOT_IMPLEMENTED', {
-      detail: 'executeBoundSpec is implemented in Phase 27 Plan 02 Task 2'
-    });
+  var MUTATING_METHODS = { POST: true, PUT: true, PATCH: true, DELETE: true };
+
+  // ---- Best-effort sidecar writes (mcp-bridge-client.js:1318-1333) ----------
+  //
+  // Persistence must NEVER block or crash the fetch. Each helper is guarded and
+  // swallows its own failure; the caller does not await correctness, only the
+  // happy-path write order.
+
+  async function _writeSnapshotBestEffort(store, taskId, snapshot) {
+    if (!store || typeof store.writeSnapshot !== 'function') { return; }
+    try {
+      await store.writeSnapshot(taskId, snapshot);
+    } catch (writeErr) {
+      // best-effort; never throw
+    }
+  }
+
+  async function _deleteSnapshotBestEffort(store, taskId) {
+    if (!store || typeof store.deleteSnapshot !== 'function') { return; }
+    try {
+      await store.deleteSnapshot(taskId);
+    } catch (delErr) {
+      // best-effort; never throw
+    }
   }
 
   // ===========================================================================
-  // classifyOnWake -- the thin local mid-mutation classifier (Task 2).
+  // executeBoundSpec -- the service-worker wrapper.
   // ===========================================================================
   //
-  // Placeholder pending Task 2 -- the CAVEAT-1 flat-snapshot classifier lands in
-  // the next task of this plan.
+  // Drives ONE bound spec against ONE tabId (D-04 direct-drive; no MCP tool, no
+  // router). Sequence:
+  //   1. FETCH-03 part 2 (D-08 part 2): re-assert the active/owned tab origin ===
+  //      spec.origin BEFORE any side effect. A mismatch returns a dual-field
+  //      RECIPE_ORIGIN_MISMATCH and fires NO executeScript -- this is what keeps
+  //      FETCH-01 actually authenticated (cookies attach only on spec.origin; a
+  //      "right URL, wrong tab session" is rejected here).
+  //   2. FETCH-04 (D-10): write a BEFORE_API_REQUEST in_progress snapshot (with
+  //      method + origin for the D-11 classifier) BEFORE executeScript.
+  //   3. Inject the FIXED capabilityFetchInPage into the page MAIN world.
+  //   4. Write a terminal snapshot then delete it (best-effort).
+  //   5. D-07: run the read-only JMESPath extract service-worker-side after the
+  //      body returns (the engine is not in page scope).
+
+  async function executeBoundSpec(spec, tabId) {
+    var c = _getChrome();
+    var store = _getTaskStore();
+
+    // ---- 1. Active-tab origin pin (FETCH-03 part 2, D-08 part 2). -----------
+    var tab = null;
+    if (c && c.tabs && typeof c.tabs.get === 'function') {
+      try {
+        tab = await c.tabs.get(tabId);
+      } catch (tabErr) {
+        tab = null;
+      }
+    }
+    var tabOrigin = null;
+    try {
+      tabOrigin = (tab && tab.url) ? new URL(tab.url).origin : null;
+    } catch (originErr) {
+      tabOrigin = null;
+    }
+    if (!tabOrigin || tabOrigin !== (spec && spec.origin)) {
+      // Dual-field typed error BEFORE any executeScript side effect.
+      return _typedError('RECIPE_ORIGIN_MISMATCH', {
+        url: spec && spec.url,
+        origin: spec && spec.origin,
+        tabOrigin: tabOrigin
+      });
+    }
+
+    // ---- 2. BEFORE_API_REQUEST resume-sidecar write (FETCH-04, D-10). -------
+    // The single bounded fetch needs no 30s heartbeat; the cadence collapses to
+    // write -> executeScript -> terminal -> delete. Task id is unique in the
+    // in-flight window and discoverable by listInFlightSnapshots().
+    var taskId = 'cap_fetch_' + (spec && spec.origin ? spec.origin : 'unknown') + '_' + Date.now();
+    var nowTs = Date.now();
+    await _writeSnapshotBestEffort(store, taskId, {
+      task_id: taskId,
+      status: 'in_progress',
+      started_at: nowTs,
+      last_heartbeat_at: nowTs,
+      target_tab_id: tabId,
+      current_step: 'BEFORE_API_REQUEST',
+      method: spec && spec.method,
+      origin: spec && spec.origin
+    });
+
+    // ---- 3. Inject the FIXED func into the page MAIN world. -----------------
+    var results;
+    try {
+      results = await c.scripting.executeScript({
+        target: { tabId: tabId },
+        world: 'MAIN',
+        func: capabilityFetchInPage,
+        args: [spec]
+      });
+    } catch (execErr) {
+      // executeScript itself threw (restricted page, tab gone). Terminal + delete.
+      await _writeSnapshotBestEffort(store, taskId, {
+        task_id: taskId,
+        status: 'error',
+        current_step: 'AFTER_API_REQUEST',
+        method: spec && spec.method,
+        origin: spec && spec.origin
+      });
+      await _deleteSnapshotBestEffort(store, taskId);
+      return {
+        success: false,
+        error: 'executeScript failed: ' + (execErr && execErr.message ? execErr.message : String(execErr))
+      };
+    }
+
+    var injectionResult = results && results[0];
+    var r = injectionResult ? injectionResult.result : null;
+
+    // ---- 4. Terminal snapshot then delete (best-effort). -------------------
+    await _writeSnapshotBestEffort(store, taskId, {
+      task_id: taskId,
+      status: (r && !r.error) ? 'complete' : 'error',
+      current_step: 'AFTER_API_REQUEST',
+      method: spec && spec.method,
+      origin: spec && spec.origin
+    });
+    await _deleteSnapshotBestEffort(store, taskId);
+
+    if (!r) {
+      return { success: false, error: 'no result from page fetch' };
+    }
+    if (r.error) {
+      return { success: false, error: r.error };
+    }
+
+    // ---- 5. Service-worker-side read-only extract (D-07). -------------------
+    // The JMESPath engine is NOT in page scope; run it here AFTER the body
+    // crosses back. Leave data as the raw json on a throw or a missing engine.
+    var data = r.json;
+    if (spec && spec.extract && data != null) {
+      var jp = _getJmespathEngine();
+      if (jp && typeof jp.search === 'function') {
+        try {
+          data = jp.search(r.json, spec.extract);
+        } catch (extractErr) {
+          data = r.json;
+        }
+      }
+    }
+
+    return {
+      success: true,
+      status: r.status,
+      finalUrl: r.finalUrl,
+      redirected: r.redirected,
+      data: data,
+      text: r.text
+    };
+  }
+
+  // ===========================================================================
+  // classifyOnWake -- the thin local mid-mutation classifier (CAVEAT-1, D-11).
+  // ===========================================================================
+  //
+  // A THIN LOCAL classifier -- it does NOT call Lattice's resume(). Lattice reads
+  // snapshot.payload (a JSON string) + state._currentStepName (camelCase); the
+  // mcp-task-store envelope is a FLAT object with current_step (snake_case) and
+  // method. This reads the flat fields directly and REUSES the Lattice marker
+  // STRINGS only.
+  //
+  // Verdicts:
+  //   - a mutating-method (POST/PUT/PATCH/DELETE) snapshot at a non-safe in-flight
+  //     marker -> 'RECOVERY_AMBIGUOUS' (surface, NEVER blind-retry).
+  //   - a GET/HEAD snapshot at the BEFORE_API_REQUEST marker -> re-issuable
+  //     ('ON_ERROR_SW_EVICTION_MID_REQUEST').
+  //   - an absent / boundary marker -> 'SAFE'.
+  // It NEVER returns a verdict that blind-retries a mutating method.
 
   function classifyOnWake(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return 'RECOVERY_AMBIGUOUS';
+    }
+    var marker = snapshot.current_step;
+    var method = (typeof snapshot.method === 'string') ? snapshot.method.toUpperCase() : '';
+
+    // Boundary / absent markers are safe to replay (no in-flight request).
+    if (marker === undefined || marker === null || marker === '' || marker === 'AFTER_API_REQUEST') {
+      return 'SAFE';
+    }
+
+    // An in-flight request (BEFORE_API_REQUEST or any other non-safe marker).
+    if (MUTATING_METHODS[method]) {
+      // Mutating + in-flight: the mutation may or may not have landed. Surface.
+      return 'RECOVERY_AMBIGUOUS';
+    }
+    if (marker === 'BEFORE_API_REQUEST') {
+      // GET/HEAD in flight: idempotent, safe to re-issue.
+      return 'ON_ERROR_SW_EVICTION_MID_REQUEST';
+    }
+    // Any other non-safe marker with a non-mutating method: surface to be safe.
     return 'RECOVERY_AMBIGUOUS';
   }
 
