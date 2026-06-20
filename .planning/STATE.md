@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Phase 27 context gathered (assumptions mode)
-last_updated: "2026-06-20T07:37:17.793Z"
-last_activity: 2026-06-20 -- Phase 27 planning complete
+last_updated: "2026-06-20T07:53:21.612Z"
+last_activity: 2026-06-20
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 13
 ---
 
@@ -29,12 +29,12 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 ## Current Position
 
-Phase: 27 of 32 (Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar) — next phase of this milestone
-Plan: — (none yet)
+Phase: 27 (Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-06-20 -- Phase 27 planning complete
+Last activity: 2026-06-20
 
-Progress: [█░░░░░░░░░] 14%
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -68,7 +68,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 
 **Velocity:**
 
-- Total plans completed (this milestone): 3
+- Total plans completed (this milestone): 4
 - Most recent completed milestone: v0.12.0 PhantomStream Package Migration (5 phases, 19 plans; live Chrome-extension UAT user-gated).
 
 **By Phase:**
@@ -76,6 +76,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 26 | 3 | - | - |
+| 27 | 1 of 3 (27-01: 27min, 3 tasks, 4 files) | - | - |
 
 *Updated after each plan completion.*
 
@@ -103,6 +104,13 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 26 Plan 03 (CAP-04): the recipe-path CI guard scans an EXPLICIT hardcoded six-file allowlist (the 3 capability modules + the 3 vendored libs) for eval/new Function/import(, NOT a whole-extension grep (D-17) -- a broad grep would false-positive on FSB's three sanctioned MAIN-world execute_js sites (tool-executor.js, mcp-bridge-client.js, lattice-runtime-adapter.js).
 - [Phase ?]: Phase 26 Plan 03 (CAP-04): the guard uses PRECISE word-boundary forbidden patterns so the minified vendored libs do not false-positive on innocent substrings (retrieval/evaluate/important); a NEGATIVE self-assertion proves the three sanctioned sites are NOT on the allowlist; a test-only FSB_RECIPE_GUARD_EXTRA_ALLOWLIST env seam lets the spawn test plant an eval file and assert exit non-zero.
 - [Phase ?]: Phase 26 Plan 03 (CAP-04): the guard is chained into npm run validate:extension per D-18 -- runs in the existing CI extension job before npm test and feeds ci/all-green with NO ci.yml edit (verified empty diff). It ALSO runs RECIPE_SCHEMA against catalog/recipes/_fixtures (valid-* accepted, reject-* rejected) as a build-time closed-vocabulary proof.
+
+**Phase 27 Plan 01 (FETCH-03, FETCH-04):**
+
+- `interpretRecipe` now folds `spec.query` into the URL (D-09) BEFORE re-asserting the origin-pin (D-08 part 1) against the EFFECTIVE post-fold target, filling the pre-flagged assembly slot. A cross-origin OR protocol-relative effective target returns the new typed `RECIPE_ORIGIN_MISMATCH` (BOTH `code` and `errorCode`) before any side effect; `spec.url` then carries the true effective request target. Folded query VALUES are not re-encoded (already escaped by buildRequest) -- only the key is encoded (T-27-04 accepted non-issue). No errors.ts edit for `RECIPE_ORIGIN_MISMATCH` -- the existing `/RECIPE_.+/` passthrough surfaces it. The no-network charter (26-D-11) is preserved and re-proven (executeScript/fetch 0-call assertions green, including the new rejection cases).
+- Test reachability: because the recipe schema gates `endpoint` to a single-leading-slash non-protocol-relative path and buildRequest escapes every query value, a SCHEMA-VALID recipe can only ever fold to a slash-rooted same-origin URL -- so the interpreter pin is defense-in-depth. The genuine reachable cross-origin/protocol-relative effective target is a single-leading-slash endpoint whose next character(s) are backslashes (one backslash resolves to https://evil.com; two resolves to a protocol-relative //evil.com): schema-valid (the leading-double-slash guard does not match), but the WHATWG URL parser normalizes the backslash to a slash and re-targets the host. This is exactly the effective-target escape the pin exists to catch.
+- `RECOVERY_AMBIGUOUS` registered in `CODE_ONLY_ERROR_KEYS` (single-token Set add, cleaner than extending the resolveErrorKey regex; INV-01-safe, no MCP tool schema touched) and verified present in the built `mcp/build/errors.js` after `npm --prefix mcp run build` (FETCH-04 surfacing prerequisite). `extension/utils/capability-fetch.js` registered on `RECIPE_PATH_ALLOWLIST` ahead of its Plan 02 creation.
+- [Rule 3 deviation]: the recipe-path guard's Check 1 called `safeRead` on every allowlist path, which PUSHES an ENOENT failure for a not-yet-existent file -- contrary to the plan's premise that an absent path is skipped silently, so registering the absent capability-fetch.js made the guard FAIL. Fix: an `existsSync` pre-check at the top of Check 1 skips a registered-but-absent recipe-path file WITHOUT recording a failure (an absent file cannot contain forbidden code). The present-file scan still flags planted-eval, and Check 4 (disk-drift) still fails on any on-disk capability module missing from the allowlist; recipe-path-guard.test.js stays green.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -149,9 +157,9 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-20T06:51:56.945Z
+Last session: 2026-06-20T07:51:42.433Z
 Stopped at: Phase 27 context gathered (assumptions mode)
-Resume file: .planning/phases/27-authenticated-fetch-primitive-main-world-origin-pin-resume-s/27-CONTEXT.md
+Resume file: None
 
 ## Next Actions
 
