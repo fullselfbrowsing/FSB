@@ -10,7 +10,7 @@
  * this file -- it would otherwise self-flag on its own forbidden-pattern regex
  * literals and on the cfworker IIFE loader).
  *
- * Three checks (D-16 / D-17):
+ * Four checks (D-16 / D-17):
  *   1. ALLOWLIST GREP -- read each of the EXACTLY SIX hardcoded recipe-path
  *      files and fail on any /\beval\s*\(/, /\bnew\s+Function\b/, /\bimport\s*\(/
  *      match. NOT a glob, NOT a whole-extension/ walk (a broad grep would
@@ -30,6 +30,12 @@
  *      eval / new Function / import in MAIN world (a different trust class) and
  *      must NOT be flagged; this defends against allowlist drift ever adding
  *      one (which would break the build on sanctioned code).
+ *   4. ALLOWLIST DRIFT / BYPASS-BY-OMISSION (LO-03) -- enumerate
+ *      extension/utils/capability-*.js FROM DISK and fail if any such module is
+ *      absent from RECIPE_PATH_ALLOWLIST. Without this, a new capability module
+ *      that nobody remembers to add to the hardcoded list is simply never
+ *      scanned and could reintroduce dynamic code undetected. The sanctioned
+ *      sites live outside utils/, so they do not collide with this glob.
  *
  * Test-only seam: FSB_RECIPE_GUARD_EXTRA_ALLOWLIST (a comma-separated path
  * list), when set, is appended to the allowlist BEFORE the grep. This exists
@@ -239,6 +245,41 @@ for (const site of SANCTIONED_SITES) {
   }
 }
 
+// ---- Check 4: allowlist drift / bypass-by-omission (LO-03) ------------------
+//
+// The hardcoded allowlist's correctness depends on humans remembering to append
+// every new capability module to it; a future extension/utils/capability-foo.js
+// that introduces eval/new Function/import() would simply not be scanned. Close
+// that gap by enumerating extension/utils/capability-*.js FROM DISK and failing
+// if any such file is absent from RECIPE_PATH_ALLOWLIST. The three sanctioned
+// MAIN-world sites live OUTSIDE utils/ (ai/, ws/), so they cannot collide with
+// this glob. Fails closed if the directory cannot be read.
+const CAPABILITY_DIR_REL = 'extension/utils';
+const CAPABILITY_DIR_ABS = resolve(ROOT, CAPABILITY_DIR_REL);
+let capabilityFiles;
+try {
+  capabilityFiles = readdirSync(CAPABILITY_DIR_ABS)
+    .filter((n) => /^capability-.*\.js$/.test(n))
+    .map((n) => `${CAPABILITY_DIR_REL}/${n}`);
+} catch (err) {
+  failures.push(
+    `allowlist drift check: cannot read ${CAPABILITY_DIR_REL} ` +
+    `(${err.code || err.message}) -- cannot prove the allowlist covers every ` +
+    `capability module.`
+  );
+  capabilityFiles = [];
+}
+for (const f of capabilityFiles) {
+  if (RECIPE_PATH_ALLOWLIST.indexOf(f) === -1) {
+    failures.push(
+      `allowlist drift: '${f}' exists on disk but is NOT on the recipe-path ` +
+      `allowlist -- a capability module that the guard does not scan can ` +
+      `reintroduce dynamic code undetected (bypass-by-omission). Add it to ` +
+      `RECIPE_PATH_ALLOWLIST.`
+    );
+  }
+}
+
 // ---- Exit convention (clone of verify-store-listing.mjs) --------------------
 if (failures.length > 0) {
   console.error('verify-recipe-path-guard: FAIL');
@@ -251,6 +292,7 @@ if (failures.length > 0) {
 console.log(
   'verify-recipe-path-guard: PASS (' +
   RECIPE_PATH_ALLOWLIST.length + ' recipe-path files clean, fixtures validated, ' +
-  SANCTIONED_SITES.length + ' sanctioned sites excluded)'
+  SANCTIONED_SITES.length + ' sanctioned sites excluded, ' +
+  capabilityFiles.length + ' on-disk capability modules all on the allowlist)'
 );
 process.exit(0);
