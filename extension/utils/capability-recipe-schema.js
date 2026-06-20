@@ -44,9 +44,12 @@
    *   new CfworkerJsonSchema.Validator(schema, '2020-12', false) // emit all errors
    *   validator.validate(value) -> { valid:boolean, errors: OutputUnit[] }
    *   OutputUnit = { keyword, keywordLocation, instanceLocation, error }
-   *   NB: cfworker ASSERTS format:'uri' by default in 2020-12 (verified), so
-   *   format:'uri' is used ONLY on `origin` (a full origin); `endpoint` is a
-   *   relative template validated with a leading-slash `pattern` (Pitfall 4).
+   *   NB: cfworker ASSERTS format:'uri' by default in 2020-12 (verified), which
+   *   is why neither `origin` nor `endpoint` uses format:'uri'. Both are gated by
+   *   explicit `pattern`s instead (ME-02/ME-03): `origin` by a scheme+authority
+   *   pattern (http/https, no path/query/fragment) so javascript:/ftp: and full
+   *   URLs are rejected; `endpoint` by a single-leading-slash, non-protocol-
+   *   relative pattern plus a `..`-traversal `not` guard (Pitfall 4).
    *
    * NO EMOJIS, ASCII-only source.
    */
@@ -83,8 +86,13 @@
       // Recipe identity. Locked to the name `id` (NOT `slug`) to match the
       // valid-recipe.json accept fixture and the downstream catalog key.
       id: { type: 'string', minLength: 1 },
-      // Full origin (e.g. https://example.com). format:'uri' asserted here ONLY.
-      origin: { type: 'string', format: 'uri' },
+      // Full origin (e.g. https://example.com). A scheme+authority pattern --
+      // NOT format:'uri' -- so the scheme is constrained to http/https and the
+      // value is a bare origin with NO path/query/fragment (ME-02). This rejects
+      // javascript:/ftp: pseudo-schemes and https://example.com/path?x=1 (a URL,
+      // not an origin). origin flows verbatim into the bound spec and becomes the
+      // Phase 27 trust anchor, so the schema is the cheapest place to gate it.
+      origin: { type: 'string', pattern: '^https?://[^/?#\\s]+$' },
       // Relative endpoint template (e.g. /api/{id}). Pattern, NOT format:'uri'
       // (Pitfall 4: cfworker asserts uri format and a relative path is not a uri).
       endpoint: { type: 'string', pattern: '^/' },
