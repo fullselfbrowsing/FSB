@@ -652,4 +652,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-20 -- v0.9.99 Phase 26 (Recipe Schema + Bundled Interpreter + MV3 CI Guard) complete; CAP-01..05 validated. Next: Phase 27.*
+*Last updated: 2026-06-20 -- v0.9.99 Phase 27 (Authenticated Fetch Primitive MAIN-world + Origin-Pin + Resume-Sidecar) complete; FETCH-01..05 validated in code (FETCH-05 live logged-in-shape assertion recorded as human_needed UAT debt -- the page-MAIN-world fetch primitive, two-point origin-pin, and run_task resume-sidecar with RECOVERY_AMBIGUOUS are proven; the live GitHub-cookie observation awaits a signed-in browser session). Next: Phase 28 (Lean MCP Surface + Capability Search + Eval Harness).*
