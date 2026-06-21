@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
-stopped_at: Completed 28-01-PLAN.md (capability-search index + eval gate)
-last_updated: "2026-06-21T03:50:22.860Z"
+stopped_at: "Completed 28-03-PLAN.md (capability surface SW transport: dispatcher routes + bridge delegates)"
+last_updated: "2026-06-21T03:57:44.284Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 10
-  completed_plans: 10
+  completed_plans: 11
   percent: 25
 ---
 
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 28 (Lean MCP Surface + Capability Search + Eval Harness) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-21
 
@@ -83,6 +83,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 27 P03 | 3min | 2 tasks | 1 files |
 | Phase 28 P28-01 | 8min | 4 tasks | 11 files |
 | Phase 28 P28-02 | 7min | 2 tasks | 4 files |
+| Phase 28 P28-03 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 28]: Plan 02 (SURF-03/05/01/02): search_capabilities + invoke_capability register via server.tool() OUTSIDE TOOL_REGISTRY in capabilities.ts (vault.ts precedent) -- the INV-01 seam; the frozen tool-definitions-parity hash is unmoved (65 tools on the wire, registry unchanged).
 - [Phase 28]: Plan 02: the SURF-05 read-only/queued split lives entirely in queue.ts readOnlyTools -- search_capabilities is a member (bypass, like search_memory), invoke_capability is NOT (serialized, like fill_credential); both still wrap in queue.enqueue.
 - [Phase 28]: Plan 02: bridge wire names mcp:capabilities-search (read-only) / mcp:capabilities-invoke (queued) added to the MCPMessageType union (Rule 3 type wiring; no TOOL_REGISTRY/tool-definitions edit) -- the exact routes Plan 03's SW dispatcher will register; invoke_capability uses a generic {slug,params?,tab_id?} zod shape (per-recipe validation is SW-side in interpretRecipe).
+- [Phase ?]: Phase 28 Plan 03 (SURF-01/SURF-02): two SW dispatcher routes (mcp:capabilities-search read-only, mcp:capabilities-invoke queued) + bridge delegates wire the capability tools; search resolves the un-spoofable owned-tab origin SW-side (new URL(tab.url).origin, D-11; payload.origin is a non-authoritative override) and returns <=5 ranked schema-on-hit hits.
+- [Phase ?]: Phase 28 Plan 03: invoke is the routerless direct Phase-27 path (NO Phase-29 router): slug -> getRecipeBySlug -> interpretRecipe -> executeBoundSpec; UNGATED (consent is Phase 30) but the two-point origin-pin holds (executeBoundSpec re-asserts tabOrigin === spec.origin); unknown slug returns RECIPE_NOT_FOUND (dual-field) verbatim via the existing errors.ts /^RECIPE_.+$/ passthrough -- NO errors.ts edit (D-06/D-07).
+- [Phase ?]: Phase 28 Plan 03: bridge delegates are pure pass-throughs (no origin/tab resolution) -- authoritative resolution lives ONLY in the dispatcher handlers (single un-spoofable point, T-28-01); both routes use the standalone handler: form (mcp:search-memory precedent), handlers are hoisted async function declarations referenced by the route-table const literal.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -170,8 +174,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T03:49:28.171Z
-Stopped at: Completed 28-01-PLAN.md (capability-search index + eval gate)
+Last session: 2026-06-21T03:57:44.279Z
+Stopped at: Completed 28-03-PLAN.md (capability surface SW transport: dispatcher routes + bridge delegates)
 Resume file: None
 
 ## Next Actions
