@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: executing
-stopped_at: Completed 29-03-PLAN.md (bundled head; Task 4 deferred human_needed UAT)
-last_updated: "2026-06-21T20:26:09.511Z"
+status: verifying
+stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
+last_updated: "2026-06-21T20:37:51.960Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 16
-  percent: 38
+  completed_plans: 17
+  percent: 50
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 29 (catalog-tiered-router-bundled-head-declarative-tail-autopilo) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-21
 
 Progress: [██████████] 100%
@@ -90,6 +90,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 29 P02 | 5min | 3 tasks | 3 files |
 | Phase 29 P04 | 4min | 1 tasks | 1 files |
 | Phase 29 PP03 | 9min | 4 tasks tasks | 12 files files |
+| Phase 29 P05 | 7min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 29 Plan 04 (CAT-01/CAT-05): the D-03 internal-only reroute -- handleCapabilitiesInvokeMessageRoute (mcp-tool-dispatcher.js) now collapses to ONE FsbCapabilityRouter.invoke(slug, params, {origin, tabId}) call (the shared engine, front door 1 of INV-02). The inline getRecipeBySlug -> interpretRecipe -> executeBoundSpec body is gone (it lives in the router's T1b tier). Engine guard swapped to the router-unavailable guard. tabId + owned-tab origin resolved SW-side in one chrome.tabs.query (payload.tab_id/origin non-authoritative overrides, D-11); the two-point origin-pin still holds in executeBoundSpec. Wire names + MCP_PHASE199_MESSAGE_ROUTES + TOOL_REGISTRY byte-unchanged -> frozen INV-01 hash unmoved; no errors.ts edit (RECIPE_* verbatim). capability-mcp-surface 19/0, capability-router 24/0.
 - [Phase 29]: Phase 29 Plan 03 (CAT-02/CAT-03): the 5-service zero-install bundled head -- github.notifications T1b seed + github.issues.* T1a (persisted-query /_graphql + from:'response' CSRF scrape) + slack.* T1a split-token (xoxc in the request BODY, xoxd HttpOnly cookie same-origin) + notion.* T1a /api/v3 token_v2 RPC + reddit.inbox T1b /message/unread.json. Every handler targets its web app's OWN first-party origin (github.com/app.slack.com/www.notion.so/www.reddit.com); the separate-origin public API (api.github.com/oauth.reddit.com/api.notion.com) is FORBIDDEN -- the session cookie does not cross to it (D-09, T-29-07). Each T1a handler builds bound spec(s) and calls ctx.executeBoundSpec only (never a browser scripting/tabs API) so the active-tab origin-pin holds on the head path (D-12); scraped tokens go ONLY into the bound spec, never a log line (T-29-08). The catalog declares the head EXPLICITLY (HEAD_HANDLER_MODULES manifest + seedHeadHandlers() reading each present handler global) and handlers self-register at load; reddit.inbox is a T1b REGISTRY entry. head-handlers 54/0, router 24/0, recipe-schema 43/0, recipe-path-guard PASS.
 - [Phase 29]: Phase 29 Plan 03 Task 4 (live-capture checkpoint) resolved as deferred human_needed live-UAT (29-HUMAN-UAT.md, status human_needed), matching the Phase 27/28 posture -- NOT a fabricated live pass. The [ASSUMED] internal endpoint PATHS (RESEARCH A2/A3/A4) are the ONLY property not headlessly provable (capturing the real internal request needs real credentials, forbidden in CI per GOV-06); the origin-separation facts ARE web-search-verified and the DOM-fallback floor (Phase 32, T3) is the rot backstop. 10 [ASSUMED-ENDPOINT] markers across the handlers track the deferred capture; the headless CI gate does not depend on it.
+- [Phase ?]: Phase 29 Plan 05 (CAT-04 / INV-02 / INV-04): autopilot front door 2 -- executeCapabilityToolForAutopilot is a pre-executeTool guard (CAPABILITY_TOOL_NAMES, ABOVE _te_getToolByName, the Pitfall-1 out-of-registry correction; NOT a switch case) calling the SAME globalThis.FsbCapabilityRouter.invoke the MCP dispatcher calls -- one engine, two front doors, no parallel autopilot stack. Reuses buildAutopilotTriggerParams + makeResult; search_capabilities -> FsbCapabilitySearch.search (never mutates), only invoke_capability sets hadEffect. Tools stay OUT of TOOL_REGISTRY; LLM reach is an additive buildSystemPrompt hint, never a tool schema (frozen INV-01 hash unmoved; getPublicTools omits them). The setTimeout iterator is byte-untouched (INV-04). Full npm test green; parity 10/0, iterator-guard 4/0, recipe-path-guard PASS.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -186,8 +188,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T20:25:55.571Z
-Stopped at: Completed 29-03-PLAN.md (bundled head; Task 4 deferred human_needed UAT)
+Last session: 2026-06-21T20:37:31.363Z
+Stopped at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
 Resume file: None
 
 ## Next Actions

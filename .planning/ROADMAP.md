@@ -92,7 +92,7 @@
 - [x] 29-02-PLAN.md — The engine: capability-catalog.js (slug→tier registry) + capability-router.js (tier dispatch, lifted T1b body, T0 special-case, T2/T3 typed seams) + SW importScripts wiring
 - [x] 29-03-PLAN.md — Zero-install head (5-service MVP): GitHub-issues/Slack/Notion T1a handlers + Reddit-inbox T1b recipe + catalog tier entries + live-capture confirmation of [ASSUMED] endpoints (human_needed)
 - [x] 29-04-PLAN.md — The reroute (INV-01-safe): handleCapabilitiesInvokeMessageRoute calls FsbCapabilityRouter.invoke; wire names/route table/TOOL_REGISTRY untouched
-- [ ] 29-05-PLAN.md — Autopilot parity (INV-02): pre-executeTool capability guard → shared FsbCapabilityRouter global + additive system-prompt hint (iterator byte-untouched, INV-04) + full-suite phase-close gate
+- [x] 29-05-PLAN.md — Autopilot parity (INV-02): pre-executeTool capability guard → shared FsbCapabilityRouter global + additive system-prompt hint (iterator byte-untouched, INV-04) + full-suite phase-close gate
 
 ### Phase 30: Consent Governance + Recipe Signature Verification + Audit + Legal Posture
 **Goal**: Wrap invoke in the safety gate the whole "credential-replay" risk hinges on — default-OFF per-origin consent, mutation gating, recipe integrity verification, a no-secrets audit log, and a documented legal posture — before any learning/auto behavior ships.
@@ -139,7 +139,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 3/3 | Complete    | 2026-06-20 |
 | 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 3/3 | Complete    | 2026-06-20 |
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 4/4 | Complete    | 2026-06-21 |
-| 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 4/5 | In Progress|  |
+| 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete   | 2026-06-21 |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 0/TBD | Not started | - |
 | 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 0/TBD | Not started | - |
 | 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 0/TBD | Not started | - |
