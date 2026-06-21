@@ -192,6 +192,28 @@ try {
   }
 } catch (e) { console.error('[FSB] capability-catalog seedHeadHandlers failed at startup:', e.message); }
 
+// Phase 30 Plan 01 (v0.9.99 GOV-02/GOV-05/SIGN-01/GOV-08): the consent +
+// signature + audit + denylist modules, PRE-ARMED ahead of their creation (Plans
+// 02/03 write them) -- the Phase-27/28/29 "register ahead of creation" precedent.
+// Load order is dependency-first: consent-policy-store + audit-log (read at the
+// invoke gate) BEFORE capability-signature (read inside interpretRecipe) BEFORE
+// service-denylist (read by the gate just above the interpret path). Each line is
+// independently try/catch'd: a not-yet-existent module logs and is skipped, so the
+// service worker still boots until Plans 02/03 land. Additive only (D-05;
+// background.js is byte-frozen as an esbuild input; no manifest/permission change).
+try { importScripts('utils/consent-policy-store.js'); } catch (e) { console.error('[FSB] Failed to load consent-policy-store.js:', e.message); }
+try { importScripts('utils/audit-log.js'); } catch (e) { console.error('[FSB] Failed to load audit-log.js:', e.message); }
+try { importScripts('utils/capability-signature.js'); } catch (e) { console.error('[FSB] Failed to load capability-signature.js:', e.message); }
+try { importScripts('utils/service-denylist.js'); } catch (e) { console.error('[FSB] Failed to load service-denylist.js:', e.message); }
+// Read the denylist + sensitive seed at service-worker startup BEFORE the gate
+// evaluates (D-15). async + non-blocking; a typeof guard tolerates a missing
+// module so a load failure above never throws at boot.
+try {
+  if (typeof FsbServiceDenylist !== 'undefined' && FsbServiceDenylist && typeof FsbServiceDenylist.load === 'function') {
+    FsbServiceDenylist.load();
+  }
+} catch (e) { console.error('[FSB] service-denylist load failed at startup:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 

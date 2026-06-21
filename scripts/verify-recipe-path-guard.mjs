@@ -124,6 +124,31 @@ const RECIPE_PATH_ALLOWLIST = [
   'catalog/handlers/github.js',
   'catalog/handlers/slack.js',
   'catalog/handlers/notion.js',
+  // Phase 30 (SIGN-01, D-05): the JCS + Ed25519 verify module reached from
+  // interpretRecipe. NAMED capability-* so Check 4's disk glob AUTO-covers it
+  // (Pitfall 5). Registered AHEAD of its creation (Plan 03 writes it), the
+  // "registered ahead of creation; Check 1 skips an absent path, Check 4 fails
+  // closed when it lands" precedent -- so the guard stays green now and scans it
+  // for dynamic-code constructs the moment it lands.
+  'extension/utils/capability-signature.js',
+  // Phase 30 (GOV-02, D-02): the per-origin consent store reached at the invoke
+  // gate. Does NOT match the capability-* glob, so it MUST be listed explicitly
+  // (Pitfall 6) -- Check 1 then scans it for dynamic-code constructs. Registered
+  // ahead of creation (Plan 02 writes it); an absent path is skipped without a
+  // failure (existsSync pre-check) and Check 4 is not in play for a non-glob name.
+  'extension/utils/consent-policy-store.js',
+  // Phase 30 (GOV-05, D-09): the append-only redacted audit ring reached at the
+  // invoke gate. Does NOT match the capability-* glob, so listed explicitly
+  // (Pitfall 6). Registered ahead of creation (Plan 02 writes it); same skip-when-
+  // absent semantics as the consent store above.
+  'extension/utils/audit-log.js',
+  // Phase 30 (GOV-08, D-15): the service-denylist source-of-truth (isDenied +
+  // classify). The consent gate reads it IMMEDIATELY ABOVE the interpret path
+  // (Pitfall 6), so it is a DEFINITE allowlist entry -- not optional. Does NOT
+  // match the capability-* glob, so listed explicitly; Check 1 scans it for
+  // dynamic-code constructs. Registered ahead of creation (Plan 03 writes it),
+  // cheap insurance matching the gate's position directly above interpretRecipe.
+  'extension/utils/service-denylist.js',
   'extension/lib/cfworker-json-schema.min.js',
   'extension/lib/jmespath.min.js',
   'extension/lib/minisearch.min.js',
