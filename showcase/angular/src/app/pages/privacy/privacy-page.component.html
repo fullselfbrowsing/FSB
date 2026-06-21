@@ -141,6 +141,15 @@
       <h3 i18n="@@PRIVACY_TELEMETRY_AGGREGATED_HEADING">Aggregated public metrics</h3>
       <p i18n="@@PRIVACY_TELEMETRY_AGGREGATED_TEXT">We publish aggregated metrics derived from this telemetry pipeline at <a href="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
 
+      <!-- Legal Posture & Consent Model (Phase 30 / GOV-08, D-15) -->
+      <h2 id="legal-posture" i18n="@@PRIVACY_LEGAL_POSTURE_HEADING">Legal Posture and Consent Model</h2>
+      <p i18n="@@PRIVACY_LEGAL_POSTURE_BODY"><span [attr.translate]="'no'">FSB</span>'s automation posture, audit-log retention, and the per-origin consent model are documented in the project's <span [attr.translate]="'no'">LEGAL.md</span> policy file. <span [attr.translate]="'no'">FSB</span> does nothing on an origin until you explicitly allow it, automated read access never implies write access, and a conservative service denylist blocks automation on sensitive categories (financial and government services) outright.</p>
+      <ul>
+        <li i18n="@@PRIVACY_LEGAL_POSTURE_CONSENT">Per-origin consent is default-off. Auto and write (mutating) access are separate, explicit opt-ins managed from the Control Panel's Consent &amp; Audit section.</li>
+        <li i18n="@@PRIVACY_LEGAL_POSTURE_AUDIT">Every capability call is recorded in a redacted, append-only local audit log. No arguments, tokens, cookies, or response bodies are ever stored.</li>
+        <li i18n="@@PRIVACY_LEGAL_POSTURE_DENYLIST">A service denylist renders sensitive origins non-enableable, enforced at the capability gate and not merely in the interface.</li>
+      </ul>
+
       <!-- Open Source -->
       <h2 i18n="@@privacy.section.openSource.title">Open Source</h2>
        

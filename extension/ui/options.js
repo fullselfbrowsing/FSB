@@ -215,6 +215,24 @@ function cacheElements() {
   elements.explorerMaxPages = document.getElementById('explorerMaxPages');
   elements.explorerCrawlers = document.getElementById('explorerCrawlers');
   elements.researchList = document.getElementById('researchList');
+
+  // Phase 30 (GOV-07/GOV-08): Consent & Audit section. These render/persist
+  // straight to the dedicated consent + audit stores (NOT defaultSettings / the
+  // Save bar). The segmented control + mutating toggle write FsbConsentPolicyStore;
+  // the audit table reads the redacted FsbAuditLog ring; the Sensitive/Blocked
+  // badges read FsbServiceDenylist.classify -- the SAME source the gate enforces.
+  elements.consentOriginList = document.getElementById('consentOriginList');
+  elements.consentOriginEmptyState = document.getElementById('consentOriginEmptyState');
+  elements.consentOriginRowTemplate = document.getElementById('consentOriginRowTemplate');
+  elements.pendingRequestList = document.getElementById('pendingRequestList');
+  elements.pendingRequestEmptyState = document.getElementById('pendingRequestEmptyState');
+  elements.pendingRequestRowTemplate = document.getElementById('pendingRequestRowTemplate');
+  elements.pendingRequestCount = document.getElementById('pendingRequestCount');
+  elements.auditLogTable = document.getElementById('auditLogTable');
+  elements.auditLogBody = document.getElementById('auditLogBody');
+  elements.auditLogEmptyRow = document.getElementById('auditLogEmptyRow');
+  elements.auditExportBtn = document.getElementById('auditExportBtn');
+  elements.auditClearBtn = document.getElementById('auditClearBtn');
 }
 
 function setupEventListeners() {
@@ -419,6 +437,72 @@ function setupEventListeners() {
         scheduleRefreshActiveTriggerCount();
       } else if (area === 'local' && changes && changes.fsbTriggerCap) {
         scheduleRefreshActiveTriggerCount();
+      } else if (area === 'local' && changes
+          && (changes.fsbConsentPolicies || changes.fsbAuditLog)) {
+        // Phase 30 (GOV-07): re-render the Consent & Audit section when the
+        // consent envelope or the audit ring changes (e.g. the gate appended an
+        // outcome, or another control-panel tab edited a policy). Debounced.
+        scheduleRenderConsentAudit();
+      }
+    });
+  }
+
+  // Phase 30 (GOV-07): Consent & Audit wiring. Consent/audit state lives in its
+  // OWN stores (consent-policy-store.js, audit-log.js), NOT defaultSettings, so
+  // these controls deliberately do NOT join the formInputs Save-bar array -- they
+  // persist immediately on change. The per-origin rows + pending rows are cloned
+  // by renderConsentAudit(); their controls are wired via event delegation so
+  // dynamically-added rows are covered without re-binding.
+  if (elements.auditExportBtn) {
+    elements.auditExportBtn.addEventListener('click', exportAuditLog);
+  }
+  if (elements.auditClearBtn) {
+    elements.auditClearBtn.addEventListener('click', clearAuditLog);
+  }
+  // Per-origin Off/Ask/Auto segmented control (delegated): write the mode to the
+  // consent store for that exact origin only.
+  if (elements.consentOriginList) {
+    elements.consentOriginList.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.detail-btn[data-mode]') : null;
+      if (!btn || btn.disabled) return;
+      const row = btn.closest('.consent-origin-row');
+      const origin = row && row.dataset ? row.dataset.origin : '';
+      const mode = btn.dataset ? btn.dataset.mode : '';
+      if (!origin || !mode) return;
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+      if (store && typeof store.setOriginMode === 'function') {
+        Promise.resolve(store.setOriginMode(origin, mode)).then(() => {
+          scheduleRenderConsentAudit();
+        });
+      }
+    });
+    // Per-origin elevated mutating opt-in (delegated change).
+    elements.consentOriginList.addEventListener('change', (e) => {
+      const input = e.target;
+      if (!input || !input.classList || !input.classList.contains('consent-mutating-input')) return;
+      const row = input.closest('.consent-origin-row');
+      const origin = row && row.dataset ? row.dataset.origin : '';
+      if (!origin) return;
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+      if (store && typeof store.setOriginMutating === 'function') {
+        Promise.resolve(store.setOriginMutating(origin, !!input.checked)).then(() => {
+          scheduleRenderConsentAudit();
+        });
+      }
+    });
+  }
+  // Pending Grant / Deny (delegated): Grant writes consent for that exact
+  // origin/scope only (T-30-16); Deny removes the row without granting.
+  if (elements.pendingRequestList) {
+    elements.pendingRequestList.addEventListener('click', (e) => {
+      const target = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (!target) return;
+      const row = target.closest('.pending-request-row');
+      if (!row) return;
+      if (target.classList.contains('pending-grant-btn')) {
+        grantPendingRequest(row);
+      } else if (target.classList.contains('pending-deny-btn')) {
+        denyPendingRequest(row);
       }
     });
   }
@@ -679,7 +763,13 @@ function switchSection(sectionId) {
   });
   
   dashboardState.currentSection = sectionId;
-  
+
+  // Phase 30 (GOV-07): render the Consent & Audit section on enter (it reads the
+  // consent envelope + audit ring + classify on demand, like the cap counter).
+  if (sectionId === 'consent-audit') {
+    renderConsentAudit();
+  }
+
   // Update URL hash without scrolling
   history.replaceState(null, null, `#${sectionId}`);
 }
@@ -1557,6 +1647,306 @@ function exportLogs() {
 
 function filterLogs() {
   updateLogsDisplay();
+}
+
+// ============================================================================
+// Phase 30 (GOV-07/GOV-08, D-13/D-14): Consent & Audit section render + actions.
+//
+// The UI is the user's control surface over the consent spine (Plans 02/03). It
+// is the ONLY surface that mutates consent from user intent; the GATE
+// (background.js, wrapping FsbCapabilityRouter.invoke) remains the authoritative
+// enforcement. The Sensitive badge + the disabled Auto segment REFLECT the gate's
+// step-4 sensitive+Auto downgrade by reading the SAME FsbServiceDenylist.classify
+// source of truth (D-14) -- the UI is a consistent visual surface, not the
+// security boundary. Denylisted origins are rendered non-enableable.
+// ============================================================================
+
+let _consentAuditDebounceHandle = null;
+
+function scheduleRenderConsentAudit() {
+  // 100ms debounce (mirror the cap-counter scheduleRefresh) so a burst of audit
+  // appends during an automation run collapses to a single re-render.
+  if (_consentAuditDebounceHandle !== null) {
+    clearTimeout(_consentAuditDebounceHandle);
+  }
+  _consentAuditDebounceHandle = setTimeout(() => {
+    _consentAuditDebounceHandle = null;
+    renderConsentAudit();
+  }, 100);
+}
+
+// renderConsentAudit() -- reads the consent envelope + the redacted audit ring
+// and (re)paints the per-origin list + the audit table. Best-effort: a store
+// hiccup must never throw into the options page (it degrades to the empty state).
+function renderConsentAudit() {
+  // Only paint when the section exists in the DOM.
+  if (!elements.consentOriginList && !elements.auditLogBody) return;
+
+  const consentStore = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+  const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+
+  // ---- Per-origin consent list ----
+  if (consentStore && typeof consentStore.readPolicies === 'function') {
+    Promise.resolve(consentStore.readPolicies())
+      .then((envelope) => renderConsentOriginList(envelope))
+      .catch(() => { /* degrade silently; existing rows untouched */ });
+  }
+
+  // ---- Audit log table ----
+  if (auditStore && typeof auditStore.getEntries === 'function') {
+    Promise.resolve(auditStore.getEntries())
+      .then((result) => renderAuditTable(result && result.entries ? result.entries : []))
+      .catch(() => { /* degrade silently */ });
+  }
+}
+
+// Paint the per-origin rows from the consent envelope. Applies
+// FsbServiceDenylist.classify(origin) for the Sensitive/Blocked friction.
+function renderConsentOriginList(envelope) {
+  const list = elements.consentOriginList;
+  const tmpl = elements.consentOriginRowTemplate;
+  if (!list || !tmpl || !tmpl.content) return;
+
+  const policies = (envelope && envelope.policies && typeof envelope.policies === 'object')
+    ? envelope.policies : {};
+  const origins = Object.keys(policies);
+
+  // Clear previously-rendered rows (keep the empty-state node).
+  const existing = list.querySelectorAll('.consent-origin-row');
+  existing.forEach((node) => node.remove());
+
+  if (origins.length === 0) {
+    if (elements.consentOriginEmptyState) elements.consentOriginEmptyState.style.display = '';
+    return;
+  }
+  if (elements.consentOriginEmptyState) elements.consentOriginEmptyState.style.display = 'none';
+
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbServiceDenylist : null;
+
+  origins.sort();
+  origins.forEach((origin) => {
+    const policy = policies[origin] || {};
+    const mode = (typeof policy.mode === 'string') ? policy.mode : 'off';
+    const mutating = !!policy.mutating;
+
+    const frag = tmpl.content.cloneNode(true);
+    const row = frag.querySelector('.consent-origin-row');
+    if (!row) return;
+    row.dataset.origin = origin;
+
+    const nameEl = row.querySelector('.consent-origin-name');
+    if (nameEl) nameEl.textContent = origin;
+
+    const radiogroup = row.querySelector('.consent-mode-toggle');
+    if (radiogroup) radiogroup.setAttribute('aria-label', 'Consent mode for ' + origin);
+
+    // classify() is the gate's source of truth (D-14). denied => Blocked + all
+    // controls disabled; sensitive => amber badge + Auto segment disabled.
+    let classified = { sensitive: false, denied: false };
+    if (denylist && typeof denylist.classify === 'function') {
+      try { classified = denylist.classify(origin) || classified; } catch (_e) { /* degrade */ }
+    }
+
+    const modeButtons = row.querySelectorAll('.detail-btn[data-mode]');
+    modeButtons.forEach((btn) => {
+      const isActive = btn.dataset.mode === mode;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+      // Sensitive: disable Auto (the gate downgrades sensitive+Auto to Ask).
+      if (classified.sensitive && btn.dataset.mode === 'auto') {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+      }
+      // Denylisted: every control disabled (non-enableable).
+      if (classified.denied) {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+      }
+    });
+
+    const mutInput = row.querySelector('.consent-mutating-input');
+    if (mutInput) {
+      mutInput.checked = mutating;
+      // Mutating is meaningless when mode == Off; disabled then. Always disabled
+      // for a denylisted origin.
+      mutInput.disabled = classified.denied || mode === 'off';
+    }
+
+    const hint = row.querySelector('.consent-origin-hint');
+    const sensBadge = row.querySelector('.consent-sensitive-badge');
+    const blockBadge = row.querySelector('.consent-blocked-badge');
+    if (classified.denied) {
+      row.classList.add('consent-origin-denied');
+      row.style.opacity = '0.6';
+      if (blockBadge) blockBadge.style.display = '';
+      if (hint) {
+        hint.style.display = '';
+        hint.textContent = 'Automation prohibited for this origin. '
+          + (classified.reason || '');
+      }
+    } else if (classified.sensitive) {
+      if (sensBadge) sensBadge.style.display = '';
+      if (hint) {
+        hint.style.display = '';
+        hint.textContent = 'Sensitive origin -- Auto is disabled. Each action requires confirmation even when allowed.';
+      }
+    }
+
+    list.appendChild(frag);
+  });
+}
+
+// Paint the redacted audit rows (newest first). Renders ONLY the seven
+// whitelisted columns -- never args/tokens/cookies/bodies (GOV-06 at the UI layer;
+// the ring is already redacted by audit-log.js, this is defense in depth).
+function renderAuditTable(entries) {
+  const body = elements.auditLogBody;
+  if (!body) return;
+
+  // Remove prior data rows (keep the empty-row node reference).
+  const dataRows = body.querySelectorAll('tr.audit-entry-row');
+  dataRows.forEach((node) => node.remove());
+
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (list.length === 0) {
+    if (elements.auditLogEmptyRow) elements.auditLogEmptyRow.style.display = '';
+    return;
+  }
+  if (elements.auditLogEmptyRow) elements.auditLogEmptyRow.style.display = 'none';
+
+  // Newest first.
+  list.reverse();
+  list.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const tr = document.createElement('tr');
+    tr.className = 'log-entry audit-entry-row';
+    const outcome = String(entry.outcome || '');
+    // Failed-outcome rows get the error tint (mirror .log-entry.error).
+    if (/fail|error|block|deny|denied/i.test(outcome)) {
+      tr.classList.add('error');
+    }
+    const ts = (typeof entry.ts === 'number') ? new Date(entry.ts).toLocaleString() : '';
+    // STRICT whitelist: only these seven fields are ever read off the entry.
+    const cells = [
+      ts,
+      String(entry.origin || ''),
+      String(entry.slug || ''),
+      String(entry.method || ''),
+      String(entry.sideEffectClass || ''),
+      String(entry.consentDecision || ''),
+      outcome
+    ];
+    cells.forEach((value) => {
+      const td = document.createElement('td');
+      td.textContent = value;   // textContent, never innerHTML -- no injection
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+}
+
+// Export the redacted audit ring as JSON (mirror exportLogs / diagnostics export).
+function exportAuditLog() {
+  const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+  if (!auditStore || typeof auditStore.getEntries !== 'function') {
+    showToast('Audit log unavailable', 'error');
+    return;
+  }
+  Promise.resolve(auditStore.getEntries()).then((result) => {
+    const entries = (result && Array.isArray(result.entries)) ? result.entries : [];
+    const json = JSON.stringify({ exportedAt: Date.now(), entries: entries }, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fsb-audit-log-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Audit log exported', 'success');
+  }).catch(() => {
+    showToast('Audit log export failed', 'error');
+  });
+}
+
+// Clear the audit ring after a destructive confirm (mirror clearLogs but guarded).
+function clearAuditLog() {
+  const confirmed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+    ? window.confirm('Clear audit log: This permanently deletes all local audit entries. Export first if you want a copy. Continue?')
+    : true;
+  if (!confirmed) return;
+  const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+  if (!auditStore || typeof auditStore.getEntries !== 'function') {
+    showToast('Audit log unavailable', 'error');
+    return;
+  }
+  Promise.resolve(auditStore.getEntries({ clear: true })).then(() => {
+    renderAuditTable([]);
+    showToast('Audit log cleared', 'warning');
+  }).catch(() => {
+    showToast('Could not clear audit log', 'error');
+  });
+}
+
+// Grant a pending request: write consent for that EXACT origin/scope only
+// (T-30-16 -- never a global enable), remove the row, surface a toast.
+function grantPendingRequest(row) {
+  if (!row || !row.dataset) return;
+  const origin = row.dataset.origin || '';
+  const scope = row.dataset.scope || '';
+  if (!origin) return;
+  const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+  if (store && typeof store.setOriginMode === 'function') {
+    // Grant => Auto for that origin; an explicit mutating scope additionally
+    // opts the origin into write access. Read scope never implies write.
+    const writes = [store.setOriginMode(origin, 'auto')];
+    if (scope === 'mutating' && typeof store.setOriginMutating === 'function') {
+      writes.push(store.setOriginMutating(origin, true));
+    }
+    Promise.all(writes.map((p) => Promise.resolve(p))).then(() => {
+      row.remove();
+      updatePendingCount();
+      scheduleRenderConsentAudit();
+      showToast('Access granted', 'success');
+    });
+  } else {
+    row.remove();
+    updatePendingCount();
+    showToast('Access granted', 'success');
+  }
+}
+
+// Deny a pending request: remove the row WITHOUT granting.
+function denyPendingRequest(row) {
+  if (!row) return;
+  row.remove();
+  updatePendingCount();
+  showToast('Request denied', 'warning');
+}
+
+// Refresh the "N pending" count pill + the empty-state from the live row count.
+// Clearing the queue (count 0) also clears the chrome.action badge (the queue is
+// what the badge surfaces).
+function updatePendingCount() {
+  const list = elements.pendingRequestList;
+  if (!list) return;
+  const count = list.querySelectorAll('.pending-request-row').length;
+  if (elements.pendingRequestCount) {
+    if (count > 0) {
+      elements.pendingRequestCount.textContent = count + ' pending';
+      elements.pendingRequestCount.style.display = '';
+    } else {
+      elements.pendingRequestCount.style.display = 'none';
+    }
+  }
+  if (elements.pendingRequestEmptyState) {
+    elements.pendingRequestEmptyState.style.display = count > 0 ? 'none' : '';
+  }
+  if (count === 0 && typeof chrome !== 'undefined' && chrome.action
+      && typeof chrome.action.setBadgeText === 'function') {
+    try { chrome.action.setBadgeText({ text: '' }); } catch (_e) { /* best-effort */ }
+  }
 }
 
 let _toastTimer = null;
