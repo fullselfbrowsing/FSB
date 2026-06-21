@@ -581,8 +581,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 27 Plan 27-02: 168 mentions (+1 new line for utils/capability-fetch.js -- the MAIN-world fetch primitive).
   // Phase 28 Plan 28-01: 170 mentions (+2 new lines for catalog/recipe-index.generated.js +
   // utils/capability-search.js -- the build-time catalog IIFE + the minisearch index/slug-map module).
+  // Phase 29 (v0.9.99 catalog/router/head): 175 mentions (+5 -- utils/capability-catalog.js +
+  // utils/capability-router.js + the three T1a head handlers catalog/handlers/{github,slack,notion}.js).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 170, 'background.js importScripts count = 170 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js)');
+  passAssertEqual(importScriptsCount, 175, 'background.js importScripts count = 175 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -590,8 +592,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (phantom-stream-protocol) -> 157. Phase 26 adds 6 (3 vendored libs + 3 capability
   // modules) -> 163; Phase 27 Plan 27-02 adds 1 (utils/capability-fetch.js) -> 164.
   // Phase 28 Plan 28-01 adds 2 (catalog/recipe-index.generated.js + utils/capability-search.js) -> 166.
+  // Phase 29 adds 5 (utils/capability-catalog.js + utils/capability-router.js + 3 catalog/handlers
+  // {github,slack,notion}.js) -> 171.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 166, 'background.js importScripts() call sites = 166 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js)');
+  passAssertEqual(importScriptsCallSites, 171, 'background.js importScripts() call sites = 171 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
