@@ -97,6 +97,15 @@ const RECIPE_PATH_ALLOWLIST = [
   // extension/utils/capability-*.js from disk and FAILS CLOSED on any not on this
   // allowlist. The module is kept free of eval/new Function/import even in comments.
   'extension/utils/capability-search.js',
+  // Phase 29 (CAT-01, D-01): the origin-biased tiered router + the slug->tier
+  // catalog registry. Registered AHEAD of their creation (Plan 02 writes them),
+  // the Phase-27/28 "pre-arm in the same milestone" precedent (Pitfall 4): Check 1
+  // skips a not-yet-existent path (existsSync pre-check) so the guard stays green
+  // now, and Check 4 fails CLOSED the moment either lands not on this allowlist.
+  // Both modules are pure dispatch/registry logic kept free of eval/new Function/
+  // import even in comments.
+  'extension/utils/capability-router.js',
+  'extension/utils/capability-catalog.js',
   'extension/lib/cfworker-json-schema.min.js',
   'extension/lib/jmespath.min.js',
   'extension/lib/minisearch.min.js',

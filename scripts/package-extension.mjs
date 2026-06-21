@@ -2,7 +2,7 @@
 // Builds the Chrome Web Store-ready archive from extension/ only.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -86,6 +86,33 @@ writeFileSync(generatedPath, generatedSource, 'utf8');
 console.log(
   `package-extension: generated ${generatedPath.replace(`${ROOT}/`, '')} ` +
   `(${recipes.length} recipes, ${descriptors.length} descriptors)`
+);
+
+// ---- Phase 29 (CAT-02, D-10): ship the bundled head handlers into the package -
+//
+// Handlers (catalog/handlers/*.js) are reviewed CODE, not data -- unlike recipes
+// they CANNOT be JSON-inlined, so they are COPIED verbatim under extension/catalog/
+// handlers/ where the existing zip-of-EXT_ROOT picks them up (the same 28-D-16 trap
+// the recipe-index step above fixes for recipes). The directory does NOT exist until
+// Plan 03 authors the head, so this step tolerates its absence (existsSync guard,
+// exactly as readJsonDir already guards an absent recipes/descriptors dir). No
+// per-handler importScripts manifest is generated here -- those load lines are added
+// in Plan 02/03. Without this copy a T1a slug routes to RECIPE_NOT_FOUND only in a
+// packaged build (works in a dev tree, empty after package-extension.mjs).
+const HANDLERS_SRC = join(CATALOG_ROOT, 'handlers');
+const HANDLERS_DEST = join(EXT_ROOT, 'catalog', 'handlers');
+let copiedHandlerCount = 0;
+if (existsSync(HANDLERS_SRC)) {
+  mkdirSync(HANDLERS_DEST, { recursive: true });
+  const handlerFiles = readdirSync(HANDLERS_SRC).filter((name) => name.endsWith('.js'));
+  for (const name of handlerFiles) {
+    copyFileSync(join(HANDLERS_SRC, name), join(HANDLERS_DEST, name));
+    copiedHandlerCount++;
+  }
+}
+console.log(
+  `package-extension: copied ${copiedHandlerCount} handler module(s) into ` +
+  `extension/catalog/handlers/ (absent catalog/handlers/ tolerated)`
 );
 
 const excludes = [
