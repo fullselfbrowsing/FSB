@@ -5,11 +5,9 @@
     "list my github issues",
     "show issues assigned to me on github",
     "what github issues do i have",
-    "create a github issue",
-    "open a new issue on github",
-    "file a github issue"
+    "view my open github issues"
   ],
-  "description": "List your assigned GitHub issues, or create a new issue (T1a persisted-query handler)",
+  "description": "List your assigned GitHub issues (T1a persisted-query handler, read)",
   "actionVerb": "list",
-  "sideEffectClass": "write"
+  "sideEffectClass": "read"
 }
