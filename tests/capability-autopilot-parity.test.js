@@ -154,7 +154,11 @@ async function run() {
     const dispatcher = require(path.join(REPO_ROOT, 'extension', 'ws', 'mcp-tool-dispatcher.js'));
     if (typeof dispatcher.dispatchMcpMessageRoute === 'function'
         && dispatcher.hasMcpMessageRoute('mcp:capabilities-invoke')) {
-      mcpResult = await dispatcher.dispatchMcpMessageRoute('mcp:capabilities-invoke', {
+      // dispatchMcpMessageRoute takes a single { type, payload, ... } object
+      // (mcp-tool-dispatcher.js:472); the Plan-04 reroute then calls
+      // FsbCapabilityRouter.invoke(payload.slug, payload.params, ...).
+      mcpResult = await dispatcher.dispatchMcpMessageRoute({
+        type: 'mcp:capabilities-invoke',
         payload: { slug: SLUG, params: ARGS, tab_id: 11 }
       });
     }
