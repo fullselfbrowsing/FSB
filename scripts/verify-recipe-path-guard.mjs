@@ -10,7 +10,7 @@
  * this file -- it would otherwise self-flag on its own forbidden-pattern regex
  * literals and on the cfworker IIFE loader).
  *
- * Four checks (D-16 / D-17):
+ * Five checks (D-16 / D-17; Check 5 added Phase 29 / MED-01):
  *   1. ALLOWLIST GREP -- read each of the EXACTLY SIX hardcoded recipe-path
  *      files and fail on any /\beval\s*\(/, /\bnew\s+Function\b/, /\bimport\s*\(/
  *      match. NOT a glob, NOT a whole-extension/ walk (a broad grep would
@@ -36,6 +36,11 @@
  *      that nobody remembers to add to the hardcoded list is simply never
  *      scanned and could reintroduce dynamic code undetected. The sanctioned
  *      sites live outside utils/, so they do not collide with this glob.
+ *   5. HANDLER-DIR DRIFT (MED-01) -- the bundled-head analog of Check 4: enumerate
+ *      catalog/handlers/*.js FROM DISK and fail if any handler is absent from
+ *      RECIPE_PATH_ALLOWLIST. The credential-bearing T1a handlers (CSRF/xoxc
+ *      scrapers) live OUTSIDE extension/utils/, so Check 4 never reached them; this
+ *      closes the same bypass-by-omission gap for the head. Tolerates an absent dir.
  *
  * Test-only seam: FSB_RECIPE_GUARD_EXTRA_ALLOWLIST (a comma-separated path
  * list), when set, is appended to the allowlist BEFORE the grep. This exists
@@ -106,6 +111,19 @@ const RECIPE_PATH_ALLOWLIST = [
   // import even in comments.
   'extension/utils/capability-router.js',
   'extension/utils/capability-catalog.js',
+  // Phase 29 (CAT-02, MED-01): the three credential-bearing T1a bundled-head
+  // handlers. These are the MOST sensitive new code on the recipe path -- they
+  // scrape CSRF/xoxc tokens and build credentialed mutation specs -- yet they live
+  // under catalog/handlers/ (shipped to extension/catalog/handlers/), OUTSIDE
+  // extension/utils/, so Check 4's utils-only glob never scanned them. Listing them
+  // here makes Check 1 grep them for eval/new Function/import(); the handler-dir
+  // disk-drift check below (the catalog/handlers/ analog of Check 4) fails CLOSED on
+  // any new handler nobody adds here. The handlers are eval-free today (verified by
+  // grep) -- this closes the guardrail gap on the exact files the charter says must
+  // be eval-free-scanned.
+  'catalog/handlers/github.js',
+  'catalog/handlers/slack.js',
+  'catalog/handlers/notion.js',
   'extension/lib/cfworker-json-schema.min.js',
   'extension/lib/jmespath.min.js',
   'extension/lib/minisearch.min.js',
@@ -310,6 +328,45 @@ for (const f of capabilityFiles) {
   }
 }
 
+// ---- Check 5: handler-dir drift (MED-01, the bundled-head analog of Check 4) -
+//
+// The T1a bundled-head handlers (catalog/handlers/*.js) are credential-bearing
+// reviewed CODE on the recipe path -- the charter requires them eval-free-scanned --
+// but they live OUTSIDE extension/utils/, so Check 4's utils glob never reaches them.
+// Enumerate catalog/handlers/*.js FROM DISK and fail closed on any handler absent
+// from RECIPE_PATH_ALLOWLIST, so a NEW token-scraping handler that nobody allowlists
+// is never silently unscanned (the same bypass-by-omission Check 4 closes for utils/).
+// The directory may not exist before Plan 03 authors the head -- tolerate its absence
+// exactly as readJsonDir tolerates an absent recipes/ dir (an absent dir => no
+// handlers => nothing to scan, not a failure).
+const HANDLER_DIR_REL = 'catalog/handlers';
+const HANDLER_DIR_ABS = resolve(ROOT, HANDLER_DIR_REL);
+let handlerFiles = [];
+if (existsSync(HANDLER_DIR_ABS)) {
+  try {
+    handlerFiles = readdirSync(HANDLER_DIR_ABS)
+      .filter((n) => n.endsWith('.js'))
+      .map((n) => `${HANDLER_DIR_REL}/${n}`);
+  } catch (err) {
+    failures.push(
+      `handler drift check: cannot read ${HANDLER_DIR_REL} ` +
+      `(${err.code || err.message}) -- cannot prove the allowlist covers every ` +
+      `bundled-head handler.`
+    );
+    handlerFiles = [];
+  }
+}
+for (const f of handlerFiles) {
+  if (RECIPE_PATH_ALLOWLIST.indexOf(f) === -1) {
+    failures.push(
+      `allowlist drift: bundled-head handler '${f}' exists on disk but is NOT on ` +
+      `the recipe-path allowlist -- a token-scraping handler the guard does not scan ` +
+      `can reintroduce dynamic code undetected (bypass-by-omission). Add it to ` +
+      `RECIPE_PATH_ALLOWLIST.`
+    );
+  }
+}
+
 // ---- Exit convention (clone of verify-store-listing.mjs) --------------------
 if (failures.length > 0) {
   console.error('verify-recipe-path-guard: FAIL');
@@ -323,6 +380,7 @@ console.log(
   'verify-recipe-path-guard: PASS (' +
   RECIPE_PATH_ALLOWLIST.length + ' recipe-path files clean, fixtures validated, ' +
   SANCTIONED_SITES.length + ' sanctioned sites excluded, ' +
-  capabilityFiles.length + ' on-disk capability modules all on the allowlist)'
+  capabilityFiles.length + ' on-disk capability modules all on the allowlist, ' +
+  handlerFiles.length + ' bundled-head handlers all on the allowlist)'
 );
 process.exit(0);
