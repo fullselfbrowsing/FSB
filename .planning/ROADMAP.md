@@ -73,7 +73,11 @@
   2. Both tools register outside `TOOL_REGISTRY` via `server.tool()`, keeping the existing ~63 MCP tool schemas byte-identical (INV-01 verified).
   3. A persisted minisearch index indexes intent synonyms + service + action verb + side-effect class and snapshots to `chrome.storage.local`; `search_capabilities` is read-only and bypasses the mutation queue while `invoke_capability` is serialized through it.
   4. An eval harness measures recall@k and wrong-invoke rate, and the milestone is gated on its thresholds.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 28-01-PLAN.md — Capability-search index layer + catalog shipping + eval-harness gate (recall@5>=0.9, wrong-invoke=0) + seed fixtures
+- [ ] 28-02-PLAN.md — Two out-of-registry MCP tools (search_capabilities + invoke_capability) + read-only/queue split (INV-01)
+- [ ] 28-03-PLAN.md — SW dispatcher routes + bridge wiring: SW-side origin bias for search, routerless invoke path, RECIPE_NOT_FOUND
+- [ ] 28-04-PLAN.md — INV-01 surface proof test (two tools on wire + registry hash unchanged + queue split) + test-chain wiring
 
 ### Phase 29: Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity
 **Goal**: Add the catalog, the origin-biased tiered router, the zero-install bundled head (imperative handlers) and declarative-recipe long tail, and the autopilot branch — so MCP and autopilot share one engine (INV-02 at the runtime layer).
@@ -129,7 +133,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 |-------|----------------|--------|-----------|
 | 26. Recipe Schema + Bundled Interpreter + MV3 CI Guard | 3/3 | Complete    | 2026-06-20 |
 | 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 3/3 | Complete    | 2026-06-20 |
-| 28. Lean MCP Surface + Capability Search + Eval Harness | 0/TBD | Not started | - |
+| 28. Lean MCP Surface + Capability Search + Eval Harness | 0/4 | Not started | - |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 0/TBD | Not started | - |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 0/TBD | Not started | - |
 | 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 0/TBD | Not started | - |
