@@ -26,10 +26,10 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 ### SURF — Lean MCP Surface & Capability Search
 
 - [x] **SURF-01**: `search_capabilities` returns ranked, schema-on-hit results (≤5) for an intent query, biased by the owned tab's origin.
-- [ ] **SURF-02**: `invoke_capability` executes a selected capability with validated parameters and returns a structured result.
-- [ ] **SURF-03**: Both tools register outside `TOOL_REGISTRY` (via `server.tool()`), keeping the existing ~63 MCP tool schemas byte-identical (INV-01).
+- [x] **SURF-02**: `invoke_capability` executes a selected capability with validated parameters and returns a structured result.
+- [x] **SURF-03**: Both tools register outside `TOOL_REGISTRY` (via `server.tool()`), keeping the existing ~63 MCP tool schemas byte-identical (INV-01).
 - [x] **SURF-04**: A persisted minisearch index indexes intent synonyms + service + action verb + side-effect class, and snapshots to `chrome.storage.local`.
-- [ ] **SURF-05**: `search_capabilities` is read-only and bypasses the mutation queue; `invoke_capability` is serialized through it.
+- [x] **SURF-05**: `search_capabilities` is read-only and bypasses the mutation queue; `invoke_capability` is serialized through it.
 - [x] **SURF-06**: An eval harness measures recall@k and wrong-invoke rate, and the milestone is gated on its thresholds.
 
 ### CAT — Catalog & Tiered Routing
@@ -121,10 +121,10 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | FETCH-04 | Phase 27 | Complete |
 | FETCH-05 | Phase 27 | Complete (CI half); live half human_needed (27-HUMAN-UAT.md UAT-27-01) |
 | SURF-01 | Phase 28 | Complete |
-| SURF-02 | Phase 28 | Pending |
-| SURF-03 | Phase 28 | Pending |
+| SURF-02 | Phase 28 | Complete |
+| SURF-03 | Phase 28 | Complete |
 | SURF-04 | Phase 28 | Complete |
-| SURF-05 | Phase 28 | Pending |
+| SURF-05 | Phase 28 | Complete |
 | SURF-06 | Phase 28 | Complete |
 | CAT-01 | Phase 29 | Pending |
 | CAT-02 | Phase 29 | Pending |
