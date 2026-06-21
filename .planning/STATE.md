@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: executing
+status: verifying
 stopped_at: "Completed 28-03-PLAN.md (capability surface SW transport: dispatcher routes + bridge delegates)"
-last_updated: "2026-06-21T03:57:44.284Z"
+last_updated: "2026-06-21T04:08:08.517Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 11
-  percent: 25
+  completed_plans: 12
+  percent: 38
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 28 (Lean MCP Surface + Capability Search + Eval Harness) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-21
 
 Progress: [██████████] 100%
@@ -84,6 +84,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 28 P28-01 | 8min | 4 tasks | 11 files |
 | Phase 28 P28-02 | 7min | 2 tasks | 4 files |
 | Phase 28 P28-03 | 3min | 2 tasks | 2 files |
+| Phase 28 P28-04 | 9min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 28 Plan 03 (SURF-01/SURF-02): two SW dispatcher routes (mcp:capabilities-search read-only, mcp:capabilities-invoke queued) + bridge delegates wire the capability tools; search resolves the un-spoofable owned-tab origin SW-side (new URL(tab.url).origin, D-11; payload.origin is a non-authoritative override) and returns <=5 ranked schema-on-hit hits.
 - [Phase ?]: Phase 28 Plan 03: invoke is the routerless direct Phase-27 path (NO Phase-29 router): slug -> getRecipeBySlug -> interpretRecipe -> executeBoundSpec; UNGATED (consent is Phase 30) but the two-point origin-pin holds (executeBoundSpec re-asserts tabOrigin === spec.origin); unknown slug returns RECIPE_NOT_FOUND (dual-field) verbatim via the existing errors.ts /^RECIPE_.+$/ passthrough -- NO errors.ts edit (D-06/D-07).
 - [Phase ?]: Phase 28 Plan 03: bridge delegates are pure pass-throughs (no origin/tab resolution) -- authoritative resolution lives ONLY in the dispatcher handlers (single un-spoofable point, T-28-01); both routes use the standalone handler: form (mcp:search-memory precedent), handlers are hoisted async function declarations referenced by the route-table const literal.
+- [Phase ?]: [Phase 28] Plan 04 (SURF-03/05/02): tests/capability-mcp-surface.test.js is the single-file INV-01 proof -- enumerates the built runtime server._registeredTools (65 = 63 + 2, both capability tools on the wire, the Plan 02 probe) ADJACENT to a recompute of registryHash(nonTriggerTools) == the frozen EXPECTED_NON_TRIGGER_REGISTRY_HASH (out-of-registry, unmoved); queue split asserted structurally (readOnlyTools Set) AND behaviorally (search bypasses a slow in-flight invoke); RECIPE_NOT_FOUND surfaces verbatim (not action_rejected) via the existing /^RECIPE_.+$/ passthrough, no errors.ts edit.
+- [Phase ?]: [Phase 28] Plan 04: both new phase tests (capability-search-eval + capability-mcp-surface) appended to the npm test chain after capability-fetch (no reorder/removal); the FULL npm test phase-close gate exits 0 after a Rule 1 fix to a stale lattice-provider-bridge-smoke importScripts baseline (168->170 / 164->166) left by Plan 28-01.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -174,7 +177,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T03:57:44.279Z
+Last session: 2026-06-21T04:07:52.652Z
 Stopped at: Completed 28-03-PLAN.md (capability surface SW transport: dispatcher routes + bridge delegates)
 Resume file: None
 
