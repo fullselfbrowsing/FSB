@@ -2196,10 +2196,12 @@ async function handleCapabilitiesSearchMessageRoute({ payload }) {
 // routerless body (getRecipeBySlug -> interpretRecipe -> executeBoundSpec) moved INTO the
 // router's T1b tier (Plan 02); this handler is now a single router call. The wire names and
 // the route table are byte-unchanged, so the frozen INV-01 registry hash never moves and the
-// two capability tools stay OUTSIDE TOOL_REGISTRY. The model NEVER supplies the authoritative
-// origin: it is resolved SW-side from the active/owned tab (the search-handler pattern, D-11);
-// payload.origin is a non-authoritative override only. The router routes but never re-targets --
-// the two-point origin-pin still holds downstream in executeBoundSpec. Typed RECIPE_* fall-through
+// two capability tools stay OUTSIDE TOOL_REGISTRY. A model-supplied payload.origin, when present,
+// takes precedence but BIASES catalog candidate ranking ONLY (catalog.resolve(slug, origin)); it can
+// NEVER select a cross-origin credentialed fetch, because handlers/recipes hardcode spec.origin and
+// the fetch is re-pinned to the active tab inside executeBoundSpec. Absent payload.origin, the origin
+// is resolved SW-side from the active/owned tab (the search-handler pattern, D-11). The router routes
+// but never re-targets -- the two-point origin-pin still holds downstream in executeBoundSpec. Typed RECIPE_* fall-through
 // reasons (RECIPE_NOT_FOUND / RECIPE_LEARN_PENDING / RECIPE_DOM_FALLBACK_PENDING) surface verbatim
 // via the existing errors.ts /^RECIPE_.+$/ passthrough (no errors.ts edit). UNGATED (consent is
 // Phase 30); the reroute is internal-only -- there is no second invoke path (INV-02).
@@ -2209,8 +2211,11 @@ async function handleCapabilitiesInvokeMessageRoute({ payload }) {
   }
   // Resolve tabId SW-side: explicit payload.tab_id, else the active/owned tab.
   let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
-  // Resolve the owned-tab origin SW-side (the search-handler pattern). The model NEVER supplies
-  // the authoritative origin; payload.origin is a non-authoritative override only (D-11).
+  // Resolve the origin: a model-supplied payload.origin, when present, takes precedence and
+  // BIASES catalog candidate ranking only (catalog.resolve(slug, origin)); it can NEVER select a
+  // cross-origin credentialed fetch, because handlers/recipes hardcode spec.origin and the real
+  // fetch is re-pinned to the active tab (origin-of(tabId) === spec.origin) inside executeBoundSpec.
+  // Absent payload.origin, we fall back to the active/owned-tab origin (the search-handler pattern).
   let origin = payload.origin || null;
   if (tabId === null || !origin) {
     try {
@@ -2222,8 +2227,9 @@ async function handleCapabilitiesInvokeMessageRoute({ payload }) {
         origin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
       }
     } catch (e) {
-      if (tabId === null) { tabId = null; }
-      if (!origin) { origin = null; }
+      // active-tab lookup failed; leave tabId/origin as-is (null). The two-point
+      // origin-pin still fails closed downstream in executeBoundSpec, so a null
+      // origin/tabId cannot select a cross-origin credentialed fetch.
     }
   }
   return await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, { origin, tabId });
