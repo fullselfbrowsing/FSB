@@ -1,8 +1,8 @@
 ---
 phase: 30
 slug: consent-governance-recipe-signature-verification-audit-legal
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-21
 ---
@@ -41,18 +41,18 @@ created: 2026-06-21
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | 0 | GOV-01 | T-consent-default-off | Unseen origin is default-OFF → `invoke` returns `RECIPE_CONSENT_REQUIRED`, no side effect | unit | `node tests/consent-gate.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-02 | — | Off/Ask/Auto round-trip in store; Auto is per-origin (no global enable) | unit | `node tests/consent-policy-store.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-03 | T-mutation-elevation | Read-Auto ≠ write-Auto: POST on read-Auto origin → `RECIPE_CONSENT_MUTATING_REQUIRED`; elevated opt-in lets it through | unit | `node tests/consent-mutation-gate.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-04 | T-single-chokepoint | Gate runs at the single `invoke` chokepoint AFTER ownership; both front doors hit it | unit | `node tests/consent-chokepoint.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-05 | — | Append-only entry has exactly `{ts,origin,slug,method,sideEffectClass,consentDecision,outcome,error?}` and FIFO-trims | unit | `node tests/audit-log.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-06 | T-no-secret-log | NO auth substring (cookie/token/csrf/xoxc/_gh_sess/bearer/authorization) survives in the persisted ring or capture | unit (security) | `node tests/audit-log-no-secret.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-07 | — | Control-panel section surface shape (nav, per-origin list, pending queue, audit table, legal card) + options.js wiring | source-text unit | `node tests/consent-audit-settings-ui.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | GOV-08 | T-denylist-bypass | `docs/LEGAL.md` exists (retention+consent); `service-denylist.json` valid; denylist checked BEFORE policy (denylisted origin non-enableable) | unit + source | `node tests/service-denylist.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | SIGN-01 | T-recipe-tamper | FIXTURE KEYPAIR: sign fixture recipe → verify-pass; flip one signed byte → `RECIPE_SIGNATURE_INVALID`; absent sig on non-bundled → reject | unit (security) | `node tests/recipe-signature.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | SIGN-02 | — | Verify hook fires INSIDE `interpretRecipe` AFTER schema-validate, BEFORE bind; integrity metadata (sig/capturedAt/schemaHash) is the verified payload | unit | `node tests/recipe-signature-interpreter-hook.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | SIGN-01/D-07 | T-recipe-tamper | Bundled-provenance recipe is EXEMPT (verify NOT called); non-bundled IS gated | unit | `node tests/recipe-signature.test.js` (provenance branch) | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | INV-01/04 | — | errors.ts passthrough surfaces `RECIPE_CONSENT_*`/`RECIPE_SIGNATURE_INVALID` verbatim (built mcp); iterator byte-untouched; ~63 tool schemas unchanged | unit | `node tests/capability-interpreter.test.js` + `node tests/agent-loop-iterator-guard.test.js` | partial | ⬜ pending |
+| 30-01 (test) / 30-02 (gate) | 30-01 (test) / 30-02 (gate) | 0 | GOV-01 | T-consent-default-off | Unseen origin is default-OFF → `invoke` returns `RECIPE_CONSENT_REQUIRED`, no side effect | unit | `node tests/consent-gate.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-02 (store) | 30-01 (test) / 30-02 (store) | 0 | GOV-02 | — | Off/Ask/Auto round-trip in store; Auto is per-origin (no global enable) | unit | `node tests/consent-policy-store.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-02 (mutation gate) | 30-01 (test) / 30-02 (mutation gate) | 0 | GOV-03 | T-mutation-elevation | Read-Auto ≠ write-Auto: POST on read-Auto origin → `RECIPE_CONSENT_MUTATING_REQUIRED`; elevated opt-in lets it through | unit | `node tests/consent-mutation-gate.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-02 (chokepoint) | 30-01 (test) / 30-02 (chokepoint) | 0 | GOV-04 | T-single-chokepoint | Gate runs at the single `invoke` chokepoint AFTER ownership; both front doors hit it | unit | `node tests/consent-chokepoint.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-02 (audit ring) | 30-01 (test) / 30-02 (audit ring) | 0 | GOV-05 | — | Append-only entry has exactly `{ts,origin,slug,method,sideEffectClass,consentDecision,outcome,error?}` and FIFO-trims | unit | `node tests/audit-log.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-02 (redaction) | 30-01 (test) / 30-02 (redaction) | 0 | GOV-06 | T-no-secret-log | NO auth substring (cookie/token/csrf/xoxc/_gh_sess/bearer/authorization) survives in the persisted ring or capture | unit (security) | `node tests/audit-log-no-secret.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-04 (UI) | 30-01 (test) / 30-04 (UI) | 0 | GOV-07 | — | Control-panel section surface shape (nav, per-origin list, pending queue, audit table, legal card) + options.js wiring | source-text unit | `node tests/consent-audit-settings-ui.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-03 (denylist+LEGAL) | 30-01 (test) / 30-03 (denylist+LEGAL) | 0 | GOV-08 | T-denylist-bypass | `docs/LEGAL.md` exists (retention+consent); `service-denylist.json` valid; denylist checked BEFORE policy (denylisted origin non-enableable) | unit + source | `node tests/service-denylist.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test+fixtures) / 30-03 (verify) | 30-01 (test+fixtures) / 30-03 (verify) | 0 | SIGN-01 | T-recipe-tamper | FIXTURE KEYPAIR: sign fixture recipe → verify-pass; flip one signed byte → `RECIPE_SIGNATURE_INVALID`; absent sig on non-bundled → reject | unit (security) | `node tests/recipe-signature.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-03 (interp hook) | 30-01 (test) / 30-03 (interp hook) | 0 | SIGN-02 | — | Verify hook fires INSIDE `interpretRecipe` AFTER schema-validate, BEFORE bind; integrity metadata (sig/capturedAt/schemaHash) is the verified payload | unit | `node tests/recipe-signature-interpreter-hook.test.js` | ❌ W0 | ⬜ pending |
+| 30-01 (test) / 30-03 (provenance) | 30-01 (test) / 30-03 (provenance) | 0 | SIGN-01/D-07 | T-recipe-tamper | Bundled-provenance recipe is EXEMPT (verify NOT called); non-bundled IS gated | unit | `node tests/recipe-signature.test.js` (provenance branch) | ❌ W0 | ⬜ pending |
+| 30-02/30-03 (regression) | 30-02/30-03 (regression) | 0 | INV-01/04 | — | errors.ts passthrough surfaces `RECIPE_CONSENT_*`/`RECIPE_SIGNATURE_INVALID` verbatim (built mcp); iterator byte-untouched; ~63 tool schemas unchanged | unit | `node tests/capability-interpreter.test.js` + `node tests/agent-loop-iterator-guard.test.js` | partial | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -87,11 +87,11 @@ created: 2026-06-21
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 1s
-- [ ] `nyquist_compliant: true` set in frontmatter (planner sets after per-task rows finalized)
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 1s
+- [x] `nyquist_compliant: true` set in frontmatter (planner sets after per-task rows finalized)
 
-**Approval:** pending
+**Approval:** planner-finalized (per-task rows mapped to 30-01..30-04; nyquist_compliant true)
