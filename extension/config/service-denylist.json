@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "_comment": "Phase 30 (GOV-08, D-15/D-16) conservative service denylist + sensitive-origin seed. deniedOrigins: services where automation is categorically prohibited (rendered non-enableable by the consent gate, checked BEFORE per-origin policy). sensitiveOrigins: services that force extra friction (Ask / confirm) even under Auto but are not necessarily hard-denied. This is a CONSERVATIVE category seed, NOT an aggressive broad blocklist, and is USER-EXTENSIBLE. Host patterns use a leading 'https://*.' subdomain-wildcard form: 'https://*.chase.com' matches any subdomain of chase.com (and the bare apex); 'https://*.gov' matches any host ending in '.gov'. A pattern with no '*' matches that exact origin. See docs/LEGAL.md for the policy rationale.",
+  "deniedReason": "Automation prohibited for this service category (financial / government). See docs/LEGAL.md.",
+  "deniedOrigins": [
+    "https://*.chase.com",
+    "https://*.bankofamerica.com",
+    "https://*.wellsfargo.com",
+    "https://*.irs.gov"
+  ],
+  "sensitiveOrigins": [
+    "https://*.chase.com",
+    "https://*.bankofamerica.com",
+    "https://*.wellsfargo.com",
+    "https://mail.google.com",
+    "https://outlook.live.com",
+    "https://outlook.office.com",
+    "https://*.gov"
+  ]
+}
