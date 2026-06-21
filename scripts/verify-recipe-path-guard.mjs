@@ -92,6 +92,11 @@ const RECIPE_PATH_ALLOWLIST = [
   // the allowlist, so naming it now keeps the guard green and pre-arms the drift
   // check for when the file lands.
   'extension/utils/capability-fetch.js',
+  // Phase 28 (SURF-04, D-04): the MiniSearch index + slug->recipe map module.
+  // Added IN THE SAME PLAN that creates the file (Pitfall 5) -- Check 4 enumerates
+  // extension/utils/capability-*.js from disk and FAILS CLOSED on any not on this
+  // allowlist. The module is kept free of eval/new Function/import even in comments.
+  'extension/utils/capability-search.js',
   'extension/lib/cfworker-json-schema.min.js',
   'extension/lib/jmespath.min.js',
   'extension/lib/minisearch.min.js',
