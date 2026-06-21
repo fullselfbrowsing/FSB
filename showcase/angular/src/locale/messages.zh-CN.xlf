@@ -3778,6 +3778,46 @@
           <context context-type="linenumber">142,144</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_HEADING" datatype="html">
+        <source>Legal Posture and Consent Model</source>
+        <target state="translated">法律立场与同意模型</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">145,146</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_BODY" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s automation posture, audit-log retention, and the per-origin consent model are documented in the project&apos;s <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>LEGAL.md<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> policy file. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> does nothing on an origin until you explicitly allow it, automated read access never implies write access, and a conservative service denylist blocks automation on sensitive categories (financial and government services) outright.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的自动化立场、审计日志保留以及按来源的同意模型均记录在项目的策略文件 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>LEGAL.md<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 中。在您明确授权之前，<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 不会对任何来源执行任何操作；自动化的读取访问绝不意味着写入访问，并且保守的服务拒绝列表会彻底阻止在敏感类别（金融和政府服务）上的自动化。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">146,147</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_CONSENT" datatype="html">
+        <source>Per-origin consent is default-off. Auto and write (mutating) access are separate, explicit opt-ins managed from the Control Panel&apos;s Consent &amp; Audit section.</source>
+        <target state="translated">按来源的同意默认关闭。自动访问与写入（更改）访问是各自独立、需明确选择启用的项，可在 Control Panel 的“同意 &amp; 审计”部分进行管理。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">148,149</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_AUDIT" datatype="html">
+        <source>Every capability call is recorded in a redacted, append-only local audit log. No arguments, tokens, cookies, or response bodies are ever stored.</source>
+        <target state="translated">每次能力调用都会记录在经过脱敏的、仅可追加的本地审计日志中。绝不会存储任何参数、令牌、Cookie 或响应正文。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">149,150</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_DENYLIST" datatype="html">
+        <source>A service denylist renders sensitive origins non-enableable, enforced at the capability gate and not merely in the interface.</source>
+        <target state="translated">服务拒绝列表使敏感来源无法被启用，并在能力门处强制执行，而不仅仅是在界面层面。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">150,151</context>
+        </context-group>
+      </trans-unit>
     </body>
   </file>
 </xliff>
