@@ -1,0 +1,208 @@
+(function(global) {
+  'use strict';
+
+  /**
+   * Phase 29 Plan 02 (v0.9.99 Native Capability Catalog) -- capability-catalog.js
+   *
+   * The authoritative per-slug TIER registry (CAT-01, CAT-03, D-01/D-04). Owns the
+   * slug -> { tier, handler|recipe, descriptor } map that drives invoke_capability
+   * tier routing in capability-router.js. A slug is EITHER T1a OR T1b -- the tier is
+   * declared EXPLICITLY here, never inferred at runtime (RESEARCH Open Q3): origin
+   * biases candidate RANKING only, never the tier of a known slug.
+   *
+   * Module shell: the dual-export IIFE mirror of capability-search.js /
+   * capability-interpreter.js -- the service worker reads global.FsbCapabilityCatalog
+   * after importScripts; Node tests require() the module.exports. Vendored / sibling
+   * globals (FsbCapabilitySearch) are reached only through a typeof-guarded accessor
+   * so the module loads cleanly under the Node test harness (the global may be absent
+   * -> degrade to a null recipe, never throw).
+   *
+   * Locked decisions implemented here (29-CONTEXT.md):
+   *   - D-01 NEW dual-export SW module on RECIPE_PATH_ALLOWLIST; free of dynamic-code
+   *          constructs even in comments -- Check 4 fails CI closed on any
+   *          extension/utils/capability-*.js carrying them (Wall-1).
+   *   - D-04 the Phase-28 capability-search slug->recipe map (getRecipeBySlug:222)
+   *          remains the T1b recipe source; a T1b/T0 entry sources its recipe via a
+   *          typeof-guarded _search() accessor, with an authored inline recipe as a
+   *          best-effort fallback so the tier resolves even when the search index is
+   *          not yet built (dev tree / unit harness).
+   *   - D-05/D-06 T0 is a no-auth declarative special-case (a recipe with
+   *          authStrategy 'none'), NOT separate infra -- it shares the T1b recipe
+   *          path and is routed by its explicit tier.
+   *   - github.notifications is seeded as the T1b head (the one proven recipe pair,
+   *          catalog/recipes/github-notifications.json + descriptor).
+   *
+   * Plan 03 mechanism: T1a (bundled imperative head) handler modules register their
+   * slug -> handler entry at load via registerHandler(slug, entry) (see below). This
+   * keeps the registry DECLARATIVE -- the catalog never imports a handler; each
+   * handler module pushes itself in after the catalog loads. resolve() returns the
+   * registered T1a entry stamped tier:'T1a' regardless of origin.
+   *
+   * The router routes; the catalog never re-targets. No chrome.*, no network here.
+   *
+   * NO EMOJIS, ASCII-only source.
+   */
+
+  // ---- typeof-guarded sibling-global accessor (mirror capability-search.js:57-69)
+  //      The T1b recipe source (D-04). Absent under the Node unit harness when the
+  //      search module is not loaded -> degrade to a null recipe (the router falls
+  //      back to the entry's authored inline recipe).
+  function _search() {
+    return (typeof FsbCapabilitySearch !== 'undefined' && FsbCapabilitySearch) ? FsbCapabilitySearch : null;
+  }
+
+  function _getRecipeBySlug(slug) {
+    var s = _search();
+    if (s && typeof s.getRecipeBySlug === 'function') {
+      try { return s.getRecipeBySlug(slug) || null; } catch (e) { return null; }
+    }
+    return null;
+  }
+
+  // ---- T1b/T0 declarative seed recipes -------------------------------------
+  //
+  // The authoritative recipe source at runtime is the search slug->recipe map
+  // (D-04). These inline copies mirror catalog/recipes/*.json verbatim and serve as
+  // a best-effort fallback so a T1b/T0 slug resolves its tier (and a usable recipe)
+  // even before the search index is built -- the router prefers entry.recipe and
+  // only then _search().getRecipeBySlug(slug). Keep these byte-identical to the
+  // shipped JSON recipe of the same id.
+  var GITHUB_NOTIFICATIONS_RECIPE = {
+    schemaVersion: 1,
+    id: 'github.notifications',
+    origin: 'https://github.com',
+    endpoint: '/notifications',
+    method: 'GET',
+    authStrategy: 'same-origin-cookie',
+    extract: '@'
+  };
+
+  // ---- The authoritative per-slug TIER registry (the declarative long tail) ----
+  //
+  // Each entry declares the slug's EXPLICIT authoritative tier:
+  //   - T0  : no-auth declarative special-case (recipe with authStrategy 'none')
+  //   - T1a : bundled imperative head -- a handler registered by a Plan-03 module
+  //   - T1b : declarative recipe bound by the interpreter (the long tail)
+  //   - T2  : learned-recipe stub (Phase 31; router returns RECIPE_LEARN_PENDING)
+  //   - T3  : DOM-fallback seam (Phase 32; router returns RECIPE_DOM_FALLBACK_PENDING)
+  // A slug is EITHER T1a OR T1b -- no runtime tie-break. For a T1b/T0 entry the
+  // recipe is attached for the router's lifted body; for a T1a entry a handler is
+  // attached (seeded by registerHandler at load). descriptor is optional metadata.
+  var REGISTRY = {
+    'github.notifications': {
+      tier: 'T1b',
+      recipe: GITHUB_NOTIFICATIONS_RECIPE,
+      descriptor: { slug: 'github.notifications', service: 'github.com', sideEffectClass: 'read' }
+    }
+  };
+
+  // ---- Plan 03 T1a handler registration mechanism --------------------------
+  //
+  // A bundled head handler module (catalog/handlers/*.js, Plan 03) registers its
+  // slug -> entry here at load -- AFTER this catalog module loads (background.js
+  // importScripts order). The entry MUST declare tier:'T1a' and carry the handler
+  // object the router invokes (handler.handle(args, ctx)). This keeps the catalog
+  // declarative: it never imports a handler; each handler pushes itself in. A slug
+  // already declared T1b cannot be silently re-tiered to T1a -- registering an
+  // existing slug overwrites only an entry of the same (or absent) tier intent;
+  // callers own slug uniqueness (a slug is EITHER T1a OR T1b, D-04).
+  function registerHandler(slug, entry) {
+    if (!slug || !entry) return false;
+    var tier = entry.tier || 'T1a';
+    REGISTRY[slug] = {
+      tier: tier,
+      handler: entry.handler || entry,
+      origin: entry.origin || null,
+      descriptor: entry.descriptor || null
+    };
+    return true;
+  }
+
+  // ---- Origin-bias helper (mirror capability-search.js:209-219) ------------
+  //
+  // Reusable owned-origin-first re-rank for candidate entries that share a slug
+  // class (CAT-01 "biased by tab origin"). Stable: owned-origin entries first,
+  // original relative order preserved within each bucket. This re-ranks WHICH
+  // candidate is chosen; it NEVER changes the tier of a known slug (RESEARCH Open
+  // Q3). The in-memory catalog stub in capability-router.test.js drives the bias
+  // selection itself; this helper is the shipped equivalent the SW catalog uses
+  // when an authored slug carries multiple same-class candidates.
+  function biasByOwnedOrigin(candidates, origin) {
+    if (!Array.isArray(candidates)) return candidates || null;
+    var owned = [];
+    var rest = [];
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i];
+      var o = c && c.origin;
+      if (o && origin && o === origin) { owned.push(c); }
+      else { rest.push(c); }
+    }
+    var ranked = owned.concat(rest);
+    return ranked.length ? ranked[0] : null;
+  }
+
+  // ---- resolve(slug, origin) -> { tier, handler|recipe, descriptor } | null ----
+  //
+  // The authoritative tier lookup. Returns null for an unknown slug. Origin biases
+  // candidate ranking only (when an entry is an array of same-class candidates); it
+  // never changes a known slug's tier. For a T1b/T0 entry the recipe is the authored
+  // inline copy when present, else the live search map (D-04). For a T1a entry the
+  // registered handler is returned as-is.
+  function resolve(slug, origin) {
+    var entry = Object.prototype.hasOwnProperty.call(REGISTRY, slug) ? REGISTRY[slug] : null;
+    if (!entry) return null;
+
+    // Multiple same-class candidates -> owned-origin-first bias picks one. The tier
+    // stays explicit (every candidate of an authored slug shares its class).
+    if (Array.isArray(entry)) {
+      entry = biasByOwnedOrigin(entry, origin);
+      if (!entry) return null;
+    }
+
+    var tier = entry.tier;
+
+    // T1b / T0: ensure a recipe is attached (authored inline first, then the live
+    // search slug->recipe map, D-04). The router also re-derives the recipe, so a
+    // null here is non-fatal (it falls back to _search() and ultimately
+    // RECIPE_NOT_FOUND).
+    if (tier === 'T1b' || tier === 'T0') {
+      var recipe = entry.recipe || _getRecipeBySlug(slug) || null;
+      return {
+        tier: tier,
+        recipe: recipe,
+        descriptor: entry.descriptor || null
+      };
+    }
+
+    // T1a: the bundled head handler (registered by a Plan-03 module).
+    if (tier === 'T1a') {
+      return {
+        tier: tier,
+        handler: entry.handler || null,
+        origin: entry.origin || null,
+        descriptor: entry.descriptor || null
+      };
+    }
+
+    // T2 / T3 / any other explicitly-declared seam tier: return the tier verbatim;
+    // the router maps it to the typed fall-through reason (RECIPE_LEARN_PENDING /
+    // RECIPE_DOM_FALLBACK_PENDING) and does NOT execute.
+    return {
+      tier: tier,
+      descriptor: entry.descriptor || null
+    };
+  }
+
+  // ---- Export shape (dual-export IIFE; mirror capability-search.js:226-241) -----
+  var exportsObj = {
+    resolve: resolve,
+    registerHandler: registerHandler,
+    biasByOwnedOrigin: biasByOwnedOrigin
+  };
+
+  global.FsbCapabilityCatalog = exportsObj;   // SW importScripts consumer reads this global
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = exportsObj;              // Node tests require() this
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
