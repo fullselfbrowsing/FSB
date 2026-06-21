@@ -102,12 +102,14 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:get-logs': { routeFamily: 'observability', handler: handleGetLogsMessageRoute },
   'mcp:search-memory': { routeFamily: 'observability', handler: handleSearchMemoryMessageRoute },
   'mcp:get-memory': { routeFamily: 'observability', handler: handleGetMemoryMessageRoute },
-  // Phase 28 (SURF-01/SURF-02): lean two-tool capability surface. capabilities-search is
-  // read-only (the owned-tab origin is resolved authoritatively SW-side, un-spoofable; D-11)
-  // and returns <=5 ranked schema-on-hit hits. capabilities-invoke runs the routerless direct
-  // Phase-27 path slug -> getRecipeBySlug -> interpretRecipe -> executeBoundSpec (D-06/D-07);
-  // an unknown slug returns RECIPE_NOT_FOUND, surfaced verbatim via the existing errors.ts
-  // /^RECIPE_.+$/ passthrough (no errors.ts edit). NO Phase-29 capability-router.
+  // Phase 28/29 (SURF-01/SURF-02 + CAT D-03): lean two-tool capability surface. capabilities-search
+  // is read-only (the owned-tab origin is resolved authoritatively SW-side, un-spoofable; D-11) and
+  // returns <=5 ranked schema-on-hit hits. capabilities-invoke now calls the shared
+  // FsbCapabilityRouter.invoke(...) -- the one engine both front doors hit (INV-02); the old
+  // routerless body (getRecipeBySlug -> interpretRecipe -> executeBoundSpec) moved INTO the router's
+  // T1b tier. The reroute is INTERNAL-ONLY: these wire names and handler bindings are byte-unchanged,
+  // so the frozen INV-01 registry hash never moves. Typed RECIPE_* reasons surface verbatim via the
+  // existing errors.ts /^RECIPE_.+$/ passthrough (no errors.ts edit).
   'mcp:capabilities-search': { routeFamily: 'capabilities', handler: handleCapabilitiesSearchMessageRoute },
   'mcp:capabilities-invoke': { routeFamily: 'capabilities', handler: handleCapabilitiesInvokeMessageRoute },
   // Phase 242: single-step ownership-gated history back. handleBackRoute
@@ -2189,35 +2191,42 @@ async function handleCapabilitiesSearchMessageRoute({ payload }) {
   return { success: true, results };
 }
 
-// Phase 28 SURF-02: routerless direct invoke (D-06/D-07). slug -> getRecipeBySlug ->
-// interpretRecipe (validates params vs recipe.params SW-side, re-asserts the origin-pin) ->
-// executeBoundSpec (the page MAIN-world credentialed fetch + the second active-tab origin-pin).
-// An unknown slug returns the RECIPE_NOT_FOUND dual-field shape; a typed RECIPE_* interpret
-// failure is returned verbatim. Both surface via the existing errors.ts passthrough (no edit).
-// NO Phase-29 capability-router; UNGATED (consent is Phase 30) but the two-point origin-pin holds.
+// Phase 29 SURF/CAT D-03 (the internal-only reroute): invoke now calls the shared
+// FsbCapabilityRouter.invoke(...) -- the ONE engine both front doors hit (INV-02). The old
+// routerless body (getRecipeBySlug -> interpretRecipe -> executeBoundSpec) moved INTO the
+// router's T1b tier (Plan 02); this handler is now a single router call. The wire names and
+// the route table are byte-unchanged, so the frozen INV-01 registry hash never moves and the
+// two capability tools stay OUTSIDE TOOL_REGISTRY. The model NEVER supplies the authoritative
+// origin: it is resolved SW-side from the active/owned tab (the search-handler pattern, D-11);
+// payload.origin is a non-authoritative override only. The router routes but never re-targets --
+// the two-point origin-pin still holds downstream in executeBoundSpec. Typed RECIPE_* fall-through
+// reasons (RECIPE_NOT_FOUND / RECIPE_LEARN_PENDING / RECIPE_DOM_FALLBACK_PENDING) surface verbatim
+// via the existing errors.ts /^RECIPE_.+$/ passthrough (no errors.ts edit). UNGATED (consent is
+// Phase 30); the reroute is internal-only -- there is no second invoke path (INV-02).
 async function handleCapabilitiesInvokeMessageRoute({ payload }) {
-  if (typeof FsbCapabilitySearch === 'undefined' || typeof FsbCapabilityInterpreter === 'undefined' || typeof FsbCapabilityFetch === 'undefined') {
-    return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability engine unavailable' });
+  if (typeof FsbCapabilityRouter === 'undefined' || typeof FsbCapabilityRouter.invoke !== 'function') {
+    return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability router unavailable' });
   }
-  const recipe = FsbCapabilitySearch.getRecipeBySlug(payload.slug);
-  if (!recipe) {
-    return { success: false, code: 'RECIPE_NOT_FOUND', errorCode: 'RECIPE_NOT_FOUND', error: 'RECIPE_NOT_FOUND', slug: payload.slug };
-  }
-  const interpreted = FsbCapabilityInterpreter.interpretRecipe(recipe, payload.params || {});
-  if (!interpreted || interpreted.success !== true) {
-    return interpreted;
-  }
-  // Resolve tabId: explicit payload.tab_id, else the active/owned tab.
+  // Resolve tabId SW-side: explicit payload.tab_id, else the active/owned tab.
   let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
-  if (tabId === null) {
+  // Resolve the owned-tab origin SW-side (the search-handler pattern). The model NEVER supplies
+  // the authoritative origin; payload.origin is a non-authoritative override only (D-11).
+  let origin = payload.origin || null;
+  if (tabId === null || !origin) {
     try {
-      const t = await chrome.tabs.query({ active: true, currentWindow: true });
-      tabId = t[0] ? t[0].id : null;
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabId === null) {
+        tabId = tabs[0] ? tabs[0].id : null;
+      }
+      if (!origin) {
+        origin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
+      }
     } catch (e) {
-      tabId = null;
+      if (tabId === null) { tabId = null; }
+      if (!origin) { origin = null; }
     }
   }
-  return await FsbCapabilityFetch.executeBoundSpec(interpreted.spec, tabId);
+  return await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, { origin, tabId });
 }
 
 async function handleGetMemoryMessageRoute({ payload }) {
