@@ -77,6 +77,20 @@
     extract: '@'
   };
 
+  // Reddit unread inbox -- a second T1b recipe (Plan 03, CAT-03). A single same-origin
+  // GET the declarative schema expresses; mirrors catalog/recipes/reddit-inbox.json
+  // verbatim. The first-party origin is www.reddit.com -- the API on oauth.reddit.com
+  // is a SEPARATE origin and is NOT used (the session cookie does not cross to it).
+  var REDDIT_INBOX_RECIPE = {
+    schemaVersion: 1,
+    id: 'reddit.inbox',
+    origin: 'https://www.reddit.com',
+    endpoint: '/message/unread.json',
+    method: 'GET',
+    authStrategy: 'same-origin-cookie',
+    extract: '@'
+  };
+
   // ---- The authoritative per-slug TIER registry (the declarative long tail) ----
   //
   // Each entry declares the slug's EXPLICIT authoritative tier:
@@ -93,6 +107,11 @@
       tier: 'T1b',
       recipe: GITHUB_NOTIFICATIONS_RECIPE,
       descriptor: { slug: 'github.notifications', service: 'github.com', sideEffectClass: 'read' }
+    },
+    'reddit.inbox': {
+      tier: 'T1b',
+      recipe: REDDIT_INBOX_RECIPE,
+      descriptor: { slug: 'reddit.inbox', service: 'www.reddit.com', sideEffectClass: 'read' }
     }
   };
 

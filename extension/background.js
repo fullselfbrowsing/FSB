@@ -173,6 +173,25 @@ try {
 try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
 try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
 
+// Phase 29 Plan 03 (v0.9.99 CAT-02): the bundled-head T1a handler modules. These
+// are reviewed CODE (catalog/handlers/*.js), copied under extension/catalog/handlers/
+// by scripts/package-extension.mjs; in a dev tree the path resolves directly. They
+// MUST load AFTER capability-catalog.js -- each handler self-registers its slugs into
+// FsbCapabilityCatalog at load, and the explicit seedHeadHandlers() pass below
+// re-asserts the head from the catalog's authoritative manifest (defense-in-depth).
+// Each line is independently try/catch'd so an absent handler degrades to that slug
+// routing to RECIPE_NOT_FOUND (never a load crash). github.notifications stays a T1b
+// recipe; these add the github.issues.* / slack.* / notion.* T1a head.
+try { importScripts('catalog/handlers/github.js'); } catch (e) { console.error('[FSB] Failed to load handlers/github.js:', e.message); }
+try { importScripts('catalog/handlers/slack.js'); } catch (e) { console.error('[FSB] Failed to load handlers/slack.js:', e.message); }
+try { importScripts('catalog/handlers/notion.js'); } catch (e) { console.error('[FSB] Failed to load handlers/notion.js:', e.message); }
+try {
+  if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+      && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {
+    FsbCapabilityCatalog.seedHeadHandlers();
+  }
+} catch (e) { console.error('[FSB] capability-catalog seedHeadHandlers failed at startup:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 

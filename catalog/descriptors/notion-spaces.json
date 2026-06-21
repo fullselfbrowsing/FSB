@@ -1,0 +1,14 @@
+{
+  "slug": "notion.getSpaces",
+  "service": "www.notion.so",
+  "intentSynonyms": [
+    "list my notion spaces",
+    "show my notion workspaces",
+    "what notion workspaces do i have",
+    "load a notion page",
+    "open a notion page"
+  ],
+  "description": "List your Notion spaces, or load a Notion page (T1a /api/v3 RPC handler)",
+  "actionVerb": "list",
+  "sideEffectClass": "read"
+}

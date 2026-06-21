@@ -1,0 +1,14 @@
+{
+  "slug": "reddit.inbox",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "check my reddit inbox",
+    "show unread reddit messages",
+    "do i have reddit notifications",
+    "read my reddit messages",
+    "what is in my reddit inbox"
+  ],
+  "description": "List your unread Reddit inbox messages (T1b same-origin recipe)",
+  "actionVerb": "list",
+  "sideEffectClass": "read"
+}
