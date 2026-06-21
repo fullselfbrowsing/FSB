@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: ready_to_plan
-stopped_at: Phase 27 complete (3/3) — ready to discuss Phase 999.1
-last_updated: 2026-06-20T08:38:56.507Z
+status: planning
+stopped_at: Phase 28 context gathered (assumptions mode)
+last_updated: "2026-06-21T02:40:52.270Z"
 last_activity: 2026-06-20
 progress:
   total_phases: 8
@@ -161,9 +161,9 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-20T08:20:55.204Z
-Stopped at: Phase 27 complete (3/3 plans, 27-03 SUMMARY committed) pending verification; live FETCH-05 logged-in-shape recorded as human_needed UAT debt
-Resume file: None
+Last session: 2026-06-21T02:40:52.265Z
+Stopped at: Phase 28 context gathered (assumptions mode)
+Resume file: .planning/phases/28-lean-mcp-surface-capability-search-eval-harness/28-CONTEXT.md
 
 ## Next Actions
 
