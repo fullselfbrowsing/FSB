@@ -42,14 +42,14 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 
 ### GOV — Consent Governance & Audit
 
-- [ ] **GOV-01**: Capability execution is default-OFF per origin; nothing runs against an origin until the user explicitly enables it.
-- [ ] **GOV-02**: Per-origin consent supports Off / Ask / Auto, where Auto is an explicit per-origin opt-in and never a global switch.
-- [ ] **GOV-03**: Mutating calls (POST/PUT/PATCH/DELETE) require elevated consent, are surfaced in the Ask prompt, and trigger disambiguation before any mutating invoke.
-- [ ] **GOV-04**: The consent gate is enforced at the single dispatch chokepoint, immediately after the existing ownership gate.
-- [ ] **GOV-05**: An append-only audit log records origin, capability, method, side-effect class, consent decision, outcome, and timestamp — and never records secrets.
-- [ ] **GOV-06**: Auth material (cookies/tokens/CSRF) never leaves the device and is never persisted; a tested redactor asserts no auth substrings survive capture or persistence.
-- [ ] **GOV-07**: A control-panel UI manages per-origin consent and shows the audit log; sensitive origins (banking/email/gov) carry extra friction even under Auto.
-- [ ] **GOV-08**: A documented legal/ToS posture and service denylist records which services FSB will not target.
+- [x] **GOV-01**: Capability execution is default-OFF per origin; nothing runs against an origin until the user explicitly enables it.
+- [x] **GOV-02**: Per-origin consent supports Off / Ask / Auto, where Auto is an explicit per-origin opt-in and never a global switch.
+- [x] **GOV-03**: Mutating calls (POST/PUT/PATCH/DELETE) require elevated consent, are surfaced in the Ask prompt, and trigger disambiguation before any mutating invoke.
+- [x] **GOV-04**: The consent gate is enforced at the single dispatch chokepoint, immediately after the existing ownership gate.
+- [x] **GOV-05**: An append-only audit log records origin, capability, method, side-effect class, consent decision, outcome, and timestamp — and never records secrets.
+- [x] **GOV-06**: Auth material (cookies/tokens/CSRF) never leaves the device and is never persisted; a tested redactor asserts no auth substrings survive capture or persistence.
+- [x] **GOV-07**: A control-panel UI manages per-origin consent and shows the audit log; sensitive origins (banking/email/gov) carry extra friction even under Auto.
+- [x] **GOV-08**: A documented legal/ToS posture and service denylist records which services FSB will not target.
 
 ### HEAL — Self-Healing & Recipe-Rot
 
@@ -75,8 +75,8 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 
 ### SIGN — Recipe Integrity
 
-- [ ] **SIGN-01**: Server-delivered recipes are signature-verified (Ed25519/JCS via Lattice receipts) before execution; unverified or tampered recipes are rejected.
-- [ ] **SIGN-02**: Recipe integrity metadata (signature, captured-at, schema hash) travels with the recipe and is checked by the interpreter before binding.
+- [x] **SIGN-01**: Server-delivered recipes are signature-verified (Ed25519/JCS via Lattice receipts) before execution; unverified or tampered recipes are rejected.
+- [x] **SIGN-02**: Recipe integrity metadata (signature, captured-at, schema hash) travels with the recipe and is checked by the interpreter before binding.
 
 ## v2 Requirements
 
@@ -131,14 +131,14 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | CAT-03 | Phase 29 | Complete |
 | CAT-04 | Phase 29 | Complete |
 | CAT-05 | Phase 29 | Complete |
-| GOV-01 | Phase 30 | Pending |
-| GOV-02 | Phase 30 | Pending |
-| GOV-03 | Phase 30 | Pending |
-| GOV-04 | Phase 30 | Pending |
-| GOV-05 | Phase 30 | Pending |
-| GOV-06 | Phase 30 | Pending |
-| GOV-07 | Phase 30 | Pending |
-| GOV-08 | Phase 30 | Pending |
+| GOV-01 | Phase 30 | Complete |
+| GOV-02 | Phase 30 | Complete |
+| GOV-03 | Phase 30 | Complete |
+| GOV-04 | Phase 30 | Complete |
+| GOV-05 | Phase 30 | Complete |
+| GOV-06 | Phase 30 | Complete |
+| GOV-07 | Phase 30 | Complete |
+| GOV-08 | Phase 30 | Complete |
 | HEAL-01 | Phase 32 | Pending |
 | HEAL-02 | Phase 32 | Pending |
 | HEAL-03 | Phase 32 | Pending |
@@ -152,8 +152,8 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | LEARN-02 | Phase 31 | Pending |
 | LEARN-03 | Phase 31 | Pending |
 | LEARN-04 | Phase 31 | Pending |
-| SIGN-01 | Phase 30 | Pending |
-| SIGN-02 | Phase 30 | Pending |
+| SIGN-01 | Phase 30 | Complete |
+| SIGN-02 | Phase 30 | Complete |
 
 **Coverage:**
 - v1 requirements: 44 total

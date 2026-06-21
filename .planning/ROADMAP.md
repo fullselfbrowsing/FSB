@@ -105,7 +105,7 @@
   4. An append-only audit log records origin, capability, method, side-effect class, consent decision, outcome, and timestamp and never records secrets; auth material (cookies/tokens/CSRF) never leaves the device and is never persisted (a tested redactor asserts no auth substrings survive).
   5. A control-panel UI manages per-origin consent and shows the audit log with extra friction for sensitive origins (banking/email/gov) even under Auto, and a documented legal/ToS posture plus service denylist records which services FSB will not target.
 **Plans**: 4 plans
-- [ ] 30-01-PLAN.md — Wave 0 validation contract: 10 tests + signed/tampered/public-key fixtures + RECIPE_PATH_ALLOWLIST pre-arm + background.js wiring + npm test-chain (GOV-01..08, SIGN-01..02)
+- [x] 30-01-PLAN.md — Wave 0 validation contract: 10 tests + signed/tampered/public-key fixtures + RECIPE_PATH_ALLOWLIST pre-arm + background.js wiring + npm test-chain (GOV-01..08, SIGN-01..02)
 - [ ] 30-02-PLAN.md — Consent spine: consent-policy-store (default-OFF Off/Ask/Auto + elevated mutating) + secret-free audit ring + consent/mutation gate wrap on FsbCapabilityRouter.invoke (GOV-01..06)
 - [ ] 30-03-PLAN.md — Integrity + legal: native Ed25519/JCS capability-signature + interpretRecipe verify hook (bundled-exempt) + service denylist + docs/LEGAL.md (SIGN-01/02, GOV-08)
 - [ ] 30-04-PLAN.md — Consent & Audit control-panel UI (per-origin consent, pending queue, redacted audit viewer, sensitive/denylist friction) + privacy-page legal cross-link + human_needed live smoke (GOV-07, GOV-08)
@@ -144,7 +144,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 27. Authenticated Fetch Primitive + Origin-Pin + Resume-Sidecar | 3/3 | Complete    | 2026-06-20 |
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 4/4 | Complete    | 2026-06-21 |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete    | 2026-06-21 |
-| 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 0/4 | Not started | - |
+| 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 1/4 | In Progress|  |
 | 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 0/TBD | Not started | - |
 | 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 0/TBD | Not started | - |
 
