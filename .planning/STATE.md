@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
-stopped_at: Phase 29 context gathered (assumptions mode)
-last_updated: "2026-06-21T20:10:35.158Z"
+stopped_at: Completed 29-03-PLAN.md (bundled head; Task 4 deferred human_needed UAT)
+last_updated: "2026-06-21T20:26:09.511Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 15
-  completed_plans: 15
+  completed_plans: 16
   percent: 38
 ---
 
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 29 (catalog-tiered-router-bundled-head-declarative-tail-autopilo) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-06-21
 
@@ -89,6 +89,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 29 P01 | 6min | 3 tasks | 6 files |
 | Phase 29 P02 | 5min | 3 tasks | 3 files |
 | Phase 29 P04 | 4min | 1 tasks | 1 files |
+| Phase 29 PP03 | 9min | 4 tasks tasks | 12 files files |
 
 ## Accumulated Context
 
@@ -136,6 +137,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: [Phase 28] Plan 04: both new phase tests (capability-search-eval + capability-mcp-surface) appended to the npm test chain after capability-fetch (no reorder/removal); the FULL npm test phase-close gate exits 0 after a Rule 1 fix to a stale lattice-provider-bridge-smoke importScripts baseline (168->170 / 164->166) left by Plan 28-01.
 - [Phase ?]: Phase 29 Plan 02 (CAT-01/03/05): capability-router.js + capability-catalog.js as two pure dual-export IIFE SW modules. Catalog = authoritative slug->tier registry (resolve declares the explicit tier; a slug is EITHER T1a OR T1b, no runtime tie-break). Router invoke(slug,args,{origin,tabId}) dispatches T0/T1a/T1b/T2/T3: T1b/T0 = the verbatim-lifted routerless body (interpretRecipe -> executeBoundSpec, tier-stamped); T1a = handler.handle(args,ctx) with ctx.executeBoundSpec; T2 -> RECIPE_LEARN_PENDING (Phase 31 stub); T3 -> RECIPE_DOM_FALLBACK_PENDING (Phase 32 seam, NO executeTool/page injection); unknown -> RECIPE_NOT_FOUND. All reasons use createRecipeError dual-field shape, surface verbatim via /^RECIPE_.+$/ (no errors.ts edit). Router is PURE (no chrome./fetch), never re-targets -- origin-pin holds inside executeBoundSpec (D-12). Origin bias lives in the catalog (biasByOwnedOrigin owned-first), never re-tiers a known slug. tests/capability-router.test.js GREEN 24/24, zero edits to the Plan-01 RED file; INV-01 surface unmoved.
 - [Phase ?]: Phase 29 Plan 04 (CAT-01/CAT-05): the D-03 internal-only reroute -- handleCapabilitiesInvokeMessageRoute (mcp-tool-dispatcher.js) now collapses to ONE FsbCapabilityRouter.invoke(slug, params, {origin, tabId}) call (the shared engine, front door 1 of INV-02). The inline getRecipeBySlug -> interpretRecipe -> executeBoundSpec body is gone (it lives in the router's T1b tier). Engine guard swapped to the router-unavailable guard. tabId + owned-tab origin resolved SW-side in one chrome.tabs.query (payload.tab_id/origin non-authoritative overrides, D-11); the two-point origin-pin still holds in executeBoundSpec. Wire names + MCP_PHASE199_MESSAGE_ROUTES + TOOL_REGISTRY byte-unchanged -> frozen INV-01 hash unmoved; no errors.ts edit (RECIPE_* verbatim). capability-mcp-surface 19/0, capability-router 24/0.
+- [Phase 29]: Phase 29 Plan 03 (CAT-02/CAT-03): the 5-service zero-install bundled head -- github.notifications T1b seed + github.issues.* T1a (persisted-query /_graphql + from:'response' CSRF scrape) + slack.* T1a split-token (xoxc in the request BODY, xoxd HttpOnly cookie same-origin) + notion.* T1a /api/v3 token_v2 RPC + reddit.inbox T1b /message/unread.json. Every handler targets its web app's OWN first-party origin (github.com/app.slack.com/www.notion.so/www.reddit.com); the separate-origin public API (api.github.com/oauth.reddit.com/api.notion.com) is FORBIDDEN -- the session cookie does not cross to it (D-09, T-29-07). Each T1a handler builds bound spec(s) and calls ctx.executeBoundSpec only (never a browser scripting/tabs API) so the active-tab origin-pin holds on the head path (D-12); scraped tokens go ONLY into the bound spec, never a log line (T-29-08). The catalog declares the head EXPLICITLY (HEAD_HANDLER_MODULES manifest + seedHeadHandlers() reading each present handler global) and handlers self-register at load; reddit.inbox is a T1b REGISTRY entry. head-handlers 54/0, router 24/0, recipe-schema 43/0, recipe-path-guard PASS.
+- [Phase 29]: Phase 29 Plan 03 Task 4 (live-capture checkpoint) resolved as deferred human_needed live-UAT (29-HUMAN-UAT.md, status human_needed), matching the Phase 27/28 posture -- NOT a fabricated live pass. The [ASSUMED] internal endpoint PATHS (RESEARCH A2/A3/A4) are the ONLY property not headlessly provable (capturing the real internal request needs real credentials, forbidden in CI per GOV-06); the origin-separation facts ARE web-search-verified and the DOM-fallback floor (Phase 32, T3) is the rot backstop. 10 [ASSUMED-ENDPOINT] markers across the handlers track the deferred capture; the headless CI gate does not depend on it.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -183,8 +186,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T20:10:10.038Z
-Stopped at: Phase 29 context gathered (assumptions mode)
+Last session: 2026-06-21T20:25:55.571Z
+Stopped at: Completed 29-03-PLAN.md (bundled head; Task 4 deferred human_needed UAT)
 Resume file: None
 
 ## Next Actions
