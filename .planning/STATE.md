@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: ready_to_plan
-stopped_at: Phase 28 complete (4/4) — ready to discuss Phase 999.1
-last_updated: 2026-06-21T04:29:20.350Z
+status: planning
+stopped_at: Phase 29 context gathered (assumptions mode)
+last_updated: "2026-06-21T10:18:38.062Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
@@ -178,9 +178,9 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T04:07:52.652Z
-Stopped at: Completed 28-03-PLAN.md (capability surface SW transport: dispatcher routes + bridge delegates)
-Resume file: None
+Last session: 2026-06-21T10:18:38.058Z
+Stopped at: Phase 29 context gathered (assumptions mode)
+Resume file: .planning/phases/29-catalog-tiered-router-bundled-head-declarative-tail-autopilo/29-CONTEXT.md
 
 ## Next Actions
 
