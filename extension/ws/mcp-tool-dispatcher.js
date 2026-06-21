@@ -102,6 +102,14 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:get-logs': { routeFamily: 'observability', handler: handleGetLogsMessageRoute },
   'mcp:search-memory': { routeFamily: 'observability', handler: handleSearchMemoryMessageRoute },
   'mcp:get-memory': { routeFamily: 'observability', handler: handleGetMemoryMessageRoute },
+  // Phase 28 (SURF-01/SURF-02): lean two-tool capability surface. capabilities-search is
+  // read-only (the owned-tab origin is resolved authoritatively SW-side, un-spoofable; D-11)
+  // and returns <=5 ranked schema-on-hit hits. capabilities-invoke runs the routerless direct
+  // Phase-27 path slug -> getRecipeBySlug -> interpretRecipe -> executeBoundSpec (D-06/D-07);
+  // an unknown slug returns RECIPE_NOT_FOUND, surfaced verbatim via the existing errors.ts
+  // /^RECIPE_.+$/ passthrough (no errors.ts edit). NO Phase-29 capability-router.
+  'mcp:capabilities-search': { routeFamily: 'capabilities', handler: handleCapabilitiesSearchMessageRoute },
+  'mcp:capabilities-invoke': { routeFamily: 'capabilities', handler: handleCapabilitiesInvokeMessageRoute },
   // Phase 242: single-step ownership-gated history back. handleBackRoute
   // performs history.length precheck, chrome.tabs.goBack, settle race,
   // 5-status classification, and bindTab parity (D-08). Background-tab
@@ -2156,6 +2164,60 @@ async function handleSearchMemoryMessageRoute({ payload }) {
     success: true,
     results: (Array.isArray(results) ? results : []).slice(0, options.topN).map(sanitizeMemoryEntry)
   };
+}
+
+// Phase 28 SURF-01: read-only capability search. The owned-tab origin is resolved
+// authoritatively SW-side (un-spoofable, D-11); payload.origin is a non-authoritative
+// override only. Returns { success:true, results } capped at <=5 ranked schema-on-hit hits.
+async function handleCapabilitiesSearchMessageRoute({ payload }) {
+  if (typeof FsbCapabilitySearch === 'undefined' || typeof FsbCapabilitySearch.search !== 'function') {
+    return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability search unavailable' });
+  }
+  // Resolve the owned-tab origin SW-side (capability-fetch.js:285-291 pattern). The model
+  // NEVER supplies the authoritative origin; payload.origin is an optional override only.
+  let ownedOrigin = payload.origin || null;
+  if (!ownedOrigin) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      ownedOrigin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
+    } catch (e) {
+      ownedOrigin = null;
+    }
+  }
+  const topN = boundedPositiveInt(payload.topN, 5, 5);
+  const results = FsbCapabilitySearch.search(payload.query || '', ownedOrigin, topN);
+  return { success: true, results };
+}
+
+// Phase 28 SURF-02: routerless direct invoke (D-06/D-07). slug -> getRecipeBySlug ->
+// interpretRecipe (validates params vs recipe.params SW-side, re-asserts the origin-pin) ->
+// executeBoundSpec (the page MAIN-world credentialed fetch + the second active-tab origin-pin).
+// An unknown slug returns the RECIPE_NOT_FOUND dual-field shape; a typed RECIPE_* interpret
+// failure is returned verbatim. Both surface via the existing errors.ts passthrough (no edit).
+// NO Phase-29 capability-router; UNGATED (consent is Phase 30) but the two-point origin-pin holds.
+async function handleCapabilitiesInvokeMessageRoute({ payload }) {
+  if (typeof FsbCapabilitySearch === 'undefined' || typeof FsbCapabilityInterpreter === 'undefined' || typeof FsbCapabilityFetch === 'undefined') {
+    return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability engine unavailable' });
+  }
+  const recipe = FsbCapabilitySearch.getRecipeBySlug(payload.slug);
+  if (!recipe) {
+    return { success: false, code: 'RECIPE_NOT_FOUND', errorCode: 'RECIPE_NOT_FOUND', error: 'RECIPE_NOT_FOUND', slug: payload.slug };
+  }
+  const interpreted = FsbCapabilityInterpreter.interpretRecipe(recipe, payload.params || {});
+  if (!interpreted || interpreted.success !== true) {
+    return interpreted;
+  }
+  // Resolve tabId: explicit payload.tab_id, else the active/owned tab.
+  let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
+  if (tabId === null) {
+    try {
+      const t = await chrome.tabs.query({ active: true, currentWindow: true });
+      tabId = t[0] ? t[0].id : null;
+    } catch (e) {
+      tabId = null;
+    }
+  }
+  return await FsbCapabilityFetch.executeBoundSpec(interpreted.spec, tabId);
 }
 
 async function handleGetMemoryMessageRoute({ payload }) {
