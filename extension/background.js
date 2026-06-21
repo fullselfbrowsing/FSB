@@ -162,6 +162,17 @@ try {
   }
 } catch (e) { console.error('[FSB] capability-search buildOrRestore failed at startup:', e.message); }
 
+// Phase 29 Plan 02 (v0.9.99 CAT-01): the tiered-router engine -- the catalog
+// (slug->tier registry) then the router (tier dispatch + typed fall-through),
+// loaded LAST of the capability family. Order is load-bearing: the catalog reads
+// FsbCapabilitySearch.getRecipeBySlug (the T1b recipe source, D-04) so it MUST
+// follow capability-search.js; the router reads FsbCapabilityCatalog so it MUST
+// follow the catalog. This is the engine both front doors share (INV-02; the MCP
+// dispatcher + autopilot reroutes are Plans 03/04). Additive only (D-05;
+// background.js is byte-frozen as an esbuild input; no manifest/permission change).
+try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
+try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 
