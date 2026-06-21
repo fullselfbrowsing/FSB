@@ -1,0 +1,206 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "slack.post-message",
+    "origin": "https://slack.com",
+    "endpoint": "/api/chat.postMessage",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "channel": { "type": "string" },
+        "text": { "type": "string" }
+      },
+      "required": ["channel", "text"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "discord.send-message",
+    "origin": "https://discord.com",
+    "endpoint": "/api/channels/{channel}/messages",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "channel": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["channel", "content"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "email.send",
+    "origin": "https://mail.google.com",
+    "endpoint": "/api/messages/send",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "to": { "type": "string" },
+        "subject": { "type": "string" },
+        "body": { "type": "string" }
+      },
+      "required": ["to", "subject", "body"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "twitter.post-tweet",
+    "origin": "https://twitter.com",
+    "endpoint": "/api/tweets",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" }
+      },
+      "required": ["text"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "sms.send",
+    "origin": "https://messages.example.com",
+    "endpoint": "/api/sms",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "to": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "required": ["to", "message"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "github.create-issue",
+    "origin": "https://github.com",
+    "endpoint": "/api/repos/{owner}/{repo}/issues",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "owner": { "type": "string" },
+        "repo": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" }
+      },
+      "required": ["owner", "repo", "title"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "github.delete-repo",
+    "origin": "https://github.com",
+    "endpoint": "/api/repos/{owner}/{repo}",
+    "method": "DELETE",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "owner": { "type": "string" },
+        "repo": { "type": "string" }
+      },
+      "required": ["owner", "repo"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "dropbox.delete-file",
+    "origin": "https://dropbox.com",
+    "endpoint": "/api/files/delete",
+    "method": "DELETE",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" }
+      },
+      "required": ["path"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "trello.list-cards",
+    "origin": "https://trello.com",
+    "endpoint": "/api/boards/{board}/cards",
+    "method": "GET",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "board": { "type": "string" }
+      },
+      "required": ["board"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "trello.create-card",
+    "origin": "https://trello.com",
+    "endpoint": "/api/cards",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "list": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["list", "name"]
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "calendar.list-events",
+    "origin": "https://calendar.google.com",
+    "endpoint": "/api/events",
+    "method": "GET",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "range": { "type": "string" }
+      },
+      "required": []
+    },
+    "extract": "@"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "calendar.create-event",
+    "origin": "https://calendar.google.com",
+    "endpoint": "/api/events",
+    "method": "POST",
+    "authStrategy": "same-origin-cookie",
+    "params": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "start": { "type": "string" },
+        "end": { "type": "string" }
+      },
+      "required": ["title", "start"]
+    },
+    "extract": "@"
+  }
+]

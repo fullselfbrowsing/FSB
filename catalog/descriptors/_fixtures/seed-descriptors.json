@@ -1,0 +1,170 @@
+[
+  {
+    "slug": "slack.post-message",
+    "service": "slack.com",
+    "intentSynonyms": [
+      "message my team on slack",
+      "send a slack message",
+      "post to the slack channel",
+      "tell my coworkers on slack",
+      "drop a note in slack"
+    ],
+    "description": "Post a message to a Slack channel",
+    "actionVerb": "post",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "discord.send-message",
+    "service": "discord.com",
+    "intentSynonyms": [
+      "send a discord message",
+      "message my discord server",
+      "post in the discord channel",
+      "ping the discord guild",
+      "write to discord"
+    ],
+    "description": "Send a message to a Discord channel",
+    "actionVerb": "send",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "email.send",
+    "service": "mail.google.com",
+    "intentSynonyms": [
+      "send an email",
+      "compose a new email",
+      "email my colleague",
+      "write and send a mail",
+      "shoot off an email"
+    ],
+    "description": "Compose and send an email",
+    "actionVerb": "send",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "twitter.post-tweet",
+    "service": "twitter.com",
+    "intentSynonyms": [
+      "post a tweet",
+      "tweet something",
+      "share an update on twitter",
+      "publish a tweet",
+      "post to twitter"
+    ],
+    "description": "Publish a tweet to your timeline",
+    "actionVerb": "post",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "sms.send",
+    "service": "messages.example.com",
+    "intentSynonyms": [
+      "send a text message",
+      "text my friend",
+      "send an sms",
+      "shoot a text",
+      "message someone by sms"
+    ],
+    "description": "Send an SMS text message",
+    "actionVerb": "send",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "github.create-issue",
+    "service": "github.com",
+    "intentSynonyms": [
+      "open a github issue",
+      "file a bug on github",
+      "create a new issue",
+      "report a problem on github",
+      "raise a github ticket"
+    ],
+    "description": "Create a new issue on a GitHub repository",
+    "actionVerb": "create",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "github.delete-repo",
+    "service": "github.com",
+    "intentSynonyms": [
+      "delete a github repository",
+      "remove a repo from github",
+      "destroy a github project",
+      "permanently delete my github repo",
+      "wipe a github repository"
+    ],
+    "description": "Permanently delete a GitHub repository",
+    "actionVerb": "delete",
+    "sideEffectClass": "destructive"
+  },
+  {
+    "slug": "dropbox.delete-file",
+    "service": "dropbox.com",
+    "intentSynonyms": [
+      "delete a file from dropbox",
+      "remove a dropbox file",
+      "permanently delete a dropbox document",
+      "trash a file in dropbox",
+      "erase a dropbox file"
+    ],
+    "description": "Permanently delete a file in Dropbox",
+    "actionVerb": "delete",
+    "sideEffectClass": "destructive"
+  },
+  {
+    "slug": "trello.list-cards",
+    "service": "trello.com",
+    "intentSynonyms": [
+      "show my trello cards",
+      "list cards on my trello board",
+      "what is on my trello board",
+      "view trello cards",
+      "read my trello list"
+    ],
+    "description": "List the cards on a Trello board",
+    "actionVerb": "list",
+    "sideEffectClass": "read"
+  },
+  {
+    "slug": "trello.create-card",
+    "service": "trello.com",
+    "intentSynonyms": [
+      "add a card to trello",
+      "create a new trello card",
+      "make a trello card",
+      "put a card on my trello board",
+      "new trello task"
+    ],
+    "description": "Create a new card on a Trello board",
+    "actionVerb": "create",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "calendar.list-events",
+    "service": "calendar.google.com",
+    "intentSynonyms": [
+      "show my calendar events",
+      "what is on my calendar",
+      "list my upcoming meetings",
+      "view my schedule",
+      "read my agenda for today"
+    ],
+    "description": "List upcoming events on your calendar",
+    "actionVerb": "list",
+    "sideEffectClass": "read"
+  },
+  {
+    "slug": "calendar.create-event",
+    "service": "calendar.google.com",
+    "intentSynonyms": [
+      "create a calendar event",
+      "schedule a meeting",
+      "add an appointment to my calendar",
+      "book a new event",
+      "put a meeting on my calendar"
+    ],
+    "description": "Create a new event on your calendar",
+    "actionVerb": "create",
+    "sideEffectClass": "mutate"
+  }
+]
