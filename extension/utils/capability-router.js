@@ -121,7 +121,11 @@
     // instead. The Phase-26 interpreter always returns a typed object today, so this
     // is a latent guardrail -- the router already branched on `!interpreted`, so it
     // must fail closed there rather than return the falsy value.
-    var interpreted = interp.interpretRecipe(recipe, args || {});
+    // interpretRecipe is async as of Phase 30 (the signature-verify hook is
+    // async). The Phase-29 head passes NO provenance envelope -- entryRecipe is
+    // the unwrapped recipe core -- so it stays on the exempt no-meta default path
+    // (no verify call); awaiting an async result is the only change here.
+    var interpreted = await interp.interpretRecipe(recipe, args || {});
     if (!interpreted) {
       return _err('RECIPE_NOT_FOUND', { slug: slug, reason: 'interpret-returned-empty' });
     }

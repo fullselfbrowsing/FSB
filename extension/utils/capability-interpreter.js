@@ -62,6 +62,17 @@
       ? FsbCapabilityAuthStrategies : null;
   }
 
+  // The recipe-integrity verifier (Phase 30, SIGN-01/02; capability-signature.js).
+  // typeof-guarded so this module loads where the signature module is absent. The
+  // signature-verify hook (interpretRecipe step 1b) calls it ONLY for non-bundled
+  // provenance; when it is absent on a non-bundled recipe the hook FAILS CLOSED
+  // with RECIPE_SIGNATURE_INVALID (a non-bundled recipe must never bind without a
+  // verifier). The bundled/no-meta default path never reaches this accessor.
+  function getFSBCapabilitySignature() {
+    return (typeof FsbCapabilitySignature !== 'undefined' && FsbCapabilitySignature)
+      ? FsbCapabilitySignature : null;
+  }
+
   // The validator constructor (cfworker IIFE global). Used to validate invoke
   // args against the recipe's params sub-schema. shortCircuit:false -> all errors.
   function getFSBRecipeValidator(schema, draft) {
@@ -221,8 +232,12 @@
   //   { success:false, code:'RECIPE_UNKNOWN_FIELD'|'RECIPE_OPCODE_INVALID'|'RECIPE_SCHEMA_INVALID', ... }
   //
   // Order:
-  //   1. validateRecipe(recipe) via the schema module -- return its typed result
-  //      verbatim on failure (closed-vocab / forbidden-name / bad-enum gate).
+  //   1. validateRecipe(recipe core) via the schema module -- return its typed
+  //      result verbatim on failure (closed-vocab / forbidden-name / bad-enum).
+  //   1b. SIGNATURE VERIFY HOOK (Phase 30, SIGN-02, D-06): for a NON-bundled
+  //      provenance envelope ONLY, AFTER schema-validate and BEFORE bind, verify
+  //      the Ed25519/JCS signature; ok:false -> RECIPE_SIGNATURE_INVALID. The
+  //      bundled/no-meta default path skips this entirely (D-07 exemption).
   //   2. validate args against recipe.params via a fresh cfworker Validator --
   //      invalid -> RECIPE_SCHEMA_INVALID.
   //   3. templateEndpoint(recipe.endpoint, args) -- typed error on unfilled {var}.
@@ -232,8 +247,55 @@
   //      {success:false} shape, return that; otherwise the shaped spec is returned.
   // The interpreter performs NO network call and does NOT run the path query lib
   // against any live response (recipe.extract is carried unevaluated -- D-14).
+  //
+  // ENVELOPE vs BARE CORE (Phase 30, SIGN-02 / D-06 / D-07): the FIRST argument is
+  // EITHER a bare schema-valid recipe core (today's callers + the Phase-29 head --
+  // the bundled/no-meta exempt default path) OR a provenance ENVELOPE
+  // { recipe:<core>, provenance:'bundled'|'server'|'learned', signature?,
+  // capturedAt?, schemaHash? }. The recipe schema is additionalProperties:false,
+  // so integrity metadata CANNOT live inside the schema-validated core -- it
+  // travels in the wrapping envelope. An envelope is detected by a `recipe` object
+  // property PLUS a string `provenance` property (a bare core has neither). When
+  // an envelope is detected the core is unwrapped for schema-validate + bind and,
+  // for NON-bundled provenance, the signature is verified after schema-validate
+  // and before bind.
+  //
+  // RETURN-SHAPE contract (backward-compatible): the bare-core / bundled / no-meta
+  // default path returns the typed result SYNCHRONOUSLY (a plain object) -- exactly
+  // as the Phase-26 interpreter did -- so every current synchronous caller and the
+  // existing capability-interpreter.test.js stay green untouched. ONLY the
+  // NON-bundled envelope path returns a Promise (the Ed25519 verify is async). A
+  // caller that may pass a non-bundled envelope (the router's _runDeclarativeTier,
+  // and the Phase-30 hook test) `await`s the result; `await` on the synchronously
+  // returned plain object is a no-op, so awaiting is always safe. This is why
+  // interpretRecipe is NOT declared `async` (an async function would force a
+  // Promise on the bundled path and break the sync callers): it is a sync
+  // dispatcher that returns a Promise only on the verify branch.
 
-  function interpretRecipe(recipe, args) {
+  // Detect the Phase-30 provenance envelope. A bare recipe core has neither a
+  // nested `recipe` object nor a string `provenance`, so a Phase-29 recipe is
+  // NEVER misread as an envelope (the exempt default path is preserved). Returns
+  // null for a bare core; an { core, provenance, signature, capturedAt,
+  // schemaHash } descriptor for an envelope.
+  function detectRecipeEnvelope(input) {
+    if (!input || typeof input !== 'object') { return null; }
+    if (!input.recipe || typeof input.recipe !== 'object') { return null; }
+    if (typeof input.provenance !== 'string' || input.provenance.length === 0) { return null; }
+    return {
+      core: input.recipe,
+      provenance: input.provenance,
+      signature: input.signature,
+      capturedAt: input.capturedAt,
+      schemaHash: input.schemaHash
+    };
+  }
+
+  function interpretRecipe(recipeOrEnvelope, args) {
+    // Unwrap a Phase-30 provenance envelope to its recipe core; a bare core is
+    // used as-is (today's callers + the Phase-29 head -- the exempt default path).
+    var envelope = detectRecipeEnvelope(recipeOrEnvelope);
+    var recipe = envelope ? envelope.core : recipeOrEnvelope;
+
     var schemaMod = getFSBRecipeSchema();
     if (!schemaMod || typeof schemaMod.validateRecipe !== 'function') {
       return createRecipeError('RECIPE_SCHEMA_INVALID', { error: 'recipe schema module unavailable' });
@@ -243,12 +305,70 @@
       return createRecipeError('RECIPE_SCHEMA_INVALID', { error: 'auth-strategies module unavailable' });
     }
 
-    // 1. Recipe schema gate (delegated; typed RECIPE_* returned verbatim).
+    // 1. Recipe schema gate (delegated; typed RECIPE_* returned verbatim). This
+    //    runs on the unwrapped CORE, so a schema-invalid envelope returns its
+    //    SCHEMA error here -- BEFORE the signature hook (the hook is strictly
+    //    after schema-validate, D-06). Runs synchronously for EVERY path so a
+    //    schema error is always returned synchronously (never wrapped in a
+    //    Promise), preserving the sync callers' contract on the failure path too.
     var recipeResult = schemaMod.validateRecipe(recipe);
     if (!recipeResult || recipeResult.success !== true) {
       return recipeResult;
     }
 
+    // BARE-CORE / BUNDLED / NO-META default path: NO signature verify (D-07).
+    // Bind synchronously and return the typed result as a plain object so every
+    // current synchronous caller behaves identically. This is the ONLY path the
+    // Phase-29 head and the existing capability-interpreter.test.js exercise.
+    if (!envelope || envelope.provenance === 'bundled') {
+      return bindRecipeCore(recipe, args, authMod);
+    }
+
+    // 1b. SIGNATURE VERIFY HOOK (Phase 30, SIGN-02, D-06/D-07) -- NON-bundled
+    //     provenance ONLY, AFTER schema-validate (above) and BEFORE bind (below).
+    //     The Ed25519 verify is async, so this branch returns a Promise; callers
+    //     that may pass a non-bundled envelope await it. A non-bundled recipe MUST
+    //     NOT bind without a verifier, so an absent signature module FAILS CLOSED.
+    return (async function verifyThenBind() {
+      var sigMod = getFSBCapabilitySignature();
+      if (!sigMod || typeof sigMod.verifyRecipeEnvelope !== 'function') {
+        return createRecipeError('RECIPE_SIGNATURE_INVALID', { reason: 'verifier-unavailable' });
+      }
+      var verifyResult;
+      try {
+        verifyResult = await sigMod.verifyRecipeEnvelope({
+          recipe: recipe,
+          provenance: envelope.provenance,
+          signature: envelope.signature,
+          capturedAt: envelope.capturedAt,
+          schemaHash: envelope.schemaHash
+        });
+      } catch (e) {
+        // verifyRecipeEnvelope is fail-closed and should not throw, but guard the
+        // public no-throw contract regardless -> treat any throw as invalid.
+        return createRecipeError('RECIPE_SIGNATURE_INVALID', { reason: 'verify-threw' });
+      }
+      if (!verifyResult || verifyResult.ok !== true) {
+        return createRecipeError('RECIPE_SIGNATURE_INVALID', {
+          reason: (verifyResult && verifyResult.reason) ? verifyResult.reason : 'signature-invalid'
+        });
+      }
+      // Verified -> bind the core (the same synchronous bind the exempt path uses).
+      return bindRecipeCore(recipe, args, authMod);
+    })();
+  }
+
+  // ---- bindRecipeCore -- the synchronous validate-args -> bind tail (D-11) ----
+  //
+  // Steps 2-6 of the original interpreter, factored out so BOTH the synchronous
+  // bundled/no-meta path and the async verified-non-bundled path share ONE bind
+  // implementation. Pure + synchronous: validates invoke args against the
+  // recipe.params sub-schema, templates the endpoint, builds the static request
+  // placement map, folds the query, re-asserts the origin-pin, and binds the auth
+  // strategy -- performing NO network call and never running the path query lib
+  // against any live response (recipe.extract is carried unevaluated -- D-14).
+  // Returns the same typed shapes the interpreter has always returned.
+  function bindRecipeCore(recipe, args, authMod) {
     var safeArgs = (args && typeof args === 'object') ? args : {};
 
     // 2. Invoke-args gate: validate against the recipe's params sub-schema.
