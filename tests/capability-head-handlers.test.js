@@ -68,7 +68,11 @@ function readJson(p) {
 // A recording stub ctx.executeBoundSpec: captures the spec(s) a handler builds,
 // returns a canned logged-in 200. The handler must never call chrome.* -- it only
 // touches this ctx member (the real pin lives in the real executeBoundSpec, proven
-// in capability-router.test.js).
+// in capability-router.test.js). A GET probe (the from:'response' token scrape) is
+// answered with a canned token payload so the SUBSEQUENT mutation/POST spec actually
+// carries the scraped token -- this exercises the real body-placement path (the
+// handler only embeds a token it successfully scraped). The token strings here are
+// synthetic test fixtures, NOT real credentials.
 function makeCtx(origin, tabId) {
   const calls = [];
   return {
@@ -78,12 +82,18 @@ function makeCtx(origin, tabId) {
       tabId: tabId,
       async executeBoundSpec(spec, tid) {
         calls.push({ spec: spec, tabId: tid });
+        // Answer a read-only GET probe with a canned token payload (the scrape
+        // source) so the handler's next spec carries the token it read.
+        const isProbe = spec && spec.method === 'GET';
+        const data = isProbe
+          ? { ok: true, xoxc: 'xoxc-TEST-SYNTHETIC', csrf_token: 'csrf-TEST-SYNTHETIC', authenticity_token: 'auth-TEST-SYNTHETIC' }
+          : { ok: true };
         return {
           success: true,
           status: 200,
           finalUrl: (spec && spec.url) || null,
           redirected: false,
-          data: { ok: true },
+          data: data,
           text: null
         };
       },

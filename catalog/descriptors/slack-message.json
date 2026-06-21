@@ -1,0 +1,15 @@
+{
+  "slug": "slack.chat.postMessage",
+  "service": "app.slack.com",
+  "intentSynonyms": [
+    "send a slack message",
+    "post a message to a slack channel",
+    "message someone on slack",
+    "list my slack channels",
+    "show slack conversations",
+    "what slack channels am i in"
+  ],
+  "description": "Post a message to a Slack channel, or list your Slack conversations (T1a split-token handler)",
+  "actionVerb": "send",
+  "sideEffectClass": "write"
+}
