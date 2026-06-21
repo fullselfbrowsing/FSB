@@ -142,6 +142,26 @@ try { importScripts('utils/capability-interpreter.js'); } catch (e) { console.er
 // esbuild input; no manifest/permission change).
 try { importScripts('utils/capability-fetch.js'); } catch (e) { console.error('[FSB] Failed to load capability-fetch.js:', e.message); }
 
+// Phase 28 Plan 01 (v0.9.99 SURF-04/SURF-01/D-16): the capability-search index +
+// its build-time catalog. Loaded LAST of the capability family. Order is
+// load-bearing: minisearch.min.js (the MiniSearch global, line ~120) AND
+// catalog/recipe-index.generated.js (the FsbRecipeIndex catalog global, generated
+// by scripts/package-extension.mjs) must BOTH precede capability-search.js, which
+// reads them. recipe-index.generated.js is absent in a dev tree until a packaged
+// build runs -> the try/catch tolerates its absence (the module degrades to an
+// empty catalog). Additive only (D-05; background.js is byte-frozen as an esbuild
+// input; no manifest/permission change).
+try { importScripts('catalog/recipe-index.generated.js'); } catch (e) { console.error('[FSB] Failed to load recipe-index.generated.js:', e.message); }
+try { importScripts('utils/capability-search.js'); } catch (e) { console.error('[FSB] Failed to load capability-search.js:', e.message); }
+// Build-or-restore the capability-search index at service-worker startup (D-05).
+// async + non-blocking; a typeof guard tolerates a missing module so a load
+// failure above never throws at boot.
+try {
+  if (typeof FsbCapabilitySearch !== 'undefined' && FsbCapabilitySearch && typeof FsbCapabilitySearch.buildOrRestore === 'function') {
+    FsbCapabilitySearch.buildOrRestore();
+  }
+} catch (e) { console.error('[FSB] capability-search buildOrRestore failed at startup:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 
