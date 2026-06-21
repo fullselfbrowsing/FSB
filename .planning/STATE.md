@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
-last_updated: "2026-06-21T23:18:59.133Z"
+last_updated: "2026-06-21T23:29:17.939Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 19
-  completed_plans: 19
+  completed_plans: 20
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 30 (consent-governance-recipe-signature-verification-audit-legal) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-21
 
@@ -94,6 +94,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 29 P05 | 7min | 3 tasks | 4 files |
 | Phase 30 PP01 | 11min | 3 tasks | 17 files |
 | Phase 30 P03 | 38min | 3 tasks | 6 files |
+| Phase 30 P02 | 22m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Signed payload = JCS of recipe-core+capturedAt+schemaHash minus signature; verified byte-identical to the offline fixture signer before implementing (SIGN-01/02)
 - [Phase ?]: interpretRecipe is a sync dispatcher returning a Promise only on the non-bundled verify branch, keeping bundled/no-meta callers synchronous and backward-compatible (D-06/D-07)
 - [Phase ?]: service-denylist.js is the single source of truth for origin sensitivity (isDenied + classify); noble Ed25519 fallback deferred to Phase 31; fail-closed native posture only blocks non-bundled recipes
+- [Phase ?]: 30-02: Consent gate runs unconditionally at the single invoke chokepoint (entry may be null) so the chokepoint is reached even on a catalog miss; RECIPE_NOT_FOUND returned only after the gate allows.
+- [Phase ?]: 30-02: Consent gate degrades to allow when the store module is absent (Phase-29 head), fails closed (default-OFF) once loaded; sensitive+Auto downgraded to ask at the gate (consentDecision sensitive, no executeBoundSpec).
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -195,7 +198,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T23:18:21.150Z
+Last session: 2026-06-21T23:28:57.571Z
 Stopped at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
 Resume file: None
 
