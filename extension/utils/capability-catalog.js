@@ -118,6 +118,60 @@
     return true;
   }
 
+  // ---- Plan 03 EXPLICIT bundled-head declaration (CAT-02) -------------------
+  //
+  // The authoritative, declarative manifest of which T1a head slugs the catalog
+  // ships, keyed by the handler module's SW global. Each handler module
+  // (catalog/handlers/*.js) exposes a slug-keyed object on its global and ALSO
+  // self-registers at load (defense-in-depth). This manifest is the catalog-side
+  // EXPLICIT declaration the head is built against: seedHeadHandlers() walks it,
+  // reads each present global typeof-guarded, and registers every slug as tier:'T1a'
+  // -- so the head is declared HERE (the authoritative registry) even though the
+  // handler CODE lives in the bundle, never imported by this pure module. A handler
+  // global absent at call time (dev tree / unit harness) is skipped silently; the
+  // shipped SW calls this after the handler importScripts run (background.js).
+  //
+  // A slug is EITHER T1a OR T1b: github.notifications stays the T1b recipe seed
+  // above; the github.issues.* slugs are the T1a head -- distinct slugs, no tie-break.
+  var HEAD_HANDLER_MODULES = [
+    { global: 'FsbHandlerGithub', service: 'github.com', origin: 'https://github.com' },
+    { global: 'FsbHandlerSlack', service: 'app.slack.com', origin: 'https://app.slack.com' },
+    { global: 'FsbHandlerNotion', service: 'www.notion.so', origin: 'https://www.notion.so' }
+  ];
+
+  function _readGlobal(name) {
+    try {
+      return (typeof global !== 'undefined' && global && global[name]) ? global[name] : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Register every slug exposed by each PRESENT head-handler global as tier:'T1a'.
+  // Idempotent: re-registering the same slug overwrites with the same entry. Returns
+  // the count of slugs registered. No chrome.*, no network -- a pure registry seed.
+  function seedHeadHandlers() {
+    var count = 0;
+    for (var i = 0; i < HEAD_HANDLER_MODULES.length; i++) {
+      var mod = HEAD_HANDLER_MODULES[i];
+      var obj = _readGlobal(mod.global);
+      if (!obj || typeof obj !== 'object') { continue; }
+      for (var slug in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, slug)) { continue; }
+        var entry = obj[slug];
+        if (!entry || typeof entry.handle !== 'function') { continue; }
+        registerHandler(slug, {
+          tier: 'T1a',
+          handler: entry,
+          origin: entry.origin || mod.origin,
+          descriptor: { slug: slug, service: mod.service, sideEffectClass: entry.sideEffectClass || 'read' }
+        });
+        count++;
+      }
+    }
+    return count;
+  }
+
   // ---- Origin-bias helper (mirror capability-search.js:209-219) ------------
   //
   // Reusable owned-origin-first re-rank for candidate entries that share a slug
@@ -197,6 +251,7 @@
   var exportsObj = {
     resolve: resolve,
     registerHandler: registerHandler,
+    seedHeadHandlers: seedHeadHandlers,
     biasByOwnedOrigin: biasByOwnedOrigin
   };
 
