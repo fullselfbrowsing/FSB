@@ -1,0 +1,14 @@
+{
+  "slug": "github.issues.create",
+  "service": "github.com",
+  "intentSynonyms": [
+    "create a github issue",
+    "open a new issue on github",
+    "file a github issue",
+    "raise a github ticket",
+    "report a bug on github"
+  ],
+  "description": "Create a new GitHub issue (T1a persisted-query handler, write)",
+  "actionVerb": "create",
+  "sideEffectClass": "write"
+}

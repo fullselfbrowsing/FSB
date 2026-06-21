@@ -1,0 +1,14 @@
+{
+  "slug": "slack.conversations.list",
+  "service": "app.slack.com",
+  "intentSynonyms": [
+    "list my slack channels",
+    "show slack conversations",
+    "what slack channels am i in",
+    "view my slack channels",
+    "list slack conversations"
+  ],
+  "description": "List your Slack conversations (T1a split-token handler, read)",
+  "actionVerb": "list",
+  "sideEffectClass": "read"
+}

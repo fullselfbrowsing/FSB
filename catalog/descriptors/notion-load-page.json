@@ -1,0 +1,14 @@
+{
+  "slug": "notion.loadPage",
+  "service": "www.notion.so",
+  "intentSynonyms": [
+    "load a notion page",
+    "open a notion page",
+    "read a notion page",
+    "fetch a notion page",
+    "show a notion page"
+  ],
+  "description": "Load a Notion page (T1a /api/v3 RPC handler, read)",
+  "actionVerb": "load",
+  "sideEffectClass": "read"
+}

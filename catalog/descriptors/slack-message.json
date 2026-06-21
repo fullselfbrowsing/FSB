@@ -5,11 +5,10 @@
     "send a slack message",
     "post a message to a slack channel",
     "message someone on slack",
-    "list my slack channels",
-    "show slack conversations",
-    "what slack channels am i in"
+    "drop a note in slack",
+    "tell my team on slack"
   ],
-  "description": "Post a message to a Slack channel, or list your Slack conversations (T1a split-token handler)",
+  "description": "Post a message to a Slack channel (T1a split-token handler, write)",
   "actionVerb": "send",
   "sideEffectClass": "write"
 }

@@ -5,10 +5,9 @@
     "list my notion spaces",
     "show my notion workspaces",
     "what notion workspaces do i have",
-    "load a notion page",
-    "open a notion page"
+    "view my notion spaces"
   ],
-  "description": "List your Notion spaces, or load a Notion page (T1a /api/v3 RPC handler)",
+  "description": "List your Notion spaces (T1a /api/v3 RPC handler, read)",
   "actionVerb": "list",
   "sideEffectClass": "read"
 }
