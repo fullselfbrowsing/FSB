@@ -111,10 +111,22 @@
     }
 
     // Validate + bind (the interpreter re-asserts the recipe-self-consistency pin
-    // and returns a typed RECIPE_* on any failure). Returned verbatim.
+    // and returns a typed RECIPE_* on any failure). A typed { success:false, ... }
+    // is returned VERBATIM so its dual-field shape survives the /^RECIPE_.+$/
+    // passthrough. A FALSY/non-object interpret result, however, must NOT be
+    // propagated as-is: dispatchMcpMessageRoute computes success as
+    // !(response && typeof response === 'object' && response.success === false)
+    // (mcp-tool-dispatcher.js), so an undefined/null result would be read as a
+    // SPURIOUS empty success (LOW-01). Fail closed with a typed RECIPE_NOT_FOUND
+    // instead. The Phase-26 interpreter always returns a typed object today, so this
+    // is a latent guardrail -- the router already branched on `!interpreted`, so it
+    // must fail closed there rather than return the falsy value.
     var interpreted = interp.interpretRecipe(recipe, args || {});
-    if (!interpreted || interpreted.success !== true) {
-      return interpreted;
+    if (!interpreted) {
+      return _err('RECIPE_NOT_FOUND', { slug: slug, reason: 'interpret-returned-empty' });
+    }
+    if (interpreted.success !== true) {
+      return interpreted;   // already a typed RECIPE_* dual-field object
     }
 
     // The credentialed execution primitive re-asserts the ACTIVE-TAB origin-pin

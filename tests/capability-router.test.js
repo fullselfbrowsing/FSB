@@ -247,6 +247,36 @@ const GITHUB_RECIPE = {
   t1bHandle.restore();
 
   // -----------------------------------------------------------------------
+  // LOW-01: a FALSY interpret result must fail closed as a typed RECIPE_NOT_FOUND,
+  // never propagate as-is. The router's `if (!interpreted)` arm used to `return
+  // interpreted` -- an undefined response that dispatchMcpMessageRoute would read as
+  // a SPURIOUS empty success. Swap the interpreter for a stub that returns undefined
+  // and assert the router emits a dual-field RECIPE_* error (not undefined). The
+  // executeBoundSpec primitive must NEVER run (no side effect on a non-interpretable
+  // recipe). Restore the real interpreter afterward.
+  // -----------------------------------------------------------------------
+  const realInterp = globalThis.FsbCapabilityInterpreter;
+  let falsyInterpFetchCalled = false;
+  globalThis.FsbCapabilityInterpreter = {
+    interpretRecipe: function () { return undefined; }   // the falsy non-object case
+  };
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() { falsyInterpFetchCalled = true; return { success: true }; }
+  };
+  installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
+  const falsyInterp = await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(falsyInterp && typeof falsyInterp === 'object' && falsyInterp.success === false,
+    'LOW-01: a falsy interpret result yields an explicit { success:false } object (not undefined/spurious success)');
+  check(falsyInterp && /^RECIPE_.+$/.test(falsyInterp.code) && falsyInterp.code === falsyInterp.errorCode,
+    'LOW-01: the falsy-interpret error is a dual-field RECIPE_* code (surfaces verbatim; got '
+    + JSON.stringify(falsyInterp && falsyInterp.code) + ')');
+  check(falsyInterpFetchCalled === false,
+    'LOW-01: executeBoundSpec is NOT called when interpretRecipe returns falsy (no side effect)');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+  globalThis.FsbCapabilityInterpreter = realInterp;
+
+  // -----------------------------------------------------------------------
   // CAT-02 T1a dispatch: a tier:'T1a' slug routes to handler.handle(args, ctx) and
   // ctx.executeBoundSpec is called with a spec whose origin == the handler's
   // declared origin. We stub ctx.executeBoundSpec and record the spec it receives.
