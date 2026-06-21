@@ -393,7 +393,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.99 Native Capability Catalog in progress; Phase 26 complete. Next: Phase 27 Authenticated Fetch Primitive (FETCH-01..05). Roadmap continues integer phases from v0.12.0's Phase 25.)
+(Milestone v0.9.99 Native Capability Catalog in progress; Phases 26, 27, and 28 complete. Next: Phase 999.1 (mcp-tool-gaps-click-heuristics), then Phase 29 Catalog + Tiered Router. Phase 28's live MCP-client end-to-end browser smoke is recorded as a `human_needed` UAT (28-HUMAN-UAT.md), consistent with the Phase 27 FETCH-05 posture; all automated SURF-01..06 gates are green. Roadmap continues integer phases from v0.12.0's Phase 25.)
 
 ### Validated (v0.9.99)
 
@@ -402,6 +402,12 @@ Carry-forward backlog candidates:
 - [x] CAP-03: Recipes + invocation params are validated in the service worker by the eval-free `@cfworker/json-schema` validator; invalid/unknown-opcode input is rejected with a typed error (interpreter never throws, even on hostile `$ref` params) -- Phase 26
 - [x] CAP-04: A Node CI guard (`scripts/verify-recipe-path-guard.mjs`, chained into `validate:extension` -> `ci/all-green`) fails the build on any eval/new Function/import( reachable from the six-file recipe-path allowlist, runs accept/reject fixtures, and self-asserts the three sanctioned `execute_js` sites are excluded; an allowlist-drift check forces new `capability-*.js` modules onto the list -- Phase 26
 - [x] CAP-05: The interpreter + three vendored eval-free libraries (`@cfworker/json-schema` IIFE, `minisearch`, `jmespath`) ship inside the extension via additive `importScripts`, with no remotely-hosted code and no manifest/permission change -- Phase 26
+- [x] SURF-01: `search_capabilities` returns ranked, schema-on-hit results (<=5) for an intent query, biased by the owned tab's origin resolved authoritatively SW-side -- Phase 28
+- [x] SURF-02: `invoke_capability` executes a selected capability via the direct routerless path (slug -> `interpretRecipe` -> `executeBoundSpec`) with SW-side param validation and returns a structured result; unknown slug surfaces `RECIPE_NOT_FOUND` verbatim -- Phase 28
+- [x] SURF-03: Both tools register OUTSIDE `TOOL_REGISTRY` via `server.tool()` (vault precedent), keeping the existing ~63 MCP tool schemas byte-identical -- INV-01 proven (frozen `EXPECTED_NON_TRIGGER_REGISTRY_HASH` unmoved; 65 tools on the wire = 63 + 2) -- Phase 28
+- [x] SURF-04: A persisted `minisearch` index over a separate capability-descriptor doc (intent synonyms + service + action verb + side-effect class; the locked recipe schema untouched) snapshots to `chrome.storage.local` under `fsbCapabilityIndex` with a `catalogVersion` stamp; one shared `INDEX_OPTIONS` is reused at build and `loadJSON` -- Phase 28
+- [x] SURF-05: `search_capabilities` is read-only and bypasses the mutation queue (joins `readOnlyTools`); `invoke_capability` is serialized through it -- Phase 28
+- [x] SURF-06: An eval harness measures recall@k + wrong-invoke over a seeded near-neighbor fixture set and gates the build (recall@5=1.000, wrong-invoke=0; a naive index provably fails the gate). Live MCP-client end-to-end smoke recorded as `human_needed` UAT -- Phase 28
 
 ### Validated (v0.9.60)
 
