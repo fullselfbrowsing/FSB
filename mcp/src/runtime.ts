@@ -11,6 +11,7 @@ import { registerReadOnlyTools } from './tools/read-only.js';
 import { registerObservabilityTools } from './tools/observability.js';
 import { registerAgentTools } from './tools/agents.js';
 import { registerVaultTools } from './tools/vault.js';
+import { registerCapabilityTools } from './tools/capabilities.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
 
@@ -40,6 +41,7 @@ export function createRuntime(options: RuntimeOptions = {}): FSBRuntime {
   registerObservabilityTools(server, bridge, queue, agentScope);
   registerAgentTools(server, bridge, queue, agentScope);
   registerVaultTools(server, bridge, queue, agentScope);
+  registerCapabilityTools(server, bridge, queue, agentScope);
   registerAutopilotTools(server, bridge, queue, agentScope);
   registerResources(server, bridge);
   registerPrompts(server);
