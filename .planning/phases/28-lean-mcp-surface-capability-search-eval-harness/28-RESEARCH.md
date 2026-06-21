@@ -607,22 +607,27 @@ process.exit(0);
 
 **Note:** Every item above is LOW risk. The DECISIONS themselves (from CONTEXT.md) are locked, not assumed; these assumptions are implementation-detail choices within Claude's Discretion areas.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three resolved inside the Phase 28 plans (plan-checker W-2, 2026-06-20). Pointers below.
 
 1. **Exact `boostDocument` callback signature in minisearch 7.2.0**
    - What we know: the vendored source contains both `options.boost` (field map) and a `boostDocumentFn(documentId, term, storedFields)` form (confirmed by `grep`).
    - What's unclear: the precise positional args and whether `storedFields` is the 3rd arg in this exact build.
    - Recommendation: when implementing, log the args once against the seeded index, or consult the minisearch 7.2.0 README `boostDocument` entry; fall back to a post-search re-rank by `service` if the signature differs. Non-blocking (the field `boost` lever alone is sufficient for a first pass).
+   - **RESOLVED:** 28-01 Task 2 bakes in the `boostDocument(id, term, stored)` call AND an explicit "post-search re-rank by `service`" fallback, so an arg-order mismatch cannot block the bias.
 
 2. **k and threshold tuning for the gate**
    - What we know: D-13 fixes recall@5>=0.9 AND wrong-invoke=0; k and the 0.9 are Claude's Discretion if evidence supports deviation.
    - What's unclear: whether a sparse synthetic seed of ~6-12 capabilities will trivially hit recall@5=1.0 (defeating the point) or expose ranking weaknesses.
    - Recommendation: seed enough NEAR-NEIGHBOR capabilities (e.g. multiple "send"/"post"/"message" services) that the top-1 disambiguation is non-trivial -- the harness must be able to FAIL on a naive index. Validate the seed actually stresses ranking before locking the threshold.
+   - **RESOLVED:** 28-01 Task 1 mandates near-neighbor send/post/message + read/mutate/destructive seeds (>=30 intent cases); 28-01 Task 3 instructs tightening the seed "until a naive index fails" so the gate can actually fail. Threshold stays recall@5>=0.9 AND wrong-invoke=0 (D-13).
 
 3. **Catalog packaging CI proof**
    - What we know: the catalog must ship (D-16); `package-extension.mjs` zips `extension/` only.
    - What's unclear: the exact CI assertion shape that proves the packaged artifact contains the catalog.
    - Recommendation: add a smoke assertion (in `tests/capability-mcp-surface.test.js` or a packaging test) that the generated `recipe-index.generated.js` exists and exports a non-empty `descriptors` array after the build step, OR that the zip entry list includes `catalog/`.
+   - **RESOLVED:** 28-01 Task 4 `<automated>` verify asserts the generated `extension/catalog/recipe-index.generated.js` (the `FsbRecipeIndex` IIFE) exports non-empty `recipes` + `descriptors` after the build step.
 
 ## Environment Availability
 

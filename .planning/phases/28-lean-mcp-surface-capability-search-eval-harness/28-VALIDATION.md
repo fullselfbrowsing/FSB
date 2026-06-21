@@ -1,9 +1,9 @@
 ---
 phase: 28
 slug: lean-mcp-surface-capability-search-eval-harness
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-06-20
 ---
 
@@ -37,16 +37,16 @@ created: 2026-06-20
 
 ## Per-Task Verification Map
 
-> Task IDs are filled by the planner (plans not yet written). Rows below are the requirement→test contract every plan task must satisfy. `File Exists: ❌ W0` = the test is a Wave 0 deliverable created within this phase.
+> Task IDs reference plan + positional task (tasks are positional in the PLAN.md XML; "28-01 T3" = plan 28-01, third `<task>`). `File Exists: ❌ W0` = the test is a Wave 0 deliverable created within this phase. Status column tracks execution progress (frontmatter `wave_0_complete` certifies the strategy is fully planned, not that the files exist on disk yet).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| (planner) | TBD | — | SURF-01 | T-28-01 | Search returns ≤5 ranked schema-on-hit results; origin-matched capability outranks generic; origin resolved SW-side (not model-spoofed) | unit | `node tests/capability-search-eval.test.js` | ❌ W0 | ⬜ pending |
-| (planner) | TBD | — | SURF-02 | T-28-02 | Routerless slug→`interpretRecipe`→`executeBoundSpec`; result `{success,status,...}` or typed error; unknown slug → `RECIPE_NOT_FOUND`; no cookie/auth in payload | unit | `node tests/capability-mcp-surface.test.js` | ❌ W0 | ⬜ pending |
-| (planner) | TBD | — | SURF-03 | T-28-03 | Both tools on the wire; `EXPECTED_NON_TRIGGER_REGISTRY_HASH` UNCHANGED (INV-01) | unit | `node tests/capability-mcp-surface.test.js` + `node tests/tool-definitions-parity.test.js` | parity test ✅ / surface test ❌ W0 | ⬜ pending |
-| (planner) | TBD | — | SURF-04 | T-28-04 | Index over synonyms+service+verb+side-effect; `toJSON`→`loadJSON(json, OPTIONS)` round-trip identical; `catalogVersion` mismatch → rebuild; snapshot to `chrome.storage.local`; descriptors are pure data (no eval) | unit | `node tests/capability-search-eval.test.js` | ❌ W0 | ⬜ pending |
-| (planner) | TBD | — | SURF-05 | T-28-05 | `'search_capabilities'` bypasses the mutation queue (in `readOnlyTools`); `'invoke_capability'` enqueued/serialized | unit | `node tests/capability-mcp-surface.test.js` | ❌ W0 | ⬜ pending |
-| (planner) | TBD | — | SURF-06 | T-28-06 | recall@5 ≥ 0.9 AND wrong-invoke = 0 over the seeded fixture set; `process.exit(1)` if either threshold fails (the milestone gate) | unit (gate) | `node tests/capability-search-eval.test.js` | ❌ W0 | ⬜ pending |
+| 28-03 T1 (route) + 28-01 T3 (eval) | 28-03, 28-01 | 2, 1 | SURF-01 | T-28-01 | Search returns ≤5 ranked schema-on-hit results; origin-matched capability outranks generic; origin resolved SW-side (not model-spoofed) | unit | `node tests/capability-search-eval.test.js` | ❌ W0 | ⬜ pending |
+| 28-03 T2 (invoke) + 28-02 T1 (shape) | 28-03, 28-02 | 2, 1 | SURF-02 | T-28-02 | Routerless slug→`interpretRecipe`→`executeBoundSpec`; result `{success,status,...}` or typed error; unknown slug → `RECIPE_NOT_FOUND`; no cookie/auth in payload | unit | `node tests/capability-mcp-surface.test.js` | ❌ W0 | ⬜ pending |
+| 28-02 T1 (register) + 28-04 T1 (proof) | 28-02, 28-04 | 1, 3 | SURF-03 | T-28-03 | Both tools on the wire; `EXPECTED_NON_TRIGGER_REGISTRY_HASH` UNCHANGED (INV-01) | unit | `node tests/capability-mcp-surface.test.js` + `node tests/tool-definitions-parity.test.js` | parity test ✅ / surface test ❌ W0 | ⬜ pending |
+| 28-01 T2 (module) + 28-01 T3 (round-trip) | 28-01 | 1 | SURF-04 | T-28-04 | Index over synonyms+service+verb+side-effect; `toJSON`→`loadJSON(json, OPTIONS)` round-trip identical; `catalogVersion` mismatch → rebuild; snapshot to `chrome.storage.local`; descriptors are pure data (no eval) | unit | `node tests/capability-search-eval.test.js` | ❌ W0 | ⬜ pending |
+| 28-02 T1 (queue.ts) + 28-04 T1 (assert) | 28-02, 28-04 | 1, 3 | SURF-05 | T-28-05 | `'search_capabilities'` bypasses the mutation queue (in `readOnlyTools`); `'invoke_capability'` enqueued/serialized | unit | `node tests/capability-mcp-surface.test.js` | ❌ W0 | ⬜ pending |
+| 28-01 T3 (gate) | 28-01 | 1 | SURF-06 | T-28-06 | recall@5 ≥ 0.9 AND wrong-invoke = 0 over the seeded fixture set; `process.exit(1)` if either threshold fails (the milestone gate) | unit (gate) | `node tests/capability-search-eval.test.js` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -74,11 +74,11 @@ created: 2026-06-20
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (the two new `tests/*.test.js` + the two fixture files)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies (plan-checker Dimension 8a: PASS — every one of the 10 tasks has an `<automated>` command)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify (8c: PASS)
+- [x] Wave 0 covers all MISSING references (the two new `tests/*.test.js` + the two fixture files; created in 28-01 T1/T3 and 28-04 T1 before they gate)
+- [x] No watch-mode flags (8b: PASS)
+- [x] Feedback latency < 30s (8b: PASS — heaviest command is the existing `npm --prefix mcp run build`)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-06-20 (plan-checker Dimension 8: PASS, 0 blockers; W-1 frontmatter/map lag resolved this pass)
