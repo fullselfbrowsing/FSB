@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Phase 29 context gathered (assumptions mode)
-last_updated: "2026-06-21T19:55:47.704Z"
+last_updated: "2026-06-21T20:04:59.905Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 38
 ---
 
@@ -30,11 +30,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 29 (catalog-tiered-router-bundled-head-declarative-tail-autopilo) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-06-21
 
-Progress: [█████████░] 87%
+Progress: [█████████░] 93%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -87,6 +87,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 28 P28-03 | 3min | 2 tasks | 2 files |
 | Phase 28 P28-04 | 9min | 2 tasks | 3 files |
 | Phase 29 P01 | 6min | 3 tasks | 6 files |
+| Phase 29 P02 | 5min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -132,6 +133,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 28 Plan 03: bridge delegates are pure pass-throughs (no origin/tab resolution) -- authoritative resolution lives ONLY in the dispatcher handlers (single un-spoofable point, T-28-01); both routes use the standalone handler: form (mcp:search-memory precedent), handlers are hoisted async function declarations referenced by the route-table const literal.
 - [Phase ?]: [Phase 28] Plan 04 (SURF-03/05/02): tests/capability-mcp-surface.test.js is the single-file INV-01 proof -- enumerates the built runtime server._registeredTools (65 = 63 + 2, both capability tools on the wire, the Plan 02 probe) ADJACENT to a recompute of registryHash(nonTriggerTools) == the frozen EXPECTED_NON_TRIGGER_REGISTRY_HASH (out-of-registry, unmoved); queue split asserted structurally (readOnlyTools Set) AND behaviorally (search bypasses a slow in-flight invoke); RECIPE_NOT_FOUND surfaces verbatim (not action_rejected) via the existing /^RECIPE_.+$/ passthrough, no errors.ts edit.
 - [Phase ?]: [Phase 28] Plan 04: both new phase tests (capability-search-eval + capability-mcp-surface) appended to the npm test chain after capability-fetch (no reorder/removal); the FULL npm test phase-close gate exits 0 after a Rule 1 fix to a stale lattice-provider-bridge-smoke importScripts baseline (168->170 / 164->166) left by Plan 28-01.
+- [Phase ?]: Phase 29 Plan 02 (CAT-01/03/05): capability-router.js + capability-catalog.js as two pure dual-export IIFE SW modules. Catalog = authoritative slug->tier registry (resolve declares the explicit tier; a slug is EITHER T1a OR T1b, no runtime tie-break). Router invoke(slug,args,{origin,tabId}) dispatches T0/T1a/T1b/T2/T3: T1b/T0 = the verbatim-lifted routerless body (interpretRecipe -> executeBoundSpec, tier-stamped); T1a = handler.handle(args,ctx) with ctx.executeBoundSpec; T2 -> RECIPE_LEARN_PENDING (Phase 31 stub); T3 -> RECIPE_DOM_FALLBACK_PENDING (Phase 32 seam, NO executeTool/page injection); unknown -> RECIPE_NOT_FOUND. All reasons use createRecipeError dual-field shape, surface verbatim via /^RECIPE_.+$/ (no errors.ts edit). Router is PURE (no chrome./fetch), never re-targets -- origin-pin holds inside executeBoundSpec (D-12). Origin bias lives in the catalog (biasByOwnedOrigin owned-first), never re-tiers a known slug. tests/capability-router.test.js GREEN 24/24, zero edits to the Plan-01 RED file; INV-01 surface unmoved.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -179,7 +181,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T19:55:42.631Z
+Last session: 2026-06-21T20:04:34.504Z
 Stopped at: Phase 29 context gathered (assumptions mode)
 Resume file: None
 
