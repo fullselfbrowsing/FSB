@@ -34,11 +34,11 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 
 ### CAT — Catalog & Tiered Routing
 
-- [ ] **CAT-01**: A capability router selects a tier — model-prior public API → bundled handler → declarative recipe → learned recipe → DOM fallback — biased by the tab origin.
-- [ ] **CAT-02**: 5–10 high-value services ship as bundled imperative handlers (the zero-install head), requiring no install.
-- [ ] **CAT-03**: Additional services load as declarative recipes (data) executed by the bundled interpreter (the long tail).
-- [ ] **CAT-04**: Autopilot reaches the same capability engine via a `tool-executor` branch — runtime-layer parity with the MCP surface, with no parallel autopilot stack (INV-02).
-- [ ] **CAT-05**: The router returns either a structured result or a typed reason for falling through to the next tier.
+- [x] **CAT-01**: A capability router selects a tier — model-prior public API → bundled handler → declarative recipe → learned recipe → DOM fallback — biased by the tab origin.
+- [x] **CAT-02**: 5–10 high-value services ship as bundled imperative handlers (the zero-install head), requiring no install.
+- [x] **CAT-03**: Additional services load as declarative recipes (data) executed by the bundled interpreter (the long tail).
+- [x] **CAT-04**: Autopilot reaches the same capability engine via a `tool-executor` branch — runtime-layer parity with the MCP surface, with no parallel autopilot stack (INV-02).
+- [x] **CAT-05**: The router returns either a structured result or a typed reason for falling through to the next tier.
 
 ### GOV — Consent Governance & Audit
 
@@ -126,11 +126,11 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | SURF-04 | Phase 28 | Complete |
 | SURF-05 | Phase 28 | Complete |
 | SURF-06 | Phase 28 | Complete |
-| CAT-01 | Phase 29 | Pending |
-| CAT-02 | Phase 29 | Pending |
-| CAT-03 | Phase 29 | Pending |
-| CAT-04 | Phase 29 | Pending |
-| CAT-05 | Phase 29 | Pending |
+| CAT-01 | Phase 29 | Complete |
+| CAT-02 | Phase 29 | Complete |
+| CAT-03 | Phase 29 | Complete |
+| CAT-04 | Phase 29 | Complete |
+| CAT-05 | Phase 29 | Complete |
 | GOV-01 | Phase 30 | Pending |
 | GOV-02 | Phase 30 | Pending |
 | GOV-03 | Phase 30 | Pending |

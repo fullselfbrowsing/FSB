@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Phase 29 context gathered (assumptions mode)
-last_updated: "2026-06-21T19:42:05.619Z"
-last_activity: 2026-06-21 -- Phase 29 planning complete
+last_updated: "2026-06-21T19:55:47.704Z"
+last_activity: 2026-06-21
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
   percent: 38
 ---
 
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase
 See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
-**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
+**Current focus:** Phase 29 — catalog-tiered-router-bundled-head-declarative-tail-autopilo
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 29 (catalog-tiered-router-bundled-head-declarative-tail-autopilo) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-06-21 -- Phase 29 planning complete
+Last activity: 2026-06-21
 
-Progress: [██████████] 100%
+Progress: [█████████░] 87%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -86,6 +86,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 28 P28-02 | 7min | 2 tasks | 4 files |
 | Phase 28 P28-03 | 3min | 2 tasks | 2 files |
 | Phase 28 P28-04 | 9min | 2 tasks | 3 files |
+| Phase 29 P01 | 6min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -178,9 +179,9 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T10:18:38.058Z
+Last session: 2026-06-21T19:55:42.631Z
 Stopped at: Phase 29 context gathered (assumptions mode)
-Resume file: .planning/phases/29-catalog-tiered-router-bundled-head-declarative-tail-autopilo/29-CONTEXT.md
+Resume file: None
 
 ## Next Actions
 
