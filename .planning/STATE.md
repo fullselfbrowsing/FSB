@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: executing
+status: verifying
 stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
-last_updated: "2026-06-21T23:29:17.939Z"
+last_updated: "2026-06-21T23:39:58.745Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 19
-  completed_plans: 20
-  percent: 50
+  completed_plans: 21
+  percent: 63
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 30 (consent-governance-recipe-signature-verification-audit-legal) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-21
 
 Progress: [██████████] 100%
@@ -95,6 +95,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 30 PP01 | 11min | 3 tasks | 17 files |
 | Phase 30 P03 | 38min | 3 tasks | 6 files |
 | Phase 30 P02 | 22m | 3 tasks | 3 files |
+| Phase 30 P04 | 24min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,7 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: service-denylist.js is the single source of truth for origin sensitivity (isDenied + classify); noble Ed25519 fallback deferred to Phase 31; fail-closed native posture only blocks non-bundled recipes
 - [Phase ?]: 30-02: Consent gate runs unconditionally at the single invoke chokepoint (entry may be null) so the chokepoint is reached even on a catalog miss; RECIPE_NOT_FOUND returned only after the gate allows.
 - [Phase ?]: 30-02: Consent gate degrades to allow when the store module is absent (Phase-29 head), fails closed (default-OFF) once loaded; sensitive+Auto downgraded to ask at the gate (consentDecision sensitive, no executeBoundSpec).
+- [Phase 30]: Phase 30 Plan 04 (GOV-07/GOV-08): the Consent & Audit control-panel section persists per-origin Off/Ask/Auto + the elevated mutating opt-in straight to FsbConsentPolicyStore (NOT the Save bar) and re-renders on chrome.storage.onChanged; the Sensitive/Blocked friction reads FsbServiceDenylist.classify (the gate's source of truth) so the UI reflects the gate's step-4 downgrade (D-14) and is never an independent boundary. The audit viewer renders only the seven redacted columns via textContent (GOV-06 at the UI). consent-audit-settings-ui 52/0 + showcase-privacy-page 53/0 green; live render/Grant/badge smoke is human_needed UAT debt (30-HUMAN-UAT.md UAT-30-01), not a fabricated pass.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -198,7 +200,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T23:28:57.571Z
+Last session: 2026-06-21T23:39:34.854Z
 Stopped at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
 Resume file: None
 
