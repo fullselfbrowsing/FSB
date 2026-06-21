@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
-last_updated: "2026-06-21T23:05:54.987Z"
+last_updated: "2026-06-21T23:18:59.133Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
   percent: 50
 ---
 
@@ -30,11 +30,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 30 (consent-governance-recipe-signature-verification-audit-legal) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-21
 
-Progress: [██████████] 95%
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -93,6 +93,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 29 PP03 | 9min | 4 tasks tasks | 12 files files |
 | Phase 29 P05 | 7min | 3 tasks | 4 files |
 | Phase 30 PP01 | 11min | 3 tasks | 17 files |
+| Phase 30 P03 | 38min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 29]: Phase 29 Plan 03 Task 4 (live-capture checkpoint) resolved as deferred human_needed live-UAT (29-HUMAN-UAT.md, status human_needed), matching the Phase 27/28 posture -- NOT a fabricated live pass. The [ASSUMED] internal endpoint PATHS (RESEARCH A2/A3/A4) are the ONLY property not headlessly provable (capturing the real internal request needs real credentials, forbidden in CI per GOV-06); the origin-separation facts ARE web-search-verified and the DOM-fallback floor (Phase 32, T3) is the rot backstop. 10 [ASSUMED-ENDPOINT] markers across the handlers track the deferred capture; the headless CI gate does not depend on it.
 - [Phase ?]: Phase 29 Plan 05 (CAT-04 / INV-02 / INV-04): autopilot front door 2 -- executeCapabilityToolForAutopilot is a pre-executeTool guard (CAPABILITY_TOOL_NAMES, ABOVE _te_getToolByName, the Pitfall-1 out-of-registry correction; NOT a switch case) calling the SAME globalThis.FsbCapabilityRouter.invoke the MCP dispatcher calls -- one engine, two front doors, no parallel autopilot stack. Reuses buildAutopilotTriggerParams + makeResult; search_capabilities -> FsbCapabilitySearch.search (never mutates), only invoke_capability sets hadEffect. Tools stay OUT of TOOL_REGISTRY; LLM reach is an additive buildSystemPrompt hint, never a tool schema (frozen INV-01 hash unmoved; getPublicTools omits them). The setTimeout iterator is byte-untouched (INV-04). Full npm test green; parity 10/0, iterator-guard 4/0, recipe-path-guard PASS.
 - [Phase ?]: Phase 30 Plan 01 (Wave 0, GOV-01..08 + SIGN-01/02): ten zero-framework RED tests authored BEFORE the modules, all failing loud so Plans 02/03/04 turn them RED -> GREEN. Signed-payload scope LOCKED = recipe core + capturedAt + schemaHash MINUS signature, in-house RFC-8785 JCS the fixture signer embeds byte-for-byte (Plan 03 binds the identical contract). Error codes LOCKED in the RECIPE_ family so they surface verbatim with ZERO errors.ts edit. GOV-07/D-14 sensitive+Auto downgrade sampled GATE-SIDE (classify-sensitive origin under mode auto -> non-allow 'sensitive', no side effect). Native crypto.subtle Ed25519 signer (zero new packages) self-checks signed-pass + tampered-fail before emitting; fixture key is non-deterministic per run and NEVER a production trusted key (T-30-02). RECIPE_PATH_ALLOWLIST + background.js pre-armed with capability-signature.js + consent-policy-store.js + audit-log.js + service-denylist.js (the last explicit per Pitfall 6); guard GREEN, fails closed when modules land; all ten tests wired into scripts.test tail.
+- [Phase ?]: Signed payload = JCS of recipe-core+capturedAt+schemaHash minus signature; verified byte-identical to the offline fixture signer before implementing (SIGN-01/02)
+- [Phase ?]: interpretRecipe is a sync dispatcher returning a Promise only on the non-bundled verify branch, keeping bundled/no-meta callers synchronous and backward-compatible (D-06/D-07)
+- [Phase ?]: service-denylist.js is the single source of truth for origin sensitivity (isDenied + classify); noble Ed25519 fallback deferred to Phase 31; fail-closed native posture only blocks non-bundled recipes
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -191,7 +195,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-21T23:05:13.110Z
+Last session: 2026-06-21T23:18:21.150Z
 Stopped at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
 Resume file: None
 
