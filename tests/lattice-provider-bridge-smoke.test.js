@@ -579,16 +579,19 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // lib/{jmespath,minisearch,cfworker-json-schema}.min.js + 3 capability modules
   // utils/capability-{recipe-schema,auth-strategies,interpreter}.js + 1 load-order comment).
   // Phase 27 Plan 27-02: 168 mentions (+1 new line for utils/capability-fetch.js -- the MAIN-world fetch primitive).
+  // Phase 28 Plan 28-01: 170 mentions (+2 new lines for catalog/recipe-index.generated.js +
+  // utils/capability-search.js -- the build-time catalog IIFE + the minisearch index/slug-map module).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 168, 'background.js importScripts count = 168 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js)');
+  passAssertEqual(importScriptsCount, 170, 'background.js importScripts count = 170 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
   // (value-extractor + trigger-manager) -> 156; Phase 24 adds 1
   // (phantom-stream-protocol) -> 157. Phase 26 adds 6 (3 vendored libs + 3 capability
   // modules) -> 163; Phase 27 Plan 27-02 adds 1 (utils/capability-fetch.js) -> 164.
+  // Phase 28 Plan 28-01 adds 2 (catalog/recipe-index.generated.js + utils/capability-search.js) -> 166.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 164, 'background.js importScripts() call sites = 164 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js)');
+  passAssertEqual(importScriptsCallSites, 166, 'background.js importScripts() call sites = 166 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
