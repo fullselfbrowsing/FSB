@@ -153,6 +153,33 @@ const executeBoundSpecCalls = [];
   check(okGate && okGate.decision === 'allow',
     'non-sensitive read-Auto origin -> decision allow (the gate does not over-block)');
 
+  // ---- (3) ME-01: store ABSENT but a Phase-30 module PRESENT -> FAIL CLOSED ----
+  // Simulate a degraded SW boot where the consent store failed to load but a
+  // sibling Phase-30 module (the denylist, already injected above) is present.
+  // The gate must NOT fall open: a missing store in a Phase-30 deployment is a
+  // degraded credential-replay gate and must block (RECIPE_CONSENT_REQUIRED). The
+  // combined-absence fail-open is what ME-01 closes -- here the denylist is
+  // present so this is unambiguously a Phase-30 deployment, not the Phase-29
+  // harness escape hatch.
+  const savedStore = globalThis.FsbConsentPolicyStore;
+  try {
+    delete globalThis.FsbConsentPolicyStore; // store now absent
+    classifyResult = { sensitive: false, denied: false };
+    isDeniedResult = { denied: false };
+    const degraded = await Gate.evaluate({
+      origin: 'https://github.com',
+      slug: 'github.notifications',
+      method: 'GET',
+      entry: { tier: 'T1b', sideEffectClass: 'read' }
+    });
+    check(degraded && degraded.decision !== 'allow',
+      'ME-01: store absent + a Phase-30 module present -> NON-allow (degraded gate fails closed, not open)');
+    check(degraded && degraded.error && degraded.error.code === 'RECIPE_CONSENT_REQUIRED',
+      'ME-01: degraded-gate block surfaces RECIPE_CONSENT_REQUIRED');
+  } finally {
+    if (savedStore) { globalThis.FsbConsentPolicyStore = savedStore; }
+  }
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {

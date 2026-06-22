@@ -105,6 +105,22 @@
   function _denylist() {
     return (typeof FsbServiceDenylist !== 'undefined' && FsbServiceDenylist) ? FsbServiceDenylist : null;
   }
+  function _signatureMod() {
+    return (typeof FsbCapabilitySignature !== 'undefined' && FsbCapabilitySignature) ? FsbCapabilitySignature : null;
+  }
+
+  // ME-01 (fail-closed-on-partial-degradation): the "consent store absent =>
+  // allow" escape hatch exists ONLY to keep the pure Phase-29 router unit harness
+  // (which predates consent and injects NONE of the four Phase-30 security
+  // modules) dispatching. In production all four modules (signature / audit /
+  // denylist / consent store) are importScripts'd together at SW boot, so the
+  // presence of ANY ONE of them means this is a Phase-30 deployment where a
+  // MISSING consent store is a DEGRADED gate, not a pre-consent baseline -- and a
+  // credential-replay gate must FAIL CLOSED on degradation, never fall open. This
+  // returns true only when ALL FOUR are absent (the genuine Phase-29 harness).
+  function _isPhase29HarnessNoSecurityModules() {
+    return !_consentStore() && !_auditLog() && !_denylist() && !_signatureMod();
+  }
 
   // ---- Mutating-method set (capability-fetch.js:228 mirror, D-04) -----------
   //      Duplicated locally so the pure router classifies a slug's side-effect
@@ -222,9 +238,24 @@
     }
 
     var store = _consentStore();
-    // Degrade: store module not loaded -> the gate is not engaged (Phase-29 head).
+    // Store absent / malformed. Two cases (ME-01):
+    //   (a) the PURE Phase-29 harness -- NONE of the four Phase-30 security
+    //       modules are present -> the gate is not engaged (legacy dispatch
+    //       contract holds); allow.
+    //   (b) a Phase-30 deployment where the store FAILED to load while a sibling
+    //       module DID -> the gate is DEGRADED. A credential-replay gate must
+    //       FAIL CLOSED here (block), never fall open, even when the denylist is
+    //       also absent (the combined-absence fail-open this fixes).
     if (!store || typeof store.readPolicies !== 'function' || typeof store.getConsentForOrigin !== 'function') {
-      return { decision: 'allow', method: method, sideEffectClass: sideEffectClass };
+      if (_isPhase29HarnessNoSecurityModules()) {
+        return { decision: 'allow', method: method, sideEffectClass: sideEffectClass };
+      }
+      return {
+        decision: 'off',
+        method: method,
+        sideEffectClass: sideEffectClass,
+        error: _err('RECIPE_CONSENT_REQUIRED', { origin: (typeof origin === 'string' && origin) ? origin : null, slug: slug, reason: 'consent-store-unavailable' })
+      };
     }
 
     // Fail closed: a null/absent origin can never be authorized.
