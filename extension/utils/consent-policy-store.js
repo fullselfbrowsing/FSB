@@ -71,8 +71,37 @@
   }
 
   // ---- a fresh default-OFF envelope ----------------------------------------
+  // ME-03: the policies map is built on a NULL prototype so a prototype-shaped
+  // origin key (__proto__ / constructor / prototype) round-trips as plain OWN
+  // data instead of silently vanishing. On a normal {} object,
+  // policies['__proto__'] = {...} sets the prototype rather than an own key, so
+  // after a readPolicies round-trip that origin record DISAPPEARS. The
+  // null-prototype map (the same idiom capability-interpreter.js:200 adopted for
+  // this exact round-trip-drop class) makes every key a real own property; the
+  // existing hasOwnProperty.call lookups stay correct, and JSON serialization of
+  // an own __proto__ key survives the storage round-trip.
+  function _emptyPolicies() {
+    return Object.create(null);
+  }
+
+  // Copy any persisted/raw policies object onto a null-proto map by OWN keys, so
+  // a stored __proto__ origin (which JSON.parse already places as an own key)
+  // becomes a real own property on a map that also accepts future __proto__
+  // assignments as own keys. A non-object input degrades to an empty map.
+  function _toNullProtoPolicies(raw) {
+    var out = _emptyPolicies();
+    if (raw && typeof raw === 'object') {
+      for (var k in raw) {
+        if (Object.prototype.hasOwnProperty.call(raw, k)) {
+          out[k] = raw[k];
+        }
+      }
+    }
+    return out;
+  }
+
   function _defaultEnvelope() {
-    return { v: PAYLOAD_VERSION, defaultMode: DEFAULT_MODE, policies: {} };
+    return { v: PAYLOAD_VERSION, defaultMode: DEFAULT_MODE, policies: _emptyPolicies() };
   }
 
   // ---- readPolicies() -> Promise<envelope> ---------------------------------
@@ -97,7 +126,9 @@
           resolve({
             v: PAYLOAD_VERSION,
             defaultMode: (typeof payload.defaultMode === 'string') ? payload.defaultMode : DEFAULT_MODE,
-            policies: payload.policies
+            // ME-03: rehome the persisted policies onto a null-proto map so a
+            // stored __proto__/constructor/prototype origin survives as own data.
+            policies: _toNullProtoPolicies(payload.policies)
           });
         });
       } catch (_e) {
@@ -157,8 +188,12 @@
     }
     return _withPolicyLock(async function() {
       var envelope = await readPolicies();
-      var policies = (envelope.policies && typeof envelope.policies === 'object') ? envelope.policies : {};
-      var existing = (policies[origin] && typeof policies[origin] === 'object') ? policies[origin] : {};
+      // null-proto map (ME-03) so a __proto__ origin assigns as an own key, not
+      // the prototype. _toNullProtoPolicies is idempotent on an already-null-proto
+      // map and re-homes any stray normal object the read path produced.
+      var policies = _toNullProtoPolicies(envelope.policies);
+      var existing = (Object.prototype.hasOwnProperty.call(policies, origin)
+        && policies[origin] && typeof policies[origin] === 'object') ? policies[origin] : {};
       policies[origin] = {
         mode: mode,
         mutating: !!existing.mutating
@@ -178,8 +213,10 @@
     }
     return _withPolicyLock(async function() {
       var envelope = await readPolicies();
-      var policies = (envelope.policies && typeof envelope.policies === 'object') ? envelope.policies : {};
-      var existing = (policies[origin] && typeof policies[origin] === 'object') ? policies[origin] : {};
+      // null-proto map (ME-03): a __proto__ origin assigns as an own key.
+      var policies = _toNullProtoPolicies(envelope.policies);
+      var existing = (Object.prototype.hasOwnProperty.call(policies, origin)
+        && policies[origin] && typeof policies[origin] === 'object') ? policies[origin] : {};
       var fallbackMode = (typeof envelope.defaultMode === 'string') ? envelope.defaultMode : DEFAULT_MODE;
       policies[origin] = {
         mode: (typeof existing.mode === 'string' && VALID_MODES[existing.mode]) ? existing.mode : fallbackMode,

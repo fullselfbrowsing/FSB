@@ -134,6 +134,30 @@ function installChromeStorageStub() {
   check(Store.getConsentForOrigin(env, 'https://other.example.com').mode === 'off',
     'a different origin stays OFF while github.com is Auto (per-origin isolation)');
 
+  // ---- ME-03: a prototype-shaped origin key round-trips as OWN data ----
+  // Probed class: setOriginMode('__proto__', ...) on a normal {} policies map
+  // assigns the PROTOTYPE, not an own key, so the record VANISHES after a
+  // readPolicies round-trip. The null-proto policies map (ME-03) makes it a real
+  // own property -- the record survives -- AND Object.prototype is NOT polluted.
+  if (typeof Store._reset === 'function') Store._reset();
+  for (const dangerKey of ['__proto__', 'constructor', 'prototype']) {
+    await Store.setOriginMode(dangerKey, 'auto');
+    const envP = await Store.readPolicies();
+    const gotP = Store.getConsentForOrigin(envP, dangerKey);
+    check(gotP && gotP.mode === 'auto',
+      "ME-03: setOriginMode('" + dangerKey + "','auto') round-trips (record not silently dropped)");
+    check(Object.prototype.hasOwnProperty.call(envP.policies, dangerKey),
+      "ME-03: '" + dangerKey + "' is an OWN key of the persisted policies map");
+  }
+  // No prototype pollution: a benign object did NOT inherit a 'mode' from the
+  // __proto__ assignment leaking onto Object.prototype.
+  check(({}).mode === undefined, 'ME-03: Object.prototype is NOT polluted by a __proto__ origin (no inherited mode)');
+  // A legitimate https origin still works alongside the danger keys (no data loss).
+  await Store.setOriginMode('https://legit.example.com', 'ask');
+  const envMix = await Store.readPolicies();
+  check(Store.getConsentForOrigin(envMix, 'https://legit.example.com').mode === 'ask',
+    'ME-03: a legitimate origin coexists with prototype-shaped keys (no data drop)');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {
