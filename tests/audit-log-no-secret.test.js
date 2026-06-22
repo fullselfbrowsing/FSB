@@ -84,10 +84,13 @@ const FORBIDDEN_SUBSTRINGS = [
   if (typeof Audit._reset === 'function') Audit._reset();
 
   // Append several entries whose NON-whitelisted fields are saturated with secrets.
-  // The whitelisted fields stay benign.
+  // The whitelisted fields stay benign. outcome values use the REAL writer
+  // vocabulary ('ok'/'error'/'blocked' -- capability-router.js), not 'success'
+  // (LO-01): the production writer never emits 'success', so seeding it would
+  // exercise the persistence path with a value the gate never produces.
   await Audit.append({
     ts: 1, origin: 'https://github.com', slug: 'github.notifications', method: 'GET',
-    sideEffectClass: 'read', consentDecision: 'allow', outcome: 'success',
+    sideEffectClass: 'read', consentDecision: 'allow', outcome: 'ok',
     args: { authenticity_token: 'CSRFTOKEN9999', cookie: 'SESSIONCOOKIEVALUE' },
     headers: { authorization: 'Bearer abc.def.ghi', 'x-csrf-token': 'CSRFTOKEN9999' },
     body: 'token=gho_LEAKEDTOKEN&xoxc=xoxc-12345-secret',
@@ -95,7 +98,7 @@ const FORBIDDEN_SUBSTRINGS = [
   });
   await Audit.append({
     ts: 2, origin: 'https://app.slack.com', slug: 'slack.send', method: 'POST',
-    sideEffectClass: 'mutating', consentDecision: 'allow', outcome: 'success',
+    sideEffectClass: 'mutating', consentDecision: 'allow', outcome: 'error',
     error: { name: 'Error', message: 'failed', token: 'xoxc-12345-secret', bearer: 'Bearer abc.def.ghi' }
   });
   // HI-02: a secret embedded directly IN error.message must NOT survive verbatim.

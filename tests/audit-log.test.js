@@ -87,7 +87,8 @@ const OPTIONAL_KEYS = ['error'];
     method: 'GET',
     sideEffectClass: 'read',
     consentDecision: 'allow',
-    outcome: 'success',
+    // LO-01: use the writer's real outcome vocabulary ('ok'), not 'success'.
+    outcome: 'ok',
     // non-whitelisted fields that MUST NOT survive:
     args: { token: 'secret-xoxc' },
     body: 'should-not-persist',
@@ -109,7 +110,7 @@ const OPTIONAL_KEYS = ['error'];
   for (let i = 0; i < 205; i++) {
     await Audit.append({
       ts: i, origin: 'https://github.com', slug: 'slug-' + i, method: 'GET',
-      sideEffectClass: 'read', consentDecision: 'allow', outcome: 'success'
+      sideEffectClass: 'read', consentDecision: 'allow', outcome: 'ok'
     });
   }
   const r2 = await Audit.getEntries({});
