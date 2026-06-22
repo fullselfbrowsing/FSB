@@ -163,7 +163,28 @@
   // module loader. BOTH paths are guarded; an absent / unreadable / malformed
   // config DEGRADES to empty sets (never throws), so a missing config cannot
   // poison SW boot.
+  // LO-03: a one-time diagnostic when BOTH config paths fail. An empty denylist
+  // is a fail-OPEN for the denylist specifically (the per-origin default-OFF
+  // backstop still holds, so it is not a gate bypass), but a SILENTLY vanished
+  // config is worth a louder-than-swallowed signal so a missing/relocated
+  // service-denylist.json is observable rather than invisibly empty. Best-effort
+  // via the standard rateLimitedWarn ring helper; absent -> a single console.warn.
+  var _loadDiagnosticEmitted = false;
+  function _warnDenylistConfigMissing(detail) {
+    if (_loadDiagnosticEmitted) { return; }
+    _loadDiagnosticEmitted = true;
+    var msg = 'service-denylist config could not be loaded (fetch + require both failed) -- denylist is EMPTY (nothing denied); per-origin default-OFF still applies';
+    try {
+      if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
+        globalThis.rateLimitedWarn('BG', 'denylist-config-missing', msg, { detail: String(detail || 'unknown') });
+        return;
+      }
+    } catch (_e) { /* fall through to console */ }
+    try { console.warn('[FSB BG] ' + msg); } catch (_e2) { /* console may be absent */ }
+  }
+
   async function load() {
+    var fetchErr = null;
     // Browser / SW path: fetch the bundled JSON via chrome.runtime.getURL.
     var chrome = _getChrome();
     if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
@@ -175,8 +196,10 @@
           _applyConfig(data);
           return;
         }
+        fetchErr = 'fetch status ' + (resp ? resp.status : 'no-response');
       } catch (_e) {
         // fall through to the Node path / degrade-to-empty below
+        fetchErr = (_e && _e.message) ? _e.message : 'fetch threw';
       }
     }
     // Node (test) path: load the bundled JSON via the module loader. Guarded so a
@@ -190,7 +213,11 @@
       }
     } catch (_e2) {
       // degrade to empty
+      fetchErr = fetchErr || ((_e2 && _e2.message) ? _e2.message : 'require threw');
     }
+    // BOTH paths failed (or neither was available) -> degrade to empty AND emit
+    // the one-time observability diagnostic (LO-03).
+    _warnDenylistConfigMissing(fetchErr);
     _applyConfig(null);
   }
 
