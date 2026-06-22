@@ -109,6 +109,54 @@ function readSigFixture(name) {
   const okRes = await I.interpretRecipe(signed, {});
   check(okRes && okRes.success === true, 'non-bundled correctly-signed envelope binds (valid signature is not over-blocked)');
 
+  // (e) HI-01 TRUST-BOUNDARY REGRESSION: a TAMPERED core that RELABELS its own
+  //     payload `provenance:'bundled'` to try to dodge verify is STILL rejected.
+  //     The loader (interpretRecipe caller) passed NO trusted provenance, so the
+  //     embedded `bundled` is ignored and the envelope is verified -> the one-byte
+  //     tamper is caught. This proves a recipe data payload can no longer
+  //     self-declare bundled to skip the signature gate.
+  const masqueradeBundled = {
+    recipe: tampered.recipe,        // the one-byte-tampered core (/notificationz)
+    provenance: 'bundled',          // SELF-ASSERTED in the payload -- must NOT be honored
+    capturedAt: tampered.capturedAt,
+    schemaHash: tampered.schemaHash,
+    signature: tampered.signature
+  };
+  const mbRes = await I.interpretRecipe(masqueradeBundled, {});
+  check(mbRes && (mbRes.code === 'RECIPE_SIGNATURE_INVALID' || mbRes.errorCode === 'RECIPE_SIGNATURE_INVALID'),
+    'HI-01: a payload self-asserting provenance:bundled does NOT skip verify (tampered core still rejected)');
+
+  // (e2) a correctly-SIGNED envelope that ALSO self-asserts `provenance:'bundled'`
+  //      is NOT short-circuited as bundled; it is verified like any unvouched
+  //      envelope (and, being correctly signed, binds). The point is that the
+  //      embedded `bundled` does NOT bypass verification -- the signature is what
+  //      admits it, not the self-asserted label.
+  let verifyCallsMasq = 0;
+  if (typeof Sig.verifyEd25519 === 'function') {
+    const realVerify2 = Sig.verifyEd25519;
+    Sig.verifyEd25519 = async function () { verifyCallsMasq += 1; return realVerify2.apply(this, arguments); };
+    const signedSelfBundled = Object.assign({}, signed, { provenance: 'bundled' });
+    const ssbRes = await I.interpretRecipe(signedSelfBundled, {});
+    Sig.verifyEd25519 = realVerify2; // restore
+    check(ssbRes && ssbRes.success === true, 'HI-01: a correctly-signed envelope self-asserting bundled still binds (via signature, not the label)');
+    check(verifyCallsMasq > 0, 'HI-01: the self-asserted bundled envelope WAS verified (verifyEd25519 called -- the label did not short-circuit)');
+  }
+
+  // (f) the TRUSTED bundled exemption: when the LOADER vouches provenance:'bundled'
+  //     via opts.trustedProvenance, the no-verify exemption (D-07) applies and the
+  //     core binds WITHOUT a verify call. This is the legitimate trusted path.
+  let verifyCallsTrusted = 0;
+  if (typeof Sig.verifyEd25519 === 'function') {
+    const realVerify3 = Sig.verifyEd25519;
+    Sig.verifyEd25519 = async function () { verifyCallsTrusted += 1; return realVerify3.apply(this, arguments); };
+    // Even a tampered core binds when the loader TRUSTS it as bundled -- that is
+    // the exemption working as designed (the loader vouches for on-disk bundles).
+    const trustedRes = await I.interpretRecipe(tampered, {}, { trustedProvenance: 'bundled' });
+    Sig.verifyEd25519 = realVerify3; // restore
+    check(trustedRes && trustedRes.success === true, 'HI-01: loader-vouched opts.trustedProvenance=bundled grants the D-07 exemption (binds)');
+    check(verifyCallsTrusted === 0, 'HI-01: the trusted-bundled exemption short-circuits BEFORE any verify call');
+  }
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {

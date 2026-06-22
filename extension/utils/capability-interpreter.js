@@ -273,28 +273,61 @@
   // dispatcher that returns a Promise only on the verify branch.
 
   // Detect the Phase-30 provenance envelope. A bare recipe core has neither a
-  // nested `recipe` object nor a string `provenance`, so a Phase-29 recipe is
-  // NEVER misread as an envelope (the exempt default path is preserved). Returns
-  // null for a bare core; an { core, provenance, signature, capturedAt,
-  // schemaHash } descriptor for an envelope.
+  // nested `recipe` object nor an integrity field, so a Phase-29 recipe is NEVER
+  // misread as an envelope (the exempt default path is preserved). Returns null
+  // for a bare core; an { core, signature, capturedAt, schemaHash } descriptor
+  // for an envelope.
+  //
+  // HI-01 (trust boundary): the envelope shape is detected by the presence of a
+  // nested `recipe` object PLUS the SIGNATURE-METADATA channel (a `signature`,
+  // `capturedAt`, or `schemaHash` field) -- NEVER by the payload's self-asserted
+  // `provenance` key. An envelope's embedded `provenance` is DELIBERATELY NOT
+  // read here: provenance is a TRUSTED decision the LOADER makes from WHERE the
+  // recipe came from (bundled-on-disk vs server vs learned), passed to
+  // interpretRecipe as a separate trusted argument (opts.trustedProvenance). A
+  // recipe data payload can therefore NEVER self-declare `bundled` to dodge the
+  // signature-verify gate.
   function detectRecipeEnvelope(input) {
     if (!input || typeof input !== 'object') { return null; }
     if (!input.recipe || typeof input.recipe !== 'object') { return null; }
-    if (typeof input.provenance !== 'string' || input.provenance.length === 0) { return null; }
+    // An envelope is anything that wraps a recipe core AND carries the integrity
+    // channel (signature / capturedAt / schemaHash). The embedded `provenance`
+    // field is intentionally IGNORED for trust purposes (HI-01).
+    var hasIntegrityMeta =
+      (typeof input.signature === 'string' && input.signature.length > 0) ||
+      (typeof input.capturedAt === 'string' && input.capturedAt.length > 0) ||
+      (typeof input.schemaHash === 'string' && input.schemaHash.length > 0) ||
+      (typeof input.provenance === 'string' && input.provenance.length > 0);
+    if (!hasIntegrityMeta) { return null; }
     return {
       core: input.recipe,
-      provenance: input.provenance,
       signature: input.signature,
       capturedAt: input.capturedAt,
       schemaHash: input.schemaHash
     };
   }
 
-  function interpretRecipe(recipeOrEnvelope, args) {
+  // interpretRecipe(recipeOrEnvelope, args, opts)
+  //
+  // opts.trustedProvenance (HI-01): the provenance the LOADER vouches for, derived
+  // from the recipe's SOURCE (the bundled on-disk catalog vs a server/learned
+  // channel) -- NEVER from a field inside the recipe payload. ONLY a trusted
+  // 'bundled' here grants the no-verify exemption (D-07). A bare recipe core (no
+  // envelope) is the bundled catalog path the router uses today, which is exempt
+  // by source. Any envelope NOT vouched as 'bundled' by the loader is ALWAYS
+  // signature-verified -- a payload carrying its own `provenance:'bundled'` can no
+  // longer skip verification.
+  function interpretRecipe(recipeOrEnvelope, args, opts) {
     // Unwrap a Phase-30 provenance envelope to its recipe core; a bare core is
     // used as-is (today's callers + the Phase-29 head -- the exempt default path).
     var envelope = detectRecipeEnvelope(recipeOrEnvelope);
     var recipe = envelope ? envelope.core : recipeOrEnvelope;
+
+    // TRUSTED provenance comes ONLY from the call path (the loader), never from
+    // the recipe payload. Absent => unvouched: a bare core is exempt by source
+    // (bundled catalog), but an ENVELOPE with no trusted vouch must be verified.
+    var trustedProvenance = (opts && typeof opts.trustedProvenance === 'string')
+      ? opts.trustedProvenance : null;
 
     var schemaMod = getFSBRecipeSchema();
     if (!schemaMod || typeof schemaMod.validateRecipe !== 'function') {
@@ -316,18 +349,23 @@
       return recipeResult;
     }
 
-    // BARE-CORE / BUNDLED / NO-META default path: NO signature verify (D-07).
-    // Bind synchronously and return the typed result as a plain object so every
-    // current synchronous caller behaves identically. This is the ONLY path the
-    // Phase-29 head and the existing capability-interpreter.test.js exercise.
-    if (!envelope || envelope.provenance === 'bundled') {
+    // BARE-CORE / TRUSTED-BUNDLED / NO-META default path: NO signature verify
+    // (D-07). The exemption fires ONLY for (a) a bare recipe core -- the bundled
+    // on-disk catalog path the router uses -- or (b) an envelope the LOADER
+    // explicitly vouched as 'bundled' via opts.trustedProvenance. The recipe
+    // payload's OWN `provenance` field is NEVER consulted here (HI-01): a tampered
+    // core relabeled `provenance:'bundled'` in its data CANNOT reach this
+    // short-circuit, so it can no longer dodge verification. Bind synchronously
+    // and return the typed result as a plain object so every current synchronous
+    // caller behaves identically.
+    if (!envelope || trustedProvenance === 'bundled') {
       return bindRecipeCore(recipe, args, authMod);
     }
 
-    // 1b. SIGNATURE VERIFY HOOK (Phase 30, SIGN-02, D-06/D-07) -- NON-bundled
-    //     provenance ONLY, AFTER schema-validate (above) and BEFORE bind (below).
-    //     The Ed25519 verify is async, so this branch returns a Promise; callers
-    //     that may pass a non-bundled envelope await it. A non-bundled recipe MUST
+    // 1b. SIGNATURE VERIFY HOOK (Phase 30, SIGN-02, D-06/D-07) -- any envelope NOT
+    //     vouched 'bundled' by the loader, AFTER schema-validate (above) and
+    //     BEFORE bind (below). The Ed25519 verify is async, so this branch returns
+    //     a Promise; callers that may pass an envelope await it. Such a recipe MUST
     //     NOT bind without a verifier, so an absent signature module FAILS CLOSED.
     return (async function verifyThenBind() {
       var sigMod = getFSBCapabilitySignature();
@@ -336,13 +374,16 @@
       }
       var verifyResult;
       try {
+        // Pass the TRUSTED provenance (from the loader, or null when unvouched) as
+        // the SECOND argument so the signature module decides the exemption from
+        // the trusted channel -- it must NOT honor a `provenance` embedded in the
+        // envelope object. We deliberately do NOT forward any payload provenance.
         verifyResult = await sigMod.verifyRecipeEnvelope({
           recipe: recipe,
-          provenance: envelope.provenance,
           signature: envelope.signature,
           capturedAt: envelope.capturedAt,
           schemaHash: envelope.schemaHash
-        });
+        }, trustedProvenance);
       } catch (e) {
         // verifyRecipeEnvelope is fail-closed and should not throw, but guard the
         // public no-throw contract regardless -> treat any throw as invalid.

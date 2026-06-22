@@ -204,9 +204,22 @@
 
   // ---- verifyRecipeEnvelope (provenance-aware, FAIL CLOSED) ---------------
   //
+  // verifyRecipeEnvelope(envelope, trustedProvenance)
+  //
   // Envelope (LOCKED -- the "Lattice receipt" provenance shape, D-05/D-07):
-  //   { recipe:<schema-valid recipe core>, provenance:'bundled'|'server'|'learned',
-  //     signature?:base64, capturedAt?:string, schemaHash?:string }
+  //   { recipe:<schema-valid recipe core>, signature?:base64, capturedAt?:string,
+  //     schemaHash?:string }
+  //
+  // TRUST BOUNDARY (HI-01): the bundled exemption is decided from the TRUSTED
+  // provenance the caller (the interpreter, fed by the loader) supplies as the
+  // SECOND argument -- derived from WHERE the recipe came from -- NOT from a
+  // `provenance` field inside the envelope payload. When trustedProvenance is
+  // supplied (a string), it is AUTHORITATIVE and any embedded `envelope.provenance`
+  // is ignored: a recipe payload CANNOT self-declare `bundled` to skip verify.
+  // For backward compatibility with direct unit-level callers that pass no second
+  // argument, an embedded `envelope.provenance` is used ONLY as a fallback when
+  // trustedProvenance is omitted (undefined). A caller that wants to FORCE verify
+  // passes any non-'bundled' string (e.g. null is treated as "no exemption").
   //
   // Signed payload (LOCKED -- byte-identical to sign-fixtures.mjs): the JCS
   // canonical form of { recipe:<core>, capturedAt, schemaHash } -- i.e. the
@@ -214,18 +227,28 @@
   // (Pitfall 3). The signature signs THESE bytes; verifying re-canonicalizes the
   // same object and Ed25519-verifies the signature against each trusted key.
   //
-  //   provenance === 'bundled' -> { ok:true } WITHOUT calling verifyEd25519 (D-07)
+  //   resolved provenance === 'bundled' -> { ok:true } WITHOUT verifyEd25519 (D-07)
   //   else: missing signature/key OR verify false -> { ok:false, reason } (FAIL CLOSED)
 
-  async function verifyRecipeEnvelope(envelope) {
+  async function verifyRecipeEnvelope(envelope, trustedProvenance) {
     if (!envelope || typeof envelope !== 'object') {
       return { ok: false, reason: 'envelope-missing' };
     }
 
+    // Resolve the provenance from the TRUSTED channel first (HI-01). A supplied
+    // trustedProvenance (including null, signaling "no exemption / force verify")
+    // is authoritative. ONLY when the caller passed nothing (undefined) do we fall
+    // back to the embedded field for legacy/direct callers.
+    var resolvedProvenance = (arguments.length >= 2)
+      ? trustedProvenance
+      : envelope.provenance;
+
     // D-07 exemption: bundled provenance is trusted-by-provenance. Short-circuit
     // BEFORE any verify call so the exemption is observable (the test spies on
-    // verifyEd25519 and asserts a zero call count on this path).
-    if (envelope.provenance === 'bundled') {
+    // verifyEd25519 and asserts a zero call count on this path). Only a TRUSTED
+    // 'bundled' reaches here -- never a payload-asserted one when the interpreter
+    // call path is used.
+    if (resolvedProvenance === 'bundled') {
       return { ok: true };
     }
 
