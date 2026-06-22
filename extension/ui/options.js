@@ -1891,24 +1891,51 @@ function clearAuditLog() {
 
 // Grant a pending request: write consent for that EXACT origin/scope only
 // (T-30-16 -- never a global enable), remove the row, surface a toast.
+//
+// ME-02: the stored mode MUST match what the gate will actually honor, so Grant
+// classifies the origin first via FsbServiceDenylist.classify -- the SAME source
+// of truth the gate's step-1 denylist block and step-4 sensitive+Auto downgrade
+// read (D-14/D-15):
+//   - DENIED origin    -> refuse the grant outright (the gate blocks it anyway;
+//                         writing any mode would be a dishonest stored policy).
+//   - SENSITIVE origin -> grant 'ask' (NOT 'auto'): the gate downgrades Auto->Ask
+//                         for sensitive origins at runtime, and the per-origin UI
+//                         list disables the Auto segment for them, so 'auto' would
+//                         persist a mode the gate never honors and the UI forbids.
+//   - otherwise        -> grant 'auto' (an explicit mutating scope additionally
+//                         opts into write; read scope never implies write).
 function grantPendingRequest(row) {
   if (!row || !row.dataset) return;
   const origin = row.dataset.origin || '';
   const scope = row.dataset.scope || '';
   if (!origin) return;
+
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbServiceDenylist : null;
+  let cls = { denied: false, sensitive: false };
+  if (denylist && typeof denylist.classify === 'function') {
+    try { cls = denylist.classify(origin) || cls; } catch (_e) { /* degrade to non-denied/non-sensitive */ }
+  }
+  if (cls.denied) {
+    // A denied origin can never be granted -- the gate blocks it regardless.
+    showToast('This origin is blocked from automation', 'error');
+    return;
+  }
+  // Sensitive origins never get a stored 'auto' (the gate would downgrade it).
+  const grantMode = cls.sensitive ? 'ask' : 'auto';
+
   const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
   if (store && typeof store.setOriginMode === 'function') {
-    // Grant => Auto for that origin; an explicit mutating scope additionally
-    // opts the origin into write access. Read scope never implies write.
-    const writes = [store.setOriginMode(origin, 'auto')];
-    if (scope === 'mutating' && typeof store.setOriginMutating === 'function') {
+    const writes = [store.setOriginMode(origin, grantMode)];
+    // The elevated mutating opt-in only makes sense once the origin can actually
+    // run under Auto -- a sensitive origin granted 'ask' does not get write-Auto.
+    if (scope === 'mutating' && grantMode === 'auto' && typeof store.setOriginMutating === 'function') {
       writes.push(store.setOriginMutating(origin, true));
     }
     Promise.all(writes.map((p) => Promise.resolve(p))).then(() => {
       row.remove();
       updatePendingCount();
       scheduleRenderConsentAudit();
-      showToast('Access granted', 'success');
+      showToast(cls.sensitive ? 'Access granted (Ask -- sensitive origin)' : 'Access granted', 'success');
     });
   } else {
     row.remove();
