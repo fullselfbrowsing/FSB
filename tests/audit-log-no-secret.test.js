@@ -27,6 +27,11 @@
 
 const path = require('path');
 
+// Load the shape-only redactor onto globalThis so audit-log's _safeError routes
+// a free-form error.message through it (HI-02: the message must be reduced to a
+// content-free shape, not persisted verbatim).
+require(path.resolve(__dirname, '..', 'extension', 'utils', 'redactForLog.js'));
+
 let passed = 0;
 let failed = 0;
 function check(cond, msg) {
@@ -63,7 +68,10 @@ function installChromeStorageStub() {
 const FORBIDDEN_SUBSTRINGS = [
   'cookie', 'token', 'csrf', 'xoxc', '_gh_sess', 'bearer', 'authorization',
   // distinctive sentinel values:
-  'xoxc-12345-secret', 'gho_LEAKEDTOKEN', 'SESSIONCOOKIEVALUE', 'CSRFTOKEN9999', 'Bearer abc.def.ghi'
+  'xoxc-12345-secret', 'gho_LEAKEDTOKEN', 'SESSIONCOOKIEVALUE', 'CSRFTOKEN9999', 'Bearer abc.def.ghi',
+  // HI-02 sentinel: a secret embedded INSIDE error.message (the gap the prior
+  // test missed -- it seeded secrets only in error SIBLING fields).
+  'access_token=SECRETLEAK123', 'SECRETLEAK123'
 ];
 
 (async () => {
@@ -90,6 +98,14 @@ const FORBIDDEN_SUBSTRINGS = [
     sideEffectClass: 'mutating', consentDecision: 'allow', outcome: 'success',
     error: { name: 'Error', message: 'failed', token: 'xoxc-12345-secret', bearer: 'Bearer abc.def.ghi' }
   });
+  // HI-02: a secret embedded directly IN error.message must NOT survive verbatim.
+  // _safeError reduces the free-form message to a content-free shape (keeping only
+  // the benign error NAME), so the sentinel cannot leak through the message path.
+  await Audit.append({
+    ts: 3, origin: 'https://api.x.com', slug: 'x.fetch', method: 'GET',
+    sideEffectClass: 'read', consentDecision: 'allow', outcome: 'error',
+    error: { name: 'FetchError', message: 'failed to fetch https://api.x.com/u?access_token=SECRETLEAK123' }
+  });
 
   const r = await Audit.getEntries({});
   const serialized = JSON.stringify(r.entries);
@@ -103,6 +119,10 @@ const FORBIDDEN_SUBSTRINGS = [
   // because the ring is empty).
   check(serialized.indexOf('github.notifications') !== -1, 'benign whitelisted slug persisted (ring is not empty)');
   check(serialized.indexOf('https://github.com') !== -1, 'benign whitelisted origin persisted');
+  // HI-02: the benign error NAME is kept (control-plane class label) even though
+  // the secret-bearing message text is reduced to a content-free shape -- proving
+  // the redaction dropped the secret without nuking the useful name.
+  check(serialized.indexOf('FetchError') !== -1, 'benign error NAME survives (message shape-redacted, name kept)');
 
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);

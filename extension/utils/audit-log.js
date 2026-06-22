@@ -90,11 +90,46 @@
     }
   }
 
-  // ---- error -> { name, message } ONLY (D-11) ------------------------------
-  // Reads ONLY the two sub-fields by name and String()-coerces them. A token /
-  // bearer / cookie slipped onto the error object is NOT a name/message field, so
-  // it is structurally excluded. No stack, no body. Returns undefined when there
-  // is no error so the key stays optional.
+  // ---- error -> name + SHAPE-only message (D-11; HI-02) --------------------
+  // Reduces an error to control-plane-only material. The error NAME (e.g.
+  // 'FetchError') is a benign class label and is kept verbatim. The MESSAGE,
+  // however, is FREE-FORM and may carry a URL / query / token (e.g. a fetch
+  // failure message containing '?access_token=...'), so it is NEVER persisted
+  // verbatim. Instead:
+  //   - a RECIPE_* code token (the ONLY error content the router feeds -- it
+  //     passes typed dual-field codes, not raw Error objects) is whitelisted and
+  //     kept verbatim, since it is a benign control-plane value; otherwise
+  //   - the free-form text is reduced to a SHAPE marker via redactForLog
+  //     (-> 'text(len:N)' / 'url(<origin>)') so a secret embedded in a message
+  //     CANNOT survive the secret-free ring (HI-02).
+  // A token / bearer / cookie slipped onto a SIBLING field of the error object is
+  // additionally still structurally excluded (only name + message are read). No
+  // stack, no body. Returns undefined when there is no error so the key stays
+  // optional.
+  var _RECIPE_CODE_RE = /^RECIPE_[A-Z0-9_]+$/;
+
+  // Reduce arbitrary free-form text to a content-free shape marker. A RECIPE_*
+  // control-plane code passes through verbatim (benign). Everything else goes
+  // through redactForLog (shape-only: url -> origin, other -> length) so no raw
+  // message content -- and therefore no embedded secret -- is ever persisted.
+  function _shapeMessage(text) {
+    if (typeof text !== 'string' || text.length === 0) { return ''; }
+    if (_RECIPE_CODE_RE.test(text)) { return text; }
+    var redact = _redact();
+    if (redact) {
+      var r = redact(text);
+      if (r && r.kind === 'url' && typeof r.origin === 'string') {
+        return 'url(' + r.origin + ')';
+      }
+      if (r && typeof r.length === 'number') {
+        return (r.kind || 'text') + '(len:' + r.length + ')';
+      }
+      return 'redacted';
+    }
+    // No redactor available (degraded): record the length only, never the text.
+    return 'text(len:' + text.length + ')';
+  }
+
   function _safeError(error) {
     if (error === null || error === undefined) { return undefined; }
     var name = '';
@@ -105,11 +140,15 @@
       if (typeof error.name === 'string') { name = error.name; }
       if (typeof error.message === 'string') { message = error.message; }
     }
-    // Compose a name/message-only string. Both empty -> a bare '' marker so the
-    // presence of an error is still recorded without any payload.
-    if (name && message) { return String(name) + ': ' + String(message); }
+    // The message is reduced to a content-free shape (or a whitelisted RECIPE_*
+    // code); the name is kept verbatim as a benign class label.
+    var safeMsg = _shapeMessage(message);
+    if (name && safeMsg) { return String(name) + ': ' + safeMsg; }
     if (name) { return String(name); }
-    return String(message);
+    if (safeMsg) { return safeMsg; }
+    // An error is present but yields no name and no usable message shape -> a
+    // stable sentinel so the presence is unambiguous vs. "no error" (LO-02).
+    return 'error';
   }
 
   // ---- append(entry) -> Promise<void> --------------------------------------
