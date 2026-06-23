@@ -180,6 +180,60 @@ const vNullData = classifyRecipeBroken(
 check(vNullData && vNullData.broken === true && vNullData.code === 'RECIPE_EXPIRED',
   "HEAL-04: success:true status:200 data:null under expectedShape 'items' -> broken === true (RECIPE_EXPIRED)");
 
+// WR-01 (masking-as-success): a 200 with a login-HTML STRING body under the WEAKEST
+// expectedShape:'@' (the shape EVERY synthesized learned recipe carries) is a near-
+// certain 200 auth-wall, NOT a real result. Without the structural HTML sniff,
+// search(data,'@') returns the whole non-null string and the shape PASSES, surfacing
+// a rotted login page as a successful capability result. It MUST classify broken ->
+// RECIPE_EXPIRED so the DOM fallback fires instead of returning garbage as success.
+const vHtmlAt = classifyRecipeBroken(
+  { success: true, status: 200, redirected: false, data: '<html>login</html>' },
+  RECIPE_WITH_SHAPE
+);
+check(vHtmlAt && vHtmlAt.broken === true,
+  'WR-01: success:true status:200 data:"<html>login</html>" under expectedShape "@" -> broken === true (auth-wall HTML body is NOT masked as success)');
+check(vHtmlAt && vHtmlAt.code === 'RECIPE_EXPIRED',
+  "WR-01: a 200 login-HTML body under expectedShape '@' carries code 'RECIPE_EXPIRED'");
+// A <!doctype html> shell (the common SPA-shell auth-wall form) is likewise broken.
+const vDoctypeAt = classifyRecipeBroken(
+  { success: true, status: 200, redirected: false, data: '<!DOCTYPE html><html><body>Sign in</body></html>' },
+  RECIPE_WITH_SHAPE
+);
+check(vDoctypeAt && vDoctypeAt.broken === true && vDoctypeAt.code === 'RECIPE_EXPIRED',
+  'WR-01: a "<!DOCTYPE html>" SPA-shell body under expectedShape "@" -> broken === true (RECIPE_EXPIRED)');
+
+// WR-01 never-mask GUARD (the load-bearing inverse): the HTML sniff is STRUCTURE-ONLY
+// and must NEVER turn a real JSON outcome -- including an EMPTY one -- into a false
+// rot. A genuine JSON object / array (parsed from r.json) is never a raw HTML string,
+// so these MUST stay NOT broken under expectedShape:'@'.
+const vRealObjAt = classifyRecipeBroken(
+  { success: true, status: 200, redirected: false, data: { id: 1, title: 'real' } },
+  RECIPE_WITH_SHAPE
+);
+check(vRealObjAt && vRealObjAt.broken === false,
+  'WR-01 never-mask: a real JSON object under expectedShape "@" -> broken === false (a real result is NEVER masked as rot)');
+const vEmptyArrAt = classifyRecipeBroken(
+  { success: true, status: 200, redirected: false, data: [] },
+  RECIPE_WITH_SHAPE
+);
+check(vEmptyArrAt && vEmptyArrAt.broken === false,
+  'WR-01 never-mask: an EMPTY JSON array under expectedShape "@" -> broken === false (a genuine 0-results outcome still passes)');
+const vEmptyObjAt = classifyRecipeBroken(
+  { success: true, status: 200, redirected: false, data: {} },
+  RECIPE_WITH_SHAPE
+);
+check(vEmptyObjAt && vEmptyObjAt.broken === false,
+  'WR-01 never-mask: an EMPTY JSON object under expectedShape "@" -> broken === false (a genuine empty container still passes)');
+// A JSON STRING value that is NOT HTML (e.g. an endpoint that legitimately returns a
+// bare JSON string) still passes -- the sniff is narrow to HTML-document strings, so a
+// non-HTML string body is not mis-flagged.
+const vPlainStrAt = classifyRecipeBroken(
+  { success: true, status: 200, redirected: false, data: 'ok' },
+  RECIPE_WITH_SHAPE
+);
+check(vPlainStrAt && vPlainStrAt.broken === false,
+  'WR-01 never-mask: a non-HTML string body ("ok") under expectedShape "@" -> broken === false (the sniff is narrow to HTML documents)');
+
 // fetch-failed (success:false, error) -> broken -> RECIPE_EXPIRED.
 const vFetchFail = classifyRecipeBroken({ success: false, error: 'no result from page fetch' }, RECIPE_WITH_SHAPE);
 check(vFetchFail && vFetchFail.broken === true,

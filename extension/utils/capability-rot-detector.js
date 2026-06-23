@@ -71,6 +71,36 @@
     return null;
   }
 
+  // ---- _looksLikeHtmlDocument -- structural auth-wall sniff (WR-01, D-06) -----
+  //
+  // A STRUCTURE-ONLY predicate (NEVER a value assertion): is `data` a STRING that
+  // is an HTML document rather than a JSON payload? A credentialed JSON-API recipe
+  // (every synthesized learned recipe carries expectedShape:'@' + extract:'@' and
+  // parses r.json; the bundled JSON recipes likewise) whose body comes back as an
+  // HTML STRING is a near-certain auth-wall: a 200 login page / SPA shell served in
+  // place of the JSON the recipe expects. This closes the WR-01 masking-as-success
+  // gap for the weakest assertion (expectedShape:'@'), where search(data,'@')
+  // returns the whole non-null string and the shape would otherwise PASS.
+  //
+  // CONSERVATIVE (D-06): this reads the TYPE and the leading structural marker
+  // only -- never a value/field. A real JSON result is an object / array / number /
+  // boolean / null (parsed from r.json), NEVER a raw HTML string, so this can never
+  // turn a legitimate (possibly-empty) JSON outcome into a false RECIPE_EXPIRED.
+  // The match is intentionally narrow: a leading '<' after trim, or a case-
+  // insensitive '<!doctype' / '<html' marker.
+  //
+  // V7: reads the body TYPE/prefix for the sniff only; NEVER logs the body.
+
+  function _looksLikeHtmlDocument(data) {
+    if (typeof data !== 'string') { return false; }
+    var trimmed = data.replace(/^[\s﻿]+/, '');
+    if (trimmed.charAt(0) !== '<') { return false; }
+    var head = trimmed.slice(0, 200).toLowerCase();
+    return head.indexOf('<!doctype') !== -1
+        || head.indexOf('<html') !== -1
+        || head.charAt(0) === '<';   // any leading-tag string under a JSON recipe is wrong-kind
+  }
+
   // ---- validateExpectedShape -- the conservative structural predicate ---------
   //
   // HEAL-02 / D-06. Assert ONLY that the recipe's expectedShape read PATH resolves
@@ -133,10 +163,12 @@
   //                                       not healed) -- the load-bearing logged-out
   //                                       line (D-01).
   //   4. status >= 400                 -> broken RECIPE_HTTP_5XX / RECIPE_HTTP_4XX.
-  //   5. expectedShape present + fails -> broken RECIPE_EXPIRED (expectedShape-
-  //                                       mismatch). A present-but-empty container
-  //                                       PASSES here (real no-results, never
-  //                                       masked).
+  //   5. expectedShape present:
+  //        5a. an HTML-document STRING body under a JSON recipe (incl. '@') ->
+  //            broken RECIPE_EXPIRED (auth-wall sniff, WR-01) -- structure-only.
+  //        5b. the shape path fails (missing / null / wrong-kind) -> broken
+  //            RECIPE_EXPIRED (expectedShape-mismatch). A present-but-empty
+  //            container PASSES here (real no-results, never masked).
   //   6. otherwise                     -> NOT broken (ok: success or legitimate
   //                                       no-results, returned verbatim).
   //
@@ -181,6 +213,16 @@
     //    body is a rot. A present-but-empty container of the expected kind is a REAL
     //    empty result and PASSES (never masked).
     if (recipe && typeof recipe.expectedShape === 'string' && recipe.expectedShape) {
+      // 5a. WR-01 auth-wall sniff (D-06, structure-only): a JSON-API recipe (one that
+      //     declares ANY expectedShape, INCLUDING the weakest '@') whose body comes
+      //     back as an HTML-document STRING is a near-certain 200 login/SPA-shell
+      //     auth-wall, NOT a real result. Under expectedShape:'@' the bare present-
+      //     predicate would PASS the whole string and mask the rotted page as success;
+      //     this closes that gap. It can NEVER mis-flag a real (even empty) JSON
+      //     outcome, which is an object/array/number/etc, never a raw HTML string.
+      if (_looksLikeHtmlDocument(result.data)) {
+        return { broken: true, code: 'RECIPE_EXPIRED', reason: 'html-body-under-json-recipe' };
+      }
       if (!validateExpectedShape(result.data, recipe.expectedShape)) {
         return { broken: true, code: 'RECIPE_EXPIRED', reason: 'expectedShape-mismatch' };
       }
