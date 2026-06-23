@@ -1298,9 +1298,12 @@ async function handleOpenTabRoute({ params }) {
 // Phase 34: MCP front door for upload_file. Tab ownership is already enforced
 // by resolveAgentTabOrError + checkOwnershipGate before this runs; the shared
 // background helper (executeUploadFile) owns the denylist + audit chokepoint.
-async function handleUploadFileRoute({ params }) {
+async function handleUploadFileRoute({ params, tab }) {
   const p = params || {};
-  if (!Number.isFinite(p.tabId)) {
+  const targetTabId = Number.isFinite(p.tabId)
+    ? p.tabId
+    : (tab && Number.isFinite(tab.id) ? tab.id : null);
+  if (!Number.isFinite(targetTabId)) {
     return createMcpInvalidParamsError('upload_file', 'upload_file requires a resolved tab');
   }
   if (typeof p.selector !== 'string' || !p.selector.trim()) {
@@ -1316,7 +1319,7 @@ async function handleUploadFileRoute({ params }) {
     return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: 'upload handler unavailable' });
   }
   try {
-    const result = await uploadFn(p.tabId, p.selector, p.file_path);
+    const result = await uploadFn(targetTabId, p.selector, p.file_path);
     if (result && result.success) {
       return { success: true, tool: 'upload_file', method: result.method, selector: result.selector, file: result.file };
     }

@@ -10,10 +10,10 @@
    * module hosts the github.issues.* slugs whose mechanics the closed declarative
    * schema cannot express:
    *   - github.issues.list  (read)  : a same-origin GET of the issues feed.
-   *   - github.issues.create (write): a same-origin POST to GitHub's own frontend
-   *     persisted-query GraphQL endpoint, which needs (a) a query body and (b) a CSRF
-   *     token SCRAPED from the page first (from:'response', 27-D-06 carried forward) --
-   *     neither expressible as recipe DATA, so it is a handler.
+   *   - github.issues.create (write): registered as a T1a handler, but intentionally
+   *     fails closed to the DOM fallback seam until a real live-captured GitHub
+   *     frontend mutation body is available. A placeholder GraphQL mutation must never
+   *     report success for an issue that was not created.
    *
    * THE DECISIVE CONSTRAINT (D-09 + the origin-pin, Pitfall 3 credential-replay):
    * every spec targets GitHub's OWN first-party origin https://github.com, because
@@ -25,17 +25,17 @@
    * only builds bound spec(s) and calls ctx.executeBoundSpec, so the active-tab
    * origin-pin (inside executeBoundSpec) stays on the head path (D-12).
    *
-   * SECURITY (T-29-08, block-on-high): the scraped CSRF token is placed ONLY into the
-   * bound spec's header; it is NEVER written to a console/diagnostic/log line and
-   * never returned off-device (redactForLog discipline). No diagnostic line in this
-   * module names a token-bearing variable.
+   * SECURITY (T-29-08, block-on-high): github.issues.create does not scrape CSRF or
+   * issue a mutation while the endpoint/body remain unverified. When the live capture
+   * replaces this fallback, token material must still stay only inside the bound spec
+   * and never in logs/diagnostics.
    *
-   * [ASSUMED] -- every internal endpoint PATH and the CSRF carrier below is training/
-   * inference-derived (RESEARCH Assumption A2) and MUST be confirmed against a live
-   * authenticated github.com tab before the head is trusted (29-03 Task 4, recorded as
-   * human_needed live-UAT in 29-HUMAN-UAT.md). Registry/public-API existence does NOT
-   * confer verified status for an INTERNAL endpoint. The origin-separation fact (the
-   * public api subdomain is a separate origin) IS web-search-verified.
+   * [ASSUMED] -- internal endpoint paths are training/inference-derived (RESEARCH
+   * Assumption A2) and MUST be confirmed against a live authenticated github.com tab
+   * before the head is trusted (29-03 Task 4, recorded as human_needed live-UAT in
+   * 29-HUMAN-UAT.md). Registry/public-API existence does NOT confer verified status
+   * for an INTERNAL endpoint. The origin-separation fact (the public api subdomain is
+   * a separate origin) IS web-search-verified.
    *
    * Module shell: the dual-export IIFE mirror of capability-interpreter.js:372-385 --
    * the service worker reads global.FsbHandlerGithub after importScripts and (the
@@ -64,51 +64,14 @@
     additionalProperties: false
   };
 
-  // A read-only same-origin GET spec the handler can issue first to obtain the CSRF
-  // token from the page response (from:'response'). The token extraction itself is
-  // [ASSUMED] -- the real selector/shape is captured live in Task 4.
-  function buildCsrfProbeSpec() {
-    return {
-      // [ASSUMED-ENDPOINT: capture live in 29-03 Task 4] -- the issues page whose
-      // HTML carries the frontend CSRF token GitHub includes on a /_graphql POST.
-      url: GITHUB_ORIGIN + '/issues',
-      method: 'GET',
-      headers: { 'Accept': 'text/html' },
-      body: null,
-      query: {},
-      authStrategy: 'same-origin-cookie',
-      origin: GITHUB_ORIGIN,
-      // Read-only extract: the bound primitive runs this JMESPath service-worker-side.
-      // '@' returns the whole body; the real token-bearing field is captured in Task 4.
-      extract: '@'
-    };
-  }
-
-  // Pull a CSRF token out of an executeBoundSpec result WITHOUT ever logging it.
-  // [ASSUMED] field names -- the live capture (Task 4) replaces these with the real
-  // token location. Returns a string token or null. Never console-logs the value.
-  function readCsrfToken(probeResult) {
-    if (!probeResult || probeResult.success !== true) { return null; }
-    var d = probeResult.data;
-    if (d && typeof d === 'object') {
-      // [ASSUMED-ENDPOINT: capture live in 29-03 Task 4] -- candidate carriers.
-      if (typeof d.csrf_token === 'string') { return d.csrf_token; }
-      if (typeof d.authenticity_token === 'string') { return d.authenticity_token; }
-    }
-    var text = (typeof probeResult.text === 'string') ? probeResult.text : '';
-    if (text) {
-      var patterns = [
-        /"csrf_token"\s*:\s*"([^"]+)"/,
-        /"authenticity_token"\s*:\s*"([^"]+)"/,
-        /name=["']csrf-token["'][^>]*content=["']([^"']+)["']/i,
-        /name=["']authenticity_token["'][^>]*value=["']([^"']+)["']/i
-      ];
-      for (var i = 0; i < patterns.length; i++) {
-        var m = patterns[i].exec(text);
-        if (m && m[1]) { return m[1]; }
+  function typedRecipeError(code, extra) {
+    var out = { success: false, code: code, errorCode: code, error: code };
+    if (extra) {
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) { out[k] = extra[k]; }
       }
     }
-    return null;
+    return out;
   }
 
   var handlers = {
@@ -142,61 +105,20 @@
     },
 
     // ---- github.issues.create (write) --------------------------------------
-    // A mutation via GitHub's own frontend persisted-query GraphQL endpoint. Needs a
-    // CSRF token scraped from the page FIRST (from:'response'), then a same-origin
-    // POST carrying the GraphQL body. The token rides the spec header ONLY -- never a
-    // log line (T-29-08). The mutating call inherits the resume-sidecar +
-    // RECOVERY_AMBIGUOUS classification inside executeBoundSpec (T-29-10); never blind-
-    // retried here.
+    // The write slug remains discoverable, but the current endpoint/body were only
+    // assumed. Fail closed so the model uses DOM tools instead of stamping success for
+    // a placeholder mutation.
     'github.issues.create': {
       tier: 'T1a',
       origin: GITHUB_ORIGIN,
       sideEffectClass: 'write',
       params: ISSUES_CREATE_PARAMS,
       async handle(args, ctx) {
-        var a = args || {};
-
-        // Step 1 -- from:'response' CSRF scrape: a prior read-only GET whose response
-        // carries the frontend CSRF token. (The pin inside executeBoundSpec applies to
-        // this read too.)
-        var probe = await ctx.executeBoundSpec(buildCsrfProbeSpec(), ctx.tabId);
-        if (probe && probe.success === false) {
-          // The probe itself failed the pin (RECIPE_ORIGIN_MISMATCH) or fetch -> return
-          // it verbatim; do NOT proceed to the mutation.
-          return probe;
-        }
-        var csrf = readCsrfToken(probe);
-
-        // Step 2 -- the mutation POST. Headers carry the scraped token (when present);
-        // the token value is NEVER logged. The GraphQL body shape is [ASSUMED].
-        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (csrf) {
-          // [ASSUMED-ENDPOINT: capture live in 29-03 Task 4] -- the exact CSRF header
-          // name GitHub's frontend uses on a /_graphql POST.
-          headers['X-CSRF-Token'] = csrf;
-        }
-        var spec = {
-          // [ASSUMED-ENDPOINT: capture live in 29-03 Task 4] -- GitHub's same-origin
-          // frontend persisted-query GraphQL endpoint (NOT the public api subdomain).
-          url: GITHUB_ORIGIN + '/_graphql',
-          method: 'POST',
-          headers: headers,
-          // [ASSUMED] persisted-query mutation body -- real operation name / hash
-          // captured in Task 4.
-          body: JSON.stringify({
-            query: 'mutation CreateIssue { __typename }',
-            variables: {
-              repositoryId: a.repositoryId,
-              title: a.title,
-              body: (typeof a.body === 'string') ? a.body : ''
-            }
-          }),
-          query: {},
-          authStrategy: 'same-origin-cookie',
-          origin: GITHUB_ORIGIN,
-          extract: '@'
-        };
-        return await ctx.executeBoundSpec(spec, ctx.tabId);
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'github.issues.create',
+          reason: 'unverified-github-create-mutation',
+          fellBackToDom: true
+        });
       }
     }
   };

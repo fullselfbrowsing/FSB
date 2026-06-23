@@ -21,7 +21,8 @@
  *     non-app origin) and no handler references chrome.scripting/chrome.tabs.
  *   - SECURITY (T-29-08): the Slack handler places the scraped xoxc token in the
  *     request BODY (not a header) and never console-logs a token-bearing variable;
- *     the GitHub create handler scrapes a CSRF token into the spec, not a log line.
+ *     if xoxc is missing it fails closed before POST. The GitHub create handler
+ *     fails closed to DOM fallback while its mutation body remains unverified.
  *   - CAT-03 the Reddit T1b recipe (catalog/recipes/reddit-inbox.json) is schema-
  *     valid: origin www.reddit.com, endpoint /message/unread.json, GET,
  *     same-origin-cookie; no oauth.reddit.com host anywhere.
@@ -74,8 +75,9 @@ function readJson(p) {
 // carries the scraped token -- this exercises the real body-placement path (the
 // handler only embeds a token it successfully scraped). The token strings here are
 // synthetic test fixtures, NOT real credentials.
-function makeCtx(origin, tabId) {
+function makeCtx(origin, tabId, opts) {
   const calls = [];
+  const options = opts || {};
   return {
     calls,
     ctx: {
@@ -88,9 +90,13 @@ function makeCtx(origin, tabId) {
         const isProbe = spec && spec.method === 'GET';
         let text = null;
         if (isProbe && spec && typeof spec.url === 'string' && spec.url.indexOf('app.slack.com') !== -1) {
-          text = '<html><script>window.boot = {"xoxc":"xoxc-TEST-SYNTHETIC"};</script></html>';
+          text = Object.prototype.hasOwnProperty.call(options, 'slackProbeText')
+            ? options.slackProbeText
+            : '<html><script>window.boot = {"xoxc":"xoxc-TEST-SYNTHETIC"};</script></html>';
         } else if (isProbe && spec && typeof spec.url === 'string' && spec.url.indexOf('github.com') !== -1) {
-          text = '<html><head><meta name="csrf-token" content="csrf-TEST-SYNTHETIC"></head></html>';
+          text = Object.prototype.hasOwnProperty.call(options, 'githubProbeText')
+            ? options.githubProbeText
+            : '<html><head><meta name="csrf-token" content="csrf-TEST-SYNTHETIC"></head></html>';
         }
         const data = isProbe ? null : { ok: true };
         return {
@@ -159,24 +165,22 @@ const Schema = require(SCHEMA_PATH);
       && ghReadQuery.calls[0].spec.url === 'https://github.com/issues?q=is%3Aopen%20label%3Abug',
       'github.issues.list folds args.query into the concrete /issues URL');
 
-    // The create handler scrapes a CSRF token into the POST spec (a from:'response'
-    // read first), targets a same-origin /_graphql POST, and never logs the token.
+    // The create handler is intentionally fail-closed while GitHub's internal
+    // mutation body remains unverified. It must not scrape CSRF or call /_graphql.
     const ghWrite = makeCtx('https://github.com', 11);
     const ghCreate = await gh['github.issues.create'].handle(
       { repositoryId: 'R_x', title: 't', body: 'b' }, ghWrite.ctx);
-    check(ghWrite.calls.length >= 1,
-      'github.issues.create.handle calls ctx.executeBoundSpec at least once');
-    const postCall = ghWrite.calls.find(function (c) { return c.spec && c.spec.method === 'POST'; });
-    check(!!postCall, 'github.issues.create issues a POST spec (the mutation)');
-    check(postCall && typeof postCall.spec.url === 'string'
-      && postCall.spec.url.indexOf('/_graphql') !== -1,
-      'github.issues.create POSTs the same-origin /_graphql persisted-query endpoint');
-    check(postCall && postCall.spec.origin === 'https://github.com',
-      'github.issues.create POST spec is pinned to https://github.com');
-    check(postCall && postCall.spec.headers && postCall.spec.headers['X-CSRF-Token'] === 'csrf-TEST-SYNTHETIC',
-      'github.issues.create scrapes CSRF from HTML text into the POST header');
-    check(ghCreate && ghCreate.success === true,
-      'github.issues.create.handle returns the executeBoundSpec result');
+    check(ghWrite.calls.length === 0,
+      'github.issues.create.handle makes no recipe calls while mutation body is unverified');
+    check(ghCreate && ghCreate.success === false
+      && ghCreate.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && ghCreate.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+      && ghCreate.error === 'RECIPE_DOM_FALLBACK_PENDING',
+      'github.issues.create returns the dual-field RECIPE_DOM_FALLBACK_PENDING failure');
+    check(ghCreate && ghCreate.slug === 'github.issues.create'
+      && ghCreate.reason === 'unverified-github-create-mutation'
+      && ghCreate.fellBackToDom === true,
+      'github.issues.create fallback carries slug, reason, and fellBackToDom marker');
     // No literal console-log of a CSRF-token-bearing identifier.
     check(!/console\.\w+\([^)]*\b(csrf|token)\b/i.test(ghSrc),
       'github.js does NOT console-log a csrf/token-bearing variable (T-29-08, redactForLog discipline)');
@@ -240,6 +244,26 @@ const Schema = require(SCHEMA_PATH);
       'slack does NOT place xoxc in a request header (split-token: body-only)');
     check(slOut && slOut.success === true,
       'slack.conversations.list.handle returns the executeBoundSpec result');
+
+    const slMissingToken = makeCtx('https://app.slack.com', 21, {
+      slackProbeText: '<html><script>window.boot = {"ok":true};</script></html>'
+    });
+    const slMissingOut = await sl['slack.conversations.list'].handle({}, slMissingToken.ctx);
+    check(slMissingToken.calls.length === 1,
+      'slack.conversations.list missing-token path performs only the probe');
+    const missingTokenPost = slMissingToken.calls.find(function (c) { return c.spec && c.spec.method === 'POST'; });
+    check(!missingTokenPost,
+      'slack.conversations.list missing-token path does not issue the Slack API POST');
+    check(slMissingOut && slMissingOut.success === false
+      && slMissingOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && slMissingOut.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+      && slMissingOut.error === 'RECIPE_DOM_FALLBACK_PENDING',
+      'slack.conversations.list missing-token path returns the dual-field RECIPE_DOM_FALLBACK_PENDING failure');
+    check(slMissingOut && slMissingOut.slug === 'slack.conversations.list'
+      && slMissingOut.method === 'conversations.list'
+      && slMissingOut.reason === 'missing-slack-xoxc'
+      && slMissingOut.fellBackToDom === true,
+      'slack.conversations.list missing-token fallback carries slug, method, reason, and fellBackToDom marker');
   }
 
   // =========================================================================

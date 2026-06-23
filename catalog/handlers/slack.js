@@ -128,15 +128,33 @@
     return parts.join('&');
   }
 
+  function typedRecipeError(code, extra) {
+    var out = { success: false, code: code, errorCode: code, error: code };
+    if (extra) {
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) { out[k] = extra[k]; }
+      }
+    }
+    return out;
+  }
+
   // Shared: scrape xoxc, then POST the given Slack web-API method with the token in
   // the body. The xoxd cookie rides same-origin automatically (no cookie header set).
-  async function callSlackMethod(method, fields, ctx) {
+  async function callSlackMethod(slug, method, fields, ctx) {
     // Step 1 -- from:'response' xoxc scrape (the pin applies to this read too).
     var probe = await ctx.executeBoundSpec(buildXoxcProbeSpec(), ctx.tabId);
     if (probe && probe.success === false) {
       return probe;   // pin / fetch failure -> return verbatim; do NOT proceed.
     }
     var xoxc = readXoxcToken(probe);
+    if (!xoxc) {
+      return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+        slug: slug,
+        method: method,
+        reason: 'missing-slack-xoxc',
+        fellBackToDom: true
+      });
+    }
 
     // Step 2 -- the web-API POST. Token in the BODY, not a header. Content-Type is
     // form-encoded (Slack's web client posts form data). NO xoxc in any header.
@@ -164,7 +182,7 @@
       params: CONVERSATIONS_LIST_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('conversations.list', {
+        return await callSlackMethod('slack.conversations.list', 'conversations.list', {
           types: a.types || 'public_channel,private_channel',
           limit: a.limit || 100
         }, ctx);
@@ -181,7 +199,7 @@
       params: POST_MESSAGE_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('chat.postMessage', {
+        return await callSlackMethod('slack.chat.postMessage', 'chat.postMessage', {
           channel: a.channel,
           text: a.text
         }, ctx);
