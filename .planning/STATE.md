@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
-stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
-last_updated: "2026-06-23T02:00:48.071Z"
+stopped_at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02)
+last_updated: "2026-06-23T02:10:29.572Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 25
-  completed_plans: 23
-  percent: 63
+  completed_plans: 24
+  percent: 96
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 31 (network-capture-discovery-recipe-synthesis-learned-recipes) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-06-23
 
-Progress: [█████████░] 92%
+Progress: [██████████] 96%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -99,6 +99,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 30 P04 | 24min | 3 tasks | 4 files |
 | Phase 31 P01 | 13min | 3 tasks | 13 files |
 | Phase 31 P02 | 10min | 2 tasks | 2 files |
+| Phase 31 P03 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 31: the synthesizer RED suite caps from:'response' to same-origin-cookie+flaggedForPhase32 (D-11/Pitfall 4); the declarative replay path cannot execute response-minted CSRF
 - [Phase ?]: Phase 31 capture: capture-time redaction uses structural exclusion (never reads header values/bodies/query); redactResponse keeps only {status,mimeType} so the redactor cannot leak
 - [Phase ?]: Phase 31 capture: CDP Network capture rides the existing Input-domain debugger attach (no manifest change); endSession detaches only if capture was the owner and no Input op holds the tab
+- [Phase ?]: Phase 31 Plan 03 (LEARN-01/02): recipe-synthesizer caps authStrategy to declarative-executable values -- NEVER emits csrf.from:'response' (D-11); response-minted-CSRF defaults to same-origin-cookie + flaggedForPhase32 on the descriptor (recipe core stays closed-vocab); validateRecipe gates output (D-12, fail closed -> null).
+- [Phase ?]: Phase 31 Plan 03: learned-recipe-store is a NEW per-origin versioned fsbLearnedRecipes envelope (distinct from the 500-cap memory layer, D-13); LRU evicts oldest lastSuccessAt past PER_ORIGIN_CAP=24; quarantine FLAGS quarantined:true (never deletes, D-16); getLearned hard-scopes recipe.origin===origin (Pitfall 6); null-proto ME-03 maps so a __proto__ origin/slug round-trips as own data.
+- [Phase ?]: Phase 31 Plan 03: promoteAfterReplay (on the synthesizer) is the D-10 gate -- promotes only on a clean injected interpretRecipe+executeBoundSpec replay, threading {trustedProvenance:'local'} (HI-01); a failed bind short-circuits before executeBoundSpec. No background.js wiring in 31-03 (importScripts + capture glue is 31-06). recipe-path guard PASS with both modules on disk + allowlisted + eval-free.
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -207,8 +211,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T01:59:12.991Z
-Stopped at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
+Last session: 2026-06-23T02:09:49.219Z
+Stopped at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
 Resume file: None
 
 ## Next Actions
