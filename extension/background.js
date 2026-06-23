@@ -211,6 +211,7 @@ try { importScripts('utils/consent-policy-store.js'); } catch (e) { console.erro
 try { importScripts('utils/audit-log.js'); } catch (e) { console.error('[FSB] Failed to load audit-log.js:', e.message); }
 try { importScripts('utils/capability-signature.js'); } catch (e) { console.error('[FSB] Failed to load capability-signature.js:', e.message); }
 try { importScripts('utils/service-denylist.js'); } catch (e) { console.error('[FSB] Failed to load service-denylist.js:', e.message); }
+try { importScripts('utils/upload-path-denylist.js'); } catch (e) { console.error('[FSB] Failed to load upload-path-denylist.js:', e.message); }
 // Warm the denylist + sensitive seed at service-worker startup (D-15). The
 // consent/capture gates still await the module's shared load() promise before
 // evaluating, so this async warmup is not the load-bearing security check.
@@ -8421,6 +8422,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case 'domStreamMedia':
+      // Phase 33 (MEDIA): relay live <video>/<audio> playback state to the
+      // dashboard viewer. The MediaSyncPayload is forwarded as the ws payload
+      // so the viewer receives it verbatim (additive STREAM.* type; the relay
+      // and ws-client are generic by type, so no other hop changes).
+      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
+        fsbWebSocket.send('ext:dom-media', request.media || {});
+      }
+      sendResponse({ success: true });
+      break;
+
+    case 'domStreamMediaHint':
+      // Phase 33 (MEDIA): relay an adaptive-manifest discovery hint (dormant
+      // until chrome.webRequest discovery is opt-in enabled).
+      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
+        fsbWebSocket.send('ext:dom-media-hint', request.hint || {});
+      }
+      sendResponse({ success: true });
+      break;
+
     case 'domStreamReady':
       if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
         fsbWebSocket.send('ext:dom-ready', { tabId: sender.tab ? sender.tab.id : null });
@@ -14470,6 +14491,164 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Phase 34 (UPLOAD-01/02/04): set a real file from a disk PATH on an
+ * <input type="file"> via CDP DOM.setFileInputFiles -- the only mechanism that
+ * can populate a file input from disk (page JS is forbidden from setting
+ * input.value or reading the filesystem). Shared by BOTH front doors (the MCP
+ * dispatcher route and the autopilot executeBackgroundTool case) so the
+ * sensitive-path denylist + audit chokepoint (security posture A) covers both.
+ * Mirrors the executeCDPToolDirect attach / stale-retry / detach seam.
+ *
+ * @param {number} tabId    target tab (gate-resolved / owned)
+ * @param {string} selector CSS selector for the file input (or a container holding one)
+ * @param {string} filePath ABSOLUTE disk path; relative / ~ paths are rejected
+ * @returns {Promise<{success:boolean, method?:string, selector?:string, file?:string, hadEffect?:boolean, error?:string, reason?:string}>}
+ */
+async function executeUploadFile(tabId, selector, filePath) {
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbUploadPathDenylist : null;
+  const auditLog = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+
+  // Best-effort target origin for the audit (never throws).
+  let origin = '';
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab && tab.url) { try { origin = new URL(tab.url).origin; } catch (_e) { origin = ''; } }
+  } catch (_e) { /* tab gone */ }
+
+  async function audit(outcome, decision, errName) {
+    if (!auditLog || typeof auditLog.append !== 'function') return;
+    try {
+      // The audit-log whitelist has no path field by design; persist origin +
+      // outcome + decision only. The full path could leak filesystem structure
+      // and must not be written to any durable logs.
+      const rec = { ts: Date.now(), origin, slug: 'upload_file', method: 'upload', sideEffectClass: 'mutating', consentDecision: decision, outcome };
+      if (errName) rec.error = errName;
+      const p = auditLog.append(rec);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_e) { /* audit is best-effort, never blocks the action */ }
+  }
+
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  if (typeof selector !== 'string' || !selector.trim()) {
+    return { success: false, error: 'upload_file requires a selector (CSS selector for the file input)' };
+  }
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    return { success: false, error: 'upload_file requires file_path (an absolute path to the file)' };
+  }
+
+  // Security posture A: sensitive-path denylist (shared chokepoint, both front doors).
+  // Fail closed if the module failed to load or its contract is incomplete.
+  if (!denylist
+      || typeof denylist.isAbsolutePath !== 'function'
+      || typeof denylist.classify !== 'function'
+      || typeof denylist.basenameOf !== 'function') {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-unavailable' });
+    await audit('blocked', 'denylist-unavailable', null);
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist unavailable', reason: 'denylist-unavailable' };
+  }
+
+  let absolutePath = false;
+  try {
+    absolutePath = denylist.isAbsolutePath(filePath);
+  } catch (error) {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-error' });
+    await audit('blocked', 'denylist-error', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist failed while checking the path', reason: 'denylist-error' };
+  }
+  if (!absolutePath) {
+    await audit('blocked', 'non-absolute-path', null);
+    return { success: false, error: 'upload_file requires an ABSOLUTE file path (relative or ~ paths cannot be resolved by the browser)' };
+  }
+
+  try {
+    const verdict = denylist.classify(filePath);
+    if (verdict && verdict.denied) {
+      automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: verdict.reason });
+      await audit('blocked', verdict.reason || 'sensitive-path', null);
+      return { success: false, error: 'upload_file blocked: the path matches a sensitive-path denylist rule (' + (verdict.reason || 'sensitive-path') + '); uploading secrets is not permitted', reason: verdict.reason };
+    }
+  } catch (error) {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-error' });
+    await audit('blocked', 'denylist-error', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist failed while classifying the path', reason: 'denylist-error' };
+  }
+
+  let fileName = '';
+  const redactPathForUploadLog = (value) => String(value).split(filePath).join(fileName || '[redacted-file-path]');
+  let debuggerAttached = false;
+  try {
+    fileName = denylist.basenameOf(filePath);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
+
+    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+      try { await keyboardEmulator.detachDebugger(tabId); } catch (_e) { /* ignore */ }
+    }
+    try {
+      await chrome.debugger.attach({ tabId }, '1.3');
+    } catch (attachErr) {
+      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
+        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+        await chrome.debugger.attach({ tabId }, '1.3');
+      } else {
+        throw attachErr;
+      }
+    }
+    debuggerAttached = true;
+
+    const doc = await chrome.debugger.sendCommand({ tabId }, 'DOM.getDocument', { depth: 0 });
+    const rootNodeId = doc && doc.root && doc.root.nodeId;
+    if (!rootNodeId) throw new Error('could not resolve the document root');
+
+    const q = await chrome.debugger.sendCommand({ tabId }, 'DOM.querySelector', { nodeId: rootNodeId, selector });
+    let nodeId = q && q.nodeId;
+    if (!nodeId) throw new Error('no element matched selector: ' + selector);
+
+    // Ensure the node is a file input; if not, look for a descendant
+    // input[type=file] (handles styled dropzones / labels that wrap a hidden one).
+    let isFileInput = false;
+    try {
+      const desc = await chrome.debugger.sendCommand({ tabId }, 'DOM.describeNode', { nodeId });
+      const node = desc && desc.node;
+      if (node && node.nodeName === 'INPUT') {
+        const attrs = node.attributes || [];
+        for (let i = 0; i + 1 < attrs.length; i += 2) {
+          if (attrs[i] === 'type' && String(attrs[i + 1]).toLowerCase() === 'file') { isFileInput = true; break; }
+        }
+      }
+    } catch (_e) { /* describeNode best-effort */ }
+
+    if (!isFileInput) {
+      const q2 = await chrome.debugger.sendCommand({ tabId }, 'DOM.querySelector', { nodeId, selector: 'input[type="file"]' });
+      if (q2 && q2.nodeId) { nodeId = q2.nodeId; isFileInput = true; }
+    }
+    if (!isFileInput) {
+      throw new Error('selector did not resolve to an <input type="file"> (or a container holding one): ' + selector);
+    }
+
+    // Set the file by absolute path -- the browser process performs the disk
+    // read and fires input/change natively.
+    await chrome.debugger.sendCommand({ tabId }, 'DOM.setFileInputFiles', { nodeId, files: [filePath] });
+
+    // The upload has succeeded. Leave the detach to the finally block (which
+    // swallows detach errors) so a detach hiccup can never flip a real success
+    // into a reported failure -- a false negative could trigger a retry / double
+    // upload.
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: true, tabId, selector, file: fileName });
+    await audit('success', 'allow', null);
+    return { success: true, method: 'cdp_set_file_input', selector, file: fileName, hadEffect: true };
+  } catch (error) {
+    const msg = error && error.message ? error.message : String(error);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactPathForUploadLog(msg) });
+    await audit('error', 'allow', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file failed: ' + msg };
+  } finally {
+    if (debuggerAttached) {
+      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+    }
   }
 }
 

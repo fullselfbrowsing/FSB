@@ -13,7 +13,7 @@
  *   - The v2 RECIPE_SCHEMA hash is a CLEARLY-MARKED placeholder -- the schema does
  *     not exist in v2 form yet, so the hash cannot be known now. Plan 04 computes it
  *     once at first green and pastes the real digest over the placeholder.
- *   - The frozen TOOL registry hash (ad6efb8c...) re-assertion can pass TODAY (this
+ *   - The frozen TOOL registry hash (6354d788...) re-assertion can pass TODAY (this
  *     plan touches no production tool definitions; INV-01 holds by construction).
  *
  * The hash mechanism (stable + sha256) is cloned VERBATIM from
@@ -42,7 +42,7 @@ const TOOL_DEFS_PATH = path.join(REPO_ROOT, 'mcp', 'ai', 'tool-definitions.cjs')
 // tests/tool-definitions-parity.test.js:52 / capability-mcp-surface.test.js. The
 // recipe-rot work must NOT move this (no tool-definitions edit this phase).
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  'ad6efb8cc3275d964488b67222129b1c0278c5c3b69c64888d926beb89a3926b';
+  '6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors tool-definitions-parity.test.js:35/132).
@@ -140,7 +140,7 @@ const nonTriggerTools = td.TOOL_REGISTRY.filter(function (tool) {
 });
 const actualRegistryHash = registryHash(nonTriggerTools);
 check(actualRegistryHash === EXPECTED_NON_TRIGGER_REGISTRY_HASH,
-  'INV-01: the frozen non-trigger tool registry hash ad6efb8cc3275d964488b67222129b1c0278c5c3b69c64888d926beb89a3926b is unmoved (no tool-definitions edit this phase)');
+  'INV-01: the frozen non-trigger tool registry hash 6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d is unmoved (no tool-definitions edit this phase)');
 if (actualRegistryHash !== EXPECTED_NON_TRIGGER_REGISTRY_HASH) {
   console.error('  DIAG: expected ' + EXPECTED_NON_TRIGGER_REGISTRY_HASH);
   console.error('  DIAG: actual   ' + actualRegistryHash);

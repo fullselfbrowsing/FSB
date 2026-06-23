@@ -7,12 +7,14 @@
   );
   var TRUNCATION_VIEWPORT_MULTIPLIER = 3;
   var SCROLL_THROTTLE_MS = 200;
+  var MEDIA_SYNC_THROTTLE_MS = 250;
   var OVERLAY_THROTTLE_MS = 500;
   var MUTATION_STALE_THRESHOLD_MS = 5e3;
   var WATCHDOG_TICK_MS = 500;
   var READY_PROBE_INTERVAL_MS = 200;
   var READY_PROBE_BUDGET_MS = 5e3;
   var INLINE_STYLE_MAX_BYTES = 5e5;
+  var ASSET_DATA_URI_MAX_BYTES = 262144;
 
   // node_modules/@full-self-browsing/phantom-stream/src/protocol/messages.js
   var CONTROL = {
@@ -30,6 +32,10 @@
     MUTATIONS: "ext:dom-mutations",
     /** Scroll position. Payload: { scrollX, scrollY, streamSessionId, snapshotId } */
     SCROLL: "ext:dom-scroll",
+    /** Media playback state. Payload: MediaSyncPayload */
+    MEDIA: "ext:dom-media",
+    /** Adaptive-manifest discovery hint (opt-in, adapter-originated). Payload: MediaHintPayload */
+    MEDIA_HINT: "ext:dom-media-hint",
     /** Automation overlay state. Payload: { glow, progress, streamSessionId, snapshotId } */
     OVERLAY: "ext:dom-overlay",
     /** Native dialog mirroring. Payload: { dialog: DialogPayload } */
@@ -68,7 +74,7 @@
     ATTR: "attr",
     /** { op:'text', nid, text } — character data change, addressed via parent nid */
     TEXT: "text",
-    /** { op:'value', nid, value?, checked?, selectedValues? } — live form state change */
+    /** { op:'value', nid, value?, checked?, selectedValues?, selectedIndexes? } — live form state change */
     VALUE: "value",
     /** ShadowRootPayload plus op:'shadow-root' — replace/open an observed shadow root */
     SHADOW_ROOT: "shadow-root",
@@ -278,6 +284,48 @@
     var compact = stripLowChars(value).toLowerCase();
     return compact.indexOf("javascript:") === 0 || compact.indexOf("vbscript:") === 0 || compact.indexOf("data:text/html") === 0;
   }
+  function assetUtf8ByteLength(text) {
+    var str = String(text == null ? "" : text);
+    var bytes = 0;
+    for (var i = 0; i < str.length; i++) {
+      var code = str.charCodeAt(i);
+      if (code < 128) {
+        bytes += 1;
+      } else if (code < 2048) {
+        bytes += 2;
+      } else if (code >= 55296 && code <= 56319 && i + 1 < str.length) {
+        var next = str.charCodeAt(i + 1);
+        if (next >= 56320 && next <= 57343) {
+          bytes += 4;
+          i++;
+        } else {
+          bytes += 3;
+        }
+      } else {
+        bytes += 3;
+      }
+    }
+    return bytes;
+  }
+  function classifyAssetRef(url, capBytes) {
+    if (!url || typeof url !== "string") return { ok: true };
+    var compact = stripLowChars(url).toLowerCase();
+    if (compact.indexOf("blob:") === 0) {
+      return { ok: false, reason: "blob" };
+    }
+    if (compact.indexOf("data:") === 0) {
+      var cap = capBytes || 0;
+      if (assetUtf8ByteLength(url) > cap) {
+        return { ok: false, reason: "oversized-data" };
+      }
+    }
+    return { ok: true };
+  }
+  function currentSrcDiffers(resolvedCurrentSrc, resolvedSrc) {
+    if (!resolvedCurrentSrc || typeof resolvedCurrentSrc !== "string") return false;
+    if (resolvedCurrentSrc === "") return false;
+    return resolvedCurrentSrc !== (resolvedSrc || "");
+  }
   function parseSrcsetCandidates(srcset) {
     var raw = String(srcset == null ? "" : srcset);
     var out = [];
@@ -386,6 +434,9 @@
     var maskInputFn = typeof cfg.maskInputFn === "function" ? cfg.maskInputFn : null;
     var blockSelector = compileMaskSelector(cfg.blockSelector);
     var maskTextSelector = compileMaskSelector(cfg.maskTextSelector);
+    var maskMediaSelector = compileMaskSelector(cfg.maskMediaSelector);
+    var maskAssetUrls = cfg.maskAssetUrls === true;
+    var maskAssetUrlFn = typeof cfg.maskAssetUrlFn === "function" ? cfg.maskAssetUrlFn : null;
     function skipElementWithAncestors(el) {
       if (!hostSkipElement) return false;
       var node = el;
@@ -457,6 +508,9 @@
     var valueCaptureActive = false;
     var valueListenerRoots = /* @__PURE__ */ new WeakSet();
     var valueListenerRecords = [];
+    var mediaTrackingActive = false;
+    var mediaTracked = /* @__PURE__ */ new Map();
+    var mediaTrackedRecords = [];
     var nativeAttachShadow = null;
     var attachShadowProto = null;
     var pendingStyleSourceChanges = /* @__PURE__ */ new Map();
@@ -476,8 +530,10 @@
       // CSS values rewritten by scrubCssText
       maskedTextNodes: 0,
       // (plan 03-03) maskTextSelector-matched text masked
-      maskedInputs: 0
+      maskedInputs: 0,
       // (plan 03-03) masked input values
+      maskedAssetUrls: 0
+      // (plan 15-01) asset/media URLs stripped/redacted/blocked
     };
     function beginStreamSession() {
       streamSessionId = createStreamSessionId(
@@ -491,6 +547,7 @@
       sanitizeCounters.cssScrubs = 0;
       sanitizeCounters.maskedTextNodes = 0;
       sanitizeCounters.maskedInputs = 0;
+      sanitizeCounters.maskedAssetUrls = 0;
       pendingStyleSourceChanges.clear();
       styleSourceRegistry.clear();
       styleScopeRoots.clear();
@@ -1215,6 +1272,7 @@
       var cloneDescendants = bodyClone.querySelectorAll("*");
       var toRemove = [];
       var blockedPairs = [];
+      var assetUnavailablePairs = [];
       for (var i = 0; i < liveDescendants.length; i++) {
         var live = liveDescendants[i];
         var clone = cloneDescendants[i];
@@ -1251,6 +1309,16 @@
         }
         var srcsetVal = clone.getAttribute("srcset");
         if (srcsetVal) clone.setAttribute("srcset", absolutifySrcset(srcsetVal, frameDoc));
+        var frameDegradeReason = assetDegradeReason(clone);
+        if (frameDegradeReason) {
+          assetUnavailablePairs.push({ orig: live, clone, reason: frameDegradeReason });
+        } else if (tag === "img") {
+          var frameResolvedCurrent = absolutifyUrl(live.currentSrc || "", frameDoc);
+          var frameResolvedSrc = clone.getAttribute("src") || "";
+          if (currentSrcDiffers(frameResolvedCurrent, frameResolvedSrc) && !hasDangerousScheme(frameResolvedCurrent)) {
+            clone.setAttribute("data-ps-currentsrc", frameResolvedCurrent);
+          }
+        }
         if (styleMode !== "cssom") captureComputedStyles(live, clone);
         sanitizeForWire("element", { orig: live, clone });
       }
@@ -1262,6 +1330,15 @@
           blockedPairs[b].orig,
           blockedPairs[b].clone,
           readBlockRect(blockedPairs[b].orig),
+          cloneToNid
+        );
+      }
+      for (var aub = 0; aub < assetUnavailablePairs.length; aub++) {
+        replaceWithAssetUnavailablePlaceholder(
+          assetUnavailablePairs[aub].orig,
+          assetUnavailablePairs[aub].clone,
+          readBlockRect(assetUnavailablePairs[aub].orig),
+          assetUnavailablePairs[aub].reason,
           cloneToNid
         );
       }
@@ -1464,6 +1541,23 @@
       }
       return values;
     }
+    function selectedOptionIndexes(select) {
+      var indexes = [];
+      var options = select && select.options ? select.options : [];
+      for (var i = 0; i < options.length; i++) {
+        if (options[i].selected) indexes.push(i);
+      }
+      return indexes;
+    }
+    function selectHasFilteredOptions(select) {
+      var nodes = select && select.querySelectorAll ? select.querySelectorAll("option, optgroup") : [];
+      for (var i = 0; i < nodes.length; i++) {
+        if (skipElementWithAncestors(nodes[i]) || blockedWithAncestors(nodes[i]) || wireDroppedWithAncestors(nodes[i])) {
+          return true;
+        }
+      }
+      return false;
+    }
     function sanitizeInputValue(value, owner) {
       return sanitizeForWire("input", {
         value: value == null ? "" : String(value),
@@ -1492,6 +1586,9 @@
         diff.selectedValues = [];
         for (var s = 0; s < selected.length; s++) {
           diff.selectedValues.push(sanitizeInputValue(selected[s], control));
+        }
+        if (!selectHasFilteredOptions(control)) {
+          diff.selectedIndexes = selectedOptionIndexes(control);
         }
         return diff;
       }
@@ -1735,6 +1832,26 @@
         return false;
       }
     }
+    function maskMediaMatches(el) {
+      if (!maskMediaSelector) return false;
+      if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+      try {
+        return !!(el.matches && el.matches(maskMediaSelector));
+      } catch (err) {
+        logger.error("[DOM Stream] maskMediaSelector match failed", err);
+        return false;
+      }
+    }
+    function maskMediaWithAncestors(el) {
+      if (!maskMediaSelector) return false;
+      if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+      try {
+        return !!(el.closest && el.closest(maskMediaSelector));
+      } catch (err) {
+        logger.error("[DOM Stream] maskMediaSelector match failed", err);
+        return false;
+      }
+    }
     function isWireDroppedElement(el) {
       if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
       var tag = el.tagName ? String(el.tagName).toLowerCase() : "";
@@ -1878,6 +1995,52 @@
       }
       sanitizeCounters.blockedSubtrees++;
       return placeholder;
+    }
+    function createAssetUnavailablePlaceholder(doc, rect, reason) {
+      var placeholder = doc.createElement("div");
+      placeholder.setAttribute("rr_width", String(rect.width || 0) + "px");
+      placeholder.setAttribute("rr_height", String(rect.height || 0) + "px");
+      placeholder.setAttribute("data-ps-asset-unavailable", reason);
+      return placeholder;
+    }
+    function replaceWithAssetUnavailablePlaceholder(liveEl, cloneEl, rect, reason, cloneToNid) {
+      if (!cloneEl || !cloneEl.parentNode) return null;
+      var nid = cloneToNid && cloneToNid.get(cloneEl);
+      if (!nid) nid = getTrackedNodeId(liveEl) || "";
+      var placeholder = createAssetUnavailablePlaceholder(cloneEl.ownerDocument, rect, reason);
+      cloneEl.parentNode.replaceChild(placeholder, cloneEl);
+      if (cloneToNid) {
+        cloneToNid.delete(cloneEl);
+        if (nid) cloneToNid.set(placeholder, nid);
+      }
+      sanitizeCounters.blockedSubtrees++;
+      return placeholder;
+    }
+    function assetDegradeReason(cloneEl) {
+      if (!cloneEl || !cloneEl.getAttribute) return "";
+      var scalarAttrs = ["src", "poster"];
+      for (var s = 0; s < scalarAttrs.length; s++) {
+        var v = cloneEl.getAttribute(scalarAttrs[s]);
+        if (v) {
+          var c = classifyAssetRef(v, ASSET_DATA_URI_MAX_BYTES);
+          if (!c.ok) return c.reason;
+        }
+      }
+      var srcset = cloneEl.getAttribute("srcset");
+      if (srcset) {
+        var reason = assetDegradeReasonForSrcset(srcset);
+        if (reason) return reason;
+      }
+      return "";
+    }
+    function assetDegradeReasonForSrcset(srcset) {
+      if (!srcset) return "";
+      var candidates = parseSrcsetCandidates(srcset);
+      for (var k = 0; k < candidates.length; k++) {
+        var rc = classifyAssetRef(candidates[k].url, ASSET_DATA_URI_MAX_BYTES);
+        if (!rc.ok) return rc.reason;
+      }
+      return "";
     }
     function createTruncatedPlaceholder(doc) {
       var placeholder = doc.createElement("div");
@@ -2047,12 +2210,22 @@
         htmlAttrs: Object.assign({}, payload && payload.htmlAttrs ? payload.htmlAttrs : {}),
         bodyAttrs: Object.assign({}, payload && payload.bodyAttrs ? payload.bodyAttrs : {})
       });
+      if (Array.isArray(next.styleSources)) {
+        next.styleSources = next.styleSources.slice();
+      }
+      if (Array.isArray(next.media)) {
+        next.media = next.media.slice();
+      }
       while (wireByteLength(next) > SNAPSHOT_BUDGET_BYTES && next.inlineStyles.length) {
         next.inlineStyles.pop();
         markSnapshotPayloadTruncated(next);
       }
       while (wireByteLength(next) > SNAPSHOT_BUDGET_BYTES && next.stylesheets.length) {
         next.stylesheets.pop();
+        markSnapshotPayloadTruncated(next);
+      }
+      while (wireByteLength(next) > SNAPSHOT_BUDGET_BYTES && Array.isArray(next.styleSources) && next.styleSources.length) {
+        next.styleSources.pop();
         markSnapshotPayloadTruncated(next);
       }
       if (wireByteLength(next) > SNAPSHOT_BUDGET_BYTES && next.htmlStyle) {
@@ -2088,6 +2261,7 @@
             next.nodeIds = buildNodeIdSidecar(clone, cloneToNid, false);
             next.shadowRoots = collectShadowRootPayloads(document.body, next.nodeIds, truncatedNodeIds);
             next.frames = collectFramePayloads(document.body, cloneToNid, truncatedNodeIds);
+            pruneMediaToNodeIds(next);
             next.missingDescendants = (next.missingDescendants || 0) + 1;
             markSnapshotPayloadTruncated(next);
           }
@@ -2100,16 +2274,155 @@
         next.frames = [];
         next.inlineStyles = [];
         next.stylesheets = [];
+        if (Array.isArray(next.styleSources)) next.styleSources = [];
         next.htmlAttrs = {};
         next.bodyAttrs = {};
         next.htmlStyle = "";
         next.bodyStyle = "";
         next.title = "";
         next.url = "";
+        pruneMediaToNodeIds(next);
         next.missingDescendants = (next.missingDescendants || 0) + 1;
         markSnapshotPayloadTruncated(next);
       }
       return next;
+    }
+    function pruneMediaToNodeIds(payload) {
+      if (!payload || !Array.isArray(payload.media)) return;
+      var ids = Array.isArray(payload.nodeIds) ? payload.nodeIds : [];
+      var live = /* @__PURE__ */ new Set();
+      for (var i = 0; i < ids.length; i++) live.add(String(ids[i]));
+      payload.media = payload.media.filter(function(m) {
+        return m && live.has(String(m.nid));
+      });
+    }
+    var TOKEN_PARAM_DENYLIST = {
+      // AWS S3 / CloudFront presigned (SigV4) -- the x-amz- prefix subsumes these
+      // but they are kept explicit for documentation/audit clarity.
+      "x-amz-signature": 1,
+      "x-amz-credential": 1,
+      "x-amz-security-token": 1,
+      "x-amz-algorithm": 1,
+      "x-amz-date": 1,
+      "x-amz-expires": 1,
+      "x-amz-signedheaders": 1,
+      // AWS S3 / CloudFront presigned (SigV2 / canned policy)
+      "awsaccesskeyid": 1,
+      "key-pair-id": 1,
+      "policy": 1,
+      // Google Cloud Storage signed URL (V4) -- x-goog- prefix subsumes these.
+      "x-goog-signature": 1,
+      "x-goog-credential": 1,
+      "x-goog-algorithm": 1,
+      "x-goog-date": 1,
+      "x-goog-expires": 1,
+      "x-goog-signedheaders": 1,
+      "googleaccessid": 1,
+      // Azure Blob SAS
+      "sig": 1,
+      "se": 1,
+      "sp": 1,
+      "sv": 1,
+      "sr": 1,
+      "st": 1,
+      "skoid": 1,
+      "sktid": 1,
+      "skt": 1,
+      "ske": 1,
+      "sks": 1,
+      "skv": 1,
+      "spr": 1,
+      "sip": 1,
+      "ss": 1,
+      "srt": 1,
+      // Generic token/secret/auth/expiry
+      "token": 1,
+      "access_token": 1,
+      "auth": 1,
+      "authorization": 1,
+      "apikey": 1,
+      "api_key": 1,
+      "key": 1,
+      "signature": 1,
+      "sign": 1,
+      "hash": 1,
+      "hmac": 1,
+      "jwt": 1,
+      "password": 1,
+      "passwd": 1,
+      "pwd": 1,
+      "secret": 1,
+      "session": 1,
+      "sessionid": 1,
+      "sid": 1,
+      "expires": 1,
+      "expiry": 1
+    };
+    var TOKEN_PARAM_PREFIXES = ["x-amz-", "x-goog-"];
+    function isTokenParamName(name) {
+      if (!name || typeof name !== "string") return false;
+      var lower = name.toLowerCase();
+      if (TOKEN_PARAM_DENYLIST[lower] === 1) return true;
+      for (var i = 0; i < TOKEN_PARAM_PREFIXES.length; i++) {
+        if (lower.indexOf(TOKEN_PARAM_PREFIXES[i]) === 0) return true;
+      }
+      return false;
+    }
+    function fragmentHasTokenParam(hash) {
+      if (!hash || hash.length < 2) return false;
+      var body = hash.charAt(0) === "#" ? hash.slice(1) : hash;
+      if (body.indexOf("=") === -1) return false;
+      var fragParams;
+      try {
+        fragParams = new URLSearchParams(body);
+      } catch (e) {
+        return false;
+      }
+      var found = false;
+      fragParams.forEach(function(_v, k) {
+        if (isTokenParamName(k)) found = true;
+      });
+      return found;
+    }
+    function stripTokenParams(url) {
+      var u;
+      try {
+        u = new URL(url);
+      } catch (e) {
+        return url;
+      }
+      var dropFragment = fragmentHasTokenParam(u.hash);
+      if (!u.search && !dropFragment) return url;
+      var changed = dropFragment;
+      var keys = [];
+      u.searchParams.forEach(function(_v, k) {
+        keys.push(k);
+      });
+      for (var i = 0; i < keys.length; i++) {
+        if (isTokenParamName(keys[i])) {
+          u.searchParams.delete(keys[i]);
+          changed = true;
+        }
+      }
+      if (dropFragment) u.hash = "";
+      return changed ? u.toString() : url;
+    }
+    function maskAssetUrlForWire(url, ctx) {
+      if (!url || typeof url !== "string") return url;
+      if (maskAssetUrlFn) {
+        try {
+          var out = maskAssetUrlFn(url, ctx || {});
+          if (out === null) return null;
+          return String(out);
+        } catch (err) {
+          logger.error("[DOM Stream] maskAssetUrlFn failed; URL blocked (fail-closed)", err);
+          return null;
+        }
+      }
+      if (maskAssetUrls) {
+        return stripTokenParams(url);
+      }
+      return url;
     }
     function sanitizeCountersSnapshot() {
       return {
@@ -2118,7 +2431,8 @@
         blockedSubtrees: sanitizeCounters.blockedSubtrees,
         cssScrubs: sanitizeCounters.cssScrubs,
         maskedTextNodes: sanitizeCounters.maskedTextNodes,
-        maskedInputs: sanitizeCounters.maskedInputs
+        maskedInputs: sanitizeCounters.maskedInputs,
+        maskedAssetUrls: sanitizeCounters.maskedAssetUrls
       };
     }
     function warnIfSanitizeStrips(before) {
@@ -2171,6 +2485,24 @@
           if (urlVal && hasDangerousScheme(urlVal)) {
             clone.removeAttribute(URL_ATTRS[u]);
             sanitizeCounters.blockedUrlSchemes++;
+          }
+        }
+        if (maskAssetUrls || maskAssetUrlFn) {
+          var elNid = getTrackedNodeId(payload.orig) || "";
+          for (var um = 0; um < URL_ATTRS.length; um++) {
+            var maskAttr = URL_ATTRS[um];
+            var maskVal = clone.getAttribute(maskAttr);
+            if (!maskVal) continue;
+            var maskKind = assetUrlKindForTag(tag);
+            var maskRes = sanitizeForWire(maskKind === "media" ? "media-url" : "asset-url", {
+              value: maskVal,
+              ctx: { attr: maskAttr, tag, nid: elNid, kind: maskKind }
+            });
+            if (maskRes.value === null) {
+              clone.removeAttribute(maskAttr);
+            } else if (maskRes.value !== maskVal) {
+              clone.setAttribute(maskAttr, maskRes.value);
+            }
           }
         }
         var formactionVal = clone.getAttribute("formaction");
@@ -2238,7 +2570,8 @@
           if (!root.contains(desc)) continue;
           if (liveDesc && wireDroppedWithAncestors(liveDesc.parentElement)) continue;
           if (liveDesc && blockedWithAncestors(liveDesc.parentElement)) continue;
-          if (liveDesc && blockMatches(liveDesc)) {
+          if (liveDesc && maskMediaWithAncestors(liveDesc.parentElement)) continue;
+          if (liveDesc && (blockMatches(liveDesc) || maskMediaMatches(liveDesc))) {
             replaceWithBlockPlaceholder(liveDesc, desc, readBlockRect(liveDesc), payload.cloneToNid);
             continue;
           }
@@ -2276,6 +2609,20 @@
         if ((URL_ATTRS.indexOf(attrName) !== -1 || attrName === "formaction" || attrName === "xlink:href") && payload.value && hasDangerousScheme(payload.value)) {
           sanitizeCounters.blockedUrlSchemes++;
           return { value: null };
+        }
+        if ((maskAssetUrls || maskAssetUrlFn) && URL_ATTRS.indexOf(attrName) !== -1 && payload.value) {
+          var attrTag = payload.target && payload.target.tagName ? String(payload.target.tagName).toLowerCase() : "";
+          var attrMaskKind = assetUrlKindForTag(attrTag);
+          var attrMaskRes = sanitizeForWire(attrMaskKind === "media" ? "media-url" : "asset-url", {
+            value: payload.value,
+            ctx: {
+              attr: attrName,
+              tag: attrTag,
+              nid: getTrackedNodeId(payload.target) || "",
+              kind: attrMaskKind
+            }
+          });
+          return { value: attrMaskRes.value };
         }
         if (attrName === "value" && (shouldMaskInput(payload.target) || isOptionUnderMaskedSelect(payload.target))) {
           var maskedAttrValue = safeMaskInput(payload.value == null ? "" : payload.value, payload.target);
@@ -2321,7 +2668,17 @@
         }
         return { css: scrubbedCss };
       }
+      if (kind === "asset-url" || kind === "media-url") {
+        var maskedUrl = maskAssetUrlForWire(payload.value, payload.ctx);
+        if (maskedUrl !== payload.value) {
+          sanitizeCounters.maskedAssetUrls++;
+        }
+        return { value: maskedUrl };
+      }
       return {};
+    }
+    function assetUrlKindForTag(tag) {
+      return tag === "video" || tag === "audio" || tag === "source" ? "media" : "image";
     }
     function absolutifyUrl(val, baseDoc) {
       if (!val || val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("javascript:")) {
@@ -2422,6 +2779,7 @@
       }
       var toRemove = [];
       var blockedPairs = [];
+      var assetUnavailablePairs = [];
       for (var i = 0; i < pairs.length; i++) {
         var orig = pairs[i].orig;
         var cl = pairs[i].clone;
@@ -2442,10 +2800,10 @@
         if (skipElementWithAncestors(cl)) {
           continue;
         }
-        if (blockedWithAncestors(orig.parentElement)) {
+        if (blockedWithAncestors(orig.parentElement) || maskMediaWithAncestors(orig.parentElement)) {
           continue;
         }
-        if (blockMatches(orig)) {
+        if (blockMatches(orig) || maskMediaMatches(orig)) {
           assignNodeId(orig, cl, cloneToNid);
           blockedPairs.push({ orig, clone: cl });
           continue;
@@ -2488,12 +2846,26 @@
         if (srcsetVal) {
           cl.setAttribute("srcset", absolutifySrcset(srcsetVal));
         }
+        var degradeReason = assetDegradeReason(cl);
+        if (degradeReason) {
+          assetUnavailablePairs.push({ orig, clone: cl, reason: degradeReason });
+        } else if (tag === "img") {
+          var resolvedCurrent = absolutifyUrl(orig.currentSrc || "");
+          var resolvedSrc = cl.getAttribute("src") || "";
+          if (currentSrcDiffers(resolvedCurrent, resolvedSrc) && !hasDangerousScheme(resolvedCurrent)) {
+            cl.setAttribute("data-ps-currentsrc", resolvedCurrent);
+          }
+        }
         if (styleMode !== "cssom") captureComputedStyles(orig, cl);
         sanitizeForWire("element", { orig, clone: cl });
       }
       var blockedRects = [];
       for (var bp = 0; bp < blockedPairs.length; bp++) {
         blockedRects.push(readBlockRect(blockedPairs[bp].orig));
+      }
+      var assetUnavailableRects = [];
+      for (var ap = 0; ap < assetUnavailablePairs.length; ap++) {
+        assetUnavailableRects.push(readBlockRect(assetUnavailablePairs[ap].orig));
       }
       for (var r = 0; r < toRemove.length; r++) {
         if (toRemove[r].parentNode) {
@@ -2502,6 +2874,15 @@
       }
       for (var br = 0; br < blockedPairs.length; br++) {
         replaceWithBlockPlaceholder(blockedPairs[br].orig, blockedPairs[br].clone, blockedRects[br], cloneToNid);
+      }
+      for (var aur = 0; aur < assetUnavailablePairs.length; aur++) {
+        replaceWithAssetUnavailablePlaceholder(
+          assetUnavailablePairs[aur].orig,
+          assetUnavailablePairs[aur].clone,
+          assetUnavailableRects[aur],
+          assetUnavailablePairs[aur].reason,
+          cloneToNid
+        );
       }
       var stylesheets = collectStylesheetsFrom(document);
       var inlineStyles = collectInlineStylesFrom(document);
@@ -2633,7 +3014,13 @@
         snapshotPayload.styleSources = documentCssom.sources;
         snapshotPayload.styleStrategy = documentCssom.strategy;
       }
-      return fitSnapshotPayloadForBudget(snapshotPayload, clone, cloneToNid, truncatedNodeIds);
+      var trackedMedia = collectTrackedMediaElements();
+      if (trackedMedia.length > 0) {
+        snapshotPayload.media = trackedMedia.map(buildMediaBaselineEntry);
+      }
+      var fitted = fitSnapshotPayloadForBudget(snapshotPayload, clone, cloneToNid, truncatedNodeIds);
+      pruneMediaToNodeIds(fitted);
+      return fitted;
     }
     function processAddedNode(el) {
       if (el.nodeType !== Node.ELEMENT_NODE) return null;
@@ -2697,6 +3084,45 @@
         var descStyleText = computedStyles.get(liveDescendants[c]);
         if (descStyleText && cloneDescendants[c]) {
           appendStyleDeclaration(cloneDescendants[c], descStyleText);
+        }
+      }
+      for (var ce = 0; ce < liveDescendants.length; ce++) {
+        var liveDesc2 = liveDescendants[ce];
+        var cloneDesc2 = cloneDescendants[ce];
+        if (!cloneDesc2) continue;
+        var descReason = assetDegradeReason(cloneDesc2);
+        if (descReason) {
+          replaceWithAssetUnavailablePlaceholder(
+            liveDesc2,
+            cloneDesc2,
+            readBlockRect(liveDesc2),
+            descReason,
+            cloneToNid
+          );
+        } else if (cloneDesc2.tagName && String(cloneDesc2.tagName).toLowerCase() === "img") {
+          var descCurrent = absolutifyUrl(liveDesc2.currentSrc || "", liveDesc2.ownerDocument || baseDoc);
+          var descSrc = cloneDesc2.getAttribute("src") || "";
+          if (currentSrcDiffers(descCurrent, descSrc) && !hasDangerousScheme(descCurrent)) {
+            cloneDesc2.setAttribute("data-ps-currentsrc", descCurrent);
+          }
+        }
+      }
+      var rootReason = assetDegradeReason(wireClone);
+      if (rootReason) {
+        var rootPlaceholder = createAssetUnavailablePlaceholder(
+          wireClone.ownerDocument || document,
+          readBlockRect(el),
+          rootReason
+        );
+        cloneToNid.delete(wireClone);
+        if (rootNid) cloneToNid.set(rootPlaceholder, rootNid);
+        sanitizeCounters.blockedSubtrees++;
+        wireClone = rootPlaceholder;
+      } else if (rootTag === "img") {
+        var rootCurrent = absolutifyUrl(el.currentSrc || "", baseDoc);
+        var rootSrc = wireClone.getAttribute("src") || "";
+        if (currentSrcDiffers(rootCurrent, rootSrc) && !hasDangerousScheme(rootCurrent)) {
+          wireClone.setAttribute("data-ps-currentsrc", rootCurrent);
         }
       }
       prepareIframeWireShellsForClone(el, wireClone);
@@ -2858,6 +3284,7 @@
                 frames: addedPayload.frames || []
               }, frameRecord);
               diffs.push(boundMutationDiffForBudget(addDiff));
+              attachMediaListenersUnder(added);
             } else if (added.nodeType === Node.TEXT_NODE || added.nodeType === Node.CDATA_SECTION_NODE) {
               sawBareTextNode = true;
             }
@@ -2865,6 +3292,7 @@
           for (var r = 0; r < m.removedNodes.length; r++) {
             var removed = m.removedNodes[r];
             if (removed.nodeType === Node.ELEMENT_NODE) {
+              detachMediaListenersUnder(removed);
               if (wireDroppedWithAncestors(removed)) continue;
               var nid = getTrackedNodeId(removed);
               if (!nid) continue;
@@ -2908,6 +3336,22 @@
           }
           if (m.attributeName === "srcset" && attrVal) {
             attrVal = absolutifySrcset(attrVal, m.target.ownerDocument);
+          }
+          var attrIsAssetUrl = attrNameLower === "src" || attrNameLower === "poster" || attrNameLower === "srcset";
+          if (attrIsAssetUrl && attrVal) {
+            var mutClass = attrNameLower === "srcset" ? assetDegradeReasonForSrcset(attrVal) : function() {
+              var c = classifyAssetRef(attrVal, ASSET_DATA_URI_MAX_BYTES);
+              return c.ok ? "" : c.reason;
+            }();
+            if (mutClass) {
+              diffs.push(scopeFrameDiff({
+                op: "attr",
+                nid: targetNid,
+                attr: "data-ps-asset-unavailable",
+                val: mutClass
+              }, frameRecord));
+              attrVal = "";
+            }
           }
           var attrResult = sanitizeForWire("attr", {
             name: m.attributeName,
@@ -3211,6 +3655,128 @@
       }
       logger.info("[DOM Stream] Scroll tracker stopped");
     }
+    function collectTrackedMediaElements() {
+      var out = [];
+      if (!document || typeof document.querySelectorAll !== "function") return out;
+      var nodes = document.querySelectorAll("video, audio");
+      for (var i = 0; i < nodes.length; i++) {
+        if (skipElementWithAncestors(nodes[i]) || blockedWithAncestors(nodes[i]) || wireDroppedWithAncestors(nodes[i]) || maskMediaWithAncestors(nodes[i])) {
+          continue;
+        }
+        out.push(nodes[i]);
+      }
+      return out;
+    }
+    function buildMediaBaselineEntry(el) {
+      var entry = {
+        nid: ensureNodeId(el),
+        currentTime: el.currentTime,
+        paused: !!el.paused,
+        muted: !!el.muted,
+        volume: el.volume,
+        playbackRate: el.playbackRate,
+        loop: !!el.loop,
+        ended: !!el.ended
+      };
+      if (isFinite(el.duration)) entry.duration = el.duration;
+      else entry.live = true;
+      return entry;
+    }
+    function sendMediaState(el, eventName) {
+      var payload = {
+        nid: getTrackedNodeId(el) || ensureNodeId(el),
+        event: eventName,
+        currentTime: el.currentTime,
+        paused: !!el.paused,
+        muted: !!el.muted,
+        volume: el.volume,
+        playbackRate: el.playbackRate,
+        loop: !!el.loop,
+        ended: !!el.ended,
+        sentAt: Date.now(),
+        streamSessionId: streamSessionId || "",
+        snapshotId: currentSnapshotId || 0
+      };
+      if (isFinite(el.duration)) payload.duration = el.duration;
+      else payload.live = true;
+      safeSend(STREAM.MEDIA, payload);
+    }
+    function attachMediaListeners(el) {
+      if (!mediaTrackingActive || !el || el.nodeType !== Node.ELEMENT_NODE) return;
+      if (typeof el.addEventListener !== "function") return;
+      var tag = el.tagName ? String(el.tagName).toLowerCase() : "";
+      if (tag !== "video" && tag !== "audio") return;
+      if (skipElementWithAncestors(el) || blockedWithAncestors(el) || wireDroppedWithAncestors(el) || maskMediaWithAncestors(el)) return;
+      if (mediaTracked.has(el)) return;
+      var record = { lastMediaSend: 0, handlers: {} };
+      var discrete = ["play", "pause", "seeked", "ratechange", "ended", "volumechange", "loadedmetadata"];
+      for (var i = 0; i < discrete.length; i++) {
+        (function(name) {
+          var handler = function() {
+            if (!mediaTrackingActive) return;
+            sendMediaState(el, name);
+          };
+          record.handlers[name] = handler;
+          el.addEventListener(name, handler);
+        })(discrete[i]);
+      }
+      var timeupdateHandler = function() {
+        if (!mediaTrackingActive) return;
+        if (el.paused) return;
+        var now = Date.now();
+        if (now - record.lastMediaSend < MEDIA_SYNC_THROTTLE_MS) return;
+        record.lastMediaSend = now;
+        sendMediaState(el, "timeupdate");
+      };
+      record.handlers.timeupdate = timeupdateHandler;
+      el.addEventListener("timeupdate", timeupdateHandler);
+      mediaTracked.set(el, record);
+      mediaTrackedRecords.push(el);
+    }
+    function detachMediaListeners(el) {
+      var record = mediaTracked.get(el);
+      if (!record) return;
+      if (typeof el.removeEventListener === "function") {
+        for (var name in record.handlers) {
+          if (Object.prototype.hasOwnProperty.call(record.handlers, name)) {
+            el.removeEventListener(name, record.handlers[name]);
+          }
+        }
+      }
+      mediaTracked.delete(el);
+      var idx = mediaTrackedRecords.indexOf(el);
+      if (idx !== -1) mediaTrackedRecords.splice(idx, 1);
+    }
+    function attachMediaListenersUnder(root) {
+      if (!mediaTrackingActive || !root || root.nodeType !== Node.ELEMENT_NODE) return;
+      var tag = root.tagName ? String(root.tagName).toLowerCase() : "";
+      if (tag === "video" || tag === "audio") attachMediaListeners(root);
+      if (typeof root.querySelectorAll !== "function") return;
+      var nested = root.querySelectorAll("video, audio");
+      for (var i = 0; i < nested.length; i++) attachMediaListeners(nested[i]);
+    }
+    function detachMediaListenersUnder(root) {
+      if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+      detachMediaListeners(root);
+      if (typeof root.querySelectorAll !== "function") return;
+      var nested = root.querySelectorAll("video, audio");
+      for (var i = 0; i < nested.length; i++) detachMediaListeners(nested[i]);
+    }
+    function startMediaTracker() {
+      stopMediaTracker();
+      mediaTrackingActive = true;
+      var els = collectTrackedMediaElements();
+      for (var i = 0; i < els.length; i++) attachMediaListeners(els[i]);
+      logger.info("[DOM Stream] Media tracker started");
+    }
+    function stopMediaTracker() {
+      mediaTrackingActive = false;
+      var els = mediaTrackedRecords.slice();
+      for (var i = 0; i < els.length; i++) detachMediaListeners(els[i]);
+      mediaTracked = /* @__PURE__ */ new Map();
+      mediaTrackedRecords = [];
+      logger.info("[DOM Stream] Media tracker stopped");
+    }
     function broadcastOverlayState(force) {
       var now = Date.now();
       if (!force && now - lastOverlayBroadcast < OVERLAY_THROTTLE_MS) return;
@@ -3243,6 +3809,7 @@
       if (streaming) {
         stopMutationStream();
         stopScrollTracker();
+        stopMediaTracker();
       }
       beginStreamSession();
       clearNodeMirror();
@@ -3252,6 +3819,7 @@
       startMutationStream();
       startValueCapture();
       startScrollTracker();
+      startMediaTracker();
       streaming = true;
       broadcastOverlayState(true);
     }
@@ -3259,6 +3827,7 @@
       logger.info("[DOM Stream] Stop requested");
       stopMutationStream();
       stopScrollTracker();
+      stopMediaTracker();
       streaming = false;
       clearNodeMirror();
       safeFlush();
@@ -3267,12 +3836,14 @@
       logger.info("[DOM Stream] Pause requested");
       stopMutationStream();
       stopScrollTracker();
+      stopMediaTracker();
     }
     function resume() {
       logger.info("[DOM Stream] Resume requested");
       startMutationStream();
       startValueCapture();
       startScrollTracker();
+      startMediaTracker();
       streaming = true;
     }
     function getNodeId(element) {
@@ -3304,7 +3875,11 @@
       resume,
       handleControl,
       getNodeId,
-      getObservedFrameDocuments
+      getObservedFrameDocuments,
+      // One-shot snapshot serializer over the ambient document. Exposed for the
+      // serializeSnapshot() top-level helper (capture-asset-degrade unit tests)
+      // and any host that wants a single payload without arming observers.
+      serializeSnapshot: serializeDOM
     };
   }
 

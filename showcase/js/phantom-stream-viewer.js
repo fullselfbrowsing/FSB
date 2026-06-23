@@ -1,4 +1,33 @@
 (() => {
+  var __create = Object.create;
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+    get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+  }) : x)(function(x) {
+    if (typeof require !== "undefined") return require.apply(this, arguments);
+    throw Error('Dynamic require of "' + x + '" is not supported');
+  });
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
+
   // node_modules/@full-self-browsing/phantom-stream/src/renderer/sanitize.js
   var DROP_TAGS = { script: true, noscript: true, object: true, embed: true };
   var URL_ATTRS = {
@@ -26,8 +55,10 @@
     while (i < raw.length) {
       while (i < raw.length && /[\s,]/.test(raw.charAt(i))) i++;
       var urlStart = i;
-      var isData = raw.slice(i, i + 5).toLowerCase() === "data:";
-      while (i < raw.length && !/\s/.test(raw.charAt(i)) && (isData || raw.charAt(i) !== ",")) {
+      var tokenSoFar = raw.slice(urlStart);
+      var isData = tokenSoFar.slice(0, 5).toLowerCase() === "data:";
+      var isAbsolute = /^[a-z][a-z0-9+.\-]*:\/\//i.test(tokenSoFar);
+      while (i < raw.length && !/\s/.test(raw.charAt(i)) && (isData || isAbsolute || raw.charAt(i) !== ",")) {
         i++;
       }
       var url = raw.slice(urlStart, i);
@@ -222,7 +253,230 @@
   }
 
   // node_modules/@full-self-browsing/phantom-stream/src/renderer/snapshot.js
-  var CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src http: https: data:; style-src http: https: 'unsafe-inline'; font-src http: https: data:">`;
+  function findTagEnd(html, from) {
+    var quote = null;
+    for (var i = from; i < html.length; i++) {
+      var ch = html.charAt(i);
+      if (quote !== null) {
+        if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        quote = ch;
+        continue;
+      }
+      if (ch === ">") return i;
+    }
+    return -1;
+  }
+  function findMatchingCloseTag(html, from, tagName) {
+    var openRe = new RegExp("<" + tagName + "\\b", "gi");
+    var closeRe = new RegExp("</" + tagName + "\\s*>", "gi");
+    var depth = 0;
+    var i = from;
+    while (i < html.length) {
+      openRe.lastIndex = i;
+      closeRe.lastIndex = i;
+      var openM = openRe.exec(html);
+      var closeM = closeRe.exec(html);
+      if (!closeM) return -1;
+      if (openM && openM.index < closeM.index) {
+        var openTagEnd = findTagEnd(html, openM.index + openM[0].length);
+        if (openTagEnd === -1) return -1;
+        var isSelfClosing = html.charAt(openTagEnd - 1) === "/";
+        if (!isSelfClosing) depth++;
+        i = openTagEnd + 1;
+        continue;
+      }
+      if (depth === 0) {
+        return closeM.index + closeM[0].length;
+      }
+      depth--;
+      i = closeM.index + closeM[0].length;
+    }
+    return -1;
+  }
+  function attrsBlobIsUnreliable(attrs) {
+    if (typeof attrs !== "string" || attrs.indexOf("`") === -1) return false;
+    var backticks = 0;
+    for (var i = 0; i < attrs.length; i++) {
+      if (attrs.charAt(i) === "`") backticks++;
+    }
+    return backticks % 2 === 1;
+  }
+  var IMG_OPEN_RE = /<img\b/gi;
+  var VIDEO_OPEN_RE = /<video\b/gi;
+  var AUDIO_OPEN_RE = /<audio\b/gi;
+  var SOURCE_OPEN_RE = /<source\b/gi;
+  var PLACEHOLDER_MARKER = "<div data-ps-asset-unavailable=";
+  function readTagAttr(attrs, name) {
+    var re = new RegExp(name + `\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i");
+    var m = re.exec(attrs);
+    if (!m) return null;
+    return m[1] != null ? m[1] : m[2] != null ? m[2] : m[3] != null ? m[3] : "";
+  }
+  function stripTagAttr(attrs, name) {
+    return attrs.replace(
+      new RegExp("\\s" + name + `\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s"'>]+)`, "gi"),
+      ""
+    );
+  }
+  function setTagAttr(attrs, name, value) {
+    var cleaned = stripTagAttr(attrs, name);
+    return cleaned + " " + name + '="' + escapeAttribute(value) + '"';
+  }
+  function assetUnavailablePlaceholderTag(attrs) {
+    var w = readTagAttr(attrs, "rr_width") || readTagAttr(attrs, "width") || "";
+    var h = readTagAttr(attrs, "rr_height") || readTagAttr(attrs, "height") || "";
+    var out = PLACEHOLDER_MARKER + '"blocked-origin"';
+    if (w) out += ' rr_width="' + escapeAttribute(w) + '"';
+    if (h) out += ' rr_height="' + escapeAttribute(h) + '"';
+    out += "></div>";
+    return out;
+  }
+  function srcsetHasBlockedCandidate(srcset, gate) {
+    if (!srcset) return false;
+    try {
+      var candidates = parseSrcsetCandidates(srcset);
+      for (var i = 0; i < candidates.length; i++) {
+        var url = candidates[i].url;
+        if (!url) continue;
+        var verdict = gate(url, "image");
+        if (!verdict || !verdict.allow) return true;
+      }
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
+  function gateOneImgTag(attrs, gate) {
+    if (attrsBlobIsUnreliable(attrs)) {
+      return assetUnavailablePlaceholderTag(attrs);
+    }
+    var pinned = readTagAttr(attrs, "data-ps-currentsrc");
+    var src = readTagAttr(attrs, "src");
+    var srcset = readTagAttr(attrs, "srcset");
+    var nextAttrs = attrs;
+    var effective = src;
+    if (pinned) {
+      effective = pinned;
+      nextAttrs = setTagAttr(nextAttrs, "src", pinned);
+      nextAttrs = stripTagAttr(nextAttrs, "srcset");
+      nextAttrs = stripTagAttr(nextAttrs, "sizes");
+      nextAttrs = stripTagAttr(nextAttrs, "data-ps-currentsrc");
+      srcset = null;
+    }
+    if (effective) {
+      var verdict = gate(effective, "image");
+      if (!verdict || !verdict.allow) {
+        return assetUnavailablePlaceholderTag(attrs);
+      }
+    }
+    if (srcset && srcsetHasBlockedCandidate(srcset, gate)) {
+      if (!effective) return assetUnavailablePlaceholderTag(attrs);
+      nextAttrs = stripTagAttr(nextAttrs, "srcset");
+    }
+    return "<img" + nextAttrs + ">";
+  }
+  function gateOneMediaTag(tagName, attrs, gate) {
+    if (attrsBlobIsUnreliable(attrs)) {
+      return assetUnavailablePlaceholderTag(attrs);
+    }
+    var nextAttrs = attrs;
+    var src = readTagAttr(attrs, "src");
+    var srcAllowed = false;
+    if (src) {
+      var srcVerdict = gate(src, tagName === "source" ? "source" : "media");
+      if (!srcVerdict || !srcVerdict.allow) {
+        if (srcVerdict && srcVerdict.reason === "poster-mode-media") {
+          nextAttrs = stripTagAttr(nextAttrs, "src");
+        } else {
+          return assetUnavailablePlaceholderTag(attrs);
+        }
+      } else {
+        srcAllowed = true;
+      }
+    }
+    if (tagName === "source") {
+      var srcset = readTagAttr(attrs, "srcset");
+      if (srcset && srcsetHasBlockedCandidate(srcset, gate)) {
+        if (!srcAllowed) return assetUnavailablePlaceholderTag(attrs);
+        nextAttrs = stripTagAttr(nextAttrs, "srcset");
+      }
+    }
+    if (tagName === "video") {
+      var poster = readTagAttr(attrs, "poster");
+      if (poster) {
+        var posterVerdict = gate(poster, "poster");
+        if (!posterVerdict || !posterVerdict.allow) {
+          return assetUnavailablePlaceholderTag(attrs);
+        }
+      }
+    }
+    return "<" + tagName + nextSelfClose(nextAttrs);
+  }
+  function nextSelfClose(attrs) {
+    return attrs + ">";
+  }
+  function gateSnapshotAssets(html, gate) {
+    if (typeof html !== "string" || !html) return html;
+    if (typeof gate !== "function") return html;
+    var out = "";
+    var cursor = 0;
+    while (cursor < html.length) {
+      var next = nextAssetOpener(html, cursor);
+      if (!next) {
+        break;
+      }
+      var tagStart = next.index;
+      var attrsStart = next.attrsStart;
+      out += html.slice(cursor, tagStart);
+      var tagEnd = findTagEnd(html, attrsStart);
+      if (tagEnd === -1) {
+        out += assetUnavailablePlaceholderTag(html.slice(attrsStart));
+        cursor = html.length;
+        break;
+      }
+      var attrs = html.slice(attrsStart, tagEnd);
+      if (next.tag === "img") {
+        out += gateOneImgTag(attrs, gate);
+        cursor = tagEnd + 1;
+      } else {
+        var replacement = gateOneMediaTag(next.tag, attrs, gate);
+        out += replacement;
+        var wasNeutralized = replacement.indexOf(PLACEHOLDER_MARKER) === 0;
+        var selfClosed = html.charAt(tagEnd - 1) === "/";
+        var isContainer = next.tag === "video" || next.tag === "audio";
+        if (wasNeutralized && isContainer && !selfClosed) {
+          var closeEnd = findMatchingCloseTag(html, tagEnd + 1, next.tag);
+          cursor = closeEnd === -1 ? tagEnd + 1 : closeEnd;
+        } else {
+          cursor = tagEnd + 1;
+        }
+      }
+    }
+    out += html.slice(cursor);
+    return out;
+  }
+  function nextAssetOpener(html, from) {
+    var best = null;
+    var specs = [
+      { re: IMG_OPEN_RE, tag: "img" },
+      { re: VIDEO_OPEN_RE, tag: "video" },
+      { re: AUDIO_OPEN_RE, tag: "audio" },
+      { re: SOURCE_OPEN_RE, tag: "source" }
+    ];
+    for (var i = 0; i < specs.length; i++) {
+      var re = specs[i].re;
+      re.lastIndex = from;
+      var m = re.exec(html);
+      if (m && (best === null || m.index < best.index)) {
+        best = { index: m.index, attrsStart: re.lastIndex, tag: specs[i].tag };
+      }
+    }
+    return best;
+  }
+  var CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src http: https: data:; media-src http: https: data: blob:; style-src http: https: 'unsafe-inline'; font-src http: https: data:">`;
   function hasDangerousStylesheetUrl(value) {
     if (!value || typeof value !== "string") return false;
     var compact = value.replace(/[\u0000-\u0020]+/g, "").toLowerCase();
@@ -278,7 +532,7 @@
     var cssomStyleTags = styleSourceTagsForDocument(p.styleSources || []);
     var htmlAttrs = buildShellAttributeString(p.htmlAttrs, p.htmlStyle);
     var bodyAttrs = buildShellAttributeString(p.bodyAttrs, p.bodyStyle);
-    return "<!DOCTYPE html><html" + htmlAttrs + "><head>" + CSP_META + '<meta charset="UTF-8"><meta name="viewport" content="width=' + (parseInt(p.viewportWidth, 10) || 1920) + '">' + stylesheetLinks + inlineStyleTags + cssomStyleTags + "<style>body { margin: 0; overflow: hidden; } *::selection { background: transparent; } ::-webkit-scrollbar { display: none; }</style></head><body" + bodyAttrs + ">" + (p.html || "") + "</body></html>";
+    return "<!DOCTYPE html><html" + htmlAttrs + "><head>" + CSP_META + '<meta name="referrer" content="no-referrer"><meta charset="UTF-8"><meta name="viewport" content="width=' + (parseInt(p.viewportWidth, 10) || 1920) + '">' + stylesheetLinks + inlineStyleTags + cssomStyleTags + "<style>body { margin: 0; overflow: hidden; } *::selection { background: transparent; } ::-webkit-scrollbar { display: none; }</style></head><body" + bodyAttrs + ">" + (p.html || "") + "</body></html>";
   }
   function buildFramePlaceholderHtml(frame) {
     var f = frame || {};
@@ -288,7 +542,7 @@
     var meta = "";
     if (origin) meta += "<p>Origin: " + origin + "</p>";
     if (src) meta += "<p>Source: " + src + "</p>";
-    return "<!DOCTYPE html><html><head>" + CSP_META + '<meta charset="UTF-8"><style>body{margin:0;font:13px system-ui,sans-serif;color:#30333a;background:#f6f7f9;}.ps-frame-placeholder{box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column;gap:6px;justify-content:center;align-items:center;text-align:center;border:1px dashed #9aa3af;padding:16px;}.ps-frame-placeholder strong{font-size:14px;} .ps-frame-placeholder p{margin:0;color:#5f6673;word-break:break-word;}</style></head><body><div class="ps-frame-placeholder" role="note"><strong>' + label + "</strong>" + meta + "</div></body></html>";
+    return "<!DOCTYPE html><html><head>" + CSP_META + '<meta name="referrer" content="no-referrer"><meta charset="UTF-8"><style>body{margin:0;font:13px system-ui,sans-serif;color:#30333a;background:#f6f7f9;}.ps-frame-placeholder{box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column;gap:6px;justify-content:center;align-items:center;text-align:center;border:1px dashed #9aa3af;padding:16px;}.ps-frame-placeholder strong{font-size:14px;} .ps-frame-placeholder p{margin:0;color:#5f6673;word-break:break-word;}</style></head><body><div class="ps-frame-placeholder" role="note"><strong>' + label + "</strong>" + meta + "</div></body></html>";
   }
 
   // node_modules/@full-self-browsing/phantom-stream/src/protocol/messages.js
@@ -307,6 +561,10 @@
     MUTATIONS: "ext:dom-mutations",
     /** Scroll position. Payload: { scrollX, scrollY, streamSessionId, snapshotId } */
     SCROLL: "ext:dom-scroll",
+    /** Media playback state. Payload: MediaSyncPayload */
+    MEDIA: "ext:dom-media",
+    /** Adaptive-manifest discovery hint (opt-in, adapter-originated). Payload: MediaHintPayload */
+    MEDIA_HINT: "ext:dom-media-hint",
     /** Automation overlay state. Payload: { glow, progress, streamSessionId, snapshotId } */
     OVERLAY: "ext:dom-overlay",
     /** Native dialog mirroring. Payload: { dialog: DialogPayload } */
@@ -345,7 +603,7 @@
     ATTR: "attr",
     /** { op:'text', nid, text } — character data change, addressed via parent nid */
     TEXT: "text",
-    /** { op:'value', nid, value?, checked?, selectedValues? } — live form state change */
+    /** { op:'value', nid, value?, checked?, selectedValues?, selectedIndexes? } — live form state change */
     VALUE: "value",
     /** ShadowRootPayload plus op:'shadow-root' — replace/open an observed shadow root */
     SHADOW_ROOT: "shadow-root",
@@ -364,8 +622,52 @@
     }
     return true;
   }
+  var HLS_CONTENT_TYPES = {
+    "application/vnd.apple.mpegurl": true,
+    "application/x-mpegurl": true,
+    "audio/mpegurl": true,
+    "audio/x-mpegurl": true
+  };
+  var DASH_CONTENT_TYPE = "application/dash+xml";
+  function manifestPathOf(url) {
+    if (typeof url !== "string" || url === "") return "";
+    try {
+      return new URL(url).pathname.toLowerCase();
+    } catch (e) {
+      return String(url).split("#")[0].split("?")[0].toLowerCase();
+    }
+  }
+  function classifyManifest(input) {
+    if (!input) return null;
+    const ct = (typeof input.contentType === "string" ? input.contentType : "").split(";")[0].trim().toLowerCase();
+    if (ct) {
+      if (HLS_CONTENT_TYPES[ct]) return "hls";
+      if (ct === DASH_CONTENT_TYPE) return "dash";
+    }
+    const path = manifestPathOf(input.url);
+    if (path) {
+      if (/\.m3u8$/.test(path)) return "hls";
+      if (/\.mpd$/.test(path)) return "dash";
+    }
+    return null;
+  }
 
   // node_modules/@full-self-browsing/phantom-stream/src/renderer/diff.js
+  function srcsetHasBlockedCandidate2(srcset, gateAssetUrl2) {
+    if (!srcset) return false;
+    try {
+      var candidates = parseSrcsetCandidates(srcset);
+      for (var i = 0; i < candidates.length; i++) {
+        var url = candidates[i].url;
+        if (!url) continue;
+        var verdict = gateAssetUrl2(url, "image");
+        if (!verdict || !verdict.allow) return true;
+      }
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
   function installShadowRootDirect(doc, host, payload, sanitizeCounters, logger, indexSubtree, removeSubtree) {
     var p = payload || {};
     if (!doc || !host) return false;
@@ -427,6 +729,13 @@
     } : null;
     var removeStyleSource = typeof identity.removeStyleSource === "function" ? function(sourceId, scope) {
       return identity.removeStyleSource(sourceId, scope);
+    } : null;
+    var gateFragmentAssets = typeof identity.gateFragmentAssets === "function" ? function(node) {
+      identity.gateFragmentAssets(node);
+    } : function() {
+    };
+    var gateAssetUrl2 = typeof identity.gateAssetUrl === "function" ? function(url, kind) {
+      return identity.gateAssetUrl(url, kind);
     } : null;
     function recordStaleMiss(op, nid) {
       tallies.staleMisses += 1;
@@ -490,6 +799,7 @@
               var tpl = doc.createElement("template");
               tpl.innerHTML = m.html;
               sanitizeFragment(tpl.content, sanitizeCounters, logger);
+              gateFragmentAssets(tpl.content);
               var newNode = tpl.content.firstElementChild;
               if (!newNode) {
                 logger.warn("[Renderer] add op dropped: html parsed to no element", {
@@ -583,6 +893,39 @@
                 target.removeAttribute(m.attr);
                 break;
               }
+              if (gateAssetUrl2 && (attrName === "src" || attrName === "poster")) {
+                var assetKind;
+                if (attrName === "poster") {
+                  assetKind = "poster";
+                } else if (targetTag === "video" || targetTag === "audio") {
+                  assetKind = "media";
+                } else if (targetTag === "source") {
+                  assetKind = "source";
+                } else {
+                  assetKind = "image";
+                }
+                var assetVerdict = gateAssetUrl2(scrubbed.value, assetKind);
+                if (!assetVerdict || !assetVerdict.allow) {
+                  sanitizeCounters.blockedUrls += 1;
+                  logger.warn("[Renderer] attr op asset blocked by origin gate", {
+                    nid: m.nid || "",
+                    attr: m.attr || ""
+                  });
+                  target.removeAttribute(m.attr);
+                  break;
+                }
+              }
+              if (gateAssetUrl2 && attrName === "srcset") {
+                if (srcsetHasBlockedCandidate2(scrubbed.value, gateAssetUrl2)) {
+                  sanitizeCounters.blockedUrls += 1;
+                  logger.warn("[Renderer] attr op srcset candidate blocked by origin gate", {
+                    nid: m.nid || "",
+                    attr: m.attr || ""
+                  });
+                  target.removeAttribute(m.attr);
+                  break;
+                }
+              }
               target.setAttribute(m.attr, scrubbed.value);
               break;
             }
@@ -598,7 +941,15 @@
               if (Object.prototype.hasOwnProperty.call(m, "checked")) {
                 valueTarget.checked = !!m.checked;
               }
-              if (Array.isArray(m.selectedValues) && valueTarget.options) {
+              if (Array.isArray(m.selectedIndexes) && valueTarget.options) {
+                var selectedIndexes = /* @__PURE__ */ new Set();
+                for (var si = 0; si < m.selectedIndexes.length; si++) {
+                  selectedIndexes.add(Number(m.selectedIndexes[si]));
+                }
+                for (var ix = 0; ix < valueTarget.options.length; ix++) {
+                  valueTarget.options[ix].selected = selectedIndexes.has(ix);
+                }
+              } else if (Array.isArray(m.selectedValues) && valueTarget.options) {
                 var selectedValues = /* @__PURE__ */ new Set();
                 for (var sv = 0; sv < m.selectedValues.length; sv++) {
                   selectedValues.add(String(m.selectedValues[sv]));
@@ -741,6 +1092,89 @@
     ".ps-overlay-dialog-message {",
     "  font-size: 14px; color: #e0e0e0; line-height: 1.5;",
     "  word-break: break-word; max-height: 200px; overflow-y: auto;",
+    "}",
+    // ---- Phase 13 (MEDIA-05): media affordance family (13-UI-SPEC States A/B/C).
+    // Parity values reused verbatim from the glow/progress/dialog built-ins:
+    // scrim rgba(0,0,0,0.5); pill rgba(0,0,0,0.75)+blur(4px)+radius 6px; accent
+    // #f59e0b (reserved for the actionable control); text #e0e0e0; glow
+    // 0 0 12px rgba(245,158,11,0.6); system-ui 13/600; play button >= 44x44.
+    // State A: blocked-play scrim clipped to the element rect.
+    ".ps-overlay-media-blocked {",
+    "  position: absolute;",
+    "  background: rgba(0, 0, 0, 0.5);",
+    "  display: flex; align-items: center; justify-content: center;",
+    "  pointer-events: none;",
+    // the scrim is passive; only the button opts in
+    "}",
+    // State A: centered circular play button (the one actionable control).
+    ".ps-overlay-media-button {",
+    "  box-sizing: border-box;",
+    "  min-width: 44px; min-height: 44px;",
+    "  display: flex; align-items: center; justify-content: center;",
+    "  border: 2px solid #f59e0b;",
+    "  border-radius: 50%;",
+    "  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);",
+    "  background: transparent;",
+    "  color: #f59e0b;",
+    // currentColor for the inline-SVG play glyph
+    "  cursor: pointer;",
+    "  pointer-events: auto;",
+    "}",
+    "@media (prefers-reduced-motion: no-preference) {",
+    "  .ps-overlay-media-button:hover, .ps-overlay-media-button:focus {",
+    "    filter: brightness(1.1);",
+    "  }",
+    "}",
+    // State B: unmute pill anchored bottom-left of the element rect.
+    ".ps-overlay-media-unmute {",
+    "  position: absolute;",
+    "  display: inline-flex; align-items: center; gap: 4px;",
+    "  background: rgba(0, 0, 0, 0.75);",
+    "  backdrop-filter: blur(4px);",
+    "  -webkit-backdrop-filter: blur(4px);",
+    "  color: #e0e0e0;",
+    "  font: 600 13px/1.2 system-ui, sans-serif;",
+    "  padding: 4px 12px;",
+    "  border-radius: 6px;",
+    "  cursor: pointer;",
+    "  pointer-events: auto;",
+    "}",
+    ".ps-overlay-media-unmute-icon {",
+    "  display: inline-flex; color: #f59e0b;",
+    // amber speaker glyph fill
+    "}",
+    "@media (prefers-reduced-motion: no-preference) {",
+    "  .ps-overlay-media-unmute:hover, .ps-overlay-media-unmute:focus {",
+    "    filter: brightness(1.1);",
+    "  }",
+    "}",
+    // State C: passive poster-only caption (no accent, no pointer events).
+    ".ps-overlay-media-poster {",
+    "  position: absolute;",
+    "  display: inline-flex; align-items: center;",
+    "  background: rgba(0, 0, 0, 0.75);",
+    "  backdrop-filter: blur(4px);",
+    "  -webkit-backdrop-filter: blur(4px);",
+    "  color: #e0e0e0;",
+    "  font: 600 13px/1.2 system-ui, sans-serif;",
+    "  padding: 4px 12px;",
+    "  border-radius: 6px;",
+    "  pointer-events: none;",
+    "}",
+    // Phase 14 (MADPT-03): the degrade-reason caption -- a passive clone of the
+    // poster caption (same parity values), NO accent. Reason rides a data-
+    // attribute (set via setAttribute), never the visible caption.
+    ".ps-overlay-media-unavailable {",
+    "  position: absolute;",
+    "  display: inline-flex; align-items: center;",
+    "  background: rgba(0, 0, 0, 0.75);",
+    "  backdrop-filter: blur(4px);",
+    "  -webkit-backdrop-filter: blur(4px);",
+    "  color: #e0e0e0;",
+    "  font: 600 13px/1.2 system-ui, sans-serif;",
+    "  padding: 4px 12px;",
+    "  border-radius: 6px;",
+    "  pointer-events: none;",
     "}"
   ].join("\n");
   var ICON_SVG = {
@@ -750,6 +1184,12 @@
     confirm: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>',
     // prompt: keyboard
     prompt: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>'
+  };
+  var MEDIA_GLYPH = {
+    // play triangle (centered in the blocked-play button)
+    play: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+    // muted speaker (line-sized for the unmute pill)
+    mutedSpeaker: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>'
   };
   function mapRectToHost(rect, scale) {
     return {
@@ -890,6 +1330,161 @@
     }
     register("glow", renderGlow);
     register("progress", renderProgress);
+    var mediaBlockedEl = null;
+    var mediaBlockedBtn = null;
+    var mediaBlockedActivate = null;
+    var mediaUnmuteEl = null;
+    var mediaUnmuteActivate = null;
+    var mediaPosterEl = null;
+    var mediaUnavailableEl = null;
+    function safeActivate(fn) {
+      if (typeof fn !== "function") return;
+      try {
+        fn();
+      } catch (err) {
+        logger.error("[Renderer] media affordance onActivate failed", err);
+      }
+    }
+    function wireActivation(el, getHandler) {
+      el.addEventListener("click", function() {
+        safeActivate(getHandler());
+      });
+      el.addEventListener("keydown", function(ev) {
+        if (ev && (ev.key === "Enter" || ev.key === " " || ev.key === "Spacebar")) {
+          if (typeof ev.preventDefault === "function") ev.preventDefault();
+          safeActivate(getHandler());
+        }
+      });
+    }
+    function anchorAffordance(el, anchorRect) {
+      if (!anchorRect) return;
+      el.style.top = anchorRect.top + "px";
+      el.style.left = anchorRect.left + "px";
+      el.style.width = anchorRect.width + "px";
+      el.style.height = anchorRect.height + "px";
+    }
+    function renderMediaBlocked(value, anchorRect) {
+      if (!value) {
+        if (mediaBlockedEl) mediaBlockedEl.style.display = "none";
+        mediaBlockedActivate = null;
+        return;
+      }
+      if (!mediaBlockedEl) {
+        mediaBlockedEl = doc.createElement("div");
+        mediaBlockedEl.className = "ps-overlay-media-blocked";
+        mediaBlockedEl.style.zIndex = "25";
+        mediaBlockedBtn = doc.createElement("div");
+        mediaBlockedBtn.className = "ps-overlay-media-button";
+        mediaBlockedBtn.setAttribute("role", "button");
+        mediaBlockedBtn.setAttribute("tabindex", "0");
+        mediaBlockedBtn.setAttribute("aria-label", "Play mirrored media");
+        mediaBlockedBtn.style.pointerEvents = "auto";
+        mediaBlockedBtn.style.minWidth = "44px";
+        mediaBlockedBtn.style.minHeight = "44px";
+        mediaBlockedBtn.innerHTML = MEDIA_GLYPH.play;
+        wireActivation(mediaBlockedBtn, function() {
+          return mediaBlockedActivate;
+        });
+        mediaBlockedEl.appendChild(mediaBlockedBtn);
+        layer.appendChild(mediaBlockedEl);
+      }
+      mediaBlockedActivate = typeof value.onActivate === "function" ? value.onActivate : null;
+      anchorAffordance(mediaBlockedEl, anchorRect);
+      mediaBlockedEl.style.display = "flex";
+    }
+    function renderMediaUnmute(value, anchorRect) {
+      if (!value) {
+        if (mediaUnmuteEl) mediaUnmuteEl.style.display = "none";
+        mediaUnmuteActivate = null;
+        return;
+      }
+      if (!mediaUnmuteEl) {
+        mediaUnmuteEl = doc.createElement("div");
+        mediaUnmuteEl.className = "ps-overlay-media-unmute";
+        mediaUnmuteEl.style.zIndex = "25";
+        mediaUnmuteEl.setAttribute("role", "button");
+        mediaUnmuteEl.setAttribute("tabindex", "0");
+        mediaUnmuteEl.setAttribute("aria-label", "Unmute mirrored media");
+        mediaUnmuteEl.style.pointerEvents = "auto";
+        var icon = doc.createElement("span");
+        icon.className = "ps-overlay-media-unmute-icon";
+        icon.innerHTML = MEDIA_GLYPH.mutedSpeaker;
+        var label = doc.createElement("span");
+        label.className = "ps-overlay-media-unmute-label";
+        label.textContent = "Unmute";
+        mediaUnmuteEl.appendChild(icon);
+        mediaUnmuteEl.appendChild(label);
+        wireActivation(mediaUnmuteEl, function() {
+          return mediaUnmuteActivate;
+        });
+        layer.appendChild(mediaUnmuteEl);
+      }
+      mediaUnmuteActivate = typeof value.onActivate === "function" ? value.onActivate : null;
+      if (anchorRect) {
+        mediaUnmuteEl.style.left = anchorRect.left + 8 + "px";
+        mediaUnmuteEl.style.top = anchorRect.top + anchorRect.height - 8 - 24 + "px";
+      }
+      mediaUnmuteEl.style.display = "inline-flex";
+    }
+    function renderMediaPoster(value, anchorRect) {
+      if (!value) {
+        if (mediaPosterEl) mediaPosterEl.style.display = "none";
+        return;
+      }
+      if (!mediaPosterEl) {
+        mediaPosterEl = doc.createElement("div");
+        mediaPosterEl.className = "ps-overlay-media-poster";
+        mediaPosterEl.style.zIndex = "24";
+        mediaPosterEl.style.pointerEvents = "none";
+        mediaPosterEl.textContent = "Media (poster only)";
+        layer.appendChild(mediaPosterEl);
+      }
+      if (anchorRect) {
+        mediaPosterEl.style.left = anchorRect.left + anchorRect.width / 2 + "px";
+        mediaPosterEl.style.top = anchorRect.top + anchorRect.height / 2 + "px";
+        mediaPosterEl.style.transform = "translate(-50%, -50%)";
+      }
+      mediaPosterEl.style.display = "inline-flex";
+    }
+    function renderMediaUnavailable(value, anchorRect) {
+      if (!value) {
+        if (mediaUnavailableEl) mediaUnavailableEl.style.display = "none";
+        return;
+      }
+      if (!mediaUnavailableEl) {
+        mediaUnavailableEl = doc.createElement("div");
+        mediaUnavailableEl.className = "ps-overlay-media-unavailable";
+        mediaUnavailableEl.style.zIndex = "24";
+        mediaUnavailableEl.style.pointerEvents = "none";
+        mediaUnavailableEl.textContent = "Media unavailable";
+        layer.appendChild(mediaUnavailableEl);
+      }
+      if (value.reason !== void 0 && value.reason !== null) {
+        mediaUnavailableEl.setAttribute("data-ps-reason", String(value.reason));
+      } else {
+        mediaUnavailableEl.removeAttribute("data-ps-reason");
+      }
+      if (anchorRect) {
+        mediaUnavailableEl.style.left = anchorRect.left + anchorRect.width / 2 + "px";
+        mediaUnavailableEl.style.top = anchorRect.top + anchorRect.height / 2 + "px";
+        mediaUnavailableEl.style.transform = "translate(-50%, -50%)";
+      }
+      mediaUnavailableEl.style.display = "inline-flex";
+    }
+    register("media-blocked", renderMediaBlocked);
+    register("media-unmute", renderMediaUnmute);
+    register("media-poster", renderMediaPoster);
+    register("media-unavailable", renderMediaUnavailable);
+    function show(kind, payload, ctx) {
+      var renderFn = registry.get(kind);
+      if (!renderFn) {
+        logger.warn("[Renderer] show() unknown overlay kind ignored", kind);
+        return;
+      }
+      var anchorRect = ctx && ctx.anchorRect ? ctx.anchorRect : null;
+      var value = payload === void 0 ? null : payload;
+      safeRenderOverlay(kind, renderFn, value, anchorRect);
+    }
     function handleOverlayMessage(payload, ctx) {
       if (!payload || typeof payload !== "object") return;
       var kinds = Object.keys(payload);
@@ -933,11 +1528,380 @@
       register,
       handleOverlayMessage,
       handleDialogMessage,
+      show,
       resetOverlays
     };
   }
 
+  // node_modules/@full-self-browsing/phantom-stream/src/renderer/asset-policy.js
+  function isPrivateOrLocalHost(host) {
+    if (!host || typeof host !== "string") return true;
+    var normalized = host.toLowerCase();
+    if (normalized.length > 1 && normalized.charAt(normalized.length - 1) === ".") {
+      normalized = normalized.slice(0, -1);
+    }
+    if (normalized === "localhost") return true;
+    var bare = normalized.charAt(0) === "[" && normalized.charAt(normalized.length - 1) === "]" ? normalized.slice(1, -1) : normalized;
+    var zone = bare.indexOf("%");
+    if (zone !== -1) bare = bare.slice(0, zone);
+    var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(bare);
+    if (m) {
+      var a = +m[1], b = +m[2];
+      if (a === 0) return true;
+      if (a === 127) return true;
+      if (a === 10) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 169 && b === 254) return true;
+      return false;
+    }
+    if (bare.indexOf(":") === -1) return false;
+    if (bare === "::1") return true;
+    if (bare === "::") return true;
+    if (/^fe[89ab][0-9a-f]*:/.test(bare)) return true;
+    if (/^f[cd][0-9a-f]*:/.test(bare)) return true;
+    if (/^64:ff9b:/.test(bare)) return true;
+    var mapped = /^(?:::ffff:|::)(?:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/.exec(bare);
+    if (mapped) {
+      var v4 = mapped[1];
+      if (!v4 && mapped[2] && mapped[3]) {
+        var hi = parseInt(mapped[2], 16), lo = parseInt(mapped[3], 16);
+        v4 = (hi >> 8) + "." + (hi & 255) + "." + (lo >> 8) + "." + (lo & 255);
+      }
+      if (v4 && isPrivateOrLocalHost(v4)) return true;
+    }
+    return false;
+  }
+  function classifyAssetOrigin(url) {
+    var u;
+    try {
+      u = new URL(String(url));
+    } catch (e) {
+      return { allowed: false, reason: "parse-error" };
+    }
+    if (u.protocol !== "https:") return { allowed: false, reason: "bad-scheme" };
+    var host = (u.hostname || "").toLowerCase();
+    if (isPrivateOrLocalHost(host)) return { allowed: false, reason: "private-host" };
+    var isIpv6Literal = host.charAt(0) === "[" && host.charAt(host.length - 1) === "]";
+    if (!isIpv6Literal && (host.indexOf(".") === -1 || host.endsWith(".local"))) {
+      return { allowed: false, reason: "unqualified-host" };
+    }
+    return { allowed: true, reason: "ok" };
+  }
+
+  // node_modules/@full-self-browsing/phantom-stream/src/renderer/media-player.js
+  async function tryLazyImportHls() {
+    try {
+      var mod = await import("hls.js");
+      return mod && (mod.default || mod.Hls || mod) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function canUseMse(win) {
+    return !!(win && (win.ManagedMediaSource || win.MediaSource));
+  }
+  function isNativeHls(videoEl, kind) {
+    if (kind !== "hls") return false;
+    var v = videoEl && typeof videoEl.canPlayType === "function" ? videoEl.canPlayType("application/vnd.apple.mpegurl") : "";
+    return v === "probably" || v === "maybe";
+  }
+  function createMediaPlayer(deps) {
+    var d = deps || {};
+    var logger = d.logger || { info: function() {
+    }, warn: function() {
+    }, error: function() {
+    } };
+    var lazyImportHls = typeof d.tryLazyImportHls === "function" ? d.tryLazyImportHls : tryLazyImportHls;
+    var registry = /* @__PURE__ */ new Map();
+    function safeInvokeMediaHook(nid, reason) {
+      if (typeof d.onMediaUnavailable !== "function") return;
+      try {
+        d.onMediaUnavailable(nid, reason);
+      } catch (err) {
+        logger.error("[Renderer] onMediaUnavailable callback failed", nid, reason, err);
+      }
+    }
+    function destroy(nid) {
+      var entry = registry.get(nid);
+      if (entry) {
+        if (entry.player && typeof entry.player.destroy === "function") {
+          try {
+            entry.player.destroy();
+          } catch (e) {
+          }
+        }
+        var el = entry.videoEl;
+        if (el) {
+          try {
+            if (typeof el.removeAttribute === "function") el.removeAttribute("src");
+          } catch (e) {
+          }
+          try {
+            if (typeof el.load === "function") el.load();
+          } catch (e) {
+          }
+        }
+        registry.delete(nid);
+      }
+    }
+    function destroyAll() {
+      var nids = [];
+      registry.forEach(function(_entry, nid) {
+        nids.push(nid);
+      });
+      nids.forEach(destroy);
+    }
+    function degrade(nid, reason) {
+      destroy(nid);
+      if (typeof d.showOverlay === "function") {
+        var anchorRect = typeof d.resolveNidRect === "function" ? d.resolveNidRect(nid) : null;
+        try {
+          d.showOverlay("media-unavailable", { nid, reason }, { anchorRect });
+        } catch (e) {
+          logger.error("[Renderer] media-unavailable overlay failed", nid, reason, e);
+        }
+      }
+      if (typeof d.keepPoster === "function") {
+        try {
+          d.keepPoster(nid);
+        } catch (e) {
+        }
+      }
+      safeInvokeMediaHook(nid, reason);
+      return void 0;
+    }
+    async function attachViaLazyHls(videoEl, manifestUrl, ctx) {
+      var win = d.win || ctx.doc && ctx.doc.defaultView || null;
+      if (!canUseMse(win)) return degrade(ctx.nid, "mse-opaque");
+      var Hls = await lazyImportHls();
+      if (!Hls || typeof Hls.isSupported !== "function" || !Hls.isSupported()) {
+        return degrade(ctx.nid, "no-player");
+      }
+      try {
+        var hls = new Hls({});
+        var onEncrypted = function() {
+          degrade(ctx.nid, "drm");
+        };
+        videoEl.addEventListener("encrypted", onEncrypted, { once: true });
+        hls.on(Hls.Events.ERROR, function(_e, info) {
+          if (!info || !info.fatal) return;
+          degrade(ctx.nid, info.type === Hls.ErrorTypes.KEY_SYSTEM_ERROR ? "drm" : "mse-opaque");
+        });
+        hls.loadSource(manifestUrl);
+        hls.attachMedia(videoEl);
+        var player = { destroy: function() {
+          try {
+            if (typeof videoEl.removeEventListener === "function") {
+              videoEl.removeEventListener("encrypted", onEncrypted);
+            }
+          } catch (e) {
+          }
+          try {
+            hls.destroy();
+          } catch (e) {
+          }
+        } };
+        registry.set(ctx.nid, { nid: ctx.nid, kind: "hls", videoEl, player });
+        return { kind: "hls", hls, player };
+      } catch (e) {
+        return degrade(ctx.nid, "mse-opaque");
+      }
+    }
+    function attachViaFactory(videoEl, manifestUrl, ctx) {
+      var player = d.playerFactory(ctx);
+      registry.set(ctx.nid, { nid: ctx.nid, kind: ctx.kind, videoEl, player });
+      if (player && typeof player.onError === "function") {
+        player.onError(function(reason) {
+          degrade(ctx.nid, reason || "mse-opaque");
+        });
+      }
+      player.attach(videoEl, manifestUrl, ctx);
+      return { kind: "factory", player };
+    }
+    function attach(videoEl, manifestUrl, ctx) {
+      var c = ctx || {};
+      var nid = c.nid !== void 0 ? c.nid : null;
+      try {
+        var gate = typeof d.gateAsset === "function" ? d.gateAsset(manifestUrl, "media") : { allow: true };
+        if (!gate || !gate.allow) return degrade(nid, "no-manifest");
+        var kind = classifyManifest({ url: manifestUrl, contentType: c.contentType });
+        if (isNativeHls(videoEl, kind)) {
+          videoEl.src = manifestUrl;
+          registry.set(nid, { nid, kind: "native", videoEl });
+          if (typeof d.ensurePlaying === "function") d.ensurePlaying(videoEl, nid);
+          return { kind: "native" };
+        }
+        var playerCtx = {
+          doc: d.doc,
+          manifestUrl,
+          kind,
+          videoEl,
+          logger,
+          gateAsset: d.gateAsset,
+          nid
+        };
+        if (typeof d.playerFactory === "function") {
+          return attachViaFactory(videoEl, manifestUrl, playerCtx);
+        }
+        if (kind === "hls") {
+          return attachViaLazyHls(videoEl, manifestUrl, playerCtx);
+        }
+        if (kind === "dash") return degrade(nid, "no-player");
+        return degrade(nid, "no-manifest");
+      } catch (e) {
+        return degrade(nid, "mse-opaque");
+      }
+    }
+    return {
+      attach,
+      degrade,
+      destroy,
+      destroyAll
+    };
+  }
+
+  // node_modules/@full-self-browsing/phantom-stream/src/protocol/media-reconcile.js
+  var DEFAULT_MEDIA_RECONCILE_CONFIG = {
+    holdBandSec: 0.25,
+    // |drift| <= this -> hold (no correction)
+    hardSeekSec: 1,
+    // |drift| >  this -> hard-seek to the clamped expected position
+    maxNudgeFraction: 0.05,
+    // (0.25, 1.0] band nudges playbackRate by at most +/- this
+    liveRejoinSec: 1
+    // live streams rejoin the edge only when drift exceeds this
+  };
+  function isFiniteNum(v) {
+    return typeof v === "number" && isFinite(v);
+  }
+  function mergeConfig(config) {
+    var d = DEFAULT_MEDIA_RECONCILE_CONFIG;
+    var c = config || {};
+    return {
+      holdBandSec: isFiniteNum(c.holdBandSec) ? c.holdBandSec : d.holdBandSec,
+      hardSeekSec: isFiniteNum(c.hardSeekSec) ? c.hardSeekSec : d.hardSeekSec,
+      maxNudgeFraction: isFiniteNum(c.maxNudgeFraction) ? c.maxNudgeFraction : d.maxNudgeFraction,
+      liveRejoinSec: isFiniteNum(c.liveRejoinSec) ? c.liveRejoinSec : d.liveRejoinSec
+    };
+  }
+  function clampToDuration(t, duration) {
+    var lo = isFiniteNum(t) ? t : 0;
+    if (lo < 0) lo = 0;
+    if (isFiniteNum(duration) && lo > duration) lo = duration;
+    return lo;
+  }
+  function isLoopWrap(localTime, expected, duration, cfg) {
+    if (!isFiniteNum(duration) || duration <= 0) return false;
+    if (!isFiniteNum(localTime) || !isFiniteNum(expected)) return false;
+    var window = Math.max(cfg.hardSeekSec, duration * 0.1);
+    if (window >= duration / 2) return false;
+    var localNearEnd = localTime >= duration - window;
+    var localNearStart = localTime <= window;
+    var expectedNearEnd = expected >= duration - window;
+    var expectedNearStart = expected <= window;
+    return localNearEnd && expectedNearStart || localNearStart && expectedNearEnd;
+  }
+  function reconcileMediaDrift(local, remote, now, config) {
+    var cfg = mergeConfig(config);
+    if (!remote || remote.currentTime == null || !isFiniteNum(remote.currentTime) || !isFiniteNum(remote.sentAt)) {
+      return { action: "hold", reason: "incomplete-remote" };
+    }
+    if (remote.event === "seeked") {
+      return { action: "seek", toTime: clampToDuration(remote.currentTime, remote.duration) };
+    }
+    if (remote.paused === true || remote.playbackRate === 0) {
+      return local && local.paused ? { action: "hold", reason: "paused" } : { action: "pause" };
+    }
+    var localTime = local && isFiniteNum(local.currentTime) ? local.currentTime : null;
+    if (localTime === null) {
+      return { action: "hold", reason: "local-not-ready" };
+    }
+    var elapsedSec = Math.max(0, (now - remote.sentAt) / 1e3);
+    if (!isFiniteNum(elapsedSec)) elapsedSec = 0;
+    var rate = isFiniteNum(remote.playbackRate) && remote.playbackRate > 0 ? remote.playbackRate : 1;
+    var expected = remote.currentTime + rate * elapsedSec;
+    if (remote.live === true || !isFiniteNum(remote.duration)) {
+      var liveDrift = Math.abs(expected - localTime);
+      return liveDrift > cfg.liveRejoinSec ? { action: "rejoin-edge" } : { action: "hold", reason: "live-in-band" };
+    }
+    var duration = remote.duration;
+    if (duration <= 0) {
+      return { action: "hold", reason: "zero-duration" };
+    }
+    if (remote.loop === true && isLoopWrap(localTime, expected, duration, cfg)) {
+      return { action: "seek", toTime: clampToDuration(expected, duration) };
+    }
+    var drift = expected - localTime;
+    var adrift = Math.abs(drift);
+    if (adrift <= cfg.holdBandSec) {
+      return { action: "hold", reason: "in-band", revertRate: rate };
+    }
+    if (adrift <= cfg.hardSeekSec) {
+      var sign = drift > 0 ? 1 : -1;
+      var nudgeRate = rate * (1 + sign * cfg.maxNudgeFraction);
+      return { action: "nudge", rate: nudgeRate, baseRate: rate };
+    }
+    return { action: "seek", toTime: clampToDuration(expected, duration) };
+  }
+
   // node_modules/@full-self-browsing/phantom-stream/src/renderer/index.js
+  var VALID_MEDIA_MODES = { off: true, poster: true, reference: true };
+  function assetUrlHost(url) {
+    try {
+      return new URL(String(url)).hostname.toLowerCase();
+    } catch (e) {
+      return "";
+    }
+  }
+  function srcsetHasBlockedCandidate3(srcset, gateAsset) {
+    if (!srcset) return false;
+    try {
+      var candidates = parseSrcsetCandidates(srcset);
+      for (var i = 0; i < candidates.length; i++) {
+        var url = candidates[i].url;
+        if (!url) continue;
+        var verdict = gateAsset(url, "image");
+        if (!verdict || !verdict.allow) return true;
+      }
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
+  function gateAssetUrl(url, ctx) {
+    var c = ctx || {};
+    var mode = VALID_MEDIA_MODES[c.mediaMode] ? c.mediaMode : "reference";
+    if (mode === "off") return { allow: false, reason: "media-off" };
+    var host = assetUrlHost(url);
+    var allowlist = Array.isArray(c.allowAssetOrigins) ? c.allowAssetOrigins : null;
+    var widened = false;
+    if (allowlist && host) {
+      for (var i = 0; i < allowlist.length; i++) {
+        if (String(allowlist[i]).toLowerCase() === host) {
+          widened = true;
+          break;
+        }
+      }
+    }
+    if (!widened) {
+      var verdict = classifyAssetOrigin(url);
+      if (!verdict.allowed) return { allow: false, reason: verdict.reason };
+    }
+    if (typeof c.assetOriginPolicy === "function") {
+      var ok;
+      try {
+        ok = c.assetOriginPolicy(url, c);
+      } catch (e) {
+        return { allow: false, reason: "hook-threw" };
+      }
+      if (ok !== true) return { allow: false, reason: "hook-denied" };
+    }
+    if (mode === "poster" && (c.kind === "media" || c.kind === "source")) {
+      return { allow: false, reason: "poster-mode-media" };
+    }
+    return { allow: true, reason: "ok" };
+  }
   function computeScale(pageW, pageH, containerW, containerH) {
     var w = Math.max(1, pageW || 1920);
     var h = Math.max(1, pageH || 1080);
@@ -953,12 +1917,26 @@
   }
   function createViewer(options) {
     var cfg = options || {};
-    var container = cfg.container;
+    var hostDriven = !cfg.container && !!cfg.mount;
+    var container = cfg.container || cfg.mount;
     if (!container || typeof container.appendChild !== "function") {
       throw new Error("viewer-container-required");
     }
     var transport = cfg.transport;
-    if (!transport || typeof transport.send !== "function" || typeof transport.onMessage !== "function") {
+    if (transport) {
+      if (typeof transport.send !== "function" || typeof transport.onMessage !== "function") {
+        throw new Error("viewer-transport-required");
+      }
+    } else if (hostDriven) {
+      transport = {
+        send: function() {
+        },
+        onMessage: function() {
+          return function() {
+          };
+        }
+      };
+    } else {
       throw new Error("viewer-transport-required");
     }
     var logger = cfg.logger || {
@@ -973,7 +1951,113 @@
       }
     };
     var disconnectDelayMs = typeof cfg.disconnectDelayMs === "number" ? Math.max(0, cfg.disconnectDelayMs) : 750;
-    var doc = container.ownerDocument;
+    var mediaMode = cfg.mediaMode == null ? "reference" : String(cfg.mediaMode);
+    if (!VALID_MEDIA_MODES[mediaMode]) {
+      throw new Error("viewer-mediamode-invalid");
+    }
+    var assetOriginPolicy = typeof cfg.assetOriginPolicy === "function" ? cfg.assetOriginPolicy : null;
+    var allowAssetOrigins = Array.isArray(cfg.allowAssetOrigins) ? cfg.allowAssetOrigins.slice() : null;
+    var onMediaBlocked = typeof cfg.onMediaBlocked === "function" ? cfg.onMediaBlocked : null;
+    var mediaReconcileConfig = cfg.mediaReconcileConfig && typeof cfg.mediaReconcileConfig === "object" ? cfg.mediaReconcileConfig : DEFAULT_MEDIA_RECONCILE_CONFIG;
+    var playerFactory = typeof cfg.playerFactory === "function" ? cfg.playerFactory : null;
+    var onMediaUnavailable = typeof cfg.onMediaUnavailable === "function" ? cfg.onMediaUnavailable : null;
+    function gateAsset(url, kind) {
+      return gateAssetUrl(url, {
+        mediaMode,
+        allowAssetOrigins,
+        assetOriginPolicy,
+        kind: kind || "image"
+      });
+    }
+    function buildAssetPlaceholderEl(ownerDoc, el) {
+      var ph = ownerDoc.createElement("div");
+      ph.setAttribute("data-ps-asset-unavailable", "blocked-origin");
+      var w = el.getAttribute && (el.getAttribute("rr_width") || el.getAttribute("width")) || "";
+      var h = el.getAttribute && (el.getAttribute("rr_height") || el.getAttribute("height")) || "";
+      if (w) ph.setAttribute("rr_width", w);
+      if (h) ph.setAttribute("rr_height", h);
+      return ph;
+    }
+    function gateFragmentAssets(rootNode) {
+      if (!rootNode || typeof rootNode.querySelectorAll !== "function") return;
+      var ownerDoc = rootNode.ownerDocument || (rootNode.nodeType === 9 ? rootNode : null);
+      if (!ownerDoc) return;
+      var imgs = rootNode.querySelectorAll("img");
+      for (var i = 0; i < imgs.length; i++) {
+        var el = imgs[i];
+        try {
+          var pinned = el.getAttribute("data-ps-currentsrc");
+          var effective = el.getAttribute("src");
+          if (pinned) {
+            effective = pinned;
+            el.setAttribute("src", pinned);
+            el.removeAttribute("srcset");
+            el.removeAttribute("sizes");
+            el.removeAttribute("data-ps-currentsrc");
+          }
+          if (effective && !gateAsset(effective, "image").allow) {
+            var ph = buildAssetPlaceholderEl(ownerDoc, el);
+            if (el.parentNode) el.parentNode.replaceChild(ph, el);
+            continue;
+          }
+          var srcset = el.getAttribute("srcset");
+          if (srcset && srcsetHasBlockedCandidate3(srcset, gateAsset)) {
+            if (!effective) {
+              var phSrcset = buildAssetPlaceholderEl(ownerDoc, el);
+              if (el.parentNode) el.parentNode.replaceChild(phSrcset, el);
+            } else {
+              el.removeAttribute("srcset");
+            }
+          }
+        } catch (e) {
+          logger.warn("[Renderer] asset gate pass failed for an element", {
+            error: e && e.message ? e.message : String(e)
+          });
+        }
+      }
+      gateFragmentMedia(rootNode, ownerDoc);
+    }
+    function gateFragmentMedia(rootNode, ownerDoc) {
+      var posterOnly = mediaMode === "poster";
+      var media = rootNode.querySelectorAll("video, audio");
+      for (var i = 0; i < media.length; i++) {
+        var el = media[i];
+        try {
+          var src = el.getAttribute("src");
+          if (src && (posterOnly || !gateAsset(src, "media").allow)) {
+            el.removeAttribute("src");
+          }
+          var poster = el.getAttribute("poster");
+          if (poster && !gateAsset(poster, "poster").allow) {
+            el.removeAttribute("poster");
+          }
+          var childSources = el.querySelectorAll("source");
+          for (var j = 0; j < childSources.length; j++) {
+            var cs = childSources[j];
+            var csSrc = cs.getAttribute("src");
+            if (csSrc && (posterOnly || !gateAsset(csSrc, "media").allow)) {
+              cs.removeAttribute("src");
+            }
+          }
+        } catch (e) {
+          logger.warn("[Renderer] media gate pass failed for an element", {
+            error: e && e.message ? e.message : String(e)
+          });
+        }
+      }
+      var looseSources = rootNode.querySelectorAll("source");
+      for (var k = 0; k < looseSources.length; k++) {
+        var ls = looseSources[k];
+        try {
+          var lsSrc = ls.getAttribute("src");
+          if (lsSrc && (posterOnly || !gateAsset(lsSrc, "media").allow)) {
+            ls.removeAttribute("src");
+          }
+        } catch (e2) {
+        }
+      }
+    }
+    var doc = container.ownerDocument || cfg.document;
     var win = doc.defaultView;
     var root = doc.createElement("div");
     root.setAttribute("data-phantomstream-ui", "viewer");
@@ -1000,11 +2084,13 @@
         var scrubDoc = iframe.contentDocument;
         if (scrubDoc && scrubDoc.body) {
           sanitizeFragment(scrubDoc.body, sanitizeCounters, logger);
+          gateFragmentAssets(scrubDoc.body);
           if (lastSnapshotPayload) {
             resetIdentityIndex(scrubDoc, lastSnapshotPayload.nodeIds || []);
             installStyleSources(scrubDoc, lastSnapshotPayload.styleSources || [], { kind: "document" });
             installShadowRoots(scrubDoc, lastSnapshotPayload.shadowRoots || []);
             installFrames(scrubDoc, lastSnapshotPayload.frames || []);
+            applyMediaBaseline(lastSnapshotPayload.media);
           }
         }
       } catch (e) {
@@ -1027,6 +2113,25 @@
     root.appendChild(iframe);
     var overlays = createOverlays({ document: doc, logger });
     root.appendChild(overlays.layer);
+    var mediaPlayer = createMediaPlayer({
+      doc,
+      win,
+      gateAsset,
+      logger,
+      playerFactory,
+      onMediaUnavailable: function(nid, reason) {
+        safeInvokeMediaHook(function(n) {
+          if (onMediaUnavailable) onMediaUnavailable(n, reason);
+        }, nid);
+      },
+      showOverlay: function(kind, payload, ctx) {
+        return overlays.show(kind, payload, ctx);
+      },
+      resolveNidRect,
+      ensurePlaying
+    });
+    var pendingHints = /* @__PURE__ */ new Map();
+    var hintBoundNids = /* @__PURE__ */ new Set();
     container.appendChild(root);
     var viewerState = "waiting";
     var publicState = "connecting";
@@ -1060,6 +2165,7 @@
     var destroyed = false;
     var nidToNode = /* @__PURE__ */ new Map();
     var nodeToNid = /* @__PURE__ */ new WeakMap();
+    var mediaFirstBind = /* @__PURE__ */ new Set();
     var frameLoadHandlers = /* @__PURE__ */ new WeakMap();
     var nodeHighlightEl = null;
     var pendingSubtreeRequests = /* @__PURE__ */ new Map();
@@ -1423,6 +2529,12 @@
       if (s.media) el.setAttribute("media", String(s.media));
       if (s.disabled) el.setAttribute("data-ps-style-disabled", "true");
       rootNode.appendChild(el);
+      if (s.disabled) {
+        try {
+          el.disabled = true;
+        } catch (err) {
+        }
+      }
       return true;
     }
     function installStyleSources(targetDoc, styleSources, scopeContext) {
@@ -1727,6 +2839,9 @@
     }
     function handleSnapshot(payload) {
       var p = payload || {};
+      if (typeof p.html !== "string" && p.payload && typeof p.payload === "object") {
+        p = p.payload;
+      }
       if (typeof p.html !== "string") {
         logger.error("[Renderer] snapshot missing html");
         return;
@@ -1744,7 +2859,14 @@
       lastScroll.y = p.scrollY || 0;
       lastSnapshotPayload = p;
       clearIdentityIndex();
-      iframe.srcdoc = buildSnapshotHtml(p);
+      mediaFirstBind.clear();
+      mediaPlayer.destroyAll();
+      pendingHints.clear();
+      hintBoundNids.clear();
+      var gatedPayload = Object.assign({}, p, {
+        html: gateSnapshotAssets(p.html, gateAsset)
+      });
+      iframe.srcdoc = buildSnapshotHtml(gatedPayload);
       markLive("snapshot");
     }
     function handleMutations(payload) {
@@ -1768,7 +2890,12 @@
             installFrames(cd, frames || []);
           },
           applyStyleSource,
-          removeStyleSource
+          removeStyleSource,
+          // Phase 12 (MSEC-01) pre-write asset gate hooks for the diff applier:
+          // ADD template content is gated as an inert fragment; ATTR src/poster
+          // is gated per-URL before setAttribute.
+          gateFragmentAssets,
+          gateAssetUrl: gateAsset
         }
       });
       if (!resyncPending) markLive("mutations");
@@ -1793,6 +2920,7 @@
       var tpl = targetDoc.createElement("template");
       tpl.innerHTML = p.html || "";
       sanitizeFragment(tpl.content, sanitizeCounters, logger);
+      gateFragmentAssets(tpl.content);
       var newNode = tpl.content.firstElementChild;
       if (!newNode) {
         logger.warn("[Renderer] subtree response dropped: html parsed to no element", {
@@ -1839,6 +2967,268 @@
       overlays.handleDialogMessage(payload);
       markLive("dialog");
     }
+    function safeInvokeMediaHook(fn, nid) {
+      if (typeof fn !== "function") return;
+      try {
+        fn(nid);
+      } catch (err) {
+        logger.error("[Renderer] onMediaBlocked hook failed", err);
+      }
+    }
+    function showBlockedPlayAffordance(el, nid) {
+      overlays.show("media-blocked", {
+        nid,
+        onActivate: function() {
+          try {
+            var p = el.play();
+            if (p !== void 0 && typeof p.then === "function") {
+              p.then(function() {
+                overlays.show("media-blocked", null);
+              }).catch(function() {
+              });
+            } else {
+              overlays.show("media-blocked", null);
+            }
+          } catch (e) {
+          }
+        }
+      }, { anchorRect: resolveNidRect(nid) });
+    }
+    function ensurePlaying(el, nid) {
+      if (!el.paused) return;
+      try {
+        el.muted = true;
+      } catch (e) {
+      }
+      var p;
+      try {
+        p = el.play();
+      } catch (e) {
+        return;
+      }
+      if (p !== void 0 && typeof p.catch === "function") {
+        p.catch(function(err) {
+          if (err && err.name === "NotAllowedError") {
+            showBlockedPlayAffordance(el, nid);
+            safeInvokeMediaHook(onMediaBlocked, nid);
+          }
+        });
+      }
+    }
+    function applyMediaAction(el, action, nid) {
+      if (!action || typeof action.action !== "string") return;
+      if (el.seeking) {
+        if (action.action === "pause") {
+          try {
+            el.pause();
+          } catch (e) {
+          }
+        }
+        return;
+      }
+      switch (action.action) {
+        case "pause":
+          try {
+            el.pause();
+          } catch (e) {
+          }
+          break;
+        case "seek":
+        case "rejoin-edge": {
+          var target;
+          if (action.action === "rejoin-edge") {
+            target = el.seekable && el.seekable.length > 0 ? el.seekable.end(el.seekable.length - 1) : null;
+          } else {
+            target = action.toTime;
+          }
+          if (target != null && el.readyState >= 1) {
+            try {
+              el.currentTime = target;
+            } catch (e) {
+            }
+          }
+          ensurePlaying(el, nid);
+          break;
+        }
+        case "nudge":
+          try {
+            el.playbackRate = action.rate;
+          } catch (e) {
+          }
+          ensurePlaying(el, nid);
+          break;
+        case "hold":
+          if (action.revertRate != null && el.playbackRate !== action.revertRate) {
+            try {
+              el.playbackRate = action.revertRate;
+            } catch (e) {
+            }
+          }
+          ensurePlaying(el, nid);
+          break;
+        default:
+          break;
+      }
+    }
+    function handleMedia(payload) {
+      if (viewerState !== "streaming") return;
+      if (!isCurrentStream(payload, active)) return;
+      if (mediaMode !== "reference") {
+        if (mediaMode === "poster") {
+          var posterNid = payload && payload.nid;
+          var posterEl = resolveIndexedNode(posterNid);
+          var hasPoster = !!(posterEl && posterEl.getAttribute && posterEl.getAttribute("poster"));
+          if (posterEl && !hasPoster) {
+            overlays.show("media-poster", { nid: posterNid }, { anchorRect: resolveNidRect(posterNid) });
+          } else {
+            overlays.show("media-poster", null);
+          }
+        }
+        markLive("media");
+        return;
+      }
+      var nid = payload && payload.nid;
+      var el = resolveIndexedNode(nid);
+      if (!el || typeof el.play !== "function") return;
+      maybeConsumePageHint(el, nid);
+      var localState = {
+        currentTime: el.currentTime,
+        paused: !!el.paused,
+        playbackRate: el.playbackRate,
+        seeking: !!el.seeking,
+        readyState: el.readyState
+      };
+      var action = reconcileMediaDrift(localState, payload, Date.now(), mediaReconcileConfig);
+      applyMediaAction(el, action, nid);
+      evaluateUnmuteTrigger(el, payload, nid);
+      markLive("media");
+    }
+    function mediaElementHasNoSource(el) {
+      try {
+        if (el.getAttribute && el.getAttribute("src")) return false;
+        if (el.currentSrc) return false;
+        if (typeof el.querySelector === "function") {
+          var sourced = el.querySelector("source[src]");
+          if (sourced) return false;
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    function maybeConsumePageHint(el, nid) {
+      if (pendingHints.size === 0) return;
+      var key = String(nid);
+      if (hintBoundNids.has(key)) return;
+      if (!mediaElementHasNoSource(el)) return;
+      var chosen = null;
+      pendingHints.forEach(function(hint) {
+        if (!chosen || hint.storedAt >= chosen.storedAt) chosen = hint;
+      });
+      if (!chosen) return;
+      pendingHints.delete(chosen.kind);
+      hintBoundNids.add(key);
+      bindAdaptiveHint(el, key, chosen.manifestUrl, chosen.kind, chosen.contentType);
+    }
+    function bindAdaptiveHint(el, nid, manifestUrl, kind, contentType) {
+      try {
+        mediaPlayer.attach(el, manifestUrl, { nid: String(nid), kind, contentType });
+      } catch (e) {
+        logger.warn("[Renderer] adaptive hint bind failed", { nid: String(nid) });
+      }
+    }
+    function handleMediaHint(payload) {
+      if (viewerState !== "streaming") return;
+      if (!isCurrentStream(payload, active)) return;
+      if ((!payload || !payload.streamSessionId) && !active.streamSessionId) return;
+      if (mediaMode !== "reference") {
+        markLive("media");
+        return;
+      }
+      var p = payload || {};
+      var manifestUrl = p.manifestUrl;
+      if (!manifestUrl || typeof manifestUrl !== "string") {
+        markLive("media");
+        return;
+      }
+      var nid = p.nid != null ? p.nid : null;
+      if (!gateAsset(manifestUrl, "media").allow) {
+        mediaPlayer.degrade(nid != null ? String(nid) : null, "no-manifest");
+        markLive("media");
+        return;
+      }
+      var kind = p.kind === "hls" || p.kind === "dash" ? p.kind : null;
+      var scope = p.scope === "element" ? "element" : p.scope === "page" ? "page" : nid != null ? "element" : "page";
+      if (scope === "element" && nid != null) {
+        var el = resolveIndexedNode(nid);
+        if (el && typeof el.play === "function" && mediaElementHasNoSource(el)) {
+          hintBoundNids.add(String(nid));
+          bindAdaptiveHint(el, nid, manifestUrl, kind, p.contentType);
+        } else {
+          logger.warn("[Renderer] element-scope media hint dropped (unresolved or non-opaque nid)", {
+            nid: String(nid),
+            reason: el ? "not-opaque" : "unresolved"
+          });
+        }
+        markLive("media");
+        return;
+      }
+      pendingHints.set(kind || "hls", {
+        manifestUrl,
+        kind: kind || "hls",
+        contentType: p.contentType,
+        storedAt: Date.now()
+      });
+      markLive("media");
+    }
+    function evaluateUnmuteTrigger(el, payload, nid) {
+      var sourceUnmuted = payload && payload.muted === false;
+      if (el.muted === true && sourceUnmuted) {
+        var vol = payload && typeof payload.volume === "number" ? payload.volume : null;
+        overlays.show("media-unmute", {
+          nid,
+          onActivate: function() {
+            try {
+              el.muted = false;
+            } catch (e) {
+            }
+            if (vol != null) {
+              try {
+                el.volume = vol;
+              } catch (e2) {
+              }
+            }
+            overlays.show("media-unmute", null);
+          }
+        }, { anchorRect: resolveNidRect(nid) });
+      } else {
+        overlays.show("media-unmute", null);
+      }
+    }
+    function applyMediaBaseline(baseline) {
+      if (mediaMode !== "reference") return;
+      if (!Array.isArray(baseline) || baseline.length === 0) return;
+      for (var i = 0; i < baseline.length; i++) {
+        var entry = baseline[i];
+        if (!entry || entry.nid == null) continue;
+        var key = String(entry.nid);
+        if (mediaFirstBind.has(key)) continue;
+        var el = resolveIndexedNode(key);
+        if (!el || typeof el.play !== "function") continue;
+        mediaFirstBind.add(key);
+        try {
+          if (typeof entry.currentTime === "number" && el.readyState >= 1) {
+            el.currentTime = entry.currentTime;
+          }
+          if (typeof entry.playbackRate === "number") el.playbackRate = entry.playbackRate;
+          if (entry.paused === false) {
+            ensurePlaying(el, key);
+          }
+        } catch (e) {
+          logger.warn("[Renderer] media baseline apply failed", { nid: key });
+        }
+      }
+    }
     function dispatch(type, payload) {
       if (detached) return;
       incrementCounter(receivedByType, type);
@@ -1862,6 +3252,12 @@
             break;
           case STREAM.DIALOG:
             handleDialog(payload);
+            break;
+          case STREAM.MEDIA:
+            handleMedia(payload);
+            break;
+          case STREAM.MEDIA_HINT:
+            handleMediaHint(payload);
             break;
           case STREAM.STATE:
             handleStreamState(payload);
@@ -1960,7 +3356,12 @@
       on,
       registerOverlay,
       requestSubtree,
-      resolveNode
+      resolveNode,
+      // Host-driven snapshot entry point (Phase 12): viewers wired without a
+      // wire transport (the asset-fetch-gate path) render a snapshot by calling
+      // this directly. Identical to the dispatch() STREAM.SNAPSHOT target and
+      // accepts either a bare payload or a { type, payload } envelope.
+      handleSnapshot
     };
   }
 
@@ -2058,7 +3459,15 @@
       container: cfg.container,
       transport: hostTransport.transport,
       logger,
-      disconnectDelayMs: cfg.disconnectDelayMs
+      disconnectDelayMs: cfg.disconnectDelayMs,
+      // Phase 33 (MEDIA): live <video>/<audio> mirroring. createViewer defaults
+      // mediaMode to 'reference' when undefined and validates it (throws on an
+      // invalid value); the degrade callbacks + reconciler tolerances are
+      // optional and pass straight through ('off' | 'poster' | 'reference').
+      mediaMode: cfg.mediaMode,
+      onMediaBlocked: cfg.onMediaBlocked,
+      onMediaUnavailable: cfg.onMediaUnavailable,
+      mediaReconcileConfig: cfg.mediaReconcileConfig
     });
     var offState = typeof cfg.onState === "function" ? viewer.on("state", cfg.onState) : null;
     var offHealth = typeof cfg.onHealth === "function" ? viewer.on("health", cfg.onHealth) : null;

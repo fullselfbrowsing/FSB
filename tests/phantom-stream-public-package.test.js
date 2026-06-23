@@ -4,7 +4,7 @@
  * PhantomStream public package integration smoke.
  *
  * Locks FSB's v0.12.0 package source decision: the production package is
- * @full-self-browsing/phantom-stream@0.1.0 from npm, not the stale
+ * @full-self-browsing/phantom-stream@0.2.1 from npm, not the stale
  * @fullselfbrowsing/phantom-stream name.
  */
 

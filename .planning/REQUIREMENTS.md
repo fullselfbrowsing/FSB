@@ -78,6 +78,24 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 - [x] **SIGN-01**: Server-delivered recipes are signature-verified (Ed25519/JCS via Lattice receipts) before execution; unverified or tampered recipes are rejected.
 - [x] **SIGN-02**: Recipe integrity metadata (signature, captured-at, schema hash) travels with the recipe and is checked by the interpreter before binding.
 
+### MEDIA — PhantomStream Media Mirroring (Phase 33, milestone extension)
+
+Added after the original v0.9.99 audit as a Phase 33 extension: take up PhantomStream `0.2.1`'s media-mirroring feature so the dashboard live preview mirrors `<video>`/`<audio>` (by reference, not pixels). Thematically continues the v0.12.0 PhantomStream lineage; lands in the open v0.9.99 tree because phase numbers are global integers and v0.12.0 is archived.
+
+- [x] **MEDIA-01**: FSB pins PhantomStream `0.2.1` (from `0.1.0`) and rebuilds the capture/protocol/viewer bundles so the package's media-mirroring feature is present; `package.json`, the lockfile integrity, and `PHANTOMSTREAM-PIN.md` agree on `0.2.1` and the version-pin tests pass.
+- [x] **MEDIA-02**: Live `<video>`/`<audio>` playback state (`STREAM.MEDIA`) is forwarded end-to-end from the capture core through the content-script adapter and background relay to the dashboard — the capture allowlist no longer drops the media side channel. The adaptive-manifest hint (`STREAM.MEDIA_HINT`) seam is wired but dormant.
+- [x] **MEDIA-03**: The static and Angular dashboards route inbound media frames to the PhantomStream viewer and run it with `mediaMode: 'reference'` (media-by-reference) plus logger-trapped degrade callbacks; the existing capture-side masking still applies.
+- [x] **MEDIA-04**: The drift-reconciler branch behavior, the full forward→relay→viewer wiring chain, and the rebuilt bundle media surface are covered by headless tests wired into `npm test`; live-browser playback fidelity is recorded as `human_needed` UAT.
+
+### UPLOAD — Explicit File Upload Tool (Phase 34, milestone extension)
+
+Added as a Phase 34 extension: a dedicated tool to upload a real file from a known disk path to a web form, filling the gap that the synthetic-only `drop_file` and the JS workaround could not (page JS cannot set a file input's value or read the local filesystem). Lands in the open v0.9.99 tree because phase numbers are global integers.
+
+- [x] **UPLOAD-01**: A first-class `upload_file(selector, file_path, tab_id?)` tool sets a real file from an ABSOLUTE disk path onto an `<input type="file">` via CDP `DOM.setFileInputFiles` (real binaries — images/PDFs/docs), including inputs hidden behind a styled label/dropzone.
+- [x] **UPLOAD-02**: Both front doors (the MCP dispatcher and the autopilot tool-executor) route through ONE shared background helper, so behavior and security are identical; the tool registers in `TOOL_REGISTRY` and the frozen parity/visual-session baselines are updated.
+- [x] **UPLOAD-03**: Security posture A — absolute-path-only, a sensitive-path denylist (keys, credential stores, `.env*`, keychains, `/proc`, `/var/run/secrets`, the FSB vault) enforced at the shared chokepoint BEFORE any side effect (covering both front doors), and every upload audit-logged (origin + outcome + decision; the path is never persisted).
+- [x] **UPLOAD-04**: Headless tests cover the denylist (incl. the Win32 trailing-dot/space bypass), the registry/parity/visual-session/routing locks, all wired into `npm test`; live upload fidelity is recorded `human_needed`.
+
 ## v2 Requirements
 
 Deferred to a future milestone. Tracked but not in the v0.9.99 roadmap.
@@ -154,10 +172,18 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | LEARN-04 | Phase 31 | Complete |
 | SIGN-01 | Phase 30 | Complete |
 | SIGN-02 | Phase 30 | Complete |
+| MEDIA-01 | Phase 33 | Complete |
+| MEDIA-02 | Phase 33 | Complete |
+| MEDIA-03 | Phase 33 | Complete |
+| MEDIA-04 | Phase 33 | Complete |
+| UPLOAD-01 | Phase 34 | Complete |
+| UPLOAD-02 | Phase 34 | Complete |
+| UPLOAD-03 | Phase 34 | Complete |
+| UPLOAD-04 | Phase 34 | Complete |
 
 **Coverage:**
-- v1 requirements: 44 total
-- Mapped to phases: 44
+- v1 requirements: 52 total (44 original + 4 MEDIA [Phase 33] + 4 UPLOAD [Phase 34] milestone extensions)
+- Mapped to phases: 52
 - Unmapped: 0
 
 Per-phase requirement counts:
@@ -168,7 +194,11 @@ Per-phase requirement counts:
 - Phase 30 (GOV + SIGN): 10 — GOV-01..08, SIGN-01..02
 - Phase 31 (DISC + LEARN): 8 — DISC-01..04, LEARN-01..04
 - Phase 32 (HEAL): 5 — HEAL-01..05
+- Phase 33 (MEDIA): 4 — MEDIA-01..04 (PhantomStream 0.2.1 media-mirroring uptake; extends the milestone)
+- Phase 34 (UPLOAD): 4 — UPLOAD-01..04 (explicit file-upload tool `upload_file`; extends the milestone)
 
 ---
 *Requirements defined: 2026-06-19*
 *Last updated: 2026-06-19 — roadmap created; traceability populated for Phases 26–32, coverage 44/44 mapped, 0 unmapped.*
+*Updated: 2026-06-23 — Phase 33 (PhantomStream 0.2.1 media-mirroring uptake) added; +4 MEDIA requirements, coverage 48/48 mapped, 0 unmapped.*
+*Updated: 2026-06-23 — Phase 34 (explicit file-upload tool, upload_file) added; +4 UPLOAD requirements, coverage 52/52 mapped, 0 unmapped.*

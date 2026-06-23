@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: ready_to_plan
-stopped_at: Phase 32 complete (5/5) — ready to discuss Phase 999.1
-last_updated: 2026-06-23T11:39:18.000Z
+stopped_at: Phase 34 (explicit file-upload tool, upload_file) execution-complete — milestone extension
+last_updated: 2026-06-23T13:30:00.000Z
 last_activity: 2026-06-23
 progress:
-  total_phases: 8
-  completed_phases: 7
-  total_plans: 30
-  completed_plans: 32
-  percent: 88
+  total_phases: 10
+  completed_phases: 9
+  total_plans: 32
+  completed_plans: 34
+  percent: 90
 ---
 
 # Project State
@@ -36,7 +36,7 @@ Last activity: 2026-06-23 - Completed quick task 260623-941: Patch learned repla
 
 Progress: [██████████] 100%
 
-## Roadmap At A Glance (v0.9.99, Phases 26-32)
+## Roadmap At A Glance (v0.9.99, Phases 26-34)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
@@ -47,6 +47,8 @@ Progress: [██████████] 100%
 | 30 | Consent Governance + Recipe Signature Verification + Audit + Legal Posture | GOV-01..08, SIGN-01..02 (10) | Not started |
 | 31 | Network-Capture Discovery + Recipe Synthesis + Learned Recipes | DISC-01..04, LEARN-01..04 (8) | Not started |
 | 32 | Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | HEAL-01..05 (5) | Not started |
+| 33 | PhantomStream Media Mirroring (0.2.1 Uptake) — milestone extension | MEDIA-01..04 (4) | Complete — 1 plan done; CI half green; live media UAT human_needed |
+| 34 | Explicit File Upload Tool (upload_file) — milestone extension | UPLOAD-01..04 (4) | Complete — 1 plan done; CI half green; live upload UAT human_needed |
 
 Coverage: 44/44 v1 requirements mapped, 0 orphaned.
 
@@ -192,6 +194,14 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: v0.9.99 milestone gate CLOSED: full npm test EXIT 0 + targeted Phase-32 gate 13/13 GREEN (HEAL-05, D-15)
 - [Phase ?]: Phase 32 Plan 05 (HEAL-01/HEAL-03 live half): authored 32-HUMAN-UAT.md (UAT-32-01) recording the irreducibly-live self-healing scenario (a real rotted/broken recipe on a real authenticated origin detected as RECIPE_EXPIRED, the autopilot completing the SAME task via the DOM tools, the recipe quarantined, and a consent-gated re-learn offered/triggered) as human_needed (status partial / result pending), matching the Phase 27-31 posture; the CI half is GREEN (Plans 02-04), ONLY the live half is human_needed, recorded debt NOT a fabricated pass (D-15, GOV-06).
 - [Phase ?]: Phase 32 Plan 05: the gated checkpoint:human-verify (non-package, gate=blocking) was resolved per the auto-mode policy as deferred human_needed live-browser UAT debt joining the v0.9.99 ledger (alongside UAT-27-01 + the Phase 29/30/31 live items); it does NOT block the milestone close -- the v0.9.99 completion criterion is the green HEAL-05 CI gate (Plan 04, full npm test EXIT 0). No live result was fabricated. Phase 32 is execution-complete (all 5 plans done).
+
+**Phase 33 (MEDIA-01..04, milestone extension):**
+
+- PhantomStream `0.1.0→0.2.1` media-mirroring uptake. FSB consumes the package via three esbuild bundles, so the port is bump + targeted rebuild (only the 3 phantom-stream entries, NOT `buildAll()`, to protect lattice-host/stt drift) + glue. The one blocker is `dom-stream.js`'s `forwardCaptureMessage` allowlist silently dropping unknown `STREAM.*`; fixed by branching `STREAM.MEDIA`/`MEDIA_HINT` → `domStreamMedia`/`domStreamMediaHint` → `ext:dom-media` relay → dashboard `handleDOMMedia` (static + Angular). `mediaMode: 'reference'` (D-02); adaptive HLS/DASH discovery deferred off-by-default (D-03, no `webRequest` permission, `classifyManifest` surfaced for later). INV-01..04 untouched; differential parity green by construction. media-sync 31/0 + media-wiring 24/0; full phantom-stream cluster green. Not committed (working-tree drift intermingled). Live media playback fidelity = `33-HUMAN-UAT.md` (human_needed).
+
+**Phase 34 (UPLOAD-01..04, milestone extension):**
+
+- Explicit `upload_file(selector, file_path, tab_id?)` tool: sets a real file from an absolute disk path onto an `<input type=file>` via CDP `DOM.setFileInputFiles` — the only mechanism that can (page JS is forbidden from setting a file input or reading disk). Routed `_route:'background'` so both front doors (MCP `mcp-tool-dispatcher` `handleUploadFileRoute` + autopilot `tool-executor` `case 'upload_file'`) share ONE background helper `executeUploadFile`, where the security chokepoint lives. Posture A (D-02): absolute-path-only + `extension/utils/upload-path-denylist.js` (sensitive paths) + audit (origin+outcome+decision, never the path) enforced BEFORE any side effect. Keeps `drop_file` for synthetic dropzones (D-03). INV-01 registry hash moved intentionally (recomputed `6354d788…` in all 4 hash files); `mcp/ai/tool-definitions.cjs` rebuilt byte-identical; `visual-session-schema-lock` 36→37; no new permission (`chrome.debugger` already granted). Review 0 critical/high/medium, 3 WARNING fixed (Win32 trailing-dot/space bypass, +`/proc`/`/var/run/secrets`/`.git-credentials`, detach-as-failure). denylist 36/0; full `npm test` EXIT 0. Not committed (drift intermingled). Live upload fidelity = `34-HUMAN-UAT.md` (human_needed).
 
 ### Top Risks (from research — bake into phase planning)
 

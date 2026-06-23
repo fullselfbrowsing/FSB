@@ -59,7 +59,22 @@ DROPZONE ANATOMY:
   (border color change, background highlight, "Drop files here" text)
 - After drop: shows file name, upload progress bar, file size, preview thumbnail
 
-INTERACTION STRATEGY A -- DROP_FILE TOOL (PREFERRED):
+INTERACTION STRATEGY 0 -- UPLOAD_FILE TOOL (PREFERRED WHEN YOU HAVE A DISK PATH):
+The upload_file MCP tool sets a REAL file from a local disk path directly on the
+target <input type="file"> via the browser DevTools protocol (DOM.setFileInputFiles).
+Use this whenever the file already exists on disk -- it handles real binaries
+(images, PDFs, documents) that drop_file's synthetic string content cannot. Steps:
+1. Use get_dom_snapshot to find the <input type="file"> (or the dropzone/label
+   that wraps a hidden one) and record its CSS selector.
+2. Call upload_file(selector="input[type=file]", file_path="/absolute/path/to/file").
+   The selector may be the input itself OR a container holding one; the path must be
+   ABSOLUTE (relative or ~ paths are rejected). A sensitive-path denylist blocks
+   secrets (keys, .env, ~/.ssh, the FSB vault) and every upload is audit-logged.
+3. Use get_dom_snapshot to verify the file name / preview / progress appeared.
+Only fall back to drop_file (Strategy A) for pure drag-only dropzones with no
+underlying file input, or when you only have synthetic/inline content (no real file).
+
+INTERACTION STRATEGY A -- DROP_FILE TOOL (synthetic content / dropzones):
 The drop_file MCP tool creates a synthetic File object and dispatches the
 HTML5 DragEvent sequence directly on the dropzone element. Steps:
 1. Use get_dom_snapshot to identify the dropzone element.
@@ -86,10 +101,13 @@ intercept and re-dispatch events internally), try the hidden input approach:
    position:absolute with negative offsets, or zero dimensions).
 2. The hidden input may have accept="image/*" or accept=".pdf,.doc" attributes
    that restrict file types.
-3. Content scripts CANNOT programmatically open the file picker dialog
-   (browser security restriction). However, some implementations allow
-   setting the files property directly on the input element.
-4. If direct file setting is not possible, document this as a tool gap.
+3. Content scripts CANNOT programmatically open the file picker dialog or set a
+   file input's value (browser security restriction). But the upload_file tool
+   CAN: it runs in the background via the DevTools protocol (DOM.setFileInputFiles),
+   which is exactly how it bypasses this restriction.
+4. If you have the file on disk, use upload_file(selector, file_path) (Strategy 0).
+   Only document a tool gap if there is no <input type="file"> at all (a pure
+   drag-only dropzone).
 
 DROPZONE.JS SPECIFIC PATTERNS:
 - Container: .dropzone, form.dropzone, div.dropzone
@@ -149,8 +167,10 @@ STUCK RECOVERY:
 - If dropzone shows error: check accepted file types (accept attribute on hidden
   input) and adjust fileName/mimeType accordingly.
 - If the site requires authentication: document as SKIP-AUTH.
-- If the upload requires a real file (not synthetic): document as a tool gap --
-  content scripts cannot access the local filesystem.`,
+- If the upload requires a real file (not synthetic): use the upload_file tool
+  with an absolute disk path (Strategy 0) -- it sets the file via the background
+  DevTools protocol (DOM.setFileInputFiles), bypassing the content-script
+  filesystem restriction.`,
   selectors: {
     // Generic dropzone selectors
     dropzone: '.dropzone, [class*="dropzone"], [class*="drop-zone"], [class*="upload-area"], [class*="drag-drop"], [class*="file-drop"], [class*="upload-zone"]',
@@ -178,9 +198,9 @@ STUCK RECOVERY:
       'Use get_dom_snapshot AGAIN to verify the file was accepted. Look for: the file name appearing in the dropzone area, an upload progress bar, a file preview thumbnail, a success indicator, or any visual change in the dropzone state.',
       'If Strategy A SUCCEEDED (file name visible, progress shown, or upload confirmed): REPORT SUCCESS. Document the dropzone selector used and verification method.',
       'If Strategy A FAILED (no visual change after drop_file): Try clicking the dropzone element to activate it, then retry drop_file. Some dropzone libraries require a prior interaction to initialize event listeners.',
-      'If the retry also fails: Look for a hidden input[type="file"] element near the dropzone. Document the input selector and note that programmatic file input population is a potential tool gap for future development.',
+      'If the retry also fails: Look for a hidden input[type="file"] element near the dropzone. If you have a real file on disk, use upload_file(selector, file_path) (Strategy 0) -- it sets the file directly via DOM.setFileInputFiles. Only note a tool gap if there is no file input at all (a pure drag-only dropzone).',
       'REPORT: Document which strategy was used (A or B), whether the file was accepted, and whether upload progress or file name was displayed.'
     ]
   },
-  toolPreferences: ['navigate', 'read_page', 'get_dom_snapshot', 'drop_file', 'click', 'wait_for_element', 'wait_for_stable']
+  toolPreferences: ['navigate', 'read_page', 'get_dom_snapshot', 'upload_file', 'drop_file', 'click', 'wait_for_element', 'wait_for_stable']
 });

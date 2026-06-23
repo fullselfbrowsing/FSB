@@ -5,11 +5,11 @@
 - **v0.10.0 Autopilot via Lattice SDK** — Phases 01-13, shipped 2026-06-15.
 - **v0.11.0 Trigger Tool (Reactive DOM Monitoring)** — Phases 14-20, completed 2026-06-17; release actions and browser UAT remain user-gated.
 - **v0.12.0 PhantomStream Package Migration** — Phases 21-25, completed 2026-06-17; live Chrome-extension UAT remains user-gated.
-- **v0.9.99 Native Capability Catalog (FSB API Execution)** — Phases 26-32, IN PROGRESS.
+- **v0.9.99 Native Capability Catalog (FSB API Execution)** — Phases 26-34, IN PROGRESS (Phase 33 = media mirroring, Phase 34 = explicit file-upload tool; both post-audit extensions).
 
 ## Active Milestone
 
-**v0.9.99 Native Capability Catalog (FSB API Execution)** — Phases 26-32.
+**v0.9.99 Native Capability Catalog (FSB API Execution)** — Phases 26-34 (Phases 33-34 are post-audit extensions: PhantomStream media mirroring + an explicit `upload_file` tool).
 
 **Milestone Goal:** Give FSB first-class authenticated-API execution as a fast path alongside DOM automation — call a service's real web API through the user's authenticated session (zero plugin installs, no MCP tool bloat), backed by FSB's DOM engine as a self-healing fallback. The whole design lives between two architectural walls: **Wall 1** (MV3 "no remotely-hosted code" — server-delivered recipes are CLOSED-vocabulary DATA bound by a fixed bundled interpreter, never `eval`'d) and **Wall 2** (the authenticated fetch MUST run in the page MAIN world so the user's first-party cookies attach; a background-SW fetch is the anti-pattern). Ordering is risk-first: the schema + CI guard (Wall 1) and the page-context fetch primitive (Wall 2) come first; consent precedes discovery/learning; self-healing fallback lands last.
 
@@ -22,7 +22,7 @@
 ## Phases
 
 **Phase Numbering:**
-- Integer phases continue from v0.12.0's Phase 25 — this milestone runs Phases 26-32. Numbering never restarts at 1.
+- Integer phases continue from v0.12.0's Phase 25 — this milestone runs Phases 26-32, plus Phase 33 (media mirroring) and Phase 34 (explicit file-upload tool) extensions added after the initial audit. Numbering never restarts at 1.
 - Decimal phases (26.1, 26.2) remain reserved for urgent insertions (marked INSERTED) and execute between their surrounding integers.
 
 - [ ] **Phase 26: Recipe Schema + Bundled Interpreter + MV3 CI Guard** - Wall 1 day-one invariant: closed-vocabulary recipe schema, fixed eval-free interpreter, and a CI guard that fails on any `eval`/`new Function`/`import(` reachable from the recipe path.
@@ -144,6 +144,32 @@
 - [x] 32-04-PLAN.md — HEAL-05 gates: freeze the v2 RECIPE_SCHEMA hash + 7-provider parity green + full npm test (the v0.9.99 milestone completion gate)
 - [x] 32-05-PLAN.md — Live self-healing UAT (32-HUMAN-UAT.md, human_needed) + gated checkpoint
 
+### Phase 33: PhantomStream Media Mirroring (0.2.1 Uptake)
+**Goal**: Take up PhantomStream `0.2.1`'s media-mirroring feature so the dashboard live preview mirrors `<video>`/`<audio>` by reference (URL + playback state, never pixels) — bump the pin, rebuild the bundles, and un-drop the media side channel at FSB's capture/relay/viewer seams. A milestone extension on the v0.12.0 PhantomStream lineage; independent of the capability stack.
+**Depends on**: v0.12.0 PhantomStream migration (the consume-the-package architecture). Touches no capability/MCP/agent-loop code.
+**Requirements**: MEDIA-01, MEDIA-02, MEDIA-03, MEDIA-04
+**Success Criteria** (what must be TRUE):
+  1. The pin/lockfile/PIN-doc agree on `0.2.1` and the three phantom-stream bundles are rebuilt with the media surface; version-pin tests pass.
+  2. Live media playback state (`STREAM.MEDIA`) flows capture → content adapter → background relay → dashboard viewer; the capture allowlist no longer drops it.
+  3. Static + Angular dashboards drive the viewer with `mediaMode: 'reference'` and route inbound media frames; existing masking still applies.
+  4. Headless tests (reconciler branches + the full wiring chain + bundle surface) are green in `npm test`; live playback fidelity is recorded `human_needed`.
+**Plans**: 1 plan (consume-the-upgrade: surgical glue + tests + docs)
+- [x] 33-01-PLAN.md — Bump `0.1.0→0.2.1` + rebuild bundles + entry shims (`classifyManifest`, `mediaMode`) + capture/relay/dashboard glue + `media-sync`/`media-wiring` tests + pin/requirements/roadmap/audit + live UAT ledger
+**Invariants**: INV-01..04 untouched (no capability/MCP/agent-loop change); the PhantomStream differential parity stays green by construction (FSB consumes the package). Adaptive HLS/DASH discovery (`STREAM.MEDIA_HINT` via `chrome.webRequest`) is deferred off-by-default (no new permission).
+
+### Phase 34: Explicit File Upload Tool (`upload_file`)
+**Goal**: Add a dedicated tool to upload a real file from a known disk path to a web form — the gap the synthetic-only `drop_file` and the JS workaround cannot fill (page JS cannot set a file input's value or read disk). A milestone extension; independent of the capability stack.
+**Depends on**: the existing `chrome.debugger` CDP seam (Input emulation) + the Phase 30 audit-log. No new permission.
+**Requirements**: UPLOAD-01, UPLOAD-02, UPLOAD-03, UPLOAD-04
+**Success Criteria** (what must be TRUE):
+  1. `upload_file(selector, file_path, tab_id?)` sets a real file from an ABSOLUTE disk path onto an `<input type=file>` (incl. hidden-behind-dropzone) via CDP `DOM.setFileInputFiles`.
+  2. Both front doors (MCP dispatcher + autopilot tool-executor) route through ONE shared background helper; the registry/parity/visual-session locks are updated.
+  3. Security posture A: absolute-path-only + a sensitive-path denylist at the shared chokepoint (both front doors) + audit without persisting the path.
+  4. Headless tests (denylist incl. the Win32 bypass + parity/visual-session/routing locks) green in `npm test`; live upload fidelity recorded `human_needed`.
+**Plans**: 1 plan
+- [x] 34-01-PLAN.md — `upload-path-denylist.js` + background `executeUploadFile` (CDP `DOM.setFileInputFiles`) + MCP route + autopilot case + `tool-definitions` entry + parity/visual-session/hash updates (4 files) + denylist test + site-guide + live UAT
+**Invariants**: INV-01 registry hash moved intentionally (sanctioned additive tool; recomputed `6354d788…` across all 4 files); no agent-loop/provider/capability-engine change; `manifest.json` unchanged (`chrome.debugger` already granted). Independent review: 0 critical/high/medium, 3 WARNING fixed.
+
 ## Progress
 
 **Execution Order:**
@@ -158,6 +184,8 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 4/4 | Complete    | 2026-06-22 |
 | 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 6/6 | Complete    | 2026-06-23 |
 | 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 5/5 | Complete    | 2026-06-23 |
+| 33. PhantomStream Media Mirroring (0.2.1 Uptake) — milestone extension | 1/1 | Complete    | 2026-06-23 |
+| 34. Explicit File Upload Tool (upload_file) — milestone extension | 1/1 | Complete    | 2026-06-23 |
 
 ## Completed Milestones
 

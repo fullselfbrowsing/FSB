@@ -59,6 +59,7 @@ const MCP_PHASE199_TOOL_ROUTES = {
   start_visual_session: { routeFamily: 'visual-session', messageType: 'mcp:start-visual-session', handler: handleToolAliasRoute },
   end_visual_session: { routeFamily: 'visual-session', messageType: 'mcp:end-visual-session', handler: handleToolAliasRoute },
   execute_js: { routeFamily: 'browser', handler: handleExecuteJsRoute },
+  upload_file: { routeFamily: 'browser', handler: handleUploadFileRoute },
   run_task: { routeFamily: 'autopilot', messageType: 'mcp:start-automation', handler: handleToolAliasRoute },
   stop_task: { routeFamily: 'autopilot', messageType: 'mcp:stop-automation', handler: handleToolAliasRoute },
   get_task_status: { routeFamily: 'autopilot', messageType: 'mcp:get-status', handler: handleToolAliasRoute },
@@ -1294,6 +1295,40 @@ async function handleOpenTabRoute({ params }) {
   }
 }
 
+// Phase 34: MCP front door for upload_file. Tab ownership is already enforced
+// by resolveAgentTabOrError + checkOwnershipGate before this runs; the shared
+// background helper (executeUploadFile) owns the denylist + audit chokepoint.
+async function handleUploadFileRoute({ params }) {
+  const p = params || {};
+  if (!Number.isFinite(p.tabId)) {
+    return createMcpInvalidParamsError('upload_file', 'upload_file requires a resolved tab');
+  }
+  if (typeof p.selector !== 'string' || !p.selector.trim()) {
+    return createMcpInvalidParamsError('upload_file', 'upload_file requires a selector');
+  }
+  if (typeof p.file_path !== 'string' || !p.file_path.trim()) {
+    return createMcpInvalidParamsError('upload_file', 'upload_file requires file_path');
+  }
+  const uploadFn = (typeof globalThis !== 'undefined' && typeof globalThis.executeUploadFile === 'function')
+    ? globalThis.executeUploadFile
+    : null;
+  if (!uploadFn) {
+    return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: 'upload handler unavailable' });
+  }
+  try {
+    const result = await uploadFn(p.tabId, p.selector, p.file_path);
+    if (result && result.success) {
+      return { success: true, tool: 'upload_file', method: result.method, selector: result.selector, file: result.file };
+    }
+    return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, {
+      error: (result && result.error) || 'upload_file failed',
+      reason: result && result.reason
+    });
+  } catch (error) {
+    return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: error.message || String(error) });
+  }
+}
+
 async function handleSwitchTabRoute({ params }) {
   const { agentId } = params || {};
   if (!Number.isFinite(params?.tabId)) {
@@ -2176,22 +2211,62 @@ async function handleSearchMemoryMessageRoute({ payload }) {
   };
 }
 
-// Phase 28 SURF-01: read-only capability search. The owned-tab origin is resolved
-// authoritatively SW-side (un-spoofable, D-11); payload.origin is a non-authoritative
-// override only. Returns { success:true, results } capped at <=5 ranked schema-on-hit hits.
-async function handleCapabilitiesSearchMessageRoute({ payload }) {
+// Phase 28 SURF-01: read-only capability search. Non-legacy MCP agents resolve
+// the owned tab before origin biasing (D-11); payload.origin is only an expected
+// origin hint on that path. Legacy/missing-agent callers keep active-tab/origin-
+// override compatibility. Returns { success:true, results } capped at <=5 hits.
+async function handleCapabilitiesSearchMessageRoute({ payload, client }) {
   if (typeof FsbCapabilitySearch === 'undefined' || typeof FsbCapabilitySearch.search !== 'function') {
     return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability search unavailable' });
   }
-  // Resolve the owned-tab origin SW-side (capability-fetch.js:285-291 pattern). The model
-  // NEVER supplies the authoritative origin; payload.origin is an optional override only.
-  let ownedOrigin = payload.origin || null;
-  if (!ownedOrigin) {
+  payload = payload || {};
+  const { agentId } = payload;
+  const isLegacyOrMissingAgent = (typeof agentId !== 'string' || !agentId || agentId.startsWith('legacy:'));
+
+  let ownedOrigin = null;
+  if (isLegacyOrMissingAgent) {
+    ownedOrigin = payload.origin || null;
+    if (!ownedOrigin) {
+      const requestedTabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
+      try {
+        const tab = requestedTabId !== null ? await chrome.tabs.get(requestedTabId) : await getActiveTabFromClient(client);
+        ownedOrigin = (tab && tab.url) ? new URL(tab.url).origin : null;
+      } catch (e) {
+        ownedOrigin = null;
+      }
+    }
+  } else {
+    const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, payload || {}, client)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    if (resolved.success === false) {
+      return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: resolved.code,
+        error: 'Tab resolution failed: ' + resolved.code,
+        agentId: resolved.agentId,
+        ...(resolved.tabIds ? { tabIds: resolved.tabIds } : {})
+      });
+    }
+    let tab = null;
     try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      ownedOrigin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
-    } catch (e) {
+      tab = await chrome.tabs.get(resolved.tabId);
+    } catch (_e) {
+      return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'tab_unavailable',
+        error: 'Resolved tabId ' + resolved.tabId + ' could not be loaded'
+      });
+    }
+    try {
+      ownedOrigin = (tab && tab.url) ? new URL(tab.url).origin : null;
+    } catch (_e) {
       ownedOrigin = null;
+    }
+    if (payload.origin && ownedOrigin && payload.origin !== ownedOrigin) {
+      return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'RECIPE_CONSENT_REQUIRED',
+        error: 'RECIPE_CONSENT_REQUIRED',
+        reason: 'supplied origin does not match the target tab origin'
+      });
     }
   }
   const topN = boundedPositiveInt(payload.topN, 5, 5);

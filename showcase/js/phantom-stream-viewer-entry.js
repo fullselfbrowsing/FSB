@@ -84,6 +84,14 @@ function createDashboardViewer(options) {
     transport: hostTransport.transport,
     logger: logger,
     disconnectDelayMs: cfg.disconnectDelayMs,
+    // Phase 33 (MEDIA): live <video>/<audio> mirroring. createViewer defaults
+    // mediaMode to 'reference' when undefined and validates it (throws on an
+    // invalid value); the degrade callbacks + reconciler tolerances are
+    // optional and pass straight through ('off' | 'poster' | 'reference').
+    mediaMode: cfg.mediaMode,
+    onMediaBlocked: cfg.onMediaBlocked,
+    onMediaUnavailable: cfg.onMediaUnavailable,
+    mediaReconcileConfig: cfg.mediaReconcileConfig,
   });
   var offState = typeof cfg.onState === 'function'
     ? viewer.on('state', cfg.onState)

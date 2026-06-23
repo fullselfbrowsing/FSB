@@ -40,22 +40,29 @@ export function registerCapabilityTools(
   // enqueue() below serializes instead of bypassing (search_memory precedent).
   server.tool(
     'search_capabilities',
-    'Search the FSB capability catalog by intent. Returns up to topN ranked capabilities, each with its slug, service, side-effect class (read/mutate/destructive), a one-line description, and the params JSON-Schema (schema-on-hit) so you can call invoke_capability in one step. Results are biased toward the active tab\'s origin. When to use: before invoke_capability, to discover which capability matches a natural-language intent and how to call it.',
+    'Search the FSB capability catalog by intent. Use before DOM tools for first-party actions on the current site. Returns up to topN ranked capabilities with slug, service, side-effect class (read/mutate/destructive), description, and params JSON-Schema (schema-on-hit) so you can call invoke_capability in one step. Results are biased toward the resolved tab origin.',
     {
       query: z.string().describe('Natural-language intent, e.g. "show my github notifications"'),
-      origin: z.string().optional().describe('Optional origin override (e.g. "https://github.com"). Non-authoritative -- omit to use the active tab origin, which is resolved inside the extension.'),
+      origin: z.string().optional().describe('Optional expected-origin hint (e.g. "https://github.com"). For agent-scoped calls, omit to use the resolved owned tab origin; if supplied, it must match that tab origin. Legacy callers may still use it as an origin override.'),
+      tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional tab id; omit to use the active/owned tab'),
       topN: z.coerce.number().int().positive().finite().optional().describe('Max results (default 5, max 5)'),
     },
-    async ({ query, origin, topN }) => {
+    async ({ query, origin, tab_id, topN }) => {
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
       // enqueue() bypasses the queue immediately because 'search_capabilities'
       // is in the readOnlyTools Set -- discovery never parks behind a mutation.
       return queue.enqueue('search_capabilities', async () => {
-        const result = await bridge.sendAndWait(
-          { type: 'mcp:capabilities-search', payload: { query, origin, topN } },
-          { timeout: 5_000 },
+        const targetTabId = typeof tab_id === 'number' ? tab_id : null;
+        const payload: Record<string, unknown> = { query, origin, topN };
+        if (tab_id !== undefined) payload.tab_id = tab_id;
+        const result = await sendAgentScopedBridgeMessage(
+          bridge,
+          agentScope,
+          'mcp:capabilities-search',
+          payload,
+          { timeout: 5_000, targetTabId },
         );
         return mapFSBError(result);
       });
@@ -70,7 +77,7 @@ export function registerCapabilityTools(
   // precedent), so a mutating invoke can never race an in-flight mutation.
   server.tool(
     'invoke_capability',
-    'Invoke a capability by slug (from a search_capabilities hit) with validated params. Executes the service\'s real web API in your authenticated session and returns a structured result. Mutating capabilities perform real side effects -- check the side-effect class from search_capabilities before invoking. Params are validated against the hit\'s params JSON-Schema inside the extension.',
+    'Invoke a capability by slug (from a search_capabilities hit) with validated params. Executes the service\'s real web API in your authenticated session and returns a structured result. Mutating capabilities perform real side effects -- check the side-effect class first. If it returns RECIPE_DOM_FALLBACK_PENDING or RECIPE_EXPIRED, continue the same task with DOM tools.',
     {
       slug: z.string().describe('Capability slug from a search_capabilities hit'),
       params: z.record(z.any()).optional().describe('Parameters matching the hit\'s params JSON-Schema'),

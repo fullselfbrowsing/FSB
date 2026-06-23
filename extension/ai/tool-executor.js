@@ -399,6 +399,28 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
         return makeResult({ success: false, error: execResult?.error || 'JS execution returned no result' });
       }
 
+      case 'upload_file': {
+        // Phase 34: set a real file from disk on an <input type=file> via CDP
+        // DOM.setFileInputFiles. Same shared background helper the MCP front
+        // door uses, so the path denylist + audit cover this autopilot path too.
+        const selector = params?.selector;
+        const filePath = params?.file_path;
+        if (!selector || !filePath) {
+          return makeResult({ success: false, error: 'upload_file requires selector and file_path' });
+        }
+        const uploadFn = (typeof globalThis !== 'undefined' && typeof globalThis.executeUploadFile === 'function')
+          ? globalThis.executeUploadFile
+          : null;
+        if (!uploadFn) {
+          return makeResult({ success: false, error: 'upload_file handler unavailable' });
+        }
+        const r = await uploadFn(tabId, selector, filePath);
+        if (r && r.success) {
+          return makeResult({ success: true, hadEffect: true, result: r });
+        }
+        return makeResult({ success: false, error: (r && r.error) || 'upload_file failed' });
+      }
+
       case 'trigger':
       case 'stop_trigger':
       case 'get_trigger_status':

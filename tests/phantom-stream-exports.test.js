@@ -133,7 +133,7 @@ function ok(condition, message) {
   const installedPkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
   ok(installedPkg.name === PACKAGE_NAME, 'installed package name is ' + PACKAGE_NAME);
-  ok(installedPkg.version === '0.1.0', 'installed package version is 0.1.0');
+  ok(installedPkg.version === '0.2.1', 'installed package version is 0.2.1');
   ok(installedPkg.type === 'module', 'installed package declares type: module');
 
   for (const entry of PACKAGE_EXPORTS) {

@@ -170,6 +170,10 @@ check(loadJsonThrew, 'loadJSON WITHOUT the options arg throws (the load-bearing 
       && slackHit.params.required.includes('text'),
     'handler-backed search hit carries descriptor params schema for slack.chat.postMessage'
   );
+  check(
+    slackHit && slackHit.sideEffectClass === 'mutate',
+    'handler-backed descriptor sideEffectClass "write" is normalized to "mutate"'
+  );
 
   // ---- Exit convention ------------------------------------------------------
   console.log(`\ncapability-search-eval: ${passed} passed, ${failed} failed`);

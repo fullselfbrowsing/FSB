@@ -17,6 +17,14 @@ interface MetricsPayload {
   connection?: { connected?: boolean; pairedClient?: string; connectedAt?: number };
   sessions?: { activeSessions?: number; completedTasks?: number; errorCount?: number };
   cost?: { totalCost?: number; totalTokens?: number };
+  usage?: {
+    timeRange?: string;
+    totalTokens?: number;
+    totalCost?: number;
+    totalRequests?: number;
+    successfulRequests?: number;
+    successRate?: number;
+  };
   activeTab?: { tabId?: number; url?: string };
 }
 
@@ -222,6 +230,9 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     reason: 'user-stop',
     ownership: 'none',
   };
+  private remoteControlRequestedAt = 0;
+  private remoteControlRequestTimer: any = null;
+  private readonly REMOTE_CONTROL_START_GRACE_MS = 5000;
 
   // ---- DOM references (populated in ngAfterViewInit) ----
   private loginSection!: HTMLElement | null;
@@ -405,6 +416,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.taskElapsedTimer) clearInterval(this.taskElapsedTimer);
     if (this.taskTimeoutTimer) clearTimeout(this.taskTimeoutTimer);
     if (this.taskRecoveryTimer) clearTimeout(this.taskRecoveryTimer);
+    this.clearRemoteControlRequestTimer();
     if (this.previewHideTimer) clearTimeout(this.previewHideTimer);
     if (this.pendingStreamRecovery) clearTimeout(this.pendingStreamRecovery);
 
@@ -622,8 +634,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     // Remote control toggle
     this.listen(this.previewRcBtn, 'click', () => {
-      if (this.previewState !== 'streaming') return;
-      this.setRemoteControl(!this.remoteControlOn);
+      this.handleRemoteControlToggleClick();
     });
 
     // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
@@ -1058,6 +1069,17 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       },
       onState: (event: any) => this.handlePreviewViewerState(event),
       onHealth: (health: any) => this.handlePreviewViewerHealth(health),
+      // Phase 33 (MEDIA): live <video>/<audio> mirroring by reference (parity
+      // with the static dashboard). 'reference' is the package default and the
+      // point of the feature; switch to 'poster'/'off' for a more conservative
+      // posture. Degrade callbacks are logger-trapped by the package.
+      mediaMode: 'reference',
+      onMediaBlocked: (nid: string) => {
+        this.recordTransportEvent('phantomstream-media-blocked', { nid: nid || '' });
+      },
+      onMediaUnavailable: (nid: string, reason: string) => {
+        this.recordTransportEvent('phantomstream-media-unavailable', { nid: nid || '', reason: reason || '' });
+      },
     });
     return this.previewViewer;
   }
@@ -1179,14 +1201,90 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     element.style.display = '';
   }
 
+  private normalizeRemoteControlReason(reason: any, fallback: string): string {
+    if (typeof reason !== 'string' || !reason) return fallback;
+    switch (reason) {
+      case 'ready':
+      case 'retarget-required':
+      case 'dispatch-failed':
+      case 'debugger-blocked':
+      case 'stream-not-ready':
+      case 'user-stop':
+      case 'no-tab':
+        return reason;
+      case 'active':
+      case 'approved':
+      case 'authorization-approved':
+      case 'control-approved':
+        return 'ready';
+      case 'locked':
+      case 'requesting':
+        return 'requesting';
+      case 'stopped':
+        return 'user-stop';
+      case 'denied':
+      case 'authorization-denied':
+      case 'control-denied':
+        return 'debugger-blocked';
+      default:
+        return fallback;
+    }
+  }
+
+  private normalizePhantomRemoteControlState(payload: any): RemoteControlState | null {
+    if (!payload || typeof payload.state !== 'string') return null;
+    const tabId = typeof payload.tabId === 'number' ? payload.tabId : null;
+    const ownership = typeof payload.ownership === 'string' && payload.ownership ? payload.ownership : null;
+
+    switch (payload.state) {
+      case 'active':
+        return {
+          enabled: true,
+          attached: true,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'ready'),
+          ownership: ownership || 'dashboard',
+        };
+      case 'requesting':
+      case 'locked':
+        return {
+          enabled: false,
+          attached: false,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'requesting'),
+          ownership: ownership || 'none',
+        };
+      case 'denied':
+        return {
+          enabled: false,
+          attached: false,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'debugger-blocked'),
+          ownership: ownership || 'none',
+        };
+      case 'stopped':
+        return {
+          enabled: false,
+          attached: false,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'user-stop'),
+          ownership: ownership || 'none',
+        };
+      default:
+        return null;
+    }
+  }
+
   private normalizeRemoteControlState(payload: any): RemoteControlState {
     payload = payload || {};
+    const phantomState = this.normalizePhantomRemoteControlState(payload);
+    if (phantomState) return phantomState;
     return {
       enabled: !!payload.enabled,
       attached: !!payload.attached,
       tabId: typeof payload.tabId === 'number' ? payload.tabId : null,
-      reason: payload.reason || 'user-stop',
-      ownership: payload.ownership || 'none',
+      reason: typeof payload.reason === 'string' && payload.reason ? payload.reason : 'user-stop',
+      ownership: typeof payload.ownership === 'string' && payload.ownership ? payload.ownership : 'none',
     };
   }
 
@@ -1213,21 +1311,24 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private deriveRemoteRuntimeSurface(payload: RemoteControlState): RemoteControlSurface {
+    const remoteControlAvailable = this.canClickRemoteControlToggle();
     const helpers = this.getDashboardRuntimeStateHelpers();
     if (helpers.deriveRemoteControlSurface) {
       return helpers.deriveRemoteControlSurface({
         remoteControlOn: this.remoteControlOn,
         previewState: this.previewState,
+        remoteControlAvailable,
         attached: payload.attached,
         reason: payload.reason,
         ownership: payload.ownership,
+        requestPending: this.isRemoteControlStartPending(),
       });
     }
     return {
       chipLabel: '',
       chipTone: 'paused',
       detailText: '',
-      available: this.previewState === 'streaming',
+      available: remoteControlAvailable,
       shouldForceDisable: payload.attached !== true || payload.reason !== 'ready',
     };
   }
@@ -1384,18 +1485,24 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private renderRemoteControlState(payload: any, options?: { skipToggleSync?: boolean }): RemoteControlSurface {
     options = options || {};
-    this.lastRemoteControlState = this.normalizeRemoteControlState(payload || this.lastRemoteControlState);
+    const nextState = this.normalizeRemoteControlState(payload || this.lastRemoteControlState);
+    const suppressStaleOff = this.isRemoteControlStartPending() && this.isBenignRemoteControlOff(nextState);
+    if (!suppressStaleOff) {
+      this.lastRemoteControlState = nextState;
+    }
     const surface = this.deriveRemoteRuntimeSurface(this.lastRemoteControlState);
     this.renderStateChip(this.previewRcState, 'dash-preview-rc-state', surface.chipLabel, surface.chipTone);
     if (this.previewRcBtn) {
-      (this.previewRcBtn as HTMLButtonElement).disabled = this.previewState !== 'streaming' || surface.available !== true;
+      (this.previewRcBtn as HTMLButtonElement).disabled = !this.canClickRemoteControlToggle();
     }
     if (options.skipToggleSync) return surface;
     if (this.lastRemoteControlState.enabled && this.lastRemoteControlState.attached && this.lastRemoteControlState.reason === 'ready') {
+      this.completeRemoteControlRequest();
       if (!this.remoteControlOn) {
         this.setRemoteControl(true, { silent: true, source: 'remote-state' });
       }
-    } else if (surface.shouldForceDisable && this.remoteControlOn) {
+    } else if (surface.shouldForceDisable && this.remoteControlOn && !suppressStaleOff) {
+      this.completeRemoteControlRequest();
       this.setRemoteControl(false, { silent: true, source: 'remote-state' });
     }
     return surface;
@@ -1411,24 +1518,38 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     const sessions = payload.sessions || {};
     const cost = payload.cost || {};
+    const usage = payload.usage || {};
 
-    const activeSessions = typeof sessions.activeSessions === 'number' ? sessions.activeSessions : 0;
+    const totalTokens = typeof usage.totalTokens === 'number'
+      ? usage.totalTokens
+      : (typeof cost.totalTokens === 'number' ? cost.totalTokens : 0);
+    const totalCost = typeof usage.totalCost === 'number'
+      ? usage.totalCost
+      : (typeof cost.totalCost === 'number' ? cost.totalCost : 0);
+    const totalRequests = typeof usage.totalRequests === 'number'
+      ? usage.totalRequests
+      : ((typeof sessions.completedTasks === 'number' ? sessions.completedTasks : 0) +
+        (typeof sessions.errorCount === 'number' ? Math.max(0, sessions.errorCount) : 0));
     const completedTasks = typeof sessions.completedTasks === 'number' ? sessions.completedTasks : 0;
     const errorCount = typeof sessions.errorCount === 'number' ? Math.max(0, sessions.errorCount) : 0;
-    const totalCost = typeof cost.totalCost === 'number' ? cost.totalCost : 0;
-
-    const totalAttempts = completedTasks + errorCount;
-    const successRate = totalAttempts > 0 ? Math.round((completedTasks / totalAttempts) * 100) : 0;
+    const totalAttempts = totalRequests > 0 ? totalRequests : completedTasks + errorCount;
+    const successRate = typeof usage.successRate === 'number'
+      ? usage.successRate
+      : (totalAttempts > 0 ? (completedTasks / totalAttempts) * 100 : 0);
 
     const enabledEl = document.getElementById('stat-enabled');
     const runsEl = document.getElementById('stat-runs-today');
     const rateEl = document.getElementById('stat-success-rate');
     const costEl = document.getElementById('stat-total-cost');
+    const remoteEl = document.getElementById('stat-cost-saved');
 
-    if (enabledEl) enabledEl.textContent = String(activeSessions);
-    if (runsEl) runsEl.textContent = String(completedTasks);
-    if (rateEl) rateEl.textContent = successRate + '%';
+    if (enabledEl) enabledEl.textContent = this.formatStatNumber(totalTokens);
+    if (runsEl) runsEl.textContent = this.formatStatNumber(totalRequests);
+    if (rateEl) rateEl.textContent = Math.round(successRate) + '%';
     if (costEl) costEl.textContent = '$' + totalCost.toFixed(2);
+    if (remoteEl) remoteEl.textContent = this.remoteControlOn
+      ? 'Remote on'
+      : (payload.connection?.connected ? 'Connected' : 'Offline');
   }
 
   private clearMetrics(): void {
@@ -1436,14 +1557,21 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     const runsEl = document.getElementById('stat-runs-today');
     const rateEl = document.getElementById('stat-success-rate');
     const costEl = document.getElementById('stat-total-cost');
+    const remoteEl = document.getElementById('stat-cost-saved');
 
     if (enabledEl) enabledEl.textContent = '0';
     if (runsEl) runsEl.textContent = '0';
     if (rateEl) rateEl.textContent = '0%';
     if (costEl) costEl.textContent = '$0.00';
+    if (remoteEl) remoteEl.textContent = 'Offline';
   }
 
   // ==================== REMOTE CONTROL HELPERS ====================
+
+  private formatStatNumber(value: number): string {
+    const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+    return Math.round(safe).toLocaleString();
+  }
 
   private getRemoteViewportSize(): { width: number; height: number } {
     return {
@@ -2919,10 +3047,90 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         break;
       }
     }
-    if (newState !== 'streaming' && newState !== 'frozen-disconnect' && newState !== 'frozen-complete' && this.remoteControlOn) {
+    const keepRemoteUntilAuthoritativeState = newState !== 'paused' &&
+      (this.isRemoteControlStartPending() || this.isDashboardWSOpen());
+    if (newState !== 'streaming' && newState !== 'frozen-disconnect' && newState !== 'frozen-complete' && this.remoteControlOn && !keepRemoteUntilAuthoritativeState) {
       this.setRemoteControl(false, { silent: newState !== 'paused', source: 'preview-state' });
     }
     this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+  }
+
+  private isRemoteControlToggleAvailable(): boolean {
+    if (this.isDashboardWSOpen()) return true;
+    if (this.isRemoteControlStartPending()) return true;
+    if (this.previewState === 'streaming') return true;
+    if (this.previewState !== 'loading') return false;
+    if (!this.streamToggleOn || this.previewNotReadyReason) return false;
+    return this.pageReady === true ||
+      this.lastRecoveredStreamState === 'ready' ||
+      this.lastRecoveredStreamState === 'recovering';
+  }
+
+  private isDashboardWSOpen(): boolean {
+    return !!(this.ws && this.ws.readyState === WebSocket.OPEN);
+  }
+
+  private canClickRemoteControlToggle(): boolean {
+    return this.remoteControlOn || this.isRemoteControlStartPending() || this.isDashboardWSOpen();
+  }
+
+  private isRemoteControlStartPending(): boolean {
+    return this.remoteControlRequestedAt > 0 &&
+      Date.now() - this.remoteControlRequestedAt < this.REMOTE_CONTROL_START_GRACE_MS;
+  }
+
+  private isBenignRemoteControlOff(state: RemoteControlState): boolean {
+    if (!state || state.enabled || state.attached) return false;
+    return state.reason === 'user-stop' || state.reason === 'stream-not-ready';
+  }
+
+  private clearRemoteControlRequestTimer(): void {
+    if (this.remoteControlRequestTimer) {
+      clearTimeout(this.remoteControlRequestTimer);
+      this.remoteControlRequestTimer = null;
+    }
+  }
+
+  private completeRemoteControlRequest(): void {
+    this.remoteControlRequestedAt = 0;
+    this.clearRemoteControlRequestTimer();
+  }
+
+  private armRemoteControlRequestTimeout(): void {
+    this.clearRemoteControlRequestTimer();
+    this.remoteControlRequestTimer = setTimeout(() => {
+      this.remoteControlRequestTimer = null;
+      if (!this.remoteControlRequestedAt || !this.remoteControlOn) return;
+      this.remoteControlRequestedAt = 0;
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'request-timeout',
+        ownership: 'none',
+      };
+      this.setRemoteControl(false, { silent: true, source: 'request-timeout' });
+      this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+    }, this.REMOTE_CONTROL_START_GRACE_MS);
+  }
+
+  private handleRemoteControlToggleClick(): void {
+    if (this.remoteControlOn) {
+      this.setRemoteControl(false);
+      return;
+    }
+    if (!this.isDashboardWSOpen()) {
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'dashboard-disconnected',
+        ownership: 'none',
+      };
+      this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+      return;
+    }
+    this.setRemoteControl(true);
   }
 
   private handleDOMSnapshot(payload: any): void {
@@ -3007,7 +3215,31 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private setRemoteControl(on: boolean, options?: { silent?: boolean; source?: string }): void {
     options = options || {};
+    if (on && options.silent !== true && !this.isDashboardWSOpen()) {
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'dashboard-disconnected',
+        ownership: 'none',
+      };
+      this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+      return;
+    }
     this.remoteControlOn = on;
+    if (on && options.silent !== true) {
+      this.remoteControlRequestedAt = Date.now();
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'requesting',
+        ownership: 'dashboard',
+      };
+      this.armRemoteControlRequestTimeout();
+    } else if (!on) {
+      this.completeRemoteControlRequest();
+    }
     this.setRemoteControlCaptureActive(false);
     if (this.remoteOverlay) {
       this.remoteOverlay.tabIndex = on ? 0 : -1;
@@ -3035,9 +3267,15 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       }
       this.previewRcBtn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i>';
     }
-    if (options.silent !== true && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
+    const activeWs = this.ws;
+    if (options.silent !== true && activeWs && activeWs.readyState === WebSocket.OPEN) {
+      activeWs.send(JSON.stringify({
         type: on ? 'dash:remote-control-start' : 'dash:remote-control-stop',
+        payload: {},
+        ts: Date.now(),
+      }));
+      activeWs.send(JSON.stringify({
+        type: on ? 'dash:ps-control-request' : 'dash:ps-control-stop',
         payload: {},
         ts: Date.now(),
       }));
@@ -3283,6 +3521,22 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.dispatchPreviewViewer('ext:dom-scroll', payload);
   }
 
+  private handleDOMMedia(payload: any): void {
+    // Phase 33 (MEDIA): forward live media playback state to the viewer's
+    // reconciler. Stream-only (like scroll); the viewer self-heals drift.
+    if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-media')) return;
+    if (this.previewState !== 'streaming') return;
+    this.dispatchPreviewViewer('ext:dom-media', payload);
+  }
+
+  private handleDOMMediaHint(payload: any): void {
+    // Phase 33 (MEDIA): adaptive-manifest discovery hint (dormant until the
+    // opt-in chrome.webRequest discovery path is enabled).
+    if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-media-hint')) return;
+    if (this.previewState !== 'streaming') return;
+    this.dispatchPreviewViewer('ext:dom-media-hint', payload);
+  }
+
   private handleDOMOverlay(payload: any): void {
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-overlay')) return;
     const canRenderOverlay = this.previewState === 'streaming'
@@ -3429,6 +3683,17 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     this.ws.onclose = (e) => {
       this.clearMetrics();
+      if (this.remoteControlOn || this.remoteControlRequestedAt) {
+        this.setRemoteControl(false, { silent: true, source: 'ws-close' });
+        this.lastRemoteControlState = {
+          enabled: false,
+          attached: false,
+          tabId: this.activePreviewTabId,
+          reason: 'dashboard-disconnected',
+          ownership: 'none',
+        };
+        this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+      }
       this.recordTransportEvent('ws-close', { closeCode: e.code, closeReason: e.reason || '' });
       this.extensionOnline = false;
       this.pageReady = false;
@@ -3447,6 +3712,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private disconnectWS(): void {
     this.clearPendingStreamRecovery();
+    this.clearRemoteControlRequestTimer();
     if (this.wsReconnectTimer) { clearTimeout(this.wsReconnectTimer); this.wsReconnectTimer = null; }
     if (this.wsPingTimer) { clearInterval(this.wsPingTimer); this.wsPingTimer = null; }
     if (this.ws) {
@@ -3550,7 +3816,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         this.pageReady = snapshot.streamStatus === 'ready';
         this.previewLoadStartedAt = Date.now();
         this.setPreviewLoadingText(snapshot.streamStatus === 'recovering' ? 'Recovering browser preview...' : 'Waiting for live page preview...');
-        this.setPreviewState('loading');
+        if (this.previewState !== 'streaming') this.setPreviewState('loading');
         if (!this.pendingStreamRecovery) this.armPreviewRecoveryWatchdog('snapshot:' + (snapshot.snapshotSource || 'unknown'));
       }
       this.updatePreviewTooltip();
@@ -3596,6 +3862,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (msg.type === 'ext:dom-scroll') { this.handleDOMScroll(msg.payload); return; }
     if (msg.type === 'ext:dom-overlay') { this.handleDOMOverlay(msg.payload); return; }
     if (msg.type === 'ext:dom-dialog') { this.handleDOMDialog(msg.payload); return; }
+    if (msg.type === 'ext:dom-media') { this.handleDOMMedia(msg.payload); return; }
+    if (msg.type === 'ext:dom-media-hint') { this.handleDOMMediaHint(msg.payload); return; }
     if (msg.type === 'ext:stream-state') { this.handleRecoveredStreamState(msg.payload || {}); return; }
     if (msg.type === 'ext:request-snapshot') {
       if (this.previewState !== 'frozen-complete') {
@@ -3603,7 +3871,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       }
       return;
     }
-    if (msg.type === 'ext:remote-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }
+    if (msg.type === 'ext:remote-control-state' || msg.type === 'ext:ps-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }
     if (msg.type === 'ext:metrics') { this.renderMetrics(msg.payload || {}); return; }
 
     if (msg.type === 'ext:page-ready') {

@@ -47,9 +47,9 @@ const EXPECTED_NON_TRIGGER_TOOL_NAMES = [
   'double_click_at', 'read_page', 'get_text', 'get_attribute',
   'set_attribute', 'get_dom_snapshot', 'list_tabs', 'get_page_snapshot',
   'get_site_guide', 'search_memory', 'report_progress', 'complete_task',
-  'partial_task', 'fail_task'
+  'partial_task', 'fail_task', 'upload_file'
 ];
-const EXPECTED_NON_TRIGGER_REGISTRY_HASH = 'ad6efb8cc3275d964488b67222129b1c0278c5c3b69c64888d926beb89a3926b';
+const EXPECTED_NON_TRIGGER_REGISTRY_HASH = '6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d';
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
@@ -229,7 +229,7 @@ if (closeTab) {
 }
 
 // Action tools have tab_id (Plan 02 Task 4 -- 35 tools)
-const actionTools = ['execute_js','navigate','search','go_back','go_forward','refresh','click','type_text','press_enter','press_key','select_option','check_box','hover','right_click','double_click','select_text_range','drag_drop','drop_file','focus','clear_input','scroll','scroll_to_top','scroll_to_bottom','scroll_to_element','wait_for_element','wait_for_stable','fill_sheet','click_at','click_and_hold','drag','drag_variable_speed','scroll_at','insert_text','double_click_at','set_attribute'];
+const actionTools = ['execute_js','navigate','search','go_back','go_forward','refresh','click','type_text','press_enter','press_key','select_option','check_box','hover','right_click','double_click','select_text_range','drag_drop','drop_file','focus','clear_input','scroll','scroll_to_top','scroll_to_bottom','scroll_to_element','wait_for_element','wait_for_stable','fill_sheet','click_at','click_and_hold','drag','drag_variable_speed','scroll_at','insert_text','double_click_at','set_attribute','upload_file'];
 actionTools.forEach(function(name) {
   const t = td.getToolByName(name);
   check(!!t, 'action tool ' + name + ' exists in TOOL_REGISTRY');

@@ -94,6 +94,13 @@
     return 'read'; // GET / HEAD / unknown
   }
 
+  function normalizeSideEffectClass(value) {
+    var c = String(value || '').toLowerCase();
+    if (c === 'destructive' || c === 'delete') { return 'destructive'; }
+    if (c === 'mutate' || c === 'mutating' || c === 'write' || c === 'writes') { return 'mutate'; }
+    return 'read';
+  }
+
   // ---- Pure index builder (the SINGLE source of truth the eval test reuses) ---
   //
   // Constructs a MiniSearch over INDEX_OPTIONS and adds the descriptor docs. The
@@ -115,7 +122,7 @@
         description: d.description || '',
         actionVerb: d.actionVerb || '',
         // recipe-derived class wins when a paired recipe exists (integrity check)
-        sideEffectClass: derived || d.sideEffectClass || 'read'
+        sideEffectClass: derived || normalizeSideEffectClass(d.sideEffectClass)
       };
     }));
     return ms;
@@ -250,7 +257,7 @@
       return {
         slug: h.slug,
         service: h.service,
-        sideEffectClass: h.sideEffectClass,
+        sideEffectClass: normalizeSideEffectClass(h.sideEffectClass),
         description: h.description,
         score: h.score,
         params: recipe.params || descriptor.params || null // schema-on-hit (D-08)
@@ -314,7 +321,7 @@
       intentSynonyms: desc.intentSynonyms || [],
       description: desc.description || '',
       actionVerb: desc.actionVerb || '',
-      sideEffectClass: (recipe.method ? deriveSideEffect(recipe.method) : (desc.sideEffectClass || 'read'))
+      sideEffectClass: (recipe.method ? deriveSideEffect(recipe.method) : normalizeSideEffectClass(desc.sideEffectClass))
     };
 
     // Re-promotion safety: discard any existing doc with this slug before add so

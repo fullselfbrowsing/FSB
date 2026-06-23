@@ -15,6 +15,8 @@
     SNAPSHOT: 'ext:dom-snapshot',
     MUTATIONS: 'ext:dom-mutations',
     SCROLL: 'ext:dom-scroll',
+    MEDIA: 'ext:dom-media',
+    MEDIA_HINT: 'ext:dom-media-hint',
     OVERLAY: 'ext:dom-overlay',
     DIALOG: 'ext:dom-dialog',
     READY: 'ext:dom-ready'
@@ -226,6 +228,31 @@
         action: 'domStreamDialog',
         dialog: dialog
       }, 'dialog-relay');
+      return;
+    }
+
+    if (type === STREAM.MEDIA) {
+      // Phase 33 (MEDIA): live <video>/<audio> playback state emitted by the
+      // PhantomStream capture core (one MediaSyncPayload per element per tick).
+      // The payload IS the sync entry (top-level nid/event/currentTime/...),
+      // so forward it intact; the viewer's reconciler consumes it as-is.
+      rememberIdentity(payload);
+      sendRuntimeMessage({
+        action: 'domStreamMedia',
+        media: payload || null
+      }, 'media-delivery');
+      return;
+    }
+
+    if (type === STREAM.MEDIA_HINT) {
+      // Phase 33 (MEDIA): adaptive-manifest (HLS/DASH) discovery hint. Dormant
+      // until the opt-in chrome.webRequest discovery path is enabled, but the
+      // relay seam is wired so enabling it later needs no content-side change.
+      rememberIdentity(payload);
+      sendRuntimeMessage({
+        action: 'domStreamMediaHint',
+        hint: payload || null
+      }, 'media-hint-relay');
       return;
     }
 
