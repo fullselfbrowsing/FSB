@@ -113,9 +113,10 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:capabilities-search': { routeFamily: 'capabilities', handler: handleCapabilitiesSearchMessageRoute },
   'mcp:capabilities-invoke': { routeFamily: 'capabilities', handler: handleCapabilitiesInvokeMessageRoute },
   // Phase 31 (DISC-01, D-01): the user-initiated, time-boxed discovery trigger. An
-  // INTERNAL-ONLY message route that mirrors the capabilities-invoke front door
-  // (SW-side origin/tabId resolution; payload.origin/tab_id are non-authoritative
-  // overrides). It is a control surface, NOT an MCP tool schema -- it does NOT enter
+  // INTERNAL-ONLY message route with SW-side tabId resolution; the consent-gated
+  // origin is read from the ACTUAL target tab (ME-02), not from payload.origin -- a
+  // supplied payload.origin must match the tab origin or the route rejects. It is a
+  // control surface, NOT an MCP tool schema -- it does NOT enter
   // TOOL_REGISTRY / getPublicTools, so the frozen INV-01 tool-definitions parity hash
   // is UNMOVED (gated by tool-definitions-parity + capability-mcp-surface).
   'mcp:capabilities-discover': { routeFamily: 'capabilities', handler: handleCapabilitiesDiscoverMessageRoute },
@@ -2243,10 +2244,15 @@ async function handleCapabilitiesInvokeMessageRoute({ payload }) {
 }
 
 // Phase 31 DISC-01 / D-01: the user-initiated, time-boxed discovery trigger. This
-// INTERNAL-ONLY route mirrors handleCapabilitiesInvokeMessageRoute's authoritative
-// SW-side origin/tabId resolution: explicit payload.tab_id / payload.origin are
-// NON-AUTHORITATIVE overrides; absent them, the active/owned tab is the source of
-// truth (the un-spoofable D-11 pattern). It then runs the promote-after-replay
+// INTERNAL-ONLY route resolves the attach target SW-side: tabId comes from explicit
+// payload.tab_id, else the active/owned tab. The session origin is then read from the
+// ACTUAL resolved tab (chrome.tabs.get -> new URL(tab.url).origin), NOT from
+// payload.origin (ME-02): because the debugger attaches to tabId and the consent gate
+// must apply to the origin that is actually attached, the gated origin is derived from
+// the un-spoofable tab origin (the D-11 pattern). A supplied payload.origin is a hint
+// that must MATCH the tab's real origin or the route rejects (RECIPE_CONSENT_REQUIRED)
+// -- a caller can no longer pair a consented origin with a different tab to land the
+// debugger banner on an un-gated origin. It then runs the promote-after-replay
 // discovery session (FsbDiscoverySession.runDiscovery), which itself enforces the
 // Phase-30 consent gate INSIDE FsbNetworkCapture.startSession BEFORE any debugger
 // attach (a default-OFF / denied / sensitive-unconfirmed origin returns a
@@ -2263,25 +2269,44 @@ async function handleCapabilitiesDiscoverMessageRoute({ payload }) {
   payload = payload || {};
   // Resolve tabId SW-side: explicit payload.tab_id, else the active/owned tab.
   let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
-  // Resolve the origin: a caller-supplied payload.origin is a non-authoritative
-  // override only; absent it, the active/owned-tab origin is authoritative (D-11).
-  // The capture session same-origin-filters + the executeBoundSpec origin-pin re-pin
-  // the active tab downstream, so a supplied origin can never select a cross-origin
-  // credentialed replay.
-  let origin = payload.origin || null;
-  if (tabId === null || !origin) {
+  if (tabId === null) {
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabId === null) {
-        tabId = tabs[0] ? tabs[0].id : null;
-      }
-      if (!origin) {
-        origin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
-      }
+      tabId = tabs[0] ? tabs[0].id : null;
     } catch (e) {
-      // active-tab lookup failed; leave tabId/origin null. The consent gate +
-      // same-origin filter inside the capture session fail closed on a null origin.
+      // active-tab lookup failed; leave tabId null. The consent gate + same-origin
+      // filter inside the capture session fail closed on a null origin/tabId.
     }
+  }
+  // ME-02: resolve the AUTHORITATIVE origin from the ACTUAL resolved tab (the
+  // un-spoofable D-11 pattern the invoke path uses), NOT from payload.origin. The
+  // discovery session attaches the debugger to `tabId` and surfaces the "DevTools is
+  // debugging this tab" banner on it; the Phase-30 consent gate must therefore be
+  // evaluated against the origin that is actually attached. Taking the origin from a
+  // caller-supplied payload.origin verbatim let a caller pair origin=benign.com
+  // (consented, non-sensitive) with tab_id=<a bank.com tab>, so the gate passed for
+  // benign.com while the attach + banner landed on the un-gated bank.com. We read the
+  // real origin from the tab and gate THAT.
+  let origin = null;
+  if (tabId !== null) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+    } catch (e) {
+      // tab lookup/URL parse failed; leave origin null -> the gate fails closed.
+      origin = null;
+    }
+  }
+  // If the caller ALSO supplied payload.origin, it is a non-authoritative hint: it
+  // must MATCH the tab's real origin or we reject (the gated origin and the attach
+  // target must be the same value). A mismatch is a spoof attempt -> fail closed.
+  if (payload.origin && origin && payload.origin !== origin) {
+    return createMcpRouteError(
+      'discover_capabilities',
+      'capabilities',
+      MCP_ROUTE_RECOVERY_HINT,
+      { error: 'RECIPE_CONSENT_REQUIRED', reason: 'supplied origin does not match the target tab origin' }
+    );
   }
   // Session bounds: explicit numeric overrides only; otherwise undefined so the
   // capture module applies its own DEFAULT_MAX_MS / DEFAULT_MAX_COUNT.
