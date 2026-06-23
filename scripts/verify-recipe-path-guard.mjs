@@ -111,6 +111,16 @@ const RECIPE_PATH_ALLOWLIST = [
   // import even in comments.
   'extension/utils/capability-router.js',
   'extension/utils/capability-catalog.js',
+  // Phase 32 (HEAL-02/HEAL-04, D-16): the eval-free recipe-rot classifier
+  // (classifyRecipeBroken + validateExpectedShape + the RECIPE_EXPIRED emission)
+  // reached from capability-router.js after executeBoundSpec. Named capability-* so
+  // Check 4's disk glob AUTO-covers it (Pitfall 5). Pre-armed AHEAD of its Plan-02
+  // creation, the Phase-27/28/29/30/31 "register in the same milestone, ahead of
+  // the file" precedent: Check 1's existsSync pre-check skips a not-yet-existent
+  // path (the file lands in Plan 02) so the guard stays GREEN now, and Check 4 fails
+  // CLOSED the moment the file lands NOT on this allowlist. The module is kept free
+  // of eval/new Function/import even in comments.
+  'extension/utils/capability-rot-detector.js',
   // Phase 29 (CAT-02, MED-01): the three credential-bearing T1a bundled-head
   // handlers. These are the MOST sensitive new code on the recipe path -- they
   // scrape CSRF/xoxc tokens and build credentialed mutation specs -- yet they live
