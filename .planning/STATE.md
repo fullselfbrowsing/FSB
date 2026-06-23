@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
-last_updated: "2026-06-23T02:16:03.427Z"
+last_updated: "2026-06-23T02:25:17.588Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 25
-  completed_plans: 25
+  completed_plans: 26
   percent: 63
 ---
 
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 31 (network-capture-discovery-recipe-synthesis-learned-recipes) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -101,6 +101,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 31 P02 | 10min | 2 tasks | 2 files |
 | Phase 31 P03 | 4min | 2 tasks | 2 files |
 | Phase 31 P04 | 1min | 1 tasks | 2 files |
+| Phase 31 P05 | 12min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -166,6 +167,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Phase 31 Plan 03: learned-recipe-store is a NEW per-origin versioned fsbLearnedRecipes envelope (distinct from the 500-cap memory layer, D-13); LRU evicts oldest lastSuccessAt past PER_ORIGIN_CAP=24; quarantine FLAGS quarantined:true (never deletes, D-16); getLearned hard-scopes recipe.origin===origin (Pitfall 6); null-proto ME-03 maps so a __proto__ origin/slug round-trips as own data.
 - [Phase ?]: Phase 31 Plan 03: promoteAfterReplay (on the synthesizer) is the D-10 gate -- promotes only on a clean injected interpretRecipe+executeBoundSpec replay, threading {trustedProvenance:'local'} (HI-01); a failed bind short-circuits before executeBoundSpec. No background.js wiring in 31-03 (importScripts + capture glue is 31-06). recipe-path guard PASS with both modules on disk + allowlisted + eval-free.
 - [Phase ?]: Phase 31 Plan 04 (LEARN-01/D-09): 'local' added to the trusted-exempt provenance SET (boolean-OR vs the already-resolved trusted value) in BOTH verifyRecipeEnvelope and interpretRecipe, parallel to 'bundled'; the resolution logic is byte-identical so HI-01 holds -- a payload self-declaring provenance:'local' with no loader vouch still verifies (tampered core rejected). The 'local' OR sits BEFORE the interpreter's async verify branch so the exemption is a zero verifyEd25519 call. learned-local-provenance-exempt 7/0; no regression; recipe-path guard PASS.
+- [Phase 31]: 31-05: addLearnedRecipe mutates the ONE INDEX_OPTIONS MiniSearch index + slug map and re-snapshots with a bumped catalogVersion (never a fresh index, Pitfall 5) -- learned slugs findable next visit and survive loadJSON (LEARN-03/D-14)
+- [Phase 31]: 31-05: catalog resolve checks the learned store FIRST (Option A) so a learned T2 recipe outranks a generic T1b by resolve order; router case T2 dispatches via _runDeclarativeTier with trustedProvenance:'local' (LEARN-04/D-15)
+- [Phase 31]: 31-05: _getLearned uses the store's synchronous getLearnedSync because resolve() is synchronous; production needs a getLearnedSync in-memory mirror on learned-recipe-store.js to surface a learned recipe at resolve time (tracked stub)
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -213,7 +217,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T02:15:31.836Z
+Last session: 2026-06-23T02:24:04.098Z
 Stopped at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
 Resume file: None
 
