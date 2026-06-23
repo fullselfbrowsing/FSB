@@ -537,15 +537,27 @@
     var out = await handler.handle(args || {}, handlerCtx);
 
     // ---- HEAL-01/HEAL-04 post-fetch rot classify hook on the T1a head path ----
-    // The same classify hook as the declarative tier. A T1a handler may not carry an
-    // expectedShape, so the status / redirect / fetch-failed rows still apply; pass
-    // the entry's recipe when present (else null) for the expectedShape row. A T1a is
-    // a BUNDLED slug, so a broken verdict quarantines via the catalog (session-only).
-    // The handler's OWN typed RECIPE_* security error (e.g. the pin's
-    // RECIPE_ORIGIN_MISMATCH) classifies as NOT broken (typed-passthrough) and is
-    // returned verbatim below -- never healed (Pitfall 3).
+    // The same classify hook as the declarative tier, but with a WEAKER rot signal by
+    // design (WR-02). A T1a entry is an IMPERATIVE bundled head handler
+    // (catalog/handlers/*.js: github.issues.* / slack.* / notion.*) that builds its
+    // own bound spec(s) internally -- it carries NO declarative recipe and therefore
+    // NO expectedShape: catalog.resolve() returns { tier, handler, origin, descriptor }
+    // for a T1a (capability-catalog.js:336-344) and registerHandler never stores a
+    // recipe, so `entry.recipe` is ALWAYS null here. (The github.notifications /
+    // reddit.inbox recipes are the DISTINCT T1b slugs, not these.) Consequently the
+    // expectedShape row of classifyRecipeBroken is intentionally NOT exercised on the
+    // head path; head-tier rot is detected ONLY via the status / redirect /
+    // fetch-failed rows (a 4xx/5xx, a 302->login, or a fetch/executeScript failure). A
+    // T1a endpoint that rots to a 200-with-wrong-shape body is NOT caught here -- it
+    // surfaces on the next break -- which is the safe direction (under-detect, never
+    // mis-heal). A T1a is a BUNDLED slug, so a broken verdict quarantines via the
+    // catalog (session-only). The handler's OWN typed RECIPE_* security error (e.g.
+    // the pin's RECIPE_ORIGIN_MISMATCH) classifies as NOT broken (typed-passthrough)
+    // and is returned verbatim below -- never healed (Pitfall 3).
     var detectorH = _rotDetector();
     if (detectorH && typeof detectorH.classifyRecipeBroken === 'function') {
+      // Always null for a T1a entry (see the contract note above); passed for shape
+      // parity with the declarative tier's classify call, not because a recipe exists.
       var recipeH = (entry && entry.recipe) ? entry.recipe : null;
       var verdictH = detectorH.classifyRecipeBroken(out, recipeH);
       if (verdictH && verdictH.broken === true) {

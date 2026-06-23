@@ -333,7 +333,12 @@
       };
     }
 
-    // T1a: the bundled head handler (registered by a Plan-03 module).
+    // T1a: the bundled head handler (registered by a Plan-03 module). A T1a entry is
+    // IMPERATIVE handler CODE that builds its own bound spec(s) internally -- it has NO
+    // declarative recipe and therefore NO expectedShape, so this shape intentionally
+    // carries no `recipe` field (WR-02). The router's head-path rot classify hook
+    // (capability-router.js _runHandlerTier) consequently exercises only the status /
+    // redirect / fetch-failed rot rows on the head tier, never the expectedShape row.
     if (tier === 'T1a') {
       return {
         tier: tier,
