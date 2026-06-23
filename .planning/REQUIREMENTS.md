@@ -53,9 +53,9 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 
 ### HEAL — Self-Healing & Recipe-Rot
 
-- [ ] **HEAL-01**: When a recipe breaks (4xx/5xx, empty, shape-mismatch, or `RECIPE_EXPIRED`), FSB falls back to DOM automation (DOM engine + site guides + `run_task`) and still completes the task.
+- [x] **HEAL-01**: When a recipe breaks (4xx/5xx, empty, shape-mismatch, or `RECIPE_EXPIRED`), FSB falls back to DOM automation (DOM engine + site guides + `run_task`) and still completes the task.
 - [x] **HEAL-02**: Recipes are stamped with captured-at and an expected-shape assertion; responses are validated against it to detect rot, emitting a typed `RECIPE_EXPIRED`.
-- [ ] **HEAL-03**: A broken recipe is quarantined/demoted, and the task is re-learned where possible.
+- [x] **HEAL-03**: A broken recipe is quarantined/demoted, and the task is re-learned where possible.
 - [x] **HEAL-04**: A failure-detection taxonomy distinguishes "recipe broken" from a legitimate "no results" so fallback never masks a real outcome.
 - [ ] **HEAL-05**: Capability and fallback paths pass tests across all 7 providers (INV-03) and a schema-lock parity test (INV-01).
 
@@ -139,9 +139,9 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | GOV-06 | Phase 30 | Complete |
 | GOV-07 | Phase 30 | Complete |
 | GOV-08 | Phase 30 | Complete |
-| HEAL-01 | Phase 32 | Pending |
+| HEAL-01 | Phase 32 | Complete |
 | HEAL-02 | Phase 32 | Complete |
-| HEAL-03 | Phase 32 | Pending |
+| HEAL-03 | Phase 32 | Complete |
 | HEAL-04 | Phase 32 | Complete |
 | HEAL-05 | Phase 32 | Pending |
 | DISC-01 | Phase 31 | Complete |

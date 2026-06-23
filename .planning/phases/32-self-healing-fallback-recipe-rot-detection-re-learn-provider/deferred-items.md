@@ -4,6 +4,25 @@ Out-of-scope discoveries logged during plan execution. NOT fixed in the plan tha
 found them (see the scope boundary in execute-plan: only auto-fix issues directly
 caused by the current task's changes).
 
+## From Plan 03 (router classify hook + quarantine/re-learn + prompt hint)
+
+### 1. tests/foreground-audit.test.js -- 1 RED assertion (missing Phase 243 doc)
+
+- **Found during:** Task 3 broader no-regression sweep.
+- **Status:** Pre-existing RED. Out of scope for Plan 03 (entirely unrelated to the
+  capability rot path).
+- **Detail:** 14/15 assertions pass. The single failure is "audit doc exists at
+  .planning/phases/243-background-tab-audit-ui-badge-integration/243-BACKGROUND-TAB-AUDIT.md"
+  -- a Phase-243 (background-tab audit UI/badge) planning-doc-presence assertion. The
+  doc file is simply absent on this branch. The test asserts a `.planning` DOC exists;
+  it does not exercise any code Plan 03 touches.
+- **Why not fixed here:** The test file is BYTE-UNCHANGED since 32-02 (verified via
+  `git show 1a33c6ef:tests/foreground-audit.test.js`) and references NONE of Plan 03's
+  modified files (capability-router.js / capability-catalog.js / capability-rot-detector.js /
+  background.js / agent-loop.js). It is a pre-existing Phase-243 documentation gap, not a
+  regression from this plan.
+- **Owner:** Phase 243 maintainer (restore or re-author the missing planning doc).
+
 ## From Plan 02 (rot-detector + additive schema v2)
 
 ### 1. tests/capability-router.test.js -- 8 RED assertions (Plan 03 wiring)
