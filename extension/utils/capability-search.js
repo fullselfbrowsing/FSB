@@ -72,6 +72,15 @@
   var _ms = null;          // MiniSearch instance
   var _slugToRecipe = {};  // slug -> recipe (invoke lookup + schema-on-hit params)
 
+  // ---- Learned-recipe snapshot bookkeeping (LEARN-03 / D-14) ----------------
+  // The descriptors fed by addLearnedRecipe AFTER the base build, plus a strictly
+  // monotonic learned-add counter. The counter is appended to the re-snapshot's
+  // catalogVersion so the stored version ALWAYS differs from the prior snapshot
+  // (even on a re-promotion that adds no new slug) -- the D-14 guarantee that a
+  // stale snapshot without the learned entry is never restored over it.
+  var _learnedDescriptors = [];
+  var _learnedAddSeq = 0;
+
   // ---- D-02: derive sideEffectClass from the recipe method -------------------
   function deriveSideEffect(method) {
     var m = String(method || '').toUpperCase();
@@ -223,12 +232,88 @@
     return _slugToRecipe[slug] || null;
   }
 
+  // ---- LEARN-03 / D-14: feed a learned recipe into the ONE index + slug map ---
+  //
+  // addLearnedRecipe(recipe, descriptor) makes the learned slug findable via
+  // search() AND getRecipeBySlug on this and the next visit. It MUTATES the
+  // EXISTING _ms instance (built with INDEX_OPTIONS) and NEVER constructs a fresh
+  // MiniSearch (Pitfall 5) -- a second index with a divergent options object would
+  // make a later MiniSearch.loadJSON(snapshot, INDEX_OPTIONS) throw "loadJSON
+  // should be given the same options". When _ms is not yet built it is built via
+  // the same buildIndex path first; when MiniSearch is absent (Node harness without
+  // the constructor) it no-op-degrades and returns false.
+  //
+  // The indexed document mirrors buildIndex's addAll mapper EXACTLY, including the
+  // D-02 integrity rule: the recipe method derives sideEffectClass and WINS over a
+  // mis-authored descriptor class. After the index mutation the snapshot under
+  // STORAGE_KEY is re-persisted with a BUMPED catalogVersion (a content hash over
+  // the grown descriptor set plus a strictly monotonic learned-add suffix) so an SW
+  // restart restores WITH the learned entry instead of a stale snapshot that lacks
+  // it (D-14). Best-effort: a missing chrome.storage.local skips only the persist.
+  async function addLearnedRecipe(recipe, descriptor) {
+    var MS = _getMiniSearch();
+    if (!MS) return false;                         // no constructor -> degrade
+    if (!recipe || typeof recipe.id !== 'string' || !recipe.id) return false;
+    var desc = descriptor || {};
+    var slug = recipe.id;                          // the recipe id IS the slug
+
+    // Build the index over INDEX_OPTIONS if it does not exist yet -- REUSING the
+    // single buildIndex path (no fresh options object); never a second index.
+    if (!_ms) {
+      _ms = buildIndex([], _slugToRecipe);
+      if (!_ms) return false;
+    }
+
+    // Mirror buildIndex's addAll mapper (the recipe-derived class wins, D-02).
+    var doc = {
+      slug: slug,
+      service: desc.service || '',
+      intentSynonyms: desc.intentSynonyms || [],
+      description: desc.description || '',
+      actionVerb: desc.actionVerb || '',
+      sideEffectClass: (recipe.method ? deriveSideEffect(recipe.method) : (desc.sideEffectClass || 'read'))
+    };
+
+    // Re-promotion safety: discard any existing doc with this slug before add so
+    // MiniSearch does not throw on a duplicate id.
+    try { _ms.discard(slug); } catch (e) { /* not present -> nothing to discard */ }
+    try { _ms.add(doc); } catch (e) { return false; }
+
+    // Wire the slug -> recipe map (getRecipeBySlug + schema-on-hit params).
+    _slugToRecipe[slug] = recipe;
+
+    // Track the learned descriptor so the re-snapshot version reflects the grown
+    // catalog; bump the strictly monotonic learned-add counter unconditionally.
+    _learnedDescriptors.push({ slug: slug });
+    _learnedAddSeq += 1;
+
+    // Re-persist the snapshot with a BUMPED catalogVersion (D-14). The base
+    // descriptor set comes from the build-time catalog; appending the learned
+    // descriptors plus the monotonic suffix guarantees the stored version DIFFERS
+    // from the prior snapshot so a stale restore can never drop the learned entry.
+    var c = _getChrome();
+    if (c && c.storage && c.storage.local && _ms) {
+      try {
+        var cat = _getCatalog();
+        var baseDescriptors = (cat.descriptors || []).concat(_learnedDescriptors);
+        var baseRecipes = (cat.recipes || []);
+        var bumped = _computeCatalogVersion(baseDescriptors, baseRecipes, cat.version)
+          + '+learned' + _learnedAddSeq;
+        var payload = {};
+        payload[STORAGE_KEY] = { catalogVersion: bumped, index: _ms.toJSON() };
+        await c.storage.local.set(payload);
+      } catch (e) { /* best-effort snapshot -- the in-memory index is already updated */ }
+    }
+    return true;
+  }
+
   // ---- Export shape (dual-export IIFE; mirror capability-interpreter.js) ------
   var exportsObj = {
     buildOrRestore: buildOrRestore,
     buildIndex: buildIndex,
     search: search,
     getRecipeBySlug: getRecipeBySlug,
+    addLearnedRecipe: addLearnedRecipe,
     deriveSideEffect: deriveSideEffect,
     INDEX_OPTIONS: INDEX_OPTIONS
   };
