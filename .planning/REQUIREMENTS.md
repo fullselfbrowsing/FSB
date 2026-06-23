@@ -57,7 +57,7 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 - [x] **HEAL-02**: Recipes are stamped with captured-at and an expected-shape assertion; responses are validated against it to detect rot, emitting a typed `RECIPE_EXPIRED`.
 - [x] **HEAL-03**: A broken recipe is quarantined/demoted, and the task is re-learned where possible.
 - [x] **HEAL-04**: A failure-detection taxonomy distinguishes "recipe broken" from a legitimate "no results" so fallback never masks a real outcome.
-- [ ] **HEAL-05**: Capability and fallback paths pass tests across all 7 providers (INV-03) and a schema-lock parity test (INV-01).
+- [x] **HEAL-05**: Capability and fallback paths pass tests across all 7 providers (INV-03) and a schema-lock parity test (INV-01).
 
 ### DISC — Network-Capture Discovery
 
@@ -143,7 +143,7 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | HEAL-02 | Phase 32 | Complete |
 | HEAL-03 | Phase 32 | Complete |
 | HEAL-04 | Phase 32 | Complete |
-| HEAL-05 | Phase 32 | Pending |
+| HEAL-05 | Phase 32 | Complete |
 | DISC-01 | Phase 31 | Complete |
 | DISC-02 | Phase 31 | Complete |
 | DISC-03 | Phase 31 | Complete |

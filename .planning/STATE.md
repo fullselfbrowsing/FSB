@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
-stopped_at: Completed 32-03-PLAN.md (router rot classify hook + quarantine/re-learn wiring + DOM-fallback prompt; HEAL-01/HEAL-03/HEAL-04; Phase 32 plan 4 of 5 next)
-last_updated: "2026-06-23T09:03:44.204Z"
+stopped_at: "Completed 32-04-PLAN.md (HEAL-05 parity gates + v0.9.99 milestone gate: frozen v2 RECIPE_SCHEMA hash f35211f5... + 7-provider parity green + full npm test EXIT 0; Phase 32 plan 5 of 5 next)"
+last_updated: "2026-06-23T09:15:51.608Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 30
-  completed_plans: 30
+  completed_plans: 31
   percent: 75
 ---
 
@@ -30,7 +30,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 32 (self-healing-fallback-recipe-rot-detection-re-learn-provider) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -107,6 +107,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 32 P01 | 35m | 3 tasks | 7 files |
 | Phase 32 P02 | 6min | 3 tasks | 6 files |
 | Phase 32 P03 | 12min | 3 tasks | 4 files |
+| Phase 32 P04 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 32]: 32-02: capability-rot-detector classifyRecipeBroken HEAL-04 taxonomy -- typed RECIPE_* security passthrough runs BEFORE the generic fetch-failed branch (T-32-PASS); validateExpectedShape reuses the extract jmespath engine, empty-but-present container passes (never masks no-results), absent/throwing engine degrades to shape-passes (D-06)
 - [Phase 32]: 32-03 (HEAL-01/03/04): the router post-executeBoundSpec rot classify hook fires in BOTH _runDeclarativeTier (~:401) and _runHandlerTier (~:433) -- a broken verdict quarantines (T2 learned via store.quarantine persisted; bundled via catalog.quarantineBundled session-only) + fires the fire-and-forget consent-gated runDiscovery re-learn + returns RECIPE_DOM_FALLBACK_PENDING carrying reason:verdict.code + fellBackToDom:true; every non-broken verdict (success/legitimate-no-results/logged-out/typed-security-passthrough) returns VERBATIM, never masked (HEAL-04). The detector is reached via the SW global with a STATIC Node-require fallback (recipe-path-guard-safe) and wired into background.js importScripts before the catalog/router. tool-executor.js UNCHANGED (the typed reason + fellBackToDom surface through the existing executeCapabilityToolForAutopilot makeResult contract; no parallel stack, INV-02). agent-loop.js:731 prompt-only hint strengthened (iterator byte-untouched, INV-04). router 38/0, autopilot-parity 13/0, iterator-guard 4/0, recipe-path-guard PASS.
 - [Phase 32]: 32-03: capability-catalog gains a SESSION-only null-proto quarantinedBundledSlugs Set + quarantineBundled/clearBundledQuarantine; resolve SKIPS a quarantined bundled slug (returns null -> the router falls through to the DOM fallback) AFTER the learned-first check and BEFORE any tier return, without mutating or persisting the REGISTRY (D-09/D-11/D-12 -- a transient blip never permanently demotes a bundled recipe; re-evaluated next SW session).
+- [Phase ?]: Froze the v2 RECIPE_SCHEMA hash (f35211f5...f622a37, independently re-computed) in recipe-schema-lock.test.js -- the closed-vocab recipe contract is locked (HEAL-05/INV-01, D-14)
+- [Phase ?]: 7-provider parity gate green unchanged -- the typed RECIPE_DOM_FALLBACK_PENDING reason is byte-equal across all 7 PROVIDER_KEYS (HEAL-05/INV-03, D-13)
+- [Phase ?]: v0.9.99 milestone gate CLOSED: full npm test EXIT 0 + targeted Phase-32 gate 13/13 GREEN (HEAL-05, D-15)
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -231,8 +235,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T09:03:17.744Z
-Stopped at: Completed 32-03-PLAN.md (router rot classify hook + quarantine/re-learn wiring + DOM-fallback prompt; HEAL-01/HEAL-03/HEAL-04; Phase 32 plan 4 of 5 next)
+Last session: 2026-06-23T09:15:32.823Z
+Stopped at: Completed 32-04-PLAN.md (HEAL-05 parity gates + v0.9.99 milestone gate: frozen v2 RECIPE_SCHEMA hash f35211f5... + 7-provider parity green + full npm test EXIT 0; Phase 32 plan 5 of 5 next)
 Resume file: None
 
 ## Next Actions

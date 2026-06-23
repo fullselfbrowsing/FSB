@@ -51,3 +51,7 @@ caused by the current task's changes).
   "re-freeze v2 hash in Plan 04"). Pasting the digest now would pre-empt Plan 04's INV-01
   freeze step. The placeholder is an intentional cross-plan tripwire.
 - **Owner:** Plan 04 (paste the printed digest over the TBD placeholder).
+- **RESOLVED (Plan 04, commit 34691424):** The digest `f35211f524639f4b9611edb973b1eaf94f24769fbaff205e3c658914fd622a37`
+  was independently re-computed from the live v2 RECIPE_SCHEMA (matched the printed value
+  exactly) and frozen over the TBD placeholder. `node tests/recipe-schema-lock.test.js`
+  now exits 0 (3/0). Closed.
