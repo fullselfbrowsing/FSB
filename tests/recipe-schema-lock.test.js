@@ -48,13 +48,19 @@ const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
 // non-trigger baseline (mirrors tool-definitions-parity.test.js:35/132).
 const TRIGGER_TOOL_NAMES = ['trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers'];
 
-// ---- The FROZEN v2 RECIPE_SCHEMA hash. PLACEHOLDER -- Plan 04 computes this once
-//      at first green (when FSB_RECIPE_SCHEMA_VERSION is bumped to 2 in Plan 02 and
-//      the optional capturedAt+expectedShape fields are added) and pastes the real
-//      sha256 digest over this string. The schema does NOT exist in v2 form yet, so
-//      the digest cannot be known now -- the placeholder GUARANTEES this assertion
-//      reds until Plan 04 freezes the real value.
-const FROZEN_RECIPE_SCHEMA_V2_HASH = 'TBD-FROZEN-IN-PLAN-04';
+// ---- The FROZEN v2 RECIPE_SCHEMA hash (D-14). Computed ONCE at first green from the
+//      LIVE v2 RECIPE_SCHEMA (FSB_RECIPE_SCHEMA_VERSION === 2 with the optional
+//      capturedAt + expectedShape fields added additively in Plan 02) via the SAME
+//      stable() + sha256 schemaHash used below, then pasted here verbatim (Plan 04,
+//      independently re-computed and cross-checked against the digest the Plan-02
+//      suite printed). The recipe schema is the contract between the bundled recipes,
+//      the Phase-31 learned recipes, and the interpreter; this digest LOCKS the closed
+//      vocab -- any drift to the schema's fields, required list, enum members, or
+//      additionalProperties:false posture reds this gate (the build fails so a vocab
+//      change cannot land silently). To intentionally evolve the schema, bump the
+//      version and re-freeze this digest in the same deliberate one-shot manner.
+const FROZEN_RECIPE_SCHEMA_V2_HASH =
+  'f35211f524639f4b9611edb973b1eaf94f24769fbaff205e3c658914fd622a37';
 
 let passed = 0;
 let failed = 0;
@@ -101,24 +107,26 @@ vm.runInThisContext(fs.readFileSync(CFWORKER_PATH, 'utf8'));
 const FsbCapabilityRecipeSchema = require(SCHEMA_MODULE_PATH);
 
 // ===========================================================================
-// (1) The v2 schema version (D-08). RED TODAY -- it is 1 until Plan 02 bumps it.
+// (1) The v2 schema version (D-08, additive). The version was bumped 1 -> 2 in
+//     Plan 02 with capturedAt + expectedShape added optionally so v1 stays valid.
 // ===========================================================================
 console.log('\n--- (1) FSB_RECIPE_SCHEMA_VERSION === 2 (D-08, additive) ---');
 check(FsbCapabilityRecipeSchema.FSB_RECIPE_SCHEMA_VERSION === 2,
-  'D-08: FSB_RECIPE_SCHEMA_VERSION === 2 (RED today; it is 1 until Plan 02 bumps it additively) -- got '
+  'D-08: FSB_RECIPE_SCHEMA_VERSION === 2 (additive v1 -> v2; v1 recipes still validate) -- got '
     + JSON.stringify(FsbCapabilityRecipeSchema.FSB_RECIPE_SCHEMA_VERSION));
 
 // ===========================================================================
-// (2) The FROZEN v2 RECIPE_SCHEMA hash (INV-01). RED TODAY -- the placeholder
-//     mismatches the real schema; Plan 04 pastes the real digest at first green.
+// (2) The FROZEN v2 RECIPE_SCHEMA hash (HEAL-05 / INV-01, D-14). GREEN once the
+//     real digest is frozen (Plan 04): the live v2 schema must hash to the frozen
+//     constant. Any drift to the closed vocab reds this gate.
 // ===========================================================================
 console.log('\n--- (2) frozen v2 RECIPE_SCHEMA hash (HEAL-05 / INV-01) ---');
 const actualSchemaHash = schemaHash(FsbCapabilityRecipeSchema.RECIPE_SCHEMA);
 check(actualSchemaHash === FROZEN_RECIPE_SCHEMA_V2_HASH,
-  'INV-01: schemaHash(RECIPE_SCHEMA) === the frozen v2 hash (RED until Plan 04 pastes the real digest over the TBD placeholder)');
+  'INV-01/D-14: schemaHash(RECIPE_SCHEMA) === the frozen v2 hash (the closed-vocab recipe contract is locked)');
 if (actualSchemaHash !== FROZEN_RECIPE_SCHEMA_V2_HASH) {
-  console.error('  DIAG: placeholder ' + FROZEN_RECIPE_SCHEMA_V2_HASH);
-  console.error('  DIAG: actual v2   ' + actualSchemaHash + '  <- Plan 04 pastes THIS once the v2 schema (capturedAt+expectedShape) lands');
+  console.error('  DIAG: frozen  ' + FROZEN_RECIPE_SCHEMA_V2_HASH);
+  console.error('  DIAG: actual  ' + actualSchemaHash + '  <- the v2 schema vocab drifted; if intentional, bump the version and re-freeze this digest deliberately');
 }
 
 // ===========================================================================
