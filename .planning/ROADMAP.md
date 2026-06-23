@@ -121,7 +121,7 @@
   3. A successfully discovered-and-replayed call is synthesized into a declarative recipe and promoted to per-origin procedural memory storing request shape only (endpoint, method, header-map, csrf-source, extract-path, origin) — never response bodies or PII.
   4. Learned recipes feed the capability search index so they are findable on the next visit to the origin, and a learned recipe for an origin outranks generic recipes during routing.
 **Plans**: 6 plans
-- [ ] 31-01-PLAN.md — Wave 0 validation contract: 9 RED test suites + the chrome.debugger event-driver stub + RECIPE_PATH_ALLOWLIST extension + package.json test-chain wiring (DISC-02/03/04, LEARN-01..04)
+- [x] 31-01-PLAN.md — Wave 0 validation contract: 9 RED test suites + the chrome.debugger event-driver stub + RECIPE_PATH_ALLOWLIST extension + package.json test-chain wiring (DISC-02/03/04, LEARN-01..04)
 - [ ] 31-02-PLAN.md — Capture leaf: network-capture-redactor.js (shape-only, no body/header-values/query) + network-capture.js (consent-gated CDP Network session over the existing debugger attach, same-origin XHR/Fetch, ownership-safe release) (DISC-02/03/04, LEARN-02)
 - [ ] 31-03-PLAN.md — Synthesis leaf: recipe-synthesizer.js (validateRecipe-gated, authStrategy capped to declarative-executable, never csrf.from:'response') + learned-recipe-store.js (per-origin versioned store, LRU + quarantine) (LEARN-01, LEARN-02)
 - [ ] 31-04-PLAN.md — The 'local' provenance exemption: capability-signature.js + capability-interpreter.js recognize 'local' (loader-vouched, HI-01 preserved) (LEARN-01)
@@ -151,7 +151,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 4/4 | Complete    | 2026-06-21 |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete    | 2026-06-21 |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 4/4 | Complete    | 2026-06-22 |
-| 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 0/6 | Not started | - |
+| 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 1/6 | In Progress|  |
 | 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 0/TBD | Not started | - |
 
 ## Completed Milestones

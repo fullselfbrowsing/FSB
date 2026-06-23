@@ -62,16 +62,16 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 ### DISC — Network-Capture Discovery
 
 - [ ] **DISC-01**: With consent, CDP Network capture (`Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody`) observes a page's real API calls to discover candidate capabilities.
-- [ ] **DISC-02**: Discovery reuses the existing `chrome.debugger` attachment by adding the Network domain (no manifest change) without disrupting the existing Input emulation.
-- [ ] **DISC-03**: Captured requests are redacted at capture time, before any persistence, stripping auth/cookie/token/CSRF material.
-- [ ] **DISC-04**: Discovery runs only on origins set to Ask/Auto and never on default-Off origins.
+- [x] **DISC-02**: Discovery reuses the existing `chrome.debugger` attachment by adding the Network domain (no manifest change) without disrupting the existing Input emulation.
+- [x] **DISC-03**: Captured requests are redacted at capture time, before any persistence, stripping auth/cookie/token/CSRF material.
+- [x] **DISC-04**: Discovery runs only on origins set to Ask/Auto and never on default-Off origins.
 
 ### LEARN — Learned Recipes
 
-- [ ] **LEARN-01**: A successfully discovered-and-replayed call is synthesized into a declarative recipe and promoted to per-origin procedural memory.
-- [ ] **LEARN-02**: Learned recipes store request shape only (endpoint, method, header-map, csrf-source, extract-path, origin) — never response bodies or PII.
-- [ ] **LEARN-03**: Learned recipes feed the capability search index so they are findable on the next visit to the origin.
-- [ ] **LEARN-04**: A learned recipe for an origin outranks generic recipes during routing.
+- [x] **LEARN-01**: A successfully discovered-and-replayed call is synthesized into a declarative recipe and promoted to per-origin procedural memory.
+- [x] **LEARN-02**: Learned recipes store request shape only (endpoint, method, header-map, csrf-source, extract-path, origin) — never response bodies or PII.
+- [x] **LEARN-03**: Learned recipes feed the capability search index so they are findable on the next visit to the origin.
+- [x] **LEARN-04**: A learned recipe for an origin outranks generic recipes during routing.
 
 ### SIGN — Recipe Integrity
 
@@ -145,13 +145,13 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | HEAL-04 | Phase 32 | Pending |
 | HEAL-05 | Phase 32 | Pending |
 | DISC-01 | Phase 31 | Pending |
-| DISC-02 | Phase 31 | Pending |
-| DISC-03 | Phase 31 | Pending |
-| DISC-04 | Phase 31 | Pending |
-| LEARN-01 | Phase 31 | Pending |
-| LEARN-02 | Phase 31 | Pending |
-| LEARN-03 | Phase 31 | Pending |
-| LEARN-04 | Phase 31 | Pending |
+| DISC-02 | Phase 31 | Complete |
+| DISC-03 | Phase 31 | Complete |
+| DISC-04 | Phase 31 | Complete |
+| LEARN-01 | Phase 31 | Complete |
+| LEARN-02 | Phase 31 | Complete |
+| LEARN-03 | Phase 31 | Complete |
+| LEARN-04 | Phase 31 | Complete |
 | SIGN-01 | Phase 30 | Complete |
 | SIGN-02 | Phase 30 | Complete |
 
