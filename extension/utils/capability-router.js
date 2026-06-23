@@ -85,6 +85,77 @@
     return (typeof FsbCapabilityFetch !== 'undefined' && FsbCapabilityFetch) ? FsbCapabilityFetch : null;
   }
 
+  // ---- Phase 32 (HEAL-01/HEAL-03/HEAL-04) self-healing collaborator accessors --
+  //      The post-executeBoundSpec rot classifier, the learned-recipe quarantine
+  //      store, and the consent-gated re-learn discovery session. Each is reached
+  //      the SAME typeof-guarded way as _catalog()/_search() so the Phase-29 head
+  //      (which injects none of them) DEGRADES to a no-op: a missing rot detector
+  //      means NO classify hook fires and the existing stamp+return is preserved
+  //      byte-for-byte; a missing store / discovery session means the best-effort
+  //      quarantine + re-learn calls are simply skipped. NEVER throws.
+  function _rotDetector() {
+    // SW path: the detector is published on the global by capability-rot-detector.js
+    // (importScripts'd before this module in background.js). Node path: the global is
+    // not set by the router unit harness, so fall back to a guarded require of the
+    // sibling module (mirrors tool-executor.js:24's typeof-or-require split). The
+    // require is a STATIC module load -- NOT any run-string-as-code construct -- so
+    // the recipe-path guard stays GREEN; it runs ONLY under Node (the SW worker scope
+    // has no require, so this branch is inert there).
+    if (typeof FsbCapabilityRotDetector !== 'undefined' && FsbCapabilityRotDetector) {
+      return FsbCapabilityRotDetector;
+    }
+    if (typeof require === 'function') {
+      try { return require('./capability-rot-detector.js'); } catch (_e) { return null; }
+    }
+    return null;
+  }
+  function _learnedStore() {
+    return (typeof FsbLearnedRecipeStore !== 'undefined' && FsbLearnedRecipeStore) ? FsbLearnedRecipeStore : null;
+  }
+  function _discoverySession() {
+    return (typeof FsbDiscoverySession !== 'undefined' && FsbDiscoverySession) ? FsbDiscoverySession : null;
+  }
+
+  // ---- HEAL-03: best-effort quarantine + opportunistic re-learn (D-09/D-10) ----
+  //
+  // Called ONLY on a classifyRecipeBroken broken:true verdict (a real rot). BOTH
+  // calls are FIRE-AND-FORGET -- they never block, never await into the invoke
+  // return path, and a rejection is swallowed (a failed quarantine / re-learn must
+  // not poison the typed RECIPE_DOM_FALLBACK_PENDING the model acts on).
+  //
+  //   - QUARANTINE: a T2 learned slug demotes via FsbLearnedRecipeStore.quarantine
+  //     (persisted flag-not-delete, D-09); a bundled (T0/T1b/T1a) slug demotes via
+  //     the catalog's session-only quarantineBundled (D-12). The recipe is DEMOTED,
+  //     never deleted -- resolve() then falls through to the DOM fallback (D-11).
+  //   - RE-LEARN: runDiscovery(origin, { tabId }) is the existing consent-gated
+  //     discovery (D-10). It self-enforces the Phase-30 consent gate INSIDE
+  //     startSession before any capture, so a default-OFF / denied / sensitive
+  //     origin re-learns NOTHING. The CI assertion is that the trigger is WIRED
+  //     (reachable on the rot path); the real re-learn-after-fallback is UAT.
+  function _quarantineAndRelearn(slug, tierLabel, origin, tabId) {
+    var store = _learnedStore();
+    var catalog = _catalog();
+    var discovery = _discoverySession();
+
+    try {
+      if (tierLabel === 'T2') {
+        if (store && typeof store.quarantine === 'function') {
+          var qp = store.quarantine(slug, origin);
+          if (qp && typeof qp.catch === 'function') { qp.catch(function() { /* best-effort */ }); }
+        }
+      } else if (catalog && typeof catalog.quarantineBundled === 'function') {
+        catalog.quarantineBundled(slug);
+      }
+    } catch (_qe) { /* best-effort; quarantine must not poison the fallback return */ }
+
+    try {
+      if (discovery && typeof discovery.runDiscovery === 'function') {
+        var dp = discovery.runDiscovery(origin, { tabId: tabId });
+        if (dp && typeof dp.catch === 'function') { dp.catch(function() { /* best-effort */ }); }
+      }
+    } catch (_de) { /* best-effort; re-learn is opportunistic, never blocking */ }
+  }
+
   // ---- Phase 30 (GOV-01..GOV-07) consent-gate collaborator accessors --------
   //      The consent gate sits at the invoke chokepoint (D-01/INV-02). It reads
   //      these SW globals the same typeof-guarded way as _catalog()/_search() so
@@ -399,8 +470,41 @@
     // BEFORE any side effect (the second pin point). The router passes the resolved
     // tabId through unchanged -- it never re-targets.
     var out = await primitive.executeBoundSpec(interpreted.spec, ctx && ctx.tabId);
+
+    // ---- HEAL-01/HEAL-04 post-fetch rot classify hook (D-01/D-16) ------------
+    // Classify the executeBoundSpec result BEFORE the success-stamp. The detector
+    // distinguishes a real rot (4xx/5xx, fetch-failed, expectedShape-mismatch) from
+    // a legitimate no-results (returned VERBATIM, never masked -- HEAL-04) and from
+    // a logged-out / typed-security passthrough (surfaced, NOT healed -- Pitfall 3).
+    // Only a broken:true verdict quarantines + emits the dual-field
+    // RECIPE_DOM_FALLBACK_PENDING carrying the underlying code so both front doors
+    // surface it. A non-broken verdict falls through to the existing stamp+return
+    // UNCHANGED. A MISSING detector (the Phase-29 head) skips the hook entirely, so
+    // the success path below is byte-identical to before.
+    var detector = _rotDetector();
+    if (detector && typeof detector.classifyRecipeBroken === 'function') {
+      var verdict = detector.classifyRecipeBroken(out, recipe);
+      if (verdict && verdict.broken === true) {
+        // Best-effort demotion + opportunistic consent-gated re-learn (fire-and-forget).
+        _quarantineAndRelearn(slug, tierLabel, ctx && ctx.origin, ctx && ctx.tabId);
+        // Emit the typed "fall back to DOM" reason carrying the underlying code (e.g.
+        // RECIPE_EXPIRED / RECIPE_HTTP_4XX) in `reason`, plus the fellBackToDom marker
+        // (D-04) the autopilot door surfaces verbatim. The completion is model-driven
+        // (the model selects the DOM tools next iteration) -- the router NEVER runs a
+        // parallel stack (INV-02) and NEVER calls executeTool.
+        return _err('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: slug,
+          reason: verdict.code,
+          recipeBrokenReason: verdict.reason,
+          fellBackToDom: true
+        });
+      }
+    }
+
     if (out && out.success === true) {
-      // Stamp the tier on the normalized hit shape.
+      // Stamp the tier on the normalized hit shape. A legitimate no-results (200 +
+      // valid shape + empty set) and a logged-out (redirected:true) both reach HERE
+      // (the detector classified them NOT broken) and return their REAL/typed result.
       out.tier = tierLabel;
       return out;
     }
@@ -431,6 +535,30 @@
       interpretRecipe: interp ? interp.interpretRecipe : undefined
     };
     var out = await handler.handle(args || {}, handlerCtx);
+
+    // ---- HEAL-01/HEAL-04 post-fetch rot classify hook on the T1a head path ----
+    // The same classify hook as the declarative tier. A T1a handler may not carry an
+    // expectedShape, so the status / redirect / fetch-failed rows still apply; pass
+    // the entry's recipe when present (else null) for the expectedShape row. A T1a is
+    // a BUNDLED slug, so a broken verdict quarantines via the catalog (session-only).
+    // The handler's OWN typed RECIPE_* security error (e.g. the pin's
+    // RECIPE_ORIGIN_MISMATCH) classifies as NOT broken (typed-passthrough) and is
+    // returned verbatim below -- never healed (Pitfall 3).
+    var detectorH = _rotDetector();
+    if (detectorH && typeof detectorH.classifyRecipeBroken === 'function') {
+      var recipeH = (entry && entry.recipe) ? entry.recipe : null;
+      var verdictH = detectorH.classifyRecipeBroken(out, recipeH);
+      if (verdictH && verdictH.broken === true) {
+        _quarantineAndRelearn(slug, 'T1a', ctx && ctx.origin, ctx && ctx.tabId);
+        return _err('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: slug,
+          reason: verdictH.code,
+          recipeBrokenReason: verdictH.reason,
+          fellBackToDom: true
+        });
+      }
+    }
+
     if (out && out.success === true) {
       out.tier = 'T1a';
       return out;

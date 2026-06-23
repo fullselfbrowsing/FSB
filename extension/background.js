@@ -170,6 +170,12 @@ try {
 // follow the catalog. This is the engine both front doors share (INV-02; the MCP
 // dispatcher + autopilot reroutes are Plans 03/04). Additive only (D-05;
 // background.js is byte-frozen as an esbuild input; no manifest/permission change).
+// Phase 32 (HEAL-01/HEAL-02/HEAL-04, D-16): the eval-free recipe-rot classifier the
+// router calls after executeBoundSpec (broken -> RECIPE_DOM_FALLBACK_PENDING). Pure
+// (no chrome.*, no network); reaches the jmespath engine via the interpreter loaded
+// above. MUST precede capability-router.js so FsbCapabilityRotDetector is published
+// before the router's post-fetch classify hook runs.
+try { importScripts('utils/capability-rot-detector.js'); } catch (e) { console.error('[FSB] Failed to load capability-rot-detector.js:', e.message); }
 try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
 try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
 
