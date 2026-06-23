@@ -85,6 +85,39 @@
     }
   }
 
+  // ---- HEAL-03 / D-09 / D-12: session-only bundled-recipe quarantine ---------
+  //
+  // A null-prototype map used as a Set of bundled slugs the router has demoted
+  // this SESSION after classifyRecipeBroken deemed a bundled (T0/T1b/T1a) result
+  // broken. resolve() consults it and SKIPS a quarantined bundled slug (returns
+  // null -> the router falls through to the next tier / the DOM fallback, D-11).
+  //
+  // Deliberately session-only + in-memory (D-12): a transient first-party blip
+  // (a one-off 500) must NOT permanently demote a shipped bundled recipe -- the
+  // Set is re-evaluated next SW session (it is NEVER persisted). It is a SEPARATE
+  // structure: the REGISTRY data is NEVER mutated (D-09, Pitfall 4). A null-proto
+  // map avoids prototype-key collisions (no inherited keys appear as "quarantined").
+  var quarantinedBundledSlugs = Object.create(null);
+
+  // Flag a bundled slug as quarantined for this session. String-guards the slug
+  // (a non-string is a no-op). Does NOT persist and does NOT touch the REGISTRY.
+  function quarantineBundled(slug) {
+    if (typeof slug !== 'string' || !slug) { return false; }
+    quarantinedBundledSlugs[slug] = true;
+    return true;
+  }
+
+  // Clear a bundled slug's session quarantine (e.g. after a successful re-review /
+  // re-learn). A no-op for an unknown / non-string slug.
+  function clearBundledQuarantine(slug) {
+    if (typeof slug !== 'string' || !slug) { return false; }
+    if (Object.prototype.hasOwnProperty.call(quarantinedBundledSlugs, slug)) {
+      delete quarantinedBundledSlugs[slug];
+      return true;
+    }
+    return false;
+  }
+
   // ---- T1b/T0 declarative seed recipes -------------------------------------
   //
   // The authoritative recipe source at runtime is the search slug->recipe map
@@ -268,6 +301,16 @@
     var entry = Object.prototype.hasOwnProperty.call(REGISTRY, slug) ? REGISTRY[slug] : null;
     if (!entry) return null;
 
+    // HEAL-03 / D-11: a SESSION-quarantined bundled slug is SKIPPED -> return null so
+    // the router falls through to the next tier / the DOM fallback. This sits AFTER
+    // the learned-first check above (a fresh re-learned recipe already returned its T2
+    // hit and is never demoted here -- the bundled skip applies ONLY to the REGISTRY
+    // entry) and BEFORE any T1a/T1b/T0/seam return, so it demotes the bundled recipe
+    // regardless of its declared tier. The REGISTRY object is NEVER mutated (D-09).
+    if (Object.prototype.hasOwnProperty.call(quarantinedBundledSlugs, slug)) {
+      return null;
+    }
+
     // Multiple same-class candidates -> owned-origin-first bias picks one. The tier
     // stays explicit (every candidate of an authored slug shares its class).
     if (Array.isArray(entry)) {
@@ -315,6 +358,8 @@
     registerHandler: registerHandler,
     seedHeadHandlers: seedHeadHandlers,
     biasByOwnedOrigin: biasByOwnedOrigin,
+    quarantineBundled: quarantineBundled,           // HEAL-03/D-09: the router flags a rotted bundled slug
+    clearBundledQuarantine: clearBundledQuarantine, // HEAL-03/D-12: clear the session quarantine
     _getLearned: _getLearned   // LEARN-04: exposed for the learned-first resolve test/inspection
   };
 
