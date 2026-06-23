@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
-last_updated: "2026-06-23T08:23:50.343Z"
-last_activity: 2026-06-23 -- Phase 32 planning complete
+last_updated: "2026-06-23T08:36:41.161Z"
+last_activity: 2026-06-23
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 30
-  completed_plans: 27
+  completed_plans: 28
   percent: 75
 ---
 
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase
 See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
-**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
+**Current focus:** Phase 32 — self-healing-fallback-recipe-rot-detection-re-learn-provider
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 32 (self-healing-fallback-recipe-rot-detection-re-learn-provider) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-06-23 -- Phase 32 planning complete
+Last activity: 2026-06-23
 
-Progress: [██████████] 100%
+Progress: [█████████░] 93%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -104,6 +104,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 31 P04 | 1min | 1 tasks | 2 files |
 | Phase 31 P05 | 12min | 2 tasks | 3 files |
 | Phase 31 P06 | 9min | 3 tasks | 5 files |
+| Phase 32 P01 | 35m | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: 31-06: Discovery-session orchestrator runs promote-after-replay (synthesize -> interpret('local') -> executeBoundSpec -> promote + addLearnedRecipe ONLY on a clean replay); failures discarded (D-10)
 - [Phase ?]: 31-06: Closed the 31-05 gap with getLearnedSync + an in-memory mirror (hydrated at SW startup, lock-stepped with promote/quarantine/LRU) so LEARN-04 outranking fires at runtime via catalog.resolve
 - [Phase ?]: 31-06: mcp:capabilities-discover is an out-of-registry control-surface route (mirrors invoke's SW-side resolution); NO manifest change; first chrome.debugger.onEvent consumer, method-dispatched so Input emulation is unaffected
+- [Phase ?]: Phase 32 Wave-0 RED suites drive the REAL capability-router (not a canned spy) so fallback-decision assertions genuinely red until Plan 03's classify hook lands
+- [Phase ?]: recipe-schema-lock freezes the v2 RECIPE_SCHEMA hash as a TBD-FROZEN-IN-PLAN-04 placeholder; Plan 04 computes-once-and-pastes the real digest at first green
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -222,7 +225,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T02:40:58.259Z
+Last session: 2026-06-23T08:35:39.616Z
 Stopped at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
 Resume file: None
 

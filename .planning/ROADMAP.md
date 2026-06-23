@@ -138,7 +138,7 @@
   3. A broken recipe is quarantined/demoted and the task is re-learned where possible.
   4. Capability and fallback paths pass tests across all 7 providers (INV-03) and a schema-lock parity test (INV-01).
 **Plans**: 5 plans
-- [ ] 32-01-PLAN.md — Wave 0 validation contract: 3 new RED suites (rot-detector taxonomy, provider-parity, schema-lock) + 2 test extensions (router, autopilot) + RECIPE_PATH_ALLOWLIST pre-arm + npm test-chain wiring
+- [x] 32-01-PLAN.md — Wave 0 validation contract: 3 new RED suites (rot-detector taxonomy, provider-parity, schema-lock) + 2 test extensions (router, autopilot) + RECIPE_PATH_ALLOWLIST pre-arm + npm test-chain wiring
 - [ ] 32-02-PLAN.md — Rot-detector leaf: capability-rot-detector.js (classifyRecipeBroken + validateExpectedShape) + additive schema v1->v2 (optional capturedAt + expectedShape) + interpreter carry + synthesizer stamp
 - [ ] 32-03-PLAN.md — Engine wiring: router classify-hook + T3-realization RECIPE_DOM_FALLBACK_PENDING emit + learned/bundled quarantine + consent-gated re-learn trigger + autopilot DOM-completion surfacing + buildSystemPrompt hint (iterator byte-untouched)
 - [ ] 32-04-PLAN.md — HEAL-05 gates: freeze the v2 RECIPE_SCHEMA hash + 7-provider parity green + full npm test (the v0.9.99 milestone completion gate)
@@ -157,7 +157,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete    | 2026-06-21 |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 4/4 | Complete    | 2026-06-22 |
 | 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 6/6 | Complete    | 2026-06-23 |
-| 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 0/5 | Not started | - |
+| 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 1/5 | In Progress|  |
 
 ## Completed Milestones
 
