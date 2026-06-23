@@ -61,7 +61,7 @@ Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (
 
 ### DISC — Network-Capture Discovery
 
-- [ ] **DISC-01**: With consent, CDP Network capture (`Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody`) observes a page's real API calls to discover candidate capabilities.
+- [x] **DISC-01**: With consent, CDP Network capture (`Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody`) observes a page's real API calls to discover candidate capabilities.
 - [x] **DISC-02**: Discovery reuses the existing `chrome.debugger` attachment by adding the Network domain (no manifest change) without disrupting the existing Input emulation.
 - [x] **DISC-03**: Captured requests are redacted at capture time, before any persistence, stripping auth/cookie/token/CSRF material.
 - [x] **DISC-04**: Discovery runs only on origins set to Ask/Auto and never on default-Off origins.
@@ -144,7 +144,7 @@ Which phase covers which requirement. Phase column populated during roadmap crea
 | HEAL-03 | Phase 32 | Pending |
 | HEAL-04 | Phase 32 | Pending |
 | HEAL-05 | Phase 32 | Pending |
-| DISC-01 | Phase 31 | Pending |
+| DISC-01 | Phase 31 | Complete |
 | DISC-02 | Phase 31 | Complete |
 | DISC-03 | Phase 31 | Complete |
 | DISC-04 | Phase 31 | Complete |

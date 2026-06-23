@@ -126,7 +126,7 @@
 - [x] 31-03-PLAN.md — Synthesis leaf: recipe-synthesizer.js (validateRecipe-gated, authStrategy capped to declarative-executable, never csrf.from:'response') + learned-recipe-store.js (per-origin versioned store, LRU + quarantine) (LEARN-01, LEARN-02)
 - [x] 31-04-PLAN.md — The 'local' provenance exemption: capability-signature.js + capability-interpreter.js recognize 'local' (loader-vouched, HI-01 preserved) (LEARN-01)
 - [x] 31-05-PLAN.md — Index + routing wiring: addLearnedRecipe (search index, INDEX_OPTIONS-preserving) + catalog resolve learned-first (T2 outranking) + router T2 dispatch via _runDeclarativeTier with trustedProvenance:'local' (LEARN-03, LEARN-04)
-- [ ] 31-06-PLAN.md — Integration: discovery-session.js promote-after-replay orchestrator + background.js wiring (importScripts + Network onEvent, no manifest change) + out-of-registry mcp:capabilities-discover trigger + live UAT (DISC-01/02, LEARN-01)
+- [x] 31-06-PLAN.md — Integration: discovery-session.js promote-after-replay orchestrator + background.js wiring (importScripts + Network onEvent, no manifest change) + out-of-registry mcp:capabilities-discover trigger + live UAT (DISC-01/02, LEARN-01)
 
 ### Phase 32: Self-Healing Fallback + Recipe-Rot Detection + Re-Learn + Provider/Schema-Lock Tests + UAT
 **Goal**: Tie recipe-break detection to the existing DOM tools so a broken recipe still completes the task — the flagship differentiator and the catch-all for Wall-2's un-replayable auth classes — and prove parity across all 7 providers plus the schema-lock invariant.
@@ -151,7 +151,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 28. Lean MCP Surface + Capability Search + Eval Harness | 4/4 | Complete    | 2026-06-21 |
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete    | 2026-06-21 |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 4/4 | Complete    | 2026-06-22 |
-| 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 5/6 | In Progress|  |
+| 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 6/6 | Complete   | 2026-06-23 |
 | 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 0/TBD | Not started | - |
 
 ## Completed Milestones

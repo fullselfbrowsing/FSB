@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: executing
+status: verifying
 stopped_at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
-last_updated: "2026-06-23T02:25:17.588Z"
+last_updated: "2026-06-23T02:41:05.536Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 25
-  completed_plans: 26
-  percent: 63
+  completed_plans: 27
+  percent: 75
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 31 (network-capture-discovery-recipe-synthesis-learned-recipes) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-23
 
 Progress: [██████████] 100%
@@ -102,6 +102,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 31 P03 | 4min | 2 tasks | 2 files |
 | Phase 31 P04 | 1min | 1 tasks | 2 files |
 | Phase 31 P05 | 12min | 2 tasks | 3 files |
+| Phase 31 P06 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,9 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 31]: 31-05: addLearnedRecipe mutates the ONE INDEX_OPTIONS MiniSearch index + slug map and re-snapshots with a bumped catalogVersion (never a fresh index, Pitfall 5) -- learned slugs findable next visit and survive loadJSON (LEARN-03/D-14)
 - [Phase 31]: 31-05: catalog resolve checks the learned store FIRST (Option A) so a learned T2 recipe outranks a generic T1b by resolve order; router case T2 dispatches via _runDeclarativeTier with trustedProvenance:'local' (LEARN-04/D-15)
 - [Phase 31]: 31-05: _getLearned uses the store's synchronous getLearnedSync because resolve() is synchronous; production needs a getLearnedSync in-memory mirror on learned-recipe-store.js to surface a learned recipe at resolve time (tracked stub)
+- [Phase ?]: 31-06: Discovery-session orchestrator runs promote-after-replay (synthesize -> interpret('local') -> executeBoundSpec -> promote + addLearnedRecipe ONLY on a clean replay); failures discarded (D-10)
+- [Phase ?]: 31-06: Closed the 31-05 gap with getLearnedSync + an in-memory mirror (hydrated at SW startup, lock-stepped with promote/quarantine/LRU) so LEARN-04 outranking fires at runtime via catalog.resolve
+- [Phase ?]: 31-06: mcp:capabilities-discover is an out-of-registry control-surface route (mirrors invoke's SW-side resolution); NO manifest change; first chrome.debugger.onEvent consumer, method-dispatched so Input emulation is unaffected
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -217,7 +221,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T02:24:04.098Z
+Last session: 2026-06-23T02:40:58.259Z
 Stopped at: Completed 31-03-PLAN.md (recipe-synthesizer + learned-recipe-store; LEARN-01/02; Phase 31 plan 4 of 6 next)
 Resume file: None
 
