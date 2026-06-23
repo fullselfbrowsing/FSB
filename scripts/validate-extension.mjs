@@ -6,6 +6,7 @@
 // Exits non-zero with a clear message on first failure.
 
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const EXT_ROOT = join(ROOT, 'extension');
+const require = createRequire(import.meta.url);
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -74,7 +76,35 @@ try {
   fail(`package.json read failed: ${e.message}`);
 }
 
-// ---------- 3. JS syntax check ----------
+// ---------- 3. Generated capability catalog snapshot ----------
+function readJsonDir(absDir) {
+  if (!existsSync(absDir)) return [];
+  return readdirSync(absDir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => JSON.parse(readFileSync(join(absDir, name), 'utf8')));
+}
+
+const catalogSnapshotPath = join(EXT_ROOT, 'catalog', 'recipe-index.generated.js');
+if (!existsSync(catalogSnapshotPath)) {
+  fail('capability catalog snapshot missing: extension/catalog/recipe-index.generated.js; run npm run package:extension');
+} else {
+  try {
+    const generated = require(catalogSnapshotPath);
+    const catalogRoot = join(ROOT, 'catalog');
+    const expected = {
+      recipes: readJsonDir(join(catalogRoot, 'recipes')),
+      descriptors: readJsonDir(join(catalogRoot, 'descriptors')),
+    };
+    if (JSON.stringify(generated) !== JSON.stringify(expected)) {
+      fail('capability catalog snapshot is stale: run npm run package:extension and commit extension/catalog/recipe-index.generated.js');
+    }
+  } catch (e) {
+    fail(`capability catalog snapshot validation failed: ${e.message}`);
+  }
+}
+
+// ---------- 4. JS syntax check ----------
 // Directories whose .js files ship to the browser as the extension.
 const EXT_DIRS = ['content', 'ui', 'agents', 'ws', 'offscreen', 'ai', 'utils', 'site-guides', 'shared', 'config', 'lib', 'catalog'];
 const ROOT_FILES = ['background.js', 'canvas-interceptor.js'];

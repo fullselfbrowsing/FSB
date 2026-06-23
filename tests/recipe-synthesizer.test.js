@@ -42,6 +42,8 @@ function check(cond, msg) {
 const REPO_ROOT = path.resolve(__dirname, '..');
 const CFWORKER_PATH = path.join(REPO_ROOT, 'extension', 'lib', 'cfworker-json-schema.min.js');
 const SCHEMA_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-recipe-schema.js');
+const AUTH_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-auth-strategies.js');
+const INTERP_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-interpreter.js');
 const SYNTH_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'recipe-synthesizer.js');
 
 (async () => {
@@ -51,6 +53,8 @@ const SYNTH_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'recipe-synthesize
   // validateRecipe runs (the SW importScripts the IIFE before the schema module).
   vm.runInThisContext(fs.readFileSync(CFWORKER_PATH, 'utf8'));
   const Schema = require(SCHEMA_PATH);
+  global.FsbCapabilityAuthStrategies = require(AUTH_PATH);
+  const Interp = require(INTERP_PATH);
   check(typeof Schema.validateRecipe === 'function', 'recipe-schema exports validateRecipe (loader OK)');
 
   // require AT TOP LEVEL -- a MISSING synthesizer throws here (the loud RED).
@@ -77,6 +81,14 @@ const SYNTH_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'recipe-synthesize
     check(out.recipe.origin === 'https://example.com', 'recipe.origin is the captured origin');
     check(typeof out.recipe.endpoint === 'string' && out.recipe.endpoint.charAt(0) === '/',
       'recipe.endpoint is a relative path template');
+    check(out.recipe.endpoint === '/api/items/{id}', 'volatile path segment is converted to a named endpoint placeholder');
+    check(out.recipe.params && Array.isArray(out.recipe.params.required) && out.recipe.params.required.indexOf('id') !== -1,
+      'synthesized recipe declares the placeholder in params.required');
+    check(out.replayArgs && out.replayArgs.id === '42',
+      'synthesize returns transient replayArgs for the observed placeholder value');
+    const bind = Interp.interpretRecipe(out.recipe, out.replayArgs, { trustedProvenance: 'local' });
+    check(bind && bind.success === true && bind.spec && bind.spec.url === '/api/items/42',
+      'synthesized placeholder recipe binds with its transient replayArgs');
     check(out.recipe.method === 'GET', 'recipe.method is the captured verb');
     // a GET with no CSRF header defaults to same-origin-cookie (D-11 default)
     check(out.recipe.authStrategy === 'same-origin-cookie', "GET recipe authStrategy defaults to 'same-origin-cookie' (D-11)");

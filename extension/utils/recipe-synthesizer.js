@@ -97,7 +97,10 @@
   // template anyway, so literal is the safe default. Re-join preserving the single
   // leading slash and never producing a '..' segment, so the result satisfies the
   // endpoint pattern ('^/(?!/)...' with a no-'..' guard). Returns null if the input
-  // is not a single-leading-slash non-protocol-relative path.
+  // is not a single-leading-slash non-protocol-relative path. For every synthesized
+  // placeholder, also returns a params sub-schema and transient replayArgs so the
+  // immediate promote-after-replay bind can fill the template without persisting
+  // concrete path values into the learned recipe.
 
   var _UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   var _ALL_DIGITS_RE = /^[0-9]+$/;
@@ -130,6 +133,9 @@
     var segments = pathOnly.split('/');   // ['', 'api', 'items', '42'] for /api/items/42
     var out = [];
     var paramIndex = 0;
+    var required = [];
+    var properties = {};
+    var replayArgs = {};
     for (var i = 0; i < segments.length; i++) {
       var seg = segments[i];
       if (seg === '') {
@@ -142,7 +148,11 @@
       }
       if (_looksVolatileSegment(seg)) {
         paramIndex += 1;
-        out.push('{' + (paramIndex === 1 ? 'id' : ('p' + paramIndex)) + '}');
+        var paramName = (paramIndex === 1 ? 'id' : ('p' + paramIndex));
+        out.push('{' + paramName + '}');
+        required.push(paramName);
+        properties[paramName] = { type: 'string', minLength: 1 };
+        replayArgs[paramName] = seg;
       } else {
         out.push(seg);                    // stable segment stays literal (A2)
       }
@@ -151,7 +161,16 @@
     // Re-assert the single-leading-slash, non-protocol-relative, no-'..' shape.
     if (template.charAt(0) !== '/' || template.charAt(1) === '/') { return null; }
     if (/(^|\/)\.\.(\/|$)/.test(template)) { return null; }
-    return template;
+    return {
+      template: template,
+      paramsSchema: required.length > 0 ? {
+        type: 'object',
+        additionalProperties: false,
+        required: required,
+        properties: properties
+      } : null,
+      replayArgs: replayArgs
+    };
   }
 
   // ---- Slug + descriptor derivation ---------------------------------------
@@ -275,8 +294,9 @@
       // Bare http(s) origin shape (mirror the schema origin pattern at the boundary).
       if (typeof origin !== 'string' || !/^https?:\/\/[^/?#\s]+$/.test(origin)) { return null; }
 
-      var template = _toPathTemplate(observedCall.path);
-      if (template === null) { return null; }
+      var pathInfo = _toPathTemplate(observedCall.path);
+      if (pathInfo === null) { return null; }
+      var template = pathInfo.template;
 
       var auth = _inferAuth(observedCall);
 
@@ -308,6 +328,9 @@
       if (auth.authStrategy === 'csrf-header-scrape' && auth.csrf) {
         recipe.csrf = auth.csrf;
       }
+      if (pathInfo.paramsSchema) {
+        recipe.params = pathInfo.paramsSchema;
+      }
 
       // VALIDATE before returning (D-12). A missing validator or a non-conforming
       // synthesis yields null -- never a partial/invalid candidate.
@@ -331,7 +354,12 @@
         flaggedForPhase32: auth.flaggedForPhase32 === true
       };
 
-      return { recipe: recipe, descriptor: descriptor, flaggedForPhase32: auth.flaggedForPhase32 === true };
+      return {
+        recipe: recipe,
+        descriptor: descriptor,
+        flaggedForPhase32: auth.flaggedForPhase32 === true,
+        replayArgs: pathInfo.replayArgs || {}
+      };
     } catch (_e) {
       // Fail closed: any thrown/malformed input yields null, never a partial candidate.
       return null;
@@ -370,7 +398,12 @@
       }
 
       // 1. Bind/verify via interpretRecipe with the loader-vouched 'local' provenance.
-      var interpreted = await deps.interpretRecipe(recipe, {}, { trustedProvenance: 'local' });
+      // replayArgs are transient values from the observed path, used only to prove
+      // this synthesized template still binds before the recipe is persisted.
+      var replayArgs = (candidate.replayArgs && typeof candidate.replayArgs === 'object')
+        ? candidate.replayArgs
+        : {};
+      var interpreted = await deps.interpretRecipe(recipe, replayArgs, { trustedProvenance: 'local' });
       if (!interpreted || interpreted.success !== true || !interpreted.spec) {
         // Failed bind -> DISCARD; do NOT reach executeBoundSpec (no replay side effect).
         return { promoted: false, reason: 'INTERPRET_FAILED' };

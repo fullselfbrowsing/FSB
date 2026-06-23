@@ -202,7 +202,8 @@
       //     execute side effect (D-10).
       var interpreted;
       try {
-        interpreted = await interp.interpretRecipe(cand.recipe, {}, { trustedProvenance: 'local' });
+        var replayArgs = (cand.replayArgs && typeof cand.replayArgs === 'object') ? cand.replayArgs : {};
+        interpreted = await interp.interpretRecipe(cand.recipe, replayArgs, { trustedProvenance: 'local' });
       } catch (_interpErr) {
         discarded++;
         continue;

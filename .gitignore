@@ -52,11 +52,3 @@ dist/skill/
 # Bundler-installed-not-wired in Plan 05-01; consumer (offscreen Lattice host)
 # lands in Plan 05-04. extension/dist/ is per-developer and never enters git.
 extension/dist/
-
-# Phase 28 (v0.9.99 SURF-04/D-16) -- build-time generated catalog snapshot.
-# scripts/package-extension.mjs regenerates extension/catalog/recipe-index.generated.js
-# from catalog/ before zipping; it is a deterministic build artifact (like the
-# vendored .min libs are sourced, but this one is emitted) and would go stale if
-# committed. Hand-authored handler copies under extension/catalog/handlers/ are
-# tracked so a fresh unpacked extension can load its T1a modules in dev.
-extension/catalog/recipe-index.generated.js

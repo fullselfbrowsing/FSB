@@ -51,6 +51,17 @@ function mkRecipe(id) {
     method: 'GET', authStrategy: 'same-origin-cookie', extract: '@'
   };
 }
+function mkParamRecipe(id) {
+  const recipe = mkRecipe(id);
+  recipe.endpoint = '/api/{id}';
+  recipe.params = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['id'],
+    properties: { id: { type: 'string', minLength: 1 } }
+  };
+  return recipe;
+}
 function mkDesc(slug) {
   return { slug: slug, service: 'example.com', intentSynonyms: ['do ' + slug], description: slug, actionVerb: 'list', sideEffectClass: 'read' };
 }
@@ -102,6 +113,19 @@ function makeExecuteStub(outcome) {
   check(optsA && optsA.trustedProvenance === 'local',
     "the replay threads {trustedProvenance:'local'} into interpretRecipe (the loader vouch, HI-01)");
   check(execA.calls.length >= 1 && execA.calls[0].tabId === TAB_ID, 'CASE A executed the bound spec on the session tab');
+
+  // Synthesized endpoint placeholders must be filled during the replay gate. The
+  // args are transient proof inputs and are not persisted by the store.
+  const candParam = { recipe: mkParamRecipe('param'), descriptor: mkDesc('param'), origin: ORIGIN, replayArgs: { id: '42' } };
+  const interpParam = makeInterpretStub({ success: true, spec: { origin: ORIGIN, url: ORIGIN + '/api/42' } });
+  const execParam = makeExecuteStub({ success: true, status: 200, data: {} });
+  const resParam = await Synth.promoteAfterReplay(candParam, { interpretRecipe: interpParam, executeBoundSpec: execParam, tabId: TAB_ID });
+  check(resParam && resParam.promoted === true, 'placeholder candidate with replayArgs promotes after clean replay');
+  check(interpParam.calls[0] && interpParam.calls[0].args && interpParam.calls[0].args.id === '42',
+    'promoteAfterReplay passes candidate.replayArgs into interpretRecipe');
+  const storedParam = await Learned.getLearned('param', ORIGIN);
+  check(storedParam && !storedParam.replayArgs && storedParam.recipe && storedParam.recipe.endpoint === '/api/{id}',
+    'transient replayArgs are not persisted with the learned recipe');
 
   // ---- CASE B: failed replay (execute fails) -> NOT stored (DISCARD, D-10) ----
   const candB = { recipe: mkRecipe('failexec'), descriptor: mkDesc('failexec'), origin: ORIGIN };
