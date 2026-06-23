@@ -211,9 +211,93 @@ async function run() {
     && autopilotResult.result.tier === 'T1b',
     'CAT-04: the autopilot wrapper `result` carries the router response verbatim (tier:T1b)');
 
-  // Restore globals.
+  // Restore the spy globals before the Phase-32 block drives the REAL router.
   if (priorRouter === undefined) { delete globalThis.FsbCapabilityRouter; } else { globalThis.FsbCapabilityRouter = priorRouter; }
   if (priorChrome === undefined) { delete globalThis.chrome; } else { globalThis.chrome = priorChrome; }
+
+  // -------------------------------------------------------------------------
+  // PHASE 32 (HEAL-01, D-02): the autopilot front door surfaces the typed reason /
+  // fellBackToDom in makeResult. This drives the REAL capability-router.invoke (NOT
+  // the spy above -- the spy would pre-bake the marker and make the assertion
+  // self-fulfilling) with a synthetic BROKEN 404 fetch, then asserts
+  // executeCapabilityToolForAutopilot surfaces the typed reason so the model sees it
+  // next iteration: makeResult.result is the router response carrying the typed code,
+  // and makeResult.error reflects response.error || response.errorCode.
+  //
+  // RED TODAY (the correct Wave 0 state): the real router has NO post-executeBoundSpec
+  // classify hook yet (Plan 03), so a broken 404 passes through as { success:true,
+  // status:404, tier:'T1b' } -> result.code is undefined and error is null -> the
+  // typed-reason assertions RED. Turns GREEN once Plan 03 emits
+  // RECIPE_DOM_FALLBACK_PENDING (+ fellBackToDom) on the broken verdict.
+  // -------------------------------------------------------------------------
+  console.log('\n--- PHASE 32: the autopilot door surfaces the typed reason / fellBackToDom on a broken fetch (HEAL-01, D-02) ---');
+
+  const fs = require('fs');
+  const vm = require('vm');
+  const BROKEN_CODE = 'RECIPE_DOM_FALLBACK_PENDING';
+
+  const priorRouter32 = globalThis.FsbCapabilityRouter;
+  const priorChrome32 = globalThis.chrome;
+  const priorCatalog32 = globalThis.FsbCapabilityCatalog;
+  const priorFetch32 = globalThis.FsbCapabilityFetch;
+  const priorInterp32 = globalThis.FsbCapabilityInterpreter;
+  const priorJmespath32 = globalThis.jmespath;
+
+  // Load the REAL router + collaborators (the capability-router.test.js preload).
+  vm.runInThisContext(fs.readFileSync(path.join(REPO_ROOT, 'extension', 'lib', 'cfworker-json-schema.min.js'), 'utf8'));
+  globalThis.jmespath = require(path.join(REPO_ROOT, 'extension', 'lib', 'jmespath.min.js'));
+  require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-recipe-schema.js'));
+  require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-auth-strategies.js'));
+  globalThis.FsbCapabilityInterpreter = require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-interpreter.js'));
+  globalThis.FsbCapabilityRouter = require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-router.js'));
+  globalThis.chrome = {
+    tabs: {
+      async query() { return [{ id: 11, url: 'https://github.com/notifications' }]; },
+      async get(id) { return { id: id, url: 'https://github.com/notifications' }; }
+    }
+  };
+  globalThis.FsbCapabilityCatalog = {
+    resolve(slug) {
+      return slug === SLUG ? { tier: 'T1b', recipe: {
+        schemaVersion: 1, id: SLUG, origin: 'https://github.com', endpoint: '/notifications',
+        method: 'GET', authStrategy: 'same-origin-cookie', extract: '@'
+      } } : null;
+    }
+  };
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 404, finalUrl: 'https://github.com/notifications', redirected: false, data: null, text: 'not found' };
+    }
+  };
+
+  let brokenAutopilot = null;
+  try {
+    const toolExecutor32 = require(path.join(REPO_ROOT, 'extension', 'ai', 'tool-executor.js'));
+    const fn32 = toolExecutor32.executeCapabilityToolForAutopilot
+      || (typeof globalThis !== 'undefined' ? globalThis.executeCapabilityToolForAutopilot : null);
+    if (typeof fn32 === 'function') {
+      brokenAutopilot = await fn32('invoke_capability', { slug: SLUG, params: ARGS }, 11);
+    }
+  } catch (err) {
+    console.error('  (Phase-32 autopilot door threw -- acceptable Wave 0 RED):', err && err.message ? err.message : err);
+  }
+
+  check(brokenAutopilot && brokenAutopilot.result && brokenAutopilot.result.code === BROKEN_CODE,
+    'HEAL-01: the autopilot makeResult.result carries the typed ' + BROKEN_CODE
+      + ' reason verbatim from the real router (RED until Plan 03 emits it on a broken fetch)');
+  check(brokenAutopilot && brokenAutopilot.error === BROKEN_CODE,
+    'HEAL-01: makeResult.error reflects response.error || response.errorCode = ' + BROKEN_CODE
+      + ' (the model sees the typed reason next iteration -- D-02)');
+  check(brokenAutopilot && brokenAutopilot.result && brokenAutopilot.result.fellBackToDom === true,
+    'HEAL-01: makeResult.result carries the fellBackToDom marker on the broken verdict (D-04 -- recorded in the audit log)');
+
+  // Restore the Phase-32 globals.
+  if (priorRouter32 === undefined) { delete globalThis.FsbCapabilityRouter; } else { globalThis.FsbCapabilityRouter = priorRouter32; }
+  if (priorChrome32 === undefined) { delete globalThis.chrome; } else { globalThis.chrome = priorChrome32; }
+  if (priorCatalog32 === undefined) { delete globalThis.FsbCapabilityCatalog; } else { globalThis.FsbCapabilityCatalog = priorCatalog32; }
+  if (priorFetch32 === undefined) { delete globalThis.FsbCapabilityFetch; } else { globalThis.FsbCapabilityFetch = priorFetch32; }
+  if (priorInterp32 === undefined) { delete globalThis.FsbCapabilityInterpreter; } else { globalThis.FsbCapabilityInterpreter = priorInterp32; }
+  if (priorJmespath32 === undefined) { delete globalThis.jmespath; } else { globalThis.jmespath = priorJmespath32; }
 
   console.log('\ncapability-autopilot-parity: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);

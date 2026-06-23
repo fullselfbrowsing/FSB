@@ -215,6 +215,157 @@ const GITHUB_RECIPE = {
   delete globalThis.executeTool;
   t3Handle.restore();
 
+  // =======================================================================
+  // PHASE 32 (HEAL-01/HEAL-03/HEAL-04) -- the self-healing fallback assertions.
+  // RED until Plan 03 realizes the router classify-hook + quarantine + re-learn
+  // wiring. These extend the CAT-05 T3 contract: the dual-field
+  // RECIPE_DOM_FALLBACK_PENDING must ALSO fire AFTER a broken T1b/T2 executeBoundSpec
+  // (not only on a pre-declared T3 tier). ASCII-only, NO emojis.
+  // =======================================================================
+
+  // -----------------------------------------------------------------------
+  // HEAL-01 (D-01): a T1b recipe whose executeBoundSpec returns a BROKEN result
+  // (an HTTP 404) routes through classifyRecipeBroken and the router returns the
+  // dual-field RECIPE_DOM_FALLBACK_PENDING, carrying the underlying reason
+  // (RECIPE_EXPIRED / RECIPE_HTTP_4XX) in an extra field. Today the router has no
+  // post-fetch classify hook, so it passes the 404 through as success:true -> RED.
+  // -----------------------------------------------------------------------
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 404, finalUrl: 'https://github.com/notifications', redirected: false, data: null, text: 'not found' };
+    }
+  };
+  installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
+  const brokenFetch = await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(brokenFetch && brokenFetch.success === false
+    && brokenFetch.code === 'RECIPE_DOM_FALLBACK_PENDING'
+    && brokenFetch.errorCode === 'RECIPE_DOM_FALLBACK_PENDING',
+    'HEAL-01: a broken (404) T1b fetch routes to the dual-field RECIPE_DOM_FALLBACK_PENDING (the T3 contract fires after a broken fetch, not only a pre-declared T3 tier)');
+  check(brokenFetch && /^RECIPE_.+$/.test(brokenFetch.code),
+    'HEAL-01: the broken-fetch RECIPE_DOM_FALLBACK_PENDING matches /^RECIPE_.+$/ (surfaces verbatim)');
+  check(brokenFetch && typeof brokenFetch.reason === 'string' && /^RECIPE_/.test(brokenFetch.reason),
+    "HEAL-01: the fallback carries the underlying broken reason (e.g. RECIPE_EXPIRED / RECIPE_HTTP_4XX) in an extra 'reason' field");
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+
+  // -----------------------------------------------------------------------
+  // HEAL-03 (D-09): on the rot path the router QUARANTINES the recipe. For a T2
+  // learned slug it calls FsbLearnedRecipeStore.quarantine(slug, origin); for a
+  // bundled slug it calls the catalog's quarantineBundled(slug). Spy both and assert
+  // the quarantine call fired on the broken verdict. RED until Plan 03 wires it.
+  // -----------------------------------------------------------------------
+  const learnedQuarantineCalls = [];
+  const priorLearnedStore = globalThis.FsbLearnedRecipeStore;
+  globalThis.FsbLearnedRecipeStore = {
+    quarantine: function (slug, origin) { learnedQuarantineCalls.push({ slug: slug, origin: origin }); return Promise.resolve(true); },
+    getLearnedSync: function () { return null; }
+  };
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 500, finalUrl: 'https://github.com/notifications', redirected: false, data: null, text: 'server error' };
+    }
+  };
+  // A T2 learned slug carrying a recipe -> a broken 500 fetch -> quarantine the learned entry.
+  installCatalog({ 'learned.github.notifications': { tier: 'T2', recipe: GITHUB_RECIPE, origin: 'https://github.com' } });
+  const rotLearned = await ROUTER.invoke('learned.github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(rotLearned && rotLearned.success === false && rotLearned.code === 'RECIPE_DOM_FALLBACK_PENDING',
+    'HEAL-03: a broken T2 learned fetch routes to RECIPE_DOM_FALLBACK_PENDING');
+  check(learnedQuarantineCalls.length >= 1
+    && learnedQuarantineCalls[0].slug === 'learned.github.notifications',
+    'HEAL-03: the rot path called FsbLearnedRecipeStore.quarantine(slug, origin) on the broken T2 verdict (the recipe is demoted, NOT deleted -- D-09)');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+  if (priorLearnedStore === undefined) { delete globalThis.FsbLearnedRecipeStore; } else { globalThis.FsbLearnedRecipeStore = priorLearnedStore; }
+
+  // Bundled rot: the catalog's quarantineBundled(slug) is called on a broken bundled
+  // (T1b) verdict (the NEW session-only quarantinedBundledSlugs set -- D-09/D-12).
+  const bundledQuarantineCalls = [];
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 503, finalUrl: 'https://github.com/notifications', redirected: false, data: null, text: 'unavailable' };
+    }
+  };
+  // installCatalog sets globalThis.FsbCapabilityCatalog; augment it with a spy
+  // quarantineBundled the router calls on the bundled rot path.
+  installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
+  globalThis.FsbCapabilityCatalog.quarantineBundled = function (slug) { bundledQuarantineCalls.push(slug); };
+  const rotBundled = await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(rotBundled && rotBundled.success === false && rotBundled.code === 'RECIPE_DOM_FALLBACK_PENDING',
+    'HEAL-03: a broken bundled (T1b) fetch routes to RECIPE_DOM_FALLBACK_PENDING');
+  check(bundledQuarantineCalls.length >= 1 && bundledQuarantineCalls[0] === 'github.notifications',
+    'HEAL-03: the rot path called catalog.quarantineBundled(slug) on the broken bundled verdict (session-only demotion -- D-09/D-12)');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+
+  // -----------------------------------------------------------------------
+  // HEAL-03 re-learn trigger WIRING (D-10): the post-fallback runDiscovery re-learn
+  // trigger is reachable on the rot path. Spy FsbDiscoverySession.runDiscovery and
+  // assert it is CALLABLE/wired when a recipe rots. NOTE: the exact trigger point is
+  // Plan 03's (router or autopilot door); the CI assertion is "the trigger is
+  // reachable/wired", NOT "a real fallback completed" (the live re-learn-after-real-
+  // fallback is UAT per D-10/A5). RED until Plan 03 wires the trigger.
+  // -----------------------------------------------------------------------
+  const runDiscoveryCalls = [];
+  const priorDiscovery = globalThis.FsbDiscoverySession;
+  globalThis.FsbDiscoverySession = {
+    runDiscovery: function (origin, opts) { runDiscoveryCalls.push({ origin: origin, opts: opts }); return Promise.resolve({ ok: true }); }
+  };
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 404, finalUrl: 'https://github.com/notifications', redirected: false, data: null, text: 'gone' };
+    }
+  };
+  installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
+  await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(typeof globalThis.FsbDiscoverySession.runDiscovery === 'function' && runDiscoveryCalls.length >= 1,
+    'HEAL-03: the post-fallback runDiscovery re-learn trigger is WIRED on the rot path (FsbDiscoverySession.runDiscovery is reachable -- the live re-learn is UAT, D-10)');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+  if (priorDiscovery === undefined) { delete globalThis.FsbDiscoverySession; } else { globalThis.FsbDiscoverySession = priorDiscovery; }
+
+  // -----------------------------------------------------------------------
+  // HEAL-04 never-mask: a LEGITIMATE no-results (200 + valid shape + empty set) and a
+  // LOGGED-OUT (redirected:true -> RECIPE_LOGGED_OUT) each return their REAL/typed
+  // result and do NOT route to RECIPE_DOM_FALLBACK_PENDING and fire NO quarantine.
+  // -----------------------------------------------------------------------
+  const noMaskQuarantineCalls = [];
+  const priorLearnedStore2 = globalThis.FsbLearnedRecipeStore;
+  globalThis.FsbLearnedRecipeStore = {
+    quarantine: function (slug, origin) { noMaskQuarantineCalls.push({ slug: slug, origin: origin }); return Promise.resolve(true); },
+    getLearnedSync: function () { return null; }
+  };
+
+  // (i) A legitimate no-results: 200 + an empty array (a present container of the
+  // expected kind). The router must return the REAL empty result, NOT fall back.
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 200, finalUrl: 'https://github.com/notifications', redirected: false, data: [], text: null };
+    }
+  };
+  installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
+  const emptyOk = await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(emptyOk && emptyOk.success === true && emptyOk.code !== 'RECIPE_DOM_FALLBACK_PENDING',
+    'HEAL-04: a legitimate no-results (200 + empty set) returns the REAL empty result and does NOT route to RECIPE_DOM_FALLBACK_PENDING (never masked)');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+
+  // (ii) A logged-out outcome: redirected:true -> surfaced as RECIPE_LOGGED_OUT, NOT
+  // a DOM fallback (a 302->login is surfaced, not healed).
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() {
+      return { success: true, status: 200, finalUrl: 'https://github.com/login', redirected: true, data: null, text: null };
+    }
+  };
+  installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
+  const loggedOut = await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
+  check(loggedOut && loggedOut.code !== 'RECIPE_DOM_FALLBACK_PENDING',
+    'HEAL-04: a logged-out (redirected:true) outcome does NOT route to RECIPE_DOM_FALLBACK_PENDING (surfaced, not healed)');
+  check(noMaskQuarantineCalls.length === 0,
+    'HEAL-04: NEITHER the legitimate-no-results NOR the logged-out outcome fired a quarantine (only a real rot demotes a recipe)');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+  if (priorLearnedStore2 === undefined) { delete globalThis.FsbLearnedRecipeStore; } else { globalThis.FsbLearnedRecipeStore = priorLearnedStore2; }
+
   // -----------------------------------------------------------------------
   // CAT-01 tier order + CAT-03 T1b lifted path: a tier:'T1b' recipe routes through
   // the lifted interpretRecipe -> executeBoundSpec body and returns the normalized
