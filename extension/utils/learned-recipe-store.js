@@ -87,6 +87,28 @@
     return next;
   }
 
+  // ---- SYNCHRONOUS in-memory mirror (Phase 31 plan 06 -- closes the 31-05 gap) --
+  //
+  // capability-catalog.js resolve() is SYNCHRONOUS (the router reads the resolved
+  // recipe immediately), so a learned recipe can only be surfaced inside resolve via
+  // a synchronous read. The async getLearned() (the storage-truth read) cannot. This
+  // mirror is the synchronous source the catalog's _getLearned reads via
+  // getLearnedSync(slug, origin): an in-memory map hydrated from chrome.storage.local
+  // at service-worker startup (hydrateSyncCache) and kept in lock-step with
+  // promote()/quarantine(). Without it, _getLearned returns null in production and
+  // LEARN-04 outranking only fires in the test stub -- this lights it up at runtime.
+  //
+  // Shape mirrors the persisted envelope's recipes map but stores ONLY what
+  // getLearnedSync returns plus the quarantine flag (no bookkeeping needed for a
+  // read): _syncMirror[origin][slug] = { recipe, descriptor, quarantined }. Null-proto
+  // at both levels (ME-03) so a __proto__ origin/slug survives as own data.
+  var _syncMirror = null;   // lazily created on first hydrate/update
+
+  function _syncMirrorMap() {
+    if (!_syncMirror) { _syncMirror = Object.create(null); }
+    return _syncMirror;
+  }
+
   // ---- null-proto maps (consent-policy-store.js ME-03 idiom) ----------------
   // A prototype-shaped key (__proto__ / constructor / prototype) round-trips as
   // plain OWN data instead of silently vanishing or hitting the prototype chain.
@@ -125,6 +147,63 @@
 
   function _defaultEnvelope() {
     return { v: PAYLOAD_VERSION, recipes: _nullProto() };
+  }
+
+  // ---- sync-mirror writers (kept in lock-step with promote/quarantine) -------
+  // _mirrorSet records (or refreshes) a slot in the sync mirror; _mirrorQuarantine
+  // flips the flag; _mirrorDelete removes an evicted slot so getLearnedSync never
+  // returns an LRU-evicted recipe. All are null-safe + null-proto.
+  function _mirrorSet(origin, slug, recipe, descriptor, quarantined) {
+    if (typeof origin !== 'string' || typeof slug !== 'string') { return; }
+    var map = _syncMirrorMap();
+    if (!map[origin] || typeof map[origin] !== 'object') { map[origin] = _nullProto(); }
+    map[origin][slug] = {
+      recipe: recipe,
+      descriptor: (descriptor !== undefined ? descriptor : null),
+      quarantined: quarantined === true
+    };
+  }
+  function _mirrorQuarantine(origin, slug) {
+    if (typeof origin !== 'string' || typeof slug !== 'string') { return; }
+    var map = _syncMirrorMap();
+    if (map[origin] && typeof map[origin] === 'object'
+      && Object.prototype.hasOwnProperty.call(map[origin], slug)
+      && map[origin][slug] && typeof map[origin][slug] === 'object') {
+      map[origin][slug].quarantined = true;
+    }
+  }
+  function _mirrorDelete(origin, slug) {
+    if (typeof origin !== 'string' || typeof slug !== 'string') { return; }
+    var map = _syncMirrorMap();
+    if (map[origin] && typeof map[origin] === 'object'
+      && Object.prototype.hasOwnProperty.call(map[origin], slug)) {
+      delete map[origin][slug];
+    }
+  }
+  // Rebuild the entire sync mirror from a persisted envelope (hydration at startup).
+  function _mirrorRebuildFrom(envelope) {
+    var fresh = Object.create(null);
+    var recipes = envelope && envelope.recipes;
+    if (recipes && typeof recipes === 'object') {
+      for (var origin in recipes) {
+        if (!Object.prototype.hasOwnProperty.call(recipes, origin)) { continue; }
+        var perOrigin = recipes[origin];
+        if (!perOrigin || typeof perOrigin !== 'object') { continue; }
+        var freshPer = Object.create(null);
+        for (var slug in perOrigin) {
+          if (!Object.prototype.hasOwnProperty.call(perOrigin, slug)) { continue; }
+          var entry = perOrigin[slug];
+          if (!entry || typeof entry !== 'object' || !entry.recipe) { continue; }
+          freshPer[slug] = {
+            recipe: entry.recipe,
+            descriptor: (entry.descriptor !== undefined ? entry.descriptor : null),
+            quarantined: entry.quarantined === true
+          };
+        }
+        fresh[origin] = freshPer;
+      }
+    }
+    _syncMirror = fresh;
   }
 
   // ---- readAll() -> Promise<envelope> --------------------------------------
@@ -208,13 +287,57 @@
     });
   }
 
+  // ---- getLearnedSync(slug, origin) -> {recipe, descriptor} | null (Plan 06) --
+  // The SYNCHRONOUS read off the in-memory mirror that capability-catalog.js
+  // _getLearned calls inside the synchronous resolve(). SAME hard-scope + quarantine
+  // semantics as the async getLearned: returns a learned entry ONLY when the
+  // per-origin map exists, the slug exists, it is NOT quarantined, AND
+  // entry.recipe.origin === origin (Pitfall 6). An un-hydrated / empty mirror returns
+  // null (resolve falls through to the REGISTRY, the Phase-29 behavior). NEVER throws
+  // -- a malformed mirror degrades to null.
+  function getLearnedSync(slug, origin) {
+    try {
+      if (typeof slug !== 'string' || typeof origin !== 'string') { return null; }
+      var map = _syncMirror;
+      if (!map || typeof map !== 'object') { return null; }
+      if (!Object.prototype.hasOwnProperty.call(map, origin)) { return null; }
+      var perOrigin = map[origin];
+      if (!perOrigin || typeof perOrigin !== 'object'
+        || !Object.prototype.hasOwnProperty.call(perOrigin, slug)) {
+        return null;
+      }
+      var entry = perOrigin[slug];
+      if (!entry || typeof entry !== 'object') { return null; }
+      if (entry.quarantined === true) { return null; }          // demoted from routing (D-16)
+      if (!entry.recipe || entry.recipe.origin !== origin) { return null; }   // hard origin scope
+      return { recipe: entry.recipe, descriptor: (entry.descriptor !== undefined ? entry.descriptor : null) };
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  // ---- hydrateSyncCache() -> Promise<void> (Plan 06 -- SW-startup hydration) --
+  // Reads the persisted envelope ONCE and rebuilds the in-memory sync mirror so
+  // getLearnedSync surfaces learned recipes that were promoted in a PRIOR service-
+  // worker lifetime. Called from background.js at startup (additive importScripts +
+  // a non-blocking hydrate, the buildOrRestore precedent). Best-effort: a read
+  // failure leaves the mirror empty (getLearnedSync returns null until the next
+  // promote populates it). Serialized through the same lock so a concurrent promote
+  // does not race the rebuild.
+  function hydrateSyncCache() {
+    return _withLock(async function() {
+      var envelope = await readAll();
+      _mirrorRebuildFrom(envelope);
+    });
+  }
+
   // ---- _evictOldestIfOverCap(perOrigin) ------------------------------------
   // LRU (D-16): if the per-origin slug count EXCEEDS PER_ORIGIN_CAP, delete the slug
   // whose entry has the OLDEST lastSuccessAt (the least-recently-succeeded recipe).
   // Mutates the passed-in null-proto map in place.
   function _evictOldestIfOverCap(perOrigin) {
     var slugs = Object.keys(perOrigin);
-    if (slugs.length <= PER_ORIGIN_CAP) { return; }
+    if (slugs.length <= PER_ORIGIN_CAP) { return null; }
     var oldestSlug = null;
     var oldestAt = Infinity;
     for (var i = 0; i < slugs.length; i++) {
@@ -228,6 +351,7 @@
     if (oldestSlug !== null) {
       delete perOrigin[oldestSlug];
     }
+    return oldestSlug;   // the evicted slug (so the caller can mirror the eviction), or null
   }
 
   // ---- promote(origin, recipe, descriptor, opts) -> Promise<void> ----------
@@ -282,11 +406,19 @@
       }
 
       // LRU eviction past the per-origin cap (D-16).
-      _evictOldestIfOverCap(perOrigin);
+      var evictedSlug = _evictOldestIfOverCap(perOrigin);
 
       recipes[origin] = perOrigin;
       envelope.recipes = recipes;
       await _write(envelope);
+
+      // Keep the synchronous mirror in lock-step (Plan 06): record the promoted slot
+      // and drop the evicted slug so getLearnedSync reflects the same set the storage
+      // truth holds. The slot's quarantined flag is preserved off the persisted slot.
+      _mirrorSet(origin, slug, recipe,
+        (perOrigin[slug] && perOrigin[slug].descriptor !== undefined ? perOrigin[slug].descriptor : descriptor),
+        perOrigin[slug] && perOrigin[slug].quarantined === true);
+      if (evictedSlug) { _mirrorDelete(origin, evictedSlug); }
     });
   }
 
@@ -310,12 +442,16 @@
       recipes[origin] = perOrigin;
       envelope.recipes = recipes;
       await _write(envelope);
+
+      // Mirror the demotion synchronously so getLearnedSync stops surfacing it (D-16).
+      _mirrorQuarantine(origin, slug);
     });
   }
 
   // ---- _reset() -- test hook ------------------------------------------------
   // Clears the persisted envelope so a test starts empty. Best-effort.
   function _reset() {
+    _syncMirror = null;   // drop the in-memory mirror so a fresh test starts empty
     if (!_hasLocalStorage()) {
       return Promise.resolve();
     }
@@ -342,6 +478,8 @@
     PER_ORIGIN_CAP: PER_ORIGIN_CAP,
     readAll: readAll,
     getLearned: getLearned,
+    getLearnedSync: getLearnedSync,     // Plan 06: the SYNCHRONOUS catalog-resolve read
+    hydrateSyncCache: hydrateSyncCache, // Plan 06: SW-startup mirror hydration
     promote: promote,
     quarantine: quarantine,
     _reset: _reset
