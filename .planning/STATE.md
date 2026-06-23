@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: ready_to_plan
-stopped_at: Phase 30 complete (4/4) — ready to discuss Phase 999.1
-last_updated: 2026-06-22T04:59:33.893Z
-last_activity: 2026-06-21
+status: executing
+stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
+last_updated: "2026-06-23T01:33:21.013Z"
+last_activity: 2026-06-23 -- Phase 31 planning complete
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 19
+  total_plans: 25
   completed_plans: 21
   percent: 63
 ---
@@ -31,8 +31,8 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 999.1
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-22
+Status: Ready to execute
+Last activity: 2026-06-23 -- Phase 31 planning complete
 
 Progress: [██████████] 100%
 
