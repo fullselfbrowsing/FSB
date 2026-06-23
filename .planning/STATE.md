@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: executing
-stopped_at: "Completed 32-04-PLAN.md (HEAL-05 parity gates + v0.9.99 milestone gate: frozen v2 RECIPE_SCHEMA hash f35211f5... + 7-provider parity green + full npm test EXIT 0; Phase 32 plan 5 of 5 next)"
-last_updated: "2026-06-23T09:15:51.608Z"
+status: verifying
+stopped_at: Completed 32-05-PLAN.md (live self-healing human_needed UAT closeout; UAT-32-01 recorded as deferred live-browser debt; Phase 32 execution-complete; v0.9.99 gated by green HEAL-05)
+last_updated: "2026-06-23T09:22:09.060Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 30
-  completed_plans: 31
-  percent: 75
+  completed_plans: 32
+  percent: 88
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 Phase: 32 (self-healing-fallback-recipe-rot-detection-re-learn-provider) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-23
 
 Progress: [██████████] 100%
@@ -108,6 +108,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 32 P02 | 6min | 3 tasks | 6 files |
 | Phase 32 P03 | 12min | 3 tasks | 4 files |
 | Phase 32 P04 | 6min | 2 tasks | 2 files |
+| Phase 32 P05 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -188,6 +189,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase ?]: Froze the v2 RECIPE_SCHEMA hash (f35211f5...f622a37, independently re-computed) in recipe-schema-lock.test.js -- the closed-vocab recipe contract is locked (HEAL-05/INV-01, D-14)
 - [Phase ?]: 7-provider parity gate green unchanged -- the typed RECIPE_DOM_FALLBACK_PENDING reason is byte-equal across all 7 PROVIDER_KEYS (HEAL-05/INV-03, D-13)
 - [Phase ?]: v0.9.99 milestone gate CLOSED: full npm test EXIT 0 + targeted Phase-32 gate 13/13 GREEN (HEAL-05, D-15)
+- [Phase ?]: Phase 32 Plan 05 (HEAL-01/HEAL-03 live half): authored 32-HUMAN-UAT.md (UAT-32-01) recording the irreducibly-live self-healing scenario (a real rotted/broken recipe on a real authenticated origin detected as RECIPE_EXPIRED, the autopilot completing the SAME task via the DOM tools, the recipe quarantined, and a consent-gated re-learn offered/triggered) as human_needed (status partial / result pending), matching the Phase 27-31 posture; the CI half is GREEN (Plans 02-04), ONLY the live half is human_needed, recorded debt NOT a fabricated pass (D-15, GOV-06).
+- [Phase ?]: Phase 32 Plan 05: the gated checkpoint:human-verify (non-package, gate=blocking) was resolved per the auto-mode policy as deferred human_needed live-browser UAT debt joining the v0.9.99 ledger (alongside UAT-27-01 + the Phase 29/30/31 live items); it does NOT block the milestone close -- the v0.9.99 completion criterion is the green HEAL-05 CI gate (Plan 04, full npm test EXIT 0). No live result was fabricated. Phase 32 is execution-complete (all 5 plans done).
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -235,8 +238,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T09:15:32.823Z
-Stopped at: Completed 32-04-PLAN.md (HEAL-05 parity gates + v0.9.99 milestone gate: frozen v2 RECIPE_SCHEMA hash f35211f5... + 7-provider parity green + full npm test EXIT 0; Phase 32 plan 5 of 5 next)
+Last session: 2026-06-23T09:22:09.055Z
+Stopped at: Completed 32-05-PLAN.md (live self-healing human_needed UAT closeout; UAT-32-01 recorded as deferred live-browser debt; Phase 32 execution-complete; v0.9.99 gated by green HEAL-05)
 Resume file: None
 
 ## Next Actions

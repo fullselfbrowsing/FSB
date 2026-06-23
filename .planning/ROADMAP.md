@@ -142,7 +142,7 @@
 - [x] 32-02-PLAN.md — Rot-detector leaf: capability-rot-detector.js (classifyRecipeBroken + validateExpectedShape) + additive schema v1->v2 (optional capturedAt + expectedShape) + interpreter carry + synthesizer stamp
 - [x] 32-03-PLAN.md — Engine wiring: router classify-hook + T3-realization RECIPE_DOM_FALLBACK_PENDING emit + learned/bundled quarantine + consent-gated re-learn trigger + autopilot DOM-completion surfacing + buildSystemPrompt hint (iterator byte-untouched)
 - [x] 32-04-PLAN.md — HEAL-05 gates: freeze the v2 RECIPE_SCHEMA hash + 7-provider parity green + full npm test (the v0.9.99 milestone completion gate)
-- [ ] 32-05-PLAN.md — Live self-healing UAT (32-HUMAN-UAT.md, human_needed) + gated checkpoint
+- [x] 32-05-PLAN.md — Live self-healing UAT (32-HUMAN-UAT.md, human_needed) + gated checkpoint
 
 ## Progress
 
@@ -157,7 +157,7 @@ Phases execute in numeric order: 26 → 27 → 28 → 29 → 30 → 31 → 32 (d
 | 29. Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete    | 2026-06-21 |
 | 30. Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 4/4 | Complete    | 2026-06-22 |
 | 31. Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 6/6 | Complete    | 2026-06-23 |
-| 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 4/5 | In Progress|  |
+| 32. Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 5/5 | Complete   | 2026-06-23 |
 
 ## Completed Milestones
 
