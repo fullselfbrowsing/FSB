@@ -214,6 +214,53 @@ try {
   }
 } catch (e) { console.error('[FSB] service-denylist load failed at startup:', e.message); }
 
+// Phase 31 (v0.10.0 -- DISC-01/DISC-02/LEARN-01; D-01/D-02/D-10): the network-
+// capture discovery stack, loaded LAST of the capability family. Order is
+// dependency-first: the redactor (the capture event handler's shape-only reducer)
+// BEFORE network-capture.js (which reads FsbNetworkCaptureRedactor), then the
+// synthesizer + the learned-recipe store (read by the discovery orchestrator and
+// the catalog T2 path), then discovery-session.js LAST (it orchestrates capture ->
+// synthesize -> replay -> promote and reads ALL of the above PLUS the already-loaded
+// FsbCapabilityInterpreter / FsbCapabilityFetch / FsbCapabilitySearch). Each line is
+// independently try/catch'd so an absent module degrades to that path being a no-op
+// (the discovery trigger surfaces RECIPE_CAPTURE_UNAVAILABLE) rather than a boot
+// crash. Additive only: NO manifest change -- the 'debugger' permission is already
+// granted (DISC-02, D-02); no tool-definitions / TOOL_REGISTRY edit (INV-01).
+try { importScripts('utils/network-capture-redactor.js'); } catch (e) { console.error('[FSB] Failed to load network-capture-redactor.js:', e.message); }
+try { importScripts('utils/network-capture.js'); } catch (e) { console.error('[FSB] Failed to load network-capture.js:', e.message); }
+try { importScripts('utils/recipe-synthesizer.js'); } catch (e) { console.error('[FSB] Failed to load recipe-synthesizer.js:', e.message); }
+try { importScripts('utils/learned-recipe-store.js'); } catch (e) { console.error('[FSB] Failed to load learned-recipe-store.js:', e.message); }
+try { importScripts('utils/discovery-session.js'); } catch (e) { console.error('[FSB] Failed to load discovery-session.js:', e.message); }
+
+// Hydrate the learned-recipe sync mirror at service-worker startup (Plan 06) so a
+// recipe promoted in a PRIOR SW lifetime surfaces synchronously via the catalog's
+// resolve() -> getLearnedSync path (LEARN-04 outranking fires at runtime). async +
+// non-blocking; a typeof guard tolerates a missing module so a load failure above
+// never throws at boot (the buildOrRestore / denylist-load precedent).
+try {
+  if (typeof FsbLearnedRecipeStore !== 'undefined' && FsbLearnedRecipeStore
+      && typeof FsbLearnedRecipeStore.hydrateSyncCache === 'function') {
+    FsbLearnedRecipeStore.hydrateSyncCache();
+  }
+} catch (e) { console.error('[FSB] learned-recipe-store hydrateSyncCache failed at startup:', e.message); }
+
+// Register the Network-domain CDP event listener ONCE on the existing
+// chrome.debugger surface (D-02). FsbNetworkCapture._onCdpEvent is method-dispatched
+// and a no-op whenever there is no active capture session (it guards `if (!_session)
+// return`), so registering it here -- ahead of any session -- is safe and never
+// disrupts the Input-domain emulation: a non-Network method (Input.*, Page.*) is
+// ignored. This is the FIRST onEvent consumer in the extension (the existing
+// debugger usage is all sendCommand/attach/detach), so it adds cleanly. NO manifest
+// change (the 'debugger' permission is already present, DISC-02).
+try {
+  if (typeof chrome !== 'undefined' && chrome.debugger && chrome.debugger.onEvent
+      && typeof chrome.debugger.onEvent.addListener === 'function'
+      && typeof FsbNetworkCapture !== 'undefined' && FsbNetworkCapture
+      && typeof FsbNetworkCapture._onCdpEvent === 'function') {
+    chrome.debugger.onEvent.addListener(FsbNetworkCapture._onCdpEvent);
+  }
+} catch (e) { console.error('[FSB] network-capture onEvent registration failed at startup:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 

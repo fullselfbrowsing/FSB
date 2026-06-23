@@ -475,6 +475,13 @@ class MCPBridgeClient {
       case 'mcp:capabilities-invoke':
         return this._handleCapabilitiesInvoke(payload);
 
+      // Phase 31 DISC-01: the user-initiated discovery trigger. Thin pass-through --
+      // the authoritative origin/tabId resolution + the consent-gated capture session
+      // run in the dispatcher handler, NOT here. Internal control surface (out of
+      // TOOL_REGISTRY, INV-01).
+      case 'mcp:capabilities-discover':
+        return this._handleCapabilitiesDiscover(payload);
+
       case 'mcp:create-agent':
         return this._handleAgentAction('createAgent', payload);
 
@@ -1687,6 +1694,19 @@ class MCPBridgeClient {
   async _handleCapabilitiesInvoke(payload) {
     const response = await dispatchMcpMessageRoute({
       type: 'mcp:capabilities-invoke',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  // Phase 31 DISC-01: user-initiated discovery trigger. Thin pass-through -- the
+  // SW-side origin/tabId resolution + the consent-gated promote-after-replay session
+  // run in the dispatcher handler (the single authoritative resolution point). No
+  // origin/tab resolution in the bridge.
+  async _handleCapabilitiesDiscover(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-discover',
       payload,
       client: this
     });

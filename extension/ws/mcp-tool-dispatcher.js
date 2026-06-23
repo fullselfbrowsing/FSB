@@ -112,6 +112,13 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   // existing errors.ts /^RECIPE_.+$/ passthrough (no errors.ts edit).
   'mcp:capabilities-search': { routeFamily: 'capabilities', handler: handleCapabilitiesSearchMessageRoute },
   'mcp:capabilities-invoke': { routeFamily: 'capabilities', handler: handleCapabilitiesInvokeMessageRoute },
+  // Phase 31 (DISC-01, D-01): the user-initiated, time-boxed discovery trigger. An
+  // INTERNAL-ONLY message route that mirrors the capabilities-invoke front door
+  // (SW-side origin/tabId resolution; payload.origin/tab_id are non-authoritative
+  // overrides). It is a control surface, NOT an MCP tool schema -- it does NOT enter
+  // TOOL_REGISTRY / getPublicTools, so the frozen INV-01 tool-definitions parity hash
+  // is UNMOVED (gated by tool-definitions-parity + capability-mcp-surface).
+  'mcp:capabilities-discover': { routeFamily: 'capabilities', handler: handleCapabilitiesDiscoverMessageRoute },
   // Phase 242: single-step ownership-gated history back. handleBackRoute
   // performs history.length precheck, chrome.tabs.goBack, settle race,
   // 5-status classification, and bindTab parity (D-08). Background-tab
@@ -2233,6 +2240,59 @@ async function handleCapabilitiesInvokeMessageRoute({ payload }) {
     }
   }
   return await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, { origin, tabId });
+}
+
+// Phase 31 DISC-01 / D-01: the user-initiated, time-boxed discovery trigger. This
+// INTERNAL-ONLY route mirrors handleCapabilitiesInvokeMessageRoute's authoritative
+// SW-side origin/tabId resolution: explicit payload.tab_id / payload.origin are
+// NON-AUTHORITATIVE overrides; absent them, the active/owned tab is the source of
+// truth (the un-spoofable D-11 pattern). It then runs the promote-after-replay
+// discovery session (FsbDiscoverySession.runDiscovery), which itself enforces the
+// Phase-30 consent gate INSIDE FsbNetworkCapture.startSession BEFORE any debugger
+// attach (a default-OFF / denied / sensitive-unconfirmed origin returns a
+// RECIPE_CONSENT_* reason and NOTHING is captured). This route registers via the
+// message-route table ONLY -- it is NOT added to TOOL_REGISTRY and NOT to
+// getPublicTools (INV-01): the discovery trigger is a control surface, not an MCP
+// tool schema, so the frozen tool-definitions parity hash never moves. The session
+// bounds (maxMs/maxCount) fall back to the capture module's own defaults when absent;
+// confirmed_sensitive is threaded as the extra-confirm flag for a sensitive origin.
+async function handleCapabilitiesDiscoverMessageRoute({ payload }) {
+  if (typeof FsbDiscoverySession === 'undefined' || typeof FsbDiscoverySession.runDiscovery !== 'function') {
+    return createMcpRouteError('discover_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability discovery unavailable' });
+  }
+  payload = payload || {};
+  // Resolve tabId SW-side: explicit payload.tab_id, else the active/owned tab.
+  let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
+  // Resolve the origin: a caller-supplied payload.origin is a non-authoritative
+  // override only; absent it, the active/owned-tab origin is authoritative (D-11).
+  // The capture session same-origin-filters + the executeBoundSpec origin-pin re-pin
+  // the active tab downstream, so a supplied origin can never select a cross-origin
+  // credentialed replay.
+  let origin = payload.origin || null;
+  if (tabId === null || !origin) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabId === null) {
+        tabId = tabs[0] ? tabs[0].id : null;
+      }
+      if (!origin) {
+        origin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
+      }
+    } catch (e) {
+      // active-tab lookup failed; leave tabId/origin null. The consent gate +
+      // same-origin filter inside the capture session fail closed on a null origin.
+    }
+  }
+  // Session bounds: explicit numeric overrides only; otherwise undefined so the
+  // capture module applies its own DEFAULT_MAX_MS / DEFAULT_MAX_COUNT.
+  const maxMs = Number.isFinite(payload.max_ms) ? payload.max_ms : undefined;
+  const maxCount = Number.isFinite(payload.max_count) ? payload.max_count : undefined;
+  return await FsbDiscoverySession.runDiscovery(origin, {
+    tabId,
+    maxMs,
+    maxCount,
+    confirmedSensitive: !!payload.confirmed_sensitive
+  });
 }
 
 async function handleGetMemoryMessageRoute({ payload }) {
