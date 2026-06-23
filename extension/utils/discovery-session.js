@@ -289,9 +289,14 @@
           try { ended = capture.endSession('discovery-complete') || []; } catch (_e) { ended = []; }
         }
         // Prefer the endSession return (the canonical method+path-filtered set);
-        // fall back to the live snapshot when endSession returned empty (the session
-        // had already self-ended on the count bound and endSession was a no-op).
-        var calls = (ended && ended.length) ? ended : live;
+        // fall back to the live snapshot, then to the count-bound session's saved
+        // teardown snapshot when endSession is already a no-op.
+        var lastEnded = [];
+        if ((!ended || !ended.length) && (!live || !live.length)
+            && capture && typeof capture._getLastEndedCalls === 'function') {
+          try { lastEnded = capture._getLastEndedCalls() || []; } catch (_e) { lastEnded = []; }
+        }
+        var calls = (ended && ended.length) ? ended : ((live && live.length) ? live : lastEnded);
         resolve(Array.isArray(calls) ? calls : []);
       }, waitMs);
       if (t && typeof t.unref === 'function') { t.unref(); }

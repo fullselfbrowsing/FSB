@@ -78,6 +78,19 @@
       if (typeof d.csrf_token === 'string') { return d.csrf_token; }
       if (typeof d.authenticity_token === 'string') { return d.authenticity_token; }
     }
+    var text = (typeof probeResult.text === 'string') ? probeResult.text : '';
+    if (text) {
+      var patterns = [
+        /"csrf_token"\s*:\s*"([^"]+)"/,
+        /"authenticity_token"\s*:\s*"([^"]+)"/,
+        /name=["']csrf-token["'][^>]*content=["']([^"']+)["']/i,
+        /name=["']authenticity_token["'][^>]*value=["']([^"']+)["']/i
+      ];
+      for (var i = 0; i < patterns.length; i++) {
+        var m = patterns[i].exec(text);
+        if (m && m[1]) { return m[1]; }
+      }
+    }
     return null;
   }
 
@@ -89,15 +102,19 @@
       sideEffectClass: 'read',
       async handle(args, ctx) {
         var a = args || {};
+        var url = GITHUB_ORIGIN + '/issues';
+        if (a.query) {
+          url += '?q=' + encodeURIComponent(String(a.query));
+        }
         var spec = {
           // [ASSUMED-ENDPOINT: capture live in 29-03 Task 4] -- the issues feed read
           // path on github.com (NOT the public api subdomain) so the first-party
           // session cookie attaches.
-          url: GITHUB_ORIGIN + '/issues',
+          url: url,
           method: 'GET',
           headers: { 'Accept': 'application/json' },
           body: null,
-          query: (a.query ? { q: String(a.query) } : {}),
+          query: {},
           authStrategy: 'same-origin-cookie',
           origin: GITHUB_ORIGIN,
           extract: '@'

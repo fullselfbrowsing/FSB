@@ -103,6 +103,16 @@ function installChromeStorageStub() {
   check(postGate && (postGate.decision === 'mutating' || postGate.sideEffectClass === 'mutating'),
     "the blocked POST is classified mutating (decision 'mutating' / sideEffectClass 'mutating')");
 
+  // ---- T1a handler descriptors use sideEffectClass:'write' and default to GET ----
+  const writeDescriptorGate = await Gate.evaluate({
+    origin: ORIGIN, slug: 'slack.chat.postMessage',
+    entry: { tier: 'T1a', descriptor: { sideEffectClass: 'write' } }
+  });
+  check(writeDescriptorGate && writeDescriptorGate.decision !== 'allow',
+    "T1a descriptor sideEffectClass:'write' on read-Auto origin -> NOT allow");
+  check(writeDescriptorGate && writeDescriptorGate.error && writeDescriptorGate.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    "T1a descriptor sideEffectClass:'write' -> error.code RECIPE_CONSENT_MUTATING_REQUIRED");
+
   // ---- after the elevated opt-in, the SAME POST is allowed ----
   await Store.setOriginMutating(ORIGIN, true);
   const postGate2 = await Gate.evaluate({

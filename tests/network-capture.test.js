@@ -71,6 +71,7 @@ const TAB_ID = 7;
   check(typeof Capture.endSession === 'function', 'exports endSession');
   check(typeof Capture._onCdpEvent === 'function', 'exports _onCdpEvent (method-dispatched handler)');
   check(typeof Capture._filterResourceType === 'function', 'exports _filterResourceType');
+  check(typeof Capture._getLastEndedCalls === 'function', 'exports _getLastEndedCalls (count-bound snapshot hook)');
 
   // ---- _filterResourceType: XHR/Fetch only (D-04) ----
   check(Capture._filterResourceType('XHR') === true, "_filterResourceType('XHR') is true");
@@ -143,6 +144,21 @@ const TAB_ID = 7;
     'an event from a different tabId is ignored (source.tabId !== session.tabId)');
 
   if (typeof Capture.endSession === 'function') { Capture.endSession('test-end'); }
+
+  // ---- count-bound self-end preserves the collected calls for discovery glue ----
+  const startedCountBound = await Capture.startSession(ORIGIN, { tabId: TAB_ID, maxMs: 5000, maxCount: 1 });
+  check(startedCountBound && startedCountBound.ok === true, 'startSession(maxCount:1) -> ok:true');
+  Capture._onCdpEvent(SRC, 'Network.requestWillBeSent',
+    cannedRequestEvent({ requestId: 'r-count', type: 'XHR', url: ORIGIN + '/api/count-bound', method: 'GET' }));
+  const liveAfterCount = Capture._getObservedCalls();
+  check(Array.isArray(liveAfterCount) && liveAfterCount.length === 0,
+    'count-bound request self-ends the live session (live observed calls empty)');
+  const savedAfterCount = Capture._getLastEndedCalls();
+  check(Array.isArray(savedAfterCount) && savedAfterCount.some(function (c) { return c && c.path === '/api/count-bound'; }),
+    'count-bound self-end preserves collected calls in _getLastEndedCalls');
+  const secondEnd = Capture.endSession('after-count-bound');
+  check(Array.isArray(secondEnd) && secondEnd.length === 0,
+    'endSession after count-bound self-end is a no-op');
 
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);

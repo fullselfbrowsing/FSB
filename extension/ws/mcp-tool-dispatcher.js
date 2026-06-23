@@ -2204,41 +2204,67 @@ async function handleCapabilitiesSearchMessageRoute({ payload }) {
 // routerless body (getRecipeBySlug -> interpretRecipe -> executeBoundSpec) moved INTO the
 // router's T1b tier (Plan 02); this handler is now a single router call. The wire names and
 // the route table are byte-unchanged, so the frozen INV-01 registry hash never moves and the
-// two capability tools stay OUTSIDE TOOL_REGISTRY. A model-supplied payload.origin, when present,
-// takes precedence but BIASES catalog candidate ranking ONLY (catalog.resolve(slug, origin)); it can
-// NEVER select a cross-origin credentialed fetch, because handlers/recipes hardcode spec.origin and
-// the fetch is re-pinned to the active tab inside executeBoundSpec. Absent payload.origin, the origin
-// is resolved SW-side from the active/owned tab (the search-handler pattern, D-11). The router routes
-// but never re-targets -- the two-point origin-pin still holds downstream in executeBoundSpec. Typed RECIPE_* fall-through
-// reasons (RECIPE_NOT_FOUND / RECIPE_LEARN_PENDING / RECIPE_DOM_FALLBACK_PENDING) surface verbatim
-// via the existing errors.ts /^RECIPE_.+$/ passthrough (no errors.ts edit). UNGATED (consent is
-// Phase 30); the reroute is internal-only -- there is no second invoke path (INV-02).
-async function handleCapabilitiesInvokeMessageRoute({ payload }) {
+// two capability tools stay OUTSIDE TOOL_REGISTRY. The target tab is resolved
+// SW-side: non-legacy MCP agents must pass through the ownership-aware agent
+// resolver, while legacy/missing-agent callers preserve the active/explicit-tab
+// path. The origin is then derived from the ACTUAL resolved tab; payload.origin is
+// only accepted as a matching hint. The router routes but never re-targets -- the
+// two-point origin-pin still holds downstream in executeBoundSpec. Typed RECIPE_*
+// fall-through reasons (RECIPE_NOT_FOUND / RECIPE_LEARN_PENDING /
+// RECIPE_DOM_FALLBACK_PENDING) surface verbatim via the existing errors.ts
+// /^RECIPE_.+$/ passthrough (no errors.ts edit). The reroute is internal-only --
+// there is no second invoke path (INV-02).
+async function handleCapabilitiesInvokeMessageRoute({ payload, client }) {
   if (typeof FsbCapabilityRouter === 'undefined' || typeof FsbCapabilityRouter.invoke !== 'function') {
     return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability router unavailable' });
   }
-  // Resolve tabId SW-side: explicit payload.tab_id, else the active/owned tab.
-  let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
-  // Resolve the origin: a model-supplied payload.origin, when present, takes precedence and
-  // BIASES catalog candidate ranking only (catalog.resolve(slug, origin)); it can NEVER select a
-  // cross-origin credentialed fetch, because handlers/recipes hardcode spec.origin and the real
-  // fetch is re-pinned to the active tab (origin-of(tabId) === spec.origin) inside executeBoundSpec.
-  // Absent payload.origin, we fall back to the active/owned-tab origin (the search-handler pattern).
-  let origin = payload.origin || null;
-  if (tabId === null || !origin) {
+  payload = payload || {};
+  const { agentId } = payload;
+  const isLegacyOrMissingAgent = (typeof agentId !== 'string' || !agentId || agentId.startsWith('legacy:'));
+
+  let tab = null;
+  if (isLegacyOrMissingAgent) {
+    const requestedTabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
     try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabId === null) {
-        tabId = tabs[0] ? tabs[0].id : null;
-      }
-      if (!origin) {
-        origin = (tabs[0] && tabs[0].url) ? new URL(tabs[0].url).origin : null;
-      }
-    } catch (e) {
-      // active-tab lookup failed; leave tabId/origin as-is (null). The two-point
-      // origin-pin still fails closed downstream in executeBoundSpec, so a null
-      // origin/tabId cannot select a cross-origin credentialed fetch.
+      tab = requestedTabId !== null ? await chrome.tabs.get(requestedTabId) : await getActiveTabFromClient(client);
+    } catch (_e) {
+      tab = null;
     }
+  } else {
+    const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, payload || {}, client)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    if (resolved.success === false) {
+      return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: resolved.code,
+        error: 'Tab resolution failed: ' + resolved.code,
+        agentId: resolved.agentId,
+        ...(resolved.tabIds ? { tabIds: resolved.tabIds } : {})
+      });
+    }
+    try {
+      tab = await chrome.tabs.get(resolved.tabId);
+    } catch (_e) {
+      return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'tab_unavailable',
+        error: 'Resolved tabId ' + resolved.tabId + ' could not be loaded'
+      });
+    }
+  }
+
+  const tabId = Number.isFinite(tab?.id) ? tab.id : null;
+  let origin = null;
+  try {
+    origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+  } catch (_e) {
+    origin = null;
+  }
+  if (payload.origin && origin && payload.origin !== origin) {
+    return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+      errorCode: 'RECIPE_CONSENT_REQUIRED',
+      error: 'RECIPE_CONSENT_REQUIRED',
+      reason: 'supplied origin does not match the target tab origin'
+    });
   }
   return await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, { origin, tabId });
 }

@@ -77,6 +77,7 @@
   // ---- The single active session (module-level; one at a time) -------------
   var _session = null;
   var _sessionSeq = 0;
+  var _lastEndedCalls = [];
 
   // ---- typeof-guarded SW-global accessors ----------------------------------
   // In the service worker the dependency was set on globalThis by importScripts,
@@ -275,6 +276,7 @@
   // ---- startSession(origin, opts) -> Promise<{ ok, reason?, sessionId? }> ---
   async function startSession(origin, opts) {
     opts = opts || {};
+    _lastEndedCalls = [];
 
     // If a prior session is somehow still live, release it first (one at a
     // time). Best-effort; never throws.
@@ -379,6 +381,10 @@
     return out;
   }
 
+  function _getLastEndedCalls() {
+    return _lastEndedCalls.slice();
+  }
+
   // ---- endSession(reason) -> ObservedCall[] (Pitfall 1) --------------------
   // Removes the per-session onDetach listener, releases the Network domain
   // (Network.disable -- KEEP the attachment), and detaches the tab ONLY if WE
@@ -412,6 +418,7 @@
         collected.push(c);
       }
     });
+    _lastEndedCalls = collected.slice();
 
     // Clear the live session reference NOW so a re-entrant onDetach (fired by the
     // detach below) sees no session and is a no-op.
@@ -443,7 +450,8 @@
     endSession: endSession,
     _onCdpEvent: _onCdpEvent,
     _filterResourceType: _filterResourceType,
-    _getObservedCalls: _getObservedCalls
+    _getObservedCalls: _getObservedCalls,
+    _getLastEndedCalls: _getLastEndedCalls
   };
 
   global.FsbNetworkCapture = exportsObj;   // SW importScripts consumer reads this global

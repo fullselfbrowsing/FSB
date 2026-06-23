@@ -126,6 +126,7 @@ async function run() {
 
   const priorRouter = globalThis.FsbCapabilityRouter;
   const priorChrome = globalThis.chrome;
+  const priorResolveAgentTabOrError = globalThis.resolveAgentTabOrError;
 
   // The shared engine: a spy that records every (slug, args) and returns a fixed
   // structured hit. BOTH front doors must reach THIS exact global (INV-02).
@@ -168,6 +169,42 @@ async function run() {
   const mcpHitSpy = spyCalls.length > mcpHitSpyBefore;
   check(mcpHitSpy,
     'CAT-04 front door 1 (MCP dispatcher mcp:capabilities-invoke) calls globalThis.FsbCapabilityRouter.invoke (RED until Plan 04 reroute)');
+
+  // Agent-scoped invoke must resolve through the ownership-aware registry helper
+  // and derive origin from the resolved tab, not from caller-controlled tab/origin
+  // fields.
+  try {
+    const dispatcher = require(path.join(REPO_ROOT, 'extension', 'ws', 'mcp-tool-dispatcher.js'));
+    const resolverCalls = [];
+    globalThis.resolveAgentTabOrError = async function (agentId, payload) {
+      resolverCalls.push({ agentId: agentId, payload: payload });
+      return { success: true, tabId: 11, agentId: agentId };
+    };
+    const scopedBefore = spyCalls.length;
+    await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-invoke',
+      payload: { slug: SLUG, params: ARGS, agentId: 'agent-a', tab_id: 999, origin: 'https://github.com' }
+    });
+    const scopedCall = spyCalls[spyCalls.length - 1];
+    check(resolverCalls.length === 1,
+      'mcp:capabilities-invoke with agentId calls resolveAgentTabOrError');
+    check(spyCalls.length > scopedBefore && scopedCall && scopedCall.ctx
+      && scopedCall.ctx.tabId === 11 && scopedCall.ctx.origin === 'https://github.com',
+      'mcp:capabilities-invoke uses the resolved tabId and tab-derived origin for router.invoke');
+
+    const mismatchBefore = spyCalls.length;
+    const mismatch = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-invoke',
+      payload: { slug: SLUG, params: ARGS, agentId: 'agent-a', tab_id: 999, origin: 'https://evil.example' }
+    });
+    check(mismatch && mismatch.success === false && mismatch.errorCode === 'RECIPE_CONSENT_REQUIRED',
+      'mcp:capabilities-invoke rejects supplied origin when it mismatches the resolved tab origin');
+    check(spyCalls.length === mismatchBefore,
+      'mcp:capabilities-invoke origin mismatch fails before FsbCapabilityRouter.invoke');
+  } catch (err) {
+    console.error('  (agent-scoped invoke regression block threw):', err && err.message ? err.message : err);
+    check(false, 'agent-scoped invoke regression block completes');
+  }
 
   // ---- Front door 2: the autopilot branch (executeCapabilityToolForAutopilot). -
   // Plan 05 adds the pre-executeTool capability branch + exports the function. Until
@@ -214,6 +251,7 @@ async function run() {
   // Restore the spy globals before the Phase-32 block drives the REAL router.
   if (priorRouter === undefined) { delete globalThis.FsbCapabilityRouter; } else { globalThis.FsbCapabilityRouter = priorRouter; }
   if (priorChrome === undefined) { delete globalThis.chrome; } else { globalThis.chrome = priorChrome; }
+  if (priorResolveAgentTabOrError === undefined) { delete globalThis.resolveAgentTabOrError; } else { globalThis.resolveAgentTabOrError = priorResolveAgentTabOrError; }
 
   // -------------------------------------------------------------------------
   // PHASE 32 (HEAL-01, D-02): the autopilot front door surfaces the typed reason /

@@ -85,16 +85,20 @@ function makeCtx(origin, tabId) {
         // Answer a read-only GET probe with a canned token payload (the scrape
         // source) so the handler's next spec carries the token it read.
         const isProbe = spec && spec.method === 'GET';
-        const data = isProbe
-          ? { ok: true, xoxc: 'xoxc-TEST-SYNTHETIC', csrf_token: 'csrf-TEST-SYNTHETIC', authenticity_token: 'auth-TEST-SYNTHETIC' }
-          : { ok: true };
+        let text = null;
+        if (isProbe && spec && typeof spec.url === 'string' && spec.url.indexOf('app.slack.com') !== -1) {
+          text = '<html><script>window.boot = {"xoxc":"xoxc-TEST-SYNTHETIC"};</script></html>';
+        } else if (isProbe && spec && typeof spec.url === 'string' && spec.url.indexOf('github.com') !== -1) {
+          text = '<html><head><meta name="csrf-token" content="csrf-TEST-SYNTHETIC"></head></html>';
+        }
+        const data = isProbe ? null : { ok: true };
         return {
           success: true,
           status: 200,
           finalUrl: (spec && spec.url) || null,
           redirected: false,
           data: data,
-          text: null
+          text: text
         };
       },
       interpretRecipe() { throw new Error('handler must not call interpretRecipe for a code-built spec'); }
@@ -143,6 +147,11 @@ const Schema = require(SCHEMA_PATH);
       'github.issues.list builds a spec pinned to origin https://github.com');
     check(ghOut && ghOut.success === true,
       'github.issues.list.handle returns the executeBoundSpec result');
+    const ghReadQuery = makeCtx('https://github.com', 11);
+    await gh['github.issues.list'].handle({ query: 'is:open label:bug' }, ghReadQuery.ctx);
+    check(ghReadQuery.calls.length === 1 && ghReadQuery.calls[0].spec
+      && ghReadQuery.calls[0].spec.url === 'https://github.com/issues?q=is%3Aopen%20label%3Abug',
+      'github.issues.list folds args.query into the concrete /issues URL');
 
     // The create handler scrapes a CSRF token into the POST spec (a from:'response'
     // read first), targets a same-origin /_graphql POST, and never logs the token.
@@ -158,6 +167,8 @@ const Schema = require(SCHEMA_PATH);
       'github.issues.create POSTs the same-origin /_graphql persisted-query endpoint');
     check(postCall && postCall.spec.origin === 'https://github.com',
       'github.issues.create POST spec is pinned to https://github.com');
+    check(postCall && postCall.spec.headers && postCall.spec.headers['X-CSRF-Token'] === 'csrf-TEST-SYNTHETIC',
+      'github.issues.create scrapes CSRF from HTML text into the POST header');
     check(ghCreate && ghCreate.success === true,
       'github.issues.create.handle returns the executeBoundSpec result');
     // No literal console-log of a CSRF-token-bearing identifier.

@@ -236,6 +236,11 @@
     return declared || 'read';
   }
 
+  function _isMutatingSideEffect(sideEffectClass) {
+    var c = (typeof sideEffectClass === 'string') ? sideEffectClass.toLowerCase() : '';
+    return c === 'mutating' || c === 'mutate' || c === 'write' || c === 'destructive';
+  }
+
   // ---- Best-effort audit append (D-09/D-10) --------------------------------
   //      Every invoke outcome -- blocked or allowed -- appends ONE redacted,
   //      field-whitelisted entry. The audit log itself owns the redaction; the
@@ -289,7 +294,7 @@
     var entry = p.entry;
     var method = (typeof p.method === 'string' && p.method) ? p.method.toUpperCase() : _deriveMethod(entry);
     var sideEffectClass = _deriveSideEffectClass(entry, method);
-    var mutating = (sideEffectClass === 'mutating') || !!MUTATING_METHODS[method];
+    var mutating = _isMutatingSideEffect(sideEffectClass) || !!MUTATING_METHODS[method];
 
     var denylist = _denylist();
 

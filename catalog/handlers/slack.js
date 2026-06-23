@@ -77,6 +77,18 @@
       if (typeof d.xoxc === 'string') { return d.xoxc; }
       if (typeof d.api_token === 'string') { return d.api_token; }
     }
+    var text = (typeof probeResult.text === 'string') ? probeResult.text : '';
+    if (text) {
+      var patterns = [
+        /"xoxc"\s*:\s*"([^"]+)"/,
+        /"api_token"\s*:\s*"([^"]+)"/,
+        /(xoxc-[A-Za-z0-9-]+)/i
+      ];
+      for (var i = 0; i < patterns.length; i++) {
+        var m = patterns[i].exec(text);
+        if (m && m[1]) { return m[1]; }
+      }
+    }
     return null;
   }
 
