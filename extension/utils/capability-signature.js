@@ -228,6 +228,7 @@
   // same object and Ed25519-verifies the signature against each trusted key.
   //
   //   resolved provenance === 'bundled' -> { ok:true } WITHOUT verifyEd25519 (D-07)
+  //   resolved provenance === 'local'   -> { ok:true } WITHOUT verifyEd25519 (D-09)
   //   else: missing signature/key OR verify false -> { ok:false, reason } (FAIL CLOSED)
 
   async function verifyRecipeEnvelope(envelope, trustedProvenance) {
@@ -243,12 +244,17 @@
       ? trustedProvenance
       : envelope.provenance;
 
-    // D-07 exemption: bundled provenance is trusted-by-provenance. Short-circuit
-    // BEFORE any verify call so the exemption is observable (the test spies on
-    // verifyEd25519 and asserts a zero call count on this path). Only a TRUSTED
-    // 'bundled' reaches here -- never a payload-asserted one when the interpreter
-    // call path is used.
-    if (resolvedProvenance === 'bundled') {
+    // D-07/D-09 exemption: 'bundled' (on-disk catalog) AND 'local' (locally-
+    // synthesized learned recipe, Phase 31) are both trusted-by-provenance.
+    // Short-circuit BEFORE any verify call so the exemption is observable (the
+    // test spies on verifyEd25519 and asserts a zero call count on this path).
+    // CRITICAL: this fires ONLY for a TRUSTED provenance resolved from the second
+    // arg (the loader's vouch, resolved above) -- NEVER a payload-asserted one. A
+    // recipe whose own data says provenance:'local'/'bundled' with no loader vouch
+    // falls through to verify, so a tampered core can never self-declare its way
+    // past the signature gate (HI-01). Do NOT add new values here without the
+    // matching trusted-channel guarantee.
+    if (resolvedProvenance === 'bundled' || resolvedProvenance === 'local') {
       return { ok: true };
     }
 

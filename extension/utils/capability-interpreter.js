@@ -349,16 +349,20 @@
       return recipeResult;
     }
 
-    // BARE-CORE / TRUSTED-BUNDLED / NO-META default path: NO signature verify
-    // (D-07). The exemption fires ONLY for (a) a bare recipe core -- the bundled
-    // on-disk catalog path the router uses -- or (b) an envelope the LOADER
-    // explicitly vouched as 'bundled' via opts.trustedProvenance. The recipe
-    // payload's OWN `provenance` field is NEVER consulted here (HI-01): a tampered
-    // core relabeled `provenance:'bundled'` in its data CANNOT reach this
-    // short-circuit, so it can no longer dodge verification. Bind synchronously
-    // and return the typed result as a plain object so every current synchronous
-    // caller behaves identically.
-    if (!envelope || trustedProvenance === 'bundled') {
+    // BARE-CORE / TRUSTED-BUNDLED / TRUSTED-LOCAL / NO-META default path: NO
+    // signature verify (D-07/D-09). The exemption fires ONLY for (a) a bare recipe
+    // core -- the bundled on-disk catalog path the router uses -- or (b) an
+    // envelope the LOADER explicitly vouched as 'bundled' (on-disk catalog) or
+    // 'local' (a locally-synthesized learned recipe, Phase 31) via
+    // opts.trustedProvenance. Both vouched values short-circuit here BEFORE the
+    // async verify branch below, so the exemption is observable as a zero
+    // verifyEd25519 call. The recipe payload's OWN `provenance` field is NEVER
+    // consulted here (HI-01): a tampered core relabeled `provenance:'bundled'` or
+    // `provenance:'local'` in its data CANNOT reach this short-circuit (the
+    // trustedProvenance was resolved from opts ONLY at :329-330), so it can no
+    // longer dodge verification. Bind synchronously and return the typed result as
+    // a plain object so every current synchronous caller behaves identically.
+    if (!envelope || trustedProvenance === 'bundled' || trustedProvenance === 'local') {
       return bindRecipeCore(recipe, args, authMod);
     }
 
