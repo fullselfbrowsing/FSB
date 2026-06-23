@@ -40,6 +40,7 @@ const vm = require('vm');
 
 const REPO_ROOT = path.join(__dirname, '..');
 const HANDLERS_DIR = path.join(REPO_ROOT, 'catalog', 'handlers');
+const EXT_HANDLERS_DIR = path.join(REPO_ROOT, 'extension', 'catalog', 'handlers');
 const RECIPES_DIR = path.join(REPO_ROOT, 'catalog', 'recipes');
 const DESCRIPTORS_DIR = path.join(REPO_ROOT, 'catalog', 'descriptors');
 const CFWORKER_PATH = path.join(REPO_ROOT, 'extension', 'lib', 'cfworker-json-schema.min.js');
@@ -130,6 +131,11 @@ const Schema = require(SCHEMA_PATH);
       'github.issues.create is a tier:T1a WRITE entry (the mutating slug)');
     check(gh['github.issues.create'] && gh['github.issues.create'].origin === 'https://github.com',
       'github.issues.create targets https://github.com (NOT api.github.com)');
+    check(gh['github.issues.create'] && gh['github.issues.create'].params
+      && Array.isArray(gh['github.issues.create'].params.required)
+      && gh['github.issues.create'].params.required.indexOf('repositoryId') !== -1
+      && gh['github.issues.create'].params.required.indexOf('title') !== -1,
+      'github.issues.create exposes a params schema requiring repositoryId + title');
 
     // SECURITY T-29-07: no separate-origin API host, no chrome.* in the handler.
     check(ghSrc.indexOf('api.github.com') === -1,
@@ -195,6 +201,11 @@ const Schema = require(SCHEMA_PATH);
       'slack.chat.postMessage is a tier:T1a WRITE entry');
     check(sl['slack.chat.postMessage'] && sl['slack.chat.postMessage'].origin === 'https://app.slack.com',
       'slack.chat.postMessage targets https://app.slack.com');
+    check(sl['slack.chat.postMessage'] && sl['slack.chat.postMessage'].params
+      && Array.isArray(sl['slack.chat.postMessage'].params.required)
+      && sl['slack.chat.postMessage'].params.required.indexOf('channel') !== -1
+      && sl['slack.chat.postMessage'].params.required.indexOf('text') !== -1,
+      'slack.chat.postMessage exposes a params schema requiring channel + text');
 
     check(!/chrome\.(scripting|tabs)/.test(slSrc),
       'slack.js references NO chrome.scripting/chrome.tabs');
@@ -247,6 +258,10 @@ const Schema = require(SCHEMA_PATH);
       'notion.getSpaces targets the first-party origin https://www.notion.so');
     check(nt['notion.getSpaces'] && nt['notion.getSpaces'].sideEffectClass === 'read',
       'notion.getSpaces is a READ slug');
+    check(nt['notion.loadPage'] && nt['notion.loadPage'].params
+      && Array.isArray(nt['notion.loadPage'].params.required)
+      && nt['notion.loadPage'].params.required.indexOf('pageId') !== -1,
+      'notion.loadPage exposes a params schema requiring pageId');
 
     check(ntSrc.indexOf('api.notion.com') === -1,
       'notion.js references NO separate-origin api.notion.com (T-29-07)');
@@ -290,11 +305,14 @@ const Schema = require(SCHEMA_PATH);
   }
 
   // =========================================================================
-  // Descriptors -- the four new search descriptors are valid JSON
+  // Descriptors -- the handler/search descriptors are valid JSON and carry schemas
   // =========================================================================
   const descriptorFiles = [
     'github-issues.json',
+    'github-issues-create.json',
     'slack-message.json',
+    'slack-conversations-list.json',
+    'notion-load-page.json',
     'notion-spaces.json',
     'reddit-inbox.json'
   ];
@@ -307,6 +325,20 @@ const Schema = require(SCHEMA_PATH);
       check(d && typeof d.slug === 'string' && typeof d.service === 'string'
         && typeof d.sideEffectClass === 'string',
         'catalog/descriptors/' + name + ' carries slug/service/sideEffectClass');
+      if (name !== 'reddit-inbox.json') {
+        check(d && d.params && d.params.type === 'object',
+          'catalog/descriptors/' + name + ' carries a params schema for search/invoke');
+      }
+    }
+  });
+
+  ['github.js', 'slack.js', 'notion.js'].forEach(function (name) {
+    const src = path.join(HANDLERS_DIR, name);
+    const ext = path.join(EXT_HANDLERS_DIR, name);
+    check(fs.existsSync(ext), 'extension/catalog/handlers/' + name + ' exists for unpacked dev loads');
+    if (fs.existsSync(src) && fs.existsSync(ext)) {
+      check(readSource(src) === readSource(ext),
+        'extension/catalog/handlers/' + name + ' matches catalog/handlers/' + name);
     }
   });
 

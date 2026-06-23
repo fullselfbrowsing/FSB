@@ -10,5 +10,24 @@
   ],
   "description": "Load a Notion page (T1a /api/v3 RPC handler, read)",
   "actionVerb": "load",
-  "sideEffectClass": "read"
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pageId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "type": "object"
+      }
+    },
+    "required": ["pageId"],
+    "additionalProperties": false
+  }
 }

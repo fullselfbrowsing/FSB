@@ -10,5 +10,20 @@
   ],
   "description": "Post a message to a Slack channel (T1a split-token handler, write)",
   "actionVerb": "send",
-  "sideEffectClass": "write"
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": ["channel", "text"],
+    "additionalProperties": false
+  }
 }

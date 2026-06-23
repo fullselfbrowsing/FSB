@@ -147,30 +147,14 @@
     });
   }
 
-  // ---- collision-safe attach (MIRRORED from background.js:13920-13935) ------
-  // Attempt the attach; on "Another debugger is already attached", force-detach
-  // and retry. Returns { attached, weAttached }: weAttached is true ONLY when WE
-  // performed a fresh attach (so the release side knows ownership, Pitfall 1).
-  // If the FIRST attach succeeds, we are the owner. If the first attach reports
-  // "already attached", the Input domain (or another owner) holds it: we
-  // force-detach + re-attach to add our Network domain, but we do NOT claim
-  // exclusive ownership on the release side (weAttached stays false) so we never
-  // detach out from under the prior owner.
+  // ---- collision-safe attach ------------------------------------------------
+  // Attempt the attach once. Chrome permits only one debugger owner per tab; if
+  // DevTools or an Input-domain automation owner is already attached, discovery
+  // fails closed rather than force-detaching that owner and leaking our own attach.
   function _collisionSafeAttach(dbg, tabId) {
     return _attach(dbg, tabId).then(function() {
       return { attached: true, weAttached: true };
     }, function(attachErr) {
-      var msg = (attachErr && attachErr.message) ? String(attachErr.message) : '';
-      if (msg.indexOf('Another debugger is already attached') !== -1) {
-        return _detach(dbg, tabId).then(function() {
-          return _attach(dbg, tabId).then(function() {
-            // Re-attached to add the Network domain, but the tab already had an
-            // owner before us -- do NOT claim exclusive ownership.
-            return { attached: true, weAttached: false };
-          });
-        });
-      }
-      // A non-collision attach error propagates (startSession handles it).
       throw attachErr;
     });
   }
@@ -234,7 +218,7 @@
   // ---- _runGate(origin, opts) -> { ok, reason? } ---------------------------
   // The Phase-30 consent gate reused verbatim, BEFORE any attach (Pattern 3).
   // Returns ok:true to proceed, or ok:false + a RECIPE_CONSENT_* reason.
-  function _runGate(origin, opts) {
+  async function _runGate(origin, opts) {
     // (0) LO-02: explicit null/empty/non-http origin rejection -- fail CLOSED on
     // un-resolvable input BEFORE any consent read or attach. Without this the gate
     // leaned on getConsentForOrigin(envelope, null) returning the envelope
@@ -243,34 +227,36 @@
     // .sensitive === false, so the gate would proceed to attach with origin===null).
     // A capture origin MUST be a concrete http(s) origin; anything else stops here.
     if (typeof origin !== 'string' || !/^https?:\/\//.test(origin)) {
-      return Promise.resolve({ ok: false, reason: REASON_REQUIRED });
+      return { ok: false, reason: REASON_REQUIRED };
     }
     var dl = _denylist();
+    if (dl && typeof dl.load === 'function') {
+      try { await dl.load(); } catch (_e) { return { ok: false, reason: REASON_REQUIRED }; }
+    }
     // (1) Denylist first -- a denied origin is BLOCKED even under Auto (D-03).
     if (dl && typeof dl.isDenied === 'function') {
       var d = dl.isDenied(origin);
-      if (d && d.denied) { return Promise.resolve({ ok: false, reason: REASON_DENIED }); }
+      if (d && d.denied) { return { ok: false, reason: REASON_DENIED }; }
     }
     var store = _consentStore();
     // (2) Consent: default-OFF is rejected (DISC-04). If the consent store is
     // absent, fail CLOSED (treat as OFF) -- never attach without a consent read.
     if (!store || typeof store.readPolicies !== 'function' || typeof store.getConsentForOrigin !== 'function') {
-      return Promise.resolve({ ok: false, reason: REASON_REQUIRED });
+      return { ok: false, reason: REASON_REQUIRED };
     }
-    return Promise.resolve(store.readPolicies()).then(function(envelope) {
-      var consent = store.getConsentForOrigin(envelope, origin);
-      if (!consent || consent.mode === 'off') {
-        return { ok: false, reason: REASON_REQUIRED };
+    var envelope = await Promise.resolve(store.readPolicies());
+    var consent = store.getConsentForOrigin(envelope, origin);
+    if (!consent || consent.mode === 'off') {
+      return { ok: false, reason: REASON_REQUIRED };
+    }
+    // (3) Sensitive origins need the extra-confirm flag (D-03).
+    if (dl && typeof dl.classify === 'function') {
+      var klass = dl.classify(origin);
+      if (klass && klass.sensitive && !(opts && opts.confirmedSensitive)) {
+        return { ok: false, reason: REASON_SENSITIVE };
       }
-      // (3) Sensitive origins need the extra-confirm flag (D-03).
-      if (dl && typeof dl.classify === 'function') {
-        var klass = dl.classify(origin);
-        if (klass && klass.sensitive && !(opts && opts.confirmedSensitive)) {
-          return { ok: false, reason: REASON_SENSITIVE };
-        }
-      }
-      return { ok: true };
-    });
+    }
+    return { ok: true };
   }
 
   // ---- startSession(origin, opts) -> Promise<{ ok, reason?, sessionId? }> ---

@@ -211,9 +211,9 @@ try { importScripts('utils/consent-policy-store.js'); } catch (e) { console.erro
 try { importScripts('utils/audit-log.js'); } catch (e) { console.error('[FSB] Failed to load audit-log.js:', e.message); }
 try { importScripts('utils/capability-signature.js'); } catch (e) { console.error('[FSB] Failed to load capability-signature.js:', e.message); }
 try { importScripts('utils/service-denylist.js'); } catch (e) { console.error('[FSB] Failed to load service-denylist.js:', e.message); }
-// Read the denylist + sensitive seed at service-worker startup BEFORE the gate
-// evaluates (D-15). async + non-blocking; a typeof guard tolerates a missing
-// module so a load failure above never throws at boot.
+// Warm the denylist + sensitive seed at service-worker startup (D-15). The
+// consent/capture gates still await the module's shared load() promise before
+// evaluating, so this async warmup is not the load-bearing security check.
 try {
   if (typeof FsbServiceDenylist !== 'undefined' && FsbServiceDenylist && typeof FsbServiceDenylist.load === 'function') {
     FsbServiceDenylist.load();

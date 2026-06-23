@@ -9,5 +9,10 @@
   ],
   "description": "List your Notion spaces (T1a /api/v3 RPC handler, read)",
   "actionVerb": "list",
-  "sideEffectClass": "read"
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
 }

@@ -117,6 +117,28 @@ function isConsentReason(r) {
     'a sensitive origin WITH opts.confirmedSensitive:true is ALLOWED (D-03 extra-confirm satisfied)');
   if (sensConfirmed && sensConfirmed.ok) { Capture.endSession('test'); }
 
+  // ---- Debugger collision -> fail closed, do NOT detach an existing owner ----
+  let collisionAttachCount = 0;
+  let collisionDetachCount = 0;
+  globalThis.chrome.debugger = {
+    attach() {
+      collisionAttachCount++;
+      return Promise.reject(new Error('Another debugger is already attached to the tab with id: ' + TAB_ID));
+    },
+    detach() {
+      collisionDetachCount++;
+      return Promise.resolve();
+    },
+    sendCommand: driver.sendCommand,
+    onEvent: { addListener: driver.addListener, removeListener: driver.removeListener },
+    onDetach: { addListener() {}, removeListener() {} }
+  };
+  const collisionRes = await Capture.startSession(autoOrigin, { tabId: TAB_ID, maxMs: 3000, maxCount: 20 });
+  check(collisionRes && collisionRes.ok === false && collisionRes.reason === 'RECIPE_CAPTURE_ATTACH_FAILED',
+    'debugger attach collision fails closed with RECIPE_CAPTURE_ATTACH_FAILED');
+  check(collisionAttachCount === 1, 'debugger attach collision attempts attach exactly once');
+  check(collisionDetachCount === 0, 'debugger attach collision does NOT detach the existing debugger owner');
+
   void store;
 
   console.log('\nPASS=' + passed + ' FAIL=' + failed);

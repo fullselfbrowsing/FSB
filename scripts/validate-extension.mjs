@@ -76,7 +76,7 @@ try {
 
 // ---------- 3. JS syntax check ----------
 // Directories whose .js files ship to the browser as the extension.
-const EXT_DIRS = ['content', 'ui', 'agents', 'ws', 'offscreen', 'ai', 'utils', 'site-guides', 'shared', 'config', 'lib'];
+const EXT_DIRS = ['content', 'ui', 'agents', 'ws', 'offscreen', 'ai', 'utils', 'site-guides', 'shared', 'config', 'lib', 'catalog'];
 const ROOT_FILES = ['background.js', 'canvas-interceptor.js'];
 
 function walk(dir, out = []) {

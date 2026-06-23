@@ -467,6 +467,51 @@ const GITHUB_RECIPE = {
   delete globalThis.FsbCapabilityFetch;
 
   // -----------------------------------------------------------------------
+  // T1a params gate: handler-backed capabilities with descriptor/handler
+  // schemas reject malformed args before handler.handle or executeBoundSpec.
+  // -----------------------------------------------------------------------
+  let validatingHandlerCalled = false;
+  let validatingFetchCalled = false;
+  const validatingHandler = {
+    tier: 'T1a',
+    origin: 'https://app.slack.com',
+    sideEffectClass: 'write',
+    params: {
+      type: 'object',
+      properties: {
+        channel: { type: 'string', minLength: 1 },
+        text: { type: 'string', minLength: 1 }
+      },
+      required: ['channel', 'text'],
+      additionalProperties: false
+    },
+    async handle(args, ctx) {
+      validatingHandlerCalled = true;
+      return await ctx.executeBoundSpec({
+        url: 'https://app.slack.com/api/chat.postMessage',
+        method: 'POST',
+        origin: 'https://app.slack.com'
+      }, ctx.tabId);
+    }
+  };
+  globalThis.FsbCapabilityFetch = {
+    async executeBoundSpec() { validatingFetchCalled = true; return { success: true }; }
+  };
+  installCatalog({ 'slack.chat.postMessage': { tier: 'T1a', handler: validatingHandler, params: validatingHandler.params } });
+  const badParams = await ROUTER.invoke('slack.chat.postMessage', {}, { origin: 'https://app.slack.com', tabId: 44 });
+  check(badParams && badParams.success === false && badParams.code === 'RECIPE_SCHEMA_INVALID',
+    'T1a params gate: missing required handler args returns RECIPE_SCHEMA_INVALID');
+  check(validatingHandlerCalled === false && validatingFetchCalled === false,
+    'T1a params gate: invalid handler args do NOT call handler.handle or executeBoundSpec');
+  const goodParams = await ROUTER.invoke('slack.chat.postMessage',
+    { channel: 'C123', text: 'hello' },
+    { origin: 'https://app.slack.com', tabId: 44 });
+  check(goodParams && goodParams.success === true && goodParams.tier === 'T1a',
+    'T1a params gate: valid handler args dispatch normally');
+  clearCatalog();
+  delete globalThis.FsbCapabilityFetch;
+
+  // -----------------------------------------------------------------------
   // CAT-02 origin-pin on the T1a path: reuse the capability-fetch.test.js chrome
   // stub so the REAL executeBoundSpec runs. The active tab is on evil.example but
   // the handler's spec.origin is github.com -> RECIPE_ORIGIN_MISMATCH with an

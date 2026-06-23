@@ -10,5 +10,23 @@
   ],
   "description": "Create a new GitHub issue (T1a persisted-query handler, write)",
   "actionVerb": "create",
-  "sideEffectClass": "write"
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "repositoryId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "body": {
+        "type": "string"
+      }
+    },
+    "required": ["repositoryId", "title"],
+    "additionalProperties": false
+  }
 }

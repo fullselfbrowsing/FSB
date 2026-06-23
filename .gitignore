@@ -57,5 +57,6 @@ extension/dist/
 # scripts/package-extension.mjs regenerates extension/catalog/recipe-index.generated.js
 # from catalog/ before zipping; it is a deterministic build artifact (like the
 # vendored .min libs are sourced, but this one is emitted) and would go stale if
-# committed. background.js tolerates its absence in a dev tree. Never enters git.
-extension/catalog/
+# committed. Hand-authored handler copies under extension/catalog/handlers/ are
+# tracked so a fresh unpacked extension can load its T1a modules in dev.
+extension/catalog/recipe-index.generated.js

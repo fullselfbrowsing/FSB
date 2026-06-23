@@ -68,6 +68,65 @@
     return out;
   }
 
+  function _getValidator(schema, draft) {
+    if (typeof CfworkerJsonSchema === 'undefined' || !CfworkerJsonSchema || !CfworkerJsonSchema.Validator) {
+      return null;
+    }
+    return new CfworkerJsonSchema.Validator(schema, draft || '2020-12', false);
+  }
+
+  function _paramsHasRemoteRef(node) {
+    if (!node || typeof node !== 'object') { return false; }
+    if (Array.isArray(node)) {
+      for (var i = 0; i < node.length; i++) {
+        if (_paramsHasRemoteRef(node[i])) { return true; }
+      }
+      return false;
+    }
+    for (var key in node) {
+      if (!Object.prototype.hasOwnProperty.call(node, key)) { continue; }
+      if (key === '$ref' || key === '$dynamicRef') { return true; }
+      if (_paramsHasRemoteRef(node[key])) { return true; }
+    }
+    return false;
+  }
+
+  function _handlerParamsSchema(entry) {
+    if (!entry) { return null; }
+    if (entry.params && typeof entry.params === 'object') { return entry.params; }
+    if (entry.handler && entry.handler.params && typeof entry.handler.params === 'object') { return entry.handler.params; }
+    if (entry.descriptor && entry.descriptor.params && typeof entry.descriptor.params === 'object') { return entry.descriptor.params; }
+    return null;
+  }
+
+  function _validateHandlerParams(entry, args) {
+    var schema = _handlerParamsSchema(entry);
+    if (!schema) { return null; }
+    if (_paramsHasRemoteRef(schema)) {
+      return _err('RECIPE_SCHEMA_INVALID', { reason: 'handler-params-ref' });
+    }
+    var safeArgs = (args && typeof args === 'object') ? args : {};
+    try {
+      var validator = _getValidator(schema, '2020-12');
+      if (!validator) {
+        return _err('RECIPE_SCHEMA_INVALID', { error: 'validator unavailable' });
+      }
+      var result = validator.validate(safeArgs);
+      if (!result || result.valid !== true) {
+        return _err('RECIPE_SCHEMA_INVALID', {
+          reason: 'handler-params',
+          errors: (result && result.errors) ? result.errors : []
+        });
+      }
+    } catch (e) {
+      return _err('RECIPE_SCHEMA_INVALID', {
+        reason: 'handler-params-schema',
+        error: (e && e.message) ? e.message : String(e)
+      });
+    }
+    return null;
+  }
+
   // ---- typeof-guarded collaborator accessors (mirror capability-search.js:57-69) -
   //      Read the SW globals this way so the Node unit harness can inject stubs
   //      (the in-memory catalog stub, the recorder-backed fetch primitive). A
@@ -175,6 +234,15 @@
   }
   function _denylist() {
     return (typeof FsbServiceDenylist !== 'undefined' && FsbServiceDenylist) ? FsbServiceDenylist : null;
+  }
+  async function _ensureDenylistReady(denylist) {
+    if (!denylist || typeof denylist.load !== 'function') { return true; }
+    try {
+      await denylist.load();
+      return true;
+    } catch (_e) {
+      return false;
+    }
   }
   function _signatureMod() {
     return (typeof FsbCapabilitySignature !== 'undefined' && FsbCapabilitySignature) ? FsbCapabilitySignature : null;
@@ -297,6 +365,17 @@
     var mutating = _isMutatingSideEffect(sideEffectClass) || !!MUTATING_METHODS[method];
 
     var denylist = _denylist();
+    if (denylist) {
+      var denylistReady = await _ensureDenylistReady(denylist);
+      if (!denylistReady) {
+        return {
+          decision: 'off',
+          method: method,
+          sideEffectClass: sideEffectClass,
+          error: _err('RECIPE_CONSENT_REQUIRED', { origin: (typeof origin === 'string' && origin) ? origin : null, slug: slug, reason: 'denylist-unavailable' })
+        };
+      }
+    }
 
     // (1) DENYLIST FIRST (D-15): a denied origin is blocked regardless of any
     //     stored policy. A null/absent denylist treats nothing as denied.
@@ -531,6 +610,8 @@
     if (!handler || typeof handler.handle !== 'function') {
       return _err('RECIPE_NOT_FOUND', { slug: slug, reason: 'handler-unavailable' });
     }
+    var paramError = _validateHandlerParams(entry, args);
+    if (paramError) { return paramError; }
     var primitive = _fetchPrimitive();
     var interp = _interp();
     var handlerCtx = {

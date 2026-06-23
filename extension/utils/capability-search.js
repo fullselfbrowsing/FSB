@@ -69,8 +69,9 @@
       : { recipes: [], descriptors: [] };
   }
 
-  var _ms = null;          // MiniSearch instance
-  var _slugToRecipe = {};  // slug -> recipe (invoke lookup + schema-on-hit params)
+  var _ms = null;              // MiniSearch instance
+  var _slugToRecipe = {};      // slug -> recipe (invoke lookup + schema-on-hit params)
+  var _slugToDescriptor = {};  // slug -> descriptor (handler schema-on-hit params)
 
   // ---- Learned-recipe snapshot bookkeeping (LEARN-03 / D-14) ----------------
   // The descriptors fed by addLearnedRecipe AFTER the base build, plus a strictly
@@ -127,9 +128,11 @@
     var cat = _getCatalog();
     var descriptors = cat.descriptors || [];
 
-    // slug -> recipe map (invoke lookup + schema-on-hit params)
+    // slug -> recipe/descriptor maps (invoke lookup + schema-on-hit params)
     _slugToRecipe = {};
     (cat.recipes || []).forEach(function(r) { if (r && r.id) _slugToRecipe[r.id] = r; });
+    _slugToDescriptor = {};
+    (descriptors || []).forEach(function(d) { if (d && d.slug) _slugToDescriptor[d.slug] = d; });
 
     // catalogVersion stamp: a content hash over the descriptor slugs + recipe
     // count is robust against same-count edits (Assumption A5).
@@ -243,13 +246,14 @@
     var k = Math.max(1, Math.min(Number(topN) || 5, 5));
     return hits.slice(0, k).map(function(h) {
       var recipe = _slugToRecipe[h.slug] || {};
+      var descriptor = _slugToDescriptor[h.slug] || {};
       return {
         slug: h.slug,
         service: h.service,
         sideEffectClass: h.sideEffectClass,
         description: h.description,
         score: h.score,
-        params: recipe.params || null // schema-on-hit (D-08)
+        params: recipe.params || descriptor.params || null // schema-on-hit (D-08)
       };
     });
   }

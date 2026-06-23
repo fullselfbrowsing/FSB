@@ -13,8 +13,9 @@
  *   - SURF-04 (round-trip): build -> toJSON() -> MiniSearch.loadJSON(json,
  *     INDEX_OPTIONS) reproduces identical top hits; loadJSON WITHOUT the options
  *     arg throws (the load-bearing minisearch contract, Pitfall 3).
- *   - SURF-01 (schema-on-hit + cap): every hit carries params (or null) +
- *     sideEffectClass; no query returns more than 5 hits.
+ *   - SURF-01 (schema-on-hit + cap): every hit carries params, including
+ *     descriptor-level params for handler-backed capabilities, plus sideEffectClass;
+ *     no query returns more than 5 hits.
  *
  * Single source of truth: this test require()s INDEX_OPTIONS + buildIndex +
  * search from extension/utils/capability-search.js, so the harness uses the SAME
@@ -148,7 +149,7 @@ check(loadJsonThrew, 'loadJSON WITHOUT the options arg throws (the load-bearing 
   check(moduleHits.length <= 5, `module search caps results at <=5 (got ${moduleHits.length})`);
   check(
     moduleHits.length > 0 && moduleHits.every((h) => Object.prototype.hasOwnProperty.call(h, 'params')),
-    'every search hit carries a params field (schema-on-hit, or null)'
+    'every search hit carries a params field (schema-on-hit)'
   );
   check(
     moduleHits.length > 0 && moduleHits.every((h) => typeof h.sideEffectClass === 'string' && h.sideEffectClass.length > 0),
@@ -157,6 +158,18 @@ check(loadJsonThrew, 'loadJSON WITHOUT the options arg throws (the load-bearing 
   // A capped query that could match many docs must still never exceed 5.
   const wideHits = search('send', null, 99);
   check(wideHits.length <= 5, `topN clamp holds even for topN=99 (got ${wideHits.length})`);
+
+  const realSlackDescriptor = require(path.join(REPO_ROOT, 'catalog', 'descriptors', 'slack-message.json'));
+  global.FsbRecipeIndex = { descriptors: [realSlackDescriptor], recipes: [] };
+  await CapabilitySearch.buildOrRestore();
+  const handlerHits = search('send a slack message', null, 5);
+  const slackHit = handlerHits.find((h) => h.slug === 'slack.chat.postMessage');
+  check(
+    slackHit && slackHit.params && Array.isArray(slackHit.params.required)
+      && slackHit.params.required.includes('channel')
+      && slackHit.params.required.includes('text'),
+    'handler-backed search hit carries descriptor params schema for slack.chat.postMessage'
+  );
 
   // ---- Exit convention ------------------------------------------------------
   console.log(`\ncapability-search-eval: ${passed} passed, ${failed} failed`);

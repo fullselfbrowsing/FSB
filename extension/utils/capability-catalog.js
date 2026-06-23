@@ -191,6 +191,7 @@
       tier: tier,
       handler: entry.handler || entry,
       origin: entry.origin || null,
+      params: entry.params || (entry.handler && entry.handler.params) || null,
       descriptor: entry.descriptor || null
     };
     return true;
@@ -242,7 +243,8 @@
           tier: 'T1a',
           handler: entry,
           origin: entry.origin || mod.origin,
-          descriptor: { slug: slug, service: mod.service, sideEffectClass: entry.sideEffectClass || 'read' }
+          params: entry.params || null,
+          descriptor: { slug: slug, service: mod.service, sideEffectClass: entry.sideEffectClass || 'read', params: entry.params || null }
         });
         count++;
       }

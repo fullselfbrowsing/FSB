@@ -90,7 +90,9 @@ function installChromeStorageStub() {
   check(typeof Denylist.isDenied === 'function', 'exports isDenied');
   check(typeof Denylist.classify === 'function', 'exports classify');
   check(typeof Denylist.load === 'function', 'exports load');
+  check(typeof Denylist.isLoaded === 'function', 'exports isLoaded readiness helper');
   await Denylist.load();
+  check(Denylist.isLoaded() === true, 'load() marks the denylist ready');
 
   // A denied origin and a sensitive-but-not-denied origin are picked FROM the
   // on-disk seed so the test tracks whatever conservative seed Plan 03 ships.
@@ -143,6 +145,32 @@ function installChromeStorageStub() {
       'denylisted origin -> RECIPE_CONSENT_BLOCKED (checked BEFORE per-origin policy)');
     check(g && (g.decision === 'blocked' || g.consentDecision === 'blocked'),
       "denylisted origin -> decision/consentDecision 'blocked'");
+
+    let gateLoadCalls = 0;
+    let gateLoadResolved = false;
+    globalThis.FsbServiceDenylist = {
+      load() {
+        gateLoadCalls++;
+        return Promise.resolve().then(() => { gateLoadResolved = true; });
+      },
+      isDenied(origin) {
+        return {
+          denied: gateLoadResolved && origin === 'https://startup-race.example.com',
+          reason: 'loaded-before-check'
+        };
+      },
+      classify() { return { sensitive: false, denied: false }; }
+    };
+    await Store.setOriginMode('https://startup-race.example.com', 'auto');
+    const race = await Gate.evaluate({
+      origin: 'https://startup-race.example.com',
+      slug: 'some.capability',
+      method: 'GET',
+      entry: { tier: 'T1b', sideEffectClass: 'read' }
+    });
+    check(gateLoadCalls === 1, 'gate awaits denylist.load() before evaluating a present denylist module');
+    check(race && race.error && race.error.code === 'RECIPE_CONSENT_BLOCKED',
+      'gate blocks using denylist data loaded during evaluation (startup race closed)');
   } else {
     check(false, 'gate absent -- cannot assert the checked-first BLOCKED path (Wave-0 RED)');
   }

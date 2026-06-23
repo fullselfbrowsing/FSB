@@ -24,8 +24,9 @@
    *     Reads the bundled extension/config/service-denylist.json (deniedOrigins +
    *     sensitiveOrigins) into memory at SW startup. Absent / unreadable -> empty
    *     sets (DEGRADE, never throw): a missing config must not poison the boot
-   *     path, and an empty denylist fails OPEN for the denylist (nothing denied)
-   *     while the per-origin default-OFF consent (Plan 02) remains the spine.
+   *     path, and an empty denylist fails OPEN for the denylist only AFTER that
+   *     load completes. Callers that gate side effects must await load() before
+   *     reading isDenied()/classify() so startup cannot observe an empty seed.
    *
    * Module shell: the dual-export IIFE mirror of capability-interpreter.js. It
    * reaches chrome only through a typeof-guarded lazy accessor (the agent-registry
@@ -58,6 +59,8 @@
   var _deniedOrigins = [];
   var _sensitiveOrigins = [];
   var _deniedReason = '';
+  var _loaded = false;
+  var _loadPromise = null;
 
   // ---- origin -> { scheme, host } parse (no throw) -------------------------
   // Returns null on an unparseable origin so a caller can treat it as non-match
@@ -183,7 +186,7 @@
     try { console.warn('[FSB BG] ' + msg); } catch (_e2) { /* console may be absent */ }
   }
 
-  async function load() {
+  async function _loadFromSources() {
     var fetchErr = null;
     // Browser / SW path: fetch the bundled JSON via chrome.runtime.getURL.
     var chrome = _getChrome();
@@ -221,8 +224,26 @@
     _applyConfig(null);
   }
 
+  function load() {
+    if (_loaded) { return Promise.resolve(); }
+    if (_loadPromise) { return _loadPromise; }
+    _loadPromise = _loadFromSources().catch(function(e) {
+      _warnDenylistConfigMissing((e && e.message) ? e.message : String(e));
+      _applyConfig(null);
+    }).then(function() {
+      _loaded = true;
+    });
+    return _loadPromise;
+  }
+
+  function isLoaded() {
+    return _loaded;
+  }
+
   // ---- _setForTest(config) -- inject a config for unit tests ----------------
   function _setForTest(config) {
+    _loadPromise = null;
+    _loaded = true;
     _applyConfig(config);
   }
 
@@ -231,6 +252,7 @@
     isDenied: isDenied,
     classify: classify,
     load: load,
+    isLoaded: isLoaded,
     _setForTest: _setForTest
   };
 
