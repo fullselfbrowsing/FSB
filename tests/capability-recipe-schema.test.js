@@ -62,13 +62,18 @@ check(typeof (globalThis.CfworkerJsonSchema && globalThis.CfworkerJsonSchema.Val
 const M = require(MODULE_PATH);
 check(typeof M.validateRecipe === 'function', 'module exports validateRecipe');
 check(typeof M.RECIPE_SCHEMA === 'object' && M.RECIPE_SCHEMA !== null, 'module exports RECIPE_SCHEMA');
-check(M.FSB_RECIPE_SCHEMA_VERSION === 1, 'module exports FSB_RECIPE_SCHEMA_VERSION === 1');
+check(M.FSB_RECIPE_SCHEMA_VERSION === 2, 'module exports FSB_RECIPE_SCHEMA_VERSION === 2');
 
 // ---- 3. Accept: the canonical valid recipe. -------------------------------
+//        The fixture carries schemaVersion:1. Asserting it STILL validates under
+//        the Phase-32 schemaVersion enum:[1,2] is the load-bearing D-08 backward-
+//        compat proof -- a persisted/bundled v1 recipe (the Phase-31 LEARNED
+//        recipes carry :1) must keep validating at runtime. The fixture is NOT
+//        migrated off schemaVersion:1 for exactly this reason.
 const valid = readFixture('valid-recipe.json');
 const validResult = M.validateRecipe(valid);
 check(validResult && validResult.success === true,
-  'valid-recipe.json -> { success: true } (got ' + JSON.stringify(validResult) + ')');
+  'valid-recipe.json (schemaVersion:1) STILL validates under enum:[1,2] -> { success: true } (D-08 backward-compat) (got ' + JSON.stringify(validResult) + ')');
 
 // ---- 4. Reject: each forbidden script-like field name. --------------------
 const FORBIDDEN = [
@@ -106,12 +111,39 @@ const badAuth = M.validateRecipe(readFixture('reject-bad-authstrategy.json'));
 check(badAuth && badAuth.success === false && badAuth.code === 'RECIPE_OPCODE_INVALID',
   'reject-bad-authstrategy.json -> RECIPE_OPCODE_INVALID (got ' + (badAuth && badAuth.code) + ')');
 
-// ---- 8. Reject: wrong/missing schemaVersion -> RECIPE_SCHEMA_INVALID. ------
-//        Constructed from the valid fixture (no dedicated fixture file).
-const wrongVersion = Object.assign({}, valid, { schemaVersion: 2 });
-const wrongVersionResult = M.validateRecipe(wrongVersion);
-check(wrongVersionResult && wrongVersionResult.success === false && wrongVersionResult.code === 'RECIPE_SCHEMA_INVALID',
-  'recipe with schemaVersion 2 -> RECIPE_SCHEMA_INVALID (got ' + (wrongVersionResult && wrongVersionResult.code) + ')');
+// ---- 8. schemaVersion enum gate (Phase 32, D-08: enum:[1,2]). --------------
+//        The schema widened schemaVersion from const:1 to enum:[1,2]. An
+//        OUT-OF-ENUM version is still rejected; a schemaVersion:2 recipe carrying
+//        the new optional fields validates.
+//
+// 8a. Out-of-enum versions (3 and 0) -> RECIPE_SCHEMA_INVALID (an unknown version
+//     is still rejected -- the enum did not open the gate to any integer).
+const outOfEnum3 = M.validateRecipe(Object.assign({}, valid, { schemaVersion: 3 }));
+check(outOfEnum3 && outOfEnum3.success === false && outOfEnum3.code === 'RECIPE_SCHEMA_INVALID',
+  'out-of-enum schemaVersion 3 -> RECIPE_SCHEMA_INVALID (got ' + (outOfEnum3 && outOfEnum3.code) + ')');
+const outOfEnum0 = M.validateRecipe(Object.assign({}, valid, { schemaVersion: 0 }));
+check(outOfEnum0 && outOfEnum0.success === false && outOfEnum0.code === 'RECIPE_SCHEMA_INVALID',
+  'out-of-enum schemaVersion 0 -> RECIPE_SCHEMA_INVALID (got ' + (outOfEnum0 && outOfEnum0.code) + ')');
+
+// 8b. A schemaVersion:2 recipe carrying the new OPTIONAL fields (capturedAt +
+//     expectedShape) -> success:true (the v2-with-optional-fields accept path).
+const v2Inline = Object.assign({}, valid, {
+  schemaVersion: 2,
+  capturedAt: '2026-06-23T00:00:00.000Z',
+  expectedShape: '@'
+});
+const v2InlineResult = M.validateRecipe(v2Inline);
+check(v2InlineResult && v2InlineResult.success === true,
+  'schemaVersion 2 + optional capturedAt/expectedShape -> valid (got ' + JSON.stringify(v2InlineResult) + ')');
+
+// 8c. Lock the v2 accept path to a FIXTURE (not only an inline object): the
+//     sibling valid-recipe-v2.json (schemaVersion:2 + capturedAt + expectedShape)
+//     must validate. The recipe-path CI guard (Check 2) also runs every valid-*
+//     fixture, so this fixture doubles as a build-time v2 accept proof.
+const v2Fixture = readFixture('valid-recipe-v2.json');
+const v2FixtureResult = M.validateRecipe(v2Fixture);
+check(v2FixtureResult && v2FixtureResult.success === true,
+  'valid-recipe-v2.json (schemaVersion:2 + capturedAt + expectedShape) -> valid (got ' + JSON.stringify(v2FixtureResult) + ')');
 
 const missingVersion = Object.assign({}, valid);
 delete missingVersion.schemaVersion;
