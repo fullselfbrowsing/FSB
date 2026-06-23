@@ -82,23 +82,25 @@
   // gap for the weakest assertion (expectedShape:'@'), where search(data,'@')
   // returns the whole non-null string and the shape would otherwise PASS.
   //
-  // CONSERVATIVE (D-06): this reads the TYPE and the leading structural marker
-  // only -- never a value/field. A real JSON result is an object / array / number /
-  // boolean / null (parsed from r.json), NEVER a raw HTML string, so this can never
-  // turn a legitimate (possibly-empty) JSON outcome into a false RECIPE_EXPIRED.
-  // The match is intentionally narrow: a leading '<' after trim, or a case-
-  // insensitive '<!doctype' / '<html' marker.
+  // CONSERVATIVE (D-06): this reads the TYPE and the single leading structural
+  // marker only -- never a value/field. A real JSON result is an object / array /
+  // number / boolean / null (parsed from r.json), NEVER a raw markup STRING, so this
+  // can never turn a legitimate (possibly-empty) JSON outcome into a false
+  // RECIPE_EXPIRED. The rule is intentionally simple and wide on the markup side: a
+  // string whose first non-whitespace character is '<' is a markup/document body
+  // (the canonical auth-wall forms are '<!doctype html>' and '<html ...>'), which a
+  // JSON-API recipe must never receive. Even in the rare event a JSON endpoint
+  // legitimately returned a bare JSON string literal beginning with '<', flagging it
+  // and routing to the DOM backstop is the recoverable direction (D-06), not a
+  // masked false success.
   //
-  // V7: reads the body TYPE/prefix for the sniff only; NEVER logs the body.
+  // V7: reads the body TYPE/leading char for the sniff only; NEVER logs the body.
 
   function _looksLikeHtmlDocument(data) {
     if (typeof data !== 'string') { return false; }
+    // Strip leading whitespace (incl. a UTF-8 BOM) before reading the first marker.
     var trimmed = data.replace(/^[\s﻿]+/, '');
-    if (trimmed.charAt(0) !== '<') { return false; }
-    var head = trimmed.slice(0, 200).toLowerCase();
-    return head.indexOf('<!doctype') !== -1
-        || head.indexOf('<html') !== -1
-        || head.charAt(0) === '<';   // any leading-tag string under a JSON recipe is wrong-kind
+    return trimmed.charAt(0) === '<';
   }
 
   // ---- validateExpectedShape -- the conservative structural predicate ---------
