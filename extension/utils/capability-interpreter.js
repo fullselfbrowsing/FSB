@@ -477,7 +477,13 @@
       query: built.query,
       authStrategy: recipe.authStrategy,
       origin: recipe.origin,
-      extract: (typeof recipe.extract === 'string') ? recipe.extract : null
+      extract: (typeof recipe.extract === 'string') ? recipe.extract : null,
+      // Phase 32 (D-05): carry the conservative rot-detection fields through the
+      // spec, mirroring the `extract` carry exactly. The router/rot-detector reads
+      // recipe.expectedShape directly per RESEARCH, so this carry is the belt-and-
+      // suspenders path; both are unevaluated DATA here (no read-path run).
+      expectedShape: (typeof recipe.expectedShape === 'string') ? recipe.expectedShape : null,
+      capturedAt: (typeof recipe.capturedAt === 'string') ? recipe.capturedAt : null
     };
 
     // 5b. Query-fold (D-09, FETCH-03): fold the built query map into the URL

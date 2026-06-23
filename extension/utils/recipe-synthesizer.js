@@ -68,7 +68,11 @@
   }
 
   // ---- Closed-vocab constants ---------------------------------------------
-  var SCHEMA_VERSION = 1;
+  // SCHEMA_VERSION follows the Phase-32 bump to 2 (the CURRENT stamp): NEW
+  // synthesized learned recipes carry schemaVersion:2. This does NOT invalidate
+  // already-persisted schemaVersion:1 learned recipes -- the schema's enum:[1,2]
+  // keeps them valid at runtime (D-08, LEARN-04).
+  var SCHEMA_VERSION = 2;
   var VALID_METHODS = { GET: true, POST: true, PUT: true, PATCH: true, DELETE: true };
 
   // CSRF-style request header NAMES the redactor may LEAVE behind (the auth-carrier
@@ -289,7 +293,17 @@
         endpoint: template,
         method: method,
         authStrategy: auth.authStrategy,
-        extract: '@'   // whole-response identity; D-08 forbids reading the body (A3)
+        extract: '@',   // whole-response identity; D-08 forbids reading the body (A3)
+        // Phase 32 (D-07/A4): a CONSERVATIVE shape-only assertion. The synthesizer
+        // only has redacted shape-only capture, never a response body, so '@' ("the
+        // learned endpoint still returns a non-null response") is the strongest
+        // derivable expectedShape -- the rot-detector then flags only a missing/null/
+        // wrong-kind body, never an empty-but-present real result.
+        expectedShape: '@',
+        // Phase 32 (D-05): ISO capture timestamp on the recipe core (the store also
+        // records capturedAt bookkeeping, learned-recipe-store.js:393; D-05 wants it
+        // ON the core for time-based rot age).
+        capturedAt: new Date().toISOString()
       };
       if (auth.authStrategy === 'csrf-header-scrape' && auth.csrf) {
         recipe.csrf = auth.csrf;

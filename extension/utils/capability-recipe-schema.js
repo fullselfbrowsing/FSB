@@ -55,8 +55,17 @@
    */
 
   // ---- Version envelope (mirror trigger-store.js:58-59) -------------------
+  //
+  // FSB_RECIPE_SCHEMA_VERSION is the CURRENT stamp NEW recipes (synthesized +
+  // newly bundled) carry. Phase 32 (D-08) bumped it 1 -> 2 ADDITIVELY: the
+  // backward-compat mechanism is the schemaVersion ENUM below ([1, 2]) -- NOT a
+  // bumped const -- so a persisted/bundled schemaVersion:1 recipe (the Phase-31
+  // LEARNED recipes carry :1, LEARN-04) STILL validates at runtime alongside a new
+  // schemaVersion:2 recipe. The two new fields (capturedAt + expectedShape) are
+  // OPTIONAL, so a v1 recipe that omits them still validates -- "v1 stays valid"
+  // is literally true at runtime.
 
-  var FSB_RECIPE_SCHEMA_VERSION = 1;
+  var FSB_RECIPE_SCHEMA_VERSION = 2;
 
   // ---- Forbidden script-like field names (D-07, Pitfall 2) ---------------
   //
@@ -81,8 +90,17 @@
     additionalProperties: false,
     required: ['schemaVersion', 'id', 'origin', 'endpoint', 'method', 'authStrategy'],
     properties: {
-      // Envelope version -- a JSON-Schema const equal to FSB_RECIPE_SCHEMA_VERSION (D-10).
-      schemaVersion: { const: FSB_RECIPE_SCHEMA_VERSION },
+      // Envelope version -- an ENUM of the supported schema versions (D-08/D-10).
+      // Phase 32 widened this from `const: FSB_RECIPE_SCHEMA_VERSION` (which was 1)
+      // to `enum: [1, 2]` so a persisted/bundled schemaVersion:1 recipe STILL
+      // validates at runtime next to a new schemaVersion:2 recipe -- this is the
+      // backward-compat mechanism (NOT a bumped const). An OUT-OF-ENUM version
+      // (e.g. 0 or 3) is still rejected, and schemaVersion remains in `required`,
+      // so a missing version is still RECIPE_SCHEMA_INVALID. cfworker emits a
+      // /properties/schemaVersion/ keywordLocation for an enum failure exactly as
+      // it did for the const, so validateRecipe's 4a schemaVersion mapping is
+      // undisturbed (it matched the property path, not the keyword name).
+      schemaVersion: { enum: [1, 2] },
       // Recipe identity. Locked to the name `id` (NOT `slug`) to match the
       // valid-recipe.json accept fixture and the downstream catalog key.
       id: { type: 'string', minLength: 1 },
@@ -125,6 +143,16 @@
       },
       // Read-only JMESPath extract (single string).
       extract: { type: 'string' },
+      // OPTIONAL ISO-8601 capture timestamp (Phase 32, D-05). Bookkeeping for
+      // time-based rot age; pure data (a string), NOT in `required` -- a v1 recipe
+      // that omits it still validates.
+      capturedAt: { type: 'string' },
+      // OPTIONAL conservative JMESPath shape assertion (Phase 32, D-05/D-06). The
+      // SAME string kind as `extract`; the rot-detector runs it through the same
+      // read-path engine to assert the read PATH resolves to a present container
+      // (structure only, never values). NOT in `required` -- a v1 recipe that omits
+      // it still validates, and the rot-detector simply skips the shape gate.
+      expectedShape: { type: 'string' },
       // Optional CSRF source declaration -- pure data (selector + header name),
       // not code. Required only when authStrategy === 'csrf-header-scrape'
       // (expressed via the if/then below). Live scrape is Phase 27.
