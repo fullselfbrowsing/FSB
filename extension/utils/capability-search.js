@@ -74,10 +74,14 @@
 
   // ---- Learned-recipe snapshot bookkeeping (LEARN-03 / D-14) ----------------
   // The descriptors fed by addLearnedRecipe AFTER the base build, plus a strictly
-  // monotonic learned-add counter. The counter is appended to the re-snapshot's
-  // catalogVersion so the stored version ALWAYS differs from the prior snapshot
-  // (even on a re-promotion that adds no new slug) -- the D-14 guarantee that a
-  // stale snapshot without the learned entry is never restored over it.
+  // monotonic learned-add counter. The counter is appended (as '+learnedN') to the
+  // re-snapshot's catalogVersion so the stored value differs from the prior snapshot
+  // even on a re-promotion that adds no new slug. CRITICAL (HI-01 fix): the suffix is
+  // appended to the BASE-catalog version (computed over cat.descriptors only), so on
+  // restart buildOrRestore can compare the base PREFIX and re-attach the persisted
+  // index (which already carries the learned docs) -- the learned slugs survive the
+  // SW restart. After such a restore _learnedAddSeq is re-seeded from the stored
+  // suffix (see _reseedLearnedFromSnapshot) to stay monotonic across the restart.
   var _learnedDescriptors = [];
   var _learnedAddSeq = 0;
 
@@ -132,14 +136,29 @@
     var catalogVersion = _computeCatalogVersion(descriptors, cat.recipes || [], cat.version);
 
     var c = _getChrome();
-    // 1. Restore from snapshot when the version matches.
+    // 1. Restore from snapshot when the BASE version matches (HI-01 / D-14 fix).
+    //
+    // A snapshot written by addLearnedRecipe carries a '+learnedN' suffix on top of
+    // the base-catalog version (e.g. "1:3fe8b718+learned3"); a base-only snapshot has
+    // no suffix. We compare the base PREFIX (everything before '+learned') against the
+    // freshly recomputed base catalogVersion. A match means the persisted index --
+    // which already contains the learned docs -- is current for THIS base catalog, so
+    // we restore it verbatim and the learned slugs survive the SW restart (LEARN-03).
+    // A genuine base-catalog change shifts catalogVersion, the prefixes diverge, and
+    // we correctly fall through to rebuild (invalidation still holds).
     if (c && c.storage && c.storage.local) {
       try {
         var stored = await c.storage.local.get(STORAGE_KEY);
         var snap = stored && stored[STORAGE_KEY];
-        if (snap && snap.catalogVersion === catalogVersion && snap.index) {
+        var storedBase = String((snap && snap.catalogVersion) || '').split('+learned')[0];
+        if (snap && storedBase === catalogVersion && snap.index) {
           // loadJSON wants a JSON string and the SAME options used at serialize.
           _ms = MS.loadJSON(JSON.stringify(snap.index), INDEX_OPTIONS);
+          // Re-seed the learned-add bookkeeping from the restored suffix so the next
+          // addLearnedRecipe keeps the '+learnedN' counter strictly monotonic across
+          // the restart (a fresh module starts _learnedAddSeq at 0 otherwise, which
+          // would re-issue an already-used suffix on the next add).
+          _reseedLearnedFromSnapshot(snap, _ms);
           return true;
         }
       } catch (e) { /* fall through to rebuild */ }
@@ -168,6 +187,26 @@
       hash = ((hash << 5) + hash + seed.charCodeAt(i)) | 0;
     }
     return (descriptors ? descriptors.length : 0) + ':' + (hash >>> 0).toString(16);
+  }
+
+  // ---- HI-01 / D-14: re-seed learned bookkeeping after a snapshot restore ------
+  //
+  // When buildOrRestore re-attaches a persisted snapshot whose version carried a
+  // '+learnedN' suffix, the in-memory learned counters (_learnedAddSeq /
+  // _learnedDescriptors) are still at their fresh-module defaults (0 / []). Left
+  // unseeded, the next addLearnedRecipe would emit '+learned1' again -- a NON-
+  // monotonic version that could equal a value already written before the restart.
+  // We recover the prior count from the stored suffix so the next add continues the
+  // sequence (e.g. restored "...+learned3" -> next add writes "...+learned4").
+  function _reseedLearnedFromSnapshot(snap, ms) {
+    try {
+      var ver = String((snap && snap.catalogVersion) || '');
+      var marker = ver.indexOf('+learned');
+      if (marker !== -1) {
+        var n = parseInt(ver.slice(marker + '+learned'.length), 10);
+        if (isFinite(n) && n > _learnedAddSeq) { _learnedAddSeq = n; }
+      }
+    } catch (e) { /* best-effort -- a malformed suffix just leaves the counter at 0 */ }
   }
 
   // ---- SURF-01: ranked, origin-biased, schema-on-hit results (<=topN) ---------
@@ -287,15 +326,26 @@
     _learnedDescriptors.push({ slug: slug });
     _learnedAddSeq += 1;
 
-    // Re-persist the snapshot with a BUMPED catalogVersion (D-14). The base
-    // descriptor set comes from the build-time catalog; appending the learned
-    // descriptors plus the monotonic suffix guarantees the stored version DIFFERS
-    // from the prior snapshot so a stale restore can never drop the learned entry.
+    // Re-persist the snapshot with a BUMPED catalogVersion (D-14 / HI-01 fix).
+    //
+    // The stored version is the BASE-catalog version (computed over cat.descriptors
+    // ONLY -- the exact same input buildOrRestore recomputes on restart) followed by
+    // a '+learnedN' suffix. Keeping the base part identical to buildOrRestore's
+    // recomputation is what lets the prefix-tolerant restore re-attach the persisted
+    // index (which already carries the learned docs) instead of discarding it. The
+    // '+learnedN' suffix still makes the stored value DIFFER from the prior snapshot
+    // (monotonic), and the base prefix still changes when the BASE catalog changes --
+    // so a genuine base-catalog edit correctly invalidates the snapshot.
+    //
+    // NOTE: the learned descriptors are deliberately NOT folded into the version
+    // input here (the previous '+learned' bug). Folding them changed the
+    // descriptor-count prefix so the base part could never equal buildOrRestore's
+    // recomputation, forcing an unconditional rebuild that dropped every learned slug.
     var c = _getChrome();
     if (c && c.storage && c.storage.local && _ms) {
       try {
         var cat = _getCatalog();
-        var baseDescriptors = (cat.descriptors || []).concat(_learnedDescriptors);
+        var baseDescriptors = (cat.descriptors || []);
         var baseRecipes = (cat.recipes || []);
         var bumped = _computeCatalogVersion(baseDescriptors, baseRecipes, cat.version)
           + '+learned' + _learnedAddSeq;

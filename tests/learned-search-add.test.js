@@ -114,6 +114,40 @@ const LEARNED_DESC = {
       'the learned slug survives an SW-restart restore (it was in the bumped snapshot)');
   }
 
+  // ---- HI-01 REGRESSION: drive the REAL buildOrRestore() across an SW restart ----
+  //
+  // The loadJSON checks above prove the snapshot CONTAINS the learned slug, but they
+  // bypass buildOrRestore()'s version-equality gate -- the exact path the HIGH bug
+  // lived in (the '+learnedN' suffix made the gate reject the snapshot and rebuild
+  // from the base catalog, dropping every learned slug). Simulate a genuine SW
+  // restart: confirm the learned slug is findable BEFORE, drop the module from the
+  // require cache (resets the module-level _ms / _learnedAddSeq to a fresh worker)
+  // while KEEPING the same backing storage Map, re-require, run the real
+  // buildOrRestore(), and assert search() STILL finds the learned slug afterwards.
+  const beforeRestart = Search.search('shopping cart', LEARNED_ORIGIN, 5);
+  check(Array.isArray(beforeRestart) && beforeRestart.some(function (h) { return h.slug === 'shop.cart'; }),
+    'learned slug findable BEFORE the restart (sanity for the regression)');
+
+  // Simulated restart: a fresh module instance, the SAME persisted storage + catalog.
+  delete require.cache[require.resolve(SEARCH_PATH)];
+  const SearchRestarted = require(SEARCH_PATH);
+  const restoredOk = await SearchRestarted.buildOrRestore();
+  check(restoredOk === true, 'buildOrRestore() returns true after the restart (restored, not rebuilt-from-empty)');
+
+  const afterSnap = store.get(STORAGE_KEY);
+  check(afterSnap && String(afterSnap.catalogVersion).indexOf('+learned') !== -1,
+    'the snapshot is NOT overwritten back to a base-only version on restore (the learned suffix survives)');
+
+  const afterRestart = SearchRestarted.search('shopping cart', LEARNED_ORIGIN, 5);
+  const afterSlugs = Array.isArray(afterRestart) ? afterRestart.map(function (h) { return h.slug; }) : [];
+  check(afterSlugs.indexOf('shop.cart') !== -1,
+    'LEARN-03/D-14: the learned slug is STILL findable AFTER a real buildOrRestore() restart (was [] before the fix)');
+  // NOTE: getRecipeBySlug(learned) is intentionally NOT asserted post-restart -- the
+  // search module's _slugToRecipe is rebuilt from the BASE catalog on restart; learned
+  // recipe RESOLUTION runs through FsbLearnedRecipeStore.getLearnedSync (hydrated by
+  // hydrateSyncCache), not this module's map. The search-index snapshot only owns
+  // DISCOVERY (search()), which is exactly the LEARN-03 surface the HIGH bug broke.
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {
