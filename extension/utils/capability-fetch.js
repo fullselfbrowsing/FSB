@@ -186,6 +186,14 @@
         // 200-vs-302 signal is never lost to a parse throw on an HTML body.
         var status = resp.status;
         var finalUrl = resp.url;
+        // IN-01: under redirect:'manual' (init above) a 3xx is surfaced as an
+        // opaqueredirect (resp.type === 'opaqueredirect', status 0), so the
+        // opaqueredirect disjunct is what actually fires for a login redirect and the
+        // numeric (status >= 300 && status < 400) range is effectively unreachable on
+        // THIS path. The numeric disjunct is kept as a belt-and-suspenders guard so the
+        // logged-out signal stays correct if this init is ever changed to a redirect
+        // mode that surfaces a live 3xx status; it does NOT mean the fetcher follows
+        // redirects.
         var redirected = resp.type === 'opaqueredirect' || (status >= 300 && status < 400);
 
         var CAP = 256 * 1024;

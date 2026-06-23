@@ -21,7 +21,8 @@ findings:
   medium: 2
   low: 3
   total: 5
-status: issues
+status: resolved
+resolution_note: "WR-01 + WR-02 + IN-01 fixed (commits fix(32): WR-01/WR-02/IN-01); IN-02 + IN-03 confirmed intentional fail-safe (no change). Targeted Phase-32 gate + full npm test green post-fix."
 ---
 
 # Phase 32: Code Review Report
@@ -74,7 +75,9 @@ The two medium findings are real robustness gaps in the conservative degrade, no
 
 ## Info
 
-### IN-01 (low): `redirect:'manual'` makes the `(status >= 300 && status < 400)` branch in the redirected predicate effectively dead
+### IN-01 (low) [RESOLVED]: `redirect:'manual'` makes the `(status >= 300 && status < 400)` branch in the redirected predicate effectively dead
+
+**Resolution:** Took the review's "add a one-line comment" option rather than deleting the disjunct -- the numeric range is genuinely-defensive belt-and-suspenders on a security-relevant signal path (the `redirected` field drives the `RECIPE_LOGGED_OUT` taxonomy), and `capabilityFetchInPage` is a serialization-isolated MAIN-world function where keeping the guard is the conservative choice. Added an explanatory comment at `extension/utils/capability-fetch.js:189` stating that under `redirect:'manual'` a 3xx surfaces as `opaqueredirect` (status 0) so the numeric range is unreachable on this path and kept only as a guard for any future non-manual redirect mode -- it does NOT mean the fetcher follows redirects. This resolves the "misleads a future reader" concern without removing a defensive guard. No behavior change; capability-fetch 26/26 + recipe-path-guard PASS. Commit: see `fix(32): IN-01`.
 
 **File:** `extension/utils/capability-fetch.js:189` (`var redirected = resp.type === 'opaqueredirect' || (status >= 300 && status < 400);`)
 
@@ -82,7 +85,9 @@ The two medium findings are real robustness gaps in the conservative degrade, no
 
 **Fix:** Optionally drop the dead disjunct or add a one-line comment noting that under `redirect:'manual'` a 3xx surfaces as `opaqueredirect` (status 0), so the numeric range is a belt-and-suspenders guard for any non-manual code path.
 
-### IN-02 (low): Re-learn `runDiscovery` is invoked without `confirmedSensitive`, so a sensitive origin silently re-learns nothing
+### IN-02 (low) [NO CHANGE -- INTENTIONAL FAIL-SAFE]: Re-learn `runDiscovery` is invoked without `confirmedSensitive`, so a sensitive origin silently re-learns nothing
+
+**Resolution:** Left as-is by design. This is the CORRECT credential-replay fail-safe -- a rot-triggered re-learn on a sensitive origin must NOT run without explicit out-of-band confirmation, and `startSession`'s consent gate denying without confirmation (the no-op) is exactly the intended posture (D-03 keeps a synchronous sensitive-origin prompt on the invoke path out of scope). The review itself records "No change required." Confirmed intentional; no source change.
 
 **File:** `extension/utils/capability-router.js:153` (`var dp = discovery.runDiscovery(origin, { tabId: tabId });`)
 
@@ -90,7 +95,9 @@ The two medium findings are real robustness gaps in the conservative degrade, no
 
 **Fix:** None required. If a future UAT wants rot-triggered re-learn to prompt for sensitive-origin confirmation, that is a deliberate product decision (a synchronous prompt on the invoke path is explicitly out of scope, D-03), not a defect here.
 
-### IN-03 (low): `_quarantineAndRelearn` fires re-learn even when the catalog/store quarantine no-ops (unknown or non-string slug)
+### IN-03 (low) [NO CHANGE -- INTENTIONAL FAIL-SAFE]: `_quarantineAndRelearn` fires re-learn even when the catalog/store quarantine no-ops (unknown or non-string slug)
+
+**Resolution:** Left as-is by design. The independent try-blocks are intentional: re-learn is consent-gated, origin-scoped, best-effort, and only ever reached on the `broken === true` branch with a resolved slug, so a re-learn on a slug whose quarantine no-op'd is benign and theoretical. Gating re-learn on a successful quarantine is an optional v1 tightening, not a defect. The review itself records "None required for v1." Confirmed intentional; no source change.
 
 **File:** `extension/utils/capability-router.js:144-157`
 
