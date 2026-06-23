@@ -4,13 +4,13 @@ milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
 status: executing
 stopped_at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
-last_updated: "2026-06-23T01:50:48.437Z"
+last_updated: "2026-06-23T02:00:48.071Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 23
   percent: 63
 ---
 
@@ -30,11 +30,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 ## Current Position
 
 Phase: 31 (network-capture-discovery-recipe-synthesis-learned-recipes) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-06-23
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 92%
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-32)
 
@@ -98,6 +98,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | Phase 30 P02 | 22m | 3 tasks | 3 files |
 | Phase 30 P04 | 24min | 3 tasks | 4 files |
 | Phase 31 P01 | 13min | 3 tasks | 13 files |
+| Phase 31 P02 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,8 @@ Full decision log lives in PROJECT.md. Carried-forward invariants binding this m
 - [Phase 30]: Phase 30 Plan 04 (GOV-07/GOV-08): the Consent & Audit control-panel section persists per-origin Off/Ask/Auto + the elevated mutating opt-in straight to FsbConsentPolicyStore (NOT the Save bar) and re-renders on chrome.storage.onChanged; the Sensitive/Blocked friction reads FsbServiceDenylist.classify (the gate's source of truth) so the UI reflects the gate's step-4 downgrade (D-14) and is never an independent boundary. The audit viewer renders only the seven redacted columns via textContent (GOV-06 at the UI). consent-audit-settings-ui 52/0 + showcase-privacy-page 53/0 green; live render/Grant/badge smoke is human_needed UAT debt (30-HUMAN-UAT.md UAT-30-01), not a fabricated pass.
 - [Phase ?]: Phase 31 Wave 0: authored 9 zero-framework RED suites + a shared chrome.debugger event-driver stub BEFORE their modules; Waves 1-3 turn them RED->GREEN (Nyquist armed)
 - [Phase ?]: Phase 31: the synthesizer RED suite caps from:'response' to same-origin-cookie+flaggedForPhase32 (D-11/Pitfall 4); the declarative replay path cannot execute response-minted CSRF
+- [Phase ?]: Phase 31 capture: capture-time redaction uses structural exclusion (never reads header values/bodies/query); redactResponse keeps only {status,mimeType} so the redactor cannot leak
+- [Phase ?]: Phase 31 capture: CDP Network capture rides the existing Input-domain debugger attach (no manifest change); endSession detaches only if capture was the owner and no Input op holds the tab
 
 ### Top Risks (from research — bake into phase planning)
 
@@ -204,7 +207,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-23T01:50:27.602Z
+Last session: 2026-06-23T01:59:12.991Z
 Stopped at: Completed 29-05-PLAN.md (autopilot parity front door; phase complete, ready for verification)
 Resume file: None
 
