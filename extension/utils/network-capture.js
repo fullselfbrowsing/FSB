@@ -324,15 +324,18 @@
       maxCount: maxCount,
       weAttached: !!(attachResult && attachResult.weAttached),
       calls: new Map(),
-      listener: _onCdpEvent,
       detachListener: null,
       timer: null
     };
 
-    // Register the method-dispatched onEvent listener.
-    if (dbg.onEvent && typeof dbg.onEvent.addListener === 'function') {
-      dbg.onEvent.addListener(_onCdpEvent);
-    }
+    // NOTE (ME-01): the method-dispatched onEvent listener is registered EXACTLY
+    // ONCE at service-worker boot (background.js) and is gated by `if (!_session)
+    // return`, so it is a no-op outside an active session. We deliberately do NOT
+    // add it per-session here: re-adding the SAME function reference and then
+    // removeListener-ing it in endSession would tear down the boot registration too
+    // (identical reference), and in a non-deduping harness it would double-fire
+    // _onCdpEvent (double-decrementing remaining, ending at half the count bound).
+    // The boot registration is the single owner; endSession leaves it intact.
 
     // Register onDetach so a Chrome-initiated detach (canceled_by_user when the
     // user dismisses the banner, target_closed on tab close) tears the session
@@ -367,10 +370,16 @@
   }
 
   // ---- endSession(reason) -> ObservedCall[] (Pitfall 1) --------------------
-  // Removes the listeners, releases the Network domain (Network.disable -- KEEP
-  // the attachment), and detaches the tab ONLY if WE attached AND no Input op
-  // holds the tab. Returns the collected ObservedCalls (those with a method +
-  // path) for Plan 06's glue, then clears the session.
+  // Removes the per-session onDetach listener, releases the Network domain
+  // (Network.disable -- KEEP the attachment), and detaches the tab ONLY if WE
+  // attached AND no Input op holds the tab. Returns the collected ObservedCalls
+  // (those with a method + path) for Plan 06's glue, then clears the session.
+  //
+  // ME-01: the onEvent (_onCdpEvent) listener is owned by the boot-time
+  // registration (background.js) and is NOT removed here -- removing it would tear
+  // down the permanent boot registration (same function reference) so the NEXT
+  // session would observe nothing. _onCdpEvent no-ops once _session is cleared
+  // below, so leaving it registered is inert between sessions.
   function endSession(reason) {
     void reason;
     if (!_session) { return []; }
@@ -380,10 +389,8 @@
 
     _clearTimer();
 
-    // Remove the onEvent + onDetach listeners.
-    if (dbg && dbg.onEvent && typeof dbg.onEvent.removeListener === 'function' && session.listener) {
-      try { dbg.onEvent.removeListener(session.listener); } catch (_e) { /* best-effort */ }
-    }
+    // Remove the per-session onDetach listener only (the onEvent listener is the
+    // boot-owned permanent registration -- see the ME-01 note above).
     if (dbg && dbg.onDetach && typeof dbg.onDetach.removeListener === 'function' && session.detachListener) {
       try { dbg.onDetach.removeListener(session.detachListener); } catch (_e) { /* best-effort */ }
     }
