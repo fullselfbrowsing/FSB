@@ -37,18 +37,18 @@ created: 2026-06-23
 
 ## Per-Task Verification Map
 
-> Task IDs are `TBD` until the planner emits PLAN.md files; rows are keyed by requirement.
+> Task IDs are `<plan>-<task>` once PLAN.md files exist. The 5-plan / 5-wave structure: Plan 01 (Wave 1, RED suites), Plan 02 (Wave 2, rot-detector + enum schema + migrated regression gate), Plan 03 (Wave 3, router/autopilot wiring), Plan 04 (Wave 4, frozen-hash + milestone gate). (Plan 05 / Wave 5 is the human-UAT checkpoint — see Manual-Only Verifications.)
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | 0 | HEAL-04 | T-mask-real-outcome | `classifyRecipeBroken` distinguishes broken (4xx/5xx, empty-when-extract-expects, shape-mismatch, RECIPE_EXPIRED) vs legitimate no-results (200+valid+empty) vs logged-out (302→login) — each asserted; no-results returned verbatim | unit | `node tests/capability-rot-detector.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | HEAL-02 | — | RECIPE_EXPIRED on a stamped recipe whose response fails expectedShape; a fresh response passes (jmespath-evaluated) | unit | `node tests/capability-rot-detector.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | HEAL-01 | T-pin/consent-bypass | the router/T3 routes a broken recipe to RECIPE_DOM_FALLBACK_PENDING + the autopilot door surfaces the typed reason / fellBackToDom; consent+origin-pin inherited (no parallel stack, iterator untouched) | unit | `node tests/capability-router.test.js` (extend) + `node tests/capability-autopilot-parity.test.js` (extend) | ⚠️ extend | ⬜ pending |
-| TBD | — | 0 | HEAL-03 | — | quarantine-on-rot demotes the recipe from resolve (learned via getLearnedSync==null; bundled via quarantinedBundledSlugs Set); the post-fallback runDiscovery re-learn trigger is wired | unit | `node tests/capability-router.test.js` (extend) + `node tests/learned-recipe-store.test.js` | ⚠️ extend | ⬜ pending |
-| TBD | — | 0 | HEAL-05/INV-03 | — | the 7-provider parity: capability + fallback decision equivalent across all 7 PROVIDER_KEYS | unit | `node tests/provider-parity.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | HEAL-05/INV-01 | — | the schema-lock test: frozen v2 RECIPE_SCHEMA hash + the frozen tool registry hash unchanged | unit | `node tests/recipe-schema-lock.test.js` | ❌ W0 | ⬜ pending |
-| TBD | — | 0 | INV-04 | — | the agent-loop setTimeout iterator stays byte-untouched | guard | `node tests/agent-loop-iterator-guard.test.js` | ✓ exists | ⬜ pending |
-| TBD | — | 0 | HEAL-02 (additive) | — | v1 recipes still validate after the v1→v2 schema bump (additive optional fields) | regression | `node tests/capability-recipe-schema.test.js` | ✓ exists | ⬜ pending |
+| 02-1 | 02 | 2 | HEAL-04 | T-32-MASK | `classifyRecipeBroken` distinguishes broken (4xx/5xx, empty-when-extract-expects, shape-mismatch, RECIPE_EXPIRED) vs legitimate no-results (200+valid+empty) vs logged-out (302→login) — each asserted; no-results returned verbatim | unit | `node tests/capability-rot-detector.test.js` | ❌ W0 | ⬜ pending |
+| 02-1 | 02 | 2 | HEAL-02 | — | RECIPE_EXPIRED on a stamped recipe whose response fails expectedShape; a fresh response passes (jmespath-evaluated) | unit | `node tests/capability-rot-detector.test.js` | ❌ W0 | ⬜ pending |
+| 03-2 / 03-3 | 03 | 3 | HEAL-01 | T-32-PASS / T-32-PIN | the router/T3 routes a broken recipe to RECIPE_DOM_FALLBACK_PENDING + the autopilot door surfaces the typed reason / fellBackToDom; consent+origin-pin inherited (no parallel stack, iterator untouched) | unit | `node tests/capability-router.test.js` (extend) + `node tests/capability-autopilot-parity.test.js` (extend) | ⚠️ extend | ⬜ pending |
+| 03-1 / 03-2 | 03 | 3 | HEAL-03 | T-32-DOS / T-32-CONSENT | quarantine-on-rot demotes the recipe from resolve (learned via getLearnedSync==null; bundled via quarantinedBundledSlugs Set); the post-fallback runDiscovery re-learn trigger is wired | unit | `node tests/capability-router.test.js` (extend) + `node tests/learned-recipe-store.test.js` | ⚠️ extend | ⬜ pending |
+| 04-2 | 04 | 4 | HEAL-05/INV-03 | T-32-PARITY | the 7-provider parity: capability + fallback decision equivalent across all 7 PROVIDER_KEYS | unit | `node tests/provider-parity.test.js` | ❌ W0 | ⬜ pending |
+| 04-1 | 04 | 4 | HEAL-05/INV-01 | T-32-LOCK | the schema-lock test: frozen v2 RECIPE_SCHEMA hash + the frozen tool registry hash unchanged | unit | `node tests/recipe-schema-lock.test.js` | ❌ W0 | ⬜ pending |
+| 01-3 / 03-3 | 01 / 03 | 1 / 3 | INV-04 | T-32-IT | the agent-loop setTimeout iterator (lines 2027/2726/2795/2805) stays byte-untouched | guard | `node tests/agent-loop-iterator-guard.test.js` | ✓ exists | ⬜ pending |
+| 02-3 | 02 | 2 | HEAL-02 (additive) | T-32-COMPAT | the persisted v1 `valid-recipe.json` fixture STILL validates `success:true` under the `schemaVersion` enum:[1,2] (backward-compat, NOT a const bump); `FSB_RECIPE_SCHEMA_VERSION===2` asserted; an out-of-enum version (3/0) -> `RECIPE_SCHEMA_INVALID`; a `schemaVersion:2` recipe with the new optional `capturedAt`+`expectedShape` -> valid | regression | `node tests/capability-recipe-schema.test.js` | ✓ migrated (02-3) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -85,3 +85,5 @@ created: 2026-06-23
 - [ ] `nyquist_compliant: true` set in frontmatter (planner sets after per-task rows finalized)
 
 **Approval:** pending
+</content>
+</invoke>
