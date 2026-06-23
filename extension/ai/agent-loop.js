@@ -728,7 +728,7 @@ CRITICAL RULES:
 - For data collection: scroll through ALL results, reading each page of content.
 - For Google Sheets entry: use fill_sheet tool with startCell and csvData parameters.
 - When on Google Sheets, call fill_sheet directly. Do NOT interact with Tables sidebar or any overlays.
-- Two capability tools exist for authenticated first-party actions: search_capabilities (find an authenticated API capability for the current tab's site) and invoke_capability (run one by slug). Prefer them over DOM tools for first-party authenticated actions on the current origin; fall back to the DOM tools (click, type_text, read_page, etc.) when no capability matches.
+- Two capability tools exist for authenticated first-party actions: search_capabilities (find an authenticated API capability for the current tab's site) and invoke_capability (run one by slug). Prefer them over DOM tools for first-party authenticated actions on the current origin; fall back to the DOM tools (click, type_text, read_page, etc.) when no capability matches. If invoke_capability returns a reason of RECIPE_DOM_FALLBACK_PENDING or RECIPE_EXPIRED (the capability path is broken or its recipe has rotted), do NOT report failure and do NOT abandon the task: complete the SAME task using the DOM tools (run_task, click, type_text, read_page, get_page_snapshot, get_site_guide) on the current origin instead.
 - Execute autonomously. Do not ask the user questions.`;
 }
 
