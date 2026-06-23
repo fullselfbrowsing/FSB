@@ -17,8 +17,9 @@
    *                 origin null (never throws).
    *   * headerNames -- the header NAMES only, lowercased; values are NEVER read
    *                 (D-07). Any name matching the auth-carrier denylist
-   *                 (authorization / cookie / set-cookie / x-csrf-* / x-xsrf-* /
-   *                 x-api-key / *bearer*) is removed entirely so even an
+   *                 (authorization / proxy-authorization / authentication /
+   *                 cookie / set-cookie / x-csrf* / x-xsrf* / x-api-key / x-auth* /
+   *                 x-access-token / *bearer*) is removed entirely so even an
    *                 unrecognized auth header leaks nothing.
    *   * NO body / postData field exists on the returned object (D-06): the
    *     redactor never reads request.postData, so it cannot leak.
@@ -45,11 +46,20 @@
    */
 
   // ---- The auth-carrier header-name denylist (D-07) ------------------------
-  // Case-insensitive. Matches the full header name (anchored) for the exact
-  // carriers, the x-csrf-* / x-xsrf-* families, and ANY name containing
-  // 'bearer'. A matched name is removed from headerNames entirely (not just its
-  // value), so an unrecognized auth header still leaks nothing.
-  var AUTH_CARRIER_DENYLIST = /^(authorization|cookie|set-cookie|x-csrf-.*|x-xsrf-.*|x-api-key|.*bearer.*)$/i;
+  // Case-insensitive, anchored to the full header name. Covers the common auth
+  // carriers AND their families so even a name-only disclosure leaks nothing:
+  //   - authorization / proxy-authorization / authentication
+  //   - cookie / set-cookie
+  //   - x-csrf* / x-xsrf*  (BARE x-csrf/x-xsrf AND the hyphenated x-csrf-token etc;
+  //                         the prior x-csrf-.* required a trailing hyphen so a bare
+  //                         x-csrf leaked -- ME-03)
+  //   - x-api-key
+  //   - x-auth*  (x-auth-token, ...)  /  x-access-token
+  //   - ANY name containing 'bearer'
+  // A matched name is removed from headerNames ENTIRELY (not just its value). This
+  // is the SECONDARY name-hygiene control; the PRIMARY value-exclusion property
+  // (the loop never reads a header value) is independent and already sound.
+  var AUTH_CARRIER_DENYLIST = /^(authorization|proxy-authorization|authentication|cookie|set-cookie|x-csrf.*|x-xsrf.*|x-api-key|x-auth.*|x-access-token|.*bearer.*)$/i;
 
   // ---- lazy redactForLog accessor (composed defensively for free-form values)
   // typeof-guarded so the redactor degrades gracefully when redactForLog has not
