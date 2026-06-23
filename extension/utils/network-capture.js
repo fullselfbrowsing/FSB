@@ -234,6 +234,16 @@
   // The Phase-30 consent gate reused verbatim, BEFORE any attach (Pattern 3).
   // Returns ok:true to proceed, or ok:false + a RECIPE_CONSENT_* reason.
   function _runGate(origin, opts) {
+    // (0) LO-02: explicit null/empty/non-http origin rejection -- fail CLOSED on
+    // un-resolvable input BEFORE any consent read or attach. Without this the gate
+    // leaned on getConsentForOrigin(envelope, null) returning the envelope
+    // defaultMode (safe under the shipped 'off' default, but a GLOBAL default of
+    // 'auto' would let a null origin pass the consent check and classify(null)
+    // .sensitive === false, so the gate would proceed to attach with origin===null).
+    // A capture origin MUST be a concrete http(s) origin; anything else stops here.
+    if (typeof origin !== 'string' || !/^https?:\/\//.test(origin)) {
+      return Promise.resolve({ ok: false, reason: REASON_REQUIRED });
+    }
     var dl = _denylist();
     // (1) Denylist first -- a denied origin is BLOCKED even under Auto (D-03).
     if (dl && typeof dl.isDenied === 'function') {
