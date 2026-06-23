@@ -349,7 +349,7 @@
   // globals (D-03). On a structured hit the normalized result is stamped with the
   // tier label ('T0' or 'T1b'); a typed RECIPE_* interpret/pin failure is returned
   // VERBATIM (no stamp) so the dual-field shape passes through unchanged.
-  async function _runDeclarativeTier(slug, args, ctx, tierLabel, entryRecipe) {
+  async function _runDeclarativeTier(slug, args, ctx, tierLabel, entryRecipe, interpretOpts) {
     var search = _search();
     var interp = _interp();
     var primitive = _fetchPrimitive();
@@ -379,10 +379,15 @@
     // is a latent guardrail -- the router already branched on `!interpreted`, so it
     // must fail closed there rather than return the falsy value.
     // interpretRecipe is async as of Phase 30 (the signature-verify hook is
-    // async). The Phase-29 head passes NO provenance envelope -- entryRecipe is
-    // the unwrapped recipe core -- so it stays on the exempt no-meta default path
-    // (no verify call); awaiting an async result is the only change here.
-    var interpreted = await interp.interpretRecipe(recipe, args || {});
+    // async). The Phase-29 head (T0/T1b) passes NO interpretOpts -- entryRecipe is
+    // the unwrapped recipe core and interpretOpts is undefined -- so it stays on
+    // the exempt no-meta default path (no verify call), BYTE-IDENTICAL to before;
+    // awaiting an async result is the only change there. The Phase-31 T2 learned
+    // path threads interpretOpts = { trustedProvenance: 'local' } (the LOADER's
+    // vouch, HI-01): the interpreter short-circuits to the synchronous bind for a
+    // 'local' provenance exactly as it does for 'bundled', so the learned recipe
+    // replays through the SAME validate-bind path without a self-declared trust.
+    var interpreted = await interp.interpretRecipe(recipe, args || {}, interpretOpts);
     if (!interpreted) {
       return _err('RECIPE_NOT_FOUND', { slug: slug, reason: 'interpret-returned-empty' });
     }
@@ -496,8 +501,17 @@
         break;
 
       case 'T2':
-        // Learned-recipe stub (Phase 31). No-op: return the reason, do NOT execute.
-        out = _err('RECIPE_LEARN_PENDING', { slug: slug });
+        // Learned-recipe tier (Phase 31, LEARN-04/D-15). When the catalog attached
+        // a learned recipe (entry.recipe -- the per-origin store resolved one for
+        // the active origin and it OUTRANKED a generic tier by resolve order),
+        // DISPATCH it through the SAME declarative replay path as a bundled recipe,
+        // threading { trustedProvenance: 'local' } as the LOADER's vouch (HI-01).
+        // The consent gate above and the executeBoundSpec origin-pin downstream are
+        // unchanged. When NO learned recipe is attached the RECIPE_LEARN_PENDING
+        // stub still fires (no-op, no execution).
+        out = entry.recipe
+          ? await _runDeclarativeTier(slug, args, c, 'T2', entry.recipe, { trustedProvenance: 'local' })
+          : _err('RECIPE_LEARN_PENDING', { slug: slug });
         break;
 
       case 'T3':

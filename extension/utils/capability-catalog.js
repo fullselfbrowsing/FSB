@@ -59,6 +59,32 @@
     return null;
   }
 
+  // ---- LEARN-04 / D-15: typeof-guarded learned-store accessor ----------------
+  //      Parallel to _search(). The Phase-31 per-origin learned-recipe store
+  //      (FsbLearnedRecipeStore) surfaces the highest-trust per-origin recipe.
+  //      resolve() is SYNCHRONOUS (the router calls it synchronously and reads the
+  //      returned recipe immediately), so this accessor uses the store's
+  //      SYNCHRONOUS getLearnedSync(slug, origin) -- a learned recipe cannot be
+  //      surfaced via the async getLearned() inside a synchronous resolve. The
+  //      store keeps the sync mirror in memory; the async getLearned() remains the
+  //      storage-truth read used elsewhere. Absent store / absent sync accessor ->
+  //      null (resolve falls through to the REGISTRY, the Phase-29 behavior). The
+  //      hard origin scope (recipe.origin === origin, Pitfall 6) lives IN the store.
+  function _learnedStore() {
+    return (typeof FsbLearnedRecipeStore !== 'undefined' && FsbLearnedRecipeStore) ? FsbLearnedRecipeStore : null;
+  }
+
+  function _getLearned(slug, origin) {
+    var store = _learnedStore();
+    if (!store || typeof store.getLearnedSync !== 'function') { return null; }
+    try {
+      var hit = store.getLearnedSync(slug, origin);
+      return (hit && hit.recipe) ? hit : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ---- T1b/T0 declarative seed recipes -------------------------------------
   //
   // The authoritative recipe source at runtime is the search slug->recipe map
@@ -222,6 +248,23 @@
   // inline copy when present, else the live search map (D-04). For a T1a entry the
   // registered handler is returned as-is.
   function resolve(slug, origin) {
+    // LEARN-04 / D-15 (Option A): the learned store is checked FIRST. A learned
+    // recipe for the ACTIVE origin resolves as a T2 tier with the recipe attached,
+    // so it OUTRANKS a generic T1b for the SAME slug by resolve order -- no router
+    // tie-break. The store hard-scopes by origin (recipe.origin === origin,
+    // Pitfall 6), so a cross-origin learned recipe is never surfaced here. When no
+    // learned recipe exists the lookup falls through to the REGISTRY below (an
+    // explicitly-declared T2 slug with no learned recipe still returns the
+    // verbatim-tier stub shape -> the router's RECIPE_LEARN_PENDING).
+    var learned = _getLearned(slug, origin);
+    if (learned && learned.recipe) {
+      return {
+        tier: 'T2',
+        recipe: learned.recipe,
+        descriptor: (learned.descriptor !== undefined ? learned.descriptor : null)
+      };
+    }
+
     var entry = Object.prototype.hasOwnProperty.call(REGISTRY, slug) ? REGISTRY[slug] : null;
     if (!entry) return null;
 
@@ -271,7 +314,8 @@
     resolve: resolve,
     registerHandler: registerHandler,
     seedHeadHandlers: seedHeadHandlers,
-    biasByOwnedOrigin: biasByOwnedOrigin
+    biasByOwnedOrigin: biasByOwnedOrigin,
+    _getLearned: _getLearned   // LEARN-04: exposed for the learned-first resolve test/inspection
   };
 
   global.FsbCapabilityCatalog = exportsObj;   // SW importScripts consumer reads this global
