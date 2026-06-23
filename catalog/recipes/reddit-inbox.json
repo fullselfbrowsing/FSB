@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "reddit.inbox",
+  "origin": "https://www.reddit.com",
+  "endpoint": "/message/unread.json",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "extract": "@"
+}

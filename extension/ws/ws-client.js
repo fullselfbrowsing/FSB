@@ -633,6 +633,7 @@ function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId, owners
     // Per Phase 211 LOG-01, route through [FSB SYNC] prefix if logging is enabled.
     try { console.warn('[FSB SYNC] runtime push failed', e && e.message ? e.message : 'unknown'); } catch (_e) { /* ignore */ }
   }
+  try { _broadcastMetrics(wsInstance, wsInstance && wsInstance.serverHashKey); } catch (_e) { /* defensive */ }
   return state;
 }
 
@@ -641,6 +642,56 @@ function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId, owners
 // ext:remote-control-state -- Phase 209 payload shape preserved).
 // Mirror of _broadcastRemoteControlState pattern. Fire-and-forget.
 // =====================================================================
+
+var _metricsBroadcastTimer = null;
+var _metricsStorageListenerInstalled = false;
+
+function _getCurrentWsInstance() {
+  return globalThis.__fsbWsInstance || null;
+}
+
+function _refreshAnalyticsThenBroadcast(reason) {
+  var wsInstance = _getCurrentWsInstance();
+  if (!wsInstance || typeof wsInstance.send !== 'function') return;
+
+  function emit() {
+    try { _broadcastMetrics(wsInstance, wsInstance.serverHashKey); } catch (_e) { /* defensive */ }
+  }
+
+  try {
+    if (typeof analytics !== 'undefined' && analytics && typeof analytics.loadStoredData === 'function') {
+      var result = analytics.loadStoredData();
+      if (result && typeof result.then === 'function') {
+        result.then(emit).catch(emit);
+        return;
+      }
+    }
+  } catch (_e) {
+    // Fall through to a best-effort emit with the in-memory analytics state.
+  }
+
+  emit();
+}
+
+function _scheduleMetricsBroadcast(reason) {
+  if (_metricsBroadcastTimer) clearTimeout(_metricsBroadcastTimer);
+  _metricsBroadcastTimer = setTimeout(function () {
+    _metricsBroadcastTimer = null;
+    _refreshAnalyticsThenBroadcast(reason || 'scheduled');
+  }, 250);
+}
+
+function _installMetricsStorageListener() {
+  if (_metricsStorageListenerInstalled) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.onChanged) return;
+  if (typeof chrome.storage.onChanged.addListener !== 'function') return;
+  _metricsStorageListenerInstalled = true;
+  chrome.storage.onChanged.addListener(function (changes, namespace) {
+    if (namespace !== 'local') return;
+    if (!changes || (!changes.fsbUsageData && !changes.fsbCurrentModel)) return;
+    _scheduleMetricsBroadcast('storage-change');
+  });
+}
 
 function _broadcastMetrics(wsInstance, serverHashKey) {
   if (!wsInstance || typeof wsInstance.send !== 'function') return;
@@ -665,6 +716,11 @@ function _broadcastMetrics(wsInstance, serverHashKey) {
   var totalRequests = typeof stats.totalRequests === 'number' ? stats.totalRequests : 0;
   var successfulRequests = typeof stats.successfulRequests === 'number' ? stats.successfulRequests : 0;
   var errorCount = Math.max(0, totalRequests - successfulRequests);
+  var totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
+  var totalTokens = typeof stats.totalTokens === 'number' ? stats.totalTokens : 0;
+  var successRate = typeof stats.successRate === 'number'
+    ? stats.successRate
+    : (totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0);
 
   var pairedClient = '';
   if (typeof serverHashKey === 'string' && serverHashKey.length > 0) {
@@ -683,8 +739,16 @@ function _broadcastMetrics(wsInstance, serverHashKey) {
       errorCount: errorCount
     },
     cost: {
-      totalCost: typeof stats.totalCost === 'number' ? stats.totalCost : 0,
-      totalTokens: typeof stats.totalTokens === 'number' ? stats.totalTokens : 0
+      totalCost: totalCost,
+      totalTokens: totalTokens
+    },
+    usage: {
+      timeRange: '24h',
+      totalTokens: totalTokens,
+      totalCost: totalCost,
+      totalRequests: totalRequests,
+      successfulRequests: successfulRequests,
+      successRate: successRate
     }
   };
 
@@ -1221,6 +1285,7 @@ class FSBWebSocket {
       recordFSBTransportReconnect('ws-open', {
         readyState: this.ws ? this.ws.readyState : null
       });
+      _installMetricsStorageListener();
       this._sendStateSnapshot('connect');
       // Phase 223 MET-01: push metrics on connect (not polling).
       try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
@@ -1678,6 +1743,7 @@ class FSBWebSocket {
         break;
       case 'dash:request-status':
         this._sendStateSnapshot('dash:request-status');
+        try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
         break;
       // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
       // case 'dash:agent-run-now':

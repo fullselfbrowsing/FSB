@@ -1376,6 +1376,30 @@ const TOOL_REGISTRY = [
   },
 
   // =========================================================================
+  // FILE UPLOAD TOOL (1 tool) -- Phase 34
+  // =========================================================================
+
+  withVisualSessionFields({
+    name: 'upload_file',
+    description: 'Upload a real file from a local disk path to a file input on the page. Sets the file directly on the target <input type="file"> via the browser DevTools protocol (DOM.setFileInputFiles), so it works for real binaries -- images, PDFs, documents -- that page JavaScript cannot upload. This is different from drop_file, which only fakes inline text content onto a dropzone; prefer upload_file whenever you know the file path on disk. Provide a CSS selector for the <input type="file"> (or a container/dropzone that wraps a hidden one) and an ABSOLUTE file path. The browser reads the file and fires the input/change events natively. When to use: any web form upload where the file already exists on disk. For pure drag-only dropzones with no underlying file input, fall back to drop_file. Security: a sensitive-path denylist blocks secrets (~/.ssh, ~/.aws, .env, private keys, the FSB vault) and every upload is audit-logged. Related: drop_file (synthetic dropzone content), get_dom_snapshot (find the input[type=file] selector), read_page (verify the upload took). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'CSS selector for the <input type="file"> element, or a container/dropzone that holds a hidden one (e.g. "#avatar", "input[type=file]", ".dropzone")' },
+        file_path: { type: 'string', description: 'Absolute path to the file on disk (e.g. "/Users/me/Documents/resume.pdf"). Relative or ~ paths are rejected; the file must be readable by the browser.' },
+        tab_id: { type: 'number', description: 'Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.' }
+      },
+      required: ['selector', 'file_path']
+    },
+    _route: 'background',
+    _readOnly: false,
+    _contentVerb: null,
+    _cdpVerb: null,
+    _forceForeground: false,
+    _emitChangeReport: true
+  }),
+
+  // =========================================================================
   // VAULT FILL TOOLS -- registered separately via vault.ts (security boundary)
   // Tools: list_credentials, fill_credential, list_payment_methods, use_payment_method
   // NOT in this registry to avoid duplicate registration errors.

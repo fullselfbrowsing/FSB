@@ -1,0 +1,18 @@
+{
+  "slug": "notion.getSpaces",
+  "service": "www.notion.so",
+  "intentSynonyms": [
+    "list my notion spaces",
+    "show my notion workspaces",
+    "what notion workspaces do i have",
+    "view my notion spaces"
+  ],
+  "description": "List your Notion spaces (T1a /api/v3 RPC handler, read)",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}

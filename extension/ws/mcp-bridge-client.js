@@ -467,6 +467,21 @@ class MCPBridgeClient {
       case 'mcp:search-memory':
         return this._handleSearchMemory(payload);
 
+      // Capability surface (Phase 28) -- thin pass-throughs into the dispatcher;
+      // origin/tab resolution lives in the dispatcher handlers, not here.
+      case 'mcp:capabilities-search':
+        return this._handleCapabilitiesSearch(payload);
+
+      case 'mcp:capabilities-invoke':
+        return this._handleCapabilitiesInvoke(payload);
+
+      // Phase 31 DISC-01: the user-initiated discovery trigger. Thin pass-through --
+      // the authoritative origin/tabId resolution + the consent-gated capture session
+      // run in the dispatcher handler, NOT here. Internal control surface (out of
+      // TOOL_REGISTRY, INV-01).
+      case 'mcp:capabilities-discover':
+        return this._handleCapabilitiesDiscover(payload);
+
       case 'mcp:create-agent':
         return this._handleAgentAction('createAgent', payload);
 
@@ -1657,6 +1672,41 @@ class MCPBridgeClient {
   async _handleSearchMemory(payload) {
     const response = await dispatchMcpMessageRoute({
       type: 'mcp:search-memory',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  // Phase 28 SURF-01: read-only capability search. Thin pass-through -- the
+  // un-spoofable owned-tab origin is resolved in the dispatcher handler (D-11).
+  async _handleCapabilitiesSearch(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-search',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  // Phase 28 SURF-02: routerless capability invoke. Thin pass-through -- the
+  // slug -> interpretRecipe -> executeBoundSpec path runs in the dispatcher handler.
+  async _handleCapabilitiesInvoke(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-invoke',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  // Phase 31 DISC-01: user-initiated discovery trigger. Thin pass-through -- the
+  // SW-side origin/tabId resolution + the consent-gated promote-after-replay session
+  // run in the dispatcher handler (the single authoritative resolution point). No
+  // origin/tab resolution in the bridge.
+  async _handleCapabilitiesDiscover(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-discover',
       payload,
       client: this
     });

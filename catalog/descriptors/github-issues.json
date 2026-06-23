@@ -1,0 +1,23 @@
+{
+  "slug": "github.issues.list",
+  "service": "github.com",
+  "intentSynonyms": [
+    "list my github issues",
+    "show issues assigned to me on github",
+    "what github issues do i have",
+    "view my open github issues"
+  ],
+  "description": "List your assigned GitHub issues (T1a persisted-query handler, read)",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

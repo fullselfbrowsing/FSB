@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "github.notifications",
+  "origin": "https://github.com",
+  "endpoint": "/notifications",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "extract": "@"
+}

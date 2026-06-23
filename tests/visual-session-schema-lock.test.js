@@ -53,7 +53,7 @@ const VISUAL_SESSION_ACTION_TOOLS = [
   'set_attribute', 'insert_text', 'search', 'refresh', 'go_back',
   'go_forward', 'open_tab', 'close_tab', 'switch_tab', 'execute_js',
   'select_text_range', 'scroll_to_top', 'scroll_to_bottom',
-  'scroll_to_element', 'fill_sheet'
+  'scroll_to_element', 'fill_sheet', 'upload_file'
 ];
 
 const VISUAL_SESSION_READ_ONLY_TOOLS = [
@@ -64,7 +64,7 @@ const VISUAL_SESSION_READ_ONLY_TOOLS = [
   'stop_trigger', 'get_trigger_status', 'list_triggers'
 ];
 
-check(VISUAL_SESSION_ACTION_TOOLS.length === 36, '36 canonical action tools enumerated');
+check(VISUAL_SESSION_ACTION_TOOLS.length === 37, '37 canonical action tools enumerated');
 check(VISUAL_SESSION_READ_ONLY_TOOLS.length === 18, '18 canonical read-only tools enumerated');
 check(VISUAL_SESSION_ACTION_TOOLS.indexOf('trigger') < 0,
   'trigger is not in the visual-session action-tool field-bundle list');

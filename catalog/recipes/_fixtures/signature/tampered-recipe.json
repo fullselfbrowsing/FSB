@@ -1,0 +1,15 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "github.notifications.signed",
+    "origin": "https://github.com",
+    "endpoint": "/notificationz",
+    "method": "GET",
+    "authStrategy": "same-origin-cookie",
+    "extract": "@"
+  },
+  "provenance": "server",
+  "capturedAt": "2026-06-21T00:00:00.000Z",
+  "schemaHash": "9f36b9164f149090e13e54e7c6ccbca3074978f265a6977655e34efbf6406bf8",
+  "signature": "vI4EYQ4bfk42MjaHyCEkWgbJQ1+doMED6zLwozX9ZaoKyPbIhpbBflDaiyhA6mjbIFUXkxXkD+20Z4wZ3XLcAA=="
+}

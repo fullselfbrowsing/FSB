@@ -103,6 +103,171 @@ try { importScripts('utils/diagnostics-ring-buffer.js'); } catch (e) { console.e
 try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB] Failed to load redactForLog.js:', e.message); }
 try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
 
+// Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
+// data spine. The three vendored libraries load FIRST so their classic-script
+// globals (lowercase `jmespath`, `MiniSearch`, `CfworkerJsonSchema`) exist
+// before the recipe-schema module's typeof-guarded accessors read them; the
+// recipe-schema module loads AFTER (it calls CfworkerJsonSchema.Validator only
+// at validateRecipe runtime). Concrete order: jmespath -> minisearch ->
+// cfworker-json-schema -> capability-recipe-schema. minisearch is vendored now
+// per CAP-05 but not wired until Phase 28 (search). cfworker-json-schema is the
+// eval-free IIFE-bundled JSON Schema validator (a top-level import/export is a
+// SyntaxError under importScripts in a classic service worker, so it MUST be
+// IIFE-bundled, not vendored raw). Each wrapped in try/catch mirroring the
+// lz-string precedent above; D-05 keeps these edits additive (manifest and
+// permissions unchanged; background.js is byte-frozen as an esbuild input).
+try { importScripts('lib/jmespath.min.js'); } catch (e) { console.error('[FSB] Failed to load jmespath.min.js:', e.message); }
+try { importScripts('lib/minisearch.min.js'); } catch (e) { console.error('[FSB] Failed to load minisearch.min.js:', e.message); }
+try { importScripts('lib/cfworker-json-schema.min.js'); } catch (e) { console.error('[FSB] Failed to load cfworker-json-schema.min.js:', e.message); }
+try { importScripts('utils/capability-recipe-schema.js'); } catch (e) { console.error('[FSB] Failed to load capability-recipe-schema.js:', e.message); }
+
+// Phase 26 Plan 02 (v0.9.99 CAP-02/CAP-03): the bundled interpreter family.
+// Loaded AFTER the Plan 01 lib + schema block (the libs and the recipe-schema
+// module are already on the global). Concrete order: capability-auth-strategies
+// (the frozen enum->handler registry) BEFORE capability-interpreter (which reads
+// FsbCapabilityAuthStrategies.bindAuthStrategy and FsbCapabilityRecipeSchema.
+// validateRecipe at interpretRecipe runtime). The interpreter validates + binds
+// and emits a bound request spec, stopping before the network (D-11; the
+// authenticated request is Phase 27). Additive only (D-05; background.js is
+// byte-frozen as an esbuild input).
+try { importScripts('utils/capability-auth-strategies.js'); } catch (e) { console.error('[FSB] Failed to load capability-auth-strategies.js:', e.message); }
+try { importScripts('utils/capability-interpreter.js'); } catch (e) { console.error('[FSB] Failed to load capability-interpreter.js:', e.message); }
+
+// Phase 27 Plan 02 (v0.9.99 FETCH-01..05): the MAIN-world authenticated fetch
+// spine. Loaded LAST of the capability family -- AFTER capability-interpreter.js
+// (so FsbCapabilityInterpreter.getFSBJmespath exists for executeBoundSpec's
+// service-worker-side extract) and AFTER jmespath.min.js. mcp-task-store.js loads
+// far earlier (~line 34), so globalThis.FsbMcpTaskStore is already present for the
+// resume-sidecar write. Additive only (D-05; background.js is byte-frozen as an
+// esbuild input; no manifest/permission change).
+try { importScripts('utils/capability-fetch.js'); } catch (e) { console.error('[FSB] Failed to load capability-fetch.js:', e.message); }
+
+// Phase 28 Plan 01 (v0.9.99 SURF-04/SURF-01/D-16): the capability-search index +
+// its build-time catalog. Loaded LAST of the capability family. Order is
+// load-bearing: minisearch.min.js (the MiniSearch global, line ~120) AND
+// catalog/recipe-index.generated.js (the FsbRecipeIndex catalog global, generated
+// by scripts/package-extension.mjs) must BOTH precede capability-search.js, which
+// reads them. recipe-index.generated.js is absent in a dev tree until a packaged
+// build runs -> the try/catch tolerates its absence (the module degrades to an
+// empty catalog). Additive only (D-05; background.js is byte-frozen as an esbuild
+// input; no manifest/permission change).
+try { importScripts('catalog/recipe-index.generated.js'); } catch (e) { console.error('[FSB] Failed to load recipe-index.generated.js:', e.message); }
+try { importScripts('utils/capability-search.js'); } catch (e) { console.error('[FSB] Failed to load capability-search.js:', e.message); }
+// Build-or-restore the capability-search index at service-worker startup (D-05).
+// async + non-blocking; a typeof guard tolerates a missing module so a load
+// failure above never throws at boot.
+try {
+  if (typeof FsbCapabilitySearch !== 'undefined' && FsbCapabilitySearch && typeof FsbCapabilitySearch.buildOrRestore === 'function') {
+    FsbCapabilitySearch.buildOrRestore();
+  }
+} catch (e) { console.error('[FSB] capability-search buildOrRestore failed at startup:', e.message); }
+
+// Phase 29 Plan 02 (v0.9.99 CAT-01): the tiered-router engine -- the catalog
+// (slug->tier registry) then the router (tier dispatch + typed fall-through),
+// loaded LAST of the capability family. Order is load-bearing: the catalog reads
+// FsbCapabilitySearch.getRecipeBySlug (the T1b recipe source, D-04) so it MUST
+// follow capability-search.js; the router reads FsbCapabilityCatalog so it MUST
+// follow the catalog. This is the engine both front doors share (INV-02; the MCP
+// dispatcher + autopilot reroutes are Plans 03/04). Additive only (D-05;
+// background.js is byte-frozen as an esbuild input; no manifest/permission change).
+// Phase 32 (HEAL-01/HEAL-02/HEAL-04, D-16): the eval-free recipe-rot classifier the
+// router calls after executeBoundSpec (broken -> RECIPE_DOM_FALLBACK_PENDING). Pure
+// (no chrome.*, no network); reaches the jmespath engine via the interpreter loaded
+// above. MUST precede capability-router.js so FsbCapabilityRotDetector is published
+// before the router's post-fetch classify hook runs.
+try { importScripts('utils/capability-rot-detector.js'); } catch (e) { console.error('[FSB] Failed to load capability-rot-detector.js:', e.message); }
+try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
+try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
+
+// Phase 29 Plan 03 (v0.9.99 CAT-02): the bundled-head T1a handler modules. These
+// are reviewed CODE (catalog/handlers/*.js), copied under extension/catalog/handlers/
+// by scripts/package-extension.mjs; in a dev tree the path resolves directly. They
+// MUST load AFTER capability-catalog.js -- each handler self-registers its slugs into
+// FsbCapabilityCatalog at load, and the explicit seedHeadHandlers() pass below
+// re-asserts the head from the catalog's authoritative manifest (defense-in-depth).
+// Each line is independently try/catch'd so an absent handler degrades to that slug
+// routing to RECIPE_NOT_FOUND (never a load crash). github.notifications stays a T1b
+// recipe; these add the github.issues.* / slack.* / notion.* T1a head.
+try { importScripts('catalog/handlers/github.js'); } catch (e) { console.error('[FSB] Failed to load handlers/github.js:', e.message); }
+try { importScripts('catalog/handlers/slack.js'); } catch (e) { console.error('[FSB] Failed to load handlers/slack.js:', e.message); }
+try { importScripts('catalog/handlers/notion.js'); } catch (e) { console.error('[FSB] Failed to load handlers/notion.js:', e.message); }
+try {
+  if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+      && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {
+    FsbCapabilityCatalog.seedHeadHandlers();
+  }
+} catch (e) { console.error('[FSB] capability-catalog seedHeadHandlers failed at startup:', e.message); }
+
+// Phase 30 Plan 01 (v0.9.99 GOV-02/GOV-05/SIGN-01/GOV-08): the consent +
+// signature + audit + denylist modules, PRE-ARMED ahead of their creation (Plans
+// 02/03 write them) -- the Phase-27/28/29 "register ahead of creation" precedent.
+// Load order is dependency-first: consent-policy-store + audit-log (read at the
+// invoke gate) BEFORE capability-signature (read inside interpretRecipe) BEFORE
+// service-denylist (read by the gate just above the interpret path). Each line is
+// independently try/catch'd: a not-yet-existent module logs and is skipped, so the
+// service worker still boots until Plans 02/03 land. Additive only (D-05;
+// background.js is byte-frozen as an esbuild input; no manifest/permission change).
+try { importScripts('utils/consent-policy-store.js'); } catch (e) { console.error('[FSB] Failed to load consent-policy-store.js:', e.message); }
+try { importScripts('utils/audit-log.js'); } catch (e) { console.error('[FSB] Failed to load audit-log.js:', e.message); }
+try { importScripts('utils/capability-signature.js'); } catch (e) { console.error('[FSB] Failed to load capability-signature.js:', e.message); }
+try { importScripts('utils/service-denylist.js'); } catch (e) { console.error('[FSB] Failed to load service-denylist.js:', e.message); }
+try { importScripts('utils/upload-path-denylist.js'); } catch (e) { console.error('[FSB] Failed to load upload-path-denylist.js:', e.message); }
+// Warm the denylist + sensitive seed at service-worker startup (D-15). The
+// consent/capture gates still await the module's shared load() promise before
+// evaluating, so this async warmup is not the load-bearing security check.
+try {
+  if (typeof FsbServiceDenylist !== 'undefined' && FsbServiceDenylist && typeof FsbServiceDenylist.load === 'function') {
+    FsbServiceDenylist.load();
+  }
+} catch (e) { console.error('[FSB] service-denylist load failed at startup:', e.message); }
+
+// Phase 31 (v0.10.0 -- DISC-01/DISC-02/LEARN-01; D-01/D-02/D-10): the network-
+// capture discovery stack, loaded LAST of the capability family. Order is
+// dependency-first: the redactor (the capture event handler's shape-only reducer)
+// BEFORE network-capture.js (which reads FsbNetworkCaptureRedactor), then the
+// synthesizer + the learned-recipe store (read by the discovery orchestrator and
+// the catalog T2 path), then discovery-session.js LAST (it orchestrates capture ->
+// synthesize -> replay -> promote and reads ALL of the above PLUS the already-loaded
+// FsbCapabilityInterpreter / FsbCapabilityFetch / FsbCapabilitySearch). Each line is
+// independently try/catch'd so an absent module degrades to that path being a no-op
+// (the discovery trigger surfaces RECIPE_CAPTURE_UNAVAILABLE) rather than a boot
+// crash. Additive only: NO manifest change -- the 'debugger' permission is already
+// granted (DISC-02, D-02); no tool-definitions / TOOL_REGISTRY edit (INV-01).
+try { importScripts('utils/network-capture-redactor.js'); } catch (e) { console.error('[FSB] Failed to load network-capture-redactor.js:', e.message); }
+try { importScripts('utils/network-capture.js'); } catch (e) { console.error('[FSB] Failed to load network-capture.js:', e.message); }
+try { importScripts('utils/recipe-synthesizer.js'); } catch (e) { console.error('[FSB] Failed to load recipe-synthesizer.js:', e.message); }
+try { importScripts('utils/learned-recipe-store.js'); } catch (e) { console.error('[FSB] Failed to load learned-recipe-store.js:', e.message); }
+try { importScripts('utils/discovery-session.js'); } catch (e) { console.error('[FSB] Failed to load discovery-session.js:', e.message); }
+
+// Hydrate the learned-recipe sync mirror at service-worker startup (Plan 06) so a
+// recipe promoted in a PRIOR SW lifetime surfaces synchronously via the catalog's
+// resolve() -> getLearnedSync path (LEARN-04 outranking fires at runtime). async +
+// non-blocking; a typeof guard tolerates a missing module so a load failure above
+// never throws at boot (the buildOrRestore / denylist-load precedent).
+try {
+  if (typeof FsbLearnedRecipeStore !== 'undefined' && FsbLearnedRecipeStore
+      && typeof FsbLearnedRecipeStore.hydrateSyncCache === 'function') {
+    FsbLearnedRecipeStore.hydrateSyncCache();
+  }
+} catch (e) { console.error('[FSB] learned-recipe-store hydrateSyncCache failed at startup:', e.message); }
+
+// Register the Network-domain CDP event listener ONCE on the existing
+// chrome.debugger surface (D-02). FsbNetworkCapture._onCdpEvent is method-dispatched
+// and a no-op whenever there is no active capture session (it guards `if (!_session)
+// return`), so registering it here -- ahead of any session -- is safe and never
+// disrupts the Input-domain emulation: a non-Network method (Input.*, Page.*) is
+// ignored. This is the FIRST onEvent consumer in the extension (the existing
+// debugger usage is all sendCommand/attach/detach), so it adds cleanly. NO manifest
+// change (the 'debugger' permission is already present, DISC-02).
+try {
+  if (typeof chrome !== 'undefined' && chrome.debugger && chrome.debugger.onEvent
+      && typeof chrome.debugger.onEvent.addListener === 'function'
+      && typeof FsbNetworkCapture !== 'undefined' && FsbNetworkCapture
+      && typeof FsbNetworkCapture._onCdpEvent === 'function') {
+    chrome.debugger.onEvent.addListener(FsbNetworkCapture._onCdpEvent);
+  }
+} catch (e) { console.error('[FSB] network-capture onEvent registration failed at startup:', e.message); }
+
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
 
@@ -4744,7 +4909,7 @@ async function fsbTriggerHandleToolStop(params, context) {
   };
 
   const terminal = fsbTriggerIsTerminalStatus(snap.status);
-  if (!terminal) {
+  if (!terminal || snap.status === 'timed_out') {
     try {
       const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
       cleanup.observe = { ok: fsbTriggerCleanupOk(observeResult), result: observeResult };
@@ -8253,6 +8418,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         fsbWebSocket.send('ext:dom-dialog', {
           dialog: request.dialog || {}
         });
+      }
+      sendResponse({ success: true });
+      break;
+
+    case 'domStreamMedia':
+      // Phase 33 (MEDIA): relay live <video>/<audio> playback state to the
+      // dashboard viewer. The MediaSyncPayload is forwarded as the ws payload
+      // so the viewer receives it verbatim (additive STREAM.* type; the relay
+      // and ws-client are generic by type, so no other hop changes).
+      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
+        fsbWebSocket.send('ext:dom-media', request.media || {});
+      }
+      sendResponse({ success: true });
+      break;
+
+    case 'domStreamMediaHint':
+      // Phase 33 (MEDIA): relay an adaptive-manifest discovery hint (dormant
+      // until chrome.webRequest discovery is opt-in enabled).
+      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
+        fsbWebSocket.send('ext:dom-media-hint', request.hint || {});
       }
       sendResponse({ success: true });
       break;
@@ -14306,6 +14491,164 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Phase 34 (UPLOAD-01/02/04): set a real file from a disk PATH on an
+ * <input type="file"> via CDP DOM.setFileInputFiles -- the only mechanism that
+ * can populate a file input from disk (page JS is forbidden from setting
+ * input.value or reading the filesystem). Shared by BOTH front doors (the MCP
+ * dispatcher route and the autopilot executeBackgroundTool case) so the
+ * sensitive-path denylist + audit chokepoint (security posture A) covers both.
+ * Mirrors the executeCDPToolDirect attach / stale-retry / detach seam.
+ *
+ * @param {number} tabId    target tab (gate-resolved / owned)
+ * @param {string} selector CSS selector for the file input (or a container holding one)
+ * @param {string} filePath ABSOLUTE disk path; relative / ~ paths are rejected
+ * @returns {Promise<{success:boolean, method?:string, selector?:string, file?:string, hadEffect?:boolean, error?:string, reason?:string}>}
+ */
+async function executeUploadFile(tabId, selector, filePath) {
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbUploadPathDenylist : null;
+  const auditLog = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+
+  // Best-effort target origin for the audit (never throws).
+  let origin = '';
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab && tab.url) { try { origin = new URL(tab.url).origin; } catch (_e) { origin = ''; } }
+  } catch (_e) { /* tab gone */ }
+
+  async function audit(outcome, decision, errName) {
+    if (!auditLog || typeof auditLog.append !== 'function') return;
+    try {
+      // The audit-log whitelist has no path field by design; persist origin +
+      // outcome + decision only. The full path could leak filesystem structure
+      // and must not be written to any durable logs.
+      const rec = { ts: Date.now(), origin, slug: 'upload_file', method: 'upload', sideEffectClass: 'mutating', consentDecision: decision, outcome };
+      if (errName) rec.error = errName;
+      const p = auditLog.append(rec);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_e) { /* audit is best-effort, never blocks the action */ }
+  }
+
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  if (typeof selector !== 'string' || !selector.trim()) {
+    return { success: false, error: 'upload_file requires a selector (CSS selector for the file input)' };
+  }
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    return { success: false, error: 'upload_file requires file_path (an absolute path to the file)' };
+  }
+
+  // Security posture A: sensitive-path denylist (shared chokepoint, both front doors).
+  // Fail closed if the module failed to load or its contract is incomplete.
+  if (!denylist
+      || typeof denylist.isAbsolutePath !== 'function'
+      || typeof denylist.classify !== 'function'
+      || typeof denylist.basenameOf !== 'function') {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-unavailable' });
+    await audit('blocked', 'denylist-unavailable', null);
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist unavailable', reason: 'denylist-unavailable' };
+  }
+
+  let absolutePath = false;
+  try {
+    absolutePath = denylist.isAbsolutePath(filePath);
+  } catch (error) {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-error' });
+    await audit('blocked', 'denylist-error', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist failed while checking the path', reason: 'denylist-error' };
+  }
+  if (!absolutePath) {
+    await audit('blocked', 'non-absolute-path', null);
+    return { success: false, error: 'upload_file requires an ABSOLUTE file path (relative or ~ paths cannot be resolved by the browser)' };
+  }
+
+  try {
+    const verdict = denylist.classify(filePath);
+    if (verdict && verdict.denied) {
+      automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: verdict.reason });
+      await audit('blocked', verdict.reason || 'sensitive-path', null);
+      return { success: false, error: 'upload_file blocked: the path matches a sensitive-path denylist rule (' + (verdict.reason || 'sensitive-path') + '); uploading secrets is not permitted', reason: verdict.reason };
+    }
+  } catch (error) {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-error' });
+    await audit('blocked', 'denylist-error', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist failed while classifying the path', reason: 'denylist-error' };
+  }
+
+  let fileName = '';
+  const redactPathForUploadLog = (value) => String(value).split(filePath).join(fileName || '[redacted-file-path]');
+  let debuggerAttached = false;
+  try {
+    fileName = denylist.basenameOf(filePath);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
+
+    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+      try { await keyboardEmulator.detachDebugger(tabId); } catch (_e) { /* ignore */ }
+    }
+    try {
+      await chrome.debugger.attach({ tabId }, '1.3');
+    } catch (attachErr) {
+      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
+        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+        await chrome.debugger.attach({ tabId }, '1.3');
+      } else {
+        throw attachErr;
+      }
+    }
+    debuggerAttached = true;
+
+    const doc = await chrome.debugger.sendCommand({ tabId }, 'DOM.getDocument', { depth: 0 });
+    const rootNodeId = doc && doc.root && doc.root.nodeId;
+    if (!rootNodeId) throw new Error('could not resolve the document root');
+
+    const q = await chrome.debugger.sendCommand({ tabId }, 'DOM.querySelector', { nodeId: rootNodeId, selector });
+    let nodeId = q && q.nodeId;
+    if (!nodeId) throw new Error('no element matched selector: ' + selector);
+
+    // Ensure the node is a file input; if not, look for a descendant
+    // input[type=file] (handles styled dropzones / labels that wrap a hidden one).
+    let isFileInput = false;
+    try {
+      const desc = await chrome.debugger.sendCommand({ tabId }, 'DOM.describeNode', { nodeId });
+      const node = desc && desc.node;
+      if (node && node.nodeName === 'INPUT') {
+        const attrs = node.attributes || [];
+        for (let i = 0; i + 1 < attrs.length; i += 2) {
+          if (attrs[i] === 'type' && String(attrs[i + 1]).toLowerCase() === 'file') { isFileInput = true; break; }
+        }
+      }
+    } catch (_e) { /* describeNode best-effort */ }
+
+    if (!isFileInput) {
+      const q2 = await chrome.debugger.sendCommand({ tabId }, 'DOM.querySelector', { nodeId, selector: 'input[type="file"]' });
+      if (q2 && q2.nodeId) { nodeId = q2.nodeId; isFileInput = true; }
+    }
+    if (!isFileInput) {
+      throw new Error('selector did not resolve to an <input type="file"> (or a container holding one): ' + selector);
+    }
+
+    // Set the file by absolute path -- the browser process performs the disk
+    // read and fires input/change natively.
+    await chrome.debugger.sendCommand({ tabId }, 'DOM.setFileInputFiles', { nodeId, files: [filePath] });
+
+    // The upload has succeeded. Leave the detach to the finally block (which
+    // swallows detach errors) so a detach hiccup can never flip a real success
+    // into a reported failure -- a false negative could trigger a retry / double
+    // upload.
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: true, tabId, selector, file: fileName });
+    await audit('success', 'allow', null);
+    return { success: true, method: 'cdp_set_file_input', selector, file: fileName, hadEffect: true };
+  } catch (error) {
+    const msg = error && error.message ? error.message : String(error);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactPathForUploadLog(msg) });
+    await audit('error', 'allow', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file failed: ' + msg };
+  } finally {
+    if (debuggerAttached) {
+      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+    }
   }
 }
 

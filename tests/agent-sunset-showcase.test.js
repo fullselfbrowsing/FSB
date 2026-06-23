@@ -3,7 +3,7 @@
  *
  * Verifies the showcase mirror of the agents sunset:
  *   - AGENTS-04: vanilla + Angular dashboards show the sunset card and removed agent UI stays removed.
- *   - D-19: _lz decompression and ext:remote-control-state consumers are BYTE-FOR-BYTE
+ *   - D-19: _lz decompression and remote-control state consumers are BYTE-FOR-BYTE
  *           preserved on a LIVE (non-commented) line in both showcase/js/dashboard.js
  *           and showcase/angular/.../dashboard-page.component.ts.
  *
@@ -97,19 +97,19 @@ function fail(label, detail) {
   }
 }
 
-// ---- Section 4: D-19 ext:remote-control-state byte-for-byte preserved on a LIVE line ----
+// ---- Section 4: D-19 remote-control state consumers preserved on a LIVE line ----
 
 {
-  const vanillaNeedle = "if (msg.type === 'ext:remote-control-state') {";
-  const angularNeedle = "if (msg.type === 'ext:remote-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }";
+  const vanillaNeedle = "if (msg.type === 'ext:remote-control-state' || msg.type === 'ext:ps-control-state') {";
+  const angularNeedle = "if (msg.type === 'ext:remote-control-state' || msg.type === 'ext:ps-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }";
   const vanilla = read('showcase/js/dashboard.js');
   const angular = read('showcase/angular/src/app/pages/dashboard/dashboard-page.component.ts');
   const vanillaLive = containsLive(vanilla, vanillaNeedle);
   const angularLive = containsLive(angular, angularNeedle);
   if (vanillaLive && angularLive) {
-    pass('D-19 ext:remote-control-state LIVE byte-for-byte in both showcase/js/dashboard.js and dashboard-page.component.ts');
+    pass('D-19 remote-control state consumers LIVE byte-for-byte in both showcase/js/dashboard.js and dashboard-page.component.ts');
   } else {
-    fail('D-19 ext:remote-control-state compromised', 'vanillaLive=' + vanillaLive + ' angularLive=' + angularLive);
+    fail('D-19 remote-control state consumers compromised', 'vanillaLive=' + vanillaLive + ' angularLive=' + angularLive);
   }
 }
 

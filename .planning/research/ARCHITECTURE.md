@@ -1,489 +1,433 @@
-# Architecture Research: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+# Architecture Research: v0.9.99 Native Capability Catalog (Authenticated-API Execution)
 
-**Domain:** MV3 Chrome extension reactive DOM-watcher tool family (`trigger`) integrating into FSB's existing service-worker / content-script / offscreen / MCP-bridge architecture
-**Milestone:** v0.11.0 (subsequent milestone; existing FSB architecture preserved, integrate WITH it)
-**Researched:** 2026-06-15
-**Confidence:** HIGH (grounded in direct reads of the FSB codebase; every named file/line verified against the working tree on branch `automation-worktree`)
+**Domain:** Authenticated-API execution capability layer for an MV3 AI browser-automation extension + MCP server (FSB)
+**Milestone:** v0.9.99 Native Capability Catalog (FSB API Execution) — subsequent milestone; integrate WITH existing FSB architecture, do not rebuild
+**Researched:** 2026-06-19
+**Confidence:** HIGH (all integration points verified against on-disk FSB source on branch `automation-worktree`; execution-context decision grounded in the actual `chrome.scripting.executeScript({world:'MAIN'})` seams already shipping in three places)
 
-> Scope note: This is an *integration* design, not an ecosystem survey. The question is "how does a standing `trigger` watcher bolt onto FSB's existing MV3 plumbing without violating INV-01/02/04?" Findings map every new piece to an existing precedent already shipping in the tree.
+> Scope note: this is a research/integration map for `gsd-roadmapper`, not an implementation. It identifies REAL FSB files/seams, marks NEW vs MODIFIED, resolves the page-vs-SW-vs-CDP execution-context tradeoff with a recommendation, places the consent gate, and proposes a phase build order that preserves INV-01..04 and MV3 "no remotely hosted code."
+>
+> Canonical-path note: the sibling `ARCHITECTURE.md` in this directory holds the v0.11.0 Trigger research, which this document **cites as a directly-applicable precedent**. To avoid destroying that cited precedent, this v0.9.99 architecture lives at a milestone-suffixed path, matching the existing `PITFALLS-v0.9.69-TELEMETRY.md` / `PITFALLS-EXCALIDRAW.md` convention already used here.
 
 ---
 
-## Standard Architecture
+## 0. The Load-Bearing Discovery (read this first)
 
-### The load-bearing precedents (what we mirror, not invent)
+FSB **already executes authenticated same-origin `fetch()` against real web APIs** — it just does not yet call it a "capability." Three shipping code paths inject arbitrary JS into the **page MAIN world** via `chrome.scripting.executeScript`:
 
-Four shipping subsystems already solve every hard sub-problem of `trigger`. The design is "copy the shape, change the constants":
+| Path | File:Line | World | Carries user session? |
+|------|-----------|-------|------------------------|
+| Autopilot `execute_js` | `extension/ai/tool-executor.js:382-394` | `world: 'MAIN'`, `eval(jsCode)` | YES (page context) |
+| MCP `execute_js` | `extension/ws/mcp-bridge-client.js:915-937` | `world: 'MAIN'`, `new Function(userCode)` | YES (page context) |
+| Canvas interceptor | `extension/manifest.json` content_scripts | `world: 'MAIN'`, `document_start` | n/a (instrumentation) |
 
-| Sub-problem | Existing precedent (verified) | What it proves |
-|-------------|-------------------------------|----------------|
-| Standing entity that survives SW eviction | `extension/utils/mcp-visual-session-lifecycle.js` — per-tab `chrome.alarms` named `mcpVisualDeath:<tabId>` + `chrome.storage.session` entry `mcpVisualSession:<tabId>` + SW-startup restore + `chrome.tabs.onRemoved` cleanup | A per-entity alarm+storage+restore lifecycle is already a proven FSB pattern |
-| Persisted lifecycle snapshot map | `extension/utils/mcp-task-store.js` — versioned envelope `{v:1, records:{[id]:snapshot}}` under `chrome.storage.session` key `fsbRunTaskRegistry`; empty-map-removes-key discipline | The exact storage-helper module shape for a `trigger-store.js` |
-| Blocking call that holds open with heartbeats + safety net | `extension/ws/mcp-bridge-client.js:_handleStartAutomation` (lines 979-1158) — 30s `setInterval` heartbeat, `settle()` single-resolve guard, 600s safety net, `partial_state` snapshot read | The exact blocking-return machinery for blocking `trigger()` |
-| Live MutationObserver → SW reporting | `extension/content/dom-stream.js` — `startMutationStream()`/`stopMutationStream()`, `requestAnimationFrame` batch/debounce, `chrome.runtime.sendMessage`, message-driven `domStreamStart`/`domStreamStop` router | The exact content-script live-observe path |
+When code runs in the page MAIN world, a `fetch('/api/...', {credentials:'include'})` is issued **by the page's own origin**, so the browser attaches the site's cookies — **including HttpOnly cookies** — automatically, and **same-origin requests are not subject to CORS**. FSB never reads the cookies; the browser does the auth. This is byte-for-byte the OpenTabs `fetchFromPage` model cited in the milestone context.
 
-Nothing about `trigger` requires a new architectural primitive. It requires assembling these four into a new tool family.
+**Architectural consequence:** the v0.9.99 "authenticated fetch primitive" is **not new infrastructure**. It is a *constrained, structured re-use* of the existing MAIN-world injection seam, wrapped by a recipe interpreter and gated by consent. This collapses most of the perceived risk and is the spine of every recommendation below.
+
+---
+
+## 1. Standard Architecture
 
 ### System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  MCP CLIENT (Claude Code / Codex / OpenClaw)                                  │
-│      trigger() · stop_trigger() · get_trigger_status() · list_triggers()      │
-└───────────────────────────────────┬──────────────────────────────────────────┘
-                                     │ JSON-RPC (stdio) + notifications/progress
-┌────────────────────────────────────▼──────────────────────────────────────────┐
-│  MCP SERVER (mcp/src)                                                          │
-│   NEW  tools/trigger.ts  ── server.tool() x4 ── routes via bridge.sendAndWait  │
-│   MOD  runtime.ts (add registerTriggerTools)  · queue.ts (read-only set +2)    │
-└───────────────────────────────────┬──────────────────────────────────────────┘
-                                     │ WebSocket bridge  (mcp:trigger-* messages)
-┌────────────────────────────────────▼──────────────────────────────────────────┐
-│  SERVICE WORKER (extension/background.js + ws/ + utils/)                        │
-│                                                                                │
-│   MOD ai/tool-definitions.js  ── TOOL_REGISTRY += 4 tool defs (additive only)  │
-│   MOD ws/mcp-tool-dispatcher.js ── route tables += trigger aliases+messages    │
-│   NEW utils/trigger-store.js     ── chrome.storage.session envelope (snapshot) │
-│   NEW utils/trigger-lifecycle.js ── chrome.alarms `fsbTrigger:<id>` + restore  │
-│   NEW utils/trigger-manager.js   ── arm/evaluate/fire/stop + cap + tab binding │
-│   MOD ws/mcp-bridge-client.js    ── blocking trigger() heartbeat/settle host   │
-│   MOD background.js              ── onAlarm dispatch branch + SW-startup hook   │
-│                                     + chrome.tabs.onRemoved trigger cleanup    │
-│        ┌────────────── refresh-poll ──────────────┐  ┌──── live-observe ────┐  │
-│        │ alarm tick → reload OWNED tab → re-read  │  │ tell content to watch │  │
-│        │ element via existing read path → compare │  │ → receive change msgs │  │
-│        └───────────────────────────────────────────┘  └──────────────────────┘ │
-└──────────────┬───────────────────────────────────────────────┬────────────────┘
-               │ chrome.tabs.sendMessage (read / observe / pulse) │
-┌───────────────▼───────────────────────────────────────────────▼────────────────┐
-│  CONTENT SCRIPT (isolated world; extension/content/*)                          │
-│   MOD content/messaging.js     ── router: triggerObserveStart/Stop, triggerRead │
-│   NEW content/trigger-observe.js ── MutationObserver on ONE element (debounced) │
-│   MOD content/visual-feedback.js ── HighlightManager analyzing-PULSE variant +  │
-│                                      ViewportGlow "watching a trigger" label    │
-└────────────────────────────────────────────────────────────────────────────────┘
-
-  OFFSCREEN (extension/offscreen/lattice-host.js) — NOT on the trigger path.
-  Lattice survivability adapter is consulted as a pattern reference only (see §
-  "State management"). Trigger snapshots use chrome.storage.session directly,
-  exactly like mcp-task-store.js does today.
++---------------------------------------------------------------------------+
+|  MCP CLIENT (Claude / Codex / Cursor)        |  AUTOPILOT (agent-loop.js)  |
+|  -- lean surface: +2 tools                   |  -- same TOOL_REGISTRY      |
+|     search_capabilities / invoke_capability  |     (INV-02)                |
++----------------------+---------------------------------+-------------------+
+                       | MCP stdio/WS (INV-01 wire)      | in-SW call
+                       v                                 v
++---------------------------------------------------------------------------+
+|  mcp/src (TS server)  registerCapabilityTools()  [NEW capabilities.ts]     |
+|    - search_capabilities  -> bridge 'mcp:capabilities-search' (read-only)  |
+|    - invoke_capability     -> bridge 'mcp:capabilities-invoke' (queued)    |
++----------------------+----------------------------------------------------+
+                       | WebSocket bridge message (data only -- no secrets)
+                       v
++===========================================================================+
+|  EXTENSION SERVICE WORKER (background.js)                                  |
+|                                                                           |
+|  +-----------------------------------------------------------------+      |
+|  |  dispatchMcpToolRoute  [MODIFIED]  ws/mcp-tool-dispatcher.js     |      |
+|  |    SINGLE CHOKEPOINT: agent identity + tab ownership gate        |      |
+|  |    + NEW: per-origin consent gate (Off/Ask/Auto) BEFORE handler  |      |
+|  +----------------------------+------------------------------------+      |
+|                               v                                           |
+|  +-----------------------------------------------------------------+      |
+|  |  Capability Runtime  [NEW]  utils/capability-*.js               |      |
+|  |   catalog-registry | router | recipe-interpreter | audit-log    |      |
+|  |   tiers: model-prior public API -> bundled/server recipe -> DOM |      |
+|  +------+---------------------------+----------------------+-------+      |
+|         |(invoke)                   |(persist learned)     |(fallback)    |
+|         v                           v                      v              |
+|  +-------------+   +------------------------+   +------------------------+ |
+|  | MAIN-world  |   | Procedural memory      |   | executeTool(...)       | |
+|  | fetch via   |   | lib/memory/* [reuse]   |   | tool-executor.js       | |
+|  | execute_js  |   | createProceduralMemory |   | (DOM self-heal path)   | |
+|  | seam [reuse]|   +------------------------+   +------------------------+ |
+|  +------+------+                                                          |
+|         |  chrome.scripting.executeScript({world:'MAIN'})                 |
++=========|=================================================================+
+          v
+   +-------------------------------------------------------------------+
+   |  PAGE (MAIN world)  -- carries user's cookies (HttpOnly incl.)    |
+   |    fetch(sameOriginApiUrl, {credentials:'include', headers:{csrf}})|
+   +-------------------------------------------------------------------+
+          ^
+          |  CDP Network.* discovery (NEW use of existing `debugger` perm)
+   +-------------------------------------------------------------------+
+   |  Discovery: chrome.debugger Network domain -> capture real calls  |
+   |    (endpoint, method, headers, payload) -> recipe synthesis       |
+   +-------------------------------------------------------------------+
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Existing precedent it mirrors |
-|-----------|----------------|-------------------------------|
-| `utils/trigger-store.js` (NEW) | Versioned `chrome.storage.session` envelope `{v:1, records:{[trigger_id]:snapshot}}`; CRUD + `listActive()` | `utils/mcp-task-store.js` (near byte-for-byte clone, new constants) |
-| `utils/trigger-lifecycle.js` (NEW) | Per-trigger `chrome.alarms` (`fsbTrigger:<id>`), arm/clear/re-arm, SW-startup restore, tab-close cleanup | `utils/mcp-visual-session-lifecycle.js` |
-| `utils/trigger-manager.js` (NEW) | Domain logic: arm a trigger, evaluate fire conditions (changed/threshold/equals/contains), smart value extraction, cap enforcement, tab-binding decision, emit fire | new — cap logic mirrors `utils/agent-registry.js` (1-64, default 8) |
-| `content/trigger-observe.js` (NEW) | Live-observe: MutationObserver scoped to ONE element, debounced, reports value deltas to SW | `content/dom-stream.js` (start/stop + rAF batch + `chrome.runtime.sendMessage`) |
-| `ws/mcp-bridge-client.js` (MOD) | Host the *blocking* `trigger()` promise: heartbeats, `settle()`, fire/timeout resolve | its own `_handleStartAutomation` (lines 979-1158) |
-| `ws/mcp-tool-dispatcher.js` (MOD) | Route `trigger`/`stop_trigger`/`get_trigger_status`/`list_triggers` + `mcp:trigger-*` messages | existing `run_task`/`mcp:start-automation` route-table rows (lines 62-91) |
-| `ai/tool-definitions.js` (MOD) | Add 4 tool defs to `TOOL_REGISTRY` (additive; existing 52 untouched → INV-01/02) | the registry array itself (line 94) |
-| `mcp/src/tools/trigger.ts` (NEW) | 4 `server.tool()` registrations; `trigger` is blocking-capable (progress notifications), companions read-only | `mcp/src/tools/autopilot.ts` (run_task family) + `observability.ts` (read-only family) |
-| `content/visual-feedback.js` (MOD) | "Analyzing pulse" glow variant on the watched element; `ViewportGlow` "watching a trigger" label | `HighlightManager.show()` + `ViewportGlow` `state-thinking` |
+| Component | Responsibility | New / Modified | Anchor file |
+|-----------|----------------|----------------|-------------|
+| MCP capability tools | Expose `search_capabilities` + `invoke_capability` over the wire; progressive disclosure (search returns slugs, invoke runs one) | **NEW** | `mcp/src/tools/capabilities.ts` |
+| Dispatch chokepoint | Identity + ownership gate (existing) **+ consent gate** + route capability messages | **MODIFIED** | `extension/ws/mcp-tool-dispatcher.js` |
+| Catalog registry | Hold tiered catalog: bundled handlers (code) + bundled/server recipes (data) + learned recipes (memory) | **NEW** | `extension/utils/capability-catalog.js` |
+| Router | Decide tier per request; bias by tab origin; pick recipe vs DOM fallback | **NEW** | `extension/utils/capability-router.js` |
+| Recipe interpreter | Execute a DECLARATIVE recipe (data) by templating an authenticated fetch + extraction; no `eval` of server strings | **NEW** | `extension/utils/capability-interpreter.js` |
+| Authenticated fetch primitive | Issue same-origin fetch in page MAIN world (re-use the `execute_js` injection seam) | **NEW thin wrapper over REUSED seam** | wraps `tool-executor.js` / `mcp-bridge-client.js:_handleExecuteJS` pattern |
+| Discovery capture | Attach CDP `Network` domain to observe real API traffic; emit candidate recipes | **NEW** (new *use* of existing debugger plumbing) | `extension/utils/capability-discovery.js` + `background.js` debugger block (~13811) |
+| Learned-recipe store | Persist synthesized recipes as procedural memory, per-origin, auto-grow | **REUSE + extend** | `extension/lib/memory/memory-schemas.js`, `memory-storage.js` |
+| Consent + audit | Per-origin Off/Ask/Auto setting; append-only audit log; auth material strictly local | **NEW** | `extension/utils/capability-consent.js`, `capability-audit.js` |
+| DOM fallback | When a recipe breaks, complete via existing DOM tools | **REUSE** | `extension/ai/tool-executor.js executeTool()` |
+| Shared tool registry | `execute_js` + DOM tools the fallback/interpreter lean on | **UNTOUCHED schemas (INV-01)** | `extension/ai/tool-definitions.js` |
 
 ---
 
-## Recommended Project Structure
+## 2. The Three Hard Decisions (resolved)
 
-NEW files (5) + MODIFIED files (8). No existing schema changes.
+### Decision A — Where `search_capabilities` + `invoke_capability` wire in (INV-01 / INV-02 safe)
+
+**Recommendation: register the two capability tools OUTSIDE `TOOL_REGISTRY`, following the `vault.ts` precedent — NOT inside the canonical registry.**
+
+Why this is the correct seam, with evidence:
+
+- `TOOL_REGISTRY` (`extension/ai/tool-definitions.js`, 55 tools) is consumed by **both** surfaces: MCP via `registerManualTools` / `registerReadOnlyTools` (which iterate `TOOL_REGISTRY.filter(...)`, `manual.ts:216`, `read-only.ts:100`) **and** autopilot via `getPublicTools()` (`agent-loop.js:674` maps *every* registry entry into the LLM tool list). Anything added to `TOOL_REGISTRY` is auto-exposed in both places — good for parity, but it would bloat the MCP context with catalog surface, which the milestone explicitly forbids.
+- The **vault tools already solve exactly this**: `mcp/src/tools/vault.ts:16-19` registers `list_credentials` / `fill_credential` / `list_payment_methods` / `use_payment_method` **directly via `server.tool()`, deliberately not via `TOOL_REGISTRY`**, "to maintain an explicit security boundary." `search_capabilities` / `invoke_capability` get the same treatment for an analogous boundary (auth replay) and to keep the surface lean.
+- INV-01 (wire contracts byte-identical for *existing* tools) is preserved because nothing in `TOOL_REGISTRY` changes. The two new tools are *additions*, not modifications, so the schema-lock tests stay green and the `.cjs` mirror is untouched.
+- INV-02 (autopilot uses the same registry MCP exposes — "no parallel autopilot-only stack") is satisfied **at the runtime layer, not the tool layer**: both surfaces invoke capabilities through the **same Capability Runtime in the SW**. Autopilot reaches it through `tool-executor.js` (a new `_route: 'background'` branch OR a `dataHandler` case); MCP reaches it through `dispatchMcpToolRoute` -> capability message route. They converge on `capability-router.js` — one engine, two thin front doors. (This mirrors how `trigger` already has an autopilot path in `tool-executor.js:402-423` and an MCP path in the dispatcher route table at `mcp-tool-dispatcher.js:65-68`.)
+
+Concrete wiring:
+
+| Seam | Change | File:Line |
+|------|--------|-----------|
+| MCP registration | add `registerCapabilityTools(server,bridge,queue,agentScope)` | `mcp/src/runtime.ts:36-43` (add one call) |
+| MCP tool defs | `server.tool('search_capabilities', ...)` (read-only, queue-bypass) + `server.tool('invoke_capability', ...)` (queued) | **NEW** `mcp/src/tools/capabilities.ts` |
+| Wire message types | `mcp:capabilities-search`, `mcp:capabilities-invoke` added to route tables | `extension/ws/mcp-tool-dispatcher.js:50-116` |
+| Read-only bypass | add `search_capabilities` to `readOnlyTools` so discovery never parks the mutation queue | `mcp/src/queue.ts` (the `readOnlyTools` set) |
+| Autopilot path | new branch routing `invoke_capability` / `search_capabilities` to the runtime | `extension/ai/tool-executor.js` (`executeBackgroundTool` switch, ~line 402 area) |
+| Autopilot LLM exposure | OPTIONAL: if autopilot should *see* the catalog, surface via a tiny prompt hint, NOT 2,769 tool defs | `agent-loop.js buildSystemPrompt` (additive string only) |
+
+**Progressive disclosure is the anti-bloat mechanism:** `search_capabilities(query, origin?)` returns a *short list of capability slugs + one-line descriptions* (data), and `invoke_capability(slug, args)` runs exactly one. The model never sees the full catalog as tool schemas — it sees two tools and queries into them. This is the same "search -> invoke" shape `search_memory` already uses (`observability.ts:84-110`), the read-only data-tool precedent.
+
+### Decision B — WHERE the recipe interpreter + authenticated fetch run (the cookie/CORS/SameSite/HttpOnly resolution)
+
+**Recommendation: the authenticated fetch executes in the PAGE MAIN world (via the existing `execute_js` injection seam); the recipe interpreter logic lives in the SW (background) and *templates* the fetch, then ships the templated call into the page. CDP `Fetch`/`Network` is used for DISCOVERY only, never as the invoke transport.**
+
+This is a three-way comparison; here is the tradeoff resolved against the actual constraint — *which context carries the user's real session for a same-origin API call*:
+
+| Context | Carries site cookies (incl. HttpOnly)? | CORS applies? | SameSite respected? | Verdict for INVOKE |
+|---------|----------------------------------------|---------------|----------------------|--------------------|
+| **Page MAIN world** (`executeScript({world:'MAIN'})` -> `fetch('/api',{credentials:'include'})`) | **YES** — request originates from the page's own origin; browser attaches cookies incl. HttpOnly automatically; FSB never reads them | **NO** for same-origin (the whole point) | **YES** — first-party context, SameSite=Lax/Strict cookies sent | **WINNER** |
+| **Background SW `fetch()`** | Partial/unreliable — SW fetch is an extension-origin request; cookies attach only per host-permission cookie policy, SameSite=Strict/Lax often withheld, and it is a *cross-origin* request to the site so **CORS blocks** most JSON APIs lacking `Access-Control-Allow-Origin: chrome-extension://...` | YES (extension origin is cross-origin to the site) | Frequently NO (third-party context) | Rejected for invoke |
+| **CDP `Fetch.fulfillRequest`/`continueRequest`** | Operates on requests the page *already* makes; can read/modify in-flight; synthesizing a brand-new authenticated request via CDP is awkward and forces an attached-debugger banner per call | Bypasses CORS but you must reconstruct headers/cookies manually | Manual | Rejected for invoke; **accepted for discovery** |
+
+**Rationale in prose:** The only context that *reliably* carries the user's authenticated, first-party session for an arbitrary same-origin JSON API — without FSB ever touching the secret cookie — is the page itself. SW `fetch()` is an extension-origin request: it is cross-origin to the target site (CORS preflight failures on credentialed JSON endpoints) and SameSite=Strict/Lax cookies are commonly withheld in that third-party context. The page MAIN world makes the call *as the site*, so cookies (HttpOnly included), CORS exemption (same-origin), and SameSite all "just work" — which is precisely why OpenTabs uses `fetchFromPage` and why FSB's own `execute_js` already does authenticated work today without anyone designing it to.
+
+**Split of concerns:**
+- **Interpreter (SW):** validates the recipe, resolves the per-origin consent decision, fills the URL/method/body template from `args`, scrapes/threads the CSRF token (see below), and **constructs a small, fixed, audited fetch snippet**. It does NOT `eval` server-delivered code (MV3 ban). It builds the *call*, not arbitrary logic.
+- **Fetch (page MAIN world):** the SW injects the constructed fetch via the `execute_js` seam (`executeScript({world:'MAIN', func, args:[fetchSpec]})`), where `func` is a **fixed, extension-bundled function** that performs `fetch(spec.url, {method, headers, body, credentials:'include'})` and returns the response. The recipe (server data) only supplies *parameters to a bundled function*, never executable strings — this is the MV3-safe code/data split.
+
+**CSRF handling (the OpenTabs detail):** many authenticated POST APIs require a CSRF token that lives in a meta tag, a cookie-readable value, or a prior GET response. The interpreter declares the CSRF source in the recipe as *data* (e.g. `csrf: {from:'meta', selector:'meta[name=csrf-token]', header:'X-CSRF-Token'}`), and a **bundled** extraction step reads it in the page context before the POST. Persisted-query-hash discovery (GraphQL) is handled the same way: the hash is captured during discovery and stored in the recipe as a data field.
+
+**Why not just keep using raw `execute_js`?** Because raw `execute_js` is an *unstructured* escape hatch with no consent gate, no audit, no recipe schema, and the model has to hand-write the fetch every time. The capability layer is the structured, governed, learnable wrapper around the same primitive.
+
+### Decision C — Catalog tiers + routing (model-prior -> recipe -> DOM), and the code/data/memory split
+
+**Recommendation: three tiers, selected by `capability-router.js`, biased by tab origin, with a hard MV3 rule that *only* bundled handlers contain code and *all* server/learned recipes are pure data interpreted by a fixed bundled interpreter.**
+
+| Tier | What it is | Storage | Code or Data? | When chosen |
+|------|------------|---------|---------------|-------------|
+| **T0 model-prior public APIs** | The model already knows the shape of well-known public/documented APIs (GitHub REST, etc.); interpreter templates a call from the model's argument | none (model knowledge) + thin validation | Data (args -> bundled fetch fn) | Public, well-known, low-risk endpoints; fastest path |
+| **T1a bundled handlers** | Imperative handlers compiled INTO the extension for the hard/popular "head" (tricky auth, multi-step, GraphQL persisted queries) | shipped in extension bundle | **Code (allowed — ships in the extension, not from server)** | Popular services where a declarative recipe is insufficient |
+| **T1b bundled/server recipes** | DECLARATIVE recipe objects (endpoint, method, header map, CSRF source, extraction path) for the easy long tail | bundled JSON + server-delivered JSON (data) | **Data only (MV3-safe)** | Long-tail services; streamed from FSB server as data |
+| **T2 learned recipes** | Recipes synthesized from CDP discovery on this user's real traffic, promoted to procedural memory | `chrome.storage.local` via `lib/memory/*` | Data only | Per-origin, auto-grown; user-specific endpoints |
+| **T3 DOM fallback** | Existing DOM automation completes the task when no recipe works or a recipe breaks | n/a | Code (existing tools) | Self-healing fallback (always available) |
+
+**Routing decision (in `capability-router.js`):**
+```
+on invoke_capability(slug, args) at origin O:
+  consent = consentForOrigin(O)            # Off -> hard refuse (DOM-only)
+  if consent == Off: return route(DOM_FALLBACK)
+  recipe = catalog.resolve(slug, O)        # learned(O) > bundled-handler > bundled/server-recipe > model-prior
+  prefer recipe whose declared origin matches O  # tab-origin bias
+  try interpreter.run(recipe, args, O)     # page MAIN-world fetch
+  on break/empty/4xx-5xx-shape-mismatch:
+      record recipe health--               # drives re-discovery
+      return route(DOM_FALLBACK)           # self-heal: finish via DOM tools
+```
+
+**Tab-origin bias:** resolution is scoped by the active tab's origin (the router has it from the ownership-gated tab). A learned recipe for `O` outranks a generic bundled recipe; a recipe whose `origin` field does not match `O` is only used if it is explicitly cross-origin-safe (public API). This keeps invocation first-party and consent-scoped.
+
+**The MV3 invariant, stated precisely:** *No remotely hosted code.* The FSB server delivers **recipe DATA** (JSON describing endpoints/headers/extraction), which a **fixed, bundled interpreter** consumes. The server never delivers a function body, and the interpreter never `eval`/`new Function`s server-supplied strings. T1a bundled handlers are the *only* place imperative capability code lives, and it is compiled into the extension at build time (reviewed, shipped through the Web Store) — fully MV3-compliant. This is the same posture as the existing `site-guides/` (data) + content-script tools (code) split.
+
+---
+
+## 3. Recommended Project Structure (NEW files in bold)
 
 ```
 extension/
-├── utils/
-│   ├── trigger-store.js          # NEW  — chrome.storage.session snapshot envelope
-│   │                             #        (clone of mcp-task-store.js; key fsbTriggerRegistry)
-│   ├── trigger-lifecycle.js      # NEW  — chrome.alarms fsbTrigger:<id> + restore + tab cleanup
-│   │                             #        (clone of mcp-visual-session-lifecycle.js shape)
-│   ├── trigger-manager.js        # NEW  — arm/evaluate/fire/stop, fire-condition eval,
-│   │                             #        value extraction, cap enforcement, tab binding
-│   ├── mcp-task-store.js         #  (reference template — unchanged)
-│   ├── mcp-visual-session-lifecycle.js  # (reference template — unchanged)
-│   └── agent-registry.js         #  (cap precedent — unchanged; trigger cap mirrors it)
-├── content/
-│   ├── trigger-observe.js        # NEW  — single-element MutationObserver (live-observe)
-│   ├── messaging.js              # MOD  — router cases: triggerObserveStart/Stop/Read + pulse
-│   └── visual-feedback.js        # MOD  — analyzing-pulse glow variant + "watching" label
-├── ws/
-│   ├── mcp-tool-dispatcher.js    # MOD  — route tables (+4 tool aliases, +N message routes)
-│   └── mcp-bridge-client.js      # MOD  — blocking trigger() heartbeat/settle handler
-├── ai/
-│   └── tool-definitions.js       # MOD  — TOOL_REGISTRY += 4 defs (additive) + .cjs mirror
-├── background.js                 # MOD  — onAlarm branch, SW-startup restore, tab cleanup hook
-└── manifest.json                 #  (NO CHANGE — alarms/storage/tabs/scripting/webNavigation granted)
-
+  ai/
+    tool-definitions.js        # UNTOUCHED schemas (INV-01); execute_js seam reused
+    tool-executor.js           # MODIFIED: +invoke_capability/search_capabilities branch
+    agent-loop.js              # UNTOUCHED iterator (INV-04); optional prompt hint only
+  ws/
+    mcp-tool-dispatcher.js     # MODIFIED: +consent gate, +capability message routes
+    mcp-bridge-client.js       # MODIFIED: route mcp:capabilities-* (reuse _handleExecuteJS pattern)
+  utils/
+    **capability-catalog.js**      # tiered catalog registry (T0/T1a/T1b/T2)
+    **capability-router.js**       # tier selection + origin bias + fallback decision
+    **capability-interpreter.js**  # declarative-recipe -> templated authenticated fetch (SW side)
+    **capability-fetch.js**        # the FIXED bundled page-MAIN-world fetch fn + CSRF/extract helpers
+    **capability-discovery.js**    # CDP Network capture -> candidate recipe synthesis
+    **capability-consent.js**      # per-origin Off/Ask/Auto store + Ask prompt plumbing
+    **capability-audit.js**        # append-only audit log (origin, slug, time, outcome; NO secrets)
+  lib/memory/
+    memory-schemas.js          # REUSE createProceduralMemory; +recipe typeData fields
+    memory-storage.js          # REUSE persist/retrieve, per-origin
+  catalog/                     # **NEW** bundled data
+    **recipes/*.json**             # T1b declarative recipes (data, MV3-safe)
+    **handlers/*.js**              # T1a imperative bundled handlers (code, shipped in bundle)
+  background.js                # MODIFIED: wire runtime at startup; extend debugger block for Network
 mcp/src/
-├── tools/
-│   └── trigger.ts                # NEW  — server.tool() x4 (1 blocking + 3 read-only/mutation)
-├── runtime.ts                    # MOD  — import + call registerTriggerTools(...)
-└── queue.ts                      # MOD  — readOnlyTools += get_trigger_status, list_triggers
+  tools/
+    **capabilities.ts**            # registerCapabilityTools: search_capabilities + invoke_capability
+  runtime.ts                   # MODIFIED: +registerCapabilityTools(...)
+  queue.ts                     # MODIFIED: search_capabilities in readOnlyTools bypass
+  ai/
+    tool-definitions.cjs       # MODIFIED only if defs added to registry (recommend: NOT — stay out)
 ```
 
 ### Structure Rationale
 
-- **`utils/` gets the three new SW-side modules** because that is where every other SW-survivable lifecycle helper already lives (`mcp-task-store.js`, `mcp-visual-session-lifecycle.js`, `agent-registry.js`, `agent-tab-resolver.js`). The SW glue (`background.js`) imports them via `importScripts` and drives them — exactly the boot-order note documented at the top of `mcp-visual-session-lifecycle.js`.
-- **`content/trigger-observe.js` is a new module, not bolted into `dom-stream.js`**, because `dom-stream.js` is a whole-page observer feeding the remote-control dashboard; trigger live-observe is single-element and notify-only. Sharing would risk the streaming watchdog (`fsb-domstream-watchdog`) and the `ext:dom-mutations` wire shape, both locked. New module, same proven internals.
-- **`mcp/src/tools/trigger.ts` is one new file** registered from `runtime.ts` (the single registration call site at lines 35-41). This is precisely how every existing family was added; no `index.ts` change needed beyond what `runtime.ts` already centralizes.
+- **`utils/capability-*.js`:** mirrors the v0.11.0 `trigger` precedent (`utils/trigger-store.js`, `trigger-manager.js`, `trigger-lifecycle.js`) — new source files composing existing primitives, one concern per file, SW-loadable via `importScripts`.
+- **`catalog/recipes/` (data) vs `catalog/handlers/` (code):** physically separates the MV3-safe declarative tier from the bundled-code tier so review and the build pipeline can treat them differently (recipes are also what the server streams).
+- **Memory reuse, not a new store:** learned recipes are procedural memory; `createProceduralMemory` already has `steps`/`selectors`/`timings`/`successRate`/`targetUrl` (`memory-schemas.js:91-103`) — extend `typeData` with `{endpoint, method, headerMap, csrfSource, extractPath, origin}` rather than inventing a parallel store (mirrors the milestone's "learned recipes via memory" goal).
+- **`capabilities.ts` outside `TOOL_REGISTRY`:** the vault-tool security-boundary precedent; keeps the lean MCP surface.
 
 ---
 
-## Architectural Patterns
+## 4. Architectural Patterns
 
-### Pattern 1: Trigger Registry as a parallel-but-analogous lifecycle (NOT reuse of run_task machinery)
+### Pattern 1: Structured re-use of the MAIN-world `execute_js` seam (do not reinvent the fetch primitive)
 
-**What:** A dedicated trigger registry (`trigger-store.js` + `trigger-lifecycle.js` + `trigger-manager.js`) that *mirrors* the run_task lifecycle shape but does not share its code paths or storage key.
+**What:** The authenticated fetch is a *fixed, bundled function* injected via `executeScript({world:'MAIN', func, args:[spec]})`, where `spec` is recipe-derived data.
+**When:** Every T0/T1b/T2 invoke (declarative path).
+**Trade-offs:** + carries real session (HttpOnly/SameSite/CORS all correct) + reuses a battle-tested seam + MV3-safe (no server code). − bound to the *active tab's* origin (cross-origin capability needs a tab on that origin or a public API); − page CSP can constrain `fetch` in rare cases (fallback to DOM).
 
-**When to use:** Always, for v0.11.0.
-
-**Recommendation: BUILD PARALLEL-BUT-ANALOGOUS. Do NOT graft onto `run_task`/`activeSessions`.** Rationale:
-
-1. **Semantic mismatch.** `run_task` is a finite agent loop driven by `agent-loop.js`'s `setTimeout`-chained iterator (INV-04, byte-frozen at lines 2003/2702/2771). A trigger is a *standing* watcher with no AI loop, no iteration count, no completion scoring. Forcing it through `activeSessions` would pollute the session schema and risk the frozen iterator.
-2. **Lifetime mismatch.** `run_task` has a 600s safety net; a price watch runs for hours. The trigger's persistence cadence is alarm-tick-driven (refresh-poll) or event-driven (live-observe), not a 30s heartbeat loop.
-3. **INV-04 protection.** Keeping triggers out of `agent-loop.js` entirely means zero risk to the load-bearing iterator. The blocking-*return* mechanics (heartbeat/settle) are reused from `mcp-bridge-client.js`, but the *watcher* itself never touches the agent loop.
-4. **Precedent says parallel.** v0.9.36 visual sessions and v0.9.60 run_task tracking are *separate* registries (`fsbMcpVisualSessions`, `fsbRunTaskRegistry`) by deliberate decision (PROJECT.md Key Decisions: "Keep client-owned visual sessions separate from autopilot `activeSessions`"). The trigger registry is the third sibling: `fsbTriggerRegistry`.
-
-What IS reused: the *return* machinery (heartbeat/settle/safety-net from `mcp-bridge-client.js`) and the *storage/alarm/restore* shapes (from `mcp-task-store.js` + `mcp-visual-session-lifecycle.js`). What is NOT reused: `activeSessions`, the agent loop, the run_task storage key.
-
-**Example (storage envelope, mirroring `mcp-task-store.js`):**
-```javascript
-// utils/trigger-store.js — chrome.storage.session key 'fsbTriggerRegistry'
-// snapshot shape per trigger_id:
-{
-  trigger_id, status,            // 'armed' | 'fired' | 'stopped' | 'error' | 'partial'
-  watch: 'refresh-poll' | 'live-observe',
-  condition: { kind, op, value, extract },   // changed|threshold|equals|contains
-  selector, target_tab_id, agent_id,
-  initial_value, last_value, last_evaluated_at,
-  poll_interval_ms, armed_at, fired_at,
-  fire_envelope                  // populated on fire (the "what happened" payload)
-}
+**Example (shape, not implementation):**
+```js
+// SW: interpreter builds spec (data); injects a FIXED func
+const spec = interpreter.template(recipe, args, origin); // {url, method, headers, body, csrf}
+const [{result}] = await chrome.scripting.executeScript({
+  target: { tabId },
+  world: 'MAIN',
+  func: capabilityFetchInPage,   // bundled, reviewed, NOT from server
+  args: [spec]
+});
+// capabilityFetchInPage(spec): reads CSRF from DOM if declared, then
+//   return fetch(spec.url, {method, headers, body, credentials:'include'}).then(r=>r.json())
 ```
 
-### Pattern 2: SW-eviction survival via chrome.alarms tick → wake → re-evaluate (generalizes run_task partial_state)
+### Pattern 2: Two front doors, one engine (INV-02 without registry bloat)
 
-**What:** Each trigger owns a `chrome.alarms` alarm. For refresh-poll, the alarm IS the poll clock (`periodInMinutes`). For live-observe, the alarm is a low-frequency *watchdog* (re-arm/re-attach the observer after SW wake, since the content observer survives but the SW that receives its messages may have evicted).
+**What:** MCP (`invoke_capability` -> `mcp:capabilities-invoke`) and autopilot (`tool-executor.js` branch) both call `capability-router.js`.
+**When:** Always — parity is enforced at the runtime, not by sharing a tool schema.
+**Trade-offs:** + lean MCP surface + true parity (same engine, same results, same consent/audit) + matches the existing `trigger` dual-path precedent. − one extra indirection vs putting it in `TOOL_REGISTRY` (accepted, because registry membership = forced dual exposure + context bloat).
 
-**When to use:** Always — this is the crux of the milestone (PROJECT.md: "MV3 survivability is the crux").
+### Pattern 3: Discovery -> synthesis -> persist as procedural memory (auto-growing catalog)
 
-**Mapping to the run_task partial_state pattern (explicit):**
+**What:** Attach CDP `Network` to a tab (reusing the `chrome.debugger.attach({tabId},'1.3')` plumbing already at `background.js:~13811`), observe `Network.requestWillBeSent` / `responseReceived` / `getResponseBody`, synthesize a candidate recipe, and promote successful ones via `createProceduralMemory`.
+**When:** Opt-in learning on origins the user has set to Ask/Auto; or after a successful DOM completion that the system recognizes could have been an API call.
+**Trade-offs:** + grows the catalog from the user's real, authenticated traffic + no server round-trip + per-origin. − CDP attach shows the "DevTools is debugging this tab" banner (already true for FSB's CDP input tools, so not a new UX cost); − must redact/avoid persisting response bodies containing PII (store *shape*, not data).
 
-| run_task (Phase 239, shipped) | trigger (v0.11.0, proposed) |
-|-------------------------------|------------------------------|
-| 30s `setInterval` heartbeat writes `in_progress` snapshot to `fsbRunTaskRegistry` | Alarm tick (refresh-poll) OR observe-event (live-observe) writes `armed` snapshot to `fsbTriggerRegistry` after each evaluation |
-| SW eviction → WebSocket drops → bridge `sendAndWait` rejects `Bridge disconnected` → server reads persisted `partial_state` | SW eviction → alarm persists in `chrome.alarms` (NOT SW memory) → next tick wakes SW → `background.js` onAlarm branch re-hydrates trigger from `trigger-store.js` → re-evaluates |
-| `chrome.storage.session` snapshot is source of truth across eviction | identical |
-| 600s safety net resolves blocking call | blocking `trigger()` has a configurable timeout with a safety ceiling (PROJECT.md: "recommend detached beyond a few minutes"); detached triggers simply persist and keep ticking |
-| `_reconcileInFlightTasksOnConnect` on bridge reconnect | SW-startup `restoreTriggersFromStorage()` (mirrors `restoreVisualSessionLifecyclesFromStorage`) re-arms every `status:'armed'` trigger's alarm on cold boot |
-
-The key insight: **`chrome.alarms` is the eviction-survival mechanism, not the SW.** The visual-session lifecycle already proves this — its `mcpVisualDeath:<tabId>` alarm "survives MV3 SW eviction because chrome.alarms persists across SW lifetime" (background.js:13288-13289). A trigger alarm with `periodInMinutes` keeps firing and waking the SW even after eviction; each wake re-reads the snapshot and re-evaluates. No offscreen document or Lattice adapter is needed for survival — `chrome.storage.session` + `chrome.alarms` is sufficient and is the lower-risk path.
-
-> Note on `chrome.storage.session` vs `local`: `session` is wiped on browser restart (not on SW eviction). `mcp-task-store.js` and the visual lifecycle both use `session` deliberately — a trigger should not silently resurrect across a full browser restart with a stale tab id. RECOMMEND `chrome.storage.session` for the live snapshot (consistent with both precedents). The trigger *cap* setting mirrors `agent-registry.js` which uses `chrome.storage.local` (a user preference that SHOULD persist) — keep that split.
-
-**Example (onAlarm dispatch branch, mirroring background.js:13284-13301):**
-```javascript
-// background.js — inside the single chrome.alarms.onAlarm listener, ADD a branch
-// BEFORE the existing mcpVisualDeath / telemetry / reconnect branches:
-if (typeof TriggerLifecycleUtils !== 'undefined'
-    && alarm?.name?.startsWith(TriggerLifecycleUtils.TRIGGER_ALARM_PREFIX)) {   // 'fsbTrigger:'
-  try { await TriggerLifecycleUtils.handleTriggerAlarm(alarm); }                // re-hydrate + re-evaluate
-  catch (err) { console.warn('[FSB TRG] trigger alarm failed (non-blocking):', err?.message); }
-  return;
-}
+**Example (capture shape):**
+```
+debugger.attach -> Network.enable
+on requestWillBeSent(req):  if req.url ~ /api|graphql/ and method in {GET,POST}: stash {url,method,headers,postData}
+on responseReceived(res):   stash {status, mimeType}
+on loadingFinished:         synthesize recipe candidate {endpoint, method, headerMap(safe), csrfSource?, extractPath?}
+-> capability-discovery.proposeRecipe(candidate, origin)  # human/auto promote to memory
 ```
 
-### Pattern 3: Two watch paths, explicit layer placement
+### Pattern 4: Consent gate co-located with the ownership gate (single chokepoint)
 
-**What:** `refresh-poll` and `live-observe` are different data flows that run in different layers.
+**What:** `dispatchMcpToolRoute` already runs `checkOwnershipGate(...)` synchronously before the handler (`mcp-tool-dispatcher.js:406-407`). Add a `checkCapabilityConsentGate({tool, origin})` immediately after it, *before* `route.handler(...)`.
+**When:** Only for `invoke_capability` (and discovery promotion); all other tools pass through unchanged (INV-01 untouched).
+**Trade-offs:** + one audited choke for both identity and consent + Off can hard-refuse before any side effect + per-origin decision is resolvable from the gate's tab context. − must keep the gate synchronous/cheap (Off/Ask/Auto is a `chrome.storage.local` map read, hydrate-on-load like `fsbChangeReportsEnabled` at `mcp-tool-dispatcher.js:14-37`).
 
-**When to use:** Per-trigger selectable (PROJECT.md target feature).
+---
 
-| Step | refresh-poll | live-observe |
-|------|--------------|--------------|
-| Clock | SW `chrome.alarms` `fsbTrigger:<id>` (`periodInMinutes`, default ~60s, hard floor ~30s — Chrome MV3 prod alarm minimum is 30s, same constraint the visual lifecycle documents) | Content MutationObserver fires on DOM change; SW alarm is a low-freq watchdog only |
-| Page reload | SW reloads the OWNED tab via the existing background reload path (same path the `refresh` tool uses), background-tab, no focus steal | none — element watched in place |
-| Element read | SW → `chrome.tabs.sendMessage(tabId, {action:'triggerRead', selector, extract})` → content reads via existing selector/extraction utilities | content reads on each mutation; debounced |
-| Value extraction | content (reuse `selectors.js` / `dom-analysis.js` value reads) | content (same) |
-| Comparison / fire decision | **SW** (`trigger-manager.evaluate`) — keeps fire logic in one place, survivable | **SW** — content sends raw value deltas; SW evaluates (so eviction can't drop the fire decision) |
-| Reporting | SW writes snapshot + (if blocking) resolves the held promise | identical |
+## 5. Data Flow
 
-**Critical placement decision: fire evaluation lives in the SW, not the content script.** Content scripts die on navigation and are not persisted; the SW (re-hydratable from `chrome.storage.session`) is the durable authority. Content's job is narrow: read the element value and report it. This mirrors how `dom-stream.js` content sends raw mutations and the SW/dashboard interprets them.
+### Invoke flow (the happy path)
 
-**Live-observe survival nuance:** the content MutationObserver survives SW eviction (it lives in the page), but its `chrome.runtime.sendMessage` calls will *wake* the SW. If the page is reloaded/navigated, the observer dies — so live-observe triggers MUST re-arm the observer on `chrome.webNavigation`/`chrome.tabs.onUpdated` for their owned tab (FSB already re-injects content scripts after navigation per the BF-cache resilience work in v0.9.11). The low-freq watchdog alarm is the backstop that detects "observer should be running but the SW has no record of a recent report" and re-issues `triggerObserveStart`.
-
-### Pattern 4: Visual feedback — analyzing pulse + "watching a trigger" label
-
-**What:** While a trigger is armed, the watched element shows a *gentle analyzing pulse* (a variant of the existing orange glow), and the viewport monitor labels itself "watching a trigger."
-
-**When to use:** On arm; stop on fire/cancel; survive reload in refresh-poll mode.
-
-**Wiring (grounded in `visual-feedback.js`):**
-- The orange glow is `HighlightManager.show(element, {glowColor, duration})` (visual-feedback.js:33-72). The steady glow uses a static `box-shadow`. The analyzing pulse is a **new glow variant** — a CSS keyframe animation toggled by a flag (e.g. `HighlightManager.showPulse(element)` or a `{pulse:true}` option) so it visually differs from the action-targeting glow.
-- The element pulse is triggered exactly like the existing `highlightElement` content-router case (messaging.js:1229-1243): SW sends `chrome.tabs.sendMessage(tabId, {action:'triggerPulseStart', selector})`; content resolves the element and applies the pulse. `triggerPulseStop` clears it.
-- The "watching a trigger" label rides on the existing `overlayState` contract (`overlay-state.js` + `ViewportGlow`). `ViewportGlow` already has `state-thinking` (orange, "AI analyzing page") at visual-feedback.js:884-1108. ADD a `mode`/`phase`-style field (e.g. `overlayState.mode = 'trigger-watch'`) so the monitor renders "Watching a trigger" instead of a task phase. This is additive to the overlay state object — no existing field changes.
-- **Lifecycle:** pulse starts when `trigger-manager.arm()` succeeds; stops on fire or `stop_trigger`. In **refresh-poll mode the pulse must survive reload** — so on each poll tick after the tab reloads and content re-injects, the SW re-issues `triggerPulseStart` (same way the dashboard re-issues `dash:dom-stream-start` after navigation, dom-stream.js:1073-1075). In live-observe mode the pulse persists with the page until navigation, then re-arms with the observer.
-
-**Example (pulse glow variant, extending HighlightManager):**
-```javascript
-// content/visual-feedback.js — HighlightManager gets a pulse variant.
-// Steady glow (existing): static box-shadow. Pulse (new): animated, distinct.
-showPulse(element) {
-  element.style.setProperty('animation', 'fsb-trigger-pulse 1.8s ease-in-out infinite', 'important');
-  // @keyframes fsb-trigger-pulse cycles box-shadow opacity — gentle, not the
-  // steady action glow. Injected into the same Shadow DOM style sheet so it
-  // inherits the existing CSS isolation (Shadow DOM decision, PROJECT.md).
-}
+```
+MCP client: invoke_capability("github.create_issue", {repo, title})
+  -> mcp/src/tools/capabilities.ts (queue.enqueue; bridge 'mcp:capabilities-invoke')
+  -> WS bridge (data only; NO cookies/CSRF on the wire)
+  -> dispatchMcpToolRoute  [ownership gate]  [NEW consent gate: Off? Ask? Auto?]
+  -> capability-router.resolve(slug, origin)   # learned(O) > handler > recipe > model-prior
+  -> capability-interpreter.template(recipe, args, origin)   # build fetch spec (SW)
+  -> chrome.scripting.executeScript({world:'MAIN', func: capabilityFetchInPage, args:[spec]})
+       PAGE: read CSRF (if declared) -> fetch(url,{credentials:'include'}) -> json
+  -> response normalized -> capability-audit.append({origin, slug, ok, ts})   # NO secrets
+  -> mapFSBError -> MCP client
+       (on break: router -> DOM fallback via executeTool(...), still completes)
 ```
 
-### Pattern 5: Concurrency cap mirroring the agent cap
+### Discovery -> learn flow
 
-**What:** A configurable cap on concurrent armed triggers (1-64, sensible default), enforced at arm time with a fail-loud typed error.
+```
+user (Auto/Ask origin) does authenticated work
+  -> capability-discovery attaches CDP Network -> captures real call
+  -> synthesize candidate recipe (endpoint/method/headers/csrf/extract) -- store SHAPE not PII
+  -> promote: lib/memory/memory-storage persist createProceduralMemory(typeData=recipe)
+  -> next invoke at that origin: router finds learned recipe first (catalog auto-grew)
+```
 
-**When to use:** Always (PROJECT.md target feature: "mirrors the v0.9.60 agent/tab cap: 1-64, sensible default").
+### State / consent
 
-**Recommendation:** Mirror `agent-registry.js` cap machinery exactly (lines 52-76, 302-308): a `chrome.storage.local` key `fsbTriggerCap`, `FSB_TRIGGER_CAP_DEFAULT` (recommend 8 to match the agent cap), `MIN=1`, `MAX=64`, clamp helper, and a typed reject `{error:'TRIGGER_CAP_REACHED', code:'TRIGGER_CAP_REACHED', cap, active}` when arming the (N+1)th trigger. Grandfather active triggers when the cap is lowered (same as agents). Surface the control in `control_panel.html` next to the existing Concurrency Cap control.
-
-**Tab ownership interaction (the subtle part):**
-
-- **Each trigger binds to exactly one tab** (the tab it was armed against), resolved via the existing agent-scoped tab resolver (`utils/agent-tab-resolver.js`, `resolveAgentTabOrError`). A trigger does NOT *exclusively lock* the tab — locking is wrong because the user (or another agent) may keep using that tab.
-- **Multiple triggers CAN share a tab.** Two live-observe triggers watching two elements on the same crypto dashboard is a legitimate case. They register independent MutationObservers, or (preferable for perf) the content module multiplexes one observer over multiple target elements.
-- **refresh-poll + live-observe on the SAME tab is a conflict** and must be rejected or coordinated: a refresh-poll trigger *reloads* the tab, which would destroy a co-located live-observe trigger's observer. RECOMMEND: at arm time, `trigger-manager.js` checks the target tab's existing triggers; if a refresh-poll trigger would reload a tab that hosts a live-observe trigger (or vice versa), reject with a typed `TRIGGER_TAB_WATCH_CONFLICT` and steer the caller to a separate tab (FSB's forced-new-tab pooling from v0.9.60 already supports background tab creation). Two refresh-poll triggers on one tab must *coordinate their reload cadence* (one reload serves both reads) rather than reload twice.
-- **Ownership is reused, not reinvented:** trigger arm/stop/status go through the same `dispatchMcpToolRoute` ownership gate as every other MCP tool (mcp-tool-dispatcher.js:389 inline gate). Cross-agent `stop_trigger` on a trigger you don't own rejects with `TAB_NOT_OWNED`, consistent with INV-01 error vocabulary.
-
-### Pattern 6: Blocking vs detached return (reuse the run_task return machinery)
-
-**What:** `trigger()` blocks by default (holds the MCP call open with `notifications/progress` heartbeats, resolves on fire or timeout); a `block:false` flag returns a `trigger_id` immediately for polling via `get_trigger_status`/`list_triggers`.
-
-**Recommendation:** **Reuse the `_handleStartAutomation` return pattern** (mcp-bridge-client.js:1014-1158) for the blocking path — this is the one place run_task machinery IS reused, because the blocking-hold-with-heartbeats problem is identical. The blocking `trigger()` handler:
-1. Arms the trigger (`trigger-manager.arm()` → writes `armed` snapshot, sets alarm or starts observer, starts pulse).
-2. Returns a Promise with the same `settle()` single-resolve guard + 30s heartbeat `setInterval` (heartbeat payload = `{trigger_id, alive, last_value, evaluated_count, elapsed_ms}`) + a configurable timeout (NOT a hard 600s — triggers legitimately run longer, but blocking ones get a safety ceiling per PROJECT.md).
-3. Resolves when `trigger-manager` emits a fire event (via a dedicated `globalThis.fsbTriggerLifecycleBus`, mirroring the `globalThis.fsbAutomationLifecycleBus` run_task uses) OR on timeout (resolving with the persisted `partial_state` / "still armed" snapshot, mirroring run_task's `partial_outcome:'timeout'`).
-4. On SW eviction during a blocking call: bridge drops → server catches `Bridge disconnected` → reads persisted snapshot (mirror autopilot.ts:144-197 `sw_evicted` shape) → returns the armed/last-value state. The trigger keeps running (its alarm survives); the caller can re-poll with `get_trigger_status`.
-
-The detached path is trivial: arm and return `{trigger_id, status:'armed'}` immediately; no held promise. `get_trigger_status(trigger_id)` and `list_triggers()` are read-only reads of `trigger-store.js` (mirror `get_task_status` / `list_sessions`). `stop_trigger` is a mutation (clears alarm/observer/pulse), so it goes through the queue like `stop_task`.
-
-**MCP-side shape (mirroring autopilot.ts + observability.ts):**
-```typescript
-// mcp/src/tools/trigger.ts
-server.tool('trigger', '<desc>', { selector: z.string(), condition: <z schema>, watch: <enum>,
-            extract: z.enum(['text','number','attribute']).optional(),
-            block: z.boolean().optional() /* default true */ },
-  async (args, extra) => {
-    if (!bridge.isConnected) return mapFSBError({success:false, error:'extension_not_connected'});
-    return queue.enqueue('trigger', async () =>
-      sendAgentScopedBridgeMessage(bridge, agentScope, 'mcp:arm-trigger', args,
-        { timeout: <configurable safety ceiling>, onProgress /* reshape heartbeats, like run_task */ }));
-  });
-// get_trigger_status + list_triggers: read-only → ALSO added to queue.ts readOnlyTools set.
-// stop_trigger: mutation → goes through the queue like stop_task.
+```
+chrome.storage.local:
+  fsbCapabilityConsent : { [origin]: 'off' | 'ask' | 'auto' }   # per-origin gate
+  fsb_memories         : [...procedural recipe memories...]      # learned catalog (existing key)
+  fsbCapabilityAudit   : append-only ring (origin, slug, outcome, ts; NO auth material)
+extension bundle (read-only):
+  catalog/recipes/*.json (data)  +  catalog/handlers/*.js (code)
+FSB server (data only):
+  GET /capabilities/recipes?origin=... -> declarative recipe JSON (interpreted locally; never eval'd)
 ```
 
 ---
 
-## Data Flow
-
-### Arm flow (blocking, refresh-poll)
-
-```
-MCP trigger(selector, threshold>=100, watch=refresh-poll, block=true)
-   ↓ JSON-RPC
-trigger.ts server.tool → queue.enqueue → sendAgentScopedBridgeMessage('mcp:arm-trigger')
-   ↓ WebSocket
-mcp-tool-dispatcher route 'mcp:arm-trigger' → ownership gate → trigger-manager.arm()
-   ↓
-trigger-manager: cap check → resolve owned tab → read INITIAL value (content) →
-   write 'armed' snapshot (trigger-store) → set chrome.alarms fsbTrigger:<id> →
-   send triggerPulseStart to content (analyzing pulse)
-   ↓
-mcp-bridge-client blocking handler: hold promise + 30s heartbeats (notifications/progress)
-   ⋮ (SW may evict here — alarm survives, promise's bridge drops, server reads snapshot)
-[alarm tick] → background.js onAlarm 'fsbTrigger:<id>' → trigger-lifecycle.handleTriggerAlarm
-   ↓
-reload owned tab (background) → re-read element (content triggerRead) →
-   trigger-manager.evaluate(last, current, condition)
-   ↓ condition met
-emit fire → fsbTriggerLifecycleBus → blocking promise settle(fire_envelope) →
-   write 'fired' snapshot → clear alarm → triggerPulseStop
-   ↓ JSON-RPC result
-MCP client receives fire_envelope ("what happened": old→new value, url, timestamp)
-```
-
-### Arm flow (detached, live-observe)
-
-```
-MCP trigger(selector, contains="In Stock", watch=live-observe, block=false)
-   ↓
-... same path to trigger-manager.arm() ...
-   ↓
-trigger-manager: send triggerObserveStart(selector, extract) to content →
-   content/trigger-observe.js starts MutationObserver on the element (debounced) →
-   write 'armed' snapshot → low-freq watchdog alarm → triggerPulseStart
-   ↓ returns immediately
-MCP client gets { trigger_id, status:'armed' }
-   ⋮ later, page DOM mutates
-content observer (debounced) → chrome.runtime.sendMessage('triggerValueChanged', {trigger_id, value})
-   ↓ (wakes SW if evicted)
-background.js onMessage → trigger-manager.evaluate → condition met → fire →
-   write 'fired' snapshot → clear observer + alarm + pulse
-   ↓
-MCP client later calls get_trigger_status(trigger_id) → reads 'fired' snapshot → fire_envelope
-```
-
-### State management (where state lives)
-
-```
-chrome.storage.session  'fsbTriggerRegistry'  → live trigger snapshots (survives SW evict,
-                                                 wiped on browser restart — intentional)
-chrome.alarms           'fsbTrigger:<id>'      → poll clock (refresh-poll) / watchdog (live)
-chrome.storage.local    'fsbTriggerCap'        → user cap preference (survives restart)
-SW memory (ephemeral)   in-flight blocking promises, heartbeat timers (rebuilt from snapshot
-                                                 on SW restart via restoreTriggersFromStorage)
-content (page memory)   the MutationObserver instance (live-observe; dies on navigation,
-                                                 re-armed by SW watchdog)
-```
-
-**On reusing the Lattice survivability adapter (explicit answer):** `extension/ai/lattice-runtime-adapter.js` implements Lattice's `SurvivabilityAdapter<TState>` over `chrome.storage.session` (serialize/deserialize/onEviction/resume). It is *available* and conceptually aligned, BUT it is keyed and shaped for **agent-loop session state** (the `run_task` runtime), and INV-06 pins the Lattice package. RECOMMEND: **do NOT route trigger snapshots through the Lattice adapter for v0.11.0.** Use `chrome.storage.session` directly via `trigger-store.js`, exactly as `mcp-task-store.js` does today (which also did not route through Lattice). Rationale: (1) lower risk — no coupling to the pinned Lattice contract or the offscreen host lifetime (the offscreen page "evicts before the SW" per lattice-host.js:71-72, which is *worse* survivability than a direct alarm); (2) the trigger snapshot is a flat record, not a Lattice `TState`; (3) keeps the offscreen document off the trigger hot path entirely. The Lattice *Capability Receipt* shape MAY inform the `fire_envelope` ("what happened") payload as a design reference, but generating a signed receipt is a deferred candidate, not v0.11.0 scope.
-
-### Key data flows
-
-1. **Tool registration (INV-01/02):** `tool-definitions.js TOOL_REGISTRY` += 4 additive defs → the `.cjs` mirror (`ai/tool-definitions.cjs`, consumed by `queue.ts`) regenerates → `runtime.ts` calls `registerTriggerTools` alongside the existing 5 registrars. Existing 52 tool schemas stay byte-identical (INV-01). Same registry feeds autopilot and MCP (INV-02): autopilot's `agent-loop.js getPublicTools()` reads the same `TOOL_REGISTRY`, so the AI can arm triggers too.
-2. **Fire decision durability:** value reads happen in content; the compare/fire decision happens in the SW (`trigger-manager.evaluate`) backed by `chrome.storage.session`, so an eviction between "value read" and "fire decision" cannot drop a fire — the next alarm tick re-reads and re-evaluates against the persisted `last_value`.
-3. **Visual lifecycle:** arm → `triggerPulseStart`; each refresh-poll reload → re-issue `triggerPulseStart` (survive reload); fire/stop → `triggerPulseStop`; overlay `mode:'trigger-watch'` drives the "watching a trigger" label.
-
----
-
-## Scaling Considerations
+## 6. Scaling Considerations
 
 | Scale | Architecture adjustments |
 |-------|--------------------------|
-| 1-8 triggers (default cap) | Each refresh-poll trigger = one alarm; live-observe = one observer + one watchdog alarm. No concern. Chrome alarms are cheap. |
-| 8-64 triggers (max cap) | Coordinate co-located refresh-poll reloads (one reload per tab per cadence, not per trigger) to avoid hammering a site and tripping rate limits (PROJECT.md "hard floor; avoid hammering sites"). Multiplex live-observe onto one observer per tab. |
-| >64 | Rejected by cap (fail-loud `TRIGGER_CAP_REACHED`). No silent backpressure — same posture as the agent cap (PROJECT.md decision: "fail-loud on cap"). |
+| 1 origin / handful of recipes | Bundled recipes + model-prior only; discovery off by default; consent default Off (supervised). Nothing to tune. |
+| Dozens of origins / learned recipes growing | Procedural-memory cap (`MAX_MEMORIES=500`, `memory-schemas.js:23`) starts to bind — add per-origin recipe cap + LRU by `successRate`/`lastSuccessAt`; memory consolidation (`memory-consolidator.js`) already exists to prune. |
+| Long-tail catalog streamed from server | Cache server recipes in `chrome.storage.local` with an ETag/version; never block invoke on a network fetch (fall back to bundled/model-prior if the server is slow/down). Server stays *data-only* (MV3). |
 
 ### Scaling priorities
 
-1. **First bottleneck: refresh-poll reload storms.** N triggers on one site reloading independently. Fix: per-tab reload coalescing in `trigger-manager` (one reload serves all refresh-poll triggers on that tab; hard floor on interval). This is the single most important perf guard.
-2. **Second bottleneck: alarm minimum granularity.** Chrome MV3 production alarms fire at minimum 30s (`mcp-visual-session-lifecycle.js:64-67` documents this). Sub-30s polling is impossible via alarms — enforce a ~30s hard floor and document it. Live-observe (event-driven, no alarm floor) is the answer for truly real-time tickers.
+1. **First bottleneck — procedural-memory size.** Learned recipes share the 500-memory / 8MB budget with all other memories. Mitigation: store recipe *shape* (no response bodies), per-origin LRU, lean on existing consolidation.
+2. **Second bottleneck — MCP context budget.** If `search_capabilities` returns too many slugs, the model context bloats. Mitigation: cap results, rank by origin-match + `successRate`, paginate. (This is *why* progressive disclosure exists.)
 
 ---
 
-## Anti-Patterns
+## 7. Anti-Patterns
 
-### Anti-Pattern 1: Running the watcher inside the agent loop / `activeSessions`
+### Anti-Pattern 1: Adding `search_capabilities`/`invoke_capability` to `TOOL_REGISTRY`
+**What people do:** put the new tools in the canonical registry "for parity."
+**Why it's wrong:** registry membership forces exposure in *both* `getPublicTools()` (autopilot LLM list, `agent-loop.js:674`) and every MCP registration filter (`manual.ts`/`read-only.ts`), and risks touching the `.cjs` mirror + schema-lock tests (INV-01 surface). It also conflates the lean *capability* surface with the 55 *primitive* tools.
+**Do this instead:** register via `server.tool()` in a dedicated `capabilities.ts` (vault-tool precedent, `vault.ts:16`), and achieve parity at the **runtime** layer (shared `capability-router.js`), not the tool layer.
 
-**What people do:** Reuse `agent-loop.js`'s iterator or the `activeSessions` map to "host" the standing trigger.
-**Why it's wrong:** INV-04 freezes the `setTimeout`-chained iterator (lines 2003/2702/2771). A standing watcher has no AI iteration, no completion scoring, and a far longer lifetime. Grafting it on risks the load-bearing iterator and pollutes the session schema.
-**Do this instead:** A parallel trigger registry (`trigger-store.js`/`trigger-lifecycle.js`/`trigger-manager.js`), exactly as v0.9.36 visual sessions and v0.9.60 run_task tracking are kept separate from `activeSessions`.
+### Anti-Pattern 2: Running the authenticated invoke from the background SW `fetch()`
+**What people do:** `fetch(siteApi, {credentials:'include'})` from `background.js`.
+**Why it's wrong:** the SW request is **extension-origin** = cross-origin to the site -> CORS preflight failures on credentialed JSON, and SameSite=Strict/Lax cookies withheld in the third-party context. It silently fails or returns 401/403 on exactly the authenticated endpoints the feature targets.
+**Do this instead:** issue the fetch in the **page MAIN world** via the `execute_js` seam (Decision B). Same-origin, first-party, cookies (HttpOnly) attached by the browser.
 
-### Anti-Pattern 2: Evaluating fire conditions in the content script
+### Anti-Pattern 3: Interpreting server recipes by `eval`/`new Function` on server-supplied strings
+**What people do:** ship "recipes" that are JS snippets and `eval` them for flexibility.
+**Why it's wrong:** that is **remotely hosted code** — a hard MV3 violation and Web Store rejection. (Note FSB's own `execute_js` uses `eval`/`new Function`, but on **user/model-supplied** code at runtime, not server-delivered code — a different trust class.)
+**Do this instead:** recipes are **pure data** (endpoint/method/header-map/CSRF-source/extract-path) consumed by a **fixed bundled interpreter**; only T1a *bundled* handlers contain code, compiled into the extension.
 
-**What people do:** Let the content MutationObserver decide "threshold crossed → fire."
-**Why it's wrong:** Content scripts die on navigation and aren't persisted; an eviction or reload mid-evaluation drops the fire. The "did it cross?" decision needs the durable `last_value` in `chrome.storage.session`.
-**Do this instead:** Content reads and reports raw values; the SW (`trigger-manager.evaluate`) owns the fire decision backed by the persisted snapshot — mirroring `dom-stream.js` (content sends mutations, SW/dashboard interprets).
+### Anti-Pattern 4: Bypassing the dispatch chokepoint for "speed"
+**What people do:** call the capability runtime directly from a new bridge handler that skips `dispatchMcpToolRoute`.
+**Why it's wrong:** it bypasses the identity + ownership gate *and* the new consent gate, breaking the single-chokepoint guarantee and the supervised-safety posture.
+**Do this instead:** route `mcp:capabilities-invoke` through `dispatchMcpToolRoute` so ownership + consent + audit all fire in one place (mirrors how every other MCP tool routes).
 
-### Anti-Pattern 3: A refresh-poll trigger reloading a tab that hosts a live-observe trigger
-
-**What people do:** Allow any mix of watch modes on one tab.
-**Why it's wrong:** The refresh-poll reload destroys the co-located observer; the live-observe trigger silently stops watching.
-**Do this instead:** Detect the conflict at arm time and reject with a typed `TRIGGER_TAB_WATCH_CONFLICT`, steering to a separate (background) tab via the existing forced-new-tab pooling.
-
-### Anti-Pattern 4: New manifest permissions or a new background context
-
-**What people do:** Add permissions or spin up a new persistent worker for "always-on" watching.
-**Why it's wrong:** `manifest.json` already grants `alarms`, `storage`, `unlimitedStorage`, `tabs`, `scripting`, `webNavigation`, `offscreen` — everything trigger needs. MV3 forbids persistent background pages; the alarm+storage+restore pattern IS the MV3-correct "always-on."
-**Do this instead:** Zero manifest changes. Reuse `chrome.alarms` + `chrome.storage.session` + SW-startup restore, exactly like the visual-session lifecycle.
+### Anti-Pattern 5: Persisting response bodies / auth material into memory or the audit log
+**What people do:** store the full API response (with PII) as the "learned recipe," or log the cookie/CSRF for "debuggability."
+**Why it's wrong:** violates "auth material strictly local / never persisted" and leaks PII into `chrome.storage`.
+**Do this instead:** store recipe *shape* only; the audit log records `{origin, slug, outcome, timestamp}` and never secrets (mirror the vault rule "raw secrets never traverse the bridge," `vault.ts:18`, and the `redactForLog` precedent).
 
 ---
 
-## Integration Points
+## 8. Integration Points
 
-### External boundaries
+### External services
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| MCP client ↔ MCP server | JSON-RPC stdio + `notifications/progress` | Blocking `trigger()` streams heartbeats exactly like `run_task`; INV-01 keeps existing tool wires byte-identical |
-| MCP server ↔ SW | WebSocket bridge, `mcp:trigger-*` messages | New message types only; existing `mcp:*` routes untouched |
-| SW ↔ content | `chrome.tabs.sendMessage` (read/observe/pulse) + `chrome.runtime.sendMessage` (value reports) | New `action` cases in `content/messaging.js` router; existing cases untouched |
-| SW ↔ Chrome platform | `chrome.alarms`, `chrome.storage.session/local`, `chrome.tabs`, `chrome.webNavigation` | All already permissioned |
+| Service | Integration pattern | Notes / gotchas |
+|---------|---------------------|------------------|
+| Target site's web API | Page MAIN-world same-origin `fetch({credentials:'include'})` via `execute_js` seam | Carries HttpOnly cookies; no CORS same-origin; needs a tab on that origin (or a public/CORS-enabled API for cross-origin) |
+| FSB server (recipe delivery) | `GET` declarative recipe JSON (DATA only); cached locally with version/ETag | MV3: data only, interpreted locally, never `eval`'d; invoke must not block on it |
+| CDP Network (discovery) | `chrome.debugger.attach({tabId},'1.3')` + `Network.enable` (extend existing debugger block) | Shows DevTools banner (already true for FSB CDP input tools); redact bodies |
 
 ### Internal boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `tool-definitions.js` ↔ autopilot + MCP | shared `TOOL_REGISTRY` array | INV-02: one registry, both consumers; `.cjs` mirror feeds `queue.ts` |
-| `trigger-manager` ↔ `trigger-store` ↔ `trigger-lifecycle` | direct function calls in SW | three new `utils/` modules, importScripts-loaded like the visual lifecycle |
-| `mcp-bridge-client` ↔ `trigger-manager` | `globalThis.fsbTriggerLifecycleBus` (fire events) | mirrors `globalThis.fsbAutomationLifecycleBus` used by run_task |
-| `trigger-manager` ↔ tab ownership | `agent-tab-resolver.js` + `agent-registry.js` ownership gate | reuse, do not reinvent (INV consistency) |
+| MCP server <-> SW | WebSocket bridge messages `mcp:capabilities-search/invoke` (data only) | INV-01: existing tool wires untouched; these are *new* message types |
+| Dispatcher <-> runtime | in-SW function call after ownership+consent gate | single chokepoint preserved (`dispatchMcpToolRoute`) |
+| Autopilot <-> runtime | `tool-executor.js` branch -> `capability-router.js` | INV-02 parity at runtime; iterator untouched (INV-04) |
+| Runtime <-> page | `chrome.scripting.executeScript({world:'MAIN'})` with a fixed bundled func + data spec | the authenticated fetch boundary; MV3-safe |
+| Runtime <-> memory | `lib/memory/*` `createProceduralMemory` / persist / retrieve, per-origin | learned-recipe store reuse (no new store) |
+| Runtime <-> consent/audit | `chrome.storage.local` maps, hydrate-on-load + `onChanged` | mirror `fsbChangeReportsEnabled` hydration pattern |
 
 ---
 
-## Dependency-Ordered Build Sequence
+## 9. Suggested Phase Build Order (dependency-respecting; INV-01..04 + MV3 honored)
 
-Ordered so each phase's output feeds the next (the project's established "data dependency chain for phases" discipline). Each phase is independently testable.
+> Ordering principle: prove the authenticated-fetch seam and the *invoke* path against a single hardcoded recipe FIRST (highest technical risk: cookies/CORS/CSRF), THEN layer catalog tiers, THEN discovery/learning, THEN governance polish. Each phase is independently shippable and keeps the existing surface green.
 
-1. **Storage + lifecycle primitives (foundation).** `utils/trigger-store.js` (clone `mcp-task-store.js`, new key/constants) + `utils/trigger-lifecycle.js` (clone `mcp-visual-session-lifecycle.js` shape: `fsbTrigger:<id>` alarm, restore, tab-close cleanup). Pure modules, Node-testable with mocked `chrome`. *No behavior wired yet — exactly like the visual lifecycle's boot-order note.*
+| # | Phase | Why this order / dependencies | Touches (NEW / MODIFIED) | Invariant watch |
+|---|-------|-------------------------------|--------------------------|-----------------|
+| **P1** | **Authenticated fetch primitive (page MAIN-world) + interpreter skeleton** | De-risk Decision B first: prove a same-origin credentialed `fetch` (incl. CSRF) works through the `execute_js` seam against ONE hardcoded recipe. Everything else depends on this working. | NEW `capability-fetch.js`, `capability-interpreter.js` (minimal); REUSE `execute_js` injection | MV3 (fixed bundled func, no server code) |
+| **P2** | **MCP `search_capabilities` + `invoke_capability` (outside TOOL_REGISTRY) + dispatcher routes** | Once invoke works internally, expose the lean wire surface and wire it through the single chokepoint. Depends on P1. | NEW `mcp/src/tools/capabilities.ts`; MOD `runtime.ts`, `queue.ts`, `mcp-tool-dispatcher.js`, `mcp-bridge-client.js` | INV-01 (existing wires untouched; new types only), lean surface |
+| **P3** | **Catalog registry + router + tiers (T0 model-prior, T1a bundled handlers, T1b bundled recipes) + autopilot path** | With one front door proven, add tiering + the autopilot branch so both surfaces share the engine. Depends on P1/P2. | NEW `capability-catalog.js`, `capability-router.js`, `catalog/recipes/*.json`, `catalog/handlers/*.js`; MOD `tool-executor.js` | INV-02 (shared runtime, no parallel stack), MV3 (data vs bundled-code split) |
+| **P4** | **Consent gate (per-origin Off/Ask/Auto) + audit log, in the dispatch path** | Governance must wrap invoke before any learning/auto behavior ships; default-off keeps FSB supervised. Depends on P2 (gate location) and P3 (something to gate). | NEW `capability-consent.js`, `capability-audit.js`; MOD `mcp-tool-dispatcher.js` (gate after ownership), control-panel UI | supervised-safety, auth-local (no secrets persisted) |
+| **P5** | **CDP Network discovery -> recipe synthesis -> persist as procedural memory (learned tier T2)** | Auto-growth is the highest-novelty; depends on consent (only learn on Ask/Auto origins) + memory schema + router (to consume learned recipes). Last because it builds on all prior layers. | NEW `capability-discovery.js`; MOD `background.js` debugger block (+Network), `memory-schemas.js` (recipe typeData), `memory-storage.js` | MV3 (no server code), redact PII, INV-04 (no iterator change) |
+| **P6** | **Self-healing fallback hardening + DOM-completion bridge + tests/UAT** | Tie recipe-break detection to the existing DOM tools so a broken recipe still completes the task; add schema-lock/parity/consent tests across providers. Depends on everything. | MOD `capability-router.js` (fallback), REUSE `tool-executor.js executeTool`; tests across 7 providers | INV-03 (provider parity), INV-01 (schema-lock test green) |
 
-2. **Trigger manager + fire-condition engine + value extraction + cap.** `utils/trigger-manager.js`: `arm`/`stop`/`evaluate`/`fire`; the four conditions (changed/threshold/equals/contains); smart extraction (strip `$`,`,`,whitespace for number; raw for text; `extract` override); cap enforcement mirroring `agent-registry.js`. Depends on (1). Unit-testable in isolation.
+**Why not discovery-first?** Discovery (P5) is tempting but useless until invoke (P1) and routing (P3) exist to *consume* a learned recipe, and dangerous until consent (P4) gates it. The riskiest unknown is the cookie/CORS/CSRF behavior of the page-context fetch — that must be P1.
 
-3. **SW glue: onAlarm branch + SW-startup restore + tab-close cleanup.** `background.js`: add the `fsbTrigger:` branch to the single `chrome.alarms.onAlarm` listener (before existing branches), call `restoreTriggersFromStorage()` in the bootstrap pipeline, add `chrome.tabs.onRemoved` trigger cleanup. Depends on (1)+(2). This makes refresh-poll *survive eviction* — the milestone crux — verifiable via alarm-tick tests.
-
-4. **Content live-observe + read + pulse.** `content/trigger-observe.js` (single-element MutationObserver, debounced, reports to SW) + `content/messaging.js` router cases (`triggerObserveStart/Stop`, `triggerRead`, `triggerPulseStart/Stop`) + `content/visual-feedback.js` analyzing-pulse glow variant + `ViewportGlow` "watching" label. Depends on (2)+(3) for the SW side to receive reports and drive pulses.
-
-5. **Tool registry + dispatcher routing (INV-01/02).** `ai/tool-definitions.js` += 4 additive defs; regenerate `.cjs` mirror; `ws/mcp-tool-dispatcher.js` route tables += trigger aliases + `mcp:trigger-*` message routes (with ownership gate). Verifies existing 52 schemas unchanged (schema-lock test) and that autopilot can arm triggers (INV-02). Depends on (2)-(4).
-
-6. **MCP server tools + blocking return.** `mcp/src/tools/trigger.ts` (4 `server.tool()`), `runtime.ts` registration, `queue.ts` read-only set += `get_trigger_status`/`list_triggers`; `ws/mcp-bridge-client.js` blocking `trigger()` heartbeat/settle handler (clone `_handleStartAutomation` shape; trigger-specific timeout ceiling + `partial_state` on eviction). Depends on (5). End-to-end MCP path now closes.
-
-7. **Cap UI + polish + docs.** `control_panel.html` trigger-cap control next to the agent cap; CHANGELOG + mcp/README trigger tool docs; concurrency/conflict edge cases (refresh-poll vs live-observe on same tab → `TRIGGER_TAB_WATCH_CONFLICT`, co-located reload coalescing). Knock-on `fsb-mcp-server@0.10.0` minor bump. Depends on (6).
-
-**Rationale for this order:** survivability primitives (1-3) must exist before anything can be tested for eviction-survival (the milestone's stated crux). Content (4) needs the SW to receive its reports. Registration/MCP (5-6) is meaningless until the watcher works. The blocking-return machinery (6) reuses the most code (`_handleStartAutomation`) and is therefore lowest-risk *last*, after the watcher itself is proven. This matches FSB's prior milestone discipline (e.g. v0.9.60: lifecycle/ownership primitives before MCP surface; v0.9.69: pipeline before consumption surface).
-
----
-
-## NEW vs MODIFIED Summary
-
-**NEW (5):**
-- `extension/utils/trigger-store.js` — snapshot envelope (clone of `mcp-task-store.js`)
-- `extension/utils/trigger-lifecycle.js` — alarm + restore + cleanup (clone of `mcp-visual-session-lifecycle.js`)
-- `extension/utils/trigger-manager.js` — arm/evaluate/fire/stop + cap + tab binding
-- `extension/content/trigger-observe.js` — single-element MutationObserver (live-observe)
-- `mcp/src/tools/trigger.ts` — 4 `server.tool()` registrations
-
-**MODIFIED (8):**
-- `extension/ai/tool-definitions.js` — `TOOL_REGISTRY` += 4 additive defs (+ regenerate `.cjs` mirror)
-- `extension/ws/mcp-tool-dispatcher.js` — route tables (tool aliases + `mcp:trigger-*` messages)
-- `extension/ws/mcp-bridge-client.js` — blocking `trigger()` heartbeat/settle handler
-- `extension/background.js` — onAlarm branch, SW-startup restore, `chrome.tabs.onRemoved` cleanup
-- `extension/content/messaging.js` — router cases (observe/read/pulse)
-- `extension/content/visual-feedback.js` — analyzing-pulse glow variant + "watching" label
-- `mcp/src/runtime.ts` — call `registerTriggerTools(...)`
-- `mcp/src/queue.ts` — `readOnlyTools` += `get_trigger_status`, `list_triggers`
-
-**NO CHANGE:** `manifest.json` (permissions sufficient), all existing 52 tool schemas (INV-01), `agent-loop.js` iterator (INV-04), Lattice package/adapter (INV-06).
+**MV3-survivability across the build:** none of these phases touch the `agent-loop.js` `setTimeout`-chained iterator (INV-04, lines 2725/2794/2804). Invoke is a single bounded async op (like `execute_js` today). If a *long* multi-call capability is ever needed, host the loop in `background.js` driven by `chrome.alarms` (the v0.11.0 trigger precedent) — never in the SW with a naked closure, and never block the MCP `TaskQueue` slot.
 
 ---
 
 ## Sources
 
-- `extension/utils/mcp-task-store.js` — `chrome.storage.session` versioned envelope; the `trigger-store.js` template (HIGH — direct read)
-- `extension/utils/mcp-visual-session-lifecycle.js` — per-entity `chrome.alarms` + storage + SW-startup restore + tab-close cleanup; the `trigger-lifecycle.js` template (HIGH — direct read)
-- `extension/ws/mcp-bridge-client.js:979-1158` — blocking heartbeat/`settle()`/600s safety-net/`partial_state` pattern; the blocking `trigger()` template (HIGH — direct read)
-- `extension/background.js:13283-13360` — single `chrome.alarms.onAlarm` listener with per-prefix branches; the onAlarm dispatch insertion point (HIGH — direct read)
-- `extension/content/dom-stream.js:740-1075` — MutationObserver start/stop + rAF debounce + `chrome.runtime.sendMessage` reporting + message-driven router; the live-observe template (HIGH — direct read)
-- `extension/content/visual-feedback.js:33-72, 884-1108` — `HighlightManager` orange glow + `ViewportGlow` thinking/acting states; the analyzing-pulse + "watching" label wiring (HIGH — direct read)
-- `extension/content/messaging.js:1229-1432` — content router + `highlightElement` precedent; pulse message entry (HIGH — direct read)
-- `extension/ai/tool-definitions.js:36-120, 94, 1213-1254` — shared `TOOL_REGISTRY` + `withVisualSessionFields` + read-only filter; INV-01/02 additive-registration surface (HIGH — direct read)
-- `extension/ws/mcp-tool-dispatcher.js:62-91, 389, 447` — tool-alias + message route tables + inline ownership gate; the routing insertion point (HIGH — direct read)
-- `extension/utils/agent-registry.js:52-76, 302-308, 810-891` — cap machinery (1-64, default 8, fail-loud, grandfather-on-lower); the trigger-cap template (HIGH — direct read)
-- `extension/utils/agent-tab-resolver.js` — `resolveAgentTabOrError`; tab-binding reuse (HIGH — direct read)
-- `extension/ai/lattice-runtime-adapter.js:1-199` — Lattice `SurvivabilityAdapter<TState>` over `chrome.storage.session`; evaluated and deliberately NOT used for trigger snapshots (HIGH — direct read)
-- `extension/offscreen/lattice-host.js:60-72, 240-243` — offscreen host lifetime ("evicts before SW"); rationale for keeping triggers off the offscreen path (HIGH — direct read)
-- `mcp/src/tools/autopilot.ts` — `run_task`/`stop_task`/`get_task_status` family + `sw_evicted` resolve shape; the `trigger.ts` template (HIGH — direct read)
-- `mcp/src/tools/observability.ts` — read-only tool registration shape; the `get_trigger_status`/`list_triggers` template (HIGH — direct read)
-- `mcp/src/runtime.ts:33-41` — single `register*Tools` call site (HIGH — direct read)
-- `mcp/src/queue.ts:30-64` — `readOnlyTools` set + `.cjs` registry bridge (HIGH — direct read)
-- `extension/manifest.json` — `alarms`/`storage`/`unlimitedStorage`/`tabs`/`scripting`/`webNavigation`/`offscreen` permissions already granted (HIGH — direct read)
-- `.planning/PROJECT.md` — v0.11.0 Trigger Tool milestone + invariants INV-01/02/03/04/06 (HIGH — direct read)
+- FSB on-disk source (authoritative for all integration seams, verified 2026-06-19 on `automation-worktree`):
+  - `extension/ws/mcp-tool-dispatcher.js` — `dispatchMcpToolRoute` single chokepoint, ownership gate (lines 394-460), route tables (50-116), consent-hydration precedent (14-37)
+  - `extension/ai/tool-executor.js` — `executeTool` `_route` dispatch (665-695), `execute_js` MAIN-world (374-400)
+  - `extension/ws/mcp-bridge-client.js` — `_handleExecuteJS` MAIN-world `new Function` fetch seam (908-962)
+  - `extension/ai/tool-definitions.js` — `TOOL_REGISTRY` (55 tools), `getToolByName`, schema shape; `execute_js` def (100-120)
+  - `extension/ai/agent-loop.js` — `getPublicTools()` LLM surface (674), `_executeTool` dispatch (2427), `setTimeout` iterator (2725/2794/2804) INV-04
+  - `mcp/src/runtime.ts` — `register*Tools` sequence (36-43)
+  - `mcp/src/tools/manual.ts` — `registerManualTools` (`TOOL_REGISTRY.filter`, `server.tool`, `mcp:execute-action` wire, 209-257)
+  - `mcp/src/tools/vault.ts` — out-of-registry `server.tool()` security-boundary precedent (16-19), "secrets never cross the bridge"
+  - `mcp/src/tools/read-only.ts` / `observability.ts` — read-only data-tool + `search_memory` progressive-disclosure precedent
+  - `mcp/src/tools/schema-bridge.ts` — `tool-definitions.cjs` -> MCP `jsonSchemaToZod` mirror
+  - `extension/lib/memory/memory-schemas.js` — `createProceduralMemory` typeData (91-103), `MAX_MEMORIES`/budget (23-24)
+  - `extension/background.js` — existing `chrome.debugger.attach({tabId},'1.3')` + `sendCommand` CDP plumbing (~13811+, Input.* today; Network.* to add); offscreen host (~15360+)
+  - `extension/manifest.json` — `debugger`, `scripting`, `<all_urls>`, `offscreen` permissions; MAIN-world content script
+  - `extension/config/secure-config.js` — local-only encrypted secret pattern (`chrome.storage.local`, AES-GCM), "never persist secrets" posture
+- `.planning/PROJECT.md` — v0.9.99 milestone goals + INV-01..04; vault/dispatch decisions
+- `.planning/research/ARCHITECTURE.md` (v0.11.0 Trigger) — directly-applicable NEW-files-compose-existing-primitives + parallel-registry + additive-tool-registration architectural precedent
+- Milestone context — OpenTabs `github-api.ts` `fetchFromPage` (page-context same-origin fetch carrying HttpOnly cookies + CSRF scraping + persisted-query-hash discovery)
+- [Same-origin policy (Wikipedia)](https://en.wikipedia.org/wiki/Same-origin_policy) — same-origin requests bypass CORS; HTTPS cookies maintain authenticated sessions
+- [Cross-origin resource sharing (Wikipedia)](https://en.wikipedia.org/wiki/Cross-origin_resource_sharing) — why an extension-origin (SW) fetch is cross-origin to the target site
+- [chrome.cookies API (Chrome for Developers)](https://developer.chrome.com/docs/extensions/reference/api/cookies) — extensions *can* read HttpOnly cookies via this API; FSB deliberately does NOT (page-context fetch instead), keeping auth handling implicit/local
 
 ---
-*Architecture research for: FSB `trigger` tool family MV3 integration*
-*Researched: 2026-06-15*
+*Architecture research for: authenticated-API capability layer integration (FSB v0.9.99)*
+*Researched: 2026-06-19*

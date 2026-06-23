@@ -31,9 +31,24 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone
+## Current Milestone: v0.9.99 Native Capability Catalog (FSB API Execution)
 
-No active milestone is currently planned. Start the next milestone with `$gsd-new-milestone`.
+**Goal:** Give FSB first-class authenticated-API execution as a fast path alongside DOM automation -- match OpenTabs' "call APIs through your authenticated session" capability with zero plugin installs and no MCP tool bloat, backed by FSB's DOM engine as a self-healing fallback.
+
+**Target features:**
+- Lean dispatcher surface: keep the existing ~63 MCP tools byte-stable; add a small handful (e.g. `search_capabilities` + `invoke_capability`) using progressive disclosure (search -> invoke) so the catalog never bloats the MCP context.
+- Capability runtime in the extension: authenticated same-origin fetch primitive (FSB already holds `debugger` + `<all_urls>` + `execute_js`) plus a fixed bundled interpreter that executes capability definitions.
+- MV3-safe code/data split: bundled imperative handlers compiled into the extension for the hard/popular head; server-delivered DECLARATIVE recipes (data, not code -- MV3 prohibits remotely-hosted code) interpreted locally for the easy long tail.
+- Network-capture discovery: use the existing CDP/`debugger` permission to observe a page's real API calls (endpoint, auth, headers, payload) to learn capabilities.
+- Learned recipes via memory: promote successful calls into FSB procedural memory as reusable per-origin recipes that auto-grow the catalog.
+- Self-healing fallback: when a recipe breaks, drop to DOM automation and still complete the task.
+- Consent governance: per-origin Off/Ask/Auto gating + audit log + default-off for authenticated API replay (FSB stays supervised/safe).
+- Out-of-box + optional install: popular capabilities ship bundled; long tail streams from FSB's server; optional explicit install via MCP command or control panel.
+
+**Key context:**
+- Carry hard invariants: INV-01 MCP wire contracts untouched, INV-02 autopilot/MCP tool-surface parity, INV-03 parity across all 7 providers, INV-04 MV3-survivability preserved.
+- Content strategy = port + learn, NOT re-derive ~2,769 service tools from scratch; do not clone OpenTabs' npm-per-plugin model.
+- DOM automation + site guides remain as the universal fallback -- not removed.
 
 ## Last Milestone: v0.12.0 PhantomStream Package Migration
 
@@ -378,7 +393,21 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.12.0 PhantomStream Package Migration initialized -- requirements are complete, roadmap is mapped to Phases 21-25, and Phase 21 package intake is next.)
+(Milestone v0.9.99 Native Capability Catalog in progress; Phases 26, 27, and 28 complete. Next: Phase 999.1 (mcp-tool-gaps-click-heuristics), then Phase 29 Catalog + Tiered Router. Phase 28's live MCP-client end-to-end browser smoke is recorded as a `human_needed` UAT (28-HUMAN-UAT.md), consistent with the Phase 27 FETCH-05 posture; all automated SURF-01..06 gates are green. Roadmap continues integer phases from v0.12.0's Phase 25.)
+
+### Validated (v0.9.99)
+
+- [x] CAP-01: A versioned closed-vocabulary recipe JSON Schema defines a recipe as pure data; out-of-vocabulary/forbidden (script/expr/transform/code/fn/js) fields are rejected with a typed RECIPE_* error -- Phase 26
+- [x] CAP-02: The fixed bundled interpreter binds a validated recipe to a closed four-member auth-strategy enum and emits a bound request spec, never via eval/new Function/import(), and STOPS before any network call (the MAIN-world fetch is Phase 27) -- Phase 26
+- [x] CAP-03: Recipes + invocation params are validated in the service worker by the eval-free `@cfworker/json-schema` validator; invalid/unknown-opcode input is rejected with a typed error (interpreter never throws, even on hostile `$ref` params) -- Phase 26
+- [x] CAP-04: A Node CI guard (`scripts/verify-recipe-path-guard.mjs`, chained into `validate:extension` -> `ci/all-green`) fails the build on any eval/new Function/import( reachable from the six-file recipe-path allowlist, runs accept/reject fixtures, and self-asserts the three sanctioned `execute_js` sites are excluded; an allowlist-drift check forces new `capability-*.js` modules onto the list -- Phase 26
+- [x] CAP-05: The interpreter + three vendored eval-free libraries (`@cfworker/json-schema` IIFE, `minisearch`, `jmespath`) ship inside the extension via additive `importScripts`, with no remotely-hosted code and no manifest/permission change -- Phase 26
+- [x] SURF-01: `search_capabilities` returns ranked, schema-on-hit results (<=5) for an intent query, biased by the owned tab's origin resolved authoritatively SW-side -- Phase 28
+- [x] SURF-02: `invoke_capability` executes a selected capability via the direct routerless path (slug -> `interpretRecipe` -> `executeBoundSpec`) with SW-side param validation and returns a structured result; unknown slug surfaces `RECIPE_NOT_FOUND` verbatim -- Phase 28
+- [x] SURF-03: Both tools register OUTSIDE `TOOL_REGISTRY` via `server.tool()` (vault precedent), keeping the existing ~63 MCP tool schemas byte-identical -- INV-01 proven (frozen `EXPECTED_NON_TRIGGER_REGISTRY_HASH` unmoved; 65 tools on the wire = 63 + 2) -- Phase 28
+- [x] SURF-04: A persisted `minisearch` index over a separate capability-descriptor doc (intent synonyms + service + action verb + side-effect class; the locked recipe schema untouched) snapshots to `chrome.storage.local` under `fsbCapabilityIndex` with a `catalogVersion` stamp; one shared `INDEX_OPTIONS` is reused at build and `loadJSON` -- Phase 28
+- [x] SURF-05: `search_capabilities` is read-only and bypasses the mutation queue (joins `readOnlyTools`); `invoke_capability` is serialized through it -- Phase 28
+- [x] SURF-06: An eval harness measures recall@k + wrong-invoke over a seeded near-neighbor fixture set and gates the build (recall@5=1.000, wrong-invoke=0; a naive index provably fails the gate). Live MCP-client end-to-end smoke recorded as `human_needed` UAT -- Phase 28
 
 ### Validated (v0.9.60)
 
@@ -629,4 +658,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-17 -- v0.12.0 PhantomStream Package Migration archived; no active milestone is currently planned.*
+*Last updated: 2026-06-20 -- v0.9.99 Phase 27 (Authenticated Fetch Primitive MAIN-world + Origin-Pin + Resume-Sidecar) complete; FETCH-01..05 validated in code (FETCH-05 live logged-in-shape assertion recorded as human_needed UAT debt -- the page-MAIN-world fetch primitive, two-point origin-pin, and run_task resume-sidecar with RECOVERY_AMBIGUOUS are proven; the live GitHub-cookie observation awaits a signed-in browser session). Next: Phase 28 (Lean MCP Surface + Capability Search + Eval Harness).*

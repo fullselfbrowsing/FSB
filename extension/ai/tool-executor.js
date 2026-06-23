@@ -399,6 +399,28 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
         return makeResult({ success: false, error: execResult?.error || 'JS execution returned no result' });
       }
 
+      case 'upload_file': {
+        // Phase 34: set a real file from disk on an <input type=file> via CDP
+        // DOM.setFileInputFiles. Same shared background helper the MCP front
+        // door uses, so the path denylist + audit cover this autopilot path too.
+        const selector = params?.selector;
+        const filePath = params?.file_path;
+        if (!selector || !filePath) {
+          return makeResult({ success: false, error: 'upload_file requires selector and file_path' });
+        }
+        const uploadFn = (typeof globalThis !== 'undefined' && typeof globalThis.executeUploadFile === 'function')
+          ? globalThis.executeUploadFile
+          : null;
+        if (!uploadFn) {
+          return makeResult({ success: false, error: 'upload_file handler unavailable' });
+        }
+        const r = await uploadFn(tabId, selector, filePath);
+        if (r && r.success) {
+          return makeResult({ success: true, hadEffect: true, result: r });
+        }
+        return makeResult({ success: false, error: (r && r.error) || 'upload_file failed' });
+      }
+
       case 'trigger':
       case 'stop_trigger':
       case 'get_trigger_status':
@@ -643,6 +665,79 @@ const AUTOPILOT_PARAM_TRANSFORMS = {
 };
 
 // ---------------------------------------------------------------------------
+// Capability autopilot front door (CAT-04 / INV-02 / D-11)
+// ---------------------------------------------------------------------------
+
+// The two capability tools are OUT-of-registry (INV-01), so _te_getToolByName()
+// returns null for them and executeTool() would die at "Unknown tool" BEFORE the
+// _route switch is ever consulted. The capability branch therefore CANNOT be an
+// executeBackgroundTool switch case (the trigger branch lives there only because
+// the trigger tools ARE in TOOL_REGISTRY). It MUST be a guard at the TOP of
+// executeTool, before _te_getToolByName -- the Pitfall-1 correction.
+const CAPABILITY_TOOL_NAMES = new Set(['invoke_capability', 'search_capabilities']);
+
+/**
+ * Autopilot front door for the capability tools (CAT-04 / INV-02).
+ *
+ * Mirrors the `trigger` branch SHAPE (strip ownership via buildAutopilotTriggerParams,
+ * source:'autopilot', call the SW-global, wrap in makeResult) but at a DIFFERENT hook
+ * point and against a DIFFERENT global: it calls the SAME globalThis.FsbCapabilityRouter
+ * the MCP dispatcher calls -- one engine, two thin front doors. No parallel autopilot
+ * stack. The router routes every credentialed call through executeBoundSpec, which
+ * re-asserts the active-tab origin-pin, so this branch is not a pin bypass.
+ *
+ * @param {string} name - 'invoke_capability' | 'search_capabilities'
+ * @param {Object} params - Tool params (slug/params for invoke; query for search)
+ * @param {number} tabId - Chrome tab ID the autopilot is acting against
+ * @returns {Promise<Object>} makeResult-shaped { success, hadEffect, error, navigationTriggered, result }
+ */
+async function executeCapabilityToolForAutopilot(name, params, tabId) {
+  const router = (typeof globalThis !== 'undefined') ? globalThis.FsbCapabilityRouter : null;
+  if (!router || typeof router.invoke !== 'function') {
+    return makeResult({ success: false, error: 'FsbCapabilityRouter unavailable' });
+  }
+
+  // Strip agent_id/ownership_token, normalize the tab alias, inject tab_id -- the
+  // same ownership-strip the trigger branch uses.
+  const finalParams = buildAutopilotTriggerParams(params, tabId);
+
+  // Resolve the active-tab origin as the catalog bias input. executeBoundSpec re-pins
+  // the active tab regardless, so a null origin here is non-fatal (the pin still holds).
+  let origin = null;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+  } catch (_) {
+    origin = null;
+  }
+
+  let response;
+  if (name === 'invoke_capability') {
+    // Route a slug through the shared engine -- may mutate.
+    response = await router.invoke(finalParams.slug, finalParams.params || {}, {
+      origin,
+      tabId,
+      source: 'autopilot'
+    });
+  } else {
+    // search_capabilities never mutates: it queries the MiniSearch index directly.
+    const searchMod = (typeof FsbCapabilitySearch !== 'undefined') ? FsbCapabilitySearch : null;
+    const results = (searchMod && typeof searchMod.search === 'function')
+      ? searchMod.search(finalParams.query || '', origin, 5)
+      : [];
+    response = { success: true, results };
+  }
+
+  const success = response && response.success !== false;
+  return makeResult({
+    success,
+    hadEffect: success && name === 'invoke_capability',   // invoke may change state; search never does
+    error: success ? null : (response?.error || response?.errorCode || null),
+    result: response
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -663,6 +758,12 @@ const AUTOPILOT_PARAM_TRANSFORMS = {
  * @returns {Promise<Object>} Structured result: {success, hadEffect, error, navigationTriggered, result}
  */
 async function executeTool(name, params, tabId, options = {}) {
+  // Capability front door (CAT-04): the two capability tools are out-of-registry,
+  // so this guard MUST run BEFORE _te_getToolByName (else they die at "Unknown tool").
+  if (CAPABILITY_TOOL_NAMES.has(name)) {
+    return executeCapabilityToolForAutopilot(name, params, tabId);
+  }
+
   const tool = _te_getToolByName(name);
 
   if (!tool) {
@@ -713,5 +814,5 @@ function isReadOnly(name) {
 
 // CommonJS for Chrome extension context and Node.js require()
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { executeTool, isReadOnly };
+  module.exports = { executeTool, isReadOnly, executeCapabilityToolForAutopilot };
 }

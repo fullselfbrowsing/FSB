@@ -15,9 +15,9 @@
 
 **Control your browser from any MCP client.**
 
-*Manual browser tools, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
+*Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-63-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-66-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -32,7 +32,7 @@ The server supports two operating styles:
 - **Manual mode**: the MCP client chooses each step with tools such as `navigate`, `read_page`, `get_dom_snapshot`, `click`, `type_text`, `execute_js`, and `scroll`.
 - **Autopilot mode**: the MCP client calls `run_task`, and FSB's built-in AI loop decides the browser steps.
 
-It also supports trigger watchers, visible client-owned visual sessions, vault autofill tools, session logs, memory search, and diagnostic commands.
+It also supports trigger watchers, visible client-owned visual sessions, capability search/invoke, vault autofill tools, session logs, memory search, and diagnostic commands.
 
 Use this package when you want your AI client to drive the browser directly while still using FSB's DOM analysis, selector handling, visual overlay, action verification, session logging, memory, and vault boundaries.
 
@@ -421,7 +421,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (63 Total)
+## Tools (66 Total)
 
 ### Visual Sessions (2)
 
@@ -448,13 +448,13 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 | `get_trigger_status` | Read one trigger snapshot and latest event. |
 | `list_triggers` | List visible triggers, defaulting to active and attention states. |
 
-### Manual Browser Control (36)
+### Manual Browser Control (37)
 
 | Group | Tools |
 |-------|-------|
 | Power | `execute_js` |
 | Navigation | `navigate`, `search`, `go_back`, `go_forward`, `refresh` |
-| Interaction | `click`, `type_text`, `press_enter`, `press_key`, `select_option`, `check_box`, `hover`, `right_click`, `double_click`, `select_text_range`, `drag_drop`, `drop_file`, `focus`, `clear_input` |
+| Interaction | `click`, `type_text`, `press_enter`, `press_key`, `select_option`, `check_box`, `hover`, `right_click`, `double_click`, `select_text_range`, `drag_drop`, `drop_file`, `upload_file`, `focus`, `clear_input` |
 | Scrolling | `scroll`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element` |
 | Tabs | `open_tab`, `switch_tab`, `close_tab` |
 | Spreadsheets | `fill_sheet` |
@@ -466,6 +466,7 @@ Notes:
 - `type_text` is preferred over setting `.value` manually for React, Angular, Vue, and similar controlled inputs.
 - `select_option` only targets native `<select>` elements; use click patterns for custom dropdowns.
 - `fill_sheet` can take longer than normal tools and uses a longer timeout.
+- `upload_file(selector, file_path, tab_id?)` sets an absolute local disk path on a real `<input type="file">`, including inputs hidden behind styled dropzones. It uses a sensitive-path denylist and audit record; use `drop_file` for synthetic drag/drop cases or pure drag-only zones without a file input.
 
 ### Read Only (8)
 
@@ -479,6 +480,13 @@ Notes:
 | `get_site_guide` | Retrieve site-specific automation guidance. |
 | `list_tabs` | List open tabs. |
 | `read_sheet` | Read spreadsheet ranges. |
+
+### Capabilities (2)
+
+| Tool | Purpose |
+|------|---------|
+| `search_capabilities` | Search first-party API capabilities by intent and return schema-on-hit results. |
+| `invoke_capability` | Invoke a selected capability in the authenticated browser session with validated params and consent/audit gates. |
 
 ### Observability (5)
 
@@ -521,6 +529,7 @@ graph TD
       R["Read-only tools"]
       O["Observability"]
       P["Vault"]
+      C["Capabilities"]
       T["Autopilot"]
       W["Trigger watchers"]
     end

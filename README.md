@@ -75,8 +75,10 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Runs natural language browser tasks from the popup or side panel.
 - Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI-compatible endpoints.
 - Discovers live provider model lists and falls back to bundled defaults.
-- Uses 55 canonical extension tool definitions and 63 registered MCP tools for external clients.
+- Uses 56 canonical extension tool definitions and 66 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
+- Invokes signed, consent-gated first-party API capabilities through the MCP capability surface.
+- Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
 - Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Windsurf, and other MCP clients can drive the browser.
@@ -101,15 +103,16 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Area | Current behavior |
 |------|------------------|
 | DOM analysis | Captures visible and structural page data, element refs, selectors, forms, ARIA labels, and DOM deltas. |
-| Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, and direct JavaScript. |
+| Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
+| Capability catalog | Searches and invokes signed, consent-gated first-party API capabilities through `search_capabilities` and `invoke_capability`. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
 | UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
-| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, and restricted-tab recovery messaging. |
+| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, capability consent/audit gates, upload-path denylisting, and restricted-tab recovery messaging. |
 | Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
-| DOM live preview | PhantomStream-backed capture, renderer, protocol, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
+| DOM live preview | PhantomStream-backed capture, renderer, protocol, media mirroring, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
 
@@ -117,7 +120,11 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 ## What's New
 
-**v0.12.0 — PhantomStream Package Migration.** Dashboard DOM live preview and remote control now run on the published `@full-self-browsing/phantom-stream` package instead of FSB-owned stream engines. The change is internal: MCP tool schemas, pairing, auth, and the dashboard's look are unchanged.
+**Native Capability Catalog (preview): first-party API execution.** Beyond DOM automation, FSB can now search and invoke real first-party authenticated API capabilities with `search_capabilities` and `invoke_capability`. The capability tools register outside the core tool registry, use an origin-biased router, require per-origin consent, verify signed recipes, write no-secrets audit records, and can learn or self-heal recipes through consent-gated discovery. The API-integration model is inspired by **OpenTabs** (see [Acknowledgements](#acknowledgements)). Capability execution is in preview with live-browser UAT pending; the headless test suite is green.
+
+**`upload_file`: real file input uploads.** MCP clients and FSB autopilot can now call `upload_file(selector, file_path, tab_id?)` to set an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
+
+**PhantomStream 0.2.1 media mirroring.** Dashboard DOM live preview now consumes the published PhantomStream media side channel in reference mode, so progressive `<video>` and `<audio>` nodes can mirror alongside DOM snapshots. Adaptive HLS/DASH discovery remains deferred because it would require a new `webRequest` permission; MCP tool schemas, pairing, auth, and dashboard ownership behavior are unchanged.
 
 **v0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
 
@@ -262,7 +269,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 63 registered tools across visual sessions, trigger watchers, manual browser control, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 66 registered tools across visual sessions, trigger watchers, manual browser control, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
 
 The extension connects to the MCP bridge on:
 
@@ -403,21 +410,22 @@ The MCP server does not replace the extension runtime. It is a local bridge that
 
 ### Browser Action Surface
 
-The extension's canonical tool registry covers navigation, search, clicking, typing, keyboard events, scrolling, waiting, tabs, spreadsheets, coordinate interactions, DOM mutation helpers, read-only inspection, site guide lookup, memory search, and task finalization signals.
+The extension's canonical tool registry covers navigation, search, clicking, typing, keyboard events, scrolling, waiting, tabs, spreadsheets, coordinate interactions, real file uploads, DOM mutation helpers, read-only inspection, site guide lookup, memory search, and task finalization signals.
 
-The MCP server exposes a curated public surface around that registry:
+The MCP server exposes a curated public surface around that registry plus direct server-registered companion tools:
 
 | Surface | Count | Examples |
 |---------|-------|----------|
 | Visual sessions | 2 | `start_visual_session`, `end_visual_session` |
 | Autopilot and agent navigation | 4 | `run_task`, `stop_task`, `get_task_status`, `back` |
 | Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
-| Manual control | 36 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `set_attribute` |
+| Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability | 5 | `list_sessions`, `get_logs`, `search_memory` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
-Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, or navigate at the same time.
+Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools.
 
 ---
 
@@ -521,6 +529,8 @@ Use separate API keys for development and production, rotate keys regularly, res
 - FSB does not bypass browser restrictions on internal pages.
 - CAPTCHA solving support is a framework and optional service integration, not a guarantee.
 - The extension can interact with the active page, tabs, and debugger-backed coordinate tools because those permissions are declared in the MV3 manifest.
+- `upload_file` requires an absolute local path, blocks known sensitive path patterns, and records audit metadata without persisting the disk path.
+- Capability invokes are default-off per origin and run through consent, mutation, signature, and audit gates.
 - Saved credentials and payment methods require explicit user configuration and unlock flows.
 - Automation should be treated like a fast assistant operating your browser, not like an unattended production worker.
 
@@ -599,6 +609,10 @@ Before cutting a release, verify:
 The root README should describe what a new user needs to understand before installing, testing, or choosing an integration path. Detailed package behavior belongs in the package README that owns it. This split keeps the public overview useful while still giving maintainers a clear place to update tool surfaces, extension entry points, or showcase deploy instructions.
 
 ---
+
+## Acknowledgements
+
+- **OpenTabs** inspired FSB's Native Capability Catalog (first-party API execution: turning authenticated browser sessions into reusable, signed, consent-gated API capabilities). Thanks for the direction on this approach.
 
 ## License
 

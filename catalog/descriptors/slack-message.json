@@ -1,0 +1,29 @@
+{
+  "slug": "slack.chat.postMessage",
+  "service": "app.slack.com",
+  "intentSynonyms": [
+    "send a slack message",
+    "post a message to a slack channel",
+    "message someone on slack",
+    "drop a note in slack",
+    "tell my team on slack"
+  ],
+  "description": "Post a message to a Slack channel (T1a split-token handler, write)",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": ["channel", "text"],
+    "additionalProperties": false
+  }
+}

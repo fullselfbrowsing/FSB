@@ -22,6 +22,10 @@
     MUTATIONS: "ext:dom-mutations",
     /** Scroll position. Payload: { scrollX, scrollY, streamSessionId, snapshotId } */
     SCROLL: "ext:dom-scroll",
+    /** Media playback state. Payload: MediaSyncPayload */
+    MEDIA: "ext:dom-media",
+    /** Adaptive-manifest discovery hint (opt-in, adapter-originated). Payload: MediaHintPayload */
+    MEDIA_HINT: "ext:dom-media-hint",
     /** Automation overlay state. Payload: { glow, progress, streamSessionId, snapshotId } */
     OVERLAY: "ext:dom-overlay",
     /** Native dialog mirroring. Payload: { dialog: DialogPayload } */
@@ -60,7 +64,7 @@
     ATTR: "attr",
     /** { op:'text', nid, text } — character data change, addressed via parent nid */
     TEXT: "text",
-    /** { op:'value', nid, value?, checked?, selectedValues? } — live form state change */
+    /** { op:'value', nid, value?, checked?, selectedValues?, selectedIndexes? } — live form state change */
     VALUE: "value",
     /** ShadowRootPayload plus op:'shadow-root' — replace/open an observed shadow root */
     SHADOW_ROOT: "shadow-root",
@@ -82,6 +86,35 @@
       return false;
     }
     return true;
+  }
+  var HLS_CONTENT_TYPES = {
+    "application/vnd.apple.mpegurl": true,
+    "application/x-mpegurl": true,
+    "audio/mpegurl": true,
+    "audio/x-mpegurl": true
+  };
+  var DASH_CONTENT_TYPE = "application/dash+xml";
+  function manifestPathOf(url) {
+    if (typeof url !== "string" || url === "") return "";
+    try {
+      return new URL(url).pathname.toLowerCase();
+    } catch (e) {
+      return String(url).split("#")[0].split("?")[0].toLowerCase();
+    }
+  }
+  function classifyManifest(input) {
+    if (!input) return null;
+    const ct = (typeof input.contentType === "string" ? input.contentType : "").split(";")[0].trim().toLowerCase();
+    if (ct) {
+      if (HLS_CONTENT_TYPES[ct]) return "hls";
+      if (ct === DASH_CONTENT_TYPE) return "dash";
+    }
+    const path = manifestPathOf(input.url);
+    if (path) {
+      if (/\.m3u8$/.test(path)) return "hls";
+      if (/\.mpd$/.test(path)) return "dash";
+    }
+    return null;
   }
 
   // node_modules/@full-self-browsing/phantom-stream/src/protocol/envelope.js
@@ -351,6 +384,10 @@
     REMOTE_CONTROL,
     REMOTE_CONTROL_STATE: REMOTE_CONTROL_STATE_VALUES,
     STREAM,
+    // Phase 33 (MEDIA): pure adaptive-manifest classifier (HLS/DASH) used by the
+    // deferred chrome.webRequest MEDIA_HINT discovery path. STREAM.MEDIA /
+    // STREAM.MEDIA_HINT ride the STREAM object above (additive, no new wire shape).
+    classifyManifest,
     createRemoteControlStateEvent,
     createStreamSessionId,
     decodeEnvelope,

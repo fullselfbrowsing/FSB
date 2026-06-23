@@ -1,0 +1,32 @@
+{
+  "slug": "github.issues.create",
+  "service": "github.com",
+  "intentSynonyms": [
+    "create a github issue",
+    "open a new issue on github",
+    "file a github issue",
+    "raise a github ticket",
+    "report a bug on github"
+  ],
+  "description": "Create a new GitHub issue (T1a persisted-query handler, write)",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "repositoryId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "body": {
+        "type": "string"
+      }
+    },
+    "required": ["repositoryId", "title"],
+    "additionalProperties": false
+  }
+}

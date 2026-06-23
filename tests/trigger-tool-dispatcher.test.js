@@ -753,7 +753,10 @@ async function caseStopTerminalCleanupIdempotent() {
     assert.strictEqual(result.stopped, false, terminalStatus + ' stop does not report a new stop');
     assert.strictEqual(result.idempotent, true, terminalStatus + ' stop is idempotent');
     assert.strictEqual(result.status, terminalStatus, terminalStatus + ' stop reports prior status');
-    assert.deepStrictEqual(calls, ['watchdog', 'lifecycle'], terminalStatus + ' stop skips content cleanup and clears watchdog before lifecycle');
+    const expectedCalls = terminalStatus === 'timed_out'
+      ? ['observe', 'watchdog', 'lifecycle']
+      : ['watchdog', 'lifecycle'];
+    assert.deepStrictEqual(calls, expectedCalls, terminalStatus + ' stop runs expected cleanup before lifecycle');
   }
 }
 

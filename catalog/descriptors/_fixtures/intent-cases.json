@@ -1,0 +1,49 @@
+[
+  { "intent": "message my team on slack", "expectedSlug": "slack.post-message" },
+  { "intent": "post a slack message to the channel", "expectedSlug": "slack.post-message" },
+  { "intent": "drop a note in our slack workspace", "expectedSlug": "slack.post-message" },
+
+  { "intent": "send a message on discord", "expectedSlug": "discord.send-message" },
+  { "intent": "post in the discord channel", "expectedSlug": "discord.send-message" },
+  { "intent": "ping everyone in my discord server", "expectedSlug": "discord.send-message" },
+
+  { "intent": "send an email to my colleague", "expectedSlug": "email.send" },
+  { "intent": "compose a new email and send it", "expectedSlug": "email.send" },
+  { "intent": "write an email message", "expectedSlug": "email.send" },
+
+  { "intent": "post a tweet to twitter", "expectedSlug": "twitter.post-tweet" },
+  { "intent": "tweet a status update", "expectedSlug": "twitter.post-tweet" },
+  { "intent": "publish a new tweet", "expectedSlug": "twitter.post-tweet" },
+
+  { "intent": "send a text message by sms", "expectedSlug": "sms.send" },
+  { "intent": "text my friend a quick sms", "expectedSlug": "sms.send" },
+  { "intent": "shoot off an sms text", "expectedSlug": "sms.send" },
+
+  { "intent": "open a new github issue", "expectedSlug": "github.create-issue" },
+  { "intent": "file a bug report on github", "expectedSlug": "github.create-issue" },
+  { "intent": "raise a github ticket for a problem", "expectedSlug": "github.create-issue" },
+
+  { "intent": "permanently delete a github repository", "expectedSlug": "github.delete-repo" },
+  { "intent": "remove my github repo for good", "expectedSlug": "github.delete-repo" },
+  { "intent": "destroy a github project repository", "expectedSlug": "github.delete-repo" },
+
+  { "intent": "delete a file from dropbox", "expectedSlug": "dropbox.delete-file" },
+  { "intent": "permanently remove a dropbox document", "expectedSlug": "dropbox.delete-file" },
+  { "intent": "erase a file in my dropbox", "expectedSlug": "dropbox.delete-file" },
+
+  { "intent": "show the cards on my trello board", "expectedSlug": "trello.list-cards" },
+  { "intent": "list my trello board cards", "expectedSlug": "trello.list-cards" },
+  { "intent": "view what cards are on trello", "expectedSlug": "trello.list-cards" },
+
+  { "intent": "add a new card to my trello board", "expectedSlug": "trello.create-card" },
+  { "intent": "create a trello card task", "expectedSlug": "trello.create-card" },
+  { "intent": "make a new card in trello", "expectedSlug": "trello.create-card" },
+
+  { "intent": "show my upcoming calendar events", "expectedSlug": "calendar.list-events" },
+  { "intent": "list the meetings on my calendar", "expectedSlug": "calendar.list-events" },
+  { "intent": "view my schedule for the week", "expectedSlug": "calendar.list-events" },
+
+  { "intent": "create a new calendar event", "expectedSlug": "calendar.create-event" },
+  { "intent": "schedule a meeting on my calendar", "expectedSlug": "calendar.create-event" },
+  { "intent": "book an appointment on my calendar", "expectedSlug": "calendar.create-event" }
+]

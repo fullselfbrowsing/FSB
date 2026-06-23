@@ -75,6 +75,10 @@
               <i class="fas fa-sliders-h"></i>
               <span>Advanced Settings</span>
             </li>
+            <li class="nav-item" data-section="consent-audit">
+              <i class="fas fa-user-shield"></i>
+              <span>Consent &amp; Audit</span>
+            </li>
             <li class="nav-item" data-section="memory">
               <i class="fas fa-brain"></i>
               <span>Memory</span>
@@ -1135,6 +1139,197 @@
 
         </section>
 
+        <!-- Phase 30 (GOV-07/GOV-08, D-13/D-14/D-15): Consent & Audit Section -->
+        <section class="content-section" id="consent-audit">
+          <div class="section-header">
+            <h2>Consent &amp; Audit</h2>
+            <p>Control which origins FSB may act on, review pending requests, and inspect the redacted audit log.</p>
+          </div>
+
+          <!-- Per-Origin Consent Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-user-shield"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Per-Origin Consent</h3>
+                <p>FSB does nothing on an origin until you allow it. Auto and write access are separate, explicit opt-ins.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <div class="session-list-container" id="consentOriginListContainer">
+                <div class="session-list" id="consentOriginList">
+                  <div class="session-empty-state" id="consentOriginEmptyState">
+                    <i class="fas fa-globe"></i>
+                    <p>No origins seen yet. Origins appear here the first time a tool targets them. Nothing runs until you set a mode above Off.</p>
+                  </div>
+                </div>
+              </div>
+              <!--
+                Per-origin row template (cloned by options.js render() for each seen
+                origin). It carries the canonical structure: an Off/Ask/Auto segmented
+                control (role="radiogroup") + the separate elevated mutating toggle.
+                The Sensitive (amber) / Blocked (red) badges are toggled by render()
+                reading FsbServiceDenylist.classify(origin) -- the SAME source of truth
+                the gate enforces (D-14). Hidden until cloned.
+              -->
+              <template id="consentOriginRowTemplate">
+                <div class="setting-item consent-origin-row" data-origin="">
+                  <div class="setting-label">
+                    <span class="consent-origin-name"></span>
+                    <span class="feature-badge consent-sensitive-badge" style="display:none; background: var(--warning-color);">
+                      <i class="fas fa-triangle-exclamation"></i> Sensitive
+                    </span>
+                    <span class="feature-badge consent-blocked-badge" style="display:none; background: var(--error-color);">
+                      <i class="fas fa-ban"></i> Blocked
+                    </span>
+                  </div>
+                  <div class="site-graph-detail-toggle consent-mode-toggle" role="radiogroup" aria-label="Consent mode for origin">
+                    <button type="button" class="detail-btn" data-mode="off" role="radio" aria-checked="true">Off</button>
+                    <button type="button" class="detail-btn" data-mode="ask" role="radio" aria-checked="false">Ask</button>
+                    <button type="button" class="detail-btn" data-mode="auto" role="radio" aria-checked="false">Auto</button>
+                  </div>
+                  <label class="modern-toggle consent-mutating-toggle">
+                    <input type="checkbox" class="consent-mutating-input" disabled>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Allow mutating (write) calls</span>
+                      <span class="toggle-desc">Lets FSB perform POST/PUT/PATCH/DELETE on this origin. Off by default; read access does not imply write access.</span>
+                    </div>
+                  </label>
+                  <div class="setting-hint consent-origin-hint" style="display:none;"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Pending Requests Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-bell"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Pending Requests</h3>
+                <p>Requests waiting on your decision. Granting one lets the caller retry; FSB never acts without your approval.</p>
+              </div>
+              <span class="sync-status-pill" id="pendingRequestCount" data-state="remote-active" style="display: none;">0 pending</span>
+            </div>
+            <div class="settings-card-content">
+              <div class="session-list-container" id="pendingRequestListContainer">
+                <div class="session-list" id="pendingRequestList">
+                  <div class="session-empty-state" id="pendingRequestEmptyState">
+                    <i class="fas fa-inbox"></i>
+                    <p>No pending requests. When a tool needs consent it appears here. You can also grant access ahead of time from the list above.</p>
+                  </div>
+                </div>
+              </div>
+              <!--
+                Pending request row template (cloned by options.js render() per queued
+                Ask). It exposes only the read-only origin/slug/method/sideEffectClass
+                (no secrets, T-30-16) plus Grant + Deny. Grant writes consent for that
+                exact origin/scope only; Deny removes without granting. Hidden until cloned.
+              -->
+              <template id="pendingRequestRowTemplate">
+                <div class="setting-item pending-request-row" data-origin="" data-scope="">
+                  <div class="setting-label">
+                    <span class="pending-request-origin"></span>
+                    <span class="pending-request-meta"></span>
+                    <span class="feature-badge pending-write-badge" style="display:none; background: var(--warning-color);">write</span>
+                  </div>
+                  <div class="session-controls">
+                    <button type="button" class="control-btn pending-grant-btn">
+                      <i class="fas fa-check"></i>
+                      Grant
+                    </button>
+                    <button type="button" class="control-btn danger pending-deny-btn">
+                      <i class="fas fa-xmark"></i>
+                      Deny
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Audit Log Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-clipboard-check"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Audit Log</h3>
+                <p>A redacted, append-only record of capability calls. No arguments, tokens, cookies, or response bodies are ever stored.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <div class="session-controls">
+                <button class="control-btn primary" id="auditExportBtn">
+                  <i class="fas fa-download"></i>
+                  Export Log
+                </button>
+                <button class="control-btn danger" id="auditClearBtn">
+                  <i class="fas fa-trash"></i>
+                  Clear Log
+                </button>
+              </div>
+              <div class="logs-content">
+                <table class="logs-display" id="auditLogTable" aria-label="Audit log">
+                  <thead>
+                    <tr class="log-entry">
+                      <th scope="col">Time</th>
+                      <th scope="col">Origin</th>
+                      <th scope="col">Capability</th>
+                      <th scope="col">Method</th>
+                      <th scope="col">Side Effect</th>
+                      <th scope="col">Consent</th>
+                      <th scope="col">Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditLogBody">
+                    <tr class="log-entry" id="auditLogEmptyRow">
+                      <td colspan="7">
+                        <div class="session-empty-state">
+                          <i class="fas fa-clipboard-list"></i>
+                          <p>No audit entries yet. Capability calls are recorded here once you allow an origin. Entries are redacted and stored locally only.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legal & Service Policy Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-scale-balanced"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Legal &amp; Service Policy</h3>
+                <p>FSB's automation posture, audit retention, and the consent model are documented in LEGAL.md. Some origins are blocked from automation by the service denylist.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <a class="setting-hint" href="../../docs/LEGAL.md"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:block; margin-top:8px;">Read the legal posture &rarr;</a>
+              <a class="setting-hint" href="../config/service-denylist.json"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:block; margin-top:8px;">View blocked services &rarr;</a>
+              <a class="setting-hint" href="https://full-selfbrowsing.com/privacy.html"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:block; margin-top:8px;">Privacy policy &rarr;</a>
+            </div>
+          </div>
+        </section>
+
 
         <!-- Passwords Section (Beta) -->
         <section class="content-section" id="passwords">
@@ -1610,6 +1805,16 @@
   <script src="pin-input.js"></script>
   <!-- Phase 243 Plan 04 / UI-03: pure helpers for the cap counter + validation. Must load BEFORE options.js. -->
   <script src="cap-counter-helpers.js"></script>
+  <!--
+    Phase 30 (GOV-07/GOV-08): the consent + audit + denylist stores the Consent &
+    Audit section reads/writes. Must load BEFORE options.js so its cacheElements +
+    render path can consume globalThis.FsbConsentPolicyStore / FsbAuditLog /
+    FsbServiceDenylist. The UI is the ONLY surface that mutates consent from user
+    intent; the gate (background.js) remains the authoritative enforcement.
+  -->
+  <script src="../utils/consent-policy-store.js"></script>
+  <script src="../utils/audit-log.js"></script>
+  <script src="../utils/service-denylist.js"></script>
   <script src="options.js"></script>
   <!--
     Phase 269 / CONS-01, CONS-02: kill-switch wiring.

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "example.get-thing",
+  "origin": "https://example.com",
+  "endpoint": "/api/{id}",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" }
+    },
+    "required": ["id"]
+  },
+  "request": {
+    "query": { "id": "{id}" }
+  },
+  "extract": "data.items[*].name",
+  "transform": "x => x.map(Number)"
+}

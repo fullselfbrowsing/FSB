@@ -155,29 +155,36 @@
     var previewState = input.previewState || 'hidden';
     var reason = input.reason || (input.attached ? 'ready' : 'stream-not-ready');
     var isStreaming = previewState === 'streaming';
+    var canUseRemote = isStreaming || input.remoteControlAvailable === true;
     var detailText = 'Remote control is off';
     var chipLabel = 'remote off';
     var chipTone = 'paused';
-    var available = isStreaming;
+    var available = canUseRemote;
 
     switch (reason) {
+      case 'requesting':
+        chipLabel = 'requesting';
+        chipTone = 'recovering';
+        detailText = 'Remote control request sent to the extension';
+        available = canUseRemote;
+        break;
       case 'ready':
         chipLabel = 'remote ready';
         chipTone = 'streaming';
         detailText = 'Remote control is attached to the live preview';
-        available = isStreaming;
+        available = canUseRemote;
         break;
       case 'retarget-required':
         chipLabel = 're-arm remote';
         chipTone = 'recovering';
         detailText = 'Preview target changed. Re-enable remote control to continue.';
-        available = isStreaming;
+        available = canUseRemote;
         break;
       case 'dispatch-failed':
         chipLabel = 'remote retry';
         chipTone = 'recovering';
         detailText = 'Remote control lost its debugger session. Re-enable it to retry.';
-        available = isStreaming;
+        available = canUseRemote;
         break;
       case 'debugger-blocked':
         chipLabel = 'remote blocked';
@@ -187,18 +194,36 @@
           : 'Remote control could not attach to the browser tab.';
         available = false;
         break;
+      case 'no-tab':
+        chipLabel = 'no tab';
+        chipTone = 'blocked';
+        detailText = 'Remote control needs a normal browser tab.';
+        available = canUseRemote;
+        break;
+      case 'request-timeout':
+        chipLabel = 'no response';
+        chipTone = 'blocked';
+        detailText = 'The extension did not confirm remote control.';
+        available = canUseRemote;
+        break;
+      case 'dashboard-disconnected':
+        chipLabel = 'dashboard offline';
+        chipTone = 'blocked';
+        detailText = 'Reconnect the dashboard before using remote control.';
+        available = false;
+        break;
       case 'stream-not-ready':
         chipLabel = 'remote off';
         chipTone = 'blocked';
         detailText = 'Remote control is unavailable until the preview is live again.';
-        available = false;
+        available = canUseRemote;
         break;
       case 'user-stop':
       default:
         chipLabel = 'remote off';
         chipTone = 'paused';
         detailText = 'Remote control is off';
-        available = isStreaming;
+        available = canUseRemote;
         break;
     }
 
@@ -207,7 +232,7 @@
       chipTone: chipTone,
       detailText: detailText,
       available: available,
-      shouldForceDisable: input.attached !== true || reason !== 'ready'
+      shouldForceDisable: reason !== 'requesting' && (input.attached !== true || reason !== 'ready')
     };
   }
 

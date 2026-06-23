@@ -38,6 +38,7 @@ export class TaskQueue {
     'get_session_detail',
     'get_logs',
     'search_memory',
+    'search_capabilities',
     'get_memory_stats',
     'list_agents',
     'get_agent_stats',

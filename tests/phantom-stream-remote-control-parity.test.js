@@ -170,6 +170,12 @@ function ok(condition, message) {
     'static and Angular dashboards keep legacy remote scroll frames for compatibility');
   ok(staticDashboardSource.includes('ext:remote-control-state') && angularDashboardSource.includes('ext:remote-control-state'),
     'static and Angular dashboards keep FSB remote-control state listener');
+  ok(staticDashboardSource.includes('ext:ps-control-state') && angularDashboardSource.includes('ext:ps-control-state'),
+    'static and Angular dashboards accept PhantomStream remote-control state listener');
+  ok(staticDashboardSource.includes("case 'active':") && angularDashboardSource.includes("case 'active':"),
+    'static and Angular dashboards normalize PhantomStream active remote-control state');
+  ok(staticDashboardSource.includes('dash:ps-control-request') && angularDashboardSource.includes('dash:ps-control-request'),
+    'static and Angular dashboards emit PhantomStream remote-control request frames');
 
   console.log('\nPhantomStream remote-control parity: ' + passed + ' PASS / 0 FAIL');
 })().catch((err) => {

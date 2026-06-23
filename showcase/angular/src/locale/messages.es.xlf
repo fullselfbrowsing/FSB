@@ -3778,6 +3778,46 @@
           <context context-type="linenumber">142,144</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_HEADING" datatype="html">
+        <source>Legal Posture and Consent Model</source>
+        <target state="translated">Postura legal y modelo de consentimiento</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">145,146</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_BODY" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s automation posture, audit-log retention, and the per-origin consent model are documented in the project&apos;s <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>LEGAL.md<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> policy file. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> does nothing on an origin until you explicitly allow it, automated read access never implies write access, and a conservative service denylist blocks automation on sensitive categories (financial and government services) outright.</source>
+        <target state="translated">La postura de automatización de <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, la retención del registro de auditoría y el modelo de consentimiento por origen están documentados en el archivo de directivas <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>LEGAL.md<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> del proyecto. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> no hace nada en un origen hasta que lo permites explícitamente; el acceso de lectura automatizado nunca implica acceso de escritura, y una lista de denegación de servicios conservadora bloquea por completo la automatización en categorías sensibles (servicios financieros y gubernamentales).</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">146,147</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_CONSENT" datatype="html">
+        <source>Per-origin consent is default-off. Auto and write (mutating) access are separate, explicit opt-ins managed from the Control Panel&apos;s Consent &amp; Audit section.</source>
+        <target state="translated">El consentimiento por origen está desactivado de forma predeterminada. El acceso automático y de escritura (modificación) son aceptaciones separadas y explícitas que se gestionan desde la sección Consentimiento &amp; Auditoría del Control Panel.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">148,149</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_AUDIT" datatype="html">
+        <source>Every capability call is recorded in a redacted, append-only local audit log. No arguments, tokens, cookies, or response bodies are ever stored.</source>
+        <target state="translated">Cada llamada a una capacidad se registra en un registro de auditoría local redactado y de solo anexión. Nunca se almacenan argumentos, tokens, cookies ni cuerpos de respuesta.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">149,150</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="PRIVACY_LEGAL_POSTURE_DENYLIST" datatype="html">
+        <source>A service denylist renders sensitive origins non-enableable, enforced at the capability gate and not merely in the interface.</source>
+        <target state="translated">Una lista de denegación de servicios hace que los orígenes sensibles no se puedan habilitar, lo cual se aplica en la puerta de capacidades y no solo en la interfaz.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.html</context>
+          <context context-type="linenumber">150,151</context>
+        </context-group>
+      </trans-unit>
     </body>
   </file>
 </xliff>

@@ -1,152 +1,224 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.12.0
-milestone_name: PhantomStream Package Migration
-status: milestone_archived
-stopped_at: Archived v0.12.0 milestone
-last_updated: "2026-06-17T19:40:06.000Z"
-last_activity: 2026-06-17 - Archived v0.12.0 PhantomStream Package Migration
+milestone: v0.9.99
+milestone_name: Native Capability Catalog (FSB API Execution)
+status: ready_to_plan
+stopped_at: Phase 34 (explicit file-upload tool, upload_file) execution-complete — milestone extension
+last_updated: 2026-06-23T13:30:00.000Z
+last_activity: 2026-06-23
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_phases: 10
+  completed_phases: 9
+  total_plans: 32
+  completed_plans: 34
+  percent: 90
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-17 -- v0.12.0 archived; no active milestone)
-See: .planning/ROADMAP.md (v0.12.0 archived under completed milestones)
-See: .planning/milestones/v0.12.0-REQUIREMENTS.md (24 v1 requirements, all satisfied)
-See: .planning/research/PHANTOMSTREAM-PACKAGE.md (package intake facts, npm 404, migration risks)
-See: .planning/PHANTOMSTREAM-PIN.md (active package source, provenance, adapter boundaries, and release-note language)
-See: .planning/MILESTONES.md (v0.10.0 entry added; prior milestones retained)
+See: .planning/PROJECT.md (v0.9.99 Native Capability Catalog milestone framing + INV-01..04)
+See: .planning/ROADMAP.md (active milestone v0.9.99, Phases 26-32)
+See: .planning/REQUIREMENTS.md (44 v1 requirements across 9 categories; 44/44 mapped, 0 unmapped)
+See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase ordering)
+See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
-**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. The dashboard preview must preserve that value while PhantomStream owns the generic DOM-mirroring engine.
-**Current focus:** No active milestone. Start the next milestone with `$gsd-new-milestone`; live Chrome-extension UAT remains recorded as `human_needed`, not passed.
+**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
+**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
 
 ## Current Position
 
-Phase: None active
-Plan: None active
-Status: v0.12.0 archived with tech_debt audit status
-Last activity: 2026-06-17 - Archived v0.12.0 PhantomStream Package Migration
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-23 - Completed quick task 260623-941: Patch learned replay placeholders and unpacked dev capability catalog snapshot
 
-Progress: [██████████] 100% (19/19 milestone plans)
+Progress: [██████████] 100%
 
-## Roadmap At A Glance (v0.12.0)
+## Roadmap At A Glance (v0.9.99, Phases 26-34)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 21 | Package Intake & Contract Mapping | PKG-01..04 (4) | Complete |
-| 22 | Capture Adapter Migration | CAP-01..04 (4) | Complete |
-| 23 | Dashboard Renderer Migration | VIEW-01..04 (4) | Complete |
-| 24 | Transport, Relay & Remote Control Integration | RELAY-01..04, CTRL-01..03 (7) | Complete |
-| 25 | Parity Removal, Docs & Browser UAT | PARITY-01..05 (5) | Complete |
+| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | CAP-01..05 (5) | Complete — all 3 plans done (CAP-01..05); ready for verification |
+| 27 | Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar | FETCH-01..05 (5) | Complete — all 3 plans done (FETCH-01..05; CI half green); live FETCH-05 logged-in-shape is human_needed UAT debt; ready for verification |
+| 28 | Lean MCP Surface + Capability Search + Eval Harness | SURF-01..06 (6) | Not started |
+| 29 | Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | CAT-01..05 (5) | Not started |
+| 30 | Consent Governance + Recipe Signature Verification + Audit + Legal Posture | GOV-01..08, SIGN-01..02 (10) | Not started |
+| 31 | Network-Capture Discovery + Recipe Synthesis + Learned Recipes | DISC-01..04, LEARN-01..04 (8) | Not started |
+| 32 | Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | HEAL-01..05 (5) | Not started |
+| 33 | PhantomStream Media Mirroring (0.2.1 Uptake) — milestone extension | MEDIA-01..04 (4) | Complete — 1 plan done; CI half green; live media UAT human_needed |
+| 34 | Explicit File Upload Tool (upload_file) — milestone extension | UPLOAD-01..04 (4) | Complete — 1 plan done; CI half green; live upload UAT human_needed |
 
-Coverage: 24/24 v1 requirements mapped, 0 orphaned.
+Coverage: 44/44 v1 requirements mapped, 0 orphaned.
+
+Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/CI guard) and Wall 2 (page-context fetch) are de-risked first; search needs invoke to exist; tiering + the autopilot path need one front door proven; consent must precede any auto/learning; discovery needs consent + memory + router to consume what it learns; self-heal needs the full stack.
+
+## Hard Invariants (bind every phase)
+
+- **INV-01:** existing ~63 MCP tool schemas stay byte-identical; the 2 new tools (`search_capabilities`, `invoke_capability`) register OUTSIDE `TOOL_REGISTRY` via `server.tool()`. (Schema-lock test green is the Phase 32 gate.)
+- **INV-02:** autopilot reaches the capability engine via a `tool-executor` branch hitting the SAME `capability-router`; no parallel autopilot-only stack (runtime-layer parity, Phase 29).
+- **INV-03:** capability + fallback paths work equally across all 7 `universal-provider.js` targets (cross-provider test gate is Phase 32).
+- **INV-04:** the `agent-loop.js` `setTimeout`-chained iterator is load-bearing and untouched; invoke is a single bounded async op.
+
+## Architectural Walls (non-negotiable, shape every phase)
+
+- **Wall 1 (MV3 no remotely-hosted code):** server-delivered recipes are CLOSED-vocabulary DATA bound by a fixed bundled interpreter — never `eval`'d, never grown into server-authored control flow. CI guard fails on `eval`/`new Function`/`import(` reachable from the recipe path.
+- **Wall 2 (execution context):** the authenticated fetch MUST run in the page MAIN world (existing `execute_js` seam) so first-party HttpOnly/SameSite cookies attach; a background-SW `fetch()` is the anti-pattern. CDP Network is discovery-only, never the invoke transport.
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed (this milestone): 19 (Phase 21: 3/3, Phase 22: 4/4, Phase 23: 4/4, Phase 24: 4/4, Phase 25: 4/4)
-- Most recent completed milestone: v0.11.0 Trigger Tool (7 phases, 26 plans; live-browser UAT and release actions user-gated).
+- Total plans completed (this milestone): 4
+- Most recent completed milestone: v0.12.0 PhantomStream Package Migration (5 phases, 19 plans; live Chrome-extension UAT user-gated).
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 21 | 3/3 | - | - |
-| 22 | 4/4 | - | - |
-| 23 | 4/4 | - | - |
-| 24 | 4/4 | - | - |
-| 25 | 4/4 | - | - |
+| 26 | 3 | - | - |
+| 27 | 3 | - | - |
+| 28 | 4 | - | - |
+| 29 | 5 | - | - |
+| 30 | 4 | - | - |
+| 31 | 6 | - | - |
+| 32 | 5 | - | - |
 
 *Updated after each plan completion.*
+| Phase 27 P02 | 7min | 3 tasks | 7 files |
+| Phase 27 P03 | 3min | 2 tasks | 1 files |
+| Phase 28 P28-01 | 8min | 4 tasks | 11 files |
+| Phase 28 P28-02 | 7min | 2 tasks | 4 files |
+| Phase 28 P28-03 | 3min | 2 tasks | 2 files |
+| Phase 28 P28-04 | 9min | 2 tasks | 3 files |
+| Phase 29 P01 | 6min | 3 tasks | 6 files |
+| Phase 29 P02 | 5min | 3 tasks | 3 files |
+| Phase 29 P04 | 4min | 1 tasks | 1 files |
+| Phase 29 PP03 | 9min | 4 tasks tasks | 12 files files |
+| Phase 29 P05 | 7min | 3 tasks | 4 files |
+| Phase 30 PP01 | 11min | 3 tasks | 17 files |
+| Phase 30 P03 | 38min | 3 tasks | 6 files |
+| Phase 30 P02 | 22m | 3 tasks | 3 files |
+| Phase 30 P04 | 24min | 3 tasks | 4 files |
+| Phase 31 P01 | 13min | 3 tasks | 13 files |
+| Phase 31 P02 | 10min | 2 tasks | 2 files |
+| Phase 31 P03 | 4min | 2 tasks | 2 files |
+| Phase 31 P04 | 1min | 1 tasks | 2 files |
+| Phase 31 P05 | 12min | 2 tasks | 3 files |
+| Phase 31 P06 | 9min | 3 tasks | 5 files |
+| Phase 32 P01 | 35m | 3 tasks | 7 files |
+| Phase 32 P02 | 6min | 3 tasks | 6 files |
+| Phase 32 P03 | 12min | 3 tasks | 4 files |
+| Phase 32 P04 | 6min | 2 tasks | 2 files |
+| Phase 32 P05 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone:
+Full decision log lives in PROJECT.md. Carried-forward invariants binding this milestone are INV-01..04 (above) plus the two architectural walls.
 
-- **PSTR-D-01:** v0.12.0 starts with a package intake gate because `@fullselfbrowsing/phantom-stream` returned npm `E404` on 2026-06-17 despite upstream package metadata declaring `0.1.0`.
-- **PSTR-D-02:** PhantomStream becomes the source of truth for generic DOM mirroring; FSB keeps product-specific adapters for pairing, task/status traffic, overlay identity, diagnostics, and remote-control ownership.
-- **PSTR-D-03:** Static and Angular dashboard viewers must share a wrapper or contract tests strong enough to prevent drift.
-- **PSTR-D-04:** Browser UAT is required before close; Node parity tests cannot prove live visual fidelity or remote-control usability alone.
-- **INV-01:** existing MCP tool schemas stay byte-identical; DOM-stream internals are not a schema change.
-- **INV-02:** autopilot uses the SAME shared tool registry MCP exposes where tool routing is involved.
-- **INV-03:** provider parity remains unchanged; stream internals are provider-agnostic.
-- **INV-04:** MV3-survivability and stream recovery paths stay preserved; package migration is additive runtime adaptation.
-- **INV-06:** Lattice public package stays pinned and audited (`.planning/LATTICE-PIN.md` + `package-lock.json` + tests agree).
-- **Phase 24 Plan 01:** `ws-client.js` now uses a classic-service-worker PhantomStream protocol bridge for stream/control constants and envelope encode/decode. The bridge is generated from `@full-self-browsing/phantom-stream/protocol` into `extension/ws/phantom-stream-protocol.js`, loaded after LZString and before `ws-client.js`. FSB keeps the stateless `_lz` shape and sends compressed frames only when the full encoded wire string is smaller than raw JSON; non-stream task/status messages still use the same `FSBWebSocket.send(type, payload)` surface.
-- **Phase 24 Plan 02:** The showcase relay keeps FSB hash-key rooms, extension/dashboard role names, status broadcasts, and task/status traffic, but now routes frame classification and cap checks through a CommonJS compatibility adapter that matches `@full-self-browsing/phantom-stream/relay`. The relay enforces the 1 MiB frame cap with `message-too-large` diagnostics, preserves the 16 MiB backpressure drop counter, and classifies `_lz` frames as self-identifying compressed envelopes.
-- **Phase 24 Plan 03:** The service-worker watchdog now sends `STREAM.REQUEST_SNAPSHOT` through the PhantomStream protocol bridge when available, and both static and Angular dashboards consume `ext:request-snapshot` by routing through the existing resync path while preserving frozen-complete state. Recovery parity now has automated coverage for extension reconnect snapshots, dashboard reconnect recovery requests, late `domStreamReady` re-arm, page-ready recovery, and stale-flush stream-state diagnostics.
-- **Phase 24 Plan 04:** `ws-client.js` now accepts PhantomStream `REMOTE_CONTROL` frames while preserving legacy dashboard `dash:remote-*` frames. Click/text/key/scroll payloads normalize through `validateRemoteControlMessage`, diagnostics use content-free `summarizeRemoteControlAction`, and state broadcasts preserve FSB `ext:remote-control-state` while adding PhantomStream `ext:ps-control-state`. Automated coverage verifies coordinate mapping source contracts, stale stream/session gates, safe text summaries, and debugger/retarget/no-tab ownership states; live browser remote-control UAT remains Phase 25 debt in `24-VALIDATION.md`.
-- **Phase 25 Plan 01:** Removed the temporary legacy `data-fsb-nid` stamping bridge from `extension/content/dom-stream.js`. The capture adapter now preserves PhantomStream `nodeIds` sidecars without rewriting mirrored HTML, while keeping FSB background action names, identity tracking, stale flush diagnostics, overlay exclusion, side-channel forwarding, and resume-as-fresh-snapshot behavior. Tests now assert the absence of legacy stamping and the presence of sidecar identity.
-- **Phase 25 Plan 02:** Added a deterministic differential PhantomStream parity guard covering package-backed adapter source boundaries, snapshot sanitizer behavior, mutation ADD/ATTR/TEXT/VALUE/REMOVE handling, stale mutation resync thresholds, stream identity rejection, compressed envelope encode/decode, relay classification, relay frame caps, and security masking coverage. The test is wired into `npm test`; browser visual fidelity and remote-control usability remain Phase 25 Plan 04 UAT debt.
-- **Phase 25 Plan 03:** Active docs now name `@full-self-browsing/phantom-stream@0.1.0` as the stream implementation, record package provenance in `.planning/PHANTOMSTREAM-PIN.md`, and document the remaining FSB-specific adapters: capture action mapping, shared dashboard viewer wrapper, service-worker protocol bridge, server relay compatibility adapter, and remote-control ownership mapping. The stale unhyphenated package name is documented only as a rejected historical source; live-browser UAT remains Phase 25 Plan 04 debt.
-- **Phase 25 Plan 04:** Final automated gates passed: `npm run validate:extension`, `npm test`, `npm run showcase:build`, and `git diff --check`. The stale Lattice source-count invariant now includes the Phase 24 PhantomStream protocol bridge import. Live Chrome-extension UAT was not performed and is explicitly recorded as `human_needed` in `25-HUMAN-UAT.md`.
-- [Phase ?]: Phase 14 Plan 01: trigger-store.js is a verbatim clone of mcp-task-store.js (6 enumerated changes only; code body byte-identical after inverse-rename). chrome.storage.session direct per D-12; agent_id stored faithfully (V4); only behavioral change is listArmedSnapshots filtering status==='armed'.
-- [Phase ?]: Phase 14 Plan 02: trigger-lifecycle.js clones mcp-visual-session-lifecycle.js with overlay STRIPPED, over FsbTriggerStore (storage-is-truth, re-read every tick). handleTriggerAlarm adds a noop_terminal idempotent fire-guard (D-09); restoreTriggersFromStorage adds the getAll() orphan sweep scoped to fsbTrigger: (D-08); three reap paths via absolute deadline_at (LIFE-05). FSB_TRIGGER_DEFAULT_TTL_MS=21600000 (6h, D-11) + 30s alarm-floor declared for Phase 17. evaluated_noop + armTrigger/clearTrigger are the fire-free Phase 15 seam.
-- [Phase ?]: Phase 14 Plan 03: wired the two trigger modules into background.js at four ADDITIVE glue points (importScripts store-before-lifecycle, bootstrap restoreTriggersFromStorage, onAlarm fsbTrigger: branch with early return, new tabs.onRemoved sibling), each mirroring its verified visual-lifecycle sibling. SURV-01/SURV-03/LIFE-05 now live in the SW; INV-04 held (agent-loop.js byte-untouched, setTimeout=8).
-- [Phase ?]: Phase 14 Plan 03: live-Chrome MV3 SW-eviction survival (Task 2 checkpoint:human-verify) DEFERRED to milestone-end Chrome MV3 UAT per 14-VALIDATION.md Manual-Only Verifications + the v0.10.0 UAT-debt pattern; autonomous code 100% complete and committed (06a241e3), all trigger logic has deterministic Node-mock coverage.
-- [Phase ?]: Phase 15 Plan 01: value-extractor.js is a pure dual-export IIFE (FsbValueExtractor, no browser-API resolver) exposing exactly parseLocaleNumber + extractValue. parseLocaleNumber uses Intl.NumberFormat formatToParts separator discovery memoized per locale; literal split/join (never a separator-built RegExp); % kept raw with isPercent (never /100); NaN -> distinct parse_error (never 0, EXTRACT-04); decimal_separator override wins over locale (D-04). extractValue selects text|number|attribute over { text, attributes? } (EXTRACT-03/D-05) -- that shape is the Phase 16/17 watch-layer report contract.
-- [Phase ?]: Phase 15 Plan 02: trigger-manager.js evaluate(snapshot, reportedValue, now?) is STRUCTURALLY pure (D-02), proven by a brace-matched source-grep (no storage access / no chrome resolver in the evaluate() body even after the durable-local cap is added to the same file). Implements all 6 kinds + compound { combinator:'AND'|'OR', conditions[] } with error short-circuit (Pitfall 5) + edge-trigger/fire-once via persisted was_satisfied. Regex flag policy is default-flags-only (no /g lastIndex footgun); caps PATTERN_MAX_LEN=1000 / TEXT_MAX_LEN_ELEMENT=10000 / TEXT_MAX_LEN_PAGE=100000 are the hard CPU bound, EVIL_SHAPES heuristic is defense-in-depth. The inline cap (D-09) counts listArmedSnapshots() (storage-first, survives SW eviction) NOT a heap set, and serializes concurrent arms via a _withArmLock module-scope mutex (TOCTOU fix); Plan 03/Phase 18 inherit a serialized arm path.
-- [Phase ?]: Phase 15 Plan 03: the Phase-14 evaluated_noop SEAM in trigger-lifecycle.js is replaced with FsbTriggerManager.evaluate(snap, reportedValue, now) + an atomic terminal write-back -- on outcome 'fired' it sets status:'fired'+fired_at, folds next_state, writes in one writeSnapshot, then clearAlarm (disarm); on no_fire/parse_error/pattern_error it merges next_state and stays armed. The SEAM is the SOLE owner of fire-path storage I/O (D-02); evaluate() stays pure. parse_error/pattern_error NEVER write status:'fired' (EXTRACT-04). The preserved noop_terminal guard + the atomic write together give exactly-one-fire across SW eviction (D-07). reportedValue contract { text, attributes? } sourced from snap.reported_value ?? snap.last_value until Phase 16/17 supplies a live scrape. background.js loads value-extractor.js + trigger-manager.js in load-bearing order value-extractor->store->manager->lifecycle. Phase 15 closed with full automated coverage, no live-Chrome UAT. INV-01/INV-04 held.
-- [Phase ?]: Phase 16 wires live-observe end-to-end without adding public tool schemas: `content/trigger-observe.js` emits `triggerValueChanged` `{text, attributes?}` from a single stable-container MutationObserver; `messaging.js` exposes triggerObserveStart/Stop, triggerRead, triggerPulseStart/Stop; `background.js` validates and stages reports then delegates fire decisions to `FsbTriggerLifecycle.handleTriggerAlarm` (no duplicate fire writer). Re-arm is owned-tab only (`target_tab_id` + `ensureContentScriptInjected`), backed by `fsbTriggerObserveWatchdog:<id>` (1 min period, stale after 2 min). The in-memory observer registry is authoritative; stale DOM `data-fsb-trigger-armed` markers never block fresh-context re-arm (fixed in `87403c77`). Live-browser UAT is tracked in 16-HUMAN-UAT.md for Phase 20.
-- [Phase 17]: Plan 01: Refresh-poll interval validation runs before snapshot persistence or lifecycle delegation so invalid sub-floor requests cannot consume cap slots or create alarms.
-- [Phase 17]: Plan 01: Refresh-poll cadence uses next_poll_at while deadline_at remains the absolute TTL/reap boundary.
-- [Phase 17]: Plan 02: triggerRead returns ELEMENT_NOT_FOUND before the successful readValue extraction so refresh-poll can distinguish missing selectors from legitimate empty text.
-- [Phase 17]: Plan 02: the missing-module guard avoids a literal readValue token before the missing-element branch so the source-invariant test protects extraction order.
-- [Phase 17]: Plan 03: Refresh-poll ownership validation returns typed TAB_NOT_OWNED before any chrome.tabs.reload side effect.
-- [Phase 17]: Plan 03: Refresh-poll reads use direct frame-0 chrome.tabs.sendMessage instead of sendMessageWithRetry.
-- [Phase 17]: Plan 03: Background refresh-poll stages values and delegates fired/no-fire decisions to FsbTriggerLifecycle.handleTriggerAlarm.
-- [Phase 17]: Plan 04: triggerRead blocks obvious login/auth/challenge/verify/CAPTCHA pages before selector resolution or readValue extraction.
-- [Phase 17]: Plan 04: Refresh-poll blocked outcomes persist status blocked with attention_reason blocked and last_attention context instead of staging challenge text.
-- [Phase 17]: Plan 04: Refresh-poll restarts triggerPulseStart only after lifecycle evaluation and only if the latest snapshot remains armed refresh-poll.
-- [Phase 17]: Plan 04: Real inactive-tab focus retention is deferred_to_phase_20 live-browser UAT, not marked as automated proof.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger tools are plain background-routed registry entries, not visual-session action tools.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: stop_trigger, get_trigger_status, and list_triggers are _readOnly:true so queue bypass can derive from the shared registry.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-01: trigger.condition stays a JSON Schema object; nested condition validation remains in the trigger runtime.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger status/list responses project from FsbTriggerStore snapshots, not activeSessions or alarm names.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: stop_trigger is idempotent for missing or terminal snapshots but rejects cross-agent access before cleanup side effects.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: autopilot trigger arms derive legacy:autopilot and ownershipToken from fsbAgentRegistryInstance instead of trusting caller-supplied identity.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-02: trigger returns a bounded arm result after validation, baseline read, persistence, and watcher startup; Phase 19 owns blocking/detached reporting.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: MCP trigger tools are registered by a trigger-specific registrar from TOOL_REGISTRY rather than through manual visual-session actions.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: trigger returns a bounded arm response through mcp:trigger; Phase 19 owns blocking wait, heartbeat, detached mode, and fire/timeout envelopes.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Plan 18-03: stop_trigger, get_trigger_status, and list_triggers dispatch directly and are also proven to bypass TaskQueue when a mutation is pending.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: MCP trigger messages delegate to fsbTriggerDispatchToolRequest instead of owning trigger runtime work in dispatcher routes.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot trigger execution strips caller supplied identity and ownership fields and uses background derived legacy autopilot ownership.
-- [Phase 18-shared-tool-registry-dispatcher-wiring]: Autopilot targetTabId is normalized to target_tab_id before background trigger dispatch.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-01: MCP trigger calls are blocking by default with 30s heartbeats, generated trigger_id correlation, detached opt-in, safety auto-detach at 240s, and bridge-disconnect partial recovery from persisted status.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: fire events are flat notify-only records persisted atomically with status:'fired'; blocking timeouts become terminal status:'timed_out' via runtime cleanup; safety auto-detach remains non-terminal and keeps the watcher armed.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-02: get_trigger_status/list_triggers expose terminal fired/timed_out fields after ownership filtering; default list remains armed/needs_attention/blocked, while include_terminal adds fired/timed_out/stopped.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: rearm_on_fire keeps snapshots armed after fire with fire_count/last_event evidence; blocking waiters settle on that first rearmed fire with still_armed:true.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: numeric hysteresis reset is pure manager logic for threshold and percent_change conditions, preserving edge-fire until the reset band is crossed.
-- [Phase 19-mcp-tools-blocking-detached-reporting]: Plan 19-03: reconnect grace expiry calls FsbTriggerLifecycle.handleTriggerOwnerReleased(agentId) best-effort after registry release; fast reconnect cancellation suppresses trigger reap.
-- [Phase 20]: Trigger Concurrency UI clones Agent Concurrency and uses fsbTriggerCap with clamp-on-input/load/save.
-- [Phase 20]: Active trigger count includes armed, needs_attention, and blocked while excluding terminal trigger records.
-- [Phase 20]: Cross-watch conflicts are rejected in background before read, persistence, observe startup, or pulse startup.
-- [Phase 20]: Conflict scans filter snapshots through owner visibility to avoid leaking another owner's trigger metadata.
-- [Phase 20]: Same-tab refresh-poll alarms now join a per-tab lock and share one explicit tab reload per due batch.
-- [Phase 20]: Refresh-poll batches still validate ownership and blocked-page state before reload, then re-read each snapshot before per-trigger lifecycle evaluation.
-- [Phase 20]: MCP release metadata, generated build version, server registry metadata, lockfile root metadata, and parity target now agree on 0.10.0.
-- [Phase 20]: Trigger Watchers docs describe local browser-open notify-only behavior and explicitly exclude push delivery, server monitoring, and auto-act workflows.
-- [Phase 20]: Phase 20 final automated release-readiness gates passed; live browser UAT remains human_needed and is recorded without fabricated proof. — 20-HUMAN-UAT.md carries Phase 16 and Phase 20 browser scenarios as human_needed, while 20-RELEASE-READINESS.md records the full automated gate set.
-- [Phase 20]: Release actions for fsb-mcp-server@0.10.0 remain user-gated and were not run. — npm publish, git tag creation/push, branch push, ClawHub publish, and public package publication require explicit user instruction.
+**Phase 26 Plan 01 (CAP-01, CAP-05):**
 
-### Top Risks (from research -- bake into phase planning)
+- `@cfworker/json-schema` IIFE-bundled (not vendored raw) because a top-level import/export is a SyntaxError under `importScripts` in a classic service worker — the durable runtime reason, independent of the Node-version-fragile `node --check` rationale in D-02. `minisearch`/`jmespath` vendor as-is (already UMD).
+- `validateRecipe` error-mapping order classifies `schemaVersion` const and `method`/`authStrategy` enum failures BEFORE the generic `additionalProperties` check, because `@cfworker/json-schema@4.1.1` emits a root `additionalProperties` error alongside enum/const failures (verified live). The RESEARCH example's order would mis-report a bad enum as `RECIPE_UNKNOWN_FIELD`.
+- Forbidden script-like names (script/expr/transform/code/fn/js) rejected by a top-level pre-scan that names the offending field (additionalProperties:false alone yields a generic location — Pitfall 2).
+- `authStrategy` enum locked at four members (D-08); `format:'uri'` on `origin` only, leading-slash `pattern` on `endpoint` (Pitfall 4). Fixtures live at repo-root `catalog/recipes/_fixtures/` (not node --check'd; test data, not shipped runtime).
+- Recipe-path source files kept free of dynamic-code substrings even in comments, pre-satisfying the Plan 03 CI-guard allowlist scan.
 
-- **REG-02 / MCP queue starvation (#1 risk):** the long-running watcher MUST run in background.js, NOT in the MCP tool handler; `stop_trigger`/`get_trigger_status`/`list_triggers` MUST be in the MCP read-only bypass set -- else a blocking `trigger()` deadlocks the single-slot task queue incl. its own `stop_trigger`. (Phase 18.)
-- **SW eviction kills the watch (Phase 14 crux):** state lives in `chrome.storage.session`; wake via `chrome.alarms`; no keepalive antipatterns.
-- **Live-observe re-arm after BF-cache/SPA nav (Phase 16):** highest-cost/highest-risk; flagged for phase-level research.
-- **Blocking transport timeout (Phase 19):** 30s heartbeats + auto-convert blocking->detached past a safety ceiling.
-- **Locale numeric parse / flapping / duplicate fires (Phase 15):** parse both sides to Number, NaN -> `parse_error`; edge-trigger + fire-once + hysteresis; atomic disarm + dedupe key.
+**Phase 26 Plan 02 (CAP-02, CAP-03):**
+
+- The interpreter REUSES Plan 01's `validateRecipe` as the recipe-schema gate (no re-implementation) and delegates step 1, inheriting the typed `RECIPE_*` codes (incl. the Plan 01 enum mapping-order fix); it focuses on bind+emit. Invoke args are validated against `recipe.params` only when that optional, intentionally-open sub-document is present, via a fresh `CfworkerJsonSchema.Validator(recipe.params,'2020-12',false)` -> `RECIPE_SCHEMA_INVALID` before binding.
+- Auth binding is a frozen `Object.freeze` registry keyed exactly by the four `authStrategy` enum members; each handler is a spec-shaping STUB returning a NEW spec (credentials / `_authNeed` / `csrfSource`) with zero I/O (D-12). `bindAuthStrategy` rejects an unknown strategy with `RECIPE_OPCODE_INVALID` (defense-in-depth beyond the schema enum).
+- The bound spec carries `extract` UNEVALUATED (D-14; jmespath reached only via `getFSBJmespath()`, never run in Phase 26) plus a resolved `query` placement map for Phase 27. The hand-rolled `{var}` templater (D-04) encodeURIComponent-escapes every param and rejects unfilled placeholders (no template injection).
+- The load-bearing Phase 26/27 boundary is proven at runtime: the interpreter test asserts `chrome.scripting.executeScript` AND `globalThis.fetch` are each called 0 times across the whole suite.
+- `mcp/src/errors.ts` gained `RECIPE_.+` in the verbatim-passthrough regex (one-line; INV-01 honored, no tool schema touched); the `RECIPE_*` codes surface verbatim (not `action_rejected`), proven against the built mcp module. The interpreter + auth-strategies files are free of `eval`/`new Function`/`import(`/`fetch`/`chrome.scripting` even in comments, pre-staging the Plan 03 allowlist.
+- [Phase ?]: Phase 26 Plan 03 (CAP-04): the recipe-path CI guard scans an EXPLICIT hardcoded six-file allowlist (the 3 capability modules + the 3 vendored libs) for eval/new Function/import(, NOT a whole-extension grep (D-17) -- a broad grep would false-positive on FSB's three sanctioned MAIN-world execute_js sites (tool-executor.js, mcp-bridge-client.js, lattice-runtime-adapter.js).
+- [Phase ?]: Phase 26 Plan 03 (CAP-04): the guard uses PRECISE word-boundary forbidden patterns so the minified vendored libs do not false-positive on innocent substrings (retrieval/evaluate/important); a NEGATIVE self-assertion proves the three sanctioned sites are NOT on the allowlist; a test-only FSB_RECIPE_GUARD_EXTRA_ALLOWLIST env seam lets the spawn test plant an eval file and assert exit non-zero.
+- [Phase ?]: Phase 26 Plan 03 (CAP-04): the guard is chained into npm run validate:extension per D-18 -- runs in the existing CI extension job before npm test and feeds ci/all-green with NO ci.yml edit (verified empty diff). It ALSO runs RECIPE_SCHEMA against catalog/recipes/_fixtures (valid-* accepted, reject-* rejected) as a build-time closed-vocabulary proof.
+
+**Phase 27 Plan 01 (FETCH-03, FETCH-04):**
+
+- `interpretRecipe` now folds `spec.query` into the URL (D-09) BEFORE re-asserting the origin-pin (D-08 part 1) against the EFFECTIVE post-fold target, filling the pre-flagged assembly slot. A cross-origin OR protocol-relative effective target returns the new typed `RECIPE_ORIGIN_MISMATCH` (BOTH `code` and `errorCode`) before any side effect; `spec.url` then carries the true effective request target. Folded query VALUES are not re-encoded (already escaped by buildRequest) -- only the key is encoded (T-27-04 accepted non-issue). No errors.ts edit for `RECIPE_ORIGIN_MISMATCH` -- the existing `/RECIPE_.+/` passthrough surfaces it. The no-network charter (26-D-11) is preserved and re-proven (executeScript/fetch 0-call assertions green, including the new rejection cases).
+- Test reachability: because the recipe schema gates `endpoint` to a single-leading-slash non-protocol-relative path and buildRequest escapes every query value, a SCHEMA-VALID recipe can only ever fold to a slash-rooted same-origin URL -- so the interpreter pin is defense-in-depth. The genuine reachable cross-origin/protocol-relative effective target is a single-leading-slash endpoint whose next character(s) are backslashes (one backslash resolves to https://evil.com; two resolves to a protocol-relative //evil.com): schema-valid (the leading-double-slash guard does not match), but the WHATWG URL parser normalizes the backslash to a slash and re-targets the host. This is exactly the effective-target escape the pin exists to catch.
+- `RECOVERY_AMBIGUOUS` registered in `CODE_ONLY_ERROR_KEYS` (single-token Set add, cleaner than extending the resolveErrorKey regex; INV-01-safe, no MCP tool schema touched) and verified present in the built `mcp/build/errors.js` after `npm --prefix mcp run build` (FETCH-04 surfacing prerequisite). `extension/utils/capability-fetch.js` registered on `RECIPE_PATH_ALLOWLIST` ahead of its Plan 02 creation.
+- [Rule 3 deviation]: the recipe-path guard's Check 1 called `safeRead` on every allowlist path, which PUSHES an ENOENT failure for a not-yet-existent file -- contrary to the plan's premise that an absent path is skipped silently, so registering the absent capability-fetch.js made the guard FAIL. Fix: an `existsSync` pre-check at the top of Check 1 skips a registered-but-absent recipe-path file WITHOUT recording a failure (an absent file cannot contain forbidden code). The present-file scan still flags planted-eval, and Check 4 (disk-drift) still fails on any on-disk capability module missing from the allowlist; recipe-path-guard.test.js stays green.
+- [Phase 27]: Phase 27 Plan 03 (FETCH-05 live half): the live logged-in-shape assertion (real GitHub HttpOnly _gh_sess/logged_in cookies attach in the page MAIN world -> a logged-in, not logged-out, body shape) is recorded as a human_needed UAT (27-HUMAN-UAT.md UAT-27-01: HTTP 200 not 302 to /login AND/OR a non-empty user-login meta) and accepted in auto-mode as documented live-browser UAT debt -- NOT a fabricated pass (D-14, D-15, T-27-12). FETCH-05's automated/CI half (the smoke test asserting the logged-in shape through the chosen execution context, stubbed seam) was proven green in Plan 02 (tests/capability-fetch.test.js); CI green does not depend on the live half. This plan introduces no code, build, or package change -- it authors one markdown doc and gated a checkpoint.
+- [Phase ?]: Phase 28 Plan 01 (SURF-04/06/01): capability-search.js uses one module-level INDEX_OPTIONS reused at new MiniSearch + loadJSON(JSON.stringify(toJSON()), INDEX_OPTIONS) and exported so the eval test shares it (no options drift); loadJSON throws without matching options.
+- [Phase ?]: Phase 28 Plan 01: the eval gate (recall@5>=0.9 AND wrong-invoke=0, D-13) is provably non-trivial -- a naive description-only index scores wrong-invoke=0.222 on the near-neighbor seed and fails; the tuned intentSynonyms boost is load-bearing (D-14).
+- [Phase ?]: Phase 28 Plan 01: catalogVersion is a djb2 content hash over sorted descriptor slugs + recipe count; catalog ships via a build-time generated FsbRecipeIndex IIFE (extension/catalog/recipe-index.generated.js, gitignored, regenerated by package-extension.mjs) loaded at SW startup (D-16).
+- [Phase ?]: Phase 28 Plan 01: buildIndex cross-checks the authored descriptor sideEffectClass against the recipe method-derived class (recipe wins) so a mis-authored descriptor cannot under-state a destructive search hit (D-02).
+- [Phase 28]: Plan 02 (SURF-03/05/01/02): search_capabilities + invoke_capability register via server.tool() OUTSIDE TOOL_REGISTRY in capabilities.ts (vault.ts precedent) -- the INV-01 seam; the frozen tool-definitions-parity hash is unmoved (65 tools on the wire, registry unchanged).
+- [Phase 28]: Plan 02: the SURF-05 read-only/queued split lives entirely in queue.ts readOnlyTools -- search_capabilities is a member (bypass, like search_memory), invoke_capability is NOT (serialized, like fill_credential); both still wrap in queue.enqueue.
+- [Phase 28]: Plan 02: bridge wire names mcp:capabilities-search (read-only) / mcp:capabilities-invoke (queued) added to the MCPMessageType union (Rule 3 type wiring; no TOOL_REGISTRY/tool-definitions edit) -- the exact routes Plan 03's SW dispatcher will register; invoke_capability uses a generic {slug,params?,tab_id?} zod shape (per-recipe validation is SW-side in interpretRecipe).
+- [Phase ?]: Phase 28 Plan 03 (SURF-01/SURF-02): two SW dispatcher routes (mcp:capabilities-search read-only, mcp:capabilities-invoke queued) + bridge delegates wire the capability tools; search resolves the un-spoofable owned-tab origin SW-side (new URL(tab.url).origin, D-11; payload.origin is a non-authoritative override) and returns <=5 ranked schema-on-hit hits.
+- [Phase ?]: Phase 28 Plan 03: invoke is the routerless direct Phase-27 path (NO Phase-29 router): slug -> getRecipeBySlug -> interpretRecipe -> executeBoundSpec; UNGATED (consent is Phase 30) but the two-point origin-pin holds (executeBoundSpec re-asserts tabOrigin === spec.origin); unknown slug returns RECIPE_NOT_FOUND (dual-field) verbatim via the existing errors.ts /^RECIPE_.+$/ passthrough -- NO errors.ts edit (D-06/D-07).
+- [Phase ?]: Phase 28 Plan 03: bridge delegates are pure pass-throughs (no origin/tab resolution) -- authoritative resolution lives ONLY in the dispatcher handlers (single un-spoofable point, T-28-01); both routes use the standalone handler: form (mcp:search-memory precedent), handlers are hoisted async function declarations referenced by the route-table const literal.
+- [Phase ?]: [Phase 28] Plan 04 (SURF-03/05/02): tests/capability-mcp-surface.test.js is the single-file INV-01 proof -- enumerates the built runtime server._registeredTools (65 = 63 + 2, both capability tools on the wire, the Plan 02 probe) ADJACENT to a recompute of registryHash(nonTriggerTools) == the frozen EXPECTED_NON_TRIGGER_REGISTRY_HASH (out-of-registry, unmoved); queue split asserted structurally (readOnlyTools Set) AND behaviorally (search bypasses a slow in-flight invoke); RECIPE_NOT_FOUND surfaces verbatim (not action_rejected) via the existing /^RECIPE_.+$/ passthrough, no errors.ts edit.
+- [Phase ?]: [Phase 28] Plan 04: both new phase tests (capability-search-eval + capability-mcp-surface) appended to the npm test chain after capability-fetch (no reorder/removal); the FULL npm test phase-close gate exits 0 after a Rule 1 fix to a stale lattice-provider-bridge-smoke importScripts baseline (168->170 / 164->166) left by Plan 28-01.
+- [Phase ?]: Phase 29 Plan 02 (CAT-01/03/05): capability-router.js + capability-catalog.js as two pure dual-export IIFE SW modules. Catalog = authoritative slug->tier registry (resolve declares the explicit tier; a slug is EITHER T1a OR T1b, no runtime tie-break). Router invoke(slug,args,{origin,tabId}) dispatches T0/T1a/T1b/T2/T3: T1b/T0 = the verbatim-lifted routerless body (interpretRecipe -> executeBoundSpec, tier-stamped); T1a = handler.handle(args,ctx) with ctx.executeBoundSpec; T2 -> RECIPE_LEARN_PENDING (Phase 31 stub); T3 -> RECIPE_DOM_FALLBACK_PENDING (Phase 32 seam, NO executeTool/page injection); unknown -> RECIPE_NOT_FOUND. All reasons use createRecipeError dual-field shape, surface verbatim via /^RECIPE_.+$/ (no errors.ts edit). Router is PURE (no chrome./fetch), never re-targets -- origin-pin holds inside executeBoundSpec (D-12). Origin bias lives in the catalog (biasByOwnedOrigin owned-first), never re-tiers a known slug. tests/capability-router.test.js GREEN 24/24, zero edits to the Plan-01 RED file; INV-01 surface unmoved.
+- [Phase ?]: Phase 29 Plan 04 (CAT-01/CAT-05): the D-03 internal-only reroute -- handleCapabilitiesInvokeMessageRoute (mcp-tool-dispatcher.js) now collapses to ONE FsbCapabilityRouter.invoke(slug, params, {origin, tabId}) call (the shared engine, front door 1 of INV-02). The inline getRecipeBySlug -> interpretRecipe -> executeBoundSpec body is gone (it lives in the router's T1b tier). Engine guard swapped to the router-unavailable guard. tabId + owned-tab origin resolved SW-side in one chrome.tabs.query (payload.tab_id/origin non-authoritative overrides, D-11); the two-point origin-pin still holds in executeBoundSpec. Wire names + MCP_PHASE199_MESSAGE_ROUTES + TOOL_REGISTRY byte-unchanged -> frozen INV-01 hash unmoved; no errors.ts edit (RECIPE_* verbatim). capability-mcp-surface 19/0, capability-router 24/0.
+- [Phase 29]: Phase 29 Plan 03 (CAT-02/CAT-03): the 5-service zero-install bundled head -- github.notifications T1b seed + github.issues.* T1a (persisted-query /_graphql + from:'response' CSRF scrape) + slack.* T1a split-token (xoxc in the request BODY, xoxd HttpOnly cookie same-origin) + notion.* T1a /api/v3 token_v2 RPC + reddit.inbox T1b /message/unread.json. Every handler targets its web app's OWN first-party origin (github.com/app.slack.com/www.notion.so/www.reddit.com); the separate-origin public API (api.github.com/oauth.reddit.com/api.notion.com) is FORBIDDEN -- the session cookie does not cross to it (D-09, T-29-07). Each T1a handler builds bound spec(s) and calls ctx.executeBoundSpec only (never a browser scripting/tabs API) so the active-tab origin-pin holds on the head path (D-12); scraped tokens go ONLY into the bound spec, never a log line (T-29-08). The catalog declares the head EXPLICITLY (HEAD_HANDLER_MODULES manifest + seedHeadHandlers() reading each present handler global) and handlers self-register at load; reddit.inbox is a T1b REGISTRY entry. head-handlers 54/0, router 24/0, recipe-schema 43/0, recipe-path-guard PASS.
+- [Phase 29]: Phase 29 Plan 03 Task 4 (live-capture checkpoint) resolved as deferred human_needed live-UAT (29-HUMAN-UAT.md, status human_needed), matching the Phase 27/28 posture -- NOT a fabricated live pass. The [ASSUMED] internal endpoint PATHS (RESEARCH A2/A3/A4) are the ONLY property not headlessly provable (capturing the real internal request needs real credentials, forbidden in CI per GOV-06); the origin-separation facts ARE web-search-verified and the DOM-fallback floor (Phase 32, T3) is the rot backstop. 10 [ASSUMED-ENDPOINT] markers across the handlers track the deferred capture; the headless CI gate does not depend on it.
+- [Phase ?]: Phase 29 Plan 05 (CAT-04 / INV-02 / INV-04): autopilot front door 2 -- executeCapabilityToolForAutopilot is a pre-executeTool guard (CAPABILITY_TOOL_NAMES, ABOVE _te_getToolByName, the Pitfall-1 out-of-registry correction; NOT a switch case) calling the SAME globalThis.FsbCapabilityRouter.invoke the MCP dispatcher calls -- one engine, two front doors, no parallel autopilot stack. Reuses buildAutopilotTriggerParams + makeResult; search_capabilities -> FsbCapabilitySearch.search (never mutates), only invoke_capability sets hadEffect. Tools stay OUT of TOOL_REGISTRY; LLM reach is an additive buildSystemPrompt hint, never a tool schema (frozen INV-01 hash unmoved; getPublicTools omits them). The setTimeout iterator is byte-untouched (INV-04). Full npm test green; parity 10/0, iterator-guard 4/0, recipe-path-guard PASS.
+- [Phase ?]: Phase 30 Plan 01 (Wave 0, GOV-01..08 + SIGN-01/02): ten zero-framework RED tests authored BEFORE the modules, all failing loud so Plans 02/03/04 turn them RED -> GREEN. Signed-payload scope LOCKED = recipe core + capturedAt + schemaHash MINUS signature, in-house RFC-8785 JCS the fixture signer embeds byte-for-byte (Plan 03 binds the identical contract). Error codes LOCKED in the RECIPE_ family so they surface verbatim with ZERO errors.ts edit. GOV-07/D-14 sensitive+Auto downgrade sampled GATE-SIDE (classify-sensitive origin under mode auto -> non-allow 'sensitive', no side effect). Native crypto.subtle Ed25519 signer (zero new packages) self-checks signed-pass + tampered-fail before emitting; fixture key is non-deterministic per run and NEVER a production trusted key (T-30-02). RECIPE_PATH_ALLOWLIST + background.js pre-armed with capability-signature.js + consent-policy-store.js + audit-log.js + service-denylist.js (the last explicit per Pitfall 6); guard GREEN, fails closed when modules land; all ten tests wired into scripts.test tail.
+- [Phase ?]: Signed payload = JCS of recipe-core+capturedAt+schemaHash minus signature; verified byte-identical to the offline fixture signer before implementing (SIGN-01/02)
+- [Phase ?]: interpretRecipe is a sync dispatcher returning a Promise only on the non-bundled verify branch, keeping bundled/no-meta callers synchronous and backward-compatible (D-06/D-07)
+- [Phase ?]: service-denylist.js is the single source of truth for origin sensitivity (isDenied + classify); noble Ed25519 fallback deferred to Phase 31; fail-closed native posture only blocks non-bundled recipes
+- [Phase ?]: 30-02: Consent gate runs unconditionally at the single invoke chokepoint (entry may be null) so the chokepoint is reached even on a catalog miss; RECIPE_NOT_FOUND returned only after the gate allows.
+- [Phase ?]: 30-02: Consent gate degrades to allow when the store module is absent (Phase-29 head), fails closed (default-OFF) once loaded; sensitive+Auto downgraded to ask at the gate (consentDecision sensitive, no executeBoundSpec).
+- [Phase 30]: Phase 30 Plan 04 (GOV-07/GOV-08): the Consent & Audit control-panel section persists per-origin Off/Ask/Auto + the elevated mutating opt-in straight to FsbConsentPolicyStore (NOT the Save bar) and re-renders on chrome.storage.onChanged; the Sensitive/Blocked friction reads FsbServiceDenylist.classify (the gate's source of truth) so the UI reflects the gate's step-4 downgrade (D-14) and is never an independent boundary. The audit viewer renders only the seven redacted columns via textContent (GOV-06 at the UI). consent-audit-settings-ui 52/0 + showcase-privacy-page 53/0 green; live render/Grant/badge smoke is human_needed UAT debt (30-HUMAN-UAT.md UAT-30-01), not a fabricated pass.
+- [Phase ?]: Phase 31 Wave 0: authored 9 zero-framework RED suites + a shared chrome.debugger event-driver stub BEFORE their modules; Waves 1-3 turn them RED->GREEN (Nyquist armed)
+- [Phase ?]: Phase 31: the synthesizer RED suite caps from:'response' to same-origin-cookie+flaggedForPhase32 (D-11/Pitfall 4); the declarative replay path cannot execute response-minted CSRF
+- [Phase ?]: Phase 31 capture: capture-time redaction uses structural exclusion (never reads header values/bodies/query); redactResponse keeps only {status,mimeType} so the redactor cannot leak
+- [Phase ?]: Phase 31 capture: CDP Network capture rides the existing Input-domain debugger attach (no manifest change); endSession detaches only if capture was the owner and no Input op holds the tab
+- [Phase ?]: Phase 31 Plan 03 (LEARN-01/02): recipe-synthesizer caps authStrategy to declarative-executable values -- NEVER emits csrf.from:'response' (D-11); response-minted-CSRF defaults to same-origin-cookie + flaggedForPhase32 on the descriptor (recipe core stays closed-vocab); validateRecipe gates output (D-12, fail closed -> null).
+- [Phase ?]: Phase 31 Plan 03: learned-recipe-store is a NEW per-origin versioned fsbLearnedRecipes envelope (distinct from the 500-cap memory layer, D-13); LRU evicts oldest lastSuccessAt past PER_ORIGIN_CAP=24; quarantine FLAGS quarantined:true (never deletes, D-16); getLearned hard-scopes recipe.origin===origin (Pitfall 6); null-proto ME-03 maps so a __proto__ origin/slug round-trips as own data.
+- [Phase ?]: Phase 31 Plan 03: promoteAfterReplay (on the synthesizer) is the D-10 gate -- promotes only on a clean injected interpretRecipe+executeBoundSpec replay, threading {trustedProvenance:'local'} (HI-01); a failed bind short-circuits before executeBoundSpec. No background.js wiring in 31-03 (importScripts + capture glue is 31-06). recipe-path guard PASS with both modules on disk + allowlisted + eval-free.
+- [Phase ?]: Phase 31 Plan 04 (LEARN-01/D-09): 'local' added to the trusted-exempt provenance SET (boolean-OR vs the already-resolved trusted value) in BOTH verifyRecipeEnvelope and interpretRecipe, parallel to 'bundled'; the resolution logic is byte-identical so HI-01 holds -- a payload self-declaring provenance:'local' with no loader vouch still verifies (tampered core rejected). The 'local' OR sits BEFORE the interpreter's async verify branch so the exemption is a zero verifyEd25519 call. learned-local-provenance-exempt 7/0; no regression; recipe-path guard PASS.
+- [Phase 31]: 31-05: addLearnedRecipe mutates the ONE INDEX_OPTIONS MiniSearch index + slug map and re-snapshots with a bumped catalogVersion (never a fresh index, Pitfall 5) -- learned slugs findable next visit and survive loadJSON (LEARN-03/D-14)
+- [Phase 31]: 31-05: catalog resolve checks the learned store FIRST (Option A) so a learned T2 recipe outranks a generic T1b by resolve order; router case T2 dispatches via _runDeclarativeTier with trustedProvenance:'local' (LEARN-04/D-15)
+- [Phase 31]: 31-05: _getLearned uses the store's synchronous getLearnedSync because resolve() is synchronous; production needs a getLearnedSync in-memory mirror on learned-recipe-store.js to surface a learned recipe at resolve time (tracked stub)
+- [Phase ?]: 31-06: Discovery-session orchestrator runs promote-after-replay (synthesize -> interpret('local') -> executeBoundSpec -> promote + addLearnedRecipe ONLY on a clean replay); failures discarded (D-10)
+- [Phase ?]: 31-06: Closed the 31-05 gap with getLearnedSync + an in-memory mirror (hydrated at SW startup, lock-stepped with promote/quarantine/LRU) so LEARN-04 outranking fires at runtime via catalog.resolve
+- [Phase ?]: 31-06: mcp:capabilities-discover is an out-of-registry control-surface route (mirrors invoke's SW-side resolution); NO manifest change; first chrome.debugger.onEvent consumer, method-dispatched so Input emulation is unaffected
+- [Phase ?]: Phase 32 Wave-0 RED suites drive the REAL capability-router (not a canned spy) so fallback-decision assertions genuinely red until Plan 03's classify hook lands
+- [Phase ?]: recipe-schema-lock freezes the v2 RECIPE_SCHEMA hash as a TBD-FROZEN-IN-PLAN-04 placeholder; Plan 04 computes-once-and-pastes the real digest at first green
+- [Phase 32]: 32-02: recipe schemaVersion widened const:1 -> enum:[1,2] (NOT a bumped const) so persisted schemaVersion:1 LEARNED recipes still validate at runtime (D-08); out-of-enum still RECIPE_SCHEMA_INVALID; optional capturedAt + expectedShape added, additionalProperties:false preserved
+- [Phase 32]: 32-02: capability-rot-detector classifyRecipeBroken HEAL-04 taxonomy -- typed RECIPE_* security passthrough runs BEFORE the generic fetch-failed branch (T-32-PASS); validateExpectedShape reuses the extract jmespath engine, empty-but-present container passes (never masks no-results), absent/throwing engine degrades to shape-passes (D-06)
+- [Phase 32]: 32-03 (HEAL-01/03/04): the router post-executeBoundSpec rot classify hook fires in BOTH _runDeclarativeTier (~:401) and _runHandlerTier (~:433) -- a broken verdict quarantines (T2 learned via store.quarantine persisted; bundled via catalog.quarantineBundled session-only) + fires the fire-and-forget consent-gated runDiscovery re-learn + returns RECIPE_DOM_FALLBACK_PENDING carrying reason:verdict.code + fellBackToDom:true; every non-broken verdict (success/legitimate-no-results/logged-out/typed-security-passthrough) returns VERBATIM, never masked (HEAL-04). The detector is reached via the SW global with a STATIC Node-require fallback (recipe-path-guard-safe) and wired into background.js importScripts before the catalog/router. tool-executor.js UNCHANGED (the typed reason + fellBackToDom surface through the existing executeCapabilityToolForAutopilot makeResult contract; no parallel stack, INV-02). agent-loop.js:731 prompt-only hint strengthened (iterator byte-untouched, INV-04). router 38/0, autopilot-parity 13/0, iterator-guard 4/0, recipe-path-guard PASS.
+- [Phase 32]: 32-03: capability-catalog gains a SESSION-only null-proto quarantinedBundledSlugs Set + quarantineBundled/clearBundledQuarantine; resolve SKIPS a quarantined bundled slug (returns null -> the router falls through to the DOM fallback) AFTER the learned-first check and BEFORE any tier return, without mutating or persisting the REGISTRY (D-09/D-11/D-12 -- a transient blip never permanently demotes a bundled recipe; re-evaluated next SW session).
+- [Phase ?]: Froze the v2 RECIPE_SCHEMA hash (f35211f5...f622a37, independently re-computed) in recipe-schema-lock.test.js -- the closed-vocab recipe contract is locked (HEAL-05/INV-01, D-14)
+- [Phase ?]: 7-provider parity gate green unchanged -- the typed RECIPE_DOM_FALLBACK_PENDING reason is byte-equal across all 7 PROVIDER_KEYS (HEAL-05/INV-03, D-13)
+- [Phase ?]: v0.9.99 milestone gate CLOSED: full npm test EXIT 0 + targeted Phase-32 gate 13/13 GREEN (HEAL-05, D-15)
+- [Phase ?]: Phase 32 Plan 05 (HEAL-01/HEAL-03 live half): authored 32-HUMAN-UAT.md (UAT-32-01) recording the irreducibly-live self-healing scenario (a real rotted/broken recipe on a real authenticated origin detected as RECIPE_EXPIRED, the autopilot completing the SAME task via the DOM tools, the recipe quarantined, and a consent-gated re-learn offered/triggered) as human_needed (status partial / result pending), matching the Phase 27-31 posture; the CI half is GREEN (Plans 02-04), ONLY the live half is human_needed, recorded debt NOT a fabricated pass (D-15, GOV-06).
+- [Phase ?]: Phase 32 Plan 05: the gated checkpoint:human-verify (non-package, gate=blocking) was resolved per the auto-mode policy as deferred human_needed live-browser UAT debt joining the v0.9.99 ledger (alongside UAT-27-01 + the Phase 29/30/31 live items); it does NOT block the milestone close -- the v0.9.99 completion criterion is the green HEAL-05 CI gate (Plan 04, full npm test EXIT 0). No live result was fabricated. Phase 32 is execution-complete (all 5 plans done).
+
+**Phase 33 (MEDIA-01..04, milestone extension):**
+
+- PhantomStream `0.1.0→0.2.1` media-mirroring uptake. FSB consumes the package via three esbuild bundles, so the port is bump + targeted rebuild (only the 3 phantom-stream entries, NOT `buildAll()`, to protect lattice-host/stt drift) + glue. The one blocker is `dom-stream.js`'s `forwardCaptureMessage` allowlist silently dropping unknown `STREAM.*`; fixed by branching `STREAM.MEDIA`/`MEDIA_HINT` → `domStreamMedia`/`domStreamMediaHint` → `ext:dom-media` relay → dashboard `handleDOMMedia` (static + Angular). `mediaMode: 'reference'` (D-02); adaptive HLS/DASH discovery deferred off-by-default (D-03, no `webRequest` permission, `classifyManifest` surfaced for later). INV-01..04 untouched; differential parity green by construction. media-sync 31/0 + media-wiring 24/0; full phantom-stream cluster green. Not committed (working-tree drift intermingled). Live media playback fidelity = `33-HUMAN-UAT.md` (human_needed).
+
+**Phase 34 (UPLOAD-01..04, milestone extension):**
+
+- Explicit `upload_file(selector, file_path, tab_id?)` tool: sets a real file from an absolute disk path onto an `<input type=file>` via CDP `DOM.setFileInputFiles` — the only mechanism that can (page JS is forbidden from setting a file input or reading disk). Routed `_route:'background'` so both front doors (MCP `mcp-tool-dispatcher` `handleUploadFileRoute` + autopilot `tool-executor` `case 'upload_file'`) share ONE background helper `executeUploadFile`, where the security chokepoint lives. Posture A (D-02): absolute-path-only + `extension/utils/upload-path-denylist.js` (sensitive paths) + audit (origin+outcome+decision, never the path) enforced BEFORE any side effect. Keeps `drop_file` for synthetic dropzones (D-03). INV-01 registry hash moved intentionally (recomputed `6354d788…` in all 4 hash files); `mcp/ai/tool-definitions.cjs` rebuilt byte-identical; `visual-session-schema-lock` 36→37; no new permission (`chrome.debugger` already granted). Review 0 critical/high/medium, 3 WARNING fixed (Win32 trailing-dot/space bypass, +`/proc`/`/var/run/secrets`/`.git-credentials`, detach-as-failure). denylist 36/0; full `npm test` EXIT 0. Not committed (drift intermingled). Live upload fidelity = `34-HUMAN-UAT.md` (human_needed).
+
+### Top Risks (from research — bake into phase planning)
+
+- **Recipe interpreter drifts into "code fetched as data" → Web Store ban (Wall 1, Phase 26):** freeze a closed opcode/enum vocabulary; CI guard fails on `eval`/`new Function`/`import(`; treat the hardest/most-popular services as bundled imperative handlers, never recipes.
+- **Replay fetch from the wrong context (extension origin) → auth silently absent (Wall 2, Phase 27):** issue same-origin authenticated calls from the page MAIN world; a smoke test must assert the logged-in (not logged-out) data shape from a real HttpOnly site.
+- **Credential-replay weapon / "safe brand" inversion (Phase 30):** default-OFF per origin; Off/Ask/Auto (Auto explicit per-origin, never global); origin-pinning in the interpreter; sign/verify server recipes; mutation gating; sensitive-origin friction.
+- **Auth/recipe data routed off-device → exfiltration + Limited-Use violation (Phases 30/31):** auth strictly local; redact at capture time before persist/promote/egress; learned recipes store shape only; tested redactor asserts no auth substrings survive.
+- **Recipe rot → confidently-wrong/empty results (Phase 32, the designed steady state):** stamp captured-at + schema hash; validate each response against an expected-shape assertion → typed `RECIPE_EXPIRED`; self-heal to DOM and re-learn; quarantine repeat failures.
+- **Capability-search recall/precision failure (Phase 28):** index intent-phrased synonyms + service + action verb + side-effect class; disambiguate before any mutating invoke; eval harness (recall@k + wrong-invoke) gates the milestone.
+- **MV3 SW eviction mid-API-call → lost in-flight request, ambiguous mutation (Phase 27):** reuse the `run_task` Phase 239 resume-sidecar + Lattice ResumePolicy; treat ambiguous mid-mutation as `RECOVERY_AMBIGUOUS` — never blind-retry.
+
+### Research Flags (phases likely needing a `--research-phase` spike at plan time)
+
+- **Phase 26 (recipe schema):** the highest-risk design artifact — the closed vocabulary must cover the realistic long tail yet be provably non-Turing-complete; needs a schema-design + RHC-line spike.
+- **Phase 27 (fetch primitive):** spike capture/replay fidelity for CSRF/ephemeral tokens (per-session vs per-request nonce, Slack xoxc/xoxd split, persisted-query hash) and the `getResponseBody` > ~1 MB limit — these size the head/tail/DOM-fallback split.
+- **Phase 31 (discovery):** spike CDP Network capture details (maxPostDataSize, extraInfo raw-header/cookie events, detach/restore so the existing Input emulation isn't disrupted) and the redactor's completeness test.
+- **Phase 32 (self-heal):** spike the failure-detection taxonomy (which signals → DOM fallback without masking legitimate "no results") and the mutation-ambiguity recovery policy.
 
 ### Pending Todos
 
@@ -160,43 +232,34 @@ None yet.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260617-e2w | Fix review findings: provider bridge timeout/offscreen recovery and trigger attribute extraction | 2026-06-17 | 3052e794 | [260617-e2w-fix-review-findings-provider-bridge-time](./quick/260617-e2w-fix-review-findings-provider-bridge-time/) |
-| 260617-eic | Fix trigger manager to persist live-observe watch metadata and trigger extraction fields | 2026-06-17 | 2d3b6979 | [260617-eic-fix-trigger-manager-to-persist-live-obse](./quick/260617-eic-fix-trigger-manager-to-persist-live-obse/) |
-| 260617-g1w | Upgrade Lattice runtime and CLI packages to 1.4.0 | 2026-06-17 | 2be7a4db | [260617-g1w-upgrade-lattice-runtime-and-cli-packages](./quick/260617-g1w-upgrade-lattice-runtime-and-cli-packages/) |
+| 260623-941 | Patch learned replay placeholders and unpacked dev capability catalog snapshot | 2026-06-23 | b1d74e87 | [260623-941-patch-review-findings-make-learned-recip](./quick/260623-941-patch-review-findings-make-learned-recip/) |
+| 260623-8l9 | Patch review findings for capability denylist startup, network capture debugger ownership, handler schemas, and dev handler loading | 2026-06-23 | 7001e49d | [260623-8l9-patch-review-findings-for-capability-den](./quick/260623-8l9-patch-review-findings-for-capability-den/) |
 
 ## Deferred Items
 
-Items acknowledged and deferred at v0.10.0 milestone close on 2026-06-15 (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/v0.10.0-phases/`):
+Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/`):
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | uat_gap | Phase 01 / 01-HUMAN-UAT.md | partial; 1 pending scenario | v0.10.0 close |
-| verification_gap | Phase 01 / 01-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 02 / 02-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 03 / 03-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 04 / 04-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 05 / 05-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 08 / 08-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 09 / 09-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 10 / 10-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 11 / 11-VERIFICATION.md | human_needed | v0.10.0 close |
-| verification_gap | Phase 12 / 12-VERIFICATION.md | human_needed | v0.10.0 close |
-| uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 Phase 16 close |
-| uat_gap | Phase 20 / 20-HUMAN-UAT.md | human_needed; 12 live-browser/composed trigger scenarios | v0.11.0 Phase 20 close |
+| verification_gap | Phases 01-05, 08-12 / *-VERIFICATION.md | human_needed | v0.10.0 close |
+| uat_gap | Phase 16 / 16-HUMAN-UAT.md | partial; 4 pending live-browser scenarios | v0.11.0 close |
+| uat_gap | Phase 20 / 20-HUMAN-UAT.md | human_needed; 12 live-browser/composed trigger scenarios | v0.11.0 close |
 | uat_gap | Phase 25 / 25-HUMAN-UAT.md | human_needed; 12 live Chrome-extension PhantomStream scenarios | v0.12.0 close |
+| uat_gap | Phase 27 / 27-HUMAN-UAT.md | human_needed; live FETCH-05 logged-in-shape (UAT-27-01) + logged-out contrast + live origin-pin (3 scenarios); CI/automated half proven green in Plan 02 | v0.9.99 Phase 27 close |
 
-Carry-forward publish/tag gates (pre-existing and current, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items; 12 Phase 25 live Chrome-extension PhantomStream UAT items.
+Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0; `clawhub publish "skills/FSB Skill"`; public package publication; 4 live-OpenClaw runtime UAT items; 12 Phase 20 live-browser/composed trigger UAT items; 12 Phase 25 live Chrome-extension PhantomStream UAT items.
 
-## Lattice Integration State (carried, INV-06)
+## Lattice Integration State (carried, INV-06 from prior milestone)
 
-Runtime is `@full-self-browsing/lattice@1.4.0` via `lattice`; pin/guardrails remain `.planning/LATTICE-PIN.md`, package-lock integrity, and `tests/lattice-public-package.test.js`.
+Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guardrails remain `.planning/LATTICE-PIN.md`, `package-lock.json` integrity, and `tests/lattice-public-package.test.js`. v0.9.99 reuses Lattice Ed25519/JCS receipts for recipe signature verification (SIGN-01/02, Phase 30) and the `run_task`/Lattice ResumePolicy survival machinery for in-flight fetch resume (FETCH-04, Phase 27).
 
 ## Session Continuity
 
-Last session: 2026-06-17T19:40:06.000Z
-Stopped at: Archived v0.12.0 milestone
+Last session: 2026-06-23T09:22:09.055Z
+Stopped at: Completed 32-05-PLAN.md (live self-healing human_needed UAT closeout; UAT-32-01 recorded as deferred live-browser debt; Phase 32 execution-complete; v0.9.99 gated by green HEAL-05)
 Resume file: None
 
 ## Next Actions
 
-Start the next milestone with `$gsd-new-milestone` when ready. Existing v0.11 live-browser UAT/release actions and v0.12.0 Chrome-extension browser UAT remain carried-forward, user-gated debt.
+Phase 27 is execution-complete (all three plans done; FETCH-01..05 delivered): Plan 01 (interpreter query-fold + origin-pin `RECIPE_ORIGIN_MISMATCH`, `RECOVERY_AMBIGUOUS` errors.ts registration, capability-fetch.js allowlist entry; FETCH-03/04), Plan 02 (the `capability-fetch.js` MAIN-world credentialed-fetch spine + active-tab origin-pin + resume-sidecar + SW-side extract + `classifyOnWake`, the hardcoded github.com GET /notifications recipe, and the FETCH-01..05 CI mock suite `tests/capability-fetch.test.js`, 26 PASS), and Plan 03 (the live FETCH-05 logged-in-shape closeout: `27-HUMAN-UAT.md` status human_needed + a human-gated checkpoint accepted in auto-mode as recorded debt). FETCH-05's automated/CI half is green; the irreducibly-LIVE half (real GitHub HttpOnly cookies attach in the page MAIN world -> logged-in body shape) is recorded as human_needed UAT debt (UAT-27-01), NOT a fabricated pass, and joins the v0.10/v0.11/v0.12 live-browser UAT ledger. Next: run phase verification for Phase 27, then plan Phase 28 (Lean MCP Surface + Capability Search; SURF-01..06) which calls `executeBoundSpec` via `invoke_capability`. Existing live-browser UAT and release/publish actions remain carried-forward, user-gated debt.

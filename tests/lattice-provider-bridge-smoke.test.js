@@ -575,15 +575,40 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // utils/trigger-manager.js -- the fire-condition engine; load order
   // value-extractor -> trigger-store -> trigger-manager -> trigger-lifecycle).
   // Phase 24 Plan 24-01: 160 mentions (+1 new line for ws/phantom-stream-protocol.js).
+  // Phase 26 (v0.9.99 capability foundation): 167 mentions (+7 -- 3 vendored libs
+  // lib/{jmespath,minisearch,cfworker-json-schema}.min.js + 3 capability modules
+  // utils/capability-{recipe-schema,auth-strategies,interpreter}.js + 1 load-order comment).
+  // Phase 27 Plan 27-02: 168 mentions (+1 new line for utils/capability-fetch.js -- the MAIN-world fetch primitive).
+  // Phase 28 Plan 28-01: 170 mentions (+2 new lines for catalog/recipe-index.generated.js +
+  // utils/capability-search.js -- the build-time catalog IIFE + the minisearch index/slug-map module).
+  // Phase 29 (v0.9.99 catalog/router/head): 175 mentions (+5 -- utils/capability-catalog.js +
+  // utils/capability-router.js + the three T1a head handlers catalog/handlers/{github,slack,notion}.js).
+  // Phase 30 (consent/governance): 179 mentions (+4 -- utils/{consent-policy-store,audit-log,
+  // capability-signature,service-denylist}.js).
+  // Phase 31 (learned recipes / discovery): 184 mentions (+5 -- utils/{network-capture-redactor,
+  // network-capture,recipe-synthesizer,learned-recipe-store,discovery-session}.js).
+  // Phase 32 (self-healing fallback): 185 mentions (+1 -- utils/capability-rot-detector.js, the
+  // rot classifier the router calls; wired in Plan 32-03). Re-baselined here in the Phase-32
+  // milestone-close plan (32-04) -- mirrors the per-phase refreshes at Phase 27/28/29; the +9 from
+  // Phase 30/31 is swept in because those phases left this byte-freeze count stale.
+  // Phase 34 (safe file upload): 186 mentions (+1 -- utils/upload-path-denylist.js).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 160, 'background.js importScripts count = 160 (Phase 5 baseline 153 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 + Phase 24 +1 for ws/phantom-stream-protocol.js)');
+  passAssertEqual(importScriptsCount, 186, 'background.js importScripts count = 186 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
   // (value-extractor + trigger-manager) -> 156; Phase 24 adds 1
-  // (phantom-stream-protocol) -> 157.
+  // (phantom-stream-protocol) -> 157. Phase 26 adds 6 (3 vendored libs + 3 capability
+  // modules) -> 163; Phase 27 Plan 27-02 adds 1 (utils/capability-fetch.js) -> 164.
+  // Phase 28 Plan 28-01 adds 2 (catalog/recipe-index.generated.js + utils/capability-search.js) -> 166.
+  // Phase 29 adds 5 (utils/capability-catalog.js + utils/capability-router.js + 3 catalog/handlers
+  // {github,slack,notion}.js) -> 171. Phase 30 adds 4 (consent-policy-store + audit-log +
+  // capability-signature + service-denylist) -> 175. Phase 31 adds 5 (network-capture-redactor +
+  // network-capture + recipe-synthesizer + learned-recipe-store + discovery-session) -> 180.
+  // Phase 32 adds 1 (utils/capability-rot-detector.js, Plan 32-03) -> 181.
+  // Phase 34 adds 1 (utils/upload-path-denylist.js) -> 182.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 157, 'background.js importScripts() call sites = 157 (Phase 5 baseline 150 + Phase 6 +1 + Phase 8 +1 + Phase 14 +2 + Phase 15 +2 + Phase 24 +1 for phantom-stream-protocol.js)');
+  passAssertEqual(importScriptsCallSites, 182, 'background.js importScripts() call sites = 182 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

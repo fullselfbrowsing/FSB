@@ -5,11 +5,11 @@ const path = require('node:path');
 
 const EXPECTED_PUBLIC_PHANTOM_STREAM = Object.freeze({
   packageName: '@full-self-browsing/phantom-stream',
-  packageVersion: '0.1.0',
-  packageSpec: '0.1.0',
-  packageIntegrity: 'sha512-Hf6K0bjAT5M9dUs7Xw1NB2Cb8hkmiMz7KDO0rq5mRkDKmQnLY1sTqTXwIX2r5gjLKVkl3TCemr3hSucVc1k69g==',
-  packageTarball: 'https://registry.npmjs.org/@full-self-browsing/phantom-stream/-/phantom-stream-0.1.0.tgz',
-  packageShasum: '87e203e2d1a0f5ef097c8b4aba5fe854a6fe134d',
+  packageVersion: '0.2.1',
+  packageSpec: '0.2.1',
+  packageIntegrity: 'sha512-3aG66I7IHMml8H2kORlghwobVyIj9/YZaVxGkGMaRYPOEO19RabFZU/R4K1RG3Epf0bSfjbFDDxyGeXmgkXd5A==',
+  packageTarball: 'https://registry.npmjs.org/@full-self-browsing/phantom-stream/-/phantom-stream-0.2.1.tgz',
+  packageShasum: '503705594ac92b463c970edfaa8f34ba6ecb50ad',
   stalePackageName: '@fullselfbrowsing/phantom-stream'
 });
 

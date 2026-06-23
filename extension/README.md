@@ -42,7 +42,7 @@ npm test
 
 ## DOM Streaming Boundary
 
-FSB uses `@full-self-browsing/phantom-stream@0.1.0` for generic browser mirroring. `content/dom-stream.js` is an FSB adapter around the bundled PhantomStream capture bridge; `ws/ws-client.js` uses the PhantomStream protocol bridge for stream/control envelopes while preserving FSB task/status traffic and remote-control ownership diagnostics.
+FSB uses `@full-self-browsing/phantom-stream@0.2.1` for generic browser mirroring and reference-mode media mirroring. `content/dom-stream.js` is an FSB adapter around the bundled PhantomStream capture bridge; `ws/ws-client.js` uses the PhantomStream protocol bridge for stream/control envelopes while preserving FSB task/status traffic and remote-control ownership diagnostics. Progressive `<video>` and `<audio>` nodes can mirror through the media side channel; adaptive HLS/DASH discovery remains deferred because enabling it would require a new `webRequest` permission.
 
 ## Trigger Watchers
 
