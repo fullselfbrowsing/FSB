@@ -149,6 +149,22 @@ const RECIPE_PATH_ALLOWLIST = [
   // dynamic-code constructs. Registered ahead of creation (Plan 03 writes it),
   // cheap insurance matching the gate's position directly above interpretRecipe.
   'extension/utils/service-denylist.js',
+  // Phase 31 (LEARN-01, D-12): the synthesizer turns a redacted ObservedCall into a
+  // closed-vocab declarative recipe that is then BOUND/REPLAYED through the
+  // interpreter -- so it is recipe-path-adjacent and MUST be eval-free-scanned. Does
+  // NOT match the capability-* glob, so listed explicitly (Pitfall 6, the Phase-30
+  // consent-store/audit-log/service-denylist precedent). Registered AHEAD of creation
+  // (a later wave writes it): Check 1's existsSync pre-check skips an absent path
+  // without a failure, and Check 4's capability-* disk glob is not in play for a
+  // non-glob name -- so the guard stays GREEN now and scans it for eval/new Function/
+  // import the moment it lands. The redactor + network-capture modules are NOT listed:
+  // they never bind/execute a recipe (they are not recipe-path-adjacent).
+  'extension/utils/recipe-synthesizer.js',
+  // Phase 31 (LEARN-01, D-13): the per-origin learned-recipe store. A promoted
+  // learned recipe is read back by the catalog and BOUND/EXECUTED on the T2 path, so
+  // the store sits on the recipe path and MUST be eval-free-scanned. Same non-glob
+  // explicit-listing + registered-ahead-of-creation semantics as the synthesizer above.
+  'extension/utils/learned-recipe-store.js',
   'extension/lib/cfworker-json-schema.min.js',
   'extension/lib/jmespath.min.js',
   'extension/lib/minisearch.min.js',
