@@ -326,35 +326,61 @@
     _learnedDescriptors.push({ slug: slug });
     _learnedAddSeq += 1;
 
-    // Re-persist the snapshot with a BUMPED catalogVersion (D-14 / HI-01 fix).
-    //
-    // The stored version is the BASE-catalog version (computed over cat.descriptors
-    // ONLY -- the exact same input buildOrRestore recomputes on restart) followed by
-    // a '+learnedN' suffix. Keeping the base part identical to buildOrRestore's
-    // recomputation is what lets the prefix-tolerant restore re-attach the persisted
-    // index (which already carries the learned docs) instead of discarding it. The
-    // '+learnedN' suffix still makes the stored value DIFFER from the prior snapshot
-    // (monotonic), and the base prefix still changes when the BASE catalog changes --
-    // so a genuine base-catalog edit correctly invalidates the snapshot.
-    //
-    // NOTE: the learned descriptors are deliberately NOT folded into the version
-    // input here (the previous '+learned' bug). Folding them changed the
-    // descriptor-count prefix so the base part could never equal buildOrRestore's
-    // recomputation, forcing an unconditional rebuild that dropped every learned slug.
-    var c = _getChrome();
-    if (c && c.storage && c.storage.local && _ms) {
-      try {
-        var cat = _getCatalog();
-        var baseDescriptors = (cat.descriptors || []);
-        var baseRecipes = (cat.recipes || []);
-        var bumped = _computeCatalogVersion(baseDescriptors, baseRecipes, cat.version)
-          + '+learned' + _learnedAddSeq;
-        var payload = {};
-        payload[STORAGE_KEY] = { catalogVersion: bumped, index: _ms.toJSON() };
-        await c.storage.local.set(payload);
-      } catch (e) { /* best-effort snapshot -- the in-memory index is already updated */ }
-    }
+    // Re-persist the snapshot with a BUMPED '+learnedN' catalogVersion (D-14 /
+    // HI-01) -- see _persistLearnedSnapshot for the base-prefix invalidation rule.
+    await _persistLearnedSnapshot();
     return true;
+  }
+
+  // ---- Re-persist the snapshot with a BUMPED '+learnedN' catalogVersion --------
+  //
+  // Shared by addLearnedRecipe and removeLearnedRecipe (LO-01). The stored version
+  // is the BASE-catalog version (computed over cat.descriptors ONLY -- the exact
+  // input buildOrRestore recomputes on restart) plus a '+learnedN' suffix, so the
+  // prefix-tolerant restore re-attaches the persisted index (which carries the
+  // current learned docs) and a base-catalog change still invalidates it (HI-01).
+  // Best-effort: a missing chrome.storage.local skips only the persist.
+  async function _persistLearnedSnapshot() {
+    var c = _getChrome();
+    if (!(c && c.storage && c.storage.local && _ms)) { return; }
+    try {
+      var cat = _getCatalog();
+      var baseDescriptors = (cat.descriptors || []);
+      var baseRecipes = (cat.recipes || []);
+      var bumped = _computeCatalogVersion(baseDescriptors, baseRecipes, cat.version)
+        + '+learned' + _learnedAddSeq;
+      var payload = {};
+      payload[STORAGE_KEY] = { catalogVersion: bumped, index: _ms.toJSON() };
+      await c.storage.local.set(payload);
+    } catch (e) { /* best-effort snapshot -- the in-memory index is already updated */ }
+  }
+
+  // ---- LO-01: drop an evicted learned slug from the index (store/index parity) -
+  //
+  // removeLearnedRecipe(slug) is the inverse of addLearnedRecipe. The learned store
+  // LRU-evicts the oldest slug past its per-origin cap (learned-recipe-store.promote
+  // -> _evictOldestIfOverCap); without a matching index drop the evicted slug stayed
+  // a DEAD search() hit (resolve() -> getLearnedSync null -> RECIPE_NOT_FOUND). This
+  // discards the doc from the ONE _ms instance, drops the slug -> recipe map entry,
+  // bumps the monotonic learned-add counter, and re-persists the snapshot so the
+  // removal survives an SW restart. Idempotent + no-op-safe: an unknown slug, an
+  // absent index, or an absent MiniSearch all degrade to false without throwing.
+  async function removeLearnedRecipe(slug) {
+    if (typeof slug !== 'string' || !slug) { return false; }
+    if (!_ms) { return false; }   // nothing built -> nothing to remove
+    var removed = false;
+    try { _ms.discard(slug); removed = true; } catch (e) { /* not present -> nothing to discard */ }
+    if (Object.prototype.hasOwnProperty.call(_slugToRecipe, slug)) {
+      delete _slugToRecipe[slug];
+      removed = true;
+    }
+    // Drop the tracked learned descriptor (best-effort; bookkeeping only).
+    _learnedDescriptors = _learnedDescriptors.filter(function(d) { return d && d.slug !== slug; });
+    // Bump the monotonic counter so the re-persisted version differs from the prior
+    // snapshot (a removal is a catalog change too).
+    _learnedAddSeq += 1;
+    await _persistLearnedSnapshot();
+    return removed;
   }
 
   // ---- Export shape (dual-export IIFE; mirror capability-interpreter.js) ------
@@ -364,6 +390,7 @@
     search: search,
     getRecipeBySlug: getRecipeBySlug,
     addLearnedRecipe: addLearnedRecipe,
+    removeLearnedRecipe: removeLearnedRecipe,
     deriveSideEffect: deriveSideEffect,
     INDEX_OPTIONS: INDEX_OPTIONS
   };

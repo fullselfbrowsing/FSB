@@ -68,6 +68,19 @@
     return (typeof globalThis !== 'undefined' && globalThis.chrome) ? globalThis.chrome : null;
   }
 
+  // ---- lazy capability-search accessor (LO-01) ------------------------------
+  // typeof-guarded so the store loads cleanly under a Node test harness where the
+  // search module may be absent (the store suite loads this module alone). Used
+  // ONLY to drop an LRU-evicted slug from the search index so store and index stay
+  // in parity (an evicted slug must not linger as a dead search() hit). Degrades to
+  // null -> the eviction-index-drop is simply skipped (the next SW-restart restore
+  // would rebuild from the post-eviction snapshot anyway).
+  function _search() {
+    return (typeof globalThis !== 'undefined' && globalThis.FsbCapabilitySearch)
+      ? globalThis.FsbCapabilitySearch
+      : (typeof FsbCapabilitySearch !== 'undefined' ? FsbCapabilitySearch : null);
+  }
+
   function _hasLocalStorage() {
     var c = _getChrome();
     return !!(c && c.storage && c.storage.local
@@ -418,7 +431,21 @@
       _mirrorSet(origin, slug, recipe,
         (perOrigin[slug] && perOrigin[slug].descriptor !== undefined ? perOrigin[slug].descriptor : descriptor),
         perOrigin[slug] && perOrigin[slug].quarantined === true);
-      if (evictedSlug) { _mirrorDelete(origin, evictedSlug); }
+      if (evictedSlug) {
+        _mirrorDelete(origin, evictedSlug);
+        // LO-01: drop the evicted slug from the capability search index too, so it
+        // stops being a dead search() hit (resolve() -> getLearnedSync null ->
+        // RECIPE_NOT_FOUND). Best-effort + fire-and-forget: a failure here never
+        // undoes the promotion (the store write already committed) and the index is
+        // self-healing on the next SW-restart snapshot restore. Guarded so a missing
+        // search module (Node store suite) is a silent no-op.
+        var search = _search();
+        if (search && typeof search.removeLearnedRecipe === 'function') {
+          try {
+            Promise.resolve(search.removeLearnedRecipe(evictedSlug)).catch(function() { /* best-effort */ });
+          } catch (_idxErr) { /* best-effort -- store/index parity is non-critical */ }
+        }
+      }
     });
   }
 
