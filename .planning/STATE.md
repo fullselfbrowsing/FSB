@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.9.99
 milestone_name: Native Capability Catalog (FSB API Execution)
-status: verifying
-stopped_at: Completed 32-05-PLAN.md (live self-healing human_needed UAT closeout; UAT-32-01 recorded as deferred live-browser debt; Phase 32 execution-complete; v0.9.99 gated by green HEAL-05)
-last_updated: "2026-06-23T09:22:09.060Z"
+status: ready_to_plan
+stopped_at: Phase 32 complete (5/5) — ready to discuss Phase 999.1
+last_updated: 2026-06-23T09:53:02.768Z
 last_activity: 2026-06-23
 progress:
   total_phases: 8
@@ -25,13 +25,13 @@ See: .planning/research/SUMMARY.md (decision-ready synthesis; risk-first 7-phase
 See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), self-healing to DOM automation when the API path breaks.
-**Current focus:** Phase 32 — self-healing-fallback-recipe-rot-detection-re-learn-provider
+**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
 
 ## Current Position
 
-Phase: 32 (self-healing-fallback-recipe-rot-detection-re-learn-provider) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-23
 
 Progress: [██████████] 100%
@@ -81,6 +81,7 @@ Ordering principle (risk-first, all four researchers converge): Wall 1 (schema/C
 | 29 | 5 | - | - |
 | 30 | 4 | - | - |
 | 31 | 6 | - | - |
+| 32 | 5 | - | - |
 
 *Updated after each plan completion.*
 | Phase 27 P02 | 7min | 3 tasks | 7 files |
