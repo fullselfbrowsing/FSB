@@ -126,6 +126,42 @@ blocklist**, and it is **user-extensible**. Host patterns use a
 subdomain) or an exact origin. A comprehensive, per-service legal review is
 ongoing; this seed establishes the mechanism and a safe default.
 
+### Categorization Axes
+
+An origin's classification is decided along **three distinct criteria**. These
+axes are independent: an origin can be denied for finance/government reasons OR
+for ToS-hostility reasons, and **sensitivity is a separate, softer tier** than
+either denial axis. `service-denylist.js classify(origin)` is the single source
+of truth that resolves an origin to denied / sensitive / safe.
+
+1. **Finance / government denial.** Categorically-prohibited financial and
+   government origins where automation is denied outright (the banking and
+   government seed -- e.g. the representative banking host patterns and `*.gov`).
+   Automation against these origins is non-enableable regardless of consent mode;
+   the denylist is consulted first.
+
+2. **ToS-hostility denial.** Origins denied because automating them violates the
+   site's own Terms of Service. This axis is **distinct from finance
+   sensitivity** -- the basis is contractual/legal hostility to automation, not
+   the handling of money. The roster denied on this axis is:
+   - brokerage / trading: **robinhood**, **fidelity**, **carta**
+   - ToS-hostile media / social: **netflix**, **spotify**, **twitch**,
+     **steam**, **youtube-music**, **tinder**, **onlyfans**
+
+3. **Sensitivity (Ask / mutating-gated).** Allowed-but-sensitive origins
+   (payments, budgeting, social, messaging) that are NOT denied. Reads run under
+   Auto everywhere; a **write** to a sensitive origin re-enforces the per-origin
+   mutating opt-in (posture B / DENY-04) before it is permitted. This is where
+   **instagram**, **facebook**, **tiktok**, and **x** sit -- their writes are
+   gated, but they are *sensitive, not denied* (reads remain available under
+   Auto). Payments (e.g. `dashboard.stripe.com`, coinbase, twilio), budgeting
+   (ynab), and messaging-app writes are classified on this axis as well.
+
+The denial axes (1 and 2) make an origin non-enableable; the sensitivity axis (3)
+keeps the origin usable but re-applies write-time friction. An import-time
+classification gate fails the build if a sensitivity-suspect origin is left
+unclassified, so a gap in the classification can never silently read as "allow".
+
 ## Recipe Integrity (Signature Verification)
 
 Server-delivered and learned recipes (a future capability) are untrusted data and
