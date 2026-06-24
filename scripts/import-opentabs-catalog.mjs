@@ -87,6 +87,53 @@ export function toClosedParams(zodInputSchema) {
 }
 
 // ---------------------------------------------------------------------------
+// Wall-1 recursive forbidden-field pre-scan (Mechanic 1, Pitfall 4).
+// z.toJSONSchema passes a property literally named script/expr/transform/code/fn/js
+// straight through at whatever depth the source put it. The pre-scan RECURSES over
+// the FLATTENED JSON Schema and rejects any descriptor carrying a forbidden field
+// name at ANY depth (top / nested / array items / union anyOf branch / recursive
+// $defs). The recipe-path guard scans the SHIPPED recipe-path FILES, not descriptor
+// FIELD names -- so this is a SEPARATE, required guard.
+// ---------------------------------------------------------------------------
+const FORBIDDEN = new Set(['script', 'expr', 'transform', 'code', 'fn', 'js']);
+
+export function collectPropertyNames(node, acc) {
+  if (!node || typeof node !== 'object') return acc;
+  if (Array.isArray(node)) {
+    for (const x of node) collectPropertyNames(x, acc);
+    return acc;
+  }
+  for (const [k, v] of Object.entries(node)) {
+    if (k === 'properties' && v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const pn of Object.keys(v)) acc.add(pn);
+    }
+    collectPropertyNames(v, acc);
+  }
+  return acc;
+}
+
+export function preScanForbidden(params) {
+  const names = collectPropertyNames(params, new Set());
+  return [...names].filter((n) => FORBIDDEN.has(String(n).toLowerCase()));
+}
+
+/**
+ * assertCleanParams(params, opName) -- the per-op Wall-1 guard the emit loop calls
+ * AFTER z.toJSONSchema/delete $schema and BEFORE the gate/emit. THROWS (so the op
+ * emits NOTHING) when a forbidden field name appears at any depth.
+ */
+export function assertCleanParams(params, opName) {
+  const hits = preScanForbidden(params);
+  if (hits.length) {
+    throw new Error(
+      `Wall-1: op '${opName}' emits forbidden field name(s) at some schema depth: ` +
+        `${hits.join(', ')} (script/expr/transform/code/fn/js are eval-able and ` +
+        `must never appear in a shipped descriptor's params).`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Side-effect inference (Mechanic 2): verb-map + GraphQL/RPC carve-out + override
 // table; disagreements resolve fail-safe-high (MAX of read < write < destructive).
 // ---------------------------------------------------------------------------
@@ -302,8 +349,10 @@ export async function extractDescriptors(app) {
     if (!tool || !tool.name || !tool.input) continue;
     const params = toClosedParams(tool.input);
 
-    // ---- [Plan 01 Task 3 slot] recursive forbidden-field pre-scan goes HERE,
-    // ---- between extraction and the gate/emit. (Wired in Task 3.)
+    // Wall-1 recursive forbidden-field pre-scan, BETWEEN extraction and the
+    // gate/emit: THROWS (emits nothing for this op) if a forbidden field name
+    // (script/expr/transform/code/fn/js) appears at any schema depth.
+    assertCleanParams(params, tool.name);
 
     const opFileBase = opFileBaseOf(tool.name);
     const rawSignals = extractTransportSignals(app, opFileBase);
