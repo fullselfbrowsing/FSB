@@ -67,8 +67,16 @@ check(vprov.source === 'opentabs',
   'vendor _provenance.json source === "opentabs"');
 
 const cprov = JSON.parse(fs.readFileSync(CATALOG_PROV, 'utf8'));
-check(cprov.sha === SHA && cprov.license === 'MIT' && Array.isArray(cprov.apps) && cprov.apps.length === 0,
-  'catalog _provenance.json: { sha: pinned, license: "MIT", apps: [] }');
+// Phase 36 (CGEN-01) FILLS the catalog-side scaffold's apps[] with per-app
+// provenance (which emitted descriptors came from which upstream app). The top-level
+// pin fields stay; apps[] is now non-empty and every entry carries the pinned SHA +
+// source 'opentabs'. (The VENDOR-side _provenance.json above remains the authoritative
+// pin and keeps apps: []; only this catalog scaffold is extended.)
+check(cprov.sha === SHA && cprov.license === 'MIT' && Array.isArray(cprov.apps) && cprov.apps.length > 0,
+  'catalog _provenance.json: { sha: pinned, license: "MIT", apps: [filled by Phase 36] }');
+check(
+  cprov.apps.every((a) => a && a.sha === SHA && a.source === 'opentabs' && Array.isArray(a.descriptors) && a.descriptors.length > 0),
+  'catalog _provenance.json apps[]: every entry pins the SHA + source opentabs + names >=1 emitted descriptor');
 
 check(vprov.sha === cprov.sha,
   'the vendor-side and catalog-side provenance scaffolds pin the SAME OpenTabs SHA (they match)');
