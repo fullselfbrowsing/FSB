@@ -70,8 +70,16 @@ const Denylist = require('../extension/utils/service-denylist.js');
 // classified sensitive, so the gate continues past it.
 const AXES = [
   {
+    // MD-02: include the common inflected finance forms (`banking`, `funds`)
+    // alongside their singular stems. The `\b...\b` anchoring means `\bbank\b`
+    // does NOT match inside "banking" and `\bfund\b` does NOT match inside
+    // "funds" -- so a brand-only finance host whose descriptor metadata reads
+    // "online banking" or "manage your funds" would otherwise slip the gate as
+    // safe (the exact false-negative class DENY-03 must prevent). Adding the
+    // inflections only WIDENS the net (fail-closed direction); a benign
+    // false-positive is fixed via SAFE_ALLOWLIST per this module's stated policy.
     axis: 'finance/payment',
-    re: /\b(bank|pay|payment|payments|wallet|invoice|billing|card|stripe|coinbase|crypto|broker|brokerage|trade|trading|fund|portfolio|tax|budget|ynab|venmo|paypal|wise|fidelity|robinhood|schwab|carta|treasury)\b/i,
+    re: /\b(bank|banking|pay|payment|payments|wallet|invoice|billing|card|stripe|coinbase|crypto|broker|brokerage|trade|trading|fund|funds|portfolio|tax|budget|ynab|venmo|paypal|wise|fidelity|robinhood|schwab|carta|treasury)\b/i,
   },
   {
     axis: 'health',

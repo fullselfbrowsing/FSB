@@ -98,6 +98,40 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   check(classifiedSensitive && classifiedSensitive.failures.length === 0,
     '(d) classifyGate([dashboard.stripe.com]) -> 0 failures (explicitly classified sensitive, even though it trips the heuristic)');
 
+  // (e) MD-02 REGRESSION (closed false-negative): a brand-only finance origin
+  //     whose HOST carries no category noun, but whose DESCRIPTION contains the
+  //     inflected forms `funds` / `banking`, is now caught. Before MD-02 the
+  //     `\bfund\b`/`\bbank\b` anchors missed "funds"/"banking" entirely, so these
+  //     unclassified-sensitive origins slipped the gate as "safe". The hosts are
+  //     fabricated (not in the roster), so they are NOT explicitly classified and
+  //     fall through to the heuristic.
+  const fundsItem = { origin: 'https://acme-capital.example.com', slug: 'acme.balance', description: 'manage your funds and transfers' };
+  const bankingItem = { origin: 'https://acme-neo.example.com', slug: 'acme.account', description: 'online banking dashboard' };
+  // Guard: these must be UNclassified (else they would continue before the heuristic).
+  check(Denylist.classify(fundsItem.origin).sensitive === false && Denylist.classify(fundsItem.origin).denied === false,
+    '(e) precondition: the "funds" test origin is unclassified (reaches the heuristic)');
+  check(Denylist.classify(bankingItem.origin).sensitive === false && Denylist.classify(bankingItem.origin).denied === false,
+    '(e) precondition: the "banking" test origin is unclassified (reaches the heuristic)');
+  const fundsCaught = gate.classifyGate([fundsItem]);
+  check(fundsCaught && fundsCaught.failures.length >= 1 && /finance\/payment/.test(fundsCaught.failures[0]),
+    '(e) an unclassified origin whose description contains "funds" is now FLAGGED (MD-02 false-negative closed)');
+  const bankingCaught = gate.classifyGate([bankingItem]);
+  check(bankingCaught && bankingCaught.failures.length >= 1 && /finance\/payment/.test(bankingCaught.failures[0]),
+    '(e) an unclassified origin whose description contains "banking" is now FLAGGED (MD-02 false-negative closed)');
+
+  // (f) NO-FALSE-POSITIVE PRESERVED: widening the finance vocabulary with
+  //     `funds`/`banking` must NOT start failing benign already-shipped
+  //     descriptors. reddit.inbox / github.notifications carry no finance token,
+  //     so they still produce zero failures.
+  const benignShipped = gate.classifyGate([
+    { origin: 'https://www.reddit.com', slug: 'reddit.inbox', description: 'list your unread messages' },
+    { origin: 'https://github.com', slug: 'github.notifications', description: 'list your notifications' },
+    { origin: 'https://airtable.com', slug: 'airtable.list', description: 'list records in a base' },
+    { origin: 'https://www.wikipedia.org', slug: 'wikipedia.search', description: 'search articles' },
+  ]);
+  check(benignShipped && benignShipped.failures.length === 0,
+    '(f) benign [reddit.inbox, github.notifications, airtable, wikipedia] -> 0 failures (MD-02 widening kept no-false-positive)');
+
   // The package.json chain wiring is asserted separately (acceptance check 4 in
   // the plan): validate:extension contains verify-classification-gate.mjs and the
   // test chain contains this file. Assert it here too so the test self-guards the
