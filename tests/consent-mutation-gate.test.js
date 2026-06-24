@@ -134,6 +134,74 @@ function installChromeStorageStub() {
   check(offPost && offPost.decision !== 'allow' && offPost.error && offPost.error.code === 'RECIPE_CONSENT_REQUIRED',
     'an explicitly Off origin still blocks writes (per-origin opt-out)');
 
+  // =====================================================================
+  // Posture B (DENY-04): the SENSITIVE-origin sensitive-write re-gate.
+  // ---------------------------------------------------------------------
+  // The block above is the NON-SENSITIVE regression canary (github.com,
+  // classify() -> {sensitive:false}): writes stay fully open under Auto,
+  // proving posture B does NOT revert the 68ceea90 opt-out base.
+  //
+  // Below: with a SENSITIVE classify stub ({sensitive:true, denied:false}),
+  // a WRITE without the per-origin mutating flag is re-gated to
+  // RECIPE_CONSENT_MUTATING_REQUIRED; reads still pass under Auto; the
+  // per-origin mutating flag elevates the sensitive write back to allow.
+  // The gate reads the LIVE global FsbServiceDenylist at call time
+  // (_denylist()), so swapping the stub here re-points it without a
+  // re-require. RED until Task 2 inserts the step-(3.5) branch.
+  // =====================================================================
+  console.log('\n--- DENY-04 (posture B): sensitive-origin write re-gate ---');
+
+  globalThis.FsbServiceDenylist = {
+    classify() { return { sensitive: true, denied: false }; },
+    isDenied() { return { denied: false }; },
+    load() { return Promise.resolve(); }
+  };
+
+  if (typeof Store._reset === 'function') Store._reset();
+  const SENSITIVE_ORIGIN = 'https://dashboard.stripe.com';
+  await Store.setOriginMode(SENSITIVE_ORIGIN, 'auto'); // Auto, mutating flag false
+
+  // ---- a GET (read) on a sensitive Auto origin still passes (write-only re-gate) ----
+  const sensGet = await Gate.evaluate({
+    origin: SENSITIVE_ORIGIN, slug: 'stripe.balance.read', method: 'GET',
+    entry: { tier: 'T1b', sideEffectClass: 'read' }
+  });
+  check(sensGet && sensGet.decision === 'allow',
+    'GET on a SENSITIVE Auto origin -> allow (reads run under Auto everywhere; re-gate is write-only)');
+
+  // ---- a POST (mutating) on a sensitive Auto origin WITHOUT the flag is re-gated ----
+  const sensPost = await Gate.evaluate({
+    origin: SENSITIVE_ORIGIN, slug: 'stripe.payouts.create', method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'mutating' }
+  });
+  check(sensPost && sensPost.decision !== 'allow',
+    'POST on a SENSITIVE Auto origin (no flag) -> NOT allow (posture B re-gates the sensitive write)');
+  // INV-03 dual-field byte-equality: the typed reason surfaces on code AND errorCode AND error.
+  check(sensPost && sensPost.error && sensPost.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'sensitive POST -> error.code === RECIPE_CONSENT_MUTATING_REQUIRED (byte-exact)');
+  check(sensPost && sensPost.error && sensPost.error.errorCode === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'sensitive POST -> error.errorCode === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+  check(sensPost && sensPost.error && sensPost.error.error === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'sensitive POST -> error.error === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+
+  // ---- a T1a 'write' descriptor (sideEffectClass write, no method) on sensitive is re-gated ----
+  const sensWriteDescriptor = await Gate.evaluate({
+    origin: SENSITIVE_ORIGIN, slug: 'stripe.invoice.send',
+    entry: { tier: 'T1a', descriptor: { sideEffectClass: 'write' } }
+  });
+  check(sensWriteDescriptor && sensWriteDescriptor.decision !== 'allow'
+    && sensWriteDescriptor.error && sensWriteDescriptor.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    "T1a 'write' descriptor on a SENSITIVE Auto origin -> RECIPE_CONSENT_MUTATING_REQUIRED");
+
+  // ---- the per-origin mutating flag ELEVATES the sensitive write back to allow ----
+  await Store.setOriginMutating(SENSITIVE_ORIGIN, true);
+  const sensPostElevated = await Gate.evaluate({
+    origin: SENSITIVE_ORIGIN, slug: 'stripe.payouts.create', method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'mutating' }
+  });
+  check(sensPostElevated && sensPostElevated.decision === 'allow',
+    'POST on a SENSITIVE Auto origin WITH the per-origin mutating flag -> allow (the flag elevates)');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {
