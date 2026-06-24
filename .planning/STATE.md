@@ -4,14 +4,14 @@ milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
 stopped_at: Created v1.0.0 roadmap (ROADMAP.md Phases 35-43, STATE.md, REQUIREMENTS.md traceability finalized — 17/17 mapped, 0 orphans). Denylist-first (35) and pipeline-before-content (36) ordering constraints encoded.
-last_updated: "2026-06-24T06:52:03.989Z"
-last_activity: 2026-06-24 -- Phase 35 planning complete
+last_updated: "2026-06-24T06:59:17.725Z"
+last_activity: 2026-06-24
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -30,12 +30,12 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 ## Current Position
 
-Phase: 35 of 43 (Denylist Expansion + Import-Time Classification Gate) — not started
-Plan: —
+Phase: 35 (Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-24 -- Phase 35 planning complete
+Last activity: 2026-06-24
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████████░░] 75%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -95,6 +95,8 @@ Tiers T0/T1a/T1b/T2-learned/T3-DOM; the closed-vocab interpreter; the consent ga
 
 Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..04 + Walls 1/2). One v1.0.0 posture decision was surfaced by research and RESOLVED in requirements: **DENY-04 (posture B)** — sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (reads run under Auto everywhere; a WRITE to a sensitive origin requires the per-origin mutating flag; non-sensitive stays fully-open). This re-scopes the friction removed in v0.9.99 Phase 30 to sensitive origins only; the denylist still covers the catastrophic worst.
 
+- [Phase ?]: Phase 35-01 (DENY-01/02): IG/FB/TikTok/X classified sensitive-not-denied (reads under Auto, writes mutating-gated by posture B Plan 35-03); fully-denied reserved for brokerage + ToS-hostile media. Exact-host forms (music.youtube.com NOT *.youtube.com; dashboard.stripe.com NOT api.stripe.com) avoid over-broadening.
+
 ### Pending Todos
 
 None yet.
@@ -126,7 +128,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24
+Last session: 2026-06-24T06:59:12.659Z
 Stopped at: Created v1.0.0 roadmap (ROADMAP.md Phases 35-43, STATE.md, REQUIREMENTS.md traceability finalized — 17/17 mapped, 0 orphans). Denylist-first (35) and pipeline-before-content (36) ordering constraints encoded.
 Resume file: None
 

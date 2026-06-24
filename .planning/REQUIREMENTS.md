@@ -9,8 +9,8 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 
 ### DENY -- Denylist Expansion & Import-Time Classification Gate (lands FIRST)
 
-- [ ] **DENY-01**: `extension/config/service-denylist.json` deniedOrigins is expanded to hard-block the categorically-prohibited OpenTabs apps (brokerage/trading: robinhood, fidelity, carta; ToS-hostile media/social: netflix, spotify, twitch, steam, youtube-music, tinder, onlyfans; and the write-paths of instagram/facebook/tiktok/x) BEFORE any of those descriptors can be emitted.
-- [ ] **DENY-02**: sensitiveOrigins is expanded to the allowed-but-sensitive tier (payments: stripe, coinbase, twilio; budgeting: ynab; messaging-app writes; finance reads) so they classify as sensitive (Ask / mutating-gated), not denied.
+- [x] **DENY-01**: `extension/config/service-denylist.json` deniedOrigins is expanded to hard-block the categorically-prohibited OpenTabs apps (brokerage/trading: robinhood, fidelity, carta; ToS-hostile media/social: netflix, spotify, twitch, steam, youtube-music, tinder, onlyfans; and the write-paths of instagram/facebook/tiktok/x) BEFORE any of those descriptors can be emitted.
+- [x] **DENY-02**: sensitiveOrigins is expanded to the allowed-but-sensitive tier (payments: stripe, coinbase, twilio; budgeting: ynab; messaging-app writes; finance reads) so they classify as sensitive (Ask / mutating-gated), not denied.
 - [ ] **DENY-03**: A build-time classification gate (in the importer and CI) refuses to emit a descriptor whose origin is not explicitly classified denied / sensitive / safe; an unclassified sensitive-or-ToS origin fails the build (fail-closed).
 - [ ] **DENY-04**: Sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (posture B): reads run under Auto everywhere, but a WRITE to a sensitive origin requires the per-origin mutating flag (already present in storage, re-gated here); non-sensitive origins remain fully-open under Auto. Scopes the friction removed in v0.9.99 Phase 30 to sensitive origins only.
 
@@ -72,8 +72,8 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DENY-01 | Phase 35 | Pending |
-| DENY-02 | Phase 35 | Pending |
+| DENY-01 | Phase 35 | Complete |
+| DENY-02 | Phase 35 | Complete |
 | DENY-03 | Phase 35 | Pending |
 | DENY-04 | Phase 35 | Pending |
 | CGEN-01 | Phase 36 | Pending |
