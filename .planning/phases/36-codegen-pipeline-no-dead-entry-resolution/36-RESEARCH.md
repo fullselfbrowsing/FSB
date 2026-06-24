@@ -591,14 +591,16 @@ if (!entry) {
 | A4 | Smoke category = a non-sensitive dev/productivity app (recommend todoist or airtable); exact pick is Claude's discretion | Validation Architecture | If the chosen app trips the classification gate (it should not — both are benign per the Phase-35 119-app sweep), the importer aborts. Verify the pick is in the §119-app "benign" list. LOW risk |
 | A5 | OpenTabs `build.ts` rejects `.transform()/.pipe()/.preprocess()` so every op's `input` is pure-structural (FSB inherits the guarantee) | Mechanic 1 | If a plugin slipped a transform past upstream, `z.toJSONSchema` THROWS in the importer (verified) -> the import fails loudly, not silently. The fail-loud direction is safe. LOW risk |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Physical subdir vs flat emit for descriptors (A1).**
+> Both resolved at plan time and baked into plans 36-01/36-04. Markers below.
+
+1. **Physical subdir vs flat emit for descriptors (A1).** — **RESOLVED: Option A (flat emit).** `readJsonDir` non-recursion verified in BOTH `package-extension.mjs` and `validate-extension.mjs`; descriptors emit FLAT as `catalog/descriptors/opentabs__<svc>__<op>.json` with provenance in-descriptor. `opentabs/` is a logical namespace (filename prefix + `provenance.source`), not a physical subdir.
    - What we know: `readJsonDir` is non-recursive; CONTEXT says both "land under `opentabs/`" AND "readJsonDir unchanged".
    - What's unclear: whether the planner/user reads `opentabs/` as a filesystem path or a logical namespace.
    - Recommendation: Option A (flat emit, provenance-in-descriptor) — honors "readJsonDir unchanged" literally. Surface to discuss-phase if a physical subdir is wanted; then Option B (1-line recurse in BOTH readers).
 
-2. **Smoke category pick.**
+2. **Smoke category pick.** — **RESOLVED: todoist** (clean read+write ops, non-sensitive, good near-neighbor pressure against asana/linear `create_task`).
    - What we know: must be non-sensitive, dev/productivity, rich ops; benign per the Phase-35 sweep.
    - What's unclear: todoist vs airtable vs asana vs clickup.
    - Recommendation: **todoist** (clean read+write ops, obviously non-sensitive, good near-neighbor pressure against asana/linear `create_task`) or **airtable** (already the ARCHITECTURE worked example with verified `apiGet`/`apiPost` ops). Either proves the machinery.

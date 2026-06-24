@@ -37,8 +37,11 @@ Discovery seeding → 42.
   contract. The forbidden-field-name pre-scan (script/expr/transform/code/fn/js) is the Wall-1
   guard that rejects any emitted descriptor containing an eval-able field name.
 - **Provenance:** each emitted descriptor carries the OpenTabs commit SHA
-  `4b17021637d2cac12b8d84d21c40e765aa7b85e9` + its source path; descriptors land under
-  `catalog/descriptors/opentabs/`.
+  `4b17021637d2cac12b8d84d21c40e765aa7b85e9` + its source path. Descriptors emit FLAT into
+  `catalog/descriptors/` as `opentabs__<service>__<op>.json` — `opentabs/` is a LOGICAL
+  namespace (filename prefix + `provenance.source`), NOT a physical subdir, because
+  `readJsonDir` is non-recursive and would silently drop a subdir (research A1; the provenance
+  intent is fully preserved).
 - **Runtime (Wall 1):** the importer runs under `tsx` at BUILD time only. NO runtime
   dependency on OpenTabs / `@opentabs-dev/plugin-sdk` / `zod` is shipped into the extension —
   the extension ships pure-data descriptors. `verify-recipe-path-guard.mjs` stays green.
