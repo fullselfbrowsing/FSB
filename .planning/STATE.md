@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: executing
-stopped_at: Completed 35-04-PLAN.md (provenance scaffold + LEGAL Categorization Axes)
-last_updated: "2026-06-24T15:24:17.973Z"
+status: verifying
+stopped_at: Completed 35-03-PLAN.md (posture-B sensitive-write re-gate, DENY-04) — Phase 35 all 4 plans complete
+last_updated: "2026-06-24T15:30:40.412Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 10
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 5
+  completed_plans: 6
   percent: 100
 ---
 
@@ -32,7 +32,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 35 (Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-24
 
 Progress: [██████████] 100%
@@ -100,6 +100,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 35]: Phase 35-04: OpenTabs pinned hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 + verbatim MIT (Copyright (c) 2026-present OpenTabs Contributors) in vendor/opentabs-snapshot/PIN.md mirroring LATTICE-PIN.md; Wall 1 enforced by tests/provenance-scaffold.test.js asserting the dir contains no runtime .js.
 - [Phase 35]: Phase 35-04: docs/LEGAL.md Categorization Axes subsection names three distinct criteria (finance/gov denial; ToS-hostility denial with the named roster robinhood..onlyfans; sensitivity Ask/mutating-gated with IG/FB/TikTok/X sensitive-not-denied), building on the 68ceea90 opt-out posture.
 - [Phase 35]: Phase 35-02 (DENY-03): the fail-closed classification gate scripts/verify-classification-gate.mjs DUAL-EXPORTS classifyGate(items, opts) (the Phase-36 importer imports it and calls it BEFORE emitting any descriptor JSON) + a CLI chained into validate:extension (-> ci) and npm test. classifyGate consults service-denylist.js classify(); an origin tripping a sensitivity axis but NOT classified denied/sensitive fails the build naming the offender + axis. The heuristic uses brand+category tokens (35-RESEARCH Q3) but DELIBERATELY omits over-generic words (a bare message/inbox/notification) so the benign already-shipped descriptors (reddit.inbox, github.notifications, slack/notion reads) are not false-failed; the SAFE_ALLOWLIST override is a classifyGate parameter (opts.safeAllowlist), not a module constant, so Phase 36 can pass a curated allowlist programmatically. Proven by catalog/descriptors/_fixtures/unclassified-sensitive.fixture.json (pay.unclassified-fixture.test) which the CLI rejects when exposed to the corpus and which _fixtures/ keeps out of the shipped catalog.
+- [Phase 35]: Phase 35-03 (DENY-04): posture-B step-(3.5) re-gate live in _evaluateConsent, scoped to classify(origin).sensitive===true. A sensitive-origin WRITE without the per-origin mutating flag returns RECIPE_CONSENT_MUTATING_REQUIRED (recovered byte-exact from 68ceea90^, emitted via the dual-field _err so code===errorCode===error holds INV-03 across the 7 universal-provider targets); reads pass under Auto everywhere, non-sensitive writes pass, the per-origin mutating flag elevates the sensitive write back to allow. Narrows the 68ceea90 opt-out base, does not revert it. Decision label 'mutating_required' (the invoke caller only checks decision !== 'allow').
 
 ### Pending Todos
 
@@ -132,8 +133,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T15:24:11.621Z
-Stopped at: Completed 35-04-PLAN.md (provenance scaffold + LEGAL Categorization Axes)
+Last session: 2026-06-24T15:30:25.370Z
+Stopped at: Completed 35-03-PLAN.md (posture-B sensitive-write re-gate, DENY-04) — Phase 35 all 4 plans complete
 Resume file: None
 
 ## Next Actions
