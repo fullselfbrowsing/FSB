@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: verifying
-stopped_at: Completed 35-03-PLAN.md (posture-B sensitive-write re-gate, DENY-04) — Phase 35 all 4 plans complete
+status: ready_to_plan
+stopped_at: Phase 35 complete (verified passed, 22/22 must-haves); next Phase 36 — Codegen Pipeline
 last_updated: "2026-06-24T15:30:40.412Z"
 last_activity: 2026-06-24
 progress:
-  total_phases: 10
+  total_phases: 9
   completed_phases: 1
   total_plans: 4
-  completed_plans: 6
-  percent: 100
+  completed_plans: 4
+  percent: 11
 ---
 
 # Project State
@@ -26,22 +26,22 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 35 — Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)
+**Current focus:** Phase 36 — Codegen Pipeline + No-Dead-Entry Resolution
 
 ## Current Position
 
-Phase: 35 (Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 36 of 43 (Codegen Pipeline + No-Dead-Entry Resolution) — not started
+Plan: —
+Status: Phase 35 complete (verified passed); ready to plan Phase 36
 Last activity: 2026-06-24
 
-Progress: [██████████] 100%
+Progress: [█░░░░░░░░░] 11% (1/9 phases)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | Not started |
+| 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
 | 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | Not started |
 | 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | Not started |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | Not started |
@@ -139,4 +139,4 @@ Resume file: None
 
 ## Next Actions
 
-Plan Phase 35 (Denylist Expansion + Import-Time Classification Gate — DENY-01..04). This is the strict-first hard dependency: under the shipped opt-out Auto default the service-denylist is the ONE hard floor, so 6 finance apps + ToS-hostile apps must be denylist-classified BEFORE any descriptor that could reach them is emitted. Phase 35 owns denylist expansion + the import-time classification CI gate (fail-closed) + the DENY-04 posture-B sensitive-origin write re-gate + the vendored MIT snapshot/provenance scaffold + the `docs/LEGAL.md` ToS-axis update. Recommended: `/gsd-plan-phase 35`. Phase 36 (codegen pipeline + no-dead-entry `resolve()` branch) is the next research-flagged spike candidate. Existing live-browser UAT and release/publish actions remain carried-forward, user-gated debt; v1.0.0 does not block on them.
+Plan Phase 36 (Codegen Pipeline + No-Dead-Entry Resolution — CGEN-01..04). Phase 35 is complete and verified (denylist roster + fail-closed classification gate + DENY-04 posture-B sensitive-write re-gate + provenance scaffold + LEGAL Categorization Axes; 22/22 must-haves; the `classifyGate()` export is ready for the importer to consume). Phase 36 is research-flagged: the build-time `scripts/import-opentabs-catalog.mjs` (zod→closed-`params` flattening, forbidden-field pre-scan, side-effect verb-map + GraphQL/RPC carve-out) + the load-bearing no-dead-entry `resolve()` fallback branch (descriptor-only → T3/T2) + the full-scale search/eval proof, all gated on the Phase-35 classification gate before any descriptor lands. Recommended: `/gsd-plan-phase 36`. Note: side Phase 999.1 (click heuristics) is Backlog — NOT part of the v1.0.0 milestone (35-43); the autonomous run skips it. Existing live-browser UAT and release/publish actions remain carried-forward, user-gated debt; v1.0.0 does not block on them.
