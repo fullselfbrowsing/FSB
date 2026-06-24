@@ -17,7 +17,7 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 ### CGEN -- Codegen Import Pipeline & No-Dead-Entry Resolution
 
 - [x] **CGEN-01**: A build-time `scripts/import-opentabs-catalog.mjs` (run under tsx) extracts each OpenTabs op's metadata (slug, params via z.toJSONSchema, service/origin, action verb, description) into provenance-stamped descriptor JSON under `catalog/descriptors/opentabs/`, pinned to an OpenTabs commit SHA; NO runtime OpenTabs/plugin-sdk dependency ships (Wall 1).
-- [ ] **CGEN-02**: Each op's side-effect class is inferred from its transport verb (apiGet -> read; apiPost/apiPut/apiDelete -> write/destructive) plus an override table; a descriptor-vs-derived cross-check fails the build when a descriptor under-states a destructive op.
+- [x] **CGEN-02**: Each op's side-effect class is inferred from its transport verb (apiGet -> read; apiPost/apiPut/apiDelete -> write/destructive) plus an override table; a descriptor-vs-derived cross-check fails the build when a descriptor under-states a destructive op.
 - [x] **CGEN-03**: `capability-catalog.js resolve()` gains a single fallback branch so a descriptor-only slug (no bundled handler or recipe) resolves to T3 (DOM) or T2 (learn-pending when seeded) -- no searchable-but-uninvocable dead entries; verified by a harness assertion over the full catalog.
 - [ ] **CGEN-04**: The generated catalog is committed and inlined by `scripts/package-extension.mjs` via the existing readJsonDir path with a stable `catalogVersion`; the IIFE shape and djb2 hashing are unchanged.
 
@@ -77,7 +77,7 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 | DENY-03 | Phase 35 | Complete |
 | DENY-04 | Phase 35 | Complete |
 | CGEN-01 | Phase 36 | Complete |
-| CGEN-02 | Phase 36 | Pending |
+| CGEN-02 | Phase 36 | Complete |
 | CGEN-03 | Phase 36 | Complete |
 | CGEN-04 | Phase 36 | Pending |
 | BRDTH-01 | Phase 37 | Pending |

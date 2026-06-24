@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: Completed 36-02-PLAN.md (resolve() descriptor-only no-dead-entry fallback, CGEN-03)
-last_updated: "2026-06-24T17:14:40.020Z"
+stopped_at: Completed 36-03-PLAN.md (descriptor-vs-derived side-effect cross-check gate, CGEN-02)
+last_updated: "2026-06-24T17:22:41.242Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 8
-  completed_plans: 8
+  completed_plans: 9
   percent: 100
 ---
 
@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 36 (Codegen Pipeline + No-Dead-Entry Resolution) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-24
 
@@ -103,6 +103,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 35]: Phase 35-03 (DENY-04): posture-B step-(3.5) re-gate live in _evaluateConsent, scoped to classify(origin).sensitive===true. A sensitive-origin WRITE without the per-origin mutating flag returns RECIPE_CONSENT_MUTATING_REQUIRED (recovered byte-exact from 68ceea90^, emitted via the dual-field _err so code===errorCode===error holds INV-03 across the 7 universal-provider targets); reads pass under Auto everywhere, non-sensitive writes pass, the per-origin mutating flag elevates the sensitive write back to allow. Narrows the 68ceea90 opt-out base, does not revert it. Decision label 'mutating_required' (the invoke caller only checks decision !== 'allow').
 - [Phase 36]: Phase 36-01 (CGEN-01): scripts/import-opentabs-catalog.mjs (tsx) imports vendored OpenTabs todoist metadata via a hermetic sdk-stub + transport stub (Wall 1: import() never touches the real SDK DOM/fetch); FLAT emit opentabs__<svc>__<op>.json closed-params (z.toJSONSchema additionalProperties:false default, $schema stripped) + provenance{sha 4b170216,sourcePath,license,signals}; classifyGate() after Denylist.load() BEFORE write; recursive Wall-1 pre-scan (script/expr/transform/code/fn/js at any depth); side-effect verb-map+GraphQL-carve-out+override fail-safe-high MAX with signals persisted for Plan-03. service=app.todoist.com benign, slug stem todoist. zod/tsx/sdk devDeps only (jiti excluded). Snapshot 8->15 descriptors INV-01 byte-stable (+390/-0). package.json registers 7 phase tests + crosscheck as passing stubs.
 - [Phase ?]: Phase 36-02 (CGEN-03): resolve() gains the single descriptor-only no-dead-entry fallback -- a searchable slug (in FsbRecipeIndex.descriptors, no REGISTRY handler, no recipe) returns {tier: backing===learn ? T2 : T3, descriptor} (NO recipe field) via _getDescriptor (a typeof-guarded direct read of FsbRecipeIndex.descriptors, Option A, one file); a genuinely-unknown slug still returns null. EXACT T2/T3 literals route through the UNCHANGED router switch to RECIPE_LEARN_PENDING / RECIPE_DOM_FALLBACK_PENDING (zero router edits). no-dead-entry.test.js asserts the invariant over the REAL emitted todoist corpus (9/0); the router test (46/0) drives the REAL resolve() through invoke proving a descriptor-only slug never returns RECIPE_NOT_FOUND.
+- [Phase 36]: Phase 36-03 (CGEN-02): verify-catalog-crosscheck.mjs is the REAL fail-safe-high derived-vs-declared gate (replaces the Plan-01 stub). deriveClass(signals,slug) MAX-merges (read<write<destructive) the GraphQL/RPC carve-out (FIRST; transport graphql/gql/rpc -> method uninformative -> classify by op-name verb; ambiguous -> write; NEVER auto-read), the named-verb helper (apiGet/apiPost/apiPut/apiPatch/apiDelete), the generic api({method}) literal (GET->read/POST,PUT,PATCH->write/DELETE->destructive), the op-name verb, and an UPGRADE-only override-table FLOOR (void_invoice/delete_customer/cancel_subscription/refund_charge/delete_record/archive_project->destructive; merge_pull_request->write; keyed by op-name OR slug-suffix so a known-destructive op with NO signals is still caught). crossCheck(descriptors)->{failures} FAILS the build when declared < derived (under-states a destructive op); over-stating is the safe direction (no failure). Dual-exported crossCheck+deriveClass (importer may call inline) + CLI chained into validate:extension AFTER verify-classification-gate.mjs. The real 7-descriptor todoist corpus passes (no 36-01 mis-class). Sample test (tests/catalog-crosscheck.test.js, via the REAL crossCheck export): void_invoice/archiveIssue (declared read) FAIL; delete_customer/linear.issues (declared destructive/read) PASS -- proving a GraphQL POST is never classed read. package.json untouched (Plan-01 stubs already chain it).
 
 ### Pending Todos
 
@@ -135,8 +136,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T17:14:40.015Z
-Stopped at: Completed 36-02-PLAN.md (resolve() descriptor-only no-dead-entry fallback, CGEN-03)
+Last session: 2026-06-24T17:22:07.712Z
+Stopped at: Completed 36-03-PLAN.md (descriptor-vs-derived side-effect cross-check gate, CGEN-02)
 Resume file: None
 
 ## Next Actions

@@ -74,7 +74,7 @@
 **Plans**: 4 plans (Wave 1: 36-01; Wave 2: 36-02, 36-03, 36-04)
 - [x] 36-01-PLAN.md — CGEN-01: build-time tsx importer (z.toJSONSchema extraction + recursive Wall-1 forbidden-field pre-scan + classifyGate-before-emit + flat provenance-stamped descriptors); deps hardened to devDeps; phase-wide test/gate registration
 - [x] 36-02-PLAN.md — CGEN-03: the load-bearing resolve() descriptor-only fallback (T3 default / T2 when backing:learn) + no-dead-entry harness + router invoke proof (never RECIPE_NOT_FOUND for a searchable slug)
-- [ ] 36-03-PLAN.md — CGEN-02: verify-catalog-crosscheck.mjs (verb-map + GraphQL/RPC carve-out + override table, MAX-merge fail-safe-high) fails the build on an under-stated destructive op; void_invoice/delete_customer sample test
+- [x] 36-03-PLAN.md — CGEN-02: verify-catalog-crosscheck.mjs (verb-map + GraphQL/RPC carve-out + override table, MAX-merge fail-safe-high) fails the build on an under-stated destructive op; void_invoice/delete_customer sample test
 - [ ] 36-04-PLAN.md — CGEN-04: catalog inlining via the unchanged readJsonDir/IIFE/djb2 path (INV-01) + smoke-category eval re-pass (recall@5>=0.9, wrong-invoke=0) + cold-start size/time asserts + HEAD_HANDLER_MODULES cap
 
 ### Phase 37: Breadth A — Dev / Productivity (least-sensitive)
@@ -155,7 +155,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 35. Denylist Expansion + Import-Time Classification Gate | 4/4 | Complete    | 2026-06-24 |
-| 36. Codegen Pipeline + No-Dead-Entry Resolution | 2/4 | In Progress|  |
+| 36. Codegen Pipeline + No-Dead-Entry Resolution | 3/4 | In Progress|  |
 | 37. Breadth A — Dev / Productivity | 0/TBD | Not started | - |
 | 38. Breadth B — Comms / Social / Content | 0/TBD | Not started | - |
 | 39. Breadth C — Commerce / Travel / Misc | 0/TBD | Not started | - |
