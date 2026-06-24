@@ -1,4 +1,6 @@
 {
+  "_role": "catalog-descriptor-provenance-scaffold",
+  "_note": "Catalog-side descriptor-provenance scaffold (35-04, RESEARCH Q3) -- NOT the authoritative snapshot pin. The source-of-truth OpenTabs pin lives at vendor/opentabs-snapshot/_provenance.json; the source/repo/sha/license/pinnedAt fields below record which vendor snapshot this catalog scaffold was seeded from (they intentionally MATCH the vendor pin's SHA), but they are not a second pin to bump by hand -- update the vendor pin, then re-seed this. Phase 36 extends THIS file with per-descriptor provenance (which emitted descriptor came from which upstream app) via the apps[] array.",
   "source": "opentabs",
   "repo": "github.com/opentabs-dev/opentabs",
   "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
