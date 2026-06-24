@@ -62,6 +62,8 @@ append-only; closed phases are not edited retroactively.
 | FSB Phase | Date | OpenTabs SHA | Metadata vendored | Notes |
 |-----------|------------|-------------|-------------------------------------------------------------|------------------------|
 | Phase 35 | 2026-06-24 | 4b170216... | (none yet -- scaffold only; metadata files land in Phase 36) | PIN + license scaffold |
+| Phase 36 | 2026-06-24 | 4b170216... | plugins/todoist (7-op Tasks smoke slice: create/list/get/update/close/reopen/delete) | importer smoke (CGEN-01) |
+| Phase 37 | 2026-06-24 | 4b170216... | plugins/linear (5 ops: create/list/get/update_issue + create_comment; GraphQL), plugins/asana (4 ops: create/list/get/update_task; REST) | breadth batch A (BRDTH-01); the MED-03 create_* collision near-neighbors |
 
 ## How this file gets used
 

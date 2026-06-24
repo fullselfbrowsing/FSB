@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs linear plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://linear.app/* -> service linear.app). defineTool/OpenTabsPlugin and the graphql transport helper are resolved from local stubs (sdk-stub.ts, linear-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. Linear is a GraphQL/camelCase transport app -- the MED-03 create_* cross-app collision near-neighbor this phase proves wrong-invoke=0 against.",
+  "name": "@opentabs-dev/opentabs-plugin-linear",
+  "version": "0.0.71",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Linear",
+    "description": "OpenTabs plugin for Linear",
+    "urlPatterns": [
+      "*://linear.app/*"
+    ],
+    "homepage": "https://linear.app"
+  },
+  "license": "MIT"
+}
