@@ -450,14 +450,42 @@
       };
     }
 
+    // (3.5) DENY-04 (posture B): a WRITE (mutating side-effect) to a SENSITIVE
+    //       (non-denied) origin re-enforces the per-origin mutating opt-in.
+    //       Reads pass under Auto everywhere; non-sensitive writes pass; only a
+    //       sensitive write WITHOUT the per-origin mutating flag is re-gated.
+    //       This NARROWS the "fully open under Auto" base committed in 68ceea90
+    //       to sensitive origins only -- the deliberate posture-B refinement; it
+    //       does NOT revert the opt-out posture. classify(origin).sensitive (the
+    //       D-14 single source of truth) is consulted here via the already-
+    //       resolved `denylist` accessor; `mutating` / `mutatingAllowed` are the
+    //       values already computed above. Denied origins are blocked at step (1),
+    //       so this branch only ever sees sensitive-but-not-denied origins.
+    if (mutating && !mutatingAllowed) {
+      var cls = null;
+      if (denylist && typeof denylist.classify === 'function') {
+        try { cls = denylist.classify(origin); } catch (_e) { cls = null; }
+      }
+      if (cls && cls.sensitive === true) {
+        return {
+          decision: 'mutating_required',
+          method: method,
+          sideEffectClass: sideEffectClass,
+          error: _err('RECIPE_CONSENT_MUTATING_REQUIRED', { origin: origin, slug: slug })
+        };
+      }
+    }
+
     // From here mode === 'auto'. Under the OPT-OUT ("fully open") posture, auto
-    // authorizes reads AND writes AND sensitive (non-denied) origins. The denylist
+    // authorizes reads everywhere AND writes to NON-sensitive origins. The denylist
     // (step 1) remains the ONLY hard block; the off/ask opt-out paths (steps 2/3)
     // are preserved so a per-origin Off -- or reverting the global default to
-    // Off/Ask -- still gates. The former sensitive-downgrade (GOV-07/D-14) and
-    // mutating-elevation (GOV-03/D-04) gates are intentionally NOT applied under
-    // auto; `mutating` / `mutatingAllowed` remain computed for back-compat but are
-    // no longer consulted here. The network-capture DISCOVERY gate keeps its own
+    // Off/Ask -- still gates. The former sensitive-downgrade (GOV-07/D-14) gate is
+    // intentionally NOT applied under auto (sensitive reads run freely). The
+    // mutating-elevation (GOV-03/D-04) gate is re-applied ONLY for sensitive-origin
+    // writes by step (3.5) above (DENY-04 / posture B); `mutating` /
+    // `mutatingAllowed` are consulted there. A non-sensitive write reaches this
+    // line and is allowed. The network-capture DISCOVERY gate keeps its own
     // sensitive-confirm, since live traffic sniffing is a broader grant.
     return { decision: 'allow', method: method, sideEffectClass: sideEffectClass };
   }
