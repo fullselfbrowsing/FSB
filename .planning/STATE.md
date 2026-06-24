@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: Completed 36-01-PLAN.md (OpenTabs importer + flat emit + reconciled snapshot, CGEN-01)
-last_updated: "2026-06-24T17:05:29.822Z"
+stopped_at: Completed 36-02-PLAN.md (resolve() descriptor-only no-dead-entry fallback, CGEN-03)
+last_updated: "2026-06-24T17:14:40.020Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 36 (Codegen Pipeline + No-Dead-Entry Resolution) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-24
 
-Progress: [█████████░] 88%
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -102,6 +102,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 35]: Phase 35-02 (DENY-03): the fail-closed classification gate scripts/verify-classification-gate.mjs DUAL-EXPORTS classifyGate(items, opts) (the Phase-36 importer imports it and calls it BEFORE emitting any descriptor JSON) + a CLI chained into validate:extension (-> ci) and npm test. classifyGate consults service-denylist.js classify(); an origin tripping a sensitivity axis but NOT classified denied/sensitive fails the build naming the offender + axis. The heuristic uses brand+category tokens (35-RESEARCH Q3) but DELIBERATELY omits over-generic words (a bare message/inbox/notification) so the benign already-shipped descriptors (reddit.inbox, github.notifications, slack/notion reads) are not false-failed; the SAFE_ALLOWLIST override is a classifyGate parameter (opts.safeAllowlist), not a module constant, so Phase 36 can pass a curated allowlist programmatically. Proven by catalog/descriptors/_fixtures/unclassified-sensitive.fixture.json (pay.unclassified-fixture.test) which the CLI rejects when exposed to the corpus and which _fixtures/ keeps out of the shipped catalog.
 - [Phase 35]: Phase 35-03 (DENY-04): posture-B step-(3.5) re-gate live in _evaluateConsent, scoped to classify(origin).sensitive===true. A sensitive-origin WRITE without the per-origin mutating flag returns RECIPE_CONSENT_MUTATING_REQUIRED (recovered byte-exact from 68ceea90^, emitted via the dual-field _err so code===errorCode===error holds INV-03 across the 7 universal-provider targets); reads pass under Auto everywhere, non-sensitive writes pass, the per-origin mutating flag elevates the sensitive write back to allow. Narrows the 68ceea90 opt-out base, does not revert it. Decision label 'mutating_required' (the invoke caller only checks decision !== 'allow').
 - [Phase 36]: Phase 36-01 (CGEN-01): scripts/import-opentabs-catalog.mjs (tsx) imports vendored OpenTabs todoist metadata via a hermetic sdk-stub + transport stub (Wall 1: import() never touches the real SDK DOM/fetch); FLAT emit opentabs__<svc>__<op>.json closed-params (z.toJSONSchema additionalProperties:false default, $schema stripped) + provenance{sha 4b170216,sourcePath,license,signals}; classifyGate() after Denylist.load() BEFORE write; recursive Wall-1 pre-scan (script/expr/transform/code/fn/js at any depth); side-effect verb-map+GraphQL-carve-out+override fail-safe-high MAX with signals persisted for Plan-03. service=app.todoist.com benign, slug stem todoist. zod/tsx/sdk devDeps only (jiti excluded). Snapshot 8->15 descriptors INV-01 byte-stable (+390/-0). package.json registers 7 phase tests + crosscheck as passing stubs.
+- [Phase ?]: Phase 36-02 (CGEN-03): resolve() gains the single descriptor-only no-dead-entry fallback -- a searchable slug (in FsbRecipeIndex.descriptors, no REGISTRY handler, no recipe) returns {tier: backing===learn ? T2 : T3, descriptor} (NO recipe field) via _getDescriptor (a typeof-guarded direct read of FsbRecipeIndex.descriptors, Option A, one file); a genuinely-unknown slug still returns null. EXACT T2/T3 literals route through the UNCHANGED router switch to RECIPE_LEARN_PENDING / RECIPE_DOM_FALLBACK_PENDING (zero router edits). no-dead-entry.test.js asserts the invariant over the REAL emitted todoist corpus (9/0); the router test (46/0) drives the REAL resolve() through invoke proving a descriptor-only slug never returns RECIPE_NOT_FOUND.
 
 ### Pending Todos
 
@@ -134,8 +135,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T17:05:03.871Z
-Stopped at: Completed 36-01-PLAN.md (OpenTabs importer + flat emit + reconciled snapshot, CGEN-01)
+Last session: 2026-06-24T17:14:40.015Z
+Stopped at: Completed 36-02-PLAN.md (resolve() descriptor-only no-dead-entry fallback, CGEN-03)
 Resume file: None
 
 ## Next Actions
