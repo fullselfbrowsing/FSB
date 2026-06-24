@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_to_plan
-stopped_at: Phase 35 complete (verified passed, 22/22 must-haves); next Phase 36 — Codegen Pipeline
-last_updated: "2026-06-24T15:30:40.412Z"
-last_activity: 2026-06-24
+status: executing
+stopped_at: Completed 35-03-PLAN.md (posture-B sensitive-write re-gate, DENY-04) — Phase 35 all 4 plans complete
+last_updated: "2026-06-24T16:45:50.914Z"
+last_activity: 2026-06-24 -- Phase 36 planning complete
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 11
+  total_plans: 8
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -32,8 +32,8 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 36 of 43 (Codegen Pipeline + No-Dead-Entry Resolution) — not started
 Plan: —
-Status: Phase 35 complete (verified passed); ready to plan Phase 36
-Last activity: 2026-06-24
+Status: Ready to execute
+Last activity: 2026-06-24 -- Phase 36 planning complete
 
 Progress: [█░░░░░░░░░] 11% (1/9 phases)
 
