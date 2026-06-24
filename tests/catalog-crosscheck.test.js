@@ -25,6 +25,20 @@
  *       caught -- the dangerous direction, threat T-36-08; method-alone would have
  *       auto-classed it read because every GraphQL op is POST).
  *
+ * Plus the hardening cases the deep review (36-REVIEW.md HI-01/HI-02) demanded:
+ *   (f) HI-01 -- the headline false-negative: an `api` helper with NO method literal
+ *       and an UNRECOGNIZED verb (process/submit/execute) declared `read` formerly
+ *       floated at the read floor and PASSED. The shared fail-safe-high floor now
+ *       derives at least `write` for a generic mutating-capable transport with no
+ *       usable signal, so all 3 of the review's adversarial under-stated mutations
+ *       FAIL (was 0 of 3 caught). The same shape declared `write` still PASSES.
+ *   (g) HI-02 -- the GraphQL camelCase surface (linear/github, Phases 37-39): a
+ *       camelCase destructive verb NOT in the override table (purgeRepository,
+ *       dropDatabase, voidInvoice) is now recognized destructive via the camelCase-
+ *       aware verb split (recovered from the slug when the persisted verb is absent),
+ *       so a declared `write` UNDER-states it and FAILS; a camelCase READ verb
+ *       (getCurrentUser) declared `read` still PASSES (no over-escalation).
+ *
  * Zero-framework convention: PASS=/FAIL=, process.exit(1) on any failed assertion.
  * NO EMOJIS, ASCII-only source.
  */
@@ -106,6 +120,52 @@ async function main() {
   check(Array.isArray(e.failures) && e.failures.length === 2, '(e) a mixed batch flags exactly the two under-stated ops (void_invoice + archiveIssue)');
   check(isFlagged(e, 'stripe.void_invoice') && isFlagged(e, 'linear.archiveIssue'), '(e) the two flagged slugs are void_invoice and archiveIssue');
   check(!isFlagged(e, 'stripe.delete_customer') && !isFlagged(e, 'linear.issues'), '(e) the correctly-stated ops are NOT flagged');
+
+  // ---- (f) HI-01: api-helper / no-method / unknown-verb declared `read` FAILS -
+  // The headline false-negative the review proved: signals {transportHelper:'api',
+  // httpMethod:null, opNameVerb:<unrecognized>} formerly returned the read FLOOR
+  // (helper null, method null, verb null -> read), so a writable-capable op declared
+  // `read` PASSED -- a fully-writable op running ungated under the opt-out Auto
+  // default. With the shared fail-safe-high floor a generic mutating-capable
+  // transport with NO usable signal derives at least `write`, so all three of the
+  // review's adversarial under-stated mutations are now CAUGHT.
+  const fAdversarial = [
+    descriptor('evil.process_payment', 'read', { transportHelper: 'api', httpMethod: null, opNameVerb: 'process' }),
+    descriptor('evil.submit_order', 'read', { transportHelper: 'api', httpMethod: null, opNameVerb: 'submit' }),
+    descriptor('evil.execute_trade', 'read', { transportHelper: 'api', httpMethod: null, opNameVerb: 'execute' }),
+  ];
+  const f = gate.crossCheck(fAdversarial);
+  check(Array.isArray(f.failures) && f.failures.length === 3, '(f) HI-01: all 3 api/no-method/unknown-verb ops declared read FAIL (gate catches 3 of 3, was 0 of 3)');
+  check(isFlagged(f, 'evil.process_payment'), '(f) process_payment (api, no method, verb `process`) declared read is CAUGHT');
+  check(isFlagged(f, 'evil.submit_order'), '(f) submit_order (api, no method, verb `submit`) declared read is CAUGHT');
+  check(isFlagged(f, 'evil.execute_trade'), '(f) execute_trade (api, no method, verb `execute`) declared read is CAUGHT');
+  // The same shape declared `write` (the floor) PASSES -- the floor is write, not an
+  // over-escalation to destructive (no destructive signal is present).
+  const fOk = gate.crossCheck([
+    descriptor('evil.process_payment', 'write', { transportHelper: 'api', httpMethod: null, opNameVerb: 'process' }),
+  ]);
+  check(Array.isArray(fOk.failures) && fOk.failures.length === 0, '(f) the same op declared `write` PASSES (the fail-safe floor is write, no false-escalation)');
+
+  // ---- (g) HI-02: camelCase destructive verb (GraphQL) is recognized ----------
+  // The GraphQL camelCase surface (linear/github) was the motivating Phase 37-39
+  // case. A camelCase destructive op NOT in the override table (purgeRepository,
+  // dropDatabase) formerly fell through every verb set to merely `write`; the
+  // camelCase-aware verb split now classes it `destructive`, so a declared `write`
+  // UNDER-states it and FAILS. The verb token is recovered even when the persisted
+  // opNameVerb is absent (from the slug's trailing op-name).
+  const g = gate.crossCheck([
+    descriptor('github.purgeRepository', 'write', { transportHelper: 'graphql', httpMethod: 'POST', opNameVerb: null }),
+    descriptor('github.dropDatabase', 'write', { transportHelper: 'graphql', httpMethod: 'POST', opNameVerb: null }),
+    descriptor('linear.voidInvoice', 'write', { transportHelper: 'graphql', httpMethod: 'POST', opNameVerb: 'void' }),
+  ]);
+  check(Array.isArray(g.failures) && g.failures.length === 3, '(g) HI-02: camelCase destructive verbs (purge/drop/void) declared write all FAIL (destructive recognized)');
+  check(isFlagged(g, 'github.purgeRepository') && isFlagged(g, 'github.dropDatabase'), '(g) purgeRepository/dropDatabase recovered from the slug (no persisted verb) and classed destructive');
+  // A camelCase READ verb (getCurrentUser) over a GraphQL POST correctly stays read
+  // (declared read PASSES) -- the carve-out does not over-escalate a genuine read.
+  const gRead = gate.crossCheck([
+    descriptor('github.getCurrentUser', 'read', { transportHelper: 'graphql', httpMethod: 'POST', opNameVerb: 'get' }),
+  ]);
+  check(Array.isArray(gRead.failures) && gRead.failures.length === 0, '(g) getCurrentUser (camelCase read verb, graphql) declared read PASSES (no false-fail)');
 
   // ---- report ---------------------------------------------------------------
   if (failed > 0) {
