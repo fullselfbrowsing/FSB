@@ -1,204 +1,98 @@
-# Requirements: FSB (Full Self-Browsing) — v0.9.99 Native Capability Catalog
+# Requirements: FSB (Full Self-Browsing) -- v1.0.0 Full App Catalog (OpenTabs Parity)
 
-**Defined:** 2026-06-19
-**Core Value:** Reliable single-attempt execution — the AI decides correctly; the mechanics execute precisely. v0.9.99 extends this to a second execution path: call a service's real web API through the user's authenticated session (fast path), and self-heal to DOM automation when the API path breaks.
+**Defined:** 2026-06-23
+**Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback) -- no new MCP tool, no new router branch, INV-01..04 + Walls 1/2 preserved by construction.
 
 ## v1 Requirements
 
-Requirements for the v0.9.99 milestone. Each maps to exactly one roadmap phase (Phases 26–32, continuing integer numbering from v0.12.0's Phase 25).
+Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+, continuing integer numbering from v0.9.99's Phase 34). Source: github.com/opentabs-dev/opentabs (MIT, 119 plugins / 2,523 ops), pinned by commit SHA; attribution already in README Acknowledgements.
 
-### CAP — Capability Runtime & Recipe Interpreter
+### DENY -- Denylist Expansion & Import-Time Classification Gate (lands FIRST)
 
-- [x] **CAP-01**: A versioned JSON Schema defines a recipe as pure data — endpoint template, method, an auth-strategy enum, parameter schema, static request/header map, and a read-only JMESPath extract — with no executable/script fields.
-- [x] **CAP-02**: A fixed, bundled interpreter executes a recipe by binding its data to a closed enum of bundled auth-strategy handlers, never via `eval`/`new Function`/`import()`.
-- [x] **CAP-03**: Recipes and invocation parameters are validated in the service worker by an eval-free JSON Schema validator before execution; invalid or unknown-opcode recipes are rejected with a typed error.
-- [x] **CAP-04**: A CI guard fails the build on any `eval`/`new Function`/`import(` reachable from the recipe path and on any recipe field outside the closed vocabulary.
-- [x] **CAP-05**: The interpreter and the three new libraries (minisearch, jmespath, @cfworker/json-schema) ship inside the extension package; no remotely-hosted code and no manifest/permission change is introduced.
+- [ ] **DENY-01**: `extension/config/service-denylist.json` deniedOrigins is expanded to hard-block the categorically-prohibited OpenTabs apps (brokerage/trading: robinhood, fidelity, carta; ToS-hostile media/social: netflix, spotify, twitch, steam, youtube-music, tinder, onlyfans; and the write-paths of instagram/facebook/tiktok/x) BEFORE any of those descriptors can be emitted.
+- [ ] **DENY-02**: sensitiveOrigins is expanded to the allowed-but-sensitive tier (payments: stripe, coinbase, twilio; budgeting: ynab; messaging-app writes; finance reads) so they classify as sensitive (Ask / mutating-gated), not denied.
+- [ ] **DENY-03**: A build-time classification gate (in the importer and CI) refuses to emit a descriptor whose origin is not explicitly classified denied / sensitive / safe; an unclassified sensitive-or-ToS origin fails the build (fail-closed).
+- [ ] **DENY-04**: Sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (posture B): reads run under Auto everywhere, but a WRITE to a sensitive origin requires the per-origin mutating flag (already present in storage, re-gated here); non-sensitive origins remain fully-open under Auto. Scopes the friction removed in v0.9.99 Phase 30 to sensitive origins only.
 
-### FETCH — Authenticated Fetch Primitive
+### CGEN -- Codegen Import Pipeline & No-Dead-Entry Resolution
 
-- [x] **FETCH-01**: An authenticated API call executes in the page MAIN world via the existing `execute_js` seam so the user's first-party HttpOnly/SameSite cookies attach automatically.
-- [x] **FETCH-02**: The fetch primitive scrapes and sends per-form CSRF tokens and the required headers declared by the recipe's auth-strategy.
-- [x] **FETCH-03**: Origin-pinning is enforced inside the interpreter — a recipe bound to origin X may only issue requests to origin X; cross-origin targets are rejected before any side effect.
-- [x] **FETCH-04**: An in-flight capability call survives MV3 service-worker eviction via the existing `run_task` resume-sidecar; mid-mutation ambiguity is treated as `RECOVERY_AMBIGUOUS` and never blind-retried.
-- [x] **FETCH-05**: A smoke test asserts the logged-in (not logged-out) data shape is returned from the chosen execution context against a real HttpOnly-cookie site. _(Automated/CI half satisfied: the smoke test through the chosen execution context is green in Plan 02, `tests/capability-fetch.test.js`. The irreducibly-LIVE half -- real GitHub HttpOnly cookies actually attach in the page MAIN world against a real signed-in session -- is recorded as **human_needed** debt in `27-HUMAN-UAT.md` UAT-27-01, NOT a fabricated pass; it cannot run in CI without shipping a real credential, GOV-06.)_
+- [ ] **CGEN-01**: A build-time `scripts/import-opentabs-catalog.mjs` (run under tsx) extracts each OpenTabs op's metadata (slug, params via z.toJSONSchema, service/origin, action verb, description) into provenance-stamped descriptor JSON under `catalog/descriptors/opentabs/`, pinned to an OpenTabs commit SHA; NO runtime OpenTabs/plugin-sdk dependency ships (Wall 1).
+- [ ] **CGEN-02**: Each op's side-effect class is inferred from its transport verb (apiGet -> read; apiPost/apiPut/apiDelete -> write/destructive) plus an override table; a descriptor-vs-derived cross-check fails the build when a descriptor under-states a destructive op.
+- [ ] **CGEN-03**: `capability-catalog.js resolve()` gains a single fallback branch so a descriptor-only slug (no bundled handler or recipe) resolves to T3 (DOM) or T2 (learn-pending when seeded) -- no searchable-but-uninvocable dead entries; verified by a harness assertion over the full catalog.
+- [ ] **CGEN-04**: The generated catalog is committed and inlined by `scripts/package-extension.mjs` via the existing readJsonDir path with a stable `catalogVersion`; the IIFE shape and djb2 hashing are unchanged.
 
-### SURF — Lean MCP Surface & Capability Search
+### BRDTH -- Breadth: All-App Descriptor Import
 
-- [x] **SURF-01**: `search_capabilities` returns ranked, schema-on-hit results (≤5) for an intent query, biased by the owned tab's origin.
-- [x] **SURF-02**: `invoke_capability` executes a selected capability with validated parameters and returns a structured result.
-- [x] **SURF-03**: Both tools register outside `TOOL_REGISTRY` (via `server.tool()`), keeping the existing ~63 MCP tool schemas byte-identical (INV-01).
-- [x] **SURF-04**: A persisted minisearch index indexes intent synonyms + service + action verb + side-effect class, and snapshots to `chrome.storage.local`.
-- [x] **SURF-05**: `search_capabilities` is read-only and bypasses the mutation queue; `invoke_capability` is serialized through it.
-- [x] **SURF-06**: An eval harness measures recall@k and wrong-invoke rate, and the milestone is gated on its thresholds.
+- [ ] **BRDTH-01**: Descriptors for all real OpenTabs apps (excluding the e2e-test / prescript-test fixtures and the DENY-01 denied set) are imported and returned by `search_capabilities`, with intent synonyms and side-effect class per op.
+- [ ] **BRDTH-02**: Apps are imported in category batches ordered least-sensitive -> most-sensitive; each batch is gated on its origins being denylist-classified (DENY-03) before merge.
+- [ ] **BRDTH-03**: Each imported descriptor carries an invocability/backing-status signal (recipe / handler / learn-pending / DOM) so a user or agent can distinguish day-one-invocable apps from discovery-pending ones.
 
-### CAT — Catalog & Tiered Routing
+### DEPTH -- Depth: Hand-Ported Handlers (~15-30 apps)
 
-- [x] **CAT-01**: A capability router selects a tier — model-prior public API → bundled handler → declarative recipe → learned recipe → DOM fallback — biased by the tab origin.
-- [x] **CAT-02**: 5–10 high-value services ship as bundled imperative handlers (the zero-install head), requiring no install.
-- [x] **CAT-03**: Additional services load as declarative recipes (data) executed by the bundled interpreter (the long tail).
-- [x] **CAT-04**: Autopilot reaches the same capability engine via a `tool-executor` branch — runtime-layer parity with the MCP surface, with no parallel autopilot stack (INV-02).
-- [x] **CAT-05**: The router returns either a structured result or a typed reason for falling through to the next tier.
+- [ ] **DEPTH-01**: The depth shortlist (~22 apps: linear, datadog, vercel, jira, netlify, todoist, circleci, cloudflare, sentry, posthog, ... reads first) is hand-ported as T1a/T1b handlers via the `github.js` contract: own first-party origin, executeBoundSpec-only, scraped tokens never logged.
+- [ ] **DEPTH-02**: Hand-ported WRITE ops fail closed and, on sensitive origins, honor the DENY-04 mutating opt-in; a per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port (linear is documented-safe; supabase / cloud-consoles must be verified or demoted to T2/T3).
 
-### GOV — Consent Governance & Audit
+### DSEED -- Discovery Seeding for the Tail
 
-- [x] **GOV-01**: Capability execution is default-OFF per origin; nothing runs against an origin until the user explicitly enables it.
-- [x] **GOV-02**: Per-origin consent supports Off / Ask / Auto, where Auto is an explicit per-origin opt-in and never a global switch.
-- [x] **GOV-03**: Mutating calls (POST/PUT/PATCH/DELETE) require elevated consent, are surfaced in the Ask prompt, and trigger disambiguation before any mutating invoke.
-- [x] **GOV-04**: The consent gate is enforced at the single dispatch chokepoint, immediately after the existing ownership gate.
-- [x] **GOV-05**: An append-only audit log records origin, capability, method, side-effect class, consent decision, outcome, and timestamp — and never records secrets.
-- [x] **GOV-06**: Auth material (cookies/tokens/CSRF) never leaves the device and is never persisted; a tested redactor asserts no auth substrings survive capture or persistence.
-- [x] **GOV-07**: A control-panel UI manages per-origin consent and shows the audit log; sensitive origins (banking/email/gov) carry extra friction even under Auto.
-- [x] **GOV-08**: A documented legal/ToS posture and service denylist records which services FSB will not target.
+- [ ] **DSEED-01**: The OpenTabs origins (+ known endpoint hints) seed the Phase-31 network-capture discovery so the non-hand-ported tail is learned on first authenticated visit, consent-gated.
+- [ ] **DSEED-02**: The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring is persisted at scale.
 
-### HEAL — Self-Healing & Recipe-Rot
+### SCALE -- Catalog Scale & Milestone Gate
 
-- [x] **HEAL-01**: When a recipe breaks (4xx/5xx, empty, shape-mismatch, or `RECIPE_EXPIRED`), FSB falls back to DOM automation (DOM engine + site guides + `run_task`) and still completes the task.
-- [x] **HEAL-02**: Recipes are stamped with captured-at and an expected-shape assertion; responses are validated against it to detect rot, emitting a typed `RECIPE_EXPIRED`.
-- [x] **HEAL-03**: A broken recipe is quarantined/demoted, and the task is re-learned where possible.
-- [x] **HEAL-04**: A failure-detection taxonomy distinguishes "recipe broken" from a legitimate "no results" so fallback never masks a real outcome.
-- [x] **HEAL-05**: Capability and fallback paths pass tests across all 7 providers (INV-03) and a schema-lock parity test (INV-01).
-
-### DISC — Network-Capture Discovery
-
-- [x] **DISC-01**: With consent, CDP Network capture (`Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody`) observes a page's real API calls to discover candidate capabilities.
-- [x] **DISC-02**: Discovery reuses the existing `chrome.debugger` attachment by adding the Network domain (no manifest change) without disrupting the existing Input emulation.
-- [x] **DISC-03**: Captured requests are redacted at capture time, before any persistence, stripping auth/cookie/token/CSRF material.
-- [x] **DISC-04**: Discovery runs only on origins set to Ask/Auto and never on default-Off origins.
-
-### LEARN — Learned Recipes
-
-- [x] **LEARN-01**: A successfully discovered-and-replayed call is synthesized into a declarative recipe and promoted to per-origin procedural memory.
-- [x] **LEARN-02**: Learned recipes store request shape only (endpoint, method, header-map, csrf-source, extract-path, origin) — never response bodies or PII.
-- [x] **LEARN-03**: Learned recipes feed the capability search index so they are findable on the next visit to the origin.
-- [x] **LEARN-04**: A learned recipe for an origin outranks generic recipes during routing.
-
-### SIGN — Recipe Integrity
-
-- [x] **SIGN-01**: Server-delivered recipes are signature-verified (Ed25519/JCS via Lattice receipts) before execution; unverified or tampered recipes are rejected.
-- [x] **SIGN-02**: Recipe integrity metadata (signature, captured-at, schema hash) travels with the recipe and is checked by the interpreter before binding.
-
-### MEDIA — PhantomStream Media Mirroring (Phase 33, milestone extension)
-
-Added after the original v0.9.99 audit as a Phase 33 extension: take up PhantomStream `0.2.1`'s media-mirroring feature so the dashboard live preview mirrors `<video>`/`<audio>` (by reference, not pixels). Thematically continues the v0.12.0 PhantomStream lineage; lands in the open v0.9.99 tree because phase numbers are global integers and v0.12.0 is archived.
-
-- [x] **MEDIA-01**: FSB pins PhantomStream `0.2.1` (from `0.1.0`) and rebuilds the capture/protocol/viewer bundles so the package's media-mirroring feature is present; `package.json`, the lockfile integrity, and `PHANTOMSTREAM-PIN.md` agree on `0.2.1` and the version-pin tests pass.
-- [x] **MEDIA-02**: Live `<video>`/`<audio>` playback state (`STREAM.MEDIA`) is forwarded end-to-end from the capture core through the content-script adapter and background relay to the dashboard — the capture allowlist no longer drops the media side channel. The adaptive-manifest hint (`STREAM.MEDIA_HINT`) seam is wired but dormant.
-- [x] **MEDIA-03**: The static and Angular dashboards route inbound media frames to the PhantomStream viewer and run it with `mediaMode: 'reference'` (media-by-reference) plus logger-trapped degrade callbacks; the existing capture-side masking still applies.
-- [x] **MEDIA-04**: The drift-reconciler branch behavior, the full forward→relay→viewer wiring chain, and the rebuilt bundle media surface are covered by headless tests wired into `npm test`; live-browser playback fidelity is recorded as `human_needed` UAT.
-
-### UPLOAD — Explicit File Upload Tool (Phase 34, milestone extension)
-
-Added as a Phase 34 extension: a dedicated tool to upload a real file from a known disk path to a web form, filling the gap that the synthetic-only `drop_file` and the JS workaround could not (page JS cannot set a file input's value or read the local filesystem). Lands in the open v0.9.99 tree because phase numbers are global integers.
-
-- [x] **UPLOAD-01**: A first-class `upload_file(selector, file_path, tab_id?)` tool sets a real file from an ABSOLUTE disk path onto an `<input type="file">` via CDP `DOM.setFileInputFiles` (real binaries — images/PDFs/docs), including inputs hidden behind a styled label/dropzone.
-- [x] **UPLOAD-02**: Both front doors (the MCP dispatcher and the autopilot tool-executor) route through ONE shared background helper, so behavior and security are identical; the tool registers in `TOOL_REGISTRY` and the frozen parity/visual-session baselines are updated.
-- [x] **UPLOAD-03**: Security posture A — absolute-path-only, a sensitive-path denylist (keys, credential stores, `.env*`, keychains, `/proc`, `/var/run/secrets`, the FSB vault) enforced at the shared chokepoint BEFORE any side effect (covering both front doors), and every upload audit-logged (origin + outcome + decision; the path is never persisted).
-- [x] **UPLOAD-04**: Headless tests cover the denylist (incl. the Win32 trailing-dot/space bypass), the registry/parity/visual-session/routing locks, all wired into `npm test`; live upload fidelity is recorded `human_needed`.
+- [ ] **SCALE-01**: The search index and catalog stay within budget at ~2,523 descriptors (searchable-text indexed; params schema-on-hit / out-of-band; sharded by service), proven by the extended SURF-06 eval harness with size/load-time assertions (index < ~1-2 MB; loadJSON + first search < ~50-100 ms).
+- [ ] **SCALE-02**: Recipe-rot self-heal is hardened for 119-app scale (per-origin re-learn coalescing / back-off); the typed fallback reason stays byte-equal across all 7 providers (INV-03); full `npm test` exits 0 (the milestone gate).
 
 ## v2 Requirements
 
-Deferred to a future milestone. Tracked but not in the v0.9.99 roadmap.
+Acknowledged but deferred beyond v1.0.0; not in this roadmap.
 
-### Future
+### Deferred Capability Families
 
-- **FUT-01**: Per-capability (vs per-origin) consent granularity.
-- **FUT-02**: Explicit, user-initiated capability-pack install (via MCP command or control panel) for heavy/rare long-tail services.
-- **FUT-03**: Capability sharing/export with a trust/provenance model.
-- **FUT-04**: Intent-based DOM healing (the 75–90% optimization beyond basic escalation).
-- **FUT-05**: Cross-origin authenticated capability orchestration under a stronger threat model (only if ever justified).
+- **GAPI-01**: gapi-bridge handler family for the Google Workspace apps (docs / drive / calendar) invoked via the page's `window.gapi.client.request` trampoline -- needs a dedicated handler-shape spike.
+- **CLOUD-01**: Cloud-console Pattern-D ports (aws-console, azure, google-cloud, terraform-cloud) -- pending per-app CORS verification of dashboard-vs-API origin.
+- **UATX-01**: Per-app live guarded-write UAT closeout across the hand-ported depth tier (human_needed, mirrors the v0.9.99 live-UAT posture).
 
 ## Out of Scope
 
-Explicitly excluded for v0.9.99. Documented to prevent scope creep. Anti-features carry warnings.
+Explicit exclusions (anti-features from research), documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| npm-package-per-plugin distribution (OpenTabs model) | MV3 bans runtime code loading; the capability layer ships bundled + as declarative data instead. |
-| Generic cross-origin authenticated replay | The CSRF / credential-exfiltration engine; v0.9.99 is same-origin-only by design. |
-| Remotely-hosted executable recipe logic / server-authored control flow | Web Store "no remotely hosted code" — recipes are closed-vocabulary data only; the interpreter is bundled. |
-| Auto-enable of newly discovered capabilities | Violates default-OFF/supervised posture; discovery never grants execution. |
-| AI-source-code-review as the trust gate (OpenTabs) | Category mismatch — FSB's tail is data, not code; replaced by recipe-data preview + consent. |
-| Background / unattended / cloud capability execution | FSB stays supervised and local; the user's browser must be active. |
-| "Match OpenTabs' ~2,769-tool count" as a goal | The count is a moving, AI-generated target; FSB matches the auto-grow mechanism and wins on resilience, not tool count. |
+| Hand-porting all 2,523 ops as bundled imperative handlers | MV3 Wall 1 / Web-Store-ban risk; the head stays curated, the tail is descriptors + learned/DOM |
+| Runtime dependency on @opentabs-dev/plugin-sdk (or any OpenTabs code) | MV3 bans remotely-hosted code; the import is build-time metadata only |
+| ToS-hostile apps as API-invocable (netflix, spotify, twitch, steam, tinder, onlyfans, instagram/tiktok/x writes) | Site Terms of Service; denylisted or DOM-only |
+| Brokerage trade execution (robinhood / fidelity / carta trades) | Financial-harm surface under an opt-out default; denied outright |
+| e2e-test / prescript-test plugins | OpenTabs CI fixtures, not real apps |
 
 ## Traceability
 
-Which phase covers which requirement. Phase column populated during roadmap creation (Phases 26–32).
+Proposed mapping (finalized by the roadmapper; each requirement maps to exactly one phase).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAP-01 | Phase 26 | Complete |
-| CAP-02 | Phase 26 | Complete |
-| CAP-03 | Phase 26 | Complete |
-| CAP-04 | Phase 26 | Complete |
-| CAP-05 | Phase 26 | Complete |
-| FETCH-01 | Phase 27 | Complete |
-| FETCH-02 | Phase 27 | Complete |
-| FETCH-03 | Phase 27 | Complete |
-| FETCH-04 | Phase 27 | Complete |
-| FETCH-05 | Phase 27 | Complete (CI half); live half human_needed (27-HUMAN-UAT.md UAT-27-01) |
-| SURF-01 | Phase 28 | Complete |
-| SURF-02 | Phase 28 | Complete |
-| SURF-03 | Phase 28 | Complete |
-| SURF-04 | Phase 28 | Complete |
-| SURF-05 | Phase 28 | Complete |
-| SURF-06 | Phase 28 | Complete |
-| CAT-01 | Phase 29 | Complete |
-| CAT-02 | Phase 29 | Complete |
-| CAT-03 | Phase 29 | Complete |
-| CAT-04 | Phase 29 | Complete |
-| CAT-05 | Phase 29 | Complete |
-| GOV-01 | Phase 30 | Complete |
-| GOV-02 | Phase 30 | Complete |
-| GOV-03 | Phase 30 | Complete |
-| GOV-04 | Phase 30 | Complete |
-| GOV-05 | Phase 30 | Complete |
-| GOV-06 | Phase 30 | Complete |
-| GOV-07 | Phase 30 | Complete |
-| GOV-08 | Phase 30 | Complete |
-| HEAL-01 | Phase 32 | Complete |
-| HEAL-02 | Phase 32 | Complete |
-| HEAL-03 | Phase 32 | Complete |
-| HEAL-04 | Phase 32 | Complete |
-| HEAL-05 | Phase 32 | Complete |
-| DISC-01 | Phase 31 | Complete |
-| DISC-02 | Phase 31 | Complete |
-| DISC-03 | Phase 31 | Complete |
-| DISC-04 | Phase 31 | Complete |
-| LEARN-01 | Phase 31 | Complete |
-| LEARN-02 | Phase 31 | Complete |
-| LEARN-03 | Phase 31 | Complete |
-| LEARN-04 | Phase 31 | Complete |
-| SIGN-01 | Phase 30 | Complete |
-| SIGN-02 | Phase 30 | Complete |
-| MEDIA-01 | Phase 33 | Complete |
-| MEDIA-02 | Phase 33 | Complete |
-| MEDIA-03 | Phase 33 | Complete |
-| MEDIA-04 | Phase 33 | Complete |
-| UPLOAD-01 | Phase 34 | Complete |
-| UPLOAD-02 | Phase 34 | Complete |
-| UPLOAD-03 | Phase 34 | Complete |
-| UPLOAD-04 | Phase 34 | Complete |
+| DENY-01 | Phase 35 | Pending |
+| DENY-02 | Phase 35 | Pending |
+| DENY-03 | Phase 35 | Pending |
+| DENY-04 | Phase 35 | Pending |
+| CGEN-01 | Phase 36 | Pending |
+| CGEN-02 | Phase 36 | Pending |
+| CGEN-03 | Phase 36 | Pending |
+| CGEN-04 | Phase 36 | Pending |
+| BRDTH-01 | Phase 37 | Pending |
+| BRDTH-02 | Phase 37 | Pending |
+| BRDTH-03 | Phase 37 | Pending |
+| DEPTH-01 | Phase 40 | Pending |
+| DEPTH-02 | Phase 40 | Pending |
+| DSEED-01 | Phase 42 | Pending |
+| DSEED-02 | Phase 42 | Pending |
+| SCALE-01 | Phase 43 | Pending |
+| SCALE-02 | Phase 43 | Pending |
 
 **Coverage:**
-- v1 requirements: 52 total (44 original + 4 MEDIA [Phase 33] + 4 UPLOAD [Phase 34] milestone extensions)
-- Mapped to phases: 52
+- v1 requirements: 17 total
+- Mapped to phases: 17 (proposed; roadmapper finalizes batch phases 37-39 + depth 40-41)
 - Unmapped: 0
 
-Per-phase requirement counts:
-- Phase 26 (CAP): 5 — CAP-01..05
-- Phase 27 (FETCH): 5 — FETCH-01..05
-- Phase 28 (SURF): 6 — SURF-01..06
-- Phase 29 (CAT): 5 — CAT-01..05
-- Phase 30 (GOV + SIGN): 10 — GOV-01..08, SIGN-01..02
-- Phase 31 (DISC + LEARN): 8 — DISC-01..04, LEARN-01..04
-- Phase 32 (HEAL): 5 — HEAL-01..05
-- Phase 33 (MEDIA): 4 — MEDIA-01..04 (PhantomStream 0.2.1 media-mirroring uptake; extends the milestone)
-- Phase 34 (UPLOAD): 4 — UPLOAD-01..04 (explicit file-upload tool `upload_file`; extends the milestone)
-
 ---
-*Requirements defined: 2026-06-19*
-*Last updated: 2026-06-19 — roadmap created; traceability populated for Phases 26–32, coverage 44/44 mapped, 0 unmapped.*
-*Updated: 2026-06-23 — Phase 33 (PhantomStream 0.2.1 media-mirroring uptake) added; +4 MEDIA requirements, coverage 48/48 mapped, 0 unmapped.*
-*Updated: 2026-06-23 — Phase 34 (explicit file-upload tool, upload_file) added; +4 UPLOAD requirements, coverage 52/52 mapped, 0 unmapped.*
+*Requirements defined: 2026-06-23 -- v1.0.0 Full App Catalog (OpenTabs Parity)*
+*Last updated: 2026-06-23 after initial definition (research-backed; posture B re-gates sensitive writes)*
