@@ -202,6 +202,50 @@ function installChromeStorageStub() {
   check(sensPostElevated && sensPostElevated.decision === 'allow',
     'POST on a SENSITIVE Auto origin WITH the per-origin mutating flag -> allow (the flag elevates)');
 
+  // =====================================================================
+  // MD-01 regression: the re-gate FAILS CLOSED on a classify() error.
+  // ---------------------------------------------------------------------
+  // If the denylist IS present but its classify() THROWS for a mutating,
+  // non-flagged call, the sensitivity is UNKNOWN -- and an unknown
+  // sensitivity on a WRITE must NOT fall through to allow (the asymmetry
+  // MD-01 closes). It must re-gate to RECIPE_CONSENT_MUTATING_REQUIRED,
+  // exactly like a known-sensitive write, mirroring the fail-closed posture
+  // of every other degradation in the gate. A throwing isDenied() at step 1
+  // is caught and treated as non-match by design, so this origin still
+  // reaches step (3.5); the classify() throw is what we exercise here.
+  // =====================================================================
+  console.log('\n--- MD-01: re-gate fails CLOSED when classify() throws ---');
+
+  globalThis.FsbServiceDenylist = {
+    classify() { throw new Error('classify boom (sensitivity probe failure)'); },
+    isDenied() { return { denied: false }; },
+    load() { return Promise.resolve(); }
+  };
+
+  if (typeof Store._reset === 'function') Store._reset();
+  const THROW_ORIGIN = 'https://probe-fails.example.com';
+  await Store.setOriginMode(THROW_ORIGIN, 'auto'); // Auto, mutating flag false
+
+  // a READ is unaffected: it never reaches the mutating re-gate, so a throwing
+  // classify() does not block a non-mutating call.
+  const throwGet = await Gate.evaluate({
+    origin: THROW_ORIGIN, slug: 'svc.read', method: 'GET',
+    entry: { tier: 'T1b', sideEffectClass: 'read' }
+  });
+  check(throwGet && throwGet.decision === 'allow',
+    'GET stays allowed when classify() throws (read never reaches the mutating re-gate)');
+
+  // a WRITE with a throwing classify() FAILS CLOSED to RECIPE_CONSENT_MUTATING_REQUIRED
+  // (NOT allow) -- the core MD-01 fix.
+  const throwPost = await Gate.evaluate({
+    origin: THROW_ORIGIN, slug: 'svc.mutate', method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'mutating' }
+  });
+  check(throwPost && throwPost.decision !== 'allow',
+    'POST with a THROWING classify() (no flag) -> NOT allow (MD-01: fail closed, never fall through)');
+  check(throwPost && throwPost.error && throwPost.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'throwing-classify POST -> RECIPE_CONSENT_MUTATING_REQUIRED (re-gated, not allowed)');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {

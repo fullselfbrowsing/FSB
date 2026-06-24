@@ -461,12 +461,31 @@
     //       resolved `denylist` accessor; `mutating` / `mutatingAllowed` are the
     //       values already computed above. Denied origins are blocked at step (1),
     //       so this branch only ever sees sensitive-but-not-denied origins.
+    //
+    //       FAIL CLOSED on a probe failure (MD-01): if the denylist IS present
+    //       but classify() THROWS -- or returns a malformed (non-object) verdict
+    //       -- the sensitivity is UNKNOWN. An unknown sensitivity on a MUTATING
+    //       call must NOT fall through to allow (that is the one wrong answer): a
+    //       credential-replay gate fails CLOSED on every other degradation
+    //       (denylist-unavailable, consent-store-degraded, null-origin all return
+    //       a typed reason above), so re-gate here too. An ABSENT denylist
+    //       (no module / no classify fn) is the documented "nothing sensitive"
+    //       baseline (see the degradation note above) -- it is NOT a degraded
+    //       probe, so the write stays open. Reads / non-sensitive writes never
+    //       reach this return.
     if (mutating && !mutatingAllowed) {
       var cls = null;
+      var clsProbed = false;
+      var clsErrored = false;
       if (denylist && typeof denylist.classify === 'function') {
-        try { cls = denylist.classify(origin); } catch (_e) { cls = null; }
+        clsProbed = true;
+        try { cls = denylist.classify(origin); }
+        catch (_e) { cls = null; clsErrored = true; }
       }
-      if (cls && cls.sensitive === true) {
+      // A probe that ran but threw, or ran but returned a non-object, cannot
+      // prove the origin is safe -> treat as potentially-sensitive (fail closed).
+      var clsUnknown = clsProbed && (clsErrored || !cls || typeof cls !== 'object');
+      if (clsUnknown || (cls && cls.sensitive === true)) {
         return {
           decision: 'mutating_required',
           method: method,
