@@ -59,6 +59,32 @@
     return null;
   }
 
+  // ---- CGEN-03 / Decision B: typeof-guarded descriptor accessor --------------
+  //      Mirrors _search()/_getRecipeBySlug above. The SEARCHABLE descriptor set
+  //      lives on the build-time generated FsbRecipeIndex global (recipe-index.
+  //      generated.js: { recipes:[...], descriptors:[...] }) -- the SAME array
+  //      capability-search.js indexes. resolve()'s no-dead-entry fallback reads it
+  //      DIRECTLY (Option A: capability-search.js exports no getDescriptorBySlug, so
+  //      a direct read keeps the load-bearing change to ONE file). Absent global /
+  //      absent array under the Node unit harness -> null (resolve falls through to
+  //      the genuinely-unknown -> null leg, the correct RECIPE_NOT_FOUND).
+  function _recipeIndex() {
+    return (typeof FsbRecipeIndex !== 'undefined' && FsbRecipeIndex) ? FsbRecipeIndex : null;
+  }
+
+  function _getDescriptor(slug) {
+    var idx = _recipeIndex();
+    if (!idx || !Array.isArray(idx.descriptors)) { return null; }
+    // Linear scan is fine at smoke scale; at full scale (Phase 43) memoize a
+    // slug->descriptor map ONCE (the descriptors array is static post-load) to stay
+    // O(1). No chrome.*, no network -- a pure in-memory read.
+    for (var i = 0; i < idx.descriptors.length; i++) {
+      var d = idx.descriptors[i];
+      if (d && d.slug === slug) { return d; }
+    }
+    return null;
+  }
+
   // ---- LEARN-04 / D-15: typeof-guarded learned-store accessor ----------------
   //      Parallel to _search(). The Phase-31 per-origin learned-recipe store
   //      (FsbLearnedRecipeStore) surfaces the highest-trust per-origin recipe.
@@ -301,7 +327,33 @@
     }
 
     var entry = Object.prototype.hasOwnProperty.call(REGISTRY, slug) ? REGISTRY[slug] : null;
-    if (!entry) return null;
+
+    // CGEN-03: descriptor-only no-dead-entry fallback. A slug that is SEARCHABLE
+    // (present in FsbRecipeIndex.descriptors, the array capability-search.js indexes)
+    // but has NO REGISTRY handler and NO recipe would otherwise return null here ->
+    // the router's switch hits its default and returns RECIPE_NOT_FOUND for a slug
+    // that search CAN surface (the discoverable-but-uninvocable dead entry, the
+    // headline risk of Phase 36). Resolve it to a non-null SEAM tier so the router's
+    // existing switch (UNCHANGED) yields an actionable typed reason:
+    //   - backing 'learn' -> tier 'T2' (NO recipe -> the router takes its
+    //                        RECIPE_LEARN_PENDING leg; discovery can learn it later)
+    //   - backing 'dom' / absent -> tier 'T3' -> RECIPE_DOM_FALLBACK_PENDING
+    // The literals 'T2'/'T3' are EXACT: any other tier string hits the router default
+    // -> RECIPE_NOT_FOUND (the bug). We NEVER fabricate a recipe here (never auto-mint
+    // a credentialed call from guessed auth) -- T2 carries NO recipe field; both T2 and
+    // T3 are seam tiers the router maps WITHOUT executing. (Decision B: the descriptor's
+    // own backing flag is the seam signal; Phase-36 smoke descriptors are all
+    // backing:'dom' -> T3; a backing:'learn' descriptor exercises the T2 leg.)
+    if (!entry) {
+      var desc = _getDescriptor(slug);
+      if (desc) {
+        return {
+          tier: (desc.backing === 'learn') ? 'T2' : 'T3',
+          descriptor: desc
+        };
+      }
+      return null;   // genuinely-unknown slug ONLY (not in REGISTRY, not in descriptors) -> RECIPE_NOT_FOUND (correct)
+    }
 
     // HEAL-03 / D-11: a SESSION-quarantined bundled slug is SKIPPED -> return null so
     // the router falls through to the next tier / the DOM fallback. This sits AFTER
