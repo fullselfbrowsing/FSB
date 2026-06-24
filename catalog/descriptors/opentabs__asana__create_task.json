@@ -1,0 +1,66 @@
+{
+  "slug": "asana.create_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "create a task in asana",
+    "create task in asana",
+    "create a new task in asana",
+    "create task on asana"
+  ],
+  "description": "Create a new task in Asana. Requires a name at minimum. Optionally set notes, assignee, projects, due date, and parent task.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task name/title"
+      },
+      "notes": {
+        "description": "Task notes/description",
+        "type": "string"
+      },
+      "assignee": {
+        "description": "User ID to assign the task to",
+        "type": "string"
+      },
+      "projects": {
+        "description": "List of project IDs to add the task to",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "workspace": {
+        "description": "Workspace ID the task belongs to",
+        "type": "string"
+      },
+      "due_on": {
+        "description": "Due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "parent": {
+        "description": "Parent task ID to create a subtask",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/create-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

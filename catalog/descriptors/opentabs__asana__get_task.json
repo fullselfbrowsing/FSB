@@ -1,26 +1,26 @@
 {
-  "slug": "todoist.get_task",
-  "service": "app.todoist.com",
+  "slug": "asana.get_task",
+  "service": "app.asana.com",
   "intentSynonyms": [
-    "get a task in todoist",
-    "get task in todoist",
-    "get a task by id in todoist",
-    "get task on todoist"
+    "get a task in asana",
+    "get task in asana",
+    "get a single task in asana",
+    "get task on asana"
   ],
-  "description": "Get detailed information about a specific Todoist task by its ID.",
+  "description": "Get a single task from Asana by its GID.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "task_id": {
+      "task_gid": {
         "type": "string",
         "minLength": 1,
-        "description": "Task ID to retrieve"
+        "description": "Task GID to fetch"
       }
     },
     "required": [
-      "task_id"
+      "task_gid"
     ],
     "additionalProperties": false
   },
@@ -28,7 +28,7 @@
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-    "sourcePath": "plugins/todoist/src/tools/get-task.ts",
+    "sourcePath": "plugins/asana/src/tools/get-task.ts",
     "license": "MIT",
     "signals": {
       "transportHelper": "api",

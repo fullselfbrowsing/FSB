@@ -2,11 +2,10 @@
   "slug": "todoist.delete_task",
   "service": "app.todoist.com",
   "intentSynonyms": [
-    "delete a task permanently in todoist",
-    "delete task on todoist",
-    "delete a task",
+    "delete a task in todoist",
     "delete task in todoist",
-    "delete a task permanently"
+    "delete a task permanently in todoist",
+    "delete task on todoist"
   ],
   "description": "Permanently delete a Todoist task by its ID. This action cannot be undone.",
   "actionVerb": "delete",

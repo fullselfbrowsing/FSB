@@ -2,11 +2,10 @@
   "slug": "todoist.create_task",
   "service": "app.todoist.com",
   "intentSynonyms": [
-    "create a new task in todoist",
-    "create task on todoist",
-    "create a task",
+    "create a task in todoist",
     "create task in todoist",
-    "create a new task"
+    "create a new task in todoist",
+    "create task on todoist"
   ],
   "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
   "actionVerb": "create",

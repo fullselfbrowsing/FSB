@@ -1,0 +1,45 @@
+{
+  "slug": "linear.create_comment",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create a comment in linear",
+    "create comment in linear",
+    "comment on an issue in linear",
+    "create comment on linear"
+  ],
+  "description": "Add a comment to a Linear issue. Requires the issue ID and the comment body.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issueId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue ID to comment on"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment body in markdown"
+      }
+    },
+    "required": [
+      "issueId",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

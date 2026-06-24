@@ -1,0 +1,48 @@
+{
+  "slug": "linear.list_issues",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list issues in linear",
+    "list issues with optional filters in linear",
+    "list issues on linear"
+  ],
+  "description": "List issues from Linear. Optionally filter by team, assignee, or state.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "teamId": {
+        "description": "Filter issues by team ID",
+        "type": "string"
+      },
+      "assigneeId": {
+        "description": "Filter issues by assignee user ID",
+        "type": "string"
+      },
+      "stateId": {
+        "description": "Filter issues by workflow state ID",
+        "type": "string"
+      },
+      "first": {
+        "description": "Maximum number of issues to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

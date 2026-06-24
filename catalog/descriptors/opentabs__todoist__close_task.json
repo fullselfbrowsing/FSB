@@ -2,11 +2,10 @@
   "slug": "todoist.close_task",
   "service": "app.todoist.com",
   "intentSynonyms": [
-    "complete a task in todoist",
-    "close task on todoist",
-    "close a task",
+    "close a task in todoist",
     "close task in todoist",
-    "complete a task"
+    "complete a task in todoist",
+    "close task on todoist"
   ],
   "description": "Close (complete) a Todoist task by its ID. The task is marked as done.",
   "actionVerb": "close",

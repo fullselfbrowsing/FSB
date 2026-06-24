@@ -1,0 +1,58 @@
+{
+  "slug": "asana.update_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "update a task in asana",
+    "update task in asana",
+    "update task on asana"
+  ],
+  "description": "Update an existing Asana task. Provide the task GID and any fields to change.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to update"
+      },
+      "name": {
+        "description": "New task name",
+        "type": "string"
+      },
+      "notes": {
+        "description": "New task notes/description",
+        "type": "string"
+      },
+      "assignee": {
+        "description": "User ID to reassign the task to",
+        "type": "string"
+      },
+      "completed": {
+        "description": "Mark the task completed or not",
+        "type": "boolean"
+      },
+      "due_on": {
+        "description": "New due date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/update-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

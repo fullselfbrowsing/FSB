@@ -8,6 +8,35 @@
   "pinnedAt": "2026-06-21T21:54:20Z",
   "apps": [
     {
+      "app": "asana",
+      "service": "app.asana.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/asana/",
+      "descriptors": [
+        "asana.create_task",
+        "asana.get_task",
+        "asana.list_tasks",
+        "asana.update_task"
+      ]
+    },
+    {
+      "app": "linear",
+      "service": "linear.app",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/linear/",
+      "descriptors": [
+        "linear.create_comment",
+        "linear.create_issue",
+        "linear.get_issue",
+        "linear.list_issues",
+        "linear.update_issue"
+      ]
+    },
+    {
       "app": "todoist",
       "service": "app.todoist.com",
       "source": "opentabs",

@@ -2,11 +2,9 @@
   "slug": "todoist.list_tasks",
   "service": "app.todoist.com",
   "intentSynonyms": [
-    "list tasks with optional filters in todoist",
-    "list tasks on todoist",
-    "list a tasks",
     "list tasks in todoist",
-    "list tasks with optional filters"
+    "list tasks with optional filters in todoist",
+    "list tasks on todoist"
   ],
   "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
   "actionVerb": "list",

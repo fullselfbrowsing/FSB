@@ -2,11 +2,10 @@
   "slug": "todoist.reopen_task",
   "service": "app.todoist.com",
   "intentSynonyms": [
-    "reopen a completed task in todoist",
-    "reopen task on todoist",
-    "reopen a task",
+    "reopen a task in todoist",
     "reopen task in todoist",
-    "reopen a completed task"
+    "reopen a completed task in todoist",
+    "reopen task on todoist"
   ],
   "description": "Reopen a previously completed Todoist task by its ID.",
   "actionVerb": "reopen",

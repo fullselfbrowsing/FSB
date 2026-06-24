@@ -1,0 +1,48 @@
+{
+  "slug": "asana.list_tasks",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "list tasks in asana",
+    "list tasks with optional filters in asana",
+    "list tasks on asana"
+  ],
+  "description": "List tasks from Asana. Optionally filter by project, assignee, or workspace.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "description": "Filter tasks by project ID",
+        "type": "string"
+      },
+      "assignee": {
+        "description": "Filter tasks by assignee user ID",
+        "type": "string"
+      },
+      "workspace": {
+        "description": "Workspace ID to scope the listing",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of tasks to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/list-tasks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

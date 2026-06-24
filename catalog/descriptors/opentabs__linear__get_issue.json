@@ -1,0 +1,39 @@
+{
+  "slug": "linear.get_issue",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get a issue in linear",
+    "get issue in linear",
+    "get a single issue in linear",
+    "get issue on linear"
+  ],
+  "description": "Get a single issue from Linear by its ID or identifier.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issueId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue ID or identifier (e.g. ENG-123) to fetch"
+      }
+    },
+    "required": [
+      "issueId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}
