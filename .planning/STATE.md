@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: Completed 35-03-PLAN.md (posture-B sensitive-write re-gate, DENY-04) — Phase 35 all 4 plans complete
-last_updated: "2026-06-24T16:45:50.914Z"
-last_activity: 2026-06-24 -- Phase 36 planning complete
+stopped_at: Completed 36-01-PLAN.md (OpenTabs importer + flat emit + reconciled snapshot, CGEN-01)
+last_updated: "2026-06-24T17:05:29.822Z"
+last_activity: 2026-06-24
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State
@@ -30,12 +30,12 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 ## Current Position
 
-Phase: 36 of 43 (Codegen Pipeline + No-Dead-Entry Resolution) — not started
-Plan: —
+Phase: 36 (Codegen Pipeline + No-Dead-Entry Resolution) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-24 -- Phase 36 planning complete
+Last activity: 2026-06-24
 
-Progress: [█░░░░░░░░░] 11% (1/9 phases)
+Progress: [█████████░] 88%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -101,6 +101,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 35]: Phase 35-04: docs/LEGAL.md Categorization Axes subsection names three distinct criteria (finance/gov denial; ToS-hostility denial with the named roster robinhood..onlyfans; sensitivity Ask/mutating-gated with IG/FB/TikTok/X sensitive-not-denied), building on the 68ceea90 opt-out posture.
 - [Phase 35]: Phase 35-02 (DENY-03): the fail-closed classification gate scripts/verify-classification-gate.mjs DUAL-EXPORTS classifyGate(items, opts) (the Phase-36 importer imports it and calls it BEFORE emitting any descriptor JSON) + a CLI chained into validate:extension (-> ci) and npm test. classifyGate consults service-denylist.js classify(); an origin tripping a sensitivity axis but NOT classified denied/sensitive fails the build naming the offender + axis. The heuristic uses brand+category tokens (35-RESEARCH Q3) but DELIBERATELY omits over-generic words (a bare message/inbox/notification) so the benign already-shipped descriptors (reddit.inbox, github.notifications, slack/notion reads) are not false-failed; the SAFE_ALLOWLIST override is a classifyGate parameter (opts.safeAllowlist), not a module constant, so Phase 36 can pass a curated allowlist programmatically. Proven by catalog/descriptors/_fixtures/unclassified-sensitive.fixture.json (pay.unclassified-fixture.test) which the CLI rejects when exposed to the corpus and which _fixtures/ keeps out of the shipped catalog.
 - [Phase 35]: Phase 35-03 (DENY-04): posture-B step-(3.5) re-gate live in _evaluateConsent, scoped to classify(origin).sensitive===true. A sensitive-origin WRITE without the per-origin mutating flag returns RECIPE_CONSENT_MUTATING_REQUIRED (recovered byte-exact from 68ceea90^, emitted via the dual-field _err so code===errorCode===error holds INV-03 across the 7 universal-provider targets); reads pass under Auto everywhere, non-sensitive writes pass, the per-origin mutating flag elevates the sensitive write back to allow. Narrows the 68ceea90 opt-out base, does not revert it. Decision label 'mutating_required' (the invoke caller only checks decision !== 'allow').
+- [Phase 36]: Phase 36-01 (CGEN-01): scripts/import-opentabs-catalog.mjs (tsx) imports vendored OpenTabs todoist metadata via a hermetic sdk-stub + transport stub (Wall 1: import() never touches the real SDK DOM/fetch); FLAT emit opentabs__<svc>__<op>.json closed-params (z.toJSONSchema additionalProperties:false default, $schema stripped) + provenance{sha 4b170216,sourcePath,license,signals}; classifyGate() after Denylist.load() BEFORE write; recursive Wall-1 pre-scan (script/expr/transform/code/fn/js at any depth); side-effect verb-map+GraphQL-carve-out+override fail-safe-high MAX with signals persisted for Plan-03. service=app.todoist.com benign, slug stem todoist. zod/tsx/sdk devDeps only (jiti excluded). Snapshot 8->15 descriptors INV-01 byte-stable (+390/-0). package.json registers 7 phase tests + crosscheck as passing stubs.
 
 ### Pending Todos
 
@@ -133,8 +134,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T15:30:25.370Z
-Stopped at: Completed 35-03-PLAN.md (posture-B sensitive-write re-gate, DENY-04) — Phase 35 all 4 plans complete
+Last session: 2026-06-24T17:05:03.871Z
+Stopped at: Completed 36-01-PLAN.md (OpenTabs importer + flat emit + reconciled snapshot, CGEN-01)
 Resume file: None
 
 ## Next Actions
