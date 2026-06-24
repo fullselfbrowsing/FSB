@@ -86,7 +86,11 @@
   2. The apps are imported as a category batch and the merge carries a denylist-coverage assertion (DENY-03) — establishing the "import in category batches ordered least-sensitive → most-sensitive, each gated on its origins being classified" rule that Phases 38-39 inherit.
   3. Each imported descriptor carries an invocability/backing-status signal (recipe / handler / learn-pending / DOM) so a user or agent can distinguish day-one-invocable apps from discovery-pending ones, and `search_capabilities` annotates by it (no confident invocable hit for a pending-only descriptor).
   4. The crosscheck CI gate and the eval harness stay green on the growing corpus; the descriptor-only → T3/T2 fallback is verified for this batch.
-**Plans**: TBD
+**Plans**: 4 plans (4 waves -- sequential; each sub-batch regenerates the shared catalog snapshot)
+  - [ ] 37-01-PLAN.md — Breadth contract machinery (importer batch-enumeration + MED-03 synonym fix + backing-status enum + search annotation + merge-time classifyGate batch gate) + vendor linear/asana + Wave-0 proof tests [wave 1] (BRDTH-01/02/03)
+  - [ ] 37-02-PLAN.md — Vendor clickup/jira/confluence/airtable (data-only, reuses the contract) + regen snapshot + extend eval [wave 2] (BRDTH-01)
+  - [ ] 37-03-PLAN.md — Vendor gitlab/bitbucket/vercel/netlify (data-only) + regen snapshot + extend eval [wave 3] (BRDTH-01)
+  - [ ] 37-04-PLAN.md — Vendor cloudflare/circleci/datadog/sentry/posthog (data-only) + regen snapshot + re-assert crosscheck/no-dead-entry/eval/cold-start over the complete batch [wave 4] (BRDTH-01)
 
 ### Phase 38: Breadth B — Comms / Social / Content (sensitivity-screened)
 **Goal**: Extend the Phase-37 breadth contract to the comms / social / content apps — the first batch where ToS-hostility and write-sensitivity bite — importing each app's descriptors only after Phase 35 covers its origin, and routing ToS-hostile apps to DOM-only/denied rather than API-invocable.
@@ -156,7 +160,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 |-------|----------------|--------|-----------|
 | 35. Denylist Expansion + Import-Time Classification Gate | 4/4 | Complete    | 2026-06-24 |
 | 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete    | 2026-06-24 |
-| 37. Breadth A — Dev / Productivity | 0/TBD | Not started | - |
+| 37. Breadth A — Dev / Productivity | 0/4 | Planned | - |
 | 38. Breadth B — Comms / Social / Content | 0/TBD | Not started | - |
 | 39. Breadth C — Commerce / Travel / Misc | 0/TBD | Not started | - |
 | 40. Depth 1 — Top READ Hand-Ports | 0/TBD | Not started | - |

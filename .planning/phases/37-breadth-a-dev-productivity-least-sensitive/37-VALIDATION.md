@@ -1,9 +1,9 @@
 ---
 phase: 37
 slug: breadth-a-dev-productivity-least-sensitive
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: planned
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-06-24
 ---
 
