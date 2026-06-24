@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: executing
-stopped_at: Completed 36-03-PLAN.md (descriptor-vs-derived side-effect cross-check gate, CGEN-02)
-last_updated: "2026-06-24T17:22:41.242Z"
+status: verifying
+stopped_at: Completed 36-04-PLAN.md (catalog inlining shape-lock + smoke eval re-pass + cold-start budget, CGEN-04) -- Phase 36 all 4 plans executed
+last_updated: "2026-06-24T17:34:24.922Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 10
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 9
+  completed_plans: 10
   percent: 100
 ---
 
@@ -32,7 +32,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 36 (Codegen Pipeline + No-Dead-Entry Resolution) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-24
 
 Progress: [██████████] 100%
@@ -104,6 +104,8 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 36]: Phase 36-01 (CGEN-01): scripts/import-opentabs-catalog.mjs (tsx) imports vendored OpenTabs todoist metadata via a hermetic sdk-stub + transport stub (Wall 1: import() never touches the real SDK DOM/fetch); FLAT emit opentabs__<svc>__<op>.json closed-params (z.toJSONSchema additionalProperties:false default, $schema stripped) + provenance{sha 4b170216,sourcePath,license,signals}; classifyGate() after Denylist.load() BEFORE write; recursive Wall-1 pre-scan (script/expr/transform/code/fn/js at any depth); side-effect verb-map+GraphQL-carve-out+override fail-safe-high MAX with signals persisted for Plan-03. service=app.todoist.com benign, slug stem todoist. zod/tsx/sdk devDeps only (jiti excluded). Snapshot 8->15 descriptors INV-01 byte-stable (+390/-0). package.json registers 7 phase tests + crosscheck as passing stubs.
 - [Phase ?]: Phase 36-02 (CGEN-03): resolve() gains the single descriptor-only no-dead-entry fallback -- a searchable slug (in FsbRecipeIndex.descriptors, no REGISTRY handler, no recipe) returns {tier: backing===learn ? T2 : T3, descriptor} (NO recipe field) via _getDescriptor (a typeof-guarded direct read of FsbRecipeIndex.descriptors, Option A, one file); a genuinely-unknown slug still returns null. EXACT T2/T3 literals route through the UNCHANGED router switch to RECIPE_LEARN_PENDING / RECIPE_DOM_FALLBACK_PENDING (zero router edits). no-dead-entry.test.js asserts the invariant over the REAL emitted todoist corpus (9/0); the router test (46/0) drives the REAL resolve() through invoke proving a descriptor-only slug never returns RECIPE_NOT_FOUND.
 - [Phase 36]: Phase 36-03 (CGEN-02): verify-catalog-crosscheck.mjs is the REAL fail-safe-high derived-vs-declared gate (replaces the Plan-01 stub). deriveClass(signals,slug) MAX-merges (read<write<destructive) the GraphQL/RPC carve-out (FIRST; transport graphql/gql/rpc -> method uninformative -> classify by op-name verb; ambiguous -> write; NEVER auto-read), the named-verb helper (apiGet/apiPost/apiPut/apiPatch/apiDelete), the generic api({method}) literal (GET->read/POST,PUT,PATCH->write/DELETE->destructive), the op-name verb, and an UPGRADE-only override-table FLOOR (void_invoice/delete_customer/cancel_subscription/refund_charge/delete_record/archive_project->destructive; merge_pull_request->write; keyed by op-name OR slug-suffix so a known-destructive op with NO signals is still caught). crossCheck(descriptors)->{failures} FAILS the build when declared < derived (under-states a destructive op); over-stating is the safe direction (no failure). Dual-exported crossCheck+deriveClass (importer may call inline) + CLI chained into validate:extension AFTER verify-classification-gate.mjs. The real 7-descriptor todoist corpus passes (no 36-01 mis-class). Sample test (tests/catalog-crosscheck.test.js, via the REAL crossCheck export): void_invoice/archiveIssue (declared read) FAIL; delete_customer/linear.issues (declared destructive/read) PASS -- proving a GraphQL POST is never classed read. package.json untouched (Plan-01 stubs already chain it).
+- [Phase 36]: Phase 36-04 (CGEN-04): Plan 04 is a VERIFIER -- tests/catalog-inline-shape.test.js reads/asserts the Plan-01-committed recipe-index.generated.js (IIFE wrapper + global.FsbRecipeIndex=DATA + module.exports dual-export tail structurally byte-stable via regex NOT byte-diff so the 8->15 descriptor growth does not falsely red; all 7 todoist slugs inlined; in-memory readJsonDir+IIFE regen reproduces the committed bytes EXACTLY proving idempotent restore-not-rebuild WITHOUT rewriting the file; djb2 _computeCatalogVersion deterministic over the same corpus + shifts on a slug-set change). It never lists the snapshot in files_modified, never regenerates-and-commits it, never asserts a pre-emit baseline; confirmed git-clean before+after the end-to-end package-extension.mjs idempotency verify.
+- [Phase 36]: Phase 36-04 (CGEN-04): head-handler-cap.test.js parses HEAD_HANDLER_MODULES from capability-catalog.js SOURCE (it is a private var, not exported) and asserts length<=30 (==3 today: github/slack/notion) -- the stronger freeze that locks the source declaration the head is built against, immune to runtime registration. Smoke eval re-pass uses _fixtures/-only descriptor-only near-neighbors (7 todoist ops + asana create/list + linear create -> cross-app create_* wrong-invoke pressure) with NO seed-recipes added; the existing harness re-passes recall@5=1.000 wrong-invoke=0.000 over 58 fixtures and the +2 cold-start asserts (serialized 9.9KB<50KB; loadJSON+first-search 0.58ms<10ms) prove the SCALE-01 data-layout (params NOT indexed/stored) before breadth lands. _fixtures excluded by readJsonDir non-recursion so the shipped snapshot + validate:extension stay green.
 
 ### Pending Todos
 
@@ -136,8 +138,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T17:22:07.712Z
-Stopped at: Completed 36-03-PLAN.md (descriptor-vs-derived side-effect cross-check gate, CGEN-02)
+Last session: 2026-06-24T17:34:24.916Z
+Stopped at: Completed 36-04-PLAN.md (catalog inlining shape-lock + smoke eval re-pass + cold-start budget, CGEN-04) -- Phase 36 all 4 plans executed
 Resume file: None
 
 ## Next Actions
