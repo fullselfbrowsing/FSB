@@ -1,28 +1,94 @@
 # Feature Research
 
-**Domain:** Authenticated-API-through-the-session agent capabilities (MV3 Chrome extension + MCP), parity-plus vs OpenTabs, for FSB v0.9.99 Native Capability Catalog
-**Researched:** 2026-06-19
-**Milestone:** v0.9.99 Native Capability Catalog (FSB API Execution)
-**Confidence:** HIGH (OpenTabs feature surface, Claude Code Tool Search mechanics, CSRF/session-replay security, self-healing fallback benchmarks all verified against primary/multiple sources; exact live plugin/tool counts are point-in-time and noted as such)
+**Domain:** Authenticated-API capability catalog (FSB v1.0.0 "Full App Catalog / OpenTabs Parity") — porting OpenTabs' 119-app / 2,523-op surface onto FSB's fixed closed-vocabulary recipe interpreter + bundled-head architecture.
+**Researched:** 2026-06-23
+**Confidence:** HIGH for the auth taxonomy and tier mapping (grounded in 20 OpenTabs `*-api.ts` files read directly from `github.com/opentabs-dev/opentabs@main`, plus the FSB slack handler + recipe-index as the FSB-side anchor). MEDIUM for the per-app value ranking (op-count is verified; "where FSB users live" is a product judgement). HIGH for the anti-feature/denylist (ToS + sensitivity are categorical, not speculative).
 
-> **Note:** This file replaces the earlier v0.11.0 Trigger Tool FEATURES research, which is archived in the v0.11.0 milestone snapshot.
+> Supersedes the prior v0.9.99 FEATURES.md (archived milestone). This file is the active v1.0.0 catalog research.
 
-## Context: What This Milestone Is
+---
 
-FSB already does DOM-based AI browser automation (55 canonical / 63 MCP tools, autopilot, memory, vault, site guides). The new capability is a **fast path**: have the AI call a service's *real web API* through the user's already-authenticated browser session (the "OpenTabs idea") instead of clicking the UI — while keeping the DOM engine as a self-healing fallback.
+## TL;DR for the roadmapper
 
-The decided architecture is the spec to validate against:
-- **Lean MCP dispatcher** — `search_capabilities` + `invoke_capability` (progressive disclosure) so a catalog of thousands of capabilities never bloats the MCP tool list.
-- **In-extension capability runtime** — authenticated *same-origin* `fetch` (FSB already holds `debugger` + `<all_urls>` + `execute_js` MAIN-world), plus a fixed bundled interpreter.
-- **MV3-safe code/data split** — bundled imperative handlers for the hard/popular head; **server-delivered DECLARATIVE recipes (data, not code)** for the long tail (MV3 bans remotely-hosted code).
-- **CDP network-capture discovery** — observe a page's real API calls to learn capabilities.
-- **Learned recipes** promoted into procedural memory; auto-growing per-origin catalog.
-- **API→DOM self-healing fallback.**
-- **Per-origin Off/Ask/Auto consent + audit log + default-off.**
+1. **The whole catalog (119 apps) is "table stakes" only as DESCRIPTORS.** Breadth = codegen descriptors so every app returns from `search_capabilities`. That is cheap and uniform. It does NOT mean every app is invocable on day one.
+2. **Invocability splits by AUTH STRATEGY, and the discriminator is brutally simple for FSB:** *does the app call its OWN first-party origin, or a SEPARATE API origin?* FSB's Wall 2 is a MAIN-world `fetch()` with `credentials:'include'` — **identical** to OpenTabs' `fetchFromPage` (verified: `platform/plugin-sdk/src/fetch.ts` is a plain page-context fetch, NO background proxy). So FSB inherits OpenTabs' CORS reality exactly. Apps that hit a separate API origin only work if that origin returns permissive `access-control-allow-credentials: true` + a matching `allow-origin` — most do NOT.
+3. **Recommended depth shortlist = 22 apps** (detailed below), biased to dev/PM/cloud/observability, ranked by value × feasibility. The cheapest wins are same-origin-cookie apps with a CSRF/preloaded-token read from a meta tag or `window` global.
+4. **Denylist must land FIRST** (it already does in the milestone plan). ~18 apps are ToS-hostile or sensitivity-critical (banking, brokerage, health-adjacent, dating, DRM-streaming, anti-automation social). These get `deniedOrigins`; a wider sensitive set gets `sensitiveOrigins` (Ask-gated, never Auto).
 
-The headline strategy: **do everything OpenTabs does AND be better** (self-healing, learned/auto-growing catalog, standalone-capable, zero-install).
+---
 
-This document classifies the feature surface into table-stakes / differentiators / anti-features, notes complexity, maps dependencies onto existing FSB subsystems, and gives an explicit OpenTabs parity matrix.
+## Grounding: the 5 real auth patterns observed in OpenTabs source
+
+Every app I inspected collapses into one of these. The FSB tier follows mechanically from which one it is. Citations are the app's `src/<app>-api.ts` at `opentabs-dev/opentabs@main`.
+
+### Pattern A — Same-origin cookie, GET, no token (pure T1b recipe)
+The web app calls its OWN origin; HttpOnly session cookie rides automatically; reads need no CSRF. This is the *only* pattern expressible as a closed-vocabulary FSB **recipe** (data, no code).
+
+- **netlify** (`netlify-api.ts`): `API_BASE = '/access-control/bb-api/api/v1'` (same-origin), auth detected via non-HttpOnly `_nf-auth-hint` cookie; `fetchJSON` default `credentials:'include'`. *"no explicit token needed."*
+- **reddit** (already FSB T1b): `/message/unread.json` same-origin.
+- **github notifications** (already FSB recipe): `/notifications` with `Accept: application/json`.
+- **shortcut** (`shortcut-api.ts`): `/backend/api/v3${endpoint}` same-origin, *"documented public API, same-origin with session cookies."*
+
+> FSB mapping: **T1b same-origin-cookie recipe.** GET-only ops. Zero hand-code. These are the long-tail freebies — but note the *write* side of even these apps usually needs a CSRF token (Pattern B), so a given app is often "T1b for reads, T1a for writes."
+
+### Pattern B — Same-origin cookie + scraped CSRF/anti-forgery token (T1a handler)
+Reads ride the cookie; writes need a token the closed recipe schema can't express (it must be SCRAPED live from a meta tag, `window` global, or localStorage, then placed in a header or body). This is the github/notion precedent and the bulk of the high-value head.
+
+- **github** (`github-api.ts`): auth via `<meta name="user-login">`; CSRF from `input[name="authenticity_token"]`; `/_graphql` persisted queries + `{meta,payload}` page-JSON + Turbo-Frame Relay extraction. (This is exactly FSB's existing github head.)
+- **gitlab** (`gitlab-api.ts`): auth via `window.gon.current_username`; CSRF from `<meta name="csrf-token">`; same-origin `/api/v4`.
+- **jira** (`jira-api.ts`): auth via `<meta name="ajs-atlassian-account-id">` + `ajs-cloud-id`; same-origin `/rest/api/3`.
+- **confluence** (`confluence-api.ts`): same Atlassian meta-tag pattern (`ajs-*`), `credentials:'include'`.
+- **datadog** (`datadog-api.ts`): CSRF in **localStorage** `dd-csrf-token` (JSON `{token,timestamp}`), *rotates* — read fresh every call; sent as `x-csrf-token`/`x-dd-csrf-token` header AND `_authentication_token` body field. Same-origin.
+- **sentry** (`sentry-api.ts`): org slug from subdomain/path; `sentry-sc` non-HttpOnly CSRF cookie → `X-CSRFToken` header for writes; same-origin.
+- **cloudflare** (`cloudflare-api.ts`): same-origin `/api/v4`; `x-atok` header from `window.bootstrap.atok` (timestamp-prefixed, refreshes per page load — read live); *"Cross-origin requests to api.cloudflare.com are blocked by CORS."* (explicit confirmation of the FSB-forbidden pattern).
+- **airtable** (`airtable-api.ts`): `window.initData.csrfToken` + `sessionUserId`; same-origin `/v0.3/`; `_csrf` body field.
+- **linkedin** (`linkedin-api.ts`): CSRF = the `JSESSIONID` cookie value itself, sent as `csrf-token` header; same-origin voyager/graphql.
+- **x / twitter** (`x-api.ts`): `ct0` cookie → `x-csrf-token`; **static public bearer** embedded in the JS bundle (same for all users) → `authorization` header; same-origin `x.com/i/api/graphql`. (Mechanically portable, but see anti-features — ToS-hostile.)
+
+> FSB mapping: **T1a bundled handler** (the slack.js shape). The handler does a `from:'response'` scrape to get the token, then `executeBoundSpec` against the first-party origin. This is the proven github/notion/slack pattern.
+
+### Pattern C — Split-token / webpack-extracted / WebSocket-captured token (T1a handler, hard)
+The token is not in a cookie or a tidy global — it's split across cookie+body, or buried in the SPA's internal module registry, or only emitted on a WebSocket auth frame. Still same-origin for transport, but extraction is bespoke and brittle.
+
+- **slack** (FSB's existing head): `xoxc` token scraped from page state → request **body** (not header); `xoxd` HttpOnly cookie rides automatically. *Body placement is load-bearing.*
+- **discord** (`discord-api.ts`): token extracted from **Discord's webpack module registry** via a `getToken()` probe across the module cache. Extremely brittle (breaks on every bundler reshuffle).
+- **clickup** (`clickup-api.ts`): JWT captured from the **WebSocket auth frame** (`{method:'auth', token}`), stashed on `globalThis.__cu_captured_jwt`; `apiUrlBase` from `cuHandshake` localStorage. Requires observing a live WS — not a simple fetch.
+- **stripe** (`stripe-api.ts`): `window.PRELOADED.session_api_key` (Bearer) + `PRELOADED.csrf_token` + merchant id; same-origin `/v1` proxy; *"dashboard's Service Worker normally injects this token, but adapter code must add it explicitly."* Portable but multi-field.
+- **chatgpt** (`chatgpt-api.ts`): access token requires an **async fetch** to `/api/auth/session` first, then Bearer to `/backend-api`. Two-step, same-origin.
+
+> FSB mapping: **T1a handler if same-origin and the extraction is a stable scrape** (slack, stripe, chatgpt). **T2/T3-only if extraction needs webpack-internals or a live WebSocket** (discord, clickup) — those are too fragile to hand-port and should be left to learned discovery / DOM fallback.
+
+### Pattern D — SEPARATE API origin + bearer from localStorage (T1a *only if* CORS permits; else FSB-FORBIDDEN → T2/T3)
+The app reads a bearer/access token from localStorage and posts it to a DIFFERENT origin than the page. **This is the critical FSB feasibility cliff.** OpenTabs' `fetchFromPage` is a page-context fetch, so this only works when the API origin sends `access-control-allow-credentials: true` + a matching `allow-origin`. FSB inherits the same constraint — there is NO background-proxy escape hatch (the milestone context's "separate-origin public API is FORBIDDEN" rule = this CORS reality).
+
+- **linear** (`linear-api.ts`): GraphQL at `https://client-api.linear.app/graphql` (separate subdomain from `linear.app`). **OpenTabs documents the CORS allowance explicitly**: *"access-control-allow-origin: https://linear.app; access-control-allow-credentials: true … in-page fetch() with credentials:'include' sends the HttpOnly cookies automatically. No fetchViaBackground needed."* Bearer-less; needs `useraccount`/`user`/`organization` headers read from `localStorage.ApplicationStore`. **→ FEASIBLE for FSB** because the cross-origin CORS is permissive *and* FSB pins the page origin to `linear.app`.
+- **supabase** (`supabase-api.ts`): `https://api.supabase.com/v1`; Bearer from `localStorage['supabase.dashboard.auth.token']`. Separate origin. Works in OpenTabs only if api.supabase.com allows the dashboard origin with credentials. **→ VERIFY CORS before porting**; treat as conditional.
+- **robinhood** (`robinhood-api.ts`): FOUR separate origins (`api.`/`bonfire.`/`nummus.`/`dora.robinhood.com`); Bearer from `localStorage['web:auth_state']`. **→ DENYLIST anyway (brokerage), moot.**
+- **asana** (`asana-api.ts`): `https://app.asana.com/api/1.0` — same registrable origin as the app (app.asana.com), cookie-based, `credentials:'include'`. **→ effectively Pattern B, FEASIBLE.**
+- **figma** (`figma-api.ts`): `https://www.figma.com/api` — same-origin as the app; cookie-based (`__Host-figma.authn-state`). **→ Pattern B, FEASIBLE.**
+
+> FSB mapping: **Per-app CORS check is mandatory.** Same-registrable-origin (asana, figma, x) → T1a. Separate origin WITH documented permissive CORS (linear) → T1a. Separate origin without it (most "public API" subdomains) → **FSB-FORBIDDEN, demote to T2-learned/T3-DOM.** The roadmap MUST NOT assume an app is portable just because OpenTabs ships it — OpenTabs' own success depends on the same CORS gate. Linear is the proof that "separate origin" ≠ "impossible," but it's the exception that documents its own CORS, not the rule.
+
+### Pattern E — Host-SDK trampoline (`gapi.client.request`) (T1a handler, Google-specific)
+Google properties don't expose a clean REST surface to scrape; instead the page loads `gapi` and you call through `window.gapi.client.request`. Same-origin-ish but you're invoking the page's own SDK function, not issuing your own fetch.
+
+- **google-calendar / google-docs / google-drive** (`*-api.ts`): all gate on `window.gapi.client.request`; `API_BASE` like `/calendar/v3`, `/drive/v3`; auth presence via `SAPISID` cookie + gapi-ready. Calling requires invoking the page global, not a bare fetch.
+
+> FSB mapping: **T1a handler that bridges to the page's `gapi.client.request` via the MAIN-world.** FSB already runs MAIN-world JS (it has `execute_js` + `<all_urls>`), so this is feasible but is a distinct handler shape from the fetch-based ones — budget extra design. Google apps are high value (calendar/docs/drive) and worth the special case.
+
+---
+
+## Auth-strategy → FSB-tier taxonomy (the deliverable)
+
+| Auth pattern (observed) | Transport origin | Token source | FSB tier | Codegen-able as DATA recipe? | Example apps |
+|---|---|---|---|---|---|
+| **A. Cookie-only GET** | first-party (same-origin) | none (cookie) | **T1b recipe** | **YES** (closed-vocab) | netlify (reads), reddit, github-notifications, shortcut (reads) |
+| **B. Cookie + scraped CSRF** | first-party (same-origin) | meta tag / `window` global / localStorage / cookie-as-CSRF | **T1a handler** | No (scrape = code) | github, gitlab, jira, confluence, datadog, sentry, cloudflare, airtable, linkedin, asana, figma |
+| **C. Split / webpack / WS token** | first-party (same-origin) | request-body split, webpack registry, WS frame | **T1a (if stable scrape) / T2-T3 (if webpack/WS)** | No | slack, stripe, chatgpt *(T1a)*; discord, clickup *(T2/T3)* |
+| **D. Separate API origin + bearer** | **cross-origin** | localStorage bearer | **T1a ONLY if CORS permits + origin-pinned; else FSB-FORBIDDEN → T2/T3** | No | linear *(feasible, documented CORS)*; supabase *(verify)*; robinhood *(denylist)* |
+| **E. Host-SDK trampoline** | first-party via `gapi` | page SDK | **T1a (gapi-bridge handler)** | No | google-calendar, google-docs, google-drive |
+
+**Rule of thumb for the generator:** default every imported descriptor to **T2/T3-discoverable** (learned/DOM). PROMOTE to T1b recipe only if the op is a same-origin GET with no token. PROMOTE to T1a only for the hand-ported shortlist below. This keeps Wall 1 intact (recipes stay pure data; anything needing a scrape is compiled code in the head, never shipped as recipe data).
 
 ---
 
@@ -30,181 +96,142 @@ This document classifies the feature surface into table-stakes / differentiators
 
 ### Table Stakes (Users Expect These)
 
-These define the category. An "authenticated-API agent" that lacks any of these feels broken or unsafe. OpenTabs has all of them; FSB must match to claim parity.
+For a "full app catalog" milestone, the table stakes are about *coverage + discoverability + safety*, not about every app being deeply wired.
 
-| Feature | Why Expected | Complexity | Notes / FSB dependency |
-|---------|--------------|------------|------------------------|
-| **Authenticated same-session API call** ("call the API the frontend calls, no API keys, no OAuth") | The entire value prop. If you're logged in, the agent should reuse the session. | HIGH | Core primitive. Build on `execute_js` MAIN-world `fetch` (confirmed: `tool-executor.js:374` runs `chrome.scripting.executeScript({world:'MAIN'})`). Same-origin fetch in the page context inherits cookies + CSRF tokens + custom auth headers automatically. **This is the safer subset** of OpenTabs' model (see anti-features). |
-| **Lean tool surface / progressive disclosure** (`search_capabilities` → `invoke_capability`) | A catalog of ~2,000–2,800 tools cannot be front-loaded into MCP context; loading 167 tools already costs ~60K tokens. Tool-selection accuracy collapses (43%→<14%) when the menu is too long. | HIGH | The defining constraint. Maps to INV-01/INV-02 (keep ~63 tools byte-stable, add ~2). Mirrors Claude Code's Tool Search: lazy schema loading, search returns schema-on-hit, 3–5 tools/query. See "Search→Invoke Pattern" section. Dependency: MCP dispatcher (`ws/mcp-tool-dispatcher.js`), tool registry. |
-| **Schema-on-hit** (search returns the callable schema, not just a name) | A search that returns only tool names forces a second "describe" round-trip; agents need the parameter schema to invoke. | MEDIUM | Return the invoke schema in the `search_capabilities` hit payload (Anthropic Tool Search loads "3–5 relevant tools (~3K tokens) per query"). Avoids an extra round-trip. |
-| **Per-origin / per-capability permission model (Off / Ask / Auto)** | Replaying a user's auth against real APIs is a write-capable, money-capable action. Users must gate it. OpenTabs ships exactly this 3-tier model. | MEDIUM | Maps to FSB's "consent governance" requirement. New per-origin permission store in `chrome.storage.local`. Reuse the consent/confirmation UX already used by `use_payment_method`. |
-| **Default-off / nothing runs until enabled** | "Everything starts off. No tool executes until you explicitly enable it." Safety baseline for the whole category. | LOW | Default state = Off for every origin. Aligns with FSB's "supervised/safe" positioning and INV-04. |
-| **Audit log** ("what ran, when, whether it succeeded") | Users replaying auth need a record. OpenTabs: "Every tool call is logged." | LOW–MEDIUM | FSB already has session logs + `get_logs` + observability tools (`list_sessions`, `get_session_detail`). Extend to record capability invocations (origin, capability, args-redacted, outcome). |
-| **Runs locally / no cloud for execution** | Trust requirement: the session and secrets never leave the machine. OpenTabs: "Runs locally. No cloud." | LOW | FSB already executes in-browser; only recipe *definitions* stream from FSB's server (data, not secrets). Make this boundary explicit in docs. |
-| **Built-in browser tools available without a plugin** (read/click/type/screenshot/network) | OpenTabs ships these so any tab works even with no plugin. Without a universal fallback the catalog has dead zones. | NONE (already shipped) | **FSB already exceeds this** — 55/63 tools incl. `click`, `type_text`, `read_page`, `get_dom_snapshot`, `execute_js`, CDP coordinate tools. This is FSB's existing moat, not new work. |
-| **Capability/plugin discovery** ("point the AI at a site, it finds the API") | OpenTabs' growth engine. Users expect the catalog to expand to sites you didn't pre-build. | HIGH | Maps to FSB's "CDP network-capture discovery." Dependency: `chrome.debugger` (already attached for CDP Input — confirmed `background.js:13811`). Add `Network.enable` + `requestWillBeSent`/`responseReceived`/`getResponseBody` capture. |
-| **Works with any MCP client** | OpenTabs and FSB both target the MCP ecosystem. | NONE (already shipped) | FSB MCP server already supports 21 client targets. New tools inherit this. |
-| **Result returns structured data, not a screenshot** | The whole point of API path vs DOM path: clean JSON back to the agent. | LOW | `invoke_capability` returns the parsed API response. Trivial once the fetch primitive exists. |
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| All 119 apps return from `search_capabilities` (descriptor import) | "OpenTabs parity" means the app is *findable*; a missing app reads as "FSB can't do X" | MEDIUM | Codegen descriptors (slug, service, intent synonyms, action verb, side-effect class, params JSON-Schema) from OpenTabs manifests. Scale `recipe-index.generated.js` from ~10 to ~2,523 descriptors with a stable `catalogVersion`. Search index (minisearch) must stay performant at thousands of docs (SURF-04 precedent). |
+| Per-op `sideEffectClass` (read/write) on every descriptor | The consent gate + Auto/Ask/Off policy keys off side-effect class; a write mislabeled as read is a safety hole | MEDIUM | Derive from OpenTabs tool metadata (each `src/tools/<op>.ts` declares its mutation intent). Cross-check descriptor side-effect vs recipe at scale ("descriptor-vs-recipe side-effect cross-check"). |
+| Denylist covering ToS-hostile + sensitive apps, landing BEFORE any sensitive app is reachable under Auto | Shipping a finance/health/dating app reachable under the opt-out Auto default is a legal + trust failure | LOW (data) / HIGH (judgement) | Grow `extension/config/service-denylist.json` `deniedOrigins` + `sensitiveOrigins`. Sequenced first in the milestone. See anti-features. |
+| First-party origin-pin on every invocation | The whole security model (Pitfall-3 credential replay) depends on specs targeting the app's OWN origin so the right cookie attaches and no token leaks cross-origin | LOW | Already enforced by `executeBoundSpec` re-pin; descriptors must carry the correct `service`/origin. |
+| Scraped tokens never logged | github/slack/datadog all scrape secrets; one `console.log` of a token is a credential leak | LOW | `redactForLog` discipline already in slack.js; enforce in every new handler + the Node CI path-guard. |
+| MIT attribution / provenance per imported descriptor | OpenTabs is MIT; derived descriptors need attribution | LOW | Already in README Acknowledgements; add per-app provenance field. |
+| Seeded discovery for the non-ported tail (119 origins + endpoint hints) | Apps not in the depth head must still be *reachable* via the network-capture learner, consent-gated | MEDIUM | Seed origins + known endpoint hints so the learner reliably promotes T2 recipes. |
 
 ### Differentiators (Competitive Advantage)
 
-These are where FSB beats OpenTabs. They map 1:1 to the milestone's stated "be better" goals. Each should be called out explicitly in positioning.
+These are where FSB does something OpenTabs structurally *cannot*, and they should be foregrounded.
 
-| Feature | Value Proposition | Complexity | Notes / FSB dependency |
-|---------|-------------------|------------|------------------------|
-| **API→DOM self-healing fallback** | When a recipe breaks (endpoint changed, schema drift, 4xx), FSB silently drops to DOM automation + site guides and still completes the task. OpenTabs has **no UI fallback** — when its API call breaks, the tool is simply dead until someone re-builds the plugin. Industry data: locator fallback heals 40–70% of failures, intent-based healing 75–90%+. FSB already owns both layers. | MEDIUM | **The single biggest differentiator.** Dependency: existing DOM engine + 17-category site guides + autopilot `run_task`. The capability runtime needs a typed "recipe failed → escalate to DOM" path. Detection: HTTP status, response-shape mismatch, empty/error payloads. |
-| **Learned / auto-growing catalog via procedural memory** | Successful discovered calls get promoted into FSB procedural memory as reusable per-origin recipes. The catalog grows *automatically from real use* on the user's own machine, including private/internal tools, with **zero authoring**. OpenTabs auto-builds plugins too, but they're code artifacts a human reviews/publishes; FSB's learned recipes are declarative data that self-populate. | HIGH | Dependency: 3-type memory system (`lib/memory/`, `PROCEDURAL` type confirmed in `memory-schemas.js`) + memory consolidator + `search_memory`. Learned recipe = declarative record {origin, endpoint, method, param-mapping, auth-mode}. Feeds `search_capabilities`. |
-| **Zero-install / out-of-box catalog** | Popular capabilities ship **bundled in the extension**. No `npm install <plugin>` per service, no per-plugin toolchain. OpenTabs requires `opentabs plugin install <name>` (npm package per plugin) for anything beyond built-ins. FSB users get the head of the catalog on day one. | MEDIUM | Bundled imperative handlers compiled into the extension (the "hard/popular head"). Long tail streams as declarative recipes on demand. No per-capability install step. Optional explicit install via MCP command/control panel for power users. |
-| **MV3-safe declarative-recipe long tail (data, not code)** | The long-tail catalog ships as **declarative recipes interpreted by a fixed bundled interpreter** — legal under MV3 (which bans remotely-hosted code). OpenTabs' npm-package-per-plugin model is fundamentally a desktop/Node distribution; it cannot ship arbitrary new code into an MV3 extension. This is *how* FSB gets a big catalog while staying Web-Store-compliant. | HIGH | Dependency: a deterministic recipe interpreter (allowlisted ops: build URL, set headers from a fixed set, map params, parse response). The interpreter is fixed code; recipes are pure data. Carries INV-04 (MV3-survivability) directly. |
-| **Standalone-capable (catalog usable without external MCP host)** | FSB's own autopilot can drive capabilities via the same registry (INV-02 parity). OpenTabs is fundamentally a bridge that needs an external AI/MCP client (or its CLI) to do anything. FSB works as a self-contained agent *and* as an MCP server. | LOW–MEDIUM | Dependency: autopilot loop already shares the canonical tool registry. `search_capabilities`/`invoke_capability` must be callable from the internal loop, not only MCP. |
-| **Unified consent across API + DOM + vault** | One coherent per-origin Off/Ask/Auto governance surface spanning API replay, DOM automation, and the credential/payment vault. OpenTabs governs plugins only; DOM-level browser tools are separate and ungoverned by the plugin permission model. | MEDIUM | Dependency: existing vault confirmation flow + new per-origin store. Single audit log across both paths. |
-| **Same-origin-fetch safety posture** | FSB executes the API call *in the page's own origin context* via MAIN-world fetch, so it only ever sends auth the page itself could send (no cross-origin credential exfiltration primitive). Positioned as a deliberately narrower, safer capability than generic cross-origin session replay. | LOW (design choice) | This is a *constraint sold as a feature*. See anti-features for the cross-origin replay trap it avoids. |
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Zero-install catalog** | OpenTabs is npm-per-plugin (119 installs). FSB ships the whole descriptor surface in one extension; depth head is bundled; tail is learned. No `npm i @opentabs-dev/plugin-*` ever. | (already the architecture) | This is the headline. The milestone's "port + learn, do NOT clone the npm-per-plugin model" IS the differentiator. |
+| **Self-healing DOM fallback (T3) on every app** | When a recipe/handler breaks (token moved, endpoint changed — and they DO: datadog rotates CSRF, cloudflare atok refreshes, discord webpack reshuffles), FSB drops to its DOM engine and still completes the task. OpenTabs just fails. | (existing) | Turns the brittle Pattern-C/D apps from "broken" into "slower but works." Huge reliability edge. |
+| **Learned discovery auto-grows the catalog (T2)** | The tail FSB doesn't hand-port gets learned from observed network traffic, consent-gated, and promoted to procedural memory. Catalog grows without code releases. | (existing discovery path) | Lets FSB credibly claim "all apps usable" without 2,523 hand-written handlers. |
+| **MV3-survivable closed-vocabulary recipes** | Recipes are DATA bound by a fixed interpreter — no remotely-hosted code, survives MV3 Wall 1. OpenTabs ships actual TS code per plugin (impossible to stream into an MV3 extension). | (existing CAP-01..05) | The reason FSB can have a streaming long tail at all. |
+| **Unified consent governance across the whole catalog** | One Off/Ask/Auto policy + audit log spanning all 119 apps, defaulting safe. OpenTabs has no equivalent cross-app supervision layer. | (existing v0.9.99 Phase 30) | Lets the denylist + sensitive-origin tiers be enforced uniformly. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Things that look like obvious parity items but should be **intentionally skipped or constrained**. Documenting these prevents scope creep and security regressions.
+These are the apps/behaviors that "complete the catalog" superficially but must be DENYLISTED or skipped. Grouped by reason. (Apps named below are confirmed present in the 119-plugin list.)
 
-| Feature | Why Requested | Why Problematic | Alternative (FSB approach) |
-|---------|---------------|-----------------|----------------------------|
-| **npm-package-per-plugin distribution** (clone OpenTabs' model) | It's how OpenTabs ships ~2,000 tools; "just do what they do." | MV3 prohibits remotely-hosted/eval'd code — you cannot load an npm plugin's JS into the extension at runtime. Per-plugin toolchains (`tsc + build`, lint, type-check) are a desktop-Node assumption. Reproducing ~2,769 tools by hand is a content treadmill. | **Port + learn, not re-derive.** Bundle the head as compiled handlers; stream the tail as declarative recipes; grow the rest via CDP-capture learning. Explicitly a milestone constraint. |
-| **Generic cross-origin authenticated session replay** | "Let the agent call ANY domain's API using my cookies from anywhere." Maximally powerful. | This is the CSRF/session-hijack threat model. Browsers auto-attach session cookies; a primitive that issues arbitrary cross-origin authenticated requests is a credential-exfiltration and forgery engine. `HttpOnly`/`SameSite`/CSRF-token protections exist precisely to stop this. | **Same-origin fetch only**, executed in the target page's own context. The agent can only send what that page could already send. Narrower by design. |
-| **Remote code execution of server-delivered logic** | "Stream the plugin code from the server so the catalog updates instantly." | Direct MV3 violation; also makes the server a supply-chain RCE vector into every user's browser. | **Declarative recipes (data) + fixed local interpreter.** Server ships parameters, never executable logic. |
-| **Auto-enable discovered capabilities** | "When FSB learns a new API, just use it." Frictionless. | Silent auto-trust of a freshly-captured, write-capable endpoint replaying user auth is the worst-case safety failure for this category. | **Default-off + Ask on first use.** Learned recipe lands in catalog as *discovered, not trusted*; first invocation requires explicit consent (mirrors OpenTabs "disabled by default even the ones I ship"). |
-| **AI source-code review as the trust gate** (copy OpenTabs literally) | OpenTabs markets "your AI reviews the plugin source before you enable it." | For FSB the long tail is **declarative data, not source code**, so "review the source" is largely a category error — there is no adapter source to audit. Over-investing here misframes the model. | Show the user the **recipe in plain terms** (origin, endpoint, method, what data it sends) + per-origin consent + audit log. Trust the *data preview*, not a code-review ritual. Optional: surface the captured request for inspection. |
-| **Background / unattended API execution** | "Run my API workflows while I'm away." | FSB is supervised-by-design; background agents were explicitly sunset (v0.9.45rc1 → OpenClaw/Claude Routines). Unattended auth-replay amplifies blast radius. | Keep capabilities **session-bound and supervised**, consistent with trigger watchers being "local and notify-only." External runtimes handle unattended. |
-| **Desktop/email/SMS/Slack push on capability events** | "Notify me when the API call finishes." | FSB already drew this line for triggers (notify-only to the caller, no push). Re-litigating it here is scope creep. | Return structured results to the caller; let the orchestrating agent decide. |
-| **Cloud-hosted capability execution** | "Run capabilities server-side so my browser doesn't need to be open." | Breaks the local-trust model and the authenticated-session premise (the session lives in the user's browser). Also contradicts OpenTabs' own "no cloud" promise. | **Local execution only.** Only recipe definitions (non-secret data) come from FSB's server. |
-
----
-
-## The Search→Invoke (Progressive Disclosure) Pattern — Detailed Findings
-
-This is the load-bearing mechanism (table-stakes #2) and deserves its own treatment because the roadmap must get it right.
-
-**The problem it solves (verified):**
-- Loading ~167 tools from 4 servers ≈ 60K tokens (~30% of a 200K window) *before any work*. Standard MCP setups can consume up to ~72% of context on tool defs.
-- Tool-selection accuracy *collapses* with menu size: 43% → under 14% (wrong tool ~7/8 times) when overloaded.
-- A 2,000–2,800-tool catalog is a non-starter as a flat MCP tool list.
-
-**How Claude Code's Tool Search does it (the reference implementation):**
-- **Lazy schema loading.** Detects when MCP tool descriptions exceed ~10K tokens, marks tools `defer_loading: true`, and replaces full defs with a single search tool. Discovery (a tool *exists*) is separated from schema fetch (how to *call* it).
-- **Two search modes:** regex (precise, when the name is roughly known) and BM25 (natural-language/semantic, exploratory). Implication: FSB should index capabilities on origin + service + action verbs + synonyms.
-- **Schema-on-hit:** "3–5 relevant tools (~3K tokens) get loaded per query." The hit carries enough to invoke — no separate describe call.
-- **Overhead:** ~500 tokens for the search tool itself; net reduction ~85% (e.g. ~77K→~8.7K with 50+ tools). The extra round-trip (search, then invoke) is real but cheap relative to the savings.
-- **Accuracy with search ON:** Opus 4 49%→74%; Opus 4.5 79.5%→88.1%. So search *improves* selection accuracy, not just token cost.
-
-**Contested data point (flag for validation):** Stacklok's "MCP Optimizer" benchmark claims 94% selection accuracy vs Anthropic Tool Search "34%" — a vendor comparison that contradicts Anthropic's own 74–88% figures. Treat the 34% as adversarial marketing; the mechanism (search→invoke + lazy schema) is sound regardless of whose router scores highest. **Recommendation:** adopt the *pattern*, keep the ranking implementation swappable.
-
-**FSB-specific design implications:**
-- `search_capabilities(query, [origin])` should **bias on the active/owned tab's origin** — a major opportunity Claude Code's generic Tool Search does *not* exploit (no context/tab biasing found in its docs). FSB knows the agent's owned tab; rank same-origin capabilities first. This is a concrete parity-plus.
-- Return schema-on-hit (avoid a describe round-trip).
-- Keep results small (≤5) to preserve the accuracy gains.
-- Index both **bundled** capabilities and **learned** (procedural-memory) recipes in one search.
-- Carries INV-01/INV-02: existing ~63 tools stay byte-stable; only `search_capabilities` + `invoke_capability` are added.
+| App / behavior | Why requested | Why problematic | FSB action |
+|---|---|---|---|
+| **netflix, spotify (playback), youtube-music, twitch, steam** | "automate my media" | DRM / ToS forbid automation; near-zero agentic value; playback isn't an API task | **deniedOrigins** (skip; descriptors may exist but never invocable). netflix already a known denylist target. |
+| **tinder** | "auto-swipe" | Dating ToS explicitly ban automation; reputational + harassment risk | **deniedOrigins.** |
+| **onlyfans** | catalog completeness | Adult/payment/ToS; sensitivity + reputational | **deniedOrigins.** |
+| **instagram, facebook, tiktok, pinterest, bluesky, tumblr, x** | "auto-post / scrape my feed" | Aggressive anti-automation; bot bans; x uses a static bundle bearer that's a ToS tripwire; engagement automation is abuse-adjacent | **deniedOrigins for write/engagement ops**; read-only `sensitiveOrigins` at most. x is mechanically portable (Pattern B) but **should be denied** to avoid account bans. |
+| **whatsapp, telegram, discord (DMs)** | "send messages for me" | Spam/abuse vector; webpack/WS token extraction (discord) is brittle; mass-DM is the #1 abuse pattern | **sensitiveOrigins** (Ask-only, never Auto) at minimum; deny write ops for messaging if abuse risk too high. |
+| **robinhood, fidelity, coinbase, carta, ynab** | "check my portfolio / trade" | Brokerage/financial trades = catastrophic on a misfire; multi-origin bearer auth (robinhood) compounds risk | **deniedOrigins** for any trade/transfer (write); reads at most **sensitiveOrigins** (Ask). Milestone already sequences finance behind denylist. |
+| **stripe (write), twilio (send)** | "issue a refund / send an SMS" | Money movement + outbound comms = real-world side effects with cost; stripe writes touch live charges | **sensitiveOrigins** (Ask-only); never Auto. Reads (list charges) can be T1a; writes gated hard. |
+| **Banking generally (not in the 119 but category)** | — | Regulatory + catastrophic | Pre-emptive **deniedOrigins** category in the denylist schema. |
+| **"Hand-port all 2,523 ops as code handlers"** | "real parity" | Violates the milestone strategy; unmaintainable; most ops low-value; brittle Pattern-C/D apps break constantly | **Descriptor import + tiered backing.** Depth = curated ~22-app head only. |
+| **"Use the public REST API (api.github.com, api.cloudflare.com)"** | "cleaner than scraping" | Session cookie does NOT cross to the separate API origin; CORS blocks it (cloudflare source says so explicitly) | **FORBIDDEN.** Always target the app's first-party origin. |
+| **e2e-test, prescript-test** | — | Test fixtures, not real apps | **Skip** (exclude from descriptor import). |
 
 ---
 
-## OpenTabs Parity Matrix
+## Recommended DEPTH-TIER shortlist (~22 apps to hand-port as T1a/T1b head)
 
-Explicit map of **what FSB matches, what it exceeds, and what it intentionally skips.** Baseline = OpenTabs as of 2026-06 (github.com/opentabs-dev/opentabs).
+Ranked by **value × feasibility**, biased to dev / PM / cloud / observability where FSB's users live. Value = audience fit + op count + agentic usefulness. Feasibility = which auth pattern (A/B easy, C-stable medium, C-webpack/WS or D-no-CORS hard). All must use `executeBoundSpec`-only, first-party origin-pin, no token logging — the slack.js contract. Op counts verified via `gh api .../src/tools --jq length`.
 
-> **On the numbers:** OpenTabs' own site says "100+ plugins, ~2,000 tools." The live `plugins/` directory currently shows ~136 plugin folders (counted 2026-06-19), and the milestone brief cites "119 plugins / ~2,769 tools." These are all consistent: the catalog is **auto-growing via AI-built plugins** ("most plugins in this repo were built by AI in minutes"), so any single number is a point-in-time snapshot. FSB should not chase the absolute count — it should match the *mechanism* (auto-grow) and beat it on resilience.
+| # | App | Category | Ops | Auth pattern | Feasibility | Value rationale |
+|---|---|---|---|---|---|---|
+| 1 | **linear** | PM/dev | 60 | D (separate origin, **documented permissive CORS**) + localStorage headers | MEDIUM | Highest-value PM tool for FSB's dev audience; huge op surface; CORS is documented-safe + origin-pinnable. The flagship depth port. |
+| 2 | **jira** | PM | 21 | B (Atlassian meta tags, same-origin `/rest/api/3`) | EASY | Enterprise PM ubiquity; clean documented REST; trivial auth scrape. |
+| 3 | **github** | dev | 36 | B (persisted-query + CSRF) | DONE (exists) | Already FSB head; extend ops. Anchor of the dev audience. |
+| 4 | **gitlab** | dev | 23 | B (`gon` global + meta CSRF, `/api/v4`) | EASY | Mirrors github; same-origin; large self-host base. |
+| 5 | **datadog** | observability | 72 | B (rotating localStorage CSRF, same-origin) | MEDIUM | Biggest observability op surface; core to FSB's ops/dev users. Caveat: CSRF rotates — read live every call (source warns). |
+| 6 | **sentry** | observability | 22 | B (`sentry-sc` CSRF cookie, same-origin) | EASY | Error triage is a top agent task; clean same-origin CSRF. |
+| 7 | **vercel** | cloud/deploy | 9 | B-ish (HttpOnly `authorization` cookie, same-origin `/api`) | EASY | Deploy/inspect is high-frequency for dev users; smallest-effort win (cookie does the work, team slug from URL). |
+| 8 | **netlify** | cloud/deploy | 41 | A/B (cookie-only reads, same-origin `/access-control/bb-api`) | EASY | Reads are pure T1b recipes (no token); large op count; deploy audience. |
+| 9 | **cloudflare** | cloud/infra | 31 | B (`x-atok` from `window.bootstrap`, same-origin `/api/v4`) | MEDIUM | Infra-critical; same-origin proven; atok refreshes (read live). Source explicitly confirms cross-origin is CORS-blocked → first-party pin mandatory. |
+| 10 | **confluence** | docs/PM | 22 | B (Atlassian `ajs-*` meta, same-origin) | EASY | Pairs with jira; same auth scrape; docs/knowledge tasks. |
+| 11 | **notion** | docs | 19 | B (`token_v2` cookie + `/api/v3` RPC) | DONE (exists) | Already FSB head; extend. Top docs/PM surface. |
+| 12 | **slack** | comms | 23 | C (split-token, same-origin) | DONE (exists) | Already FSB head. Comms backbone for teams. |
+| 13 | **figma** | design/docs | 15 | B/D (same-origin `www.figma.com/api`, cookie) | EASY | Design handoff is a real agent task; same-origin cookie. |
+| 14 | **asana** | PM | 25 | D-as-B (`app.asana.com/api/1.0`, same registrable origin, cookie) | EASY | Major PM tool; cookie-only; effectively same-origin. |
+| 15 | **todoist** | PM/personal | 34 | B (localStorage `User.token` Bearer, same-origin `/api/v1`) | EASY | High op count; same-origin; popular task surface. |
+| 16 | **supabase** | db/backend | 27 | D (separate `api.supabase.com`, localStorage Bearer) | MEDIUM (**verify CORS**) | Core dev/db tool; HIGH value IF api.supabase.com permits the dashboard origin with credentials. Port only after CORS check. |
+| 17 | **shortcut** | PM/dev | 28 | A (documented public API, same-origin `/backend/api/v3`) | EASY | Clean documented API, same-origin cookie; good op count; dev-PM fit. |
+| 18 | **stripe** | finance/dev | 31 | C (`PRELOADED` bearer+csrf, same-origin `/v1`) | MEDIUM | High dev value for READS (list charges/customers); **writes → sensitiveOrigins Ask-only.** Port reads first. |
+| 19 | **mongodb-atlas** | db | 21 | (verify; expect B/D) | MEDIUM | Core db tool for dev audience; confirm auth pattern + CORS before committing. |
+| 20 | **circleci** | dev/CI | 34 | (verify; expect B same-origin) | MEDIUM | CI status/retrigger is a frequent agent task; large op count; dev fit. |
+| 21 | **google-calendar** | productivity | 19 | E (`gapi.client.request` bridge) | MEDIUM | Highest-value Google surface; scheduling is a top agent task. Needs the gapi-bridge handler shape (distinct from fetch handlers) — budget design. |
+| 22 | **linkedin** | comms/social | 7 | B (`JSESSIONID`-as-CSRF, same-origin) | EASY-but-CAUTION | Mechanically trivial (Pattern B). Include ONLY read ops; LinkedIn ToS is automation-hostile → keep writes denied. Borderline; could drop to keep the head clean. |
 
-| Capability | OpenTabs | FSB v0.9.99 plan | Verdict |
-|------------|----------|------------------|---------|
-| Authenticated API call via session, no API keys/OAuth | Yes — calls the app's internal API the frontend calls | Yes — MAIN-world same-origin `fetch` via existing `execute_js` primitive | **MATCH** |
-| Lean tool surface for huge catalog | Implicit (MCP client + plugin enable); not a documented search→invoke router | `search_capabilities` + `invoke_capability`, schema-on-hit, tab-origin biasing | **EXCEED** (explicit progressive disclosure + tab biasing) |
-| Permission model Off/Ask/Auto | Yes — per-plugin or per-tool; resets on plugin update | Yes — per-origin (+ per-capability) Off/Ask/Auto; default-off | **MATCH** |
-| Default-off, nothing runs until enabled | Yes — "everything starts off… even the ones I ship" | Yes — default Off per origin | **MATCH** |
-| Audit log | Yes — "every tool call is logged (what ran, when, succeeded)" | Yes — extend existing session logs/observability to capability invocations | **MATCH** |
-| Local execution, no cloud | Yes | Yes — execution in-browser; only recipe *data* from server | **MATCH** |
-| Built-in browser tools (screenshot/click/type/network), no plugin needed | Yes — works on any tab | Yes, and far deeper — 55/63 DOM+CDP tools already shipped | **EXCEED** (mature DOM engine pre-exists) |
-| Plugin/capability discovery from a live site | Yes — AI analyzes page, discovers APIs, scaffolds code, registers plugin (3-step, self-improving skill) | Yes — CDP `Network.*` capture of real requests → declarative recipe | **MATCH** (different mechanism: capture vs scaffold-code) |
-| AI code review before enable | Yes — reviews adapter source; user decides | Intentionally reframed — long tail is *data*, not code; show recipe preview + consent instead | **INTENTIONAL SKIP** (category mismatch; replaced by data-preview consent) |
-| Plugin distribution | npm package per plugin; `opentabs plugin install <name>`; publishable | Bundled head (zero-install) + server-streamed declarative recipes; optional explicit install | **EXCEED** (zero-install, MV3-legal) — and **SKIP** the npm-per-plugin model |
-| CLI mode (non-MCP) | Yes — "don't want MCP? use CLI mode" | FSB has its own standalone autopilot + control panel; not shipping a separate CLI for capabilities | **PARTIAL / SKIP** (standalone-via-autopilot instead of a dedicated CLI) |
-| Self-healing API→DOM fallback | **No** — broken API tool is dead until re-built | **Yes** — drops to DOM + site guides, completes task | **EXCEED** (unique) |
-| Learned/auto-growing catalog from real use | Partial — AI *builds* plugins (code artifacts, human-reviewed/published) | Yes — successful calls auto-promote to procedural-memory recipes (data, zero authoring) | **EXCEED** (auto-learn into memory, incl. private/internal tools) |
-| Standalone usable without external MCP host | Limited — bridge needs an MCP client or its CLI | Yes — internal autopilot shares the same capability registry | **EXCEED** |
-| Same-origin-only safety constraint | Not emphasized (model is plugin-mediated API access) | Yes — deliberately same-origin fetch only | **EXCEED** (narrower, safer primitive) |
-| Anonymous telemetry, opt-out | Yes | FSB already has anonymous opt-out telemetry (v0.9.69) | **MATCH** |
+**Shortlist composition:** dev/source 4 (github, gitlab, circleci) + stretch (npm, docker-hub); PM 6 (linear, jira, asana, todoist, shortcut, confluence); cloud/infra 4 (vercel, netlify, cloudflare); observability 2 (datadog, sentry); db 2 (supabase, mongodb-atlas); docs/design 3 (notion, figma, google-calendar); comms 2 (slack, linkedin-read); finance-read 1 (stripe-read). 4 of these (github, gitlab→easy, notion, slack) are already done/trivial, so **net new hand-port effort ≈ 18 apps.**
 
-**Summary:** FSB **matches** every table-stakes item, **exceeds** on six axes (self-healing fallback, learned/auto-grow, zero-install, standalone, tab-biased search, same-origin safety), and **intentionally skips** three (npm-per-plugin distribution, generic cross-origin replay, code-review-as-trust-gate) — each skip is a deliberate safety/MV3 posture, not a gap.
+**Stretch (port if cheap, defer otherwise):** `npm` (15, registry reads), `docker-hub` (13), `grafana` (30), `posthog` (39, analytics), `newrelic` (23), cloud consoles `azure`/`google-cloud`/`aws-console` (often Pattern-D/E, may be CORS-blocked; verify), `terraform-cloud` (39), `clickup` (Pattern-C WS token → DEFER, let T2 learn it).
+
+**Explicitly NOT in the head (leave to T2-learned / T3-DOM):**
+- **discord** (webpack-registry token — too brittle), **clickup** (WebSocket-captured JWT — needs live WS observation), and any Pattern-D app whose separate API origin does NOT send permissive CORS.
+- All anti-feature apps (media, dating, social-write, finance-write) — denylisted, never ported.
 
 ---
 
 ## Feature Dependencies
 
 ```
-[search_capabilities + invoke_capability]   (lean MCP dispatcher, INV-01/02)
-        |
-        +--requires--> [Capability registry/index] (bundled head + learned recipes)
-        |                      |
-        |                      +--requires--> [Authenticated same-origin fetch primitive]
-        |                      |                      └─builds on─> execute_js MAIN-world (EXISTS)
-        |                      |
-        |                      +--requires--> [Declarative recipe interpreter] (MV3-safe, fixed code)
-        |                                             └─fed by─> server-delivered recipe data
-        |
-        +--enhanced-by--> [Tab-origin biasing] (rank owned-tab origin first)  <- parity-plus
+Denylist expansion (deniedOrigins + sensitiveOrigins)
+    └──MUST PRECEDE──> Any sensitive app reachable under Auto default
+                           └──gates──> Descriptor import making apps invocable
 
-[CDP network-capture discovery]
-        └─requires─> chrome.debugger Network.* (debugger already attached, EXISTS)
-        └─produces─> candidate recipe -> [Learned recipe in procedural memory]
-                                              └─requires─> 3-type memory + consolidator (EXISTS)
-                                              └─feeds─> Capability registry/index
+Descriptor import (all 119, with sideEffectClass)
+    └──requires──> Side-effect classification (read/write per op)
+    └──requires──> Scaled search index (minisearch perf at ~2.5k docs)
+    └──enables──> search_capabilities returns every app
 
-[Per-origin Off/Ask/Auto consent]  --gates--> [invoke_capability]
-        └─reuses─> vault confirmation UX (EXISTS)
-        └─requires─> per-origin permission store (chrome.storage.local) (NEW)
+Depth head (T1a/T1b hand-ports)
+    └──requires──> Per-app CORS / first-party-origin verification (Pattern D gate)
+    └──requires──> Token-redaction discipline + CI path-guard (no eval, no log)
+    └──reuses────> slack.js handler contract (executeBoundSpec, origin-pin)
 
-[Audit log] --records--> every [invoke_capability] + every API->DOM fallback
-        └─extends─> session logs / get_logs / observability tools (EXISTS)
+Seeded discovery (T2 learner)
+    └──depends on──> 119 origins + endpoint hints seeded
+    └──depends on──> Consent gate (Phase 30) already shipped
+    └──covers─────> The tail NOT in the depth head
 
-[API->DOM self-healing fallback]  --depends-on--> DOM engine + 17-category site guides + run_task (ALL EXIST)
-        └─triggered-by─> recipe failure detection (HTTP status / shape mismatch / empty payload)
-
-[Default-off] --conflicts-with--> [Auto-enable discovered capabilities] (ANTI-FEATURE — keep default-off)
-[Generic cross-origin replay] --conflicts-with--> [Same-origin-only safety] (ANTI-FEATURE — keep same-origin)
+T3 DOM fallback (existing)
+    └──enhances──> Every app (catches Pattern-C/D breakage)
 ```
 
 ### Dependency Notes
-
-- **search/invoke requires the registry, which requires the fetch primitive + the interpreter:** you cannot expose capabilities you can't execute. Build order: fetch primitive → interpreter → registry → search/invoke tools.
-- **Discovery requires CDP network capture, which is unlocked by the existing `debugger` attach** (confirmed live in `background.js`). The new work is `Network.enable` + request/response/getResponseBody handling, not acquiring the permission.
-- **Learned recipes require procedural memory** — the `PROCEDURAL` type, consolidator, and `search_memory` already exist; the new work is the recipe *shape* and the promote-on-success path.
-- **Consent gates invoke, and reuses the vault confirmation pattern** — don't build a second confirmation UX; extend the one `use_payment_method` already uses.
-- **Self-healing depends entirely on pre-existing FSB subsystems** (DOM engine, site guides, autopilot) — this differentiator is cheap *because FSB already owns both halves*; OpenTabs would have to build a whole DOM engine to match it.
-- **Two hard conflicts are the anti-features:** default-off vs auto-enable, and same-origin vs cross-origin replay. The roadmap must keep the safe side of both; they should never land in the same phase as "make it frictionless."
+- **Denylist MUST precede invocability:** the shipped Auto default (v0.9.99 Phase 30) means an imported finance/health/dating descriptor is reachable the moment it's invocable. The denylist data has to land first. (Milestone already sequences this.)
+- **Depth head requires the Pattern-D CORS gate:** porting linear/supabase/etc. without verifying the separate-origin CORS yields silent runtime failures. Linear documents its CORS in-source; supabase does not — verify each.
+- **Descriptor import requires side-effect classification:** the consent policy keys off read/write; importing descriptors without trustworthy side-effect class breaks the safety model.
+- **T3 DOM fallback enhances everything:** it's what makes the brittle Pattern-C/D apps acceptable to ship — they degrade instead of fail.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v1 of the capability catalog)
-
-The thinnest slice that proves "FSB calls authenticated APIs through the session, safely, behind a lean dispatcher."
-
-- [ ] **Authenticated same-origin fetch primitive** — the executable core; nothing works without it.
-- [ ] **`search_capabilities` + `invoke_capability` (schema-on-hit, ≤5 results, tab-origin biasing)** — the lean surface; satisfies INV-01/INV-02 and the no-bloat mandate.
-- [ ] **Bundled head: a handful of hard/popular services as compiled handlers** — proves zero-install + the imperative path. (Pick 5–10 high-value services.)
-- [ ] **Per-origin Off/Ask/Auto consent + default-off** — non-negotiable safety; reuses vault confirm UX.
-- [ ] **Audit log of capability invocations** — extends existing observability.
-- [ ] **API→DOM self-healing fallback (basic: on failure, escalate to `run_task`/DOM)** — the flagship differentiator; even a simple version is the headline.
+### Launch With (v1.0.0 core)
+- [ ] **Denylist expansion** — deniedOrigins (media/dating/adult/finance-write/social-write) + sensitiveOrigins (messaging, finance-read, stripe/twilio writes). Lands FIRST. *Essential: legal + trust gate.*
+- [ ] **Descriptor import for all ~117 real apps** (exclude e2e-test/prescript-test) with slug/service/synonyms/verb/sideEffectClass/params + MIT provenance. *Essential: this IS "OpenTabs parity / all apps discoverable."*
+- [ ] **Scaled search index** performant at ~2,523 descriptors with stable `catalogVersion` + descriptor-vs-recipe side-effect cross-check. *Essential: SURF-04 must not regress.*
+- [ ] **Depth head: the ~18 net-new T1a/T1b ports** from the shortlist (Pattern A/B + stable-C, CORS-verified). *Essential: "depth where users live."*
+- [ ] **T1b recipe promotion** for same-origin cookie GET ops across imported apps (netlify reads, shortcut reads, etc.). *Essential: cheap breadth-into-depth.*
+- [ ] **Seeded discovery** (119 origins + endpoint hints) for the tail. *Essential: "all apps usable" via the learner.*
 
 ### Add After Validation (v1.x)
-
-- [ ] **Declarative recipe interpreter + server-delivered long-tail recipes** — scales the catalog the MV3-legal way. *Trigger: head proves out and demand for the tail is real.*
-- [ ] **CDP network-capture discovery** — "point FSB at a site, it learns the API." *Trigger: interpreter exists to hold the captured recipe.*
-- [ ] **Learned recipes auto-promoted into procedural memory** — the auto-grow flywheel. *Trigger: discovery + interpreter both shipped.*
-- [ ] **Capability-discovered UX surface** ("FSB found a faster way to do X here — save it? trust it?") with recipe-data preview. *Trigger: learning path exists to surface.*
-- [ ] **Per-capability (not just per-origin) consent granularity.** *Trigger: users want finer control after living with per-origin.*
+- [ ] **Stretch ports** (grafana, posthog, newrelic, npm, docker-hub, mongodb-atlas, circleci) once the head pattern is proven and CORS-verified. *Trigger: depth-head ships clean + telemetry shows demand.*
+- [ ] **gapi-bridge handler family** (google-calendar/docs/drive) as a distinct handler shape. *Trigger: validate one gapi bridge end-to-end first.*
+- [ ] **Cloud-console ports** (azure, google-cloud, aws-console, terraform-cloud) — only after confirming their API proxies are same-origin/CORS-permissive. *Trigger: per-app CORS verification passes.*
 
 ### Future Consideration (v2+)
-
-- [ ] **Optional explicit install of long-tail capability packs via MCP command / control panel** — power-user curation. *Defer: auto-grow + streamed tail covers most needs first.*
-- [ ] **Capability sharing/export between users or machines** (declarative recipes are portable data). *Defer: needs a trust/provenance model; until PMF, learned-local is enough.*
-- [ ] **Richer fallback intelligence** (intent-based DOM healing using the captured API's semantic intent to guide the DOM path). *Defer: basic escalation first; 75–90% intent-based healing is a later optimization.*
+- [ ] **Pattern-C-hard ports** (discord webpack, clickup WS) — only if T2-learned proves insufficient. *Defer: brittleness not worth hand-maintenance.*
+- [ ] **Per-op depth beyond the head** (porting more of datadog's 72 / linear's 60 ops) driven by usage telemetry. *Defer: import gives discoverability; deep-wire on demand.*
+- [ ] **Carefully-gated finance/messaging WRITE ops** behind explicit per-call confirmation + vault. *Defer: high blast radius.*
 
 ---
 
@@ -212,84 +239,54 @@ The thinnest slice that proves "FSB calls authenticated APIs through the session
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Authenticated same-origin fetch primitive | HIGH | MEDIUM | P1 |
-| `search_capabilities` + `invoke_capability` (lean dispatcher) | HIGH | HIGH | P1 |
-| Schema-on-hit + tab-origin biasing | HIGH | MEDIUM | P1 |
-| Per-origin Off/Ask/Auto + default-off | HIGH (safety) | MEDIUM | P1 |
-| Audit log of invocations | MEDIUM | LOW | P1 |
-| Bundled head (compiled handlers, zero-install) | HIGH | MEDIUM | P1 |
-| API→DOM self-healing fallback (basic) | HIGH (differentiator) | MEDIUM | P1 |
-| Declarative recipe interpreter (MV3-safe) | HIGH | HIGH | P2 |
-| Server-delivered long-tail recipes | MEDIUM | MEDIUM | P2 |
-| CDP network-capture discovery | HIGH (differentiator) | HIGH | P2 |
-| Learned recipes → procedural memory (auto-grow) | HIGH (differentiator) | HIGH | P2 |
-| Capability-discovered "save/trust" UX | MEDIUM | MEDIUM | P2 |
-| Per-capability consent granularity | MEDIUM | LOW | P2 |
-| Optional explicit install of capability packs | LOW | MEDIUM | P3 |
-| Capability sharing/export | LOW | HIGH | P3 |
-| Intent-based DOM healing (advanced fallback) | MEDIUM | HIGH | P3 |
+| Denylist expansion (lands first) | HIGH | LOW | **P1** |
+| Descriptor import (all 117 real apps) | HIGH | MEDIUM | **P1** |
+| Scaled search index + side-effect cross-check | HIGH | MEDIUM | **P1** |
+| Depth head — easy Pattern-A/B ports (jira, gitlab, sentry, vercel, netlify, confluence, todoist, shortcut, asana, figma) | HIGH | LOW-MEDIUM | **P1** |
+| Depth head — flagship linear (CORS-documented) | HIGH | MEDIUM | **P1** |
+| Depth head — datadog/cloudflare (live-rotating tokens) | HIGH | MEDIUM | **P1/P2** |
+| T1b recipe promotion (same-origin GET ops) | MEDIUM | LOW | **P1** |
+| Seeded discovery for the tail | HIGH | MEDIUM | **P1** |
+| stripe-read / mongodb-atlas / circleci ports | MEDIUM | MEDIUM | **P2** |
+| supabase port (CORS-conditional) | MEDIUM | MEDIUM (gated on CORS check) | **P2** |
+| gapi-bridge (google-calendar/docs/drive) | HIGH | HIGH (new handler shape) | **P2** |
+| Stretch observability/analytics ports (grafana, posthog, newrelic) | MEDIUM | MEDIUM | **P2** |
+| Cloud-console ports (azure/gcloud/aws/terraform) | MEDIUM | HIGH (CORS-uncertain) | **P3** |
+| discord/clickup hand-ports | LOW | HIGH (brittle) | **P3** (let T2 learn) |
+| Deep per-op wiring beyond head | MEDIUM | HIGH | **P3** |
 
-**Priority key:** P1 = must have for the v1 capability slice · P2 = add after the core path validates · P3 = future / PMF-gated.
+**Priority key:** P1 = must have for v1.0.0; P2 = add when head pattern proven; P3 = defer / let the learner handle.
 
 ---
 
 ## Competitor Feature Analysis
 
-| Feature | OpenTabs | Claude Code Tool Search (pattern reference) | FSB v0.9.99 approach |
-|---------|----------|---------------------------------------------|----------------------|
-| Big-catalog tool exposure | MCP + per-plugin enable; flat-ish surface | Lazy schema load, `defer_loading`, search→invoke, 3–5 tools/query, ~500-tok overhead | `search_capabilities`/`invoke_capability` + schema-on-hit + **tab-origin biasing** (beyond Claude's generic search) |
-| Auth API execution | Plugin calls app's internal API via session | N/A (general tool router) | MAIN-world same-origin fetch via `execute_js` |
-| Discovery / catalog growth | AI scaffolds a code plugin (self-improving skill) | N/A | CDP network capture → declarative recipe → procedural memory |
-| Distribution | npm package per plugin | N/A | Bundled head + streamed declarative tail; no per-plugin install |
-| Permissions | Off/Ask/Auto per plugin/tool, reset on update | N/A | Off/Ask/Auto per origin (+per capability), default-off |
-| Trust gate | AI reviews adapter *source* | N/A | Recipe *data* preview + consent + audit (no source to review) |
-| Failure when API breaks | Tool dead until re-built | N/A | **Self-heal to DOM + site guides** |
-| Standalone | Needs MCP client or its CLI | Lives inside Claude Code | Standalone via FSB autopilot **and** MCP |
-| Safety scope | Plugin-mediated API access | N/A | **Same-origin only** (no cross-origin credential replay) |
-
----
-
-## Open Questions / Flags for Roadmap
-
-- **Ranking implementation is swappable, but pick one for v1.** BM25 + regex (Claude Code's choice) is a sane default; vendor accuracy claims conflict (Anthropic 74–88% vs Stacklok's adversarial 34%/94% framing). Don't over-engineer the router in v1 — keep it replaceable.
-- **Recipe schema is the crux of the MV3-safe split.** The declarative recipe format must be expressive enough for the long tail (URL templating, header set from a fixed allowlist, param mapping, response extraction, pagination?) yet provably non-Turing-complete so the interpreter stays "fixed code, data-only input." This is the highest-risk design artifact → likely needs a dedicated research/spike phase. (PITFALLS will cover MV3 remote-code boundaries in depth.)
-- **Failure-detection taxonomy for self-healing** needs definition: which signals (HTTP 4xx/5xx, auth-redirect HTML instead of JSON, empty/shape-mismatched payload, CSRF-token rejection) trigger the DOM fallback, and how to avoid false-fallbacks that mask real "no results" answers.
-- **CSRF/same-origin nuance:** even same-origin fetch can trip CSRF defenses if the page's real requests carry a per-request token the agent didn't capture. Capture-then-replay must record token-bearing headers; flag as a discovery-fidelity requirement.
-- **Counting expectations:** do not set a "match OpenTabs' N tools" success metric. Match the *auto-grow mechanism* and win on resilience; the absolute count is a moving, AI-generated target.
+| Feature | OpenTabs (the source) | "Public-API" approach (naive MCP-per-API) | FSB's approach |
+|---------|------------------------|-------------------------------------------|----------------|
+| App coverage | 119 plugins, 2,523 ops, **one npm install per plugin** | Per-API server, per-API auth/OAuth setup | One extension; all 119 as descriptors; ~22 bundled depth; tail learned. **Zero installs.** |
+| Auth | Page-context `fetchFromPage` (cookie/scraped token), CORS-bound | OAuth tokens you manage/store | Same page-context model (inherits the constraint) BUT origin-pinned + consent-gated + never-logged. |
+| Cross-origin API | Works only where CORS permits (linear documented; cloudflare blocked) | Designed for separate API origins | **Forbidden** unless CORS-permissive + origin-pinned; otherwise demote to learned/DOM. |
+| Breakage handling | Plugin fails (token moved / endpoint changed) | API version break → 4xx | **Self-healing T3 DOM fallback** still completes the task. |
+| Catalog growth | New plugin = new npm package + release | New API = new server | **T2 learner** auto-grows from observed traffic, consent-gated. |
+| Safety/supervision | Per-plugin, no unified gate | Per-server | **Unified Off/Ask/Auto + audit + denylist** across all apps. |
+| MV3 compliance | N/A (their host model differs) | N/A | **Closed-vocabulary recipes = data**, no remotely-hosted code (Wall 1). |
 
 ---
 
 ## Sources
 
-OpenTabs feature surface and parity baseline:
-- [github.com/opentabs-dev/opentabs (README + plugins directory, ~136 plugin folders counted 2026-06-19)](https://github.com/opentabs-dev/opentabs)
-- [opentabs.dev (landing — plugin/tool counts, discovery flow, "disabled by default," AI code review, audit log)](https://opentabs.dev/)
-- [OpenTabs on mcpmarket.com](https://mcpmarket.com/server/opentabs)
-- [OpenTabs on mcpservers.org](https://mcpservers.org/servers/opentabs-dev/opentabs)
-
-Search→invoke / progressive disclosure (Claude Code Tool Search + MCP context-bloat):
-- [What is MCP Tool Search — Claude Code context-pollution guide (lazy schema, defer_loading, regex/BM25, accuracy numbers)](https://www.atcyrus.com/stories/mcp-tool-search-claude-code-context-pollution-guide)
-- [Claude Code MCP Tool Search: lazy loading cut token usage 85% (Software Thug)](https://www.softwarethug.com/posts/claude-code-mcp-tool-search-lazy-loading/)
-- [MCP context-bloat crisis — accuracy collapse 43%→14% (AgentMarketCap)](https://agentmarketcap.ai/blog/2026/04/08/mcp-context-bloat-enterprise-scale-tool-definitions-agent-context-budget)
-- [Stacklok MCP Optimizer vs Anthropic Tool Search head-to-head (contested accuracy figures)](https://dev.to/stacklok/stackloks-mcp-optimizer-vs-anthropics-tool-search-tool-a-head-to-head-comparison-2f32)
-- [RAG-MCP: when too many tools become too much context (Medium)](https://medium.com/@pankaj_pandey/when-too-many-tools-become-too-much-context-a-deep-dive-into-rag-mcp-9b628c8476d3)
-
-Self-healing API→DOM fallback (differentiator grounding):
-- [Browser Harness — self-healing browser automation for AI agents](https://openflows.org/currency/currents/browser-harness/)
-- [Best self-healing test automation tools 2026 — locator-fallback 40–70% vs intent-based 75–90%+ (Shiplight)](https://www.shiplight.ai/blog/best-self-healing-test-automation-tools)
-- [The State of AI & Browser Automation in 2026 (Browserless)](https://www.browserless.io/blog/state-of-ai-browser-automation-2026)
-
-Consent / session-replay security (default-off + same-origin grounding):
-- [CSRF — OWASP Cheat Sheet (cookie auto-attach, SameSite, tokens)](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
-- [CSRF — MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/CSRF)
-- [Towards Browser Controls to Protect Cookies from Malicious Extensions (arXiv)](https://arxiv.org/html/2405.06830v3)
-
-Capture-then-replay UX precedent:
-- [NetReplay — capture & replay network requests, local-only (Chrome Web Store)](https://chromewebstore.google.com/detail/netreplay-%E2%80%93-capture-repla/elfmodpnblbidnigceioaffjdadpgjko)
-- [Trustworthy AI agents: deterministic replay (Sakura Sky)](https://www.sakurasky.com/blog/missing-primitives-for-trustworthy-ai-part-8/)
-
-FSB-internal (read directly, not cited as web sources): `extension/ai/tool-executor.js` (`execute_js` MAIN-world), `extension/background.js` (`chrome.debugger` attach for CDP), `extension/lib/memory/memory-schemas.js` (`PROCEDURAL` memory type), `mcp/README.md` (63-tool surface), `.planning/PROJECT.md` (milestone goal + invariants INV-01..04).
+- **OpenTabs source, read directly via authenticated `gh` at `opentabs-dev/opentabs@main`** (HIGH confidence — primary source):
+  - Plugin list: `gh api repos/opentabs-dev/opentabs/contents/plugins` (119 dirs incl. 2 test fixtures `e2e-test`, `prescript-test`).
+  - Auth/transport `src/<app>-api.ts` inspected in full or grepped for: **linear, github, gitlab, vercel, datadog, stripe, jira, notion, supabase, sentry, cloudflare, netlify, clickup, todoist, asana, shortcut, confluence, figma, coinbase, robinhood, discord, telegram, x, linkedin, chatgpt, claude, google-calendar, google-docs, google-drive, airtable** (20 read in detail, 10 more grepped).
+  - Transport SDK: `platform/plugin-sdk/src/fetch.ts` — confirmed `fetchFromPage`/`fetchJSON` are plain page-context `fetch()` with `credentials:'include'`, **no background proxy** (the load-bearing finding that maps OpenTabs' CORS reality onto FSB's MAIN-world Wall 2).
+  - Op counts per app via `gh api .../src/tools --jq length` (HIGH — verified counts; cited inline in the shortlist).
+  - Key in-source CORS quotes: linear-api.ts (`access-control-allow-origin: https://linear.app; access-control-allow-credentials: true … No fetchViaBackground needed`); cloudflare-api.ts (`Cross-origin requests to api.cloudflare.com are blocked by CORS`).
+- **FSB-side anchors** (HIGH — read directly):
+  - `extension/catalog/handlers/slack.js` — the T1a split-token handler contract (executeBoundSpec-only, origin-pin, no-log) the depth head must follow.
+  - `extension/catalog/recipe-index.generated.js` — existing descriptor/recipe shapes + the github/notion/slack/reddit head precedent.
+  - `.planning/PROJECT.md` — v1.0.0 framing, Wall 1/Wall 2, tier definitions, "port + learn not clone", denylist-first sequencing.
+- **Confidence caveats:** auth pattern + tier mapping = HIGH (grounded in source). Per-app value ranking = MEDIUM (op counts verified; audience-fit is product judgement). supabase/mongodb-atlas/circleci/cloud-console portability = MEDIUM-to-LOW pending the explicit per-app CORS verification flagged as a P1/P2 dependency. ToS/sensitivity classification = HIGH (categorical).
 
 ---
-*Feature research for: authenticated-API-through-the-session agent capabilities (FSB v0.9.99 Native Capability Catalog)*
-*Researched: 2026-06-19*
+*Feature research for: FSB v1.0.0 Full App Catalog (OpenTabs Parity) — auth-strategy → tier taxonomy, depth shortlist, anti-feature/denylist.*
+*Researched: 2026-06-23*
