@@ -56,7 +56,11 @@
   3. A build-time classification gate (in the importer and CI) refuses to emit a descriptor whose origin is not explicitly classified denied / sensitive / safe; an unclassified sensitive-or-ToS origin fails the build (fail-closed) — proven by a fixture that fails the build when a sensitive origin is left unclassified.
   4. Sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (posture B): a WRITE to a sensitive origin requires the per-origin mutating flag; reads run under Auto everywhere; non-sensitive origins remain fully-open under Auto — the friction removed in v0.9.99 Phase 30 is re-scoped to sensitive origins only.
   5. The vendored MIT snapshot (`vendor/opentabs-snapshot/` + `PIN.md` = commit SHA + license) and the `_provenance.json` scaffold are in place, and `docs/LEGAL.md` names the ToS-hostility axis as a distinct categorization criterion.
-**Plans**: TBD
+**Plans**: 4 plans (2 waves)
+  - [ ] 35-01-PLAN.md — Denylist roster expansion: deniedOrigins + sensitiveOrigins for the named DENY-01/02 roster (exact-host forms) + per-origin classify() assertions [wave 1]
+  - [ ] 35-04-PLAN.md — OpenTabs provenance scaffold (PIN.md SHA + verbatim MIT, _provenance.json) + docs/LEGAL.md Categorization Axes [wave 1]
+  - [ ] 35-02-PLAN.md — Fail-closed classification gate (verify-classification-gate.mjs, classifyGate export + CLI) + proof fixture, chained into validate:extension [wave 2]
+  - [ ] 35-03-PLAN.md — Posture-B sensitive-write re-gate in _evaluateConsent (RECIPE_CONSENT_MUTATING_REQUIRED, scoped to classify().sensitive) [wave 2]
 
 ### Phase 36: Codegen Pipeline + No-Dead-Entry Resolution
 **Goal**: Build the descriptor import pipeline and the load-bearing "no dead descriptor" resolution so that the moment 2,523 descriptors land they are both safe (side-effect class cross-checked, escalate-to-write on disagreement) and invocable (every searchable slug resolves to a non-null tier) — the pipeline and the quality gate must exist before any real content import.
@@ -146,7 +150,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 35. Denylist Expansion + Import-Time Classification Gate | 0/TBD | Not started | - |
+| 35. Denylist Expansion + Import-Time Classification Gate | 0/4 | Planned | - |
 | 36. Codegen Pipeline + No-Dead-Entry Resolution | 0/TBD | Not started | - |
 | 37. Breadth A — Dev / Productivity | 0/TBD | Not started | - |
 | 38. Breadth B — Comms / Social / Content | 0/TBD | Not started | - |
