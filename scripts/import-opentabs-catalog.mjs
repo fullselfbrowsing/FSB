@@ -48,6 +48,12 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { classifyGate } from './verify-classification-gate.mjs';
+// THE single shared side-effect derivation (HI-02). The importer stamps the class
+// with the SAME verb-map + GraphQL/RPC carve-out + override table + fail-safe-high
+// floor the cross-check gate (scripts/verify-catalog-crosscheck.mjs) re-derives with
+// -- imported from one module so the two can never diverge. verbPrefix is camelCase-
+// aware here too (it is the importer's actionVerb + synonym seed).
+import { verbPrefix, deriveClass } from './lib/side-effect-class.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -134,70 +140,28 @@ export function assertCleanParams(params, opName) {
 }
 
 // ---------------------------------------------------------------------------
-// Side-effect inference (Mechanic 2): verb-map + GraphQL/RPC carve-out + override
-// table; disagreements resolve fail-safe-high (MAX of read < write < destructive).
+// Side-effect inference (Mechanic 2): the verb-map + GraphQL/RPC carve-out +
+// override table + fail-safe-high floor all live in ONE shared module
+// (scripts/lib/side-effect-class.mjs), imported above. The importer STAMPS the
+// class with the SAME deriveClass() the cross-check gate re-derives with, so the
+// two can never disagree -- and the gate independently catches an importer mis-stamp
+// because both evaluate the identical logic over the persisted signals (HI-02).
+// verbPrefix (the actionVerb + synonym seed) is also the shared, camelCase-aware one.
 // ---------------------------------------------------------------------------
-const SIDE_EFFECT_RANK = { read: 0, write: 1, destructive: 2 };
-const RANK_TO_CLASS = ['read', 'write', 'destructive'];
 
-function maxClass(a, b) {
-  const ra = SIDE_EFFECT_RANK[a] === undefined ? 0 : SIDE_EFFECT_RANK[a];
-  const rb = SIDE_EFFECT_RANK[b] === undefined ? 0 : SIDE_EFFECT_RANK[b];
-  return RANK_TO_CLASS[Math.max(ra, rb)];
-}
-
-// op-name verb prefix -> action verb + a coarse read/write/destructive lean.
-const READ_VERBS = new Set(['list', 'get', 'search', 'read', 'fetch', 'find', 'show', 'view']);
-const DESTRUCTIVE_VERBS = new Set(['delete', 'remove', 'destroy', 'purge', 'void', 'cancel']);
-const WRITE_VERBS = new Set([
-  'create', 'update', 'add', 'set', 'edit', 'rename', 'move', 'archive', 'unarchive',
-  'close', 'reopen', 'complete', 'finalize', 'merge', 'assign', 'upload', 'post', 'send',
-]);
-
-export function verbPrefix(opName) {
-  const s = String(opName || '');
-  const m = s.match(/^([a-zA-Z]+)/);
-  return m ? m[1].toLowerCase() : '';
-}
-
-function classFromVerb(verb) {
-  if (DESTRUCTIVE_VERBS.has(verb)) return 'destructive';
-  if (READ_VERBS.has(verb)) return 'read';
-  if (WRITE_VERBS.has(verb)) return 'write';
-  // Unknown verb -> fail-safe-high to write (never silently read).
-  return 'write';
-}
-
-// HTTP method -> class (when a method literal is present).
-function classFromMethod(method) {
-  const m = String(method || '').toUpperCase();
-  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return 'read';
-  if (m === 'DELETE') return 'destructive';
-  if (m === 'POST' || m === 'PUT' || m === 'PATCH') return 'write';
-  return null; // no usable signal
-}
-
-// Override table (FLOOR -- max-merged, never a downgrade). Known-destructive /
-// known-mutating ops whose name/transport understates them. (RESEARCH A3.)
-const SIDE_EFFECT_OVERRIDES = {
-  void_invoice: 'destructive',
-  delete_customer: 'destructive',
-  cancel_subscription: 'destructive',
-  refund_charge: 'destructive',
-  delete_record: 'destructive',
-  archive_project: 'destructive',
-  merge_pull_request: 'write',
-};
-
-// GraphQL/RPC transport helpers: the HTTP method is uninformative (always POST), so
-// classify by NAME verb, never auto-read.
-const GRAPHQL_HELPERS = new Set(['graphql', 'gql', 'gqlrequest', 'query', 'mutate']);
+// Re-export verbPrefix from the shared module so existing importers of
+// { verbPrefix } from THIS module keep working (the importer's public surface is
+// unchanged after the HI-02 hoist).
+export { verbPrefix };
 
 /**
  * inferSideEffect(tool, signals) -> { sideEffectClass, signals }
  *
- * signals: { transportHelper, httpMethod, opNameVerb } persisted into provenance so
- * the Plan-03 cross-check re-derives without re-parsing TS.
+ * Stamps the side-effect class via the SHARED deriveClass() (the same logic the
+ * cross-check gate runs). signals: { transportHelper, httpMethod, opNameVerb }
+ * persisted into provenance so the Plan-03 cross-check re-derives without re-parsing
+ * TS. The opNameVerb is the camelCase-aware verb token (so a GraphQL camelCase op
+ * yields a live verb signal, not a dead whole-identifier token).
  */
 export function inferSideEffect(tool, signals) {
   const opName = tool && tool.name ? String(tool.name) : '';
@@ -205,27 +169,19 @@ export function inferSideEffect(tool, signals) {
   const helper = String((signals && signals.transportHelper) || '').toLowerCase();
   const method = (signals && signals.httpMethod) || null;
 
-  const nameClass = classFromVerb(opNameVerb);
-
-  let derived;
-  if (GRAPHQL_HELPERS.has(helper)) {
-    // GraphQL/RPC carve-out (highest priority): NAME decides; never auto-read.
-    derived = nameClass;
-  } else {
-    // Named verb helper OR generic api({method}): use the method signal if present,
-    // else the name verb; then MAX with the name verb (the cross-check partner).
-    const methodClass = classFromMethod(method);
-    derived = methodClass ? maxClass(methodClass, nameClass) : nameClass;
-  }
-
-  // Override table is the highest-specificity FLOOR (UPGRADE only).
-  const override = SIDE_EFFECT_OVERRIDES[opName];
-  if (override) derived = maxClass(derived, override);
-
-  return {
-    sideEffectClass: derived,
-    signals: { transportHelper: helper || null, httpMethod: method || null, opNameVerb: opNameVerb || null },
+  const persisted = {
+    transportHelper: helper || null,
+    httpMethod: method || null,
+    opNameVerb: opNameVerb || null,
   };
+
+  // Derive via the shared module, keyed by the persisted signals AND the slug (the
+  // override table + slug-recovered verb both resolve from the op-name). The slug
+  // here is `<service>.<op>` so overrideFloor() and the camelCase verb recovery fire.
+  const slug = opName ? '.' + opName : '';
+  const sideEffectClass = deriveClass(persisted, slug);
+
+  return { sideEffectClass, signals: persisted };
 }
 
 // ---------------------------------------------------------------------------

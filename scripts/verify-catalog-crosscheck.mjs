@@ -30,16 +30,33 @@
  *   3. Generic api({method}): GET/HEAD->read; POST/PUT/PATCH->write;
  *      DELETE->destructive; no literal -> default GET -> read (cross-checked vs
  *      the name verb, which is always also computed).
- *   4. Op-name verb prefix (ALWAYS computed; the cross-check partner): the read
- *      verb set and the write/destructive verb set (delete-family -> destructive).
+ *   4. Op-name verb prefix (ALWAYS computed; the cross-check partner; camelCase-
+ *      aware): the read verb set and the write/destructive verb set (delete-family
+ *      + void/cancel/archive -> destructive).
  *   5. Override table (highest specificity, applied LAST as an UPGRADE-only FLOOR,
  *      never a downgrade): known-destructive / known-mutating ops.
- * deriveClass(signals) = MAX over every computed signal AND the override floor.
+ *   6. Fail-safe-high floor (HI-01): a generic mutating-capable api/apiVoid helper
+ *      with NO usable signal derives at least WRITE -- never the read floor.
+ * deriveClass(signals) = MAX over every computed signal AND the override floor AND
+ * the no-signal fail-safe-high floor.
+ *
+ * SHARED DERIVATION (HI-02): the verb sets, the lattice MAX, the helper/method/verb
+ * classifiers, the GraphQL/RPC carve-out, the override table, AND the no-signal
+ * fail-safe-high floor all live in ONE module -- scripts/lib/side-effect-class.mjs --
+ * imported by BOTH this gate AND the importer (scripts/import-opentabs-catalog.mjs).
+ * Previously each carried its own divergent copy (the importer treated void/cancel as
+ * destructive while the gate treated them as mere write; the importer's verb-prefix
+ * could not split camelCase). A gate that re-derives from a DIFFERENT map than the
+ * importer is a check that can silently disagree with what it checks. With the single
+ * shared module the gate is a true SECOND evaluation of the SAME logic over the
+ * persisted signals -- so an importer mis-stamp (a different generator, a hand-edit)
+ * is caught because both sides agree on what the signals imply.
  *
  * DUAL EXPORT (mirrors scripts/verify-classification-gate.mjs):
- *   - export { crossCheck, deriveClass } -- the Phase-36 importer
- *     (scripts/import-opentabs-catalog.mjs) can call crossCheck inline BEFORE
- *     writing a descriptor; the CLI below reuses the SAME logic as the CI backstop.
+ *   - export { crossCheck, deriveClass, verbClass } -- the Phase-36 importer can call
+ *     crossCheck inline BEFORE writing a descriptor; the CLI below reuses the SAME
+ *     logic as the CI backstop. deriveClass/verbClass are re-exported from the shared
+ *     module for the existing tests.
  *   - CLI on direct invocation -- chained into validate:extension (-> ci) AFTER
  *     verify-classification-gate.mjs (registered by Plan 01). Sweeps the committed
  *     catalog/descriptors/*.json corpus and process.exit(1) on any under-stated op.
@@ -63,183 +80,25 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+// THE single shared side-effect derivation (HI-02). Both this gate AND the importer
+// (scripts/import-opentabs-catalog.mjs) import from here, so they cannot diverge:
+// the gate re-derives with the SAME verb-map + carve-out + override table + fail-
+// safe-high floor the importer stamped with.
+import {
+  SIDE_EFFECT_ORDER as ORDER,
+  rankOf,
+  deriveClass,
+  verbClass,
+} from './lib/side-effect-class.mjs';
+
+// Re-export the shared derivation so existing tests importing { deriveClass,
+// verbClass } from THIS gate keep working (and so the gate's public surface is
+// unchanged after the HI-02 hoist).
+export { deriveClass, verbClass };
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');
-
-// ---- Class lattice: read < write < destructive (fail-safe-high MAX-merge) -----
-const ORDER = { read: 0, write: 1, destructive: 2 };
-const BY_RANK = ['read', 'write', 'destructive'];
-
-function rankOf(cls) {
-  const r = ORDER[cls];
-  return typeof r === 'number' ? r : 0; // unknown -> treat as read floor (the MAX of real signals dominates)
-}
-
-// Return the higher-severity of two classes (the MAX in the read<write<destructive lattice).
-function maxClass(a, b) {
-  return rankOf(a) >= rankOf(b) ? (BY_RANK[rankOf(a)]) : (BY_RANK[rankOf(b)]);
-}
-
-// ---- Verb sets (RESEARCH Mechanic 2, priority 1 + 4) --------------------------
-// Read verbs: a pure data read.
-const READ_VERBS = new Set(['list', 'get', 'search', 'read', 'fetch', 'find', 'query', 'load', 'show', 'view']);
-// Destructive verbs: irreversible mutation (the delete-family).
-const DESTRUCTIVE_VERBS = new Set(['delete', 'remove', 'destroy', 'purge', 'drop']);
-// Write verbs: a reversible / additive mutation. (delete-family is split out above.)
-const WRITE_VERBS = new Set([
-  'create', 'update', 'add', 'set', 'void', 'archive', 'merge', 'move', 'finalize',
-  'edit', 'patch', 'put', 'post', 'cancel', 'refund', 'send', 'close', 'reopen',
-  'complete', 'assign', 'upload', 'write', 'insert', 'replace', 'enable', 'disable',
-]);
-
-/**
- * verbClass(opNameVerb) -> 'read' | 'write' | 'destructive' | null
- *
- * Maps the op-name verb prefix to a class. A delete-family verb -> destructive; a
- * read verb -> read; a known write verb -> write; an UNRECOGNIZED verb -> null (no
- * signal; the method/helper signals carry it, MAX-merged).
- */
-export function verbClass(opNameVerb) {
-  const v = String(opNameVerb || '').toLowerCase().trim();
-  if (!v) return null;
-  if (DESTRUCTIVE_VERBS.has(v)) return 'destructive';
-  if (READ_VERBS.has(v)) return 'read';
-  if (WRITE_VERBS.has(v)) return 'write';
-  return null;
-}
-
-// ---- Transport classification: GraphQL/RPC carve-out + named-verb helper ------
-// A GraphQL/RPC transport is ALWAYS POST -> the method is uninformative.
-const GRAPHQL_TRANSPORT_RE = /(graphql|gql|gqlrequest|persisted-?query|\brpc\b)/i;
-
-function isGraphqlTransport(transportHelper) {
-  return GRAPHQL_TRANSPORT_RE.test(String(transportHelper || ''));
-}
-
-/**
- * helperClass(transportHelper) -> 'read' | 'write' | 'destructive' | null
- *
- * The named-verb helper signal (airtable convention): apiGet->read; apiPost/
- * apiPut/apiPatch->write; apiDelete->destructive. The helper name is matched
- * case-insensitively as a SUFFIX-ish token so a normalized "apidelete" / "apiPost"
- * both resolve. An unrecognized helper (e.g. a bare generic "api") -> null (the
- * method literal carries it). Checked delete-FIRST so "apiDelete" is not shadowed
- * by a substring match.
- */
-function helperClass(transportHelper) {
-  const h = String(transportHelper || '').toLowerCase();
-  if (!h) return null;
-  // Order matters: delete before the generic post/put/patch checks so an
-  // "apidelete" helper is not shadowed. Tolerates api_delete / api-delete forms.
-  if (/api[_-]?delete/.test(h)) return 'destructive';
-  if (/api[_-]?(post|put|patch)/.test(h)) return 'write';
-  if (/api[_-]?get/.test(h)) return 'read';
-  return null;
-}
-
-// ---- Generic api({method}) literal (stripe convention) ------------------------
-function methodClass(httpMethod) {
-  const m = String(httpMethod || '').toUpperCase().trim();
-  if (!m) return null;
-  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return 'read';
-  if (m === 'POST' || m === 'PUT' || m === 'PATCH') return 'write';
-  if (m === 'DELETE') return 'destructive';
-  return null;
-}
-
-// ---- Override table (RESEARCH Mechanic 2, priority 5) -------------------------
-// Keyed by op-name (or a slug ending in the op-name), value is the FLOOR class
-// (max-merged -- it can only ESCALATE, never downgrade). Membership exactly as
-// RESEARCH lists: the CONTEXT exemplars (void_invoice, delete_customer) + the
-// obvious destructive siblings + one known-mutating GraphQL op a name-verb
-// heuristic might miss.
-const SIDE_EFFECT_OVERRIDES = {
-  void_invoice: 'destructive',
-  delete_customer: 'destructive',
-  cancel_subscription: 'destructive',
-  refund_charge: 'destructive',
-  delete_record: 'destructive',
-  archive_project: 'destructive',
-  merge_pull_request: 'write',
-};
-
-/**
- * overrideFloor(opName, slug) -> 'read' | 'write' | 'destructive' | null
- *
- * The override is keyed by the op-name. We also match when the slug ENDS WITH the
- * op-name (the importer's slugs are `<service>.<op>` e.g. `stripe.void_invoice`),
- * so feeding either the bare op-name OR the dotted slug resolves the floor.
- */
-function overrideFloor(opName, slug) {
-  const name = String(opName || '').toLowerCase();
-  if (name && Object.prototype.hasOwnProperty.call(SIDE_EFFECT_OVERRIDES, name)) {
-    return SIDE_EFFECT_OVERRIDES[name];
-  }
-  const s = String(slug || '').toLowerCase();
-  if (s) {
-    for (const key of Object.keys(SIDE_EFFECT_OVERRIDES)) {
-      // slug ends with the op-name (after the service dot) -> the override applies.
-      if (s === key || s.endsWith('.' + key) || s.endsWith('__' + key)) {
-        return SIDE_EFFECT_OVERRIDES[key];
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * deriveClass(signals, slug) -> 'read' | 'write' | 'destructive'
- *
- * The MAX over every computed signal AND the override floor (fail-safe-high).
- * Applies the GraphQL/RPC carve-out FIRST (per Mechanic 2): for a GraphQL/RPC
- * transport the method is discarded and the op-name verb decides, with an
- * ambiguous GraphQL op failing safe to WRITE (never auto-read). For a non-GraphQL
- * transport, the named-verb helper, the generic method literal, AND the op-name
- * verb are all computed and MAX-merged. The override table is the last UPGRADE.
- *
- * signals: { transportHelper, httpMethod, opNameVerb } (the importer's persisted
- * shape). A missing signals object derives `read` floor BUT the override (keyed by
- * slug) can still escalate -- so a known-destructive op with no signals is still
- * caught.
- */
-export function deriveClass(signals, slug) {
-  const s = signals && typeof signals === 'object' ? signals : {};
-  const transportHelper = s.transportHelper;
-  const httpMethod = s.httpMethod;
-  const opNameVerb = s.opNameVerb;
-
-  const nameVerbCls = verbClass(opNameVerb);
-
-  let derived = 'read'; // floor
-
-  if (isGraphqlTransport(transportHelper)) {
-    // CARVE-OUT: the HTTP method is uninformative (GraphQL/RPC is always POST).
-    // Classify by the op-name verb; an ambiguous GraphQL op (no recognized verb)
-    // fails-safe to WRITE -- it is NEVER auto-classed read because the method is POST.
-    if (nameVerbCls) {
-      derived = maxClass(derived, nameVerbCls);
-    } else {
-      derived = maxClass(derived, 'write');
-    }
-  } else {
-    // Non-GraphQL: combine the named-verb helper, the generic method literal, and
-    // the op-name verb -- MAX-merged so the most-severe signal wins.
-    const hCls = helperClass(transportHelper);
-    const mCls = methodClass(httpMethod);
-    if (hCls) derived = maxClass(derived, hCls);
-    if (mCls) derived = maxClass(derived, mCls);
-    if (nameVerbCls) derived = maxClass(derived, nameVerbCls);
-  }
-
-  // Override table: an UPGRADE-only FLOOR applied LAST (never a downgrade).
-  // Keyed by the op-name; the overrideFloor() also matches when the slug ends with
-  // a listed op-name (e.g. 'stripe.void_invoice'), so feeding either resolves it.
-  const floor = overrideFloor(opNameVerb, slug);
-  if (floor) derived = maxClass(derived, floor);
-
-  return derived;
-}
 
 /**
  * crossCheck(descriptors) -> { failures: string[] }
