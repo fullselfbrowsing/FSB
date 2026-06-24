@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_to_plan
+status: executing
 stopped_at: Completed 36-04-PLAN.md (catalog inlining shape-lock + smoke eval re-pass + cold-start budget, CGEN-04) -- Phase 36 all 4 plans executed
-last_updated: "2026-06-24T17:34:24.922Z"
-last_activity: 2026-06-24
+last_updated: "2026-06-24T21:18:19.947Z"
+last_activity: 2026-06-24 -- Phase 37 planning complete
 progress:
   total_phases: 10
-  completed_phases: 3
-  total_plans: 8
+  completed_phases: 2
+  total_plans: 12
   completed_plans: 10
-  percent: 30
+  percent: 83
 ---
 
 # Project State
@@ -32,8 +32,8 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 37 of 43 (Breadth A — Dev / Productivity) — not started
 Plan: —
-Status: Phase 36 complete (verified passed); ready to plan Phase 37
-Last activity: 2026-06-24
+Status: Ready to execute
+Last activity: 2026-06-24 -- Phase 37 planning complete
 
 Progress: [██░░░░░░░░] 22% (2/9 phases)
 
