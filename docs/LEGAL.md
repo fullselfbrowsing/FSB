@@ -41,7 +41,7 @@ Advanced Settings -> Consent & Audit -> "Default for New Sites".
 
 | Mode | Behavior |
 |------|----------|
-| **Auto** (shipped default) | Capability invocations run without per-call prompting, including reads **and** writes, against any non-denylisted origin. |
+| **Auto** (shipped default) | Capability invocations run without per-call prompting, including reads **and** writes, against any non-denylisted origin -- except that a **write to a sensitive origin** re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04; see the Categorization Axes below). Reads, and writes to non-sensitive origins, run freely under Auto. |
 | **Ask** | Each invocation surfaces a pending request out-of-band (control panel + a badge) for the user to grant; nothing runs until granted. There is no blocking in-page modal mid-invocation. |
 | **Off** | Nothing runs against the origin. Capability invocations return a typed consent-required reason. Set an individual origin to Off to opt it out, or set the global default to Off to restore strict opt-in. |
 
@@ -54,24 +54,33 @@ Additional consent rules:
 - **Per-origin opt-out.** Every origin FSB acts on is listed in the control panel
   (sourced from the audit trail) so the user can set it to Off (or Ask) at any
   time. An explicit per-origin policy overrides the global default.
-- **Writes are allowed under Auto.** Under the opt-out posture, read-Auto implies
-  write-Auto: side-effecting invocations (POST/PUT/PATCH/DELETE) run without a
-  separate elevated opt-in. The per-origin mutating flag is retained in storage
-  but is not enforced at the invoke gate while the origin is Auto.
-- **Sensitive-origin friction remains on discovery only.** Origins classified as
-  **sensitive** (banking, primary email, government categories) no longer force
-  extra confirmation at the capability **invoke** gate under Auto. The more
-  invasive **network-capture discovery** path still requires an explicit
-  confirmation for sensitive origins.
+- **Writes to non-sensitive origins are allowed under Auto.** Under the opt-out
+  posture, for a **non-sensitive** origin read-Auto implies write-Auto:
+  side-effecting invocations (POST/PUT/PATCH/DELETE) run without a separate
+  elevated opt-in, and the per-origin mutating flag is inert at the invoke gate.
+  A **write to a sensitive origin is the exception**: it re-enforces the
+  per-origin mutating opt-in at the invoke gate (posture B / DENY-04), so the
+  mutating flag IS consulted there for sensitive origins (see the Categorization
+  Axes section). Reads run under Auto everywhere.
+- **Sensitive-origin writes are re-gated at the invoke gate; reads are not.**
+  Origins classified as **sensitive** (banking, primary email, government, and
+  the payments / budgeting / social / messaging categories below) run **reads**
+  under Auto, but a **write** re-enforces the per-origin mutating opt-in at the
+  capability **invoke** gate (posture B / DENY-04) before it is permitted. In
+  addition, the more invasive **network-capture discovery** path keeps its own,
+  broader explicit confirmation for sensitive origins. (Sensitive writes are NOT
+  ungated under Auto -- the invoke gate re-applies the mutating opt-in for them.)
 - **Reverting to opt-in.** Setting the global default to **Off** restores the
   strict opt-in posture: nothing runs against an origin until the user enables it.
 
-> Security note: under the shipped Auto default, FSB can call any non-denylisted
-> site's authenticated web API -- reads and writes -- using the browser's logged-in
-> session, without a per-site prompt. This is a deliberate, user-configurable
-> posture; the denylist, the per-origin and global opt-out, the active-tab origin
-> pin, the fail-closed degradation path, and the append-only audit trail remain in
-> force.
+> Security note: under the shipped Auto default, FSB can call a non-denylisted
+> site's authenticated web API using the browser's logged-in session, without a
+> per-site prompt -- reads everywhere, and writes to non-sensitive origins. A
+> write to a **sensitive** origin is re-gated at the invoke gate (it re-enforces
+> the per-origin mutating opt-in; posture B / DENY-04). This is a deliberate,
+> user-configurable posture; the denylist, the per-origin and global opt-out, the
+> sensitive-write re-gate, the active-tab origin pin, the fail-closed degradation
+> path, and the append-only audit trail remain in force.
 
 ## Audit Log
 
