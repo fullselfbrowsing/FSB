@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: Created v1.0.0 roadmap (ROADMAP.md Phases 35-43, STATE.md, REQUIREMENTS.md traceability finalized — 17/17 mapped, 0 orphans). Denylist-first (35) and pipeline-before-content (36) ordering constraints encoded.
-last_updated: "2026-06-24T06:59:17.725Z"
+stopped_at: Completed 35-04-PLAN.md (provenance scaffold + LEGAL Categorization Axes)
+last_updated: "2026-06-24T07:09:07.399Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 35 (Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-24
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -96,6 +96,9 @@ Tiers T0/T1a/T1b/T2-learned/T3-DOM; the closed-vocab interpreter; the consent ga
 Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..04 + Walls 1/2). One v1.0.0 posture decision was surfaced by research and RESOLVED in requirements: **DENY-04 (posture B)** — sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (reads run under Auto everywhere; a WRITE to a sensitive origin requires the per-origin mutating flag; non-sensitive stays fully-open). This re-scopes the friction removed in v0.9.99 Phase 30 to sensitive origins only; the denylist still covers the catastrophic worst.
 
 - [Phase ?]: Phase 35-01 (DENY-01/02): IG/FB/TikTok/X classified sensitive-not-denied (reads under Auto, writes mutating-gated by posture B Plan 35-03); fully-denied reserved for brokerage + ToS-hostile media. Exact-host forms (music.youtube.com NOT *.youtube.com; dashboard.stripe.com NOT api.stripe.com) avoid over-broadening.
+- [Phase 35]: Phase 35-04: catalog-side provenance scaffold placed under catalog/descriptors/_fixtures/ (not top-level descriptors/) because the non-recursive readJsonDir inlines every top-level descriptors/*.json into the shipped recipe-index.generated.js; _fixtures/ is excluded (proven via catalog regen showing 8 descriptors + SHA absent + validate-extension green).
+- [Phase 35]: Phase 35-04: OpenTabs pinned hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 + verbatim MIT (Copyright (c) 2026-present OpenTabs Contributors) in vendor/opentabs-snapshot/PIN.md mirroring LATTICE-PIN.md; Wall 1 enforced by tests/provenance-scaffold.test.js asserting the dir contains no runtime .js.
+- [Phase 35]: Phase 35-04: docs/LEGAL.md Categorization Axes subsection names three distinct criteria (finance/gov denial; ToS-hostility denial with the named roster robinhood..onlyfans; sensitivity Ask/mutating-gated with IG/FB/TikTok/X sensitive-not-denied), building on the 68ceea90 opt-out posture.
 
 ### Pending Todos
 
@@ -128,8 +131,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T06:59:12.659Z
-Stopped at: Created v1.0.0 roadmap (ROADMAP.md Phases 35-43, STATE.md, REQUIREMENTS.md traceability finalized — 17/17 mapped, 0 orphans). Denylist-first (35) and pipeline-before-content (36) ordering constraints encoded.
+Last session: 2026-06-24T07:09:07.392Z
+Stopped at: Completed 35-04-PLAN.md (provenance scaffold + LEGAL Categorization Axes)
 Resume file: None
 
 ## Next Actions
