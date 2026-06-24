@@ -180,6 +180,87 @@ function installChromeStorageStub() {
   check(/retention/i.test(legal), 'docs/LEGAL.md contains a retention section');
   check(/consent/i.test(legal), 'docs/LEGAL.md contains a consent section');
 
+  // ======================================================================
+  // Phase 35 plan 01 (v1.0.0 -- DENY-01/02) -- per-origin roster classify()
+  // assertions over the FULL denied + sensitive roster. RED until Plan 35-01
+  // Task 2 expands service-denylist.json; the concrete origins below are taken
+  // VERBATIM from 35-RESEARCH Q2 (Roster -> Origins), each at OpenTabs' own
+  // urlPattern host scope so the EXACT-host forms (digital.fidelity.com,
+  // dashboard.stripe.com, music.youtube.com, ...) match only their exact host
+  // and never over-broaden to the whole domain. Re-uses the Denylist module +
+  // the awaited load() above; no second require/load.
+  //
+  // Matcher reminder (service-denylist.js _parsePattern, LOCKED): 'https://*.h'
+  // = suffix (apex + any subdomain); 'https://h' (no '*') = exact origin.
+  // ======================================================================
+
+  // DENY-01 -- categorically prohibited. Each CONCRETE origin must classify
+  // denied:true. Brokerage/trading (robinhood/fidelity/carta) + ToS-hostile
+  // media/social (netflix/spotify/twitch/steam/youtube-music/tinder/onlyfans).
+  const deniedRoster = [
+    'https://robinhood.com',             // via https://*.robinhood.com (suffix; apex)
+    'https://digital.fidelity.com',      // exact -- NOT *.fidelity.com
+    'https://app.carta.com',             // exact
+    'https://www.netflix.com',           // via https://*.netflix.com (suffix)
+    'https://open.spotify.com',          // exact
+    'https://www.twitch.tv',             // via https://*.twitch.tv (suffix)
+    'https://store.steampowered.com',    // exact
+    'https://music.youtube.com',         // exact -- NOT *.youtube.com (would catch youtube proper)
+    'https://www.tinder.com',            // via https://*.tinder.com (suffix)
+    'https://www.onlyfans.com'           // via https://*.onlyfans.com (suffix)
+  ];
+  for (const origin of deniedRoster) {
+    const c = Denylist.classify(origin);
+    check(c && c.denied === true,
+      'DENY-01 denied roster: classify(' + origin + ').denied === true');
+  }
+
+  // DENY-02 -- allowed-but-sensitive. Each CONCRETE origin must classify
+  // { sensitive:true, denied:false }: payments (stripe/coinbase/twilio),
+  // budgeting (ynab), the IG/FB/TikTok/X social set (sensitive NOT denied --
+  // reads under Auto, writes mutating-gated by Plan 03), and the messaging set.
+  const sensitiveRoster = [
+    'https://dashboard.stripe.com',      // exact -- the dashboard origin, NOT api.stripe.com
+    'https://www.coinbase.com',          // via https://*.coinbase.com (suffix)
+    'https://console.twilio.com',        // exact
+    'https://app.ynab.com',              // exact
+    'https://www.instagram.com',         // via https://*.instagram.com (suffix)
+    'https://www.facebook.com',          // via https://*.facebook.com (suffix)
+    'https://www.tiktok.com',            // via https://*.tiktok.com (suffix)
+    'https://x.com',                     // via https://*.x.com (suffix; apex)
+    'https://web.whatsapp.com',          // exact
+    'https://web.telegram.org',          // exact
+    'https://www.slack.com',             // via https://*.slack.com (suffix)
+    'https://discord.com',               // exact
+    'https://teams.microsoft.com'        // exact (one of the three teams origins)
+  ];
+  for (const origin of sensitiveRoster) {
+    const c = Denylist.classify(origin);
+    check(c && c.sensitive === true && c.denied === false,
+      'DENY-02 sensitive roster: classify(' + origin + ') -> { sensitive:true, denied:false }');
+  }
+
+  // Exact-host discrimination (T-35-03 anti-over-broadening proof): the exact
+  // forms must NOT collapse to whole-domain wildcards.
+  check(Denylist.classify('https://api.stripe.com').sensitive === false,
+    "exact-host: classify('https://api.stripe.com').sensitive === false (dashboard.stripe.com did NOT over-broaden to *.stripe.com)");
+  check(Denylist.classify('https://www.youtube.com').denied === false,
+    "exact-host: classify('https://www.youtube.com').denied === false (music.youtube.com did NOT over-broaden to *.youtube.com)");
+  check(Denylist.classify('https://digital.fidelity.com').denied === true,
+    "exact-host: classify('https://digital.fidelity.com').denied === true (fidelity is exact digital.fidelity.com only)");
+
+  // Negative controls: fidelity is exact-host, so a different fidelity subdomain
+  // is allowed to be non-denied; a benign non-roster origin stays fully clean.
+  check(Denylist.classify('https://www.fidelity.com').denied === false,
+    "negative control: classify('https://www.fidelity.com').denied === false (only digital.fidelity.com is denied)");
+  const cBenign = Denylist.classify('https://github.com');
+  check(cBenign && cBenign.sensitive === false && cBenign.denied === false,
+    "negative control: a benign non-roster origin (github.com) stays { sensitive:false, denied:false }");
+
+  // Regression guard: the existing FSB seed survived the expansion.
+  check(Denylist.classify('https://www.chase.com').denied === true,
+    'seed regression: classify(a concrete chase origin) -> denied:true (the FSB seed was not dropped)');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {
