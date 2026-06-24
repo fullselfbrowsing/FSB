@@ -155,7 +155,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 35. Denylist Expansion + Import-Time Classification Gate | 4/4 | Complete    | 2026-06-24 |
-| 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete   | 2026-06-24 |
+| 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete    | 2026-06-24 |
 | 37. Breadth A — Dev / Productivity | 0/TBD | Not started | - |
 | 38. Breadth B — Comms / Social / Content | 0/TBD | Not started | - |
 | 39. Breadth C — Commerce / Travel / Misc | 0/TBD | Not started | - |

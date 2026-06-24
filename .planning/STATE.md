@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: verifying
+status: ready_to_plan
 stopped_at: Completed 36-04-PLAN.md (catalog inlining shape-lock + smoke eval re-pass + cold-start budget, CGEN-04) -- Phase 36 all 4 plans executed
 last_updated: "2026-06-24T17:34:24.922Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
   completed_plans: 10
-  percent: 100
+  percent: 30
 ---
 
 # Project State
@@ -26,23 +26,23 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 36 — Codegen Pipeline + No-Dead-Entry Resolution
+**Current focus:** Phase 37 — Breadth A — Dev / Productivity (least-sensitive)
 
 ## Current Position
 
-Phase: 36 (Codegen Pipeline + No-Dead-Entry Resolution) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 37 of 43 (Breadth A — Dev / Productivity) — not started
+Plan: —
+Status: Phase 36 complete (verified passed); ready to plan Phase 37
 Last activity: 2026-06-24
 
-Progress: [██████████] 100%
+Progress: [██░░░░░░░░] 22% (2/9 phases)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
-| 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | Not started |
+| 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | ✓ Complete (2026-06-24) |
 | 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | Not started |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | Not started |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | Not started |
@@ -144,4 +144,4 @@ Resume file: None
 
 ## Next Actions
 
-Plan Phase 36 (Codegen Pipeline + No-Dead-Entry Resolution — CGEN-01..04). Phase 35 is complete and verified (denylist roster + fail-closed classification gate + DENY-04 posture-B sensitive-write re-gate + provenance scaffold + LEGAL Categorization Axes; 22/22 must-haves; the `classifyGate()` export is ready for the importer to consume). Phase 36 is research-flagged: the build-time `scripts/import-opentabs-catalog.mjs` (zod→closed-`params` flattening, forbidden-field pre-scan, side-effect verb-map + GraphQL/RPC carve-out) + the load-bearing no-dead-entry `resolve()` fallback branch (descriptor-only → T3/T2) + the full-scale search/eval proof, all gated on the Phase-35 classification gate before any descriptor lands. Recommended: `/gsd-plan-phase 36`. Note: side Phase 999.1 (click heuristics) is Backlog — NOT part of the v1.0.0 milestone (35-43); the autonomous run skips it. Existing live-browser UAT and release/publish actions remain carried-forward, user-gated debt; v1.0.0 does not block on them.
+Plan Phase 37 (Breadth A — Dev / Productivity, least-sensitive — BRDTH-01/02/03). Phases 35 + 36 are complete and verified. Phase 36 shipped the load-bearing pipeline: the tsx `scripts/import-opentabs-catalog.mjs` (z.toJSONSchema→closed flat descriptors, recursive forbidden-field pre-scan, classifyGate-before-emit), the shared `scripts/lib/side-effect-class.mjs` (verb-map + GraphQL/RPC carve-out + override floor + fail-safe-high, used by BOTH importer and the `verify-catalog-crosscheck.mjs` gate so they can't diverge), the one-branch `resolve()` no-dead-entry fallback (descriptor-only → T3/T2, zero router edits), and the catalog inlining (IIFE/djb2 byte-stable, INV-01). Smoke proof on todoist: recall@5=1.000, wrong-invoke=0, cold-start 9.9KB/0.4ms. Phase 37 reuses this pipeline to import the FIRST real breadth batch (dev/PM/cloud/observability apps), establishing the BRDTH contract: all real apps return from `search_capabilities` with intent synonyms + side-effect class + a backing-status signal; each batch gated on its origins being denylist-classified (DENY-03) before merge. **CARRY-FORWARD into Phase 37 (from 36 code review MED-03): the intent-synonym generator has a synonym-collision/grammar weakness that bites at breadth scale (cross-app `create_*` near-neighbors) — address it in Phase 37 with the asana/linear near-neighbor eval fixtures.** Recommended: `/gsd-plan-phase 37`. Side Phase 999.1 (click heuristics) is Backlog — NOT part of v1.0.0 (35-43); the autonomous run skips it. Existing live-browser UAT + release/publish actions remain carried-forward, user-gated debt.
