@@ -45,5 +45,34 @@
 
   { "intent": "create a new calendar event", "expectedSlug": "calendar.create-event" },
   { "intent": "schedule a meeting on my calendar", "expectedSlug": "calendar.create-event" },
-  { "intent": "book an appointment on my calendar", "expectedSlug": "calendar.create-event" }
+  { "intent": "book an appointment on my calendar", "expectedSlug": "calendar.create-event" },
+
+  { "intent": "create a new task in todoist", "expectedSlug": "todoist.create_task" },
+  { "intent": "add a to-do item to my todoist", "expectedSlug": "todoist.create_task" },
+  { "intent": "make a new todoist task", "expectedSlug": "todoist.create_task" },
+  { "intent": "create a task on todoist", "expectedSlug": "todoist.create_task" },
+
+  { "intent": "list the tasks in my todoist", "expectedSlug": "todoist.list_tasks" },
+  { "intent": "show me my todoist to-do list", "expectedSlug": "todoist.list_tasks" },
+  { "intent": "what tasks do i have in todoist", "expectedSlug": "todoist.list_tasks" },
+
+  { "intent": "get a single todoist task by id", "expectedSlug": "todoist.get_task" },
+  { "intent": "look up one specific todoist task", "expectedSlug": "todoist.get_task" },
+  { "intent": "fetch a particular task from todoist", "expectedSlug": "todoist.get_task" },
+
+  { "intent": "update an existing todoist task", "expectedSlug": "todoist.update_task" },
+  { "intent": "edit the details of a todoist task", "expectedSlug": "todoist.update_task" },
+  { "intent": "change a task in todoist", "expectedSlug": "todoist.update_task" },
+
+  { "intent": "complete a task in todoist", "expectedSlug": "todoist.close_task" },
+  { "intent": "mark my todoist task as done", "expectedSlug": "todoist.close_task" },
+  { "intent": "check off a todoist task", "expectedSlug": "todoist.close_task" },
+
+  { "intent": "reopen a completed todoist task", "expectedSlug": "todoist.reopen_task" },
+  { "intent": "uncomplete a task in todoist", "expectedSlug": "todoist.reopen_task" },
+  { "intent": "restore a finished todoist task", "expectedSlug": "todoist.reopen_task" },
+
+  { "intent": "delete a task from todoist", "expectedSlug": "todoist.delete_task" },
+  { "intent": "permanently remove a todoist task", "expectedSlug": "todoist.delete_task" },
+  { "intent": "trash a todoist task for good", "expectedSlug": "todoist.delete_task" }
 ]

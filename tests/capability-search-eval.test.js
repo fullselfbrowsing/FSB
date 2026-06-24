@@ -118,6 +118,27 @@ if (wrongs.length) {
 check(recall >= 0.9, `recall@5 ${recall.toFixed(3)} >= 0.9 (SURF-06 / D-13)`);
 check(wrongRate === 0, `wrong-invoke ${wrongRate.toFixed(3)} === 0 (non-negotiable, D-13)`);
 
+// ---- CGEN-04: serialized-index-size + SW cold-start budget (smoke proof) ------
+// Phase 36 Plan 04: add the MEASUREMENT MACHINERY before breadth lands (Phase 43
+// re-runs the same gate at the full ~2,523-descriptor scale). The data-layout
+// discipline this proves: params are NOT indexed/stored (schema-on-hit via the
+// slug->descriptor map), so the serialized index stays small and loadJSON+first
+// search stays fast. Serialize the SAME ms built above with INDEX_OPTIONS, then time
+// MiniSearch.loadJSON(serialized, INDEX_OPTIONS) + a first search (the cold-start
+// path: a freshly-woken SW restores the snapshot and answers one query). Generous
+// smoke gates (< 50KB, < 10ms) -- the point is that the asserts exist + the layout
+// holds, not a tight benchmark.
+const { performance } = require('perf_hooks');
+const smokeSerialized = JSON.stringify(ms.toJSON()); // toJSON() returns an object; loadJSON wants a JSON string
+check(smokeSerialized.length < 50 * 1024,
+  `smoke index serialized < 50KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors)`);
+const _t0 = performance.now();
+const smokeRestored = MiniSearch.loadJSON(smokeSerialized, INDEX_OPTIONS); // SAME options -- mandatory
+smokeRestored.search('create a task'); // first search on the cold-restored index
+const smokeElapsedMs = performance.now() - _t0;
+check(smokeElapsedMs < 10,
+  `smoke loadJSON(serialized, INDEX_OPTIONS) + first search < 10ms (got ${smokeElapsedMs.toFixed(2)}ms)`);
+
 // ---- SURF-04: toJSON -> loadJSON(json, INDEX_OPTIONS) round-trip -------------
 const sampleQuery = 'message my team on slack';
 const beforeHits = ms.search(sampleQuery).slice(0, 5).map((h) => h.id);

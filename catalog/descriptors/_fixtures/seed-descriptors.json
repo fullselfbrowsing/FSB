@@ -166,5 +166,147 @@
     "description": "Create a new event on your calendar",
     "actionVerb": "create",
     "sideEffectClass": "mutate"
+  },
+
+  {
+    "slug": "todoist.create_task",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "create a new task in todoist",
+      "add a todoist task",
+      "make a task on todoist",
+      "create a todoist to-do",
+      "add a to-do item to todoist"
+    ],
+    "description": "Create a new task in Todoist",
+    "actionVerb": "create",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "todoist.list_tasks",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "list my todoist tasks",
+      "show my tasks in todoist",
+      "what tasks do i have in todoist",
+      "view my todoist to-do list",
+      "read my todoist tasks"
+    ],
+    "description": "List active tasks in Todoist",
+    "actionVerb": "list",
+    "sideEffectClass": "read"
+  },
+  {
+    "slug": "todoist.get_task",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "get a todoist task by id",
+      "show one todoist task",
+      "fetch a single todoist task",
+      "view a specific todoist task",
+      "look up a todoist task"
+    ],
+    "description": "Get a single task from Todoist",
+    "actionVerb": "get",
+    "sideEffectClass": "read"
+  },
+  {
+    "slug": "todoist.update_task",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "update a todoist task",
+      "edit a task in todoist",
+      "change a todoist task",
+      "modify my todoist task",
+      "rename a todoist task"
+    ],
+    "description": "Update an existing task in Todoist",
+    "actionVerb": "update",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "todoist.close_task",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "complete a todoist task",
+      "close a task in todoist",
+      "mark a todoist task done",
+      "finish a todoist task",
+      "check off a todoist task"
+    ],
+    "description": "Close (complete) a task in Todoist",
+    "actionVerb": "close",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "todoist.reopen_task",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "reopen a todoist task",
+      "uncomplete a todoist task",
+      "mark a todoist task not done",
+      "restore a completed todoist task",
+      "undo completing a todoist task"
+    ],
+    "description": "Reopen a completed task in Todoist",
+    "actionVerb": "reopen",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "todoist.delete_task",
+    "service": "app.todoist.com",
+    "intentSynonyms": [
+      "delete a todoist task",
+      "remove a task from todoist",
+      "permanently delete a todoist task",
+      "erase a todoist task",
+      "trash a todoist task"
+    ],
+    "description": "Delete a task in Todoist",
+    "actionVerb": "delete",
+    "sideEffectClass": "destructive"
+  },
+
+  {
+    "slug": "asana.create_task",
+    "service": "app.asana.com",
+    "intentSynonyms": [
+      "create a new task in asana",
+      "add an asana task",
+      "make a task on asana",
+      "create an asana to-do",
+      "add a task to my asana project"
+    ],
+    "description": "Create a new task in Asana",
+    "actionVerb": "create",
+    "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "asana.list_tasks",
+    "service": "app.asana.com",
+    "intentSynonyms": [
+      "list my asana tasks",
+      "show my tasks in asana",
+      "view my asana task list",
+      "what tasks are in asana",
+      "read my asana tasks"
+    ],
+    "description": "List tasks in Asana",
+    "actionVerb": "list",
+    "sideEffectClass": "read"
+  },
+  {
+    "slug": "linear.create_issue",
+    "service": "linear.app",
+    "intentSynonyms": [
+      "create a new issue in linear",
+      "open a linear issue",
+      "file a linear ticket",
+      "add an issue to linear",
+      "make a new linear issue"
+    ],
+    "description": "Create a new issue in Linear",
+    "actionVerb": "create",
+    "sideEffectClass": "mutate"
   }
 ]
