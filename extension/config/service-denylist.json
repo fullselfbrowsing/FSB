@@ -1,12 +1,22 @@
 {
   "v": 1,
-  "_comment": "Phase 30 (GOV-08, D-15/D-16) conservative service denylist + sensitive-origin seed. deniedOrigins: services where automation is categorically prohibited (rendered non-enableable by the consent gate, checked BEFORE per-origin policy). sensitiveOrigins: services that force extra friction (Ask / confirm) even under Auto but are not necessarily hard-denied. This is a CONSERVATIVE category seed, NOT an aggressive broad blocklist, and is USER-EXTENSIBLE. Host patterns use a leading 'https://*.' subdomain-wildcard form: 'https://*.chase.com' matches any subdomain of chase.com (and the bare apex); 'https://*.gov' matches any host ending in '.gov'. A pattern with no '*' matches that exact origin. See docs/LEGAL.md for the policy rationale.",
+  "_comment": "Phase 30 (GOV-08, D-15/D-16) conservative service denylist + sensitive-origin seed. deniedOrigins: services where automation is categorically prohibited (rendered non-enableable by the consent gate, checked BEFORE per-origin policy). sensitiveOrigins: services that force extra friction (Ask / confirm) even under Auto but are not necessarily hard-denied. This is a CONSERVATIVE category seed, NOT an aggressive broad blocklist, and is USER-EXTENSIBLE. Host patterns use a leading 'https://*.' subdomain-wildcard form: 'https://*.chase.com' matches any subdomain of chase.com (and the bare apex); 'https://*.gov' matches any host ending in '.gov'. A pattern with no '*' matches that exact origin. See docs/LEGAL.md for the policy rationale. Phase 35 (v1.0.0, DENY-01/02) expands the roster ahead of OpenTabs descriptor import (opt-out Auto makes the denylist the ONE hard floor): brokerage/trading + ToS-hostile media/social are added to deniedOrigins; payments/budgeting + IG/FB/TikTok/X + messaging are added to sensitiveOrigins (reads under Auto, writes mutating-gated by posture B). Several roster origins use the EXACT-host form (digital.fidelity.com, dashboard.stripe.com, music.youtube.com NOT *.youtube.com, etc.) so a pattern is never broader than OpenTabs' own urlPattern host scope.",
   "deniedReason": "Automation prohibited for this service category (financial / government). See docs/LEGAL.md.",
   "deniedOrigins": [
     "https://*.chase.com",
     "https://*.bankofamerica.com",
     "https://*.wellsfargo.com",
-    "https://*.irs.gov"
+    "https://*.irs.gov",
+    "https://*.robinhood.com",
+    "https://digital.fidelity.com",
+    "https://app.carta.com",
+    "https://*.netflix.com",
+    "https://open.spotify.com",
+    "https://*.twitch.tv",
+    "https://store.steampowered.com",
+    "https://music.youtube.com",
+    "https://*.tinder.com",
+    "https://*.onlyfans.com"
   ],
   "sensitiveOrigins": [
     "https://*.chase.com",
@@ -15,6 +25,21 @@
     "https://mail.google.com",
     "https://outlook.live.com",
     "https://outlook.office.com",
-    "https://*.gov"
+    "https://*.gov",
+    "https://dashboard.stripe.com",
+    "https://*.coinbase.com",
+    "https://console.twilio.com",
+    "https://app.ynab.com",
+    "https://*.instagram.com",
+    "https://*.facebook.com",
+    "https://*.tiktok.com",
+    "https://*.x.com",
+    "https://web.whatsapp.com",
+    "https://web.telegram.org",
+    "https://*.slack.com",
+    "https://discord.com",
+    "https://teams.live.com",
+    "https://teams.microsoft.com",
+    "https://teams.cloud.microsoft"
   ]
 }
