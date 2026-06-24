@@ -201,9 +201,20 @@ export function classifyGate(items, opts) {
 
 // ---- The named roster origins (35-RESEARCH Q2) -------------------------------
 // Appended to the CLI item list so the gate sweeps the explicitly-classified
-// roster too: every one of these trips a heuristic axis, and Plan 35-01's data
-// classifies all of them, so they prove the "explicitly classified -> OK" path
-// over real origins (and would catch a regression that dropped a roster entry).
+// roster too. Plan 35-01's data classifies all of them, so they prove the
+// "explicitly classified -> OK" path over real origins: each hits the
+// classify()-matched `continue` BEFORE the heuristic runs.
+//
+// LO-01: this sweep proves CLASSIFICATION, not heuristic-coverage of every host.
+// With slug/description empty (as these roster items are), the HOST alone does
+// NOT trip any axis for 4 of the 23 entries -- store.steampowered.com
+// ("steampowered" is not "steam" under \bsteam\b), console.twilio.com ("twilio"
+// is in no axis), x.com (the social axis has "twitter", not "x"), and
+// teams.microsoft.com ("teams" is no token). They pass today ONLY because they
+// are explicitly classified. So if a future edit dropped one of THOSE from
+// service-denylist.json, this host-only sweep would NOT catch it on the
+// heuristic alone -- the sweep is a classification proof, not a per-host
+// regression net for brand-only hosts the vocabulary lacks.
 const ROSTER_ITEMS = [
   // DENY-01 denied (brokerage/trading + ToS-hostile media/social)
   { origin: 'https://robinhood.com', service: 'robinhood' },
