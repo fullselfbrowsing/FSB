@@ -5131,24 +5131,144 @@ textarea.form-input {
  * Inline indicator chip + refresh button row used by the model selector.
  * Tokens reused from the existing semantic palette to stay theme-aware.
  * ------------------------------------------------------------------------- */
-.model-select-row {
+/* Unified model combobox — a searchable dropdown rendered over a hidden
+   native <select> that remains the value source of truth. */
+.model-combobox {
+  position: relative;
+}
+
+/* Native <select> kept in the DOM as the value store, hidden from view. */
+.model-combobox__native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.model-combobox__control {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
 }
-.model-search-row {
-  margin-bottom: var(--space-2, 0.5rem);
-}
-.model-search-row .form-input {
-  width: 100%;
-}
-.model-select-row .form-select {
+
+.model-combobox__field {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  align-items: center;
 }
-.model-select-row #refreshModelsBtn {
+
+.model-combobox__input {
+  width: 100%;
+  padding-right: 2.5rem; /* room for the chevron */
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.model-combobox.is-open .model-combobox__input {
+  cursor: text;
+}
+
+.model-combobox__chevron {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+.model-combobox__chevron:hover {
+  color: var(--primary-color);
+}
+.model-combobox.is-open .model-combobox__chevron {
+  transform: rotate(180deg);
+  color: var(--primary-color);
+}
+
+.model-combobox.is-disabled {
+  opacity: 0.7;
+}
+.model-combobox.is-disabled .model-combobox__input,
+.model-combobox.is-disabled .model-combobox__chevron {
+  cursor: not-allowed;
+}
+
+.model-combobox__control #refreshModelsBtn {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+/* Popup listbox */
+.model-combobox__listbox {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.25));
+}
+.model-combobox__listbox[hidden] {
+  display: none;
+}
+
+.model-combobox__option {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 8px);
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-combobox__option:hover,
+.model-combobox__option.is-active {
+  background: var(--primary-light);
+}
+.model-combobox__option.is-selected {
+  font-weight: 600;
+}
+.model-combobox__option.is-selected::after {
+  content: "\2713"; /* check mark */
+  float: right;
+  margin-left: 8px;
+  color: var(--primary-color);
+}
+
+.model-combobox__status {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* Subtle orange emphasis on the matched search term within results. */
+.model-combobox__hl {
+  background: color-mix(in srgb, var(--primary-color) 22%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 600;
 }
 
 .discovery-status {

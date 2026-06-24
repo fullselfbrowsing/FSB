@@ -576,13 +576,12 @@ function setupEventListeners() {
     });
   }
 
-  const modelSearch = document.getElementById('modelSearch');
-  if (modelSearch) {
-    modelSearch.addEventListener('input', (e) => {
-      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
-      if (!ui || typeof ui.applyModelSearch !== 'function') return;
-      ui.applyModelSearch(e.target.value, { previousSelection: elements.modelName?.value });
-    });
+  // Unified model combobox: a searchable dropdown rendered over the (now
+  // hidden) #modelName select. It owns search/filter + selection, while the
+  // native select stays the value source of truth that discovery and the
+  // legacy provider flows keep writing into.
+  if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
+    globalThis.FSBModelCombobox.init();
   }
   
   // Model name change
@@ -965,6 +964,9 @@ function loadSettings() {
       // Wait for options to be populated
       setTimeout(() => {
         elements.modelName.value = settings.modelName;
+        if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
+          globalThis.FSBModelCombobox.refresh();
+        }
         const models = availableModels[settings.modelProvider || 'xai'];
         const selectedModel = models.find(m => m.id === settings.modelName);
         if (selectedModel) {
@@ -7031,13 +7033,6 @@ function initializeSyncSection() {
     });
   }
 
-  function _readSearchQuery() {
-    const doc = _doc();
-    if (!doc) return _currentSearchQuery;
-    const input = doc.getElementById('modelSearch');
-    return input && typeof input.value === 'string' ? input.value : _currentSearchQuery;
-  }
-
   function _renderModelDropdownOptions(models, selectedId) {
     const doc = _doc();
     if (!doc) return null;
@@ -7088,8 +7083,9 @@ function initializeSyncSection() {
 
   function renderModelDropdown(models, selectedId) {
     _currentModels = (Array.isArray(models) ? models : []).map(m => ({ ...m }));
-    _currentSearchQuery = _readSearchQuery();
-    return _renderModelDropdownOptions(filterModelsForSearch(_currentModels, _currentSearchQuery), selectedId);
+    // The unified combobox owns search/filtering as a view concern, so the
+    // native select always holds the full discovered list here.
+    return _renderModelDropdownOptions(_currentModels.slice(), selectedId);
   }
 
   function applyModelSearch(query, opts) {
@@ -7279,6 +7275,364 @@ function initializeSyncSection() {
   };
 
   global.FSBDiscoveryUI = api;
+})(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
+
+/**
+ * FSBModelCombobox — a searchable, keyboard-navigable dropdown rendered as a
+ * view over the native <select id="modelName"> (kept in the DOM but visually
+ * hidden as the value source of truth). It unifies the former separate search
+ * input + select into one control and highlights the matched search term in
+ * the result list.
+ *
+ * The native select stays canonical: discovery (FSBDiscoveryUI) and the legacy
+ * lmstudio/custom flow keep writing <option>s into it. A MutationObserver
+ * mirrors those changes into the popup; committing a pick writes back to the
+ * select and dispatches a native 'change' event so existing listeners fire.
+ */
+(function defineFSBModelCombobox(global) {
+  'use strict';
+
+  let _root = null;
+  let _input = null;
+  let _toggle = null;
+  let _listbox = null;
+  let _select = null;
+  let _observer = null;
+  let _initialized = false;
+
+  let _open = false;
+  let _searching = false;   // true once the user types; gates view-only filtering
+  let _activeIndex = -1;    // index into _optionEls
+  let _optionEls = [];      // rendered selectable <li> elements
+
+  function _doc() { return (typeof document !== 'undefined') ? document : null; }
+
+  function _normalize(value) {
+    return String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function _tokenize(query) {
+    return _normalize(query).trim().split(/\s+/).filter(Boolean);
+  }
+
+  function _escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // Wrap occurrences of the search tokens in <mark> for a subtle orange accent.
+  // Falls back to plain (escaped) text whenever normalization changes the
+  // string length, which would misalign match indices against the original.
+  function _highlight(text, tokens) {
+    const original = String(text || '');
+    if (!tokens.length) return _escapeHtml(original);
+    const norm = _normalize(original);
+    if (norm.length !== original.length) return _escapeHtml(original);
+
+    const ranges = [];
+    tokens.forEach((token) => {
+      if (!token) return;
+      let from = 0;
+      let idx;
+      while ((idx = norm.indexOf(token, from)) !== -1) {
+        ranges.push([idx, idx + token.length]);
+        from = idx + token.length;
+      }
+    });
+    if (!ranges.length) return _escapeHtml(original);
+
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    ranges.forEach((range) => {
+      const last = merged[merged.length - 1];
+      if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+      else merged.push(range.slice());
+    });
+
+    let out = '';
+    let cursor = 0;
+    merged.forEach((pair) => {
+      out += _escapeHtml(original.slice(cursor, pair[0]));
+      out += '<mark class="model-combobox__hl">' + _escapeHtml(original.slice(pair[0], pair[1])) + '</mark>';
+      cursor = pair[1];
+    });
+    out += _escapeHtml(original.slice(cursor));
+    return out;
+  }
+
+  function _selectedOption() {
+    if (!_select) return null;
+    const idx = _select.selectedIndex;
+    return idx >= 0 ? _select.options[idx] : null;
+  }
+
+  // Render the popup list from the native select's current options.
+  function _render() {
+    if (!_select || !_listbox) return;
+    const doc = _doc();
+    if (!doc) return;
+    const tokens = _searching ? _tokenize(_input.value) : [];
+    const options = Array.from(_select.options || []);
+
+    _listbox.innerHTML = '';
+    _optionEls = [];
+    let selectableShown = 0;
+
+    options.forEach((opt) => {
+      const value = opt.value;
+      const label = opt.textContent || '';
+      // Options with an empty value are status rows (loading / auth / empty
+      // states), not real choices. Show them only when not actively searching.
+      if (value === '') {
+        if (_searching) return;
+        const status = doc.createElement('li');
+        status.className = 'model-combobox__status';
+        status.setAttribute('role', 'presentation');
+        status.textContent = label;
+        _listbox.appendChild(status);
+        return;
+      }
+
+      if (tokens.length) {
+        const haystack = _normalize(label + ' ' + value);
+        if (!tokens.every((t) => haystack.indexOf(t) !== -1)) return;
+      }
+
+      const li = doc.createElement('li');
+      li.className = 'model-combobox__option';
+      li.setAttribute('role', 'option');
+      li.id = 'modelOption-' + _optionEls.length;
+      li.dataset.value = value;
+      li.innerHTML = _highlight(label, tokens);
+      const isSelected = value === _select.value;
+      li.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      if (isSelected) li.classList.add('is-selected');
+      _listbox.appendChild(li);
+      _optionEls.push(li);
+      selectableShown += 1;
+    });
+
+    if (_searching && selectableShown === 0) {
+      const empty = doc.createElement('li');
+      empty.className = 'model-combobox__status';
+      empty.setAttribute('role', 'presentation');
+      empty.textContent = 'No models match';
+      _listbox.appendChild(empty);
+    }
+
+    _setActive(_defaultActiveIndex());
+  }
+
+  function _defaultActiveIndex() {
+    const selectedIdx = _optionEls.findIndex((li) => li.dataset.value === _select.value);
+    if (selectedIdx !== -1) return selectedIdx;
+    return _optionEls.length ? 0 : -1;
+  }
+
+  function _setActive(index) {
+    _activeIndex = -1;
+    _optionEls.forEach((li, i) => {
+      const on = i === index;
+      li.classList.toggle('is-active', on);
+      if (on) {
+        _activeIndex = i;
+        if (_input) _input.setAttribute('aria-activedescendant', li.id);
+      }
+    });
+    if (_activeIndex === -1 && _input) _input.removeAttribute('aria-activedescendant');
+  }
+
+  function _moveActive(delta) {
+    if (!_optionEls.length) return;
+    let i = _activeIndex === -1 ? _defaultActiveIndex() : _activeIndex;
+    i = (i + delta + _optionEls.length) % _optionEls.length;
+    _setActive(i);
+    _scrollActiveIntoView();
+  }
+
+  function _scrollActiveIntoView() {
+    if (_activeIndex < 0) return;
+    const li = _optionEls[_activeIndex];
+    if (li && typeof li.scrollIntoView === 'function') li.scrollIntoView({ block: 'nearest' });
+  }
+
+  // Mirror the selected option's label into the input (display mode). Only runs
+  // when the popup is closed, so it never clobbers an in-progress search query.
+  function _syncDisplay() {
+    if (!_input || !_select || _open) return;
+    const opt = _selectedOption();
+    _input.value = (opt && opt.value !== '') ? (opt.textContent || '') : '';
+  }
+
+  function _syncDisabled() {
+    if (!_select || !_root) return;
+    const disabled = !!_select.disabled;
+    if (_input) _input.disabled = disabled;
+    if (_toggle) _toggle.disabled = disabled;
+    _root.classList.toggle('is-disabled', disabled);
+    if (disabled && _open) _close();
+  }
+
+  function _openList() {
+    if (_open || !_select || _select.disabled) return;
+    _open = true;
+    _searching = false;
+    if (_input) _input.value = ''; // clean search field; selection shown in-list + restored on close
+    _root.classList.add('is-open');
+    _listbox.hidden = false;
+    _input.setAttribute('aria-expanded', 'true');
+    _render();
+    _scrollActiveIntoView();
+  }
+
+  function _close() {
+    if (!_open) return;
+    _open = false;
+    _searching = false;
+    _root.classList.remove('is-open');
+    _listbox.hidden = true;
+    _input.setAttribute('aria-expanded', 'false');
+    _input.removeAttribute('aria-activedescendant');
+    _syncDisplay();
+  }
+
+  function _commit(value) {
+    if (value == null) return;
+    if (_select.value !== value) {
+      _select.value = value;
+      _select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    _close();
+  }
+
+  function _onKeydown(e) {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!_open) _openList();
+        else _moveActive(1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (!_open) _openList();
+        else _moveActive(-1);
+        break;
+      case 'Enter':
+        if (_open && _activeIndex >= 0 && _optionEls[_activeIndex]) {
+          e.preventDefault();
+          _commit(_optionEls[_activeIndex].dataset.value);
+        }
+        break;
+      case 'Escape':
+        if (_open) {
+          e.preventDefault();
+          _close();
+        }
+        break;
+      case 'Home':
+        if (_open && _optionEls.length) {
+          e.preventDefault();
+          _setActive(0);
+          _scrollActiveIntoView();
+        }
+        break;
+      case 'End':
+        if (_open && _optionEls.length) {
+          e.preventDefault();
+          _setActive(_optionEls.length - 1);
+          _scrollActiveIntoView();
+        }
+        break;
+      case 'Tab':
+        if (_open) _close();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function _onMutation() {
+    _syncDisabled();
+    if (_open) _render();
+    else _syncDisplay();
+  }
+
+  function init() {
+    if (_initialized) return;
+    const doc = _doc();
+    if (!doc) return;
+    _root = doc.getElementById('modelCombobox');
+    _input = doc.getElementById('modelSearch');
+    _toggle = doc.getElementById('modelComboboxToggle');
+    _listbox = doc.getElementById('modelListbox');
+    _select = doc.getElementById('modelName');
+    if (!_root || !_input || !_listbox || !_select) return;
+    _initialized = true;
+
+    _input.addEventListener('focus', () => {
+      if (_select.disabled) return;
+      _openList();
+    });
+    _input.addEventListener('click', () => {
+      if (_select.disabled) return;
+      if (!_open) _openList();
+    });
+    _input.addEventListener('input', () => {
+      _searching = true;
+      if (!_open) _openList();
+      else _render();
+    });
+    _input.addEventListener('keydown', _onKeydown);
+    _input.addEventListener('blur', () => { _close(); });
+
+    // Keep focus on the input while interacting with the popup / chevron so the
+    // blur-to-close handler doesn't fire before a click can commit a choice.
+    _listbox.addEventListener('mousedown', (e) => { e.preventDefault(); });
+    _listbox.addEventListener('click', (e) => {
+      const li = e.target.closest ? e.target.closest('.model-combobox__option') : null;
+      if (!li || !_listbox.contains(li)) return;
+      _commit(li.dataset.value);
+    });
+
+    if (_toggle) {
+      _toggle.addEventListener('mousedown', (e) => { e.preventDefault(); });
+      _toggle.addEventListener('click', () => {
+        if (_select.disabled) return;
+        if (_open) {
+          _close();
+        } else {
+          _input.focus();
+          _openList();
+        }
+      });
+    }
+
+    _select.addEventListener('change', () => { if (!_searching) _syncDisplay(); });
+
+    if (typeof MutationObserver === 'function') {
+      _observer = new MutationObserver(_onMutation);
+      _observer.observe(_select, { childList: true, attributes: true, attributeFilter: ['disabled'] });
+    }
+
+    _syncDisabled();
+    _syncDisplay();
+  }
+
+  // Re-sync the visible state after the select's value is set programmatically
+  // (e.g. loadSettings), which fires neither 'change' nor a DOM mutation.
+  function refresh() {
+    if (!_initialized) return;
+    _syncDisabled();
+    if (_open) _render();
+    else _syncDisplay();
+  }
+
+  global.FSBModelCombobox = { init, refresh };
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
 
 

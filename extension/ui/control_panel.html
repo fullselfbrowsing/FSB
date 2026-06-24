@@ -179,17 +179,23 @@
               
               <!-- Model Selection -->
               <div class="form-group">
-                <label for="modelName">Model</label>
-                <div class="model-search-row">
-                  <input type="search" id="modelSearch" class="form-input" placeholder="Search models" autocomplete="off" aria-label="Search models">
-                </div>
-                <div class="model-select-row">
-                  <select id="modelName" class="form-select">
-                    <!-- Options will be populated dynamically based on provider -->
+                <label for="modelSearch">Model</label>
+                <div class="model-combobox" id="modelCombobox">
+                  <div class="model-combobox__control">
+                    <div class="model-combobox__field">
+                      <input type="text" id="modelSearch" class="form-input model-combobox__input" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model">
+                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list">
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                    <button id="refreshModelsBtn" type="button" class="btn-secondary btn-icon" title="Refresh model list">
+                      <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                  </div>
+                  <ul class="model-combobox__listbox" id="modelListbox" role="listbox" aria-label="Models" tabindex="-1" hidden></ul>
+                  <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true">
+                    <!-- Hidden source of truth; options populated dynamically based on provider -->
                   </select>
-                  <button id="refreshModelsBtn" type="button" class="btn-secondary btn-icon" title="Refresh model list">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                  </button>
                 </div>
                 <div id="modelDiscoveryStatus" class="discovery-status" hidden></div>
                 <div class="form-help" id="modelDescription">Select the AI model to use</div>

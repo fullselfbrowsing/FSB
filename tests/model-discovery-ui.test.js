@@ -81,6 +81,14 @@ assert(
   /id="modelSearch"/.test(HTML),
   '[Task 1] control_panel.html has #modelSearch input'
 );
+assert(
+  /id="modelListbox"/.test(HTML),
+  '[Task 1] control_panel.html has #modelListbox combobox popup'
+);
+assert(
+  /id="modelName"/.test(HTML),
+  '[Task 1] control_panel.html retains #modelName select (value source of truth)'
+);
 
 console.log('\n--- Plan 228-02 / Task 1: CSS chip styles ---');
 
@@ -89,7 +97,9 @@ assert(/\.discovery-status\.info\b/.test(CSS), '[Task 1] options.css defines .di
 assert(/\.discovery-status\.warning\b/.test(CSS), '[Task 1] options.css defines .discovery-status.warning');
 assert(/\.discovery-status\.error\b/.test(CSS), '[Task 1] options.css defines .discovery-status.error');
 assert(/\.discovery-status\.loading\b/.test(CSS), '[Task 1] options.css defines .discovery-status.loading');
-assert(/\.model-search-row\b/.test(CSS), '[Task 1] options.css defines .model-search-row');
+assert(/\.model-combobox\b/.test(CSS), '[Task 1] options.css defines .model-combobox');
+assert(/\.model-combobox__listbox\b/.test(CSS), '[Task 1] options.css defines .model-combobox__listbox');
+assert(/\.model-combobox__hl\b/.test(CSS), '[Task 1] options.css defines .model-combobox__hl (search-term highlight)');
 
 console.log('\n--- Plan 228-02 / Task 2: options.js wiring call sites ---');
 
