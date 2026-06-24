@@ -66,7 +66,9 @@ Explicit exclusions (anti-features from research), documented to prevent scope c
 
 ## Traceability
 
-Proposed mapping (finalized by the roadmapper; each requirement maps to exactly one phase).
+Finalized by the roadmapper; each requirement maps to exactly one phase. 100% coverage, 0 orphans.
+
+Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes the breadth contract (all real apps return from search with intent synonyms + side-effect class + backing-status, each batch gated on denylist coverage). Phases 38 (Comms/Social/Content) and 39 (Commerce/Travel/Misc) are sensitivity-ascending CONTINUATION batches that extend the same three requirements to more categories; they own no additional v1.0.0 REQ-ID. Depth splits cleanly: DEPTH-01 (the hand-port contract + read heads) is owned by Phase 40; DEPTH-02 (guarded writes + DENY-04 re-enforcement + per-app CORS gate) is owned by Phase 41, which continues the same hand-port mechanism for the remaining heads.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -82,7 +84,7 @@ Proposed mapping (finalized by the roadmapper; each requirement maps to exactly 
 | BRDTH-02 | Phase 37 | Pending |
 | BRDTH-03 | Phase 37 | Pending |
 | DEPTH-01 | Phase 40 | Pending |
-| DEPTH-02 | Phase 40 | Pending |
+| DEPTH-02 | Phase 41 | Pending |
 | DSEED-01 | Phase 42 | Pending |
 | DSEED-02 | Phase 42 | Pending |
 | SCALE-01 | Phase 43 | Pending |
@@ -90,9 +92,9 @@ Proposed mapping (finalized by the roadmapper; each requirement maps to exactly 
 
 **Coverage:**
 - v1 requirements: 17 total
-- Mapped to phases: 17 (proposed; roadmapper finalizes batch phases 37-39 + depth 40-41)
+- Mapped to phases: 17 (DENY 4 -> P35; CGEN 4 -> P36; BRDTH 3 -> P37 [P38/P39 continue the contract]; DEPTH-01 -> P40, DEPTH-02 -> P41; DSEED 2 -> P42; SCALE 2 -> P43)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-23 -- v1.0.0 Full App Catalog (OpenTabs Parity)*
-*Last updated: 2026-06-23 after initial definition (research-backed; posture B re-gates sensitive writes)*
+*Last updated: 2026-06-24 -- traceability finalized by roadmapper (9 phases 35-43; DEPTH-02 mapped to Phase 41; BRDTH continuation batches 38-39 noted)*
