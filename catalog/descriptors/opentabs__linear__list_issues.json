@@ -3,8 +3,10 @@
   "service": "linear.app",
   "intentSynonyms": [
     "list issues in linear",
-    "list issues with optional filters in linear",
-    "list issues on linear"
+    "show me my issues in linear",
+    "view my issues in linear",
+    "see all my issues in linear",
+    "list issues with optional filters in linear"
   ],
   "description": "List issues from Linear. Optionally filter by team, assignee, or state.",
   "actionVerb": "list",

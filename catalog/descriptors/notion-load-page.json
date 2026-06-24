@@ -11,6 +11,7 @@
   "description": "Load a Notion page (T1a /api/v3 RPC handler, read)",
   "actionVerb": "load",
   "sideEffectClass": "read",
+  "backing": "handler",
   "params": {
     "type": "object",
     "properties": {

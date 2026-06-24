@@ -320,12 +320,12 @@ function opFileBaseOf(opName) {
 }
 
 // ---------------------------------------------------------------------------
-// intentSynonyms: >=3 (target 4) app-disambiguated, grammatically-clean phrases.
+// intentSynonyms: app-disambiguated, grammatically-clean, intent-rich phrases.
 // ---------------------------------------------------------------------------
 // MED-03 rewrite (carried from 36-REVIEW; CONTEXT "Intent synonyms + MED-03"). The
-// Phase-36 heuristic produced two failures that erode recall@5/wrong-invoke at
-// breadth scale, where cross-app create_* near-neighbors (asana/linear/todoist)
-// collide:
+// Phase-36 heuristic produced failures that erode recall@5/wrong-invoke at breadth
+// scale, where cross-app create_* near-neighbors (asana/linear/todoist) AND intra-app
+// op near-neighbors (todoist get/update/close/reopen/delete) collide:
 //   1. GRAMMATICALLY-BROKEN phrases: `${parts[0]} a ${noun}` over `list_tasks` ->
 //      "list a tasks" (a plural noun after "a"). DROP the "<verb> a <noun>" form when
 //      the noun is plural.
@@ -333,10 +333,33 @@ function opFileBaseOf(opName) {
 //      the index cannot disambiguate. EVERY synthesized phrase MUST carry the
 //      serviceStem token (the app-disambiguating signal) so the index + the owned-
 //      origin search bias (ORIGIN_BOOST in capability-search.js) route the intent to
-//      the right app. The "<verb> a <singular-noun>" form is the ONLY stem-less
-//      phrase the old code emitted; it is removed (its stem-bearing sibling
-//      "<verb> <noun> in <service>" stays).
-// Guarantee >=3 entries; cap at 5. Pure string synthesis (no dynamic-code).
+//      the right app.
+//   3. INTENT-SPARSE phrases: a bare op verb ("get", "close") does not match the
+//      colloquial way a user expresses the intent ("look up", "check off", "mark
+//      done"), so an op loses its own intent-case to a sibling op. A CURATED
+//      verb-synonym map (INTENT_VERB_SYNONYMS, Claude's Discretion per CONTEXT) maps
+//      each canonical op verb to its distinguishing colloquial alternates so each op
+//      OWNS its intent and never cross-matches a sibling.
+// Guarantee >=3 entries. Pure string synthesis (no dynamic-code).
+
+// Curated op-verb -> distinguishing colloquial alternates. Keyed by the canonical
+// op-name verb (verbPrefix). Each alternate is woven into an app-tagged phrase so the
+// op owns its intent surface. The map is deliberately SMALL + per-verb-distinct: the
+// read-family verbs (get vs list) and the mutate-family verbs (update vs close vs
+// reopen vs delete) get NON-overlapping alternates so a "look up one task" routes to
+// get_task, not list_tasks, and "check off a task" routes to close_task, not update.
+const INTENT_VERB_SYNONYMS = {
+  create: ['create', 'add', 'make a new', 'open a new'],
+  list: ['list', 'show me my', 'view my', 'see all my'],
+  get: ['get', 'look up', 'fetch a single', 'view one specific'],
+  update: ['update', 'edit', 'change the details of', 'modify'],
+  close: ['complete', 'mark done', 'check off', 'finish'],
+  reopen: ['reopen', 'uncomplete', 'restore a completed', 'mark not done'],
+  delete: ['delete', 'remove', 'trash', 'permanently delete'],
+  send: ['send', 'post', 'write a new'],
+  comment: ['comment on', 'add a comment to', 'reply on'],
+};
+
 function isPluralNoun(noun) {
   const n = String(noun || '').trim().toLowerCase();
   if (!n) return false;
@@ -348,47 +371,68 @@ function isPluralNoun(noun) {
 function synthSynonyms(tool, serviceStem) {
   const out = [];
   const stem = String(serviceStem || '').trim();
+  const stemRe = new RegExp('\\b' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
   const push = (s) => {
-    const v = String(s || '').trim();
+    const v = String(s || '').trim().replace(/\s+/g, ' ');
     // Every phrase MUST carry the serviceStem token (app disambiguation, MED-03).
-    if (v && new RegExp('\\b' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(v) && !out.includes(v)) {
+    if (v && stemRe.test(v) && !out.includes(v)) {
       out.push(v);
     }
   };
   const summary = tool.summary ? String(tool.summary).toLowerCase() : '';
-  const display = tool.displayName ? String(tool.displayName).toLowerCase() : '';
   const verb = verbPrefix(tool.name);
   // verb + noun from the op name (create_issue -> verb 'create', noun 'issue').
   const parts = String(tool.name || '').split('_');
   const noun = parts.length >= 2 ? parts.slice(1).join(' ') : '';
+  const plural = isPluralNoun(noun);
+  // Singularize a trailing-'s' plural noun for the "<alt> a <noun>" article form.
+  const singular = plural ? noun.replace(/s$/, '') : noun;
 
-  // 1. "<verb> a <singular-noun> in <service>" -- the strong intent form, app-tagged.
-  //    DROPPED entirely when the noun is plural ("list a tasks" is wrong); the plural
-  //    op still gets its "<verb> <noun> in <service>" phrase below.
-  if (verb && noun && !isPluralNoun(noun)) {
-    push(`${verb} a ${noun} in ${stem}`);
+  // The curated verb alternates (each distinguishing this op from its siblings),
+  // falling back to the bare op verb when the verb is not in the map.
+  const verbAlts = (Object.prototype.hasOwnProperty.call(INTENT_VERB_SYNONYMS, verb)
+    ? INTENT_VERB_SYNONYMS[verb]
+    : [verb]).filter(Boolean);
+
+  // 1. Curated alternate phrases, app-tagged. For a plural-noun op (list_tasks) use
+  //    the plain "<alt> <noun> in <stem>" form; for a singular-noun op use the
+  //    "<alt> a <noun> in <stem>" article form -- UNLESS the alternate already ends in
+  //    an article/determiner word (a / an / new / my / of / specific), in which case
+  //    the bare-noun form is grammatically clean ("make a new issue", not "make a new
+  //    a issue"; "fetch a single task", not "fetch a single a task").
+  const endsWithDeterminer = (alt) => /\b(a|an|new|my|of|specific|single)$/i.test(String(alt || '').trim());
+  for (const alt of verbAlts) {
+    if (!noun) {
+      push(`${alt} in ${stem}`);
+    } else if (plural) {
+      // plural-noun op (list_tasks): keep the plural noun, no article ("list tasks").
+      push(`${alt} ${noun} in ${stem}`);
+    } else if (endsWithDeterminer(alt)) {
+      // the alternate already supplies the determiner ("make a new" / "fetch a
+      // single") -> bare singular noun, no extra article ("make a new issue").
+      push(`${alt} ${singular} in ${stem}`);
+    } else {
+      // a bare verb alternate ("create"/"edit") -> add the article ("create a issue").
+      push(`${alt} a ${singular} in ${stem}`);
+    }
   }
-  // 2. "<verb> <noun> in <service>" -- works for both singular and plural nouns.
+  // 2. The canonical "<verb> <noun> in <service>" form (covers the literal op name).
   if (verb && noun) {
     push(`${verb} ${noun} in ${stem}`);
   }
-  // 3. summary + service ("create a new issue in linear").
+  // 3. summary + service ("create a new issue in linear") -- a natural full phrasing.
   if (summary) push(`${summary} in ${stem}`);
-  // 4. display + service ("create issue on linear").
-  if (display) push(`${display.replace(/\s+/g, ' ')} on ${stem}`);
-  // 5. "<verb> <noun> on <service>" -- an alternate-preposition phrasing for variety.
-  if (verb && noun) {
-    push(`${verb} ${noun} on ${stem}`);
-  }
 
   // Guarantee at least 3 entries (every fallback still carries the stem).
   let i = 0;
   while (out.length < 3) {
-    push(`${verb || 'use'} ${stem} ${noun || i}`.trim());
+    push(`${verb || 'use'} ${noun || ''} ${stem} ${i || ''}`.trim());
     i++;
     if (i > 8) break; // defensive: never loop forever
   }
-  return out.slice(0, 5);
+  // Cap at 6: enough to cover the colloquial intent surface (recall + wrong-invoke=0)
+  // while keeping the serialized index small (the SCALE-01 cold-start budget).
+  return out.slice(0, 6);
 }
 
 // ---------------------------------------------------------------------------

@@ -10,5 +10,6 @@
   ],
   "description": "List your unread GitHub notifications",
   "actionVerb": "list",
-  "sideEffectClass": "read"
+  "sideEffectClass": "read",
+  "backing": "recipe"
 }

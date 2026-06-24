@@ -3,9 +3,11 @@
   "service": "linear.app",
   "intentSynonyms": [
     "update a issue in linear",
+    "edit a issue in linear",
+    "change the details of issue in linear",
+    "modify a issue in linear",
     "update issue in linear",
-    "update an issue in linear",
-    "update issue on linear"
+    "update an issue in linear"
   ],
   "description": "Update an existing Linear issue. Provide the issue ID and any fields to change.",
   "actionVerb": "update",

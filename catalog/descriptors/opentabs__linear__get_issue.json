@@ -3,9 +3,11 @@
   "service": "linear.app",
   "intentSynonyms": [
     "get a issue in linear",
+    "look up a issue in linear",
+    "fetch a single issue in linear",
+    "view one specific issue in linear",
     "get issue in linear",
-    "get a single issue in linear",
-    "get issue on linear"
+    "get a single issue in linear"
   ],
   "description": "Get a single issue from Linear by its ID or identifier.",
   "actionVerb": "get",

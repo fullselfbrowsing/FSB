@@ -3,9 +3,11 @@
   "service": "app.asana.com",
   "intentSynonyms": [
     "create a task in asana",
+    "add a task in asana",
+    "make a new task in asana",
+    "open a new task in asana",
     "create task in asana",
-    "create a new task in asana",
-    "create task on asana"
+    "create a new task in asana"
   ],
   "description": "Create a new task in Asana. Requires a name at minimum. Optionally set notes, assignee, projects, due date, and parent task.",
   "actionVerb": "create",

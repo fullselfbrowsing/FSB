@@ -39,6 +39,7 @@
       "description": "Create a new GitHub issue (T1a persisted-query handler, write)",
       "actionVerb": "create",
       "sideEffectClass": "write",
+      "backing": "handler",
       "params": {
         "type": "object",
         "properties": {
@@ -73,6 +74,7 @@
       "description": "List your assigned GitHub issues (T1a persisted-query handler, read)",
       "actionVerb": "list",
       "sideEffectClass": "read",
+      "backing": "handler",
       "params": {
         "type": "object",
         "properties": {
@@ -96,7 +98,8 @@
       ],
       "description": "List your unread GitHub notifications",
       "actionVerb": "list",
-      "sideEffectClass": "read"
+      "sideEffectClass": "read",
+      "backing": "recipe"
     },
     {
       "slug": "notion.loadPage",
@@ -111,6 +114,7 @@
       "description": "Load a Notion page (T1a /api/v3 RPC handler, read)",
       "actionVerb": "load",
       "sideEffectClass": "read",
+      "backing": "handler",
       "params": {
         "type": "object",
         "properties": {
@@ -145,6 +149,7 @@
       "description": "List your Notion spaces (T1a /api/v3 RPC handler, read)",
       "actionVerb": "list",
       "sideEffectClass": "read",
+      "backing": "handler",
       "params": {
         "type": "object",
         "properties": {},
@@ -152,14 +157,510 @@
       }
     },
     {
+      "slug": "asana.create_task",
+      "service": "app.asana.com",
+      "intentSynonyms": [
+        "create a task in asana",
+        "add a task in asana",
+        "make a new task in asana",
+        "open a new task in asana",
+        "create task in asana",
+        "create a new task in asana"
+      ],
+      "description": "Create a new task in Asana. Requires a name at minimum. Optionally set notes, assignee, projects, due date, and parent task.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task name/title"
+          },
+          "notes": {
+            "description": "Task notes/description",
+            "type": "string"
+          },
+          "assignee": {
+            "description": "User ID to assign the task to",
+            "type": "string"
+          },
+          "projects": {
+            "description": "List of project IDs to add the task to",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "workspace": {
+            "description": "Workspace ID the task belongs to",
+            "type": "string"
+          },
+          "due_on": {
+            "description": "Due date in YYYY-MM-DD format",
+            "type": "string"
+          },
+          "parent": {
+            "description": "Parent task ID to create a subtask",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/asana/src/tools/create-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "asana.get_task",
+      "service": "app.asana.com",
+      "intentSynonyms": [
+        "get a task in asana",
+        "look up a task in asana",
+        "fetch a single task in asana",
+        "view one specific task in asana",
+        "get task in asana",
+        "get a single task in asana"
+      ],
+      "description": "Get a single task from Asana by its GID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_gid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task GID to fetch"
+          }
+        },
+        "required": [
+          "task_gid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/asana/src/tools/get-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "asana.list_tasks",
+      "service": "app.asana.com",
+      "intentSynonyms": [
+        "list tasks in asana",
+        "show me my tasks in asana",
+        "view my tasks in asana",
+        "see all my tasks in asana",
+        "list tasks with optional filters in asana"
+      ],
+      "description": "List tasks from Asana. Optionally filter by project, assignee, or workspace.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "description": "Filter tasks by project ID",
+            "type": "string"
+          },
+          "assignee": {
+            "description": "Filter tasks by assignee user ID",
+            "type": "string"
+          },
+          "workspace": {
+            "description": "Workspace ID to scope the listing",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of tasks to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/asana/src/tools/list-tasks.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "asana.update_task",
+      "service": "app.asana.com",
+      "intentSynonyms": [
+        "update a task in asana",
+        "edit a task in asana",
+        "change the details of task in asana",
+        "modify a task in asana",
+        "update task in asana"
+      ],
+      "description": "Update an existing Asana task. Provide the task GID and any fields to change.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_gid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task GID to update"
+          },
+          "name": {
+            "description": "New task name",
+            "type": "string"
+          },
+          "notes": {
+            "description": "New task notes/description",
+            "type": "string"
+          },
+          "assignee": {
+            "description": "User ID to reassign the task to",
+            "type": "string"
+          },
+          "completed": {
+            "description": "Mark the task completed or not",
+            "type": "boolean"
+          },
+          "due_on": {
+            "description": "New due date in YYYY-MM-DD format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_gid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/asana/src/tools/update-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "PUT",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "linear.create_comment",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "create a comment in linear",
+        "add a comment in linear",
+        "make a new comment in linear",
+        "open a new comment in linear",
+        "create comment in linear",
+        "comment on an issue in linear"
+      ],
+      "description": "Add a comment to a Linear issue. Requires the issue ID and the comment body.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID to comment on"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comment body in markdown"
+          }
+        },
+        "required": [
+          "issueId",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/create-comment.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "linear.create_issue",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "create a issue in linear",
+        "add a issue in linear",
+        "make a new issue in linear",
+        "open a new issue in linear",
+        "create issue in linear",
+        "create a new issue in linear"
+      ],
+      "description": "Create a new issue in Linear. Requires a team and a title at minimum. Optionally set description, assignee, priority, labels, project, and estimate.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team ID to create the issue in"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue title"
+          },
+          "description": {
+            "description": "Issue description in markdown",
+            "type": "string"
+          },
+          "assigneeId": {
+            "description": "User ID to assign the issue to",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority from 0 (none) to 4 (urgent)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          },
+          "labelIds": {
+            "description": "List of label IDs to apply",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "projectId": {
+            "description": "Project ID to associate the issue with",
+            "type": "string"
+          },
+          "estimate": {
+            "description": "Estimate points for the issue",
+            "type": "number"
+          }
+        },
+        "required": [
+          "teamId",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/create-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "linear.get_issue",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "get a issue in linear",
+        "look up a issue in linear",
+        "fetch a single issue in linear",
+        "view one specific issue in linear",
+        "get issue in linear",
+        "get a single issue in linear"
+      ],
+      "description": "Get a single issue from Linear by its ID or identifier.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID or identifier (e.g. ENG-123) to fetch"
+          }
+        },
+        "required": [
+          "issueId"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/get-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "linear.list_issues",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "list issues in linear",
+        "show me my issues in linear",
+        "view my issues in linear",
+        "see all my issues in linear",
+        "list issues with optional filters in linear"
+      ],
+      "description": "List issues from Linear. Optionally filter by team, assignee, or state.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "description": "Filter issues by team ID",
+            "type": "string"
+          },
+          "assigneeId": {
+            "description": "Filter issues by assignee user ID",
+            "type": "string"
+          },
+          "stateId": {
+            "description": "Filter issues by workflow state ID",
+            "type": "string"
+          },
+          "first": {
+            "description": "Maximum number of issues to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/list-issues.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "linear.update_issue",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "update a issue in linear",
+        "edit a issue in linear",
+        "change the details of issue in linear",
+        "modify a issue in linear",
+        "update issue in linear",
+        "update an issue in linear"
+      ],
+      "description": "Update an existing Linear issue. Provide the issue ID and any fields to change.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID to update"
+          },
+          "title": {
+            "description": "New issue title",
+            "type": "string"
+          },
+          "description": {
+            "description": "New issue description in markdown",
+            "type": "string"
+          },
+          "assigneeId": {
+            "description": "User ID to reassign the issue to",
+            "type": "string"
+          },
+          "stateId": {
+            "description": "Workflow state ID to move the issue to",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority from 0 (none) to 4 (urgent)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          }
+        },
+        "required": [
+          "issueId"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/update-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
       "slug": "todoist.close_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
         "complete a task in todoist",
-        "close task on todoist",
-        "close a task",
-        "close task in todoist",
-        "complete a task"
+        "mark done a task in todoist",
+        "check off a task in todoist",
+        "finish a task in todoist",
+        "close task in todoist"
       ],
       "description": "Close (complete) a Todoist task by its ID. The task is marked as done.",
       "actionVerb": "close",
@@ -195,11 +696,12 @@
       "slug": "todoist.create_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
-        "create a new task in todoist",
-        "create task on todoist",
-        "create a task",
+        "create a task in todoist",
+        "add a task in todoist",
+        "make a new task in todoist",
+        "open a new task in todoist",
         "create task in todoist",
-        "create a new task"
+        "create a new task in todoist"
       ],
       "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
       "actionVerb": "create",
@@ -292,11 +794,12 @@
       "slug": "todoist.delete_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
-        "delete a task permanently in todoist",
-        "delete task on todoist",
-        "delete a task",
+        "delete a task in todoist",
+        "remove a task in todoist",
+        "trash a task in todoist",
+        "permanently delete a task in todoist",
         "delete task in todoist",
-        "delete a task permanently"
+        "delete a task permanently in todoist"
       ],
       "description": "Permanently delete a Todoist task by its ID. This action cannot be undone.",
       "actionVerb": "delete",
@@ -332,11 +835,12 @@
       "slug": "todoist.get_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
-        "get a task by id in todoist",
-        "get task on todoist",
-        "get a task",
+        "get a task in todoist",
+        "look up a task in todoist",
+        "fetch a single task in todoist",
+        "view one specific task in todoist",
         "get task in todoist",
-        "get a task by id"
+        "get a task by id in todoist"
       ],
       "description": "Get detailed information about a specific Todoist task by its ID.",
       "actionVerb": "get",
@@ -372,11 +876,11 @@
       "slug": "todoist.list_tasks",
       "service": "app.todoist.com",
       "intentSynonyms": [
-        "list tasks with optional filters in todoist",
-        "list tasks on todoist",
-        "list a tasks",
         "list tasks in todoist",
-        "list tasks with optional filters"
+        "show me my tasks in todoist",
+        "view my tasks in todoist",
+        "see all my tasks in todoist",
+        "list tasks with optional filters in todoist"
       ],
       "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
       "actionVerb": "list",
@@ -416,11 +920,12 @@
       "slug": "todoist.reopen_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
-        "reopen a completed task in todoist",
-        "reopen task on todoist",
-        "reopen a task",
+        "reopen a task in todoist",
+        "uncomplete a task in todoist",
+        "restore a completed a task in todoist",
+        "mark not done a task in todoist",
         "reopen task in todoist",
-        "reopen a completed task"
+        "reopen a completed task in todoist"
       ],
       "description": "Reopen a previously completed Todoist task by its ID.",
       "actionVerb": "reopen",
@@ -456,11 +961,12 @@
       "slug": "todoist.update_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
-        "update an existing task in todoist",
-        "update task on todoist",
-        "update a task",
+        "update a task in todoist",
+        "edit a task in todoist",
+        "change the details of task in todoist",
+        "modify a task in todoist",
         "update task in todoist",
-        "update an existing task"
+        "update an existing task in todoist"
       ],
       "description": "Update an existing Todoist task. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -553,7 +1059,8 @@
       ],
       "description": "List your unread Reddit inbox messages (T1b same-origin recipe)",
       "actionVerb": "list",
-      "sideEffectClass": "read"
+      "sideEffectClass": "read",
+      "backing": "recipe"
     },
     {
       "slug": "slack.conversations.list",
@@ -568,6 +1075,7 @@
       "description": "List your Slack conversations (T1a split-token handler, read)",
       "actionVerb": "list",
       "sideEffectClass": "read",
+      "backing": "handler",
       "params": {
         "type": "object",
         "properties": {
@@ -597,6 +1105,7 @@
       "description": "Post a message to a Slack channel (T1a split-token handler, write)",
       "actionVerb": "send",
       "sideEffectClass": "write",
+      "backing": "handler",
       "params": {
         "type": "object",
         "properties": {

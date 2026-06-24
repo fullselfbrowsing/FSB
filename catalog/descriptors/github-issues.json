@@ -10,6 +10,7 @@
   "description": "List your assigned GitHub issues (T1a persisted-query handler, read)",
   "actionVerb": "list",
   "sideEffectClass": "read",
+  "backing": "handler",
   "params": {
     "type": "object",
     "properties": {

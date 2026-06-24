@@ -10,5 +10,6 @@
   ],
   "description": "List your unread Reddit inbox messages (T1b same-origin recipe)",
   "actionVerb": "list",
-  "sideEffectClass": "read"
+  "sideEffectClass": "read",
+  "backing": "recipe"
 }

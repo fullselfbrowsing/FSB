@@ -53,26 +53,37 @@ function check(cond, msg) {
   }
 }
 
-// ---- Load the REAL emitted smoke-category corpus ---------------------------
-// The opentabs__todoist__*.json descriptors are the EXACT flat set
-// package-extension.mjs's readJsonDir inlines into recipe-index.generated.js, so
-// the harness checks the live shipped invariant -- not a hand-written stub. (The
-// _fixtures/ subdir is excluded by readJsonDir's non-recursion AND by the prefix
-// filter below.)
-const smokeFiles = fs.readdirSync(DESCRIPTORS_DIR)
-  .filter(function (name) { return name.indexOf('opentabs__todoist__') === 0 && name.endsWith('.json'); })
+// ---- Load the REAL emitted opentabs corpus (GENERALIZED loader) ------------
+// The opentabs__*.json descriptors are the EXACT flat set package-extension.mjs's
+// readJsonDir inlines into recipe-index.generated.js, so the harness checks the live
+// shipped invariant -- not a hand-written stub. (The _fixtures/ subdir is excluded by
+// readJsonDir's non-recursion AND by the prefix filter below.)
+//
+// CGEN-03-at-breadth (37-01): the loader matches ALL opentabs__*.json (not just
+// opentabs__todoist__) so EVERY batch's new descriptor-only slugs (todoist + linear +
+// asana, and every later batch) are genuinely checked for non-null T3/T2 resolution.
+// The Phase-36-only `opentabs__todoist__` filter was a false-green for every new app:
+// it never checked linear/asana. This generalization is what makes 02/03/04's per-wave
+// no-dead-entry assertion real.
+const opentabsFiles = fs.readdirSync(DESCRIPTORS_DIR)
+  .filter(function (name) { return name.indexOf('opentabs__') === 0 && name.endsWith('.json'); })
   .sort();
 
-const corpus = smokeFiles.map(function (name) {
+const corpus = opentabsFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
 check(corpus.length > 0,
-  'corpus loaded the REAL emitted smoke descriptors (got ' + corpus.length + ' opentabs__todoist__*.json)');
+  'corpus loaded the REAL emitted opentabs descriptors (got ' + corpus.length + ' opentabs__*.json -- all batches, not just todoist)');
 check(corpus.every(function (d) { return d && typeof d.slug === 'string' && typeof d.service === 'string'; }),
   'every loaded descriptor carries a string slug + service');
-check(corpus.every(function (d) { return d.backing === 'dom' || d.backing === undefined; }),
-  "the Phase-36 smoke corpus is all backing:'dom'/absent (no seeds until Phase 42) -> exercises the T3 leg");
+// Widened backing assertion: the grown corpus may carry non-dom backings as later
+// batches add head/seed-backed descriptors. The invariant under test is NON-NULL seam
+// resolution, not a single backing value -> tolerate dom/handler/learn/absent.
+check(corpus.every(function (d) {
+    return d.backing === 'dom' || d.backing === 'handler' || d.backing === 'learn' || d.backing === undefined;
+  }),
+  "every emitted opentabs descriptor's backing is in {'dom','handler','learn',absent} (the Phase-37 dev/productivity batch is all 'dom' -> the T3 leg)");
 
 // One SYNTHETIC backing:'learn' descriptor to exercise the T2 (learn-pending) leg.
 // (No real 'learn' descriptor ships this phase; the T2 path is proven by this fixture

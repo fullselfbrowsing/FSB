@@ -3,8 +3,10 @@
   "service": "app.asana.com",
   "intentSynonyms": [
     "update a task in asana",
-    "update task in asana",
-    "update task on asana"
+    "edit a task in asana",
+    "change the details of task in asana",
+    "modify a task in asana",
+    "update task in asana"
   ],
   "description": "Update an existing Asana task. Provide the task GID and any fields to change.",
   "actionVerb": "update",

@@ -11,6 +11,7 @@
   "description": "Create a new GitHub issue (T1a persisted-query handler, write)",
   "actionVerb": "create",
   "sideEffectClass": "write",
+  "backing": "handler",
   "params": {
     "type": "object",
     "properties": {

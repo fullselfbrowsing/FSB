@@ -3,9 +3,11 @@
   "service": "app.todoist.com",
   "intentSynonyms": [
     "get a task in todoist",
+    "look up a task in todoist",
+    "fetch a single task in todoist",
+    "view one specific task in todoist",
     "get task in todoist",
-    "get a task by id in todoist",
-    "get task on todoist"
+    "get a task by id in todoist"
   ],
   "description": "Get detailed information about a specific Todoist task by its ID.",
   "actionVerb": "get",

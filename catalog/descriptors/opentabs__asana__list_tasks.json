@@ -3,8 +3,10 @@
   "service": "app.asana.com",
   "intentSynonyms": [
     "list tasks in asana",
-    "list tasks with optional filters in asana",
-    "list tasks on asana"
+    "show me my tasks in asana",
+    "view my tasks in asana",
+    "see all my tasks in asana",
+    "list tasks with optional filters in asana"
   ],
   "description": "List tasks from Asana. Optionally filter by project, assignee, or workspace.",
   "actionVerb": "list",

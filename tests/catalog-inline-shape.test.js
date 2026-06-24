@@ -109,9 +109,16 @@ const inlinedSlugSet = new Set((DATA && DATA.descriptors ? DATA.descriptors : []
   .map((d) => d && d.slug).filter(Boolean));
 const missingFromSnapshot = emittedTodoistSlugs.filter((slug) => !inlinedSlugSet.has(slug));
 check(missingFromSnapshot.length === 0,
-  `every emitted todoist slug is inlined in the committed DATA.descriptors (missing: [${missingFromSnapshot.join(', ') || 'none'}])`);
-check(emittedTodoistSlugs.length > 0 && emittedTodoistSlugs.every((s) => /^todoist\./.test(s)),
-  `the emitted smoke slugs are the todoist family (e.g. ${emittedTodoistSlugs[0] || 'n/a'}) -- present in the inlined snapshot`);
+  `every emitted opentabs slug is inlined in the committed DATA.descriptors (missing: [${missingFromSnapshot.join(', ') || 'none'}])`);
+// Phase 37 (BRDTH-01): the emitted opentabs family grew from the todoist smoke slice
+// to the dev/productivity batch (todoist + linear + asana). Assert every emitted slug
+// is a well-formed `<stem>.<op>` AND that the batch stems are represented -- not the
+// Phase-36-only `^todoist\.` premise (which a new batch correctly invalidates).
+check(emittedTodoistSlugs.length > 0 && emittedTodoistSlugs.every((s) => /^[a-z0-9]+\.[a-z0-9_]+$/i.test(s)),
+  `every emitted opentabs slug is a well-formed <stem>.<op> (e.g. ${emittedTodoistSlugs[0] || 'n/a'})`);
+const emittedStems = new Set(emittedTodoistSlugs.map((s) => s.split('.')[0]));
+check(emittedStems.has('todoist') && emittedStems.has('linear') && emittedStems.has('asana'),
+  `the emitted opentabs batch spans the dev/productivity stems todoist+linear+asana (got: ${[...emittedStems].sort().join(', ')})`);
 
 // ---- (c) IDEMPOTENCY / restore-not-rebuild (recompute the generation path in-memory) ----
 //

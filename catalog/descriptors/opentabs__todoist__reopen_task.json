@@ -3,9 +3,11 @@
   "service": "app.todoist.com",
   "intentSynonyms": [
     "reopen a task in todoist",
+    "uncomplete a task in todoist",
+    "restore a completed a task in todoist",
+    "mark not done a task in todoist",
     "reopen task in todoist",
-    "reopen a completed task in todoist",
-    "reopen task on todoist"
+    "reopen a completed task in todoist"
   ],
   "description": "Reopen a previously completed Todoist task by its ID.",
   "actionVerb": "reopen",

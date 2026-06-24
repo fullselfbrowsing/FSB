@@ -3,9 +3,11 @@
   "service": "linear.app",
   "intentSynonyms": [
     "create a comment in linear",
+    "add a comment in linear",
+    "make a new comment in linear",
+    "open a new comment in linear",
     "create comment in linear",
-    "comment on an issue in linear",
-    "create comment on linear"
+    "comment on an issue in linear"
   ],
   "description": "Add a comment to a Linear issue. Requires the issue ID and the comment body.",
   "actionVerb": "create",

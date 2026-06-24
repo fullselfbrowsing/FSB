@@ -11,6 +11,7 @@
   "description": "Post a message to a Slack channel (T1a split-token handler, write)",
   "actionVerb": "send",
   "sideEffectClass": "write",
+  "backing": "handler",
   "params": {
     "type": "object",
     "properties": {

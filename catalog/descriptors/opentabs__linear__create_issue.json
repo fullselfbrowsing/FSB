@@ -3,9 +3,11 @@
   "service": "linear.app",
   "intentSynonyms": [
     "create a issue in linear",
+    "add a issue in linear",
+    "make a new issue in linear",
+    "open a new issue in linear",
     "create issue in linear",
-    "create a new issue in linear",
-    "create issue on linear"
+    "create a new issue in linear"
   ],
   "description": "Create a new issue in Linear. Requires a team and a title at minimum. Optionally set description, assignee, priority, labels, project, and estimate.",
   "actionVerb": "create",

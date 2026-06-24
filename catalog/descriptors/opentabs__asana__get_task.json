@@ -3,9 +3,11 @@
   "service": "app.asana.com",
   "intentSynonyms": [
     "get a task in asana",
+    "look up a task in asana",
+    "fetch a single task in asana",
+    "view one specific task in asana",
     "get task in asana",
-    "get a single task in asana",
-    "get task on asana"
+    "get a single task in asana"
   ],
   "description": "Get a single task from Asana by its GID.",
   "actionVerb": "get",

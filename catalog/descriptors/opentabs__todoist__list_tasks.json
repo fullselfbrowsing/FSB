@@ -3,8 +3,10 @@
   "service": "app.todoist.com",
   "intentSynonyms": [
     "list tasks in todoist",
-    "list tasks with optional filters in todoist",
-    "list tasks on todoist"
+    "show me my tasks in todoist",
+    "view my tasks in todoist",
+    "see all my tasks in todoist",
+    "list tasks with optional filters in todoist"
   ],
   "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
   "actionVerb": "list",

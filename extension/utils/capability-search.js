@@ -48,7 +48,9 @@
   var INDEX_OPTIONS = {
     idField: 'slug',
     fields: ['intentSynonyms', 'description', 'service', 'actionVerb'], // searchable
-    storeFields: ['slug', 'service', 'sideEffectClass', 'description']   // returned on hit
+    // returned on hit. `backing` (BRDTH-03) is the canonical seam enum
+    // (recipe/handler/learn/dom) search() annotates invocable-vs-discovery-pending by.
+    storeFields: ['slug', 'service', 'sideEffectClass', 'description', 'backing']
   };
 
   var STORAGE_KEY = 'fsbCapabilityIndex';
@@ -101,6 +103,34 @@
     return 'read';
   }
 
+  // ---- BRDTH-03: backing-status enum + the invocable/display annotation ------
+  // The CANONICAL backing field value is one of recipe/handler/learn/dom (the value
+  // resolve() in capability-catalog.js routes to a seam tier; 'learn' -> T2, 'dom' ->
+  // T3). A descriptor with no backing defaults to 'dom' (the safe DOM-fallback seam,
+  // matching the resolve() else-branch). 'discovery-pending'/'learn-pending' is the
+  // DISPLAY LABEL only -- never the field value -> no resolve() change.
+  function normalizeBacking(value) {
+    var b = String(value || '').toLowerCase();
+    if (b === 'recipe' || b === 'handler' || b === 'learn' || b === 'dom') { return b; }
+    return 'dom'; // absent/unknown -> the DOM-fallback seam (resolve() else -> T3)
+  }
+  // A descriptor is a CONFIDENT INVOCABLE hit ONLY when it is backed by a bundled
+  // recipe or a registered handler (day-one invocable). A backing 'learn'/'dom'
+  // descriptor RETURNS from search but is discovery-pending -- never surfaced as a
+  // confident invocable hit (T-37-02: a pending-only descriptor must not look
+  // invocable). The DISPLAY label maps learn -> 'learn-pending', dom -> 'discovery-
+  // pending'; recipe/handler carry no pending label.
+  function isInvocableBacking(backing) {
+    var b = normalizeBacking(backing);
+    return b === 'recipe' || b === 'handler';
+  }
+  function backingDisplayLabel(backing) {
+    var b = normalizeBacking(backing);
+    if (b === 'learn') { return 'learn-pending'; }
+    if (b === 'dom') { return 'discovery-pending'; }
+    return b; // recipe / handler -> the backing itself (no pending label)
+  }
+
   // ---- Pure index builder (the SINGLE source of truth the eval test reuses) ---
   //
   // Constructs a MiniSearch over INDEX_OPTIONS and adds the descriptor docs. The
@@ -122,7 +152,10 @@
         description: d.description || '',
         actionVerb: d.actionVerb || '',
         // recipe-derived class wins when a paired recipe exists (integrity check)
-        sideEffectClass: derived || normalizeSideEffectClass(d.sideEffectClass)
+        sideEffectClass: derived || normalizeSideEffectClass(d.sideEffectClass),
+        // BRDTH-03: a paired recipe makes the entry recipe-backed; else carry the
+        // descriptor's own backing enum (defaults to 'dom' -> the DOM-fallback seam).
+        backing: (map[d.slug] ? 'recipe' : normalizeBacking(d.backing))
       };
     }));
     return ms;
@@ -254,13 +287,22 @@
     return hits.slice(0, k).map(function(h) {
       var recipe = _slugToRecipe[h.slug] || {};
       var descriptor = _slugToDescriptor[h.slug] || {};
+      // BRDTH-03 backing annotation: a recipe/handler-backed hit is a CONFIDENT
+      // invocable hit (invocable:true); a learn/dom-backed hit RETURNS but is
+      // discovery-pending (invocable:false, backingStatus display label) -- never
+      // presented as a confident invocable hit (T-37-02). A hit with a paired recipe
+      // in the slug->recipe map is recipe-backed even if its stored backing differs.
+      var backing = (_slugToRecipe[h.slug]) ? 'recipe' : normalizeBacking(h.backing);
       return {
         slug: h.slug,
         service: h.service,
         sideEffectClass: normalizeSideEffectClass(h.sideEffectClass),
         description: h.description,
         score: h.score,
-        params: recipe.params || descriptor.params || null // schema-on-hit (D-08)
+        params: recipe.params || descriptor.params || null, // schema-on-hit (D-08)
+        backing: backing,                                    // canonical seam enum
+        backingStatus: backingDisplayLabel(backing),         // display label
+        invocable: isInvocableBacking(backing)               // confident-invocable flag
       };
     });
   }
@@ -314,14 +356,16 @@
       if (!_ms) return false;
     }
 
-    // Mirror buildIndex's addAll mapper (the recipe-derived class wins, D-02).
+    // Mirror buildIndex's addAll mapper (the recipe-derived class wins, D-02). A
+    // learned recipe is recipe-backed (BRDTH-03) -> a confident invocable hit.
     var doc = {
       slug: slug,
       service: desc.service || '',
       intentSynonyms: desc.intentSynonyms || [],
       description: desc.description || '',
       actionVerb: desc.actionVerb || '',
-      sideEffectClass: (recipe.method ? deriveSideEffect(recipe.method) : normalizeSideEffectClass(desc.sideEffectClass))
+      sideEffectClass: (recipe.method ? deriveSideEffect(recipe.method) : normalizeSideEffectClass(desc.sideEffectClass)),
+      backing: 'recipe'
     };
 
     // Re-promotion safety: discard any existing doc with this slug before add so
