@@ -488,19 +488,21 @@ return { decision: 'allow', method: method, sideEffectClass: sideEffectClass };
 | A4 | `readJsonDir` in `package-extension.mjs`/`validate-extension.mjs` is non-recursive, so `catalog/descriptors/_fixtures/` is excluded from the shipped corpus | Q3 / Pitfall 4 | If recursive, the gate fixture leaks into production. **Mitigation: verify `readJsonDir` impl OR place fixture outside `descriptors/`.** Tagged ASSUMED until the impl is read. |
 | A5 | The heuristic keyword vocabulary (discretion) catches all sensitive apps in the 119-set without flagging the listed benign apps | Q3 / Pitfall 5 | A false-negative lets a sensitive origin ship unclassified. **Mitigation: the 119-app sweep + the fail-closed fixture; tune the vocabulary against the real set.** |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact DENY-02 membership for "messaging-app writes" and "finance reads."**
+> All three resolved at plan time — decisions locked in 35-CONTEXT.md and baked into plans 35-01/02/03/04. Per-item markers below.
+
+1. **Exact DENY-02 membership for "messaging-app writes" and "finance reads."** — **RESOLVED:** the full messaging set (whatsapp/telegram/discord/teams/slack/linkedin) is classified sensitive in 35-01 (writes mutating-gated, reads under Auto); no extra finance-read carve-out beyond the sensitive classification.
    - What we know: the payments/budgeting set (stripe/coinbase/twilio/ynab) is unambiguous and verified; messaging origins are verified.
    - What's unclear: whether DENY-02 intends the full messaging set (whatsapp/telegram/discord/teams/slack/linkedin) or a subset, and whether any finance app should be sensitive-but-read-allowed beyond what the sensitive classification already gives.
    - Recommendation: planner locks the membership; default to including the messaging set as sensitive (writes mutating-gated, reads under Auto) — it is the safe direction and matches "messaging-app writes."
 
-2. **Exact typed-reason string for the re-gate (INV-03).**
+2. **Exact typed-reason string for the re-gate (INV-03).** — **RESOLVED:** confirmed byte-exact `RECIPE_CONSENT_MUTATING_REQUIRED` via `git show 68ceea90^:extension/utils/capability-router.js`; reused verbatim (dual-field) in 35-03.
    - What we know: it is the pre-`68ceea90` mutating-elevation code; the commit message + criteria call it `RECIPE_CONSENT_MUTATING_REQUIRED`.
    - What's unclear: byte-exact confirmation requires reading the removed branch.
    - Recommendation: `git show <commit>^:extension/utils/capability-router.js | grep MUTATING` before authoring; reuse byte-for-byte.
 
-3. **`readJsonDir` recursion (fixture isolation).**
+3. **`readJsonDir` recursion (fixture isolation).** — **RESOLVED:** verified non-recursive in both `validate-extension.mjs` and `package-extension.mjs`; gate fixture placed under `_fixtures/` in 35-02/35-04, excluded from the shipped corpus.
    - What we know: `_fixtures/` already exists as a sibling holding seed data; `validate-extension.mjs` reads `readJsonDir(catalog/descriptors)`.
    - What's unclear: whether it recurses into `_fixtures/`.
    - Recommendation: read the `readJsonDir` impl in `package-extension.mjs`; if recursive, place the gate fixture at `catalog/_gate-fixtures/`.
