@@ -1,0 +1,44 @@
+{
+  "slug": "todoist.list_tasks",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "list tasks with optional filters in todoist",
+    "list tasks on todoist",
+    "list a tasks",
+    "list tasks in todoist",
+    "list tasks with optional filters"
+  ],
+  "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Filter tasks by project ID",
+        "type": "string"
+      },
+      "section_id": {
+        "description": "Filter tasks by section ID",
+        "type": "string"
+      },
+      "label": {
+        "description": "Filter tasks by label name",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/list-tasks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

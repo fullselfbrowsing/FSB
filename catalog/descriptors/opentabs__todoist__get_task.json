@@ -1,0 +1,40 @@
+{
+  "slug": "todoist.get_task",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "get a task by id in todoist",
+    "get task on todoist",
+    "get a task",
+    "get task in todoist",
+    "get a task by id"
+  ],
+  "description": "Get detailed information about a specific Todoist task by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task ID to retrieve"
+      }
+    },
+    "required": [
+      "task_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/get-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

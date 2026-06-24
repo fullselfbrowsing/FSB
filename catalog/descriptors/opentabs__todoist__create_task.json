@@ -1,0 +1,97 @@
+{
+  "slug": "todoist.create_task",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "create a new task in todoist",
+    "create task on todoist",
+    "create a task",
+    "create task in todoist",
+    "create a new task"
+  ],
+  "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task content/title"
+      },
+      "description": {
+        "description": "Task description in markdown",
+        "type": "string"
+      },
+      "project_id": {
+        "description": "Project ID to create the task in",
+        "type": "string"
+      },
+      "section_id": {
+        "description": "Section ID within the project",
+        "type": "string"
+      },
+      "parent_id": {
+        "description": "Parent task ID to create a subtask",
+        "type": "string"
+      },
+      "labels": {
+        "description": "List of label names to apply",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "priority": {
+        "description": "Priority from 1 (normal) to 4 (urgent)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4
+      },
+      "due_string": {
+        "description": "Human-readable due date string (e.g. \"tomorrow at 3pm\")",
+        "type": "string"
+      },
+      "due_date": {
+        "description": "Due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "due_datetime": {
+        "description": "Due datetime in RFC3339 format",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "User ID to assign the task to",
+        "type": "string"
+      },
+      "duration": {
+        "description": "Estimated duration amount",
+        "type": "number"
+      },
+      "duration_unit": {
+        "description": "Duration unit: \"minute\" or \"day\"",
+        "type": "string",
+        "enum": [
+          "minute",
+          "day"
+        ]
+      }
+    },
+    "required": [
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/create-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

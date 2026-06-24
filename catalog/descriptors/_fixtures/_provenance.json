@@ -6,5 +6,23 @@
   "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
   "license": "MIT",
   "pinnedAt": "2026-06-21T21:54:20Z",
-  "apps": []
+  "apps": [
+    {
+      "app": "todoist",
+      "service": "app.todoist.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/todoist/",
+      "descriptors": [
+        "todoist.close_task",
+        "todoist.create_task",
+        "todoist.delete_task",
+        "todoist.get_task",
+        "todoist.list_tasks",
+        "todoist.reopen_task",
+        "todoist.update_task"
+      ]
+    }
+  ]
 }

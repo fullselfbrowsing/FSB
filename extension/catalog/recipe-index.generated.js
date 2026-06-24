@@ -152,6 +152,396 @@
       }
     },
     {
+      "slug": "todoist.close_task",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "complete a task in todoist",
+        "close task on todoist",
+        "close a task",
+        "close task in todoist",
+        "complete a task"
+      ],
+      "description": "Close (complete) a Todoist task by its ID. The task is marked as done.",
+      "actionVerb": "close",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to close"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/close-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "POST",
+          "opNameVerb": "close"
+        }
+      }
+    },
+    {
+      "slug": "todoist.create_task",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "create a new task in todoist",
+        "create task on todoist",
+        "create a task",
+        "create task in todoist",
+        "create a new task"
+      ],
+      "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task content/title"
+          },
+          "description": {
+            "description": "Task description in markdown",
+            "type": "string"
+          },
+          "project_id": {
+            "description": "Project ID to create the task in",
+            "type": "string"
+          },
+          "section_id": {
+            "description": "Section ID within the project",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "Parent task ID to create a subtask",
+            "type": "string"
+          },
+          "labels": {
+            "description": "List of label names to apply",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "description": "Priority from 1 (normal) to 4 (urgent)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "due_string": {
+            "description": "Human-readable due date string (e.g. \"tomorrow at 3pm\")",
+            "type": "string"
+          },
+          "due_date": {
+            "description": "Due date in YYYY-MM-DD format",
+            "type": "string"
+          },
+          "due_datetime": {
+            "description": "Due datetime in RFC3339 format",
+            "type": "string"
+          },
+          "assignee_id": {
+            "description": "User ID to assign the task to",
+            "type": "string"
+          },
+          "duration": {
+            "description": "Estimated duration amount",
+            "type": "number"
+          },
+          "duration_unit": {
+            "description": "Duration unit: \"minute\" or \"day\"",
+            "type": "string",
+            "enum": [
+              "minute",
+              "day"
+            ]
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/create-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "todoist.delete_task",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "delete a task permanently in todoist",
+        "delete task on todoist",
+        "delete a task",
+        "delete task in todoist",
+        "delete a task permanently"
+      ],
+      "description": "Permanently delete a Todoist task by its ID. This action cannot be undone.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to delete"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/delete-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "todoist.get_task",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "get a task by id in todoist",
+        "get task on todoist",
+        "get a task",
+        "get task in todoist",
+        "get a task by id"
+      ],
+      "description": "Get detailed information about a specific Todoist task by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to retrieve"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/get-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "todoist.list_tasks",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "list tasks with optional filters in todoist",
+        "list tasks on todoist",
+        "list a tasks",
+        "list tasks in todoist",
+        "list tasks with optional filters"
+      ],
+      "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "description": "Filter tasks by project ID",
+            "type": "string"
+          },
+          "section_id": {
+            "description": "Filter tasks by section ID",
+            "type": "string"
+          },
+          "label": {
+            "description": "Filter tasks by label name",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/list-tasks.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "todoist.reopen_task",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "reopen a completed task in todoist",
+        "reopen task on todoist",
+        "reopen a task",
+        "reopen task in todoist",
+        "reopen a completed task"
+      ],
+      "description": "Reopen a previously completed Todoist task by its ID.",
+      "actionVerb": "reopen",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to reopen"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/reopen-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "POST",
+          "opNameVerb": "reopen"
+        }
+      }
+    },
+    {
+      "slug": "todoist.update_task",
+      "service": "app.todoist.com",
+      "intentSynonyms": [
+        "update an existing task in todoist",
+        "update task on todoist",
+        "update a task",
+        "update task in todoist",
+        "update an existing task"
+      ],
+      "description": "Update an existing Todoist task. Only specified fields are changed; omitted fields remain unchanged.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to update"
+          },
+          "content": {
+            "description": "New task content/title",
+            "type": "string"
+          },
+          "description": {
+            "description": "New task description in markdown",
+            "type": "string"
+          },
+          "labels": {
+            "description": "New list of label names (replaces existing)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "description": "Priority from 1 (normal) to 4 (urgent)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "due_string": {
+            "description": "Human-readable due date string (e.g. \"tomorrow at 3pm\")",
+            "type": "string"
+          },
+          "due_date": {
+            "description": "Due date in YYYY-MM-DD format",
+            "type": "string"
+          },
+          "due_datetime": {
+            "description": "Due datetime in RFC3339 format",
+            "type": "string"
+          },
+          "assignee_id": {
+            "description": "User ID to assign the task to",
+            "type": "string"
+          },
+          "duration": {
+            "description": "Estimated duration amount",
+            "type": "number"
+          },
+          "duration_unit": {
+            "description": "Duration unit: \"minute\" or \"day\"",
+            "type": "string",
+            "enum": [
+              "minute",
+              "day"
+            ]
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/todoist/src/tools/update-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
       "slug": "reddit.inbox",
       "service": "www.reddit.com",
       "intentSynonyms": [

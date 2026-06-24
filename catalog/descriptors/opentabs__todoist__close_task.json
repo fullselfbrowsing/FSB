@@ -1,0 +1,40 @@
+{
+  "slug": "todoist.close_task",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "complete a task in todoist",
+    "close task on todoist",
+    "close a task",
+    "close task in todoist",
+    "complete a task"
+  ],
+  "description": "Close (complete) a Todoist task by its ID. The task is marked as done.",
+  "actionVerb": "close",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task ID to close"
+      }
+    },
+    "required": [
+      "task_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/close-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "close"
+    }
+  }
+}
