@@ -61,6 +61,7 @@ const INTERP_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-inter
 const FETCH_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-fetch.js');
 const STORE_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'mcp-task-store.js');
 const ERRORS_BUILT = path.join(REPO_ROOT, 'mcp', 'build', 'errors.js');
+const CATALOG_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-catalog.js');
 
 let passed = 0;
 let failed = 0;
@@ -589,6 +590,60 @@ const GITHUB_RECIPE = {
     'CAT-01: origin bias selected the owned-tab-origin (github.com) handler over the generic (gitlab.com) one');
   clearCatalog();
   delete globalThis.FsbCapabilityFetch;
+
+  // -----------------------------------------------------------------------
+  // CGEN-03 (Pitfall-3 sibling proof): a descriptor-only slug invoke yields the
+  // typed seam reason, NEVER RECIPE_NOT_FOUND. Unlike every block above (which
+  // installs an in-memory catalog stub), this drives the REAL capability-catalog.js
+  // resolve() fallback end-to-end: populate FsbRecipeIndex.descriptors with a
+  // searchable-but-unbacked slug (no REGISTRY handler, no recipe), load the actual
+  // catalog as globalThis.FsbCapabilityCatalog, and invoke. The resolve() fallback
+  // (Task 1) returns {tier:'T3'} (backing:'dom') / {tier:'T2'} (backing:'learn'); the
+  // router's UNCHANGED switch then maps those to RECIPE_DOM_FALLBACK_PENDING /
+  // RECIPE_LEARN_PENDING. This proves search-can-surface -> invoke is actionable.
+  // -----------------------------------------------------------------------
+  const priorRecipeIndex = globalThis.FsbRecipeIndex;
+  const priorCatalog = globalThis.FsbCapabilityCatalog;
+  globalThis.FsbRecipeIndex = {
+    recipes: [],
+    descriptors: [
+      { slug: 'todoist.create_task', service: 'app.todoist.com', backing: 'dom', sideEffectClass: 'write' },
+      { slug: 'todoist.__synthetic_learn__', service: 'app.todoist.com', backing: 'learn', sideEffectClass: 'read' }
+    ]
+  };
+  // Load the REAL catalog (fresh -- it reads FsbRecipeIndex via a typeof-guarded
+  // accessor at call time, so the descriptors set above is live) and expose it as the
+  // global the router resolves against.
+  try { delete require.cache[require.resolve(CATALOG_PATH)]; } catch (_e) { /* not loaded */ }
+  globalThis.FsbCapabilityCatalog = require(CATALOG_PATH);
+
+  // backing:'dom' descriptor-only slug -> resolve() T3 -> RECIPE_DOM_FALLBACK_PENDING.
+  const descDom = await ROUTER.invoke('todoist.create_task', {}, { origin: 'https://app.todoist.com', tabId: 71 });
+  check(descDom && descDom.success === false
+    && descDom.code === 'RECIPE_DOM_FALLBACK_PENDING'
+    && descDom.errorCode === 'RECIPE_DOM_FALLBACK_PENDING',
+    'CGEN-03: a SEARCHABLE descriptor-only slug (todoist.create_task) invoke -> dual-field RECIPE_DOM_FALLBACK_PENDING via the REAL resolve() fallback (not the in-memory stub)');
+  check(descDom && descDom.code !== 'RECIPE_NOT_FOUND',
+    'CGEN-03: the descriptor-only invoke is NOT RECIPE_NOT_FOUND (the dead-entry bug is closed -- search-can-surface implies invoke-is-actionable)');
+
+  // backing:'learn' descriptor-only slug -> resolve() T2 (no recipe) -> RECIPE_LEARN_PENDING.
+  const descLearn = await ROUTER.invoke('todoist.__synthetic_learn__', {}, { origin: 'https://app.todoist.com', tabId: 72 });
+  check(descLearn && descLearn.success === false
+    && descLearn.code === 'RECIPE_LEARN_PENDING'
+    && descLearn.errorCode === 'RECIPE_LEARN_PENDING',
+    "CGEN-03: a backing:'learn' descriptor-only slug invoke -> dual-field RECIPE_LEARN_PENDING (T2 with no recipe -> the learn-pending leg, no replay)");
+  check(descLearn && descLearn.code !== 'RECIPE_NOT_FOUND',
+    "CGEN-03: the backing:'learn' descriptor-only invoke is NOT RECIPE_NOT_FOUND");
+
+  // Control: a slug in NEITHER REGISTRY NOR descriptors still -> RECIPE_NOT_FOUND
+  // (the fallback does NOT mask a genuinely-unknown slug).
+  const descUnknown = await ROUTER.invoke('nope.not_a_real_slug', {}, { origin: 'https://x.com', tabId: 73 });
+  check(descUnknown && descUnknown.success === false && descUnknown.code === 'RECIPE_NOT_FOUND',
+    'CGEN-03: a genuinely-unknown slug (not in REGISTRY, not in descriptors) still -> RECIPE_NOT_FOUND through the REAL resolve() (the fallback masks nothing)');
+
+  try { delete require.cache[require.resolve(CATALOG_PATH)]; } catch (_e) { /* not loaded */ }
+  if (priorRecipeIndex === undefined) { delete globalThis.FsbRecipeIndex; } else { globalThis.FsbRecipeIndex = priorRecipeIndex; }
+  if (priorCatalog === undefined) { delete globalThis.FsbCapabilityCatalog; } else { globalThis.FsbCapabilityCatalog = priorCatalog; }
 
   // -----------------------------------------------------------------------
   // CAT-05: the typed reasons surface VERBATIM through the built mcp errors module
