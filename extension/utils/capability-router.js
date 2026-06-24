@@ -335,26 +335,27 @@
     } catch (_e) { /* best-effort */ }
   }
 
-  // ---- The consent + sensitive + mutation gate (D-01..D-04, D-14, D-15) -----
+  // ---- The consent gate (D-01..D-04, D-14, D-15; opt-out / "fully open") -----
   //      evaluate({ origin, slug, method, entry }) -> a decision object.
-  //      LOCKED decision order (the BLOCKER fix -- sensitive BEFORE mutation, so a
-  //      sensitive Auto origin can NEVER reach a mutation decision or allow
-  //      without first being downgraded to ask):
+  //      Decision order:
   //        (1) denylist isDenied        -> 'blocked'   RECIPE_CONSENT_BLOCKED
-  //        (2) default-OFF / mode 'off' -> 'off'       RECIPE_CONSENT_REQUIRED
+  //        (2) mode 'off'               -> 'off'       RECIPE_CONSENT_REQUIRED
   //            (origin null / store absent-but-engaged also fails closed here)
   //        (3) mode 'ask'               -> 'ask'       RECIPE_CONSENT_REQUIRED
-  //        (4) sensitive AND mode 'auto'-> 'sensitive' RECIPE_CONSENT_REQUIRED
-  //            (classify(origin).sensitive is the single source of truth, D-14;
-  //             Auto is DOWNGRADED to ask AT THE GATE -- never silently executed)
-  //        (5) mutating AND not opted-in-> 'mutating'  RECIPE_CONSENT_MUTATING_REQUIRED
-  //        (6) otherwise                -> 'allow'
+  //        (4) otherwise (mode 'auto')  -> 'allow'
+  //      OPT-OUT posture: the shipped global default is 'auto', so an unseen origin
+  //      is allowed. The former sensitive-downgrade (GOV-07/D-14) and mutating-
+  //      elevation (GOV-03/D-04) gates are NO LONGER applied under 'auto' -- auto
+  //      authorizes reads, writes, and sensitive (non-denied) origins alike. The
+  //      denylist (1) is the only hard block; off/ask (2)/(3) are the per-origin
+  //      (or global) opt-out paths. The network-capture DISCOVERY gate keeps its
+  //      own sensitive-confirm, since live traffic sniffing is a broader grant.
   //      The error objects are dual-field RECIPE_* (the _err helper) so they
   //      surface verbatim through the /^RECIPE_.+$/ passthrough.
   //
   //      Degradation: when the consent store module is NOT loaded (the Phase-29
   //      router unit harness), the gate returns 'allow' so the legacy dispatch
-  //      contract holds. Once the store is loaded, default-OFF is enforced.
+  //      contract holds. Once the store is loaded, the global default is enforced.
   async function _evaluateConsent(params) {
     var p = params || {};
     var origin = p.origin;
@@ -429,7 +430,7 @@
     var mode = (consent && typeof consent.mode === 'string') ? consent.mode : 'off';
     var mutatingAllowed = !!(consent && consent.mutating);
 
-    // (2) default-OFF / mode 'off' -> consent required (GOV-01).
+    // (2) mode 'off' (per-origin opt-out, or a reverted global default) -> required.
     if (mode === 'off') {
       return {
         decision: 'off',
@@ -449,36 +450,15 @@
       };
     }
 
-    // From here mode === 'auto' (the only remaining valid mode).
-    // (4) SENSITIVE + AUTO downgrade (GOV-07/D-14): classify is the single source
-    //     of truth. A sensitive Auto origin is downgraded to ask BEFORE the
-    //     mutation/allow steps so Auto never silently executes against it.
-    if (denylist && typeof denylist.classify === 'function') {
-      var klass = null;
-      try { klass = denylist.classify(origin); } catch (_e) { klass = null; }
-      if (klass && klass.sensitive === true) {
-        return {
-          decision: 'sensitive',
-          consentDecision: 'sensitive',
-          method: method,
-          sideEffectClass: sideEffectClass,
-          error: _err('RECIPE_CONSENT_REQUIRED', { origin: origin, slug: slug })
-        };
-      }
-    }
-
-    // (5) MUTATION (GOV-03/D-04): a mutating method on a non-elevated origin needs
-    //     the SEPARATE mutating opt-in. read-Auto != write-Auto.
-    if (mutating && !mutatingAllowed) {
-      return {
-        decision: 'mutating',
-        method: method,
-        sideEffectClass: sideEffectClass,
-        error: _err('RECIPE_CONSENT_MUTATING_REQUIRED', { origin: origin, slug: slug })
-      };
-    }
-
-    // (6) allow.
+    // From here mode === 'auto'. Under the OPT-OUT ("fully open") posture, auto
+    // authorizes reads AND writes AND sensitive (non-denied) origins. The denylist
+    // (step 1) remains the ONLY hard block; the off/ask opt-out paths (steps 2/3)
+    // are preserved so a per-origin Off -- or reverting the global default to
+    // Off/Ask -- still gates. The former sensitive-downgrade (GOV-07/D-14) and
+    // mutating-elevation (GOV-03/D-04) gates are intentionally NOT applied under
+    // auto; `mutating` / `mutatingAllowed` remain computed for back-compat but are
+    // no longer consulted here. The network-capture DISCOVERY gate keeps its own
+    // sensitive-confirm, since live traffic sniffing is a broader grant.
     return { decision: 'allow', method: method, sideEffectClass: sideEffectClass };
   }
 

@@ -8,13 +8,15 @@
  * turns GREEN only when Wave 2 wires startSession through the SAME Phase-30 consent
  * gate the invoke chokepoint uses (RESEARCH Pattern 3). NEVER silently passes.
  *
- * DISC-04 / D-03 sampled behavior -- startSession is consent-gated:
- *   - REJECTED (ok:false, reason a RECIPE_CONSENT_* code) on an OFF origin
- *   - REJECTED on an isDenied() origin
- *   - ALLOWED on Ask
- *   - ALLOWED on Auto
+ * DISC-04 / D-03 sampled behavior -- startSession is consent-gated. Under the
+ * OPT-OUT default ('auto'):
+ *   - ALLOWED on an UNSEEN origin (the shipped default is auto)
+ *   - REJECTED (ok:false, reason a RECIPE_CONSENT_* code) on an explicitly Off origin
+ *   - REJECTED on an isDenied() origin (the denylist is the hard block)
+ *   - ALLOWED on Ask / Auto
  *   - a classify().sensitive origin is REJECTED unless opts.confirmedSensitive === true
- *     (the extra-confirm flag, D-03 -- same friction as the Phase-30 gate)
+ *     (the DISCOVERY path KEEPS the extra-confirm friction, unlike the fully-open
+ *     invoke gate)
  *
  * Stubs: installChromeStorageStub (the storage the real FsbConsentPolicyStore reads)
  * + the real FsbConsentPolicyStore/FsbServiceDenylist modules driven with seeded
@@ -77,12 +79,21 @@ function isConsentReason(r) {
   const Capture = require(CAPTURE_PATH);
   check(typeof Capture.startSession === 'function', 'network-capture exports startSession (RED until Wave 2)');
 
-  // ---- OFF origin -> REJECTED (default-OFF, DISC-04) ----
-  const offOrigin = 'https://off.example.com'; // unseen => OFF
+  // ---- explicitly Off origin -> REJECTED (per-origin opt-out, DISC-04) ----
+  // Under the opt-out default an UNSEEN origin is now Auto, so set Off explicitly
+  // to exercise the rejection path (an unseen origin is covered by the Auto case).
+  const offOrigin = 'https://off.example.com';
+  await Consent.setOriginMode(offOrigin, 'off');
   const offRes = await Capture.startSession(offOrigin, { tabId: TAB_ID, maxMs: 3000, maxCount: 20 });
-  check(offRes && offRes.ok === false, 'startSession on an OFF origin is REJECTED (ok:false, DISC-04 default-OFF)');
-  check(offRes && isConsentReason(offRes.reason), 'OFF rejection reason is a RECIPE_CONSENT_* code (D-03)');
-  check(driver.sendCommandCount('Network.enable') === 0, 'OFF rejection does NOT attach/enable Network (gate is BEFORE attach)');
+  check(offRes && offRes.ok === false, 'startSession on an explicitly Off origin is REJECTED (ok:false, DISC-04)');
+  check(offRes && isConsentReason(offRes.reason), 'Off rejection reason is a RECIPE_CONSENT_* code (D-03)');
+  check(driver.sendCommandCount('Network.enable') === 0, 'Off rejection does NOT attach/enable Network (gate is BEFORE attach)');
+
+  // ---- an UNSEEN origin under the shipped Auto default is ALLOWED ----
+  const unseenOrigin = 'https://unseen-capture.example.com';
+  const unseenRes = await Capture.startSession(unseenOrigin, { tabId: TAB_ID, maxMs: 3000, maxCount: 20 });
+  check(unseenRes && unseenRes.ok === true, 'startSession on an UNSEEN origin is ALLOWED (shipped opt-out default is auto)');
+  if (unseenRes && unseenRes.ok) { Capture.endSession('test'); }
 
   // ---- DENIED origin -> REJECTED (isDenied, DISC-04) ----
   await Consent.setOriginMode('https://denied.example.com', 'auto'); // even Auto cannot override a denylist

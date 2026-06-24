@@ -33,29 +33,45 @@ capability layer. The posture is deliberately conservative:
 ## Consent Model
 
 Consent is enforced at a single dispatch chokepoint (one gate, both front doors),
-immediately after the existing ownership gate. Each origin carries one of three
-modes:
+immediately after the existing ownership gate. The shipped posture is **opt-out
+("fully open")**: a global default mode applies to every origin the user has not
+explicitly configured, and the user opts individual origins **out**. The global
+default ships as **Auto** and is user-configurable (Off / Ask / Auto) under
+Advanced Settings -> Consent & Audit -> "Default for New Sites".
 
 | Mode | Behavior |
 |------|----------|
-| **Off** (default) | Nothing runs against the origin. Capability invocations return a typed consent-required reason. |
+| **Auto** (shipped default) | Capability invocations run without per-call prompting, including reads **and** writes, against any non-denylisted origin. |
 | **Ask** | Each invocation surfaces a pending request out-of-band (control panel + a badge) for the user to grant; nothing runs until granted. There is no blocking in-page modal mid-invocation. |
-| **Auto** | Read invocations run without per-call prompting, subject to the sensitive-origin and mutation rules below. |
+| **Off** | Nothing runs against the origin. Capability invocations return a typed consent-required reason. Set an individual origin to Off to opt it out, or set the global default to Off to restore strict opt-in. |
 
 Additional consent rules:
 
-- **Mutation gating.** Side-effecting invocations (POST/PUT/PATCH/DELETE, or a
-  recipe/handler marked mutating) require a **separate, elevated** per-origin
-  opt-in. Read-Auto does not imply write-Auto. Mutating calls always surface for
-  confirmation before any side effect.
-- **Sensitive-origin friction even under Auto.** Origins classified as
-  **sensitive** (banking, primary email, and government categories -- see the
-  service denylist below) force extra confirmation even when the origin is set to
-  Auto. This classification is a real gate boundary, not a cosmetic UI flag: the
-  consent gate consumes it directly.
-- **Denylist is checked first.** A denylisted origin is non-enableable regardless
-  of any stored per-origin policy -- the denylist is consulted before per-origin
-  consent.
+- **Denylist is the one hard block.** A denylisted origin (financial and
+  government services -- see the service denylist below) is non-enableable
+  regardless of the global default or any per-origin policy. The denylist is
+  consulted **first**, before the consent mode.
+- **Per-origin opt-out.** Every origin FSB acts on is listed in the control panel
+  (sourced from the audit trail) so the user can set it to Off (or Ask) at any
+  time. An explicit per-origin policy overrides the global default.
+- **Writes are allowed under Auto.** Under the opt-out posture, read-Auto implies
+  write-Auto: side-effecting invocations (POST/PUT/PATCH/DELETE) run without a
+  separate elevated opt-in. The per-origin mutating flag is retained in storage
+  but is not enforced at the invoke gate while the origin is Auto.
+- **Sensitive-origin friction remains on discovery only.** Origins classified as
+  **sensitive** (banking, primary email, government categories) no longer force
+  extra confirmation at the capability **invoke** gate under Auto. The more
+  invasive **network-capture discovery** path still requires an explicit
+  confirmation for sensitive origins.
+- **Reverting to opt-in.** Setting the global default to **Off** restores the
+  strict opt-in posture: nothing runs against an origin until the user enables it.
+
+> Security note: under the shipped Auto default, FSB can call any non-denylisted
+> site's authenticated web API -- reads and writes -- using the browser's logged-in
+> session, without a per-site prompt. This is a deliberate, user-configurable
+> posture; the denylist, the per-origin and global opt-out, the active-tab origin
+> pin, the fail-closed degradation path, and the append-only audit trail remain in
+> force.
 
 ## Audit Log
 

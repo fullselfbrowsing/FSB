@@ -221,6 +221,7 @@ function cacheElements() {
   // Save bar). The segmented control + mutating toggle write FsbConsentPolicyStore;
   // the audit table reads the redacted FsbAuditLog ring; the Sensitive/Blocked
   // badges read FsbServiceDenylist.classify -- the SAME source the gate enforces.
+  elements.consentDefaultModeToggle = document.getElementById('consentDefaultModeToggle');
   elements.consentOriginList = document.getElementById('consentOriginList');
   elements.consentOriginEmptyState = document.getElementById('consentOriginEmptyState');
   elements.consentOriginRowTemplate = document.getElementById('consentOriginRowTemplate');
@@ -486,6 +487,24 @@ function setupEventListeners() {
       const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
       if (store && typeof store.setOriginMutating === 'function') {
         Promise.resolve(store.setOriginMutating(origin, !!input.checked)).then(() => {
+          scheduleRenderConsentAudit();
+        });
+      }
+    });
+  }
+  // Global "Default for new sites" segmented control (delegated): writes the
+  // global defaultMode to the consent store, then re-renders so per-origin
+  // effective modes update. Uses data-default-mode (distinct from the per-origin
+  // data-mode handler above).
+  if (elements.consentDefaultModeToggle) {
+    elements.consentDefaultModeToggle.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.detail-btn[data-default-mode]') : null;
+      if (!btn || btn.disabled) return;
+      const mode = btn.dataset ? btn.dataset.defaultMode : '';
+      if (!mode) return;
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+      if (store && typeof store.setDefaultMode === 'function') {
+        Promise.resolve(store.setDefaultMode(mode)).then(() => {
           scheduleRenderConsentAudit();
         });
       }
@@ -757,16 +776,20 @@ function switchSection(sectionId) {
     item.classList.toggle('active', item.dataset.section === sectionId);
   });
   
-  // Update content sections
+  // Update content sections. Consent & Audit is merged under Advanced Settings:
+  // when 'advanced' is active, #consent-audit is shown alongside #advanced.
   elements.contentSections.forEach(section => {
-    section.classList.toggle('active', section.id === sectionId);
+    const active = section.id === sectionId
+      || (sectionId === 'advanced' && section.id === 'consent-audit');
+    section.classList.toggle('active', active);
   });
   
   dashboardState.currentSection = sectionId;
 
-  // Phase 30 (GOV-07): render the Consent & Audit section on enter (it reads the
-  // consent envelope + audit ring + classify on demand, like the cap counter).
-  if (sectionId === 'consent-audit') {
+  // Render the merged Consent & Audit cards when entering Advanced Settings (they
+  // read the consent envelope + audit ring + classify on demand). The stale
+  // '#consent-audit' hash also renders for back-compat.
+  if (sectionId === 'advanced' || sectionId === 'consent-audit') {
     renderConsentAudit();
   }
 
@@ -1655,10 +1678,9 @@ function filterLogs() {
 // The UI is the user's control surface over the consent spine (Plans 02/03). It
 // is the ONLY surface that mutates consent from user intent; the GATE
 // (background.js, wrapping FsbCapabilityRouter.invoke) remains the authoritative
-// enforcement. The Sensitive badge + the disabled Auto segment REFLECT the gate's
-// step-4 sensitive+Auto downgrade by reading the SAME FsbServiceDenylist.classify
-// source of truth (D-14) -- the UI is a consistent visual surface, not the
-// security boundary. Denylisted origins are rendered non-enableable.
+// enforcement. Sensitive is informational for capability invokes under the
+// opt-out posture; the network-capture discovery path keeps its own sensitive
+// confirmation. Denylisted origins are rendered non-enableable.
 // ============================================================================
 
 let _consentAuditDebounceHandle = null;
@@ -1685,10 +1707,16 @@ function renderConsentAudit() {
   const consentStore = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
   const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
 
-  // ---- Per-origin consent list ----
+  // ---- Per-origin consent list (merged from policies + audit-seen origins) ----
   if (consentStore && typeof consentStore.readPolicies === 'function') {
-    Promise.resolve(consentStore.readPolicies())
-      .then((envelope) => renderConsentOriginList(envelope))
+    const originsP = (auditStore && typeof auditStore.getDistinctOrigins === 'function')
+      ? Promise.resolve(auditStore.getDistinctOrigins()).catch(() => [])
+      : Promise.resolve([]);
+    Promise.all([Promise.resolve(consentStore.readPolicies()), originsP])
+      .then(([envelope, auditOrigins]) => {
+        renderConsentOriginList(envelope, auditOrigins);
+        renderDefaultModeToggle(envelope && envelope.defaultMode);
+      })
       .catch(() => { /* degrade silently; existing rows untouched */ });
   }
 
@@ -1702,14 +1730,23 @@ function renderConsentAudit() {
 
 // Paint the per-origin rows from the consent envelope. Applies
 // FsbServiceDenylist.classify(origin) for the Sensitive/Blocked friction.
-function renderConsentOriginList(envelope) {
+function renderConsentOriginList(envelope, auditOrigins) {
   const list = elements.consentOriginList;
   const tmpl = elements.consentOriginRowTemplate;
   if (!list || !tmpl || !tmpl.content) return;
 
   const policies = (envelope && envelope.policies && typeof envelope.policies === 'object')
     ? envelope.policies : {};
-  const origins = Object.keys(policies);
+  const defaultMode = (envelope && typeof envelope.defaultMode === 'string') ? envelope.defaultMode : 'auto';
+
+  // Union: explicit-policy origins + audit-seen origins (so a blocked/attempted
+  // site surfaces for opt-out, not only stored policies).
+  const originSet = Object.create(null);
+  Object.keys(policies).forEach((o) => { originSet[o] = true; });
+  (Array.isArray(auditOrigins) ? auditOrigins : []).forEach((o) => {
+    if (typeof o === 'string' && o) originSet[o] = true;
+  });
+  const origins = Object.keys(originSet);
 
   // Clear previously-rendered rows (keep the empty-state node).
   const existing = list.querySelectorAll('.consent-origin-row');
@@ -1725,8 +1762,9 @@ function renderConsentOriginList(envelope) {
 
   origins.sort();
   origins.forEach((origin) => {
-    const policy = policies[origin] || {};
-    const mode = (typeof policy.mode === 'string') ? policy.mode : 'off';
+    const hasExplicit = Object.prototype.hasOwnProperty.call(policies, origin);
+    const policy = hasExplicit ? (policies[origin] || {}) : {};
+    const mode = (typeof policy.mode === 'string') ? policy.mode : defaultMode;
     const mutating = !!policy.mutating;
 
     const frag = tmpl.content.cloneNode(true);
@@ -1740,8 +1778,8 @@ function renderConsentOriginList(envelope) {
     const radiogroup = row.querySelector('.consent-mode-toggle');
     if (radiogroup) radiogroup.setAttribute('aria-label', 'Consent mode for ' + origin);
 
-    // classify() is the gate's source of truth (D-14). denied => Blocked + all
-    // controls disabled; sensitive => amber badge + Auto segment disabled.
+    // classify() is the gate's source of truth. denied => Blocked + all controls
+    // disabled; sensitive => amber badge only for capability invokes.
     let classified = { sensitive: false, denied: false };
     if (denylist && typeof denylist.classify === 'function') {
       try { classified = denylist.classify(origin) || classified; } catch (_e) { /* degrade */ }
@@ -1752,11 +1790,6 @@ function renderConsentOriginList(envelope) {
       const isActive = btn.dataset.mode === mode;
       btn.classList.toggle('active', isActive);
       btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
-      // Sensitive: disable Auto (the gate downgrades sensitive+Auto to Ask).
-      if (classified.sensitive && btn.dataset.mode === 'auto') {
-        btn.disabled = true;
-        btn.setAttribute('aria-disabled', 'true');
-      }
       // Denylisted: every control disabled (non-enableable).
       if (classified.denied) {
         btn.disabled = true;
@@ -1788,11 +1821,25 @@ function renderConsentOriginList(envelope) {
       if (sensBadge) sensBadge.style.display = '';
       if (hint) {
         hint.style.display = '';
-        hint.textContent = 'Sensitive origin -- Auto is disabled. Each action requires confirmation even when allowed.';
+        hint.textContent = 'Sensitive origin. Capability invocations can run under Auto; network-capture discovery still requires confirmation.';
       }
     }
 
     list.appendChild(frag);
+  });
+}
+
+// Paint the global "Default for new sites" segmented control from the envelope's
+// defaultMode (off/ask/auto). Best-effort: a missing toggle is a no-op.
+function renderDefaultModeToggle(defaultMode) {
+  const tg = elements.consentDefaultModeToggle;
+  if (!tg) return;
+  const mode = (typeof defaultMode === 'string' && defaultMode) ? defaultMode : 'auto';
+  const btns = tg.querySelectorAll('.detail-btn[data-default-mode]');
+  btns.forEach((btn) => {
+    const active = btn.dataset.defaultMode === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
   });
 }
 
@@ -1892,18 +1939,12 @@ function clearAuditLog() {
 // Grant a pending request: write consent for that EXACT origin/scope only
 // (T-30-16 -- never a global enable), remove the row, surface a toast.
 //
-// ME-02: the stored mode MUST match what the gate will actually honor, so Grant
-// classifies the origin first via FsbServiceDenylist.classify -- the SAME source
-// of truth the gate's step-1 denylist block and step-4 sensitive+Auto downgrade
-// read (D-14/D-15):
-//   - DENIED origin    -> refuse the grant outright (the gate blocks it anyway;
-//                         writing any mode would be a dishonest stored policy).
-//   - SENSITIVE origin -> grant 'ask' (NOT 'auto'): the gate downgrades Auto->Ask
-//                         for sensitive origins at runtime, and the per-origin UI
-//                         list disables the Auto segment for them, so 'auto' would
-//                         persist a mode the gate never honors and the UI forbids.
-//   - otherwise        -> grant 'auto' (an explicit mutating scope additionally
-//                         opts into write; read scope never implies write).
+// Grant classifies the origin first via FsbServiceDenylist.classify:
+//   - DENIED origin -> refuse the grant outright (the gate blocks it anyway;
+//                      writing any mode would be a dishonest stored policy).
+//   - otherwise     -> grant 'auto', including sensitive non-denied origins. The
+//                      invoke gate allows sensitive origins under Auto; discovery
+//                      keeps its separate sensitive-confirm path.
 function grantPendingRequest(row) {
   if (!row || !row.dataset) return;
   const origin = row.dataset.origin || '';
@@ -1920,14 +1961,13 @@ function grantPendingRequest(row) {
     showToast('This origin is blocked from automation', 'error');
     return;
   }
-  // Sensitive origins never get a stored 'auto' (the gate would downgrade it).
-  const grantMode = cls.sensitive ? 'ask' : 'auto';
+  const grantMode = 'auto';
 
   const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
   if (store && typeof store.setOriginMode === 'function') {
     const writes = [store.setOriginMode(origin, grantMode)];
-    // The elevated mutating opt-in only makes sense once the origin can actually
-    // run under Auto -- a sensitive origin granted 'ask' does not get write-Auto.
+    // Retain the legacy mutating flag as compatibility metadata; under the
+    // opt-out posture the invoke gate allows writes whenever the origin is Auto.
     if (scope === 'mutating' && grantMode === 'auto' && typeof store.setOriginMutating === 'function') {
       writes.push(store.setOriginMutating(origin, true));
     }
@@ -1935,7 +1975,7 @@ function grantPendingRequest(row) {
       row.remove();
       updatePendingCount();
       scheduleRenderConsentAudit();
-      showToast(cls.sensitive ? 'Access granted (Ask -- sensitive origin)' : 'Access granted', 'success');
+      showToast(cls.sensitive ? 'Access granted (sensitive origin)' : 'Access granted', 'success');
     });
   } else {
     row.remove();

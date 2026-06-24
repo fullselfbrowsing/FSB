@@ -75,10 +75,6 @@
               <i class="fas fa-sliders-h"></i>
               <span>Advanced Settings</span>
             </li>
-            <li class="nav-item" data-section="consent-audit">
-              <i class="fas fa-user-shield"></i>
-              <span>Consent &amp; Audit</span>
-            </li>
             <li class="nav-item" data-section="memory">
               <i class="fas fa-brain"></i>
               <span>Memory</span>
@@ -1139,11 +1135,32 @@
 
         </section>
 
-        <!-- Phase 30 (GOV-07/GOV-08, D-13/D-14/D-15): Consent & Audit Section -->
+        <!-- Phase 30 (GOV-07/GOV-08, D-13/D-14/D-15): Consent & Audit (shown under Advanced Settings) -->
         <section class="content-section" id="consent-audit">
           <div class="section-header">
             <h2>Consent &amp; Audit</h2>
-            <p>Control which origins FSB may act on, review pending requests, and inspect the redacted audit log.</p>
+            <p>Part of Advanced Settings. The default below applies to every site you have not configured; the per-origin list lets you opt individual sites out.</p>
+          </div>
+
+          <!-- Default for New Sites Card (global consent default; opt-out posture) -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-shield-halved"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Default for New Sites</h3>
+                <p>How FSB treats a site you have not configured. Auto lets FSB call any non-blocked site's authenticated API (reads and writes). Off requires you to enable each site first. Ask queues a request for your approval.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <div class="site-graph-detail-toggle consent-default-toggle" role="radiogroup" aria-label="Default consent mode for new sites" id="consentDefaultModeToggle">
+                <button type="button" class="detail-btn" data-default-mode="off" role="radio" aria-checked="false">Off</button>
+                <button type="button" class="detail-btn" data-default-mode="ask" role="radio" aria-checked="false">Ask</button>
+                <button type="button" class="detail-btn" data-default-mode="auto" role="radio" aria-checked="true">Auto</button>
+              </div>
+              <div class="setting-hint">Financial and government services are always blocked regardless of this setting. Shipped as Auto; set to Off to restore strict opt-in.</div>
+            </div>
           </div>
 
           <!-- Per-Origin Consent Card -->
@@ -1154,7 +1171,7 @@
               </div>
               <div class="settings-card-title">
                 <h3>Per-Origin Consent</h3>
-                <p>FSB does nothing on an origin until you allow it. Auto and write access are separate, explicit opt-ins.</p>
+                <p>Every site follows the default above unless you override it here. Set a site to Off to stop FSB acting on it.</p>
               </div>
             </div>
             <div class="settings-card-content">
@@ -1162,17 +1179,18 @@
                 <div class="session-list" id="consentOriginList">
                   <div class="session-empty-state" id="consentOriginEmptyState">
                     <i class="fas fa-globe"></i>
-                    <p>No origins seen yet. Origins appear here the first time a tool targets them. Nothing runs until you set a mode above Off.</p>
+                    <p>No sites yet. Every site FSB acts on appears here so you can set it to Off (opt out). New sites follow the default above.</p>
                   </div>
                 </div>
               </div>
               <!--
                 Per-origin row template (cloned by options.js render() for each seen
                 origin). It carries the canonical structure: an Off/Ask/Auto segmented
-                control (role="radiogroup") + the separate elevated mutating toggle.
+                control (role="radiogroup") + the legacy mutating metadata toggle.
                 The Sensitive (amber) / Blocked (red) badges are toggled by render()
-                reading FsbServiceDenylist.classify(origin) -- the SAME source of truth
-                the gate enforces (D-14). Hidden until cloned.
+                reading FsbServiceDenylist.classify(origin). Sensitive is
+                informational for invokes; Blocked remains non-enableable. Hidden
+                until cloned.
               -->
               <template id="consentOriginRowTemplate">
                 <div class="setting-item consent-origin-row" data-origin="">
@@ -1190,14 +1208,14 @@
                     <button type="button" class="detail-btn" data-mode="ask" role="radio" aria-checked="false">Ask</button>
                     <button type="button" class="detail-btn" data-mode="auto" role="radio" aria-checked="false">Auto</button>
                   </div>
-                  <label class="modern-toggle consent-mutating-toggle">
+                  <label class="modern-toggle consent-mutating-toggle" style="display:none;">
                     <input type="checkbox" class="consent-mutating-input" disabled>
                     <span class="toggle-track">
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
                       <span class="toggle-label">Allow mutating (write) calls</span>
-                      <span class="toggle-desc">Lets FSB perform POST/PUT/PATCH/DELETE on this origin. Off by default; read access does not imply write access.</span>
+                      <span class="toggle-desc">Compatibility metadata for POST/PUT/PATCH/DELETE. Under Auto, FSB can perform reads and writes on non-blocked origins.</span>
                     </div>
                   </label>
                   <div class="setting-hint consent-origin-hint" style="display:none;"></div>

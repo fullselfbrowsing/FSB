@@ -7,16 +7,20 @@
    *
    * The per-origin consent policy spine. Owns the answer to "may a capability
    * run against THIS origin, and may it MUTATE there?" -- the credential-replay
-   * safety baseline (D-01..D-04). Default-OFF: an origin with no stored record is
-   * { mode:'off', mutating:false } so NOTHING runs against an origin the user has
-   * not explicitly enabled (GOV-01). Auto is a per-origin opt-in ONLY -- there is
-   * no global enable key (GOV-02). The elevated mutating opt-in is a SEPARATE
-   * per-origin flag (read-Auto does NOT imply write-Auto, GOV-03/D-04).
+   * safety baseline (D-01..D-04). The shipped default is OPT-OUT ("fully open"):
+   * an origin with no stored record inherits the global defaultMode (shipped
+   * 'auto'), so FSB may act on any non-denylisted origin unless the user opts it
+   * OUT (per-origin Off) or reverts the global default. The global default lives
+   * in the envelope's defaultMode field and is set via setDefaultMode (the
+   * "Default for new sites" control) -- there is still no separate global enable
+   * key, so the GOV-02 forbidden-key contract holds. The finance/gov service
+   * denylist remains the one hard block; the per-origin mutating flag is retained
+   * in storage but no longer enforced at the gate under 'auto' (GOV-03 relaxed).
    *
    * Storage: a versioned envelope persisted to chrome.storage.LOCAL (D-02 -- the
    * policy must survive SW restart AND browser restart, so NOT chrome.storage.
    * session). The envelope shape:
-   *   { v:1, defaultMode:'off', policies: { [origin]: { mode, mutating } } }
+   *   { v:1, defaultMode:'auto', policies: { [origin]: { mode, mutating } } }
    *
    * The read/write helpers clone agent-registry.js:87-138 (lazy globalThis.chrome
    * accessor, swallow-to-null on error, remove-on-empty, v:1 envelope guard) but
@@ -39,7 +43,7 @@
 
   var STORAGE_KEY = 'fsbConsentPolicies';
   var PAYLOAD_VERSION = 1;
-  var DEFAULT_MODE = 'off';
+  var DEFAULT_MODE = 'auto';
   var VALID_MODES = { off: true, ask: true, auto: true };
 
   // ---- lazy chrome accessor (agent-registry.js:87-89 idiom) ----------------
@@ -164,9 +168,9 @@
   }
 
   // ---- getConsentForOrigin(envelope, origin) -> { mode, mutating } ----------
-  // PURE. Falls back to envelope.defaultMode then 'off' for an unknown origin,
-  // and false for mutating. The single source of truth for the gate's per-origin
-  // decision (GOV-01/GOV-02/GOV-03).
+  // PURE. Falls back to envelope.defaultMode then the shipped DEFAULT_MODE for an
+  // unknown origin, and false for mutating. The single source of truth for the
+  // gate's per-origin decision (GOV-01/GOV-02/GOV-03).
   function getConsentForOrigin(envelope, origin) {
     var policies = (envelope && envelope.policies && typeof envelope.policies === 'object') ? envelope.policies : {};
     var p = (typeof origin === 'string' && Object.prototype.hasOwnProperty.call(policies, origin))
@@ -227,8 +231,28 @@
     });
   }
 
+  // ---- setDefaultMode(mode) -> Promise<void> -------------------------------
+  // Sets the GLOBAL default mode applied to any origin with no explicit per-origin
+  // policy (the "Default for new sites" control). Validated against {off,ask,auto}.
+  // Stored in the envelope's existing defaultMode field -- NOT a new global-enable
+  // key, so the GOV-02 forbidden-key contract is unaffected. An invalid mode is a
+  // no-op (degrade, never throw). Per-origin policies are left untouched, so an
+  // origin the user explicitly set keeps its mode regardless of the global default.
+  function setDefaultMode(mode) {
+    if (!VALID_MODES[mode]) {
+      return Promise.resolve();
+    }
+    return _withPolicyLock(async function() {
+      var envelope = await readPolicies();
+      var policies = _toNullProtoPolicies(envelope.policies);
+      envelope.defaultMode = mode;
+      envelope.policies = policies;
+      await _writeEnvelope(envelope);
+    });
+  }
+
   // ---- _reset() -- test hook -----------------------------------------------
-  // Clears the persisted envelope so each test starts default-OFF. Best-effort.
+  // Clears the persisted envelope so each test starts at the shipped default. Best-effort.
   function _reset() {
     if (!_hasLocalStorage()) {
       return Promise.resolve();
@@ -257,6 +281,7 @@
     readPolicies: readPolicies,
     setOriginMode: setOriginMode,
     setOriginMutating: setOriginMutating,
+    setDefaultMode: setDefaultMode,
     _reset: _reset
   };
 

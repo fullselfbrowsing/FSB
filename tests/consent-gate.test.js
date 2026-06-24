@@ -9,22 +9,21 @@
  * gate surface + the step-4 sensitive downgrade. It NEVER silently passes -- a
  * 'sensitive' assertion against an absent gate cannot accidentally hold.
  *
- * LOCKED gate interface (30-01-PLAN.md <interfaces>):
+ * Gate interface:
  *   async evaluate({ origin, slug, method, entry }) ->
- *     { decision:'allow' } | { decision:'off'|'ask'|'mutating'|'blocked'|'sensitive', method, sideEffectClass, error }
- *   LOCKED decision order: denylist(blocked) -> default-OFF/Off(off) -> ask
- *     -> sensitive+Auto(sensitive) -> mutation(mutating) -> allow
+ *     { decision:'allow' } | { decision:'off'|'ask'|'blocked', method, sideEffectClass, error }
+ *   Decision order (OPT-OUT posture): denylist(blocked) -> Off(off) -> ask -> allow
  *   error is the dual-field RECIPE_CONSENT_* object.
  *
- * Two sampled controls:
- *   (1) GOV-01 default-OFF: an UNSEEN origin -> decision !== 'allow', error.code
- *       === 'RECIPE_CONSENT_REQUIRED', and NO executeBoundSpec ran (no side effect).
- *   (2) GOV-07/D-14 sensitive+Auto: an origin stored mode 'auto' whose injected
- *       FsbServiceDenylist.classify(origin) returns { sensitive:true, denied:false }
- *       is DOWNGRADED to ask AT THE GATE -> a NON-allow decision with
- *       error.code === 'RECIPE_CONSENT_REQUIRED' AND decision/consentDecision
- *       === 'sensitive' (Auto is NOT silently executed). Gate-side enforcement,
- *       not UI-only.
+ * Sampled controls (opt-out / "fully open"):
+ *   (1) the shipped global default is 'auto', so an UNSEEN origin -> allow.
+ *       Reverting the global default to Off restores opt-in (unseen -> non-allow,
+ *       RECIPE_CONSENT_REQUIRED, no executeBoundSpec).
+ *   (2) a sensitive (non-denied) origin under Auto -> allow, and a POST/mutating
+ *       call under Auto -> allow: the former sensitive-downgrade (GOV-07/D-14) and
+ *       mutating-elevation (GOV-03/D-04) gates are no longer applied at INVOKE.
+ *   (3) ME-01 still holds: a degraded gate (store absent, sibling present) fails
+ *       CLOSED, and the denylist remains a hard block.
  *
  * Stubs: the in-memory chrome.storage.local stub (so the gate's policy lookup has
  * a backing store) + an injected FsbServiceDenylist whose classify/isDenied are
@@ -110,35 +109,59 @@ const executeBoundSpecCalls = [];
     process.exit(1);
   }
 
-  // ---- (1) GOV-01: default-OFF unseen origin -> non-allow CONSENT_REQUIRED ----
-  const off = await Gate.evaluate({
+  // ---- (1) OPT-OUT: an unseen origin under the shipped 'auto' default is ALLOWED ----
+  const unseenAllow = await Gate.evaluate({
     origin: 'https://unseen.example.com',
     slug: 'github.notifications',
     method: 'GET',
     entry: { tier: 'T1b', sideEffectClass: 'read' }
   });
-  check(off && off.decision !== 'allow', 'unseen origin -> decision !== allow (default-OFF)');
-  check(off && off.error && off.error.code === 'RECIPE_CONSENT_REQUIRED',
-    'unseen origin -> error.code RECIPE_CONSENT_REQUIRED');
-  check(executeBoundSpecCalls.length === 0, 'no executeBoundSpec ran on a blocked gate (no side effect)');
+  check(unseenAllow && unseenAllow.decision === 'allow',
+    'unseen origin -> allow (shipped opt-out default is auto)');
 
-  // ---- (2) GOV-07/D-14: sensitive origin under Auto -> downgraded ('sensitive') ----
+  // ---- (1b) reverting the global default to Off restores opt-in ----
+  if (typeof Store.setDefaultMode === 'function') {
+    await Store.setDefaultMode('off');
+    const off = await Gate.evaluate({
+      origin: 'https://unseen-2.example.com',
+      slug: 'github.notifications',
+      method: 'GET',
+      entry: { tier: 'T1b', sideEffectClass: 'read' }
+    });
+    check(off && off.decision !== 'allow', 'with global default Off, an unseen origin -> non-allow');
+    check(off && off.error && off.error.code === 'RECIPE_CONSENT_REQUIRED',
+      'reverted default -> RECIPE_CONSENT_REQUIRED on unseen origin');
+    check(executeBoundSpecCalls.length === 0, 'no executeBoundSpec ran on a blocked gate (no side effect)');
+    await Store.setDefaultMode('auto'); // restore the shipped default for the rest of the test
+  }
+
+  // ---- (2) FULLY-OPEN: a sensitive (non-denied) origin under Auto is now ALLOWED ----
+  // The former sensitive-downgrade gate (GOV-07/D-14) is no longer applied at the
+  // INVOKE gate under the opt-out posture. (The network-capture DISCOVERY gate keeps
+  // its own sensitive-confirm -- see network-capture-consent.test.js.)
   const SENSITIVE_ORIGIN = 'https://mail.example.com';
-  await Store.setOriginMode(SENSITIVE_ORIGIN, 'auto'); // user opted this origin into Auto
-  classifyResult = { sensitive: true, denied: false };  // but the classifier flags it sensitive
+  await Store.setOriginMode(SENSITIVE_ORIGIN, 'auto');
+  classifyResult = { sensitive: true, denied: false };  // classifier flags it sensitive
   const sens = await Gate.evaluate({
     origin: SENSITIVE_ORIGIN,
     slug: 'github.notifications',
     method: 'GET',
     entry: { tier: 'T1b', sideEffectClass: 'read' }
   });
-  check(sens && sens.decision !== 'allow',
-    'sensitive origin under Auto -> NON-allow (Auto downgraded at the gate, NOT silently executed)');
-  check(sens && (sens.decision === 'sensitive' || sens.consentDecision === 'sensitive'),
-    "sensitive origin under Auto -> decision/consentDecision === 'sensitive' (D-14)");
-  check(sens && sens.error && sens.error.code === 'RECIPE_CONSENT_REQUIRED',
-    'sensitive+Auto -> error.code RECIPE_CONSENT_REQUIRED (surfaces as consent-required)');
-  check(executeBoundSpecCalls.length === 0, 'sensitive+Auto did NOT execute (gate-side enforcement)');
+  check(sens && sens.decision === 'allow',
+    'sensitive (non-denied) origin under Auto -> allow (sensitive-downgrade no longer gates invoke)');
+
+  // ---- (2b) FULLY-OPEN: a WRITE (mutating) under the auto default is ALLOWED ----
+  // read-Auto == write-Auto under the opt-out posture (GOV-03 relaxed at the gate).
+  classifyResult = { sensitive: false, denied: false };
+  const writeGate = await Gate.evaluate({
+    origin: 'https://write.example.com',
+    slug: 'github.issues.create',
+    method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'mutate' }
+  });
+  check(writeGate && writeGate.decision === 'allow',
+    'a POST/mutating call under the auto default -> allow (write-Auto no longer needs a separate opt-in)');
 
   // ---- contrast: a NON-sensitive origin under Auto IS allowed (read) ----
   const SAFE_ORIGIN = 'https://github.com';

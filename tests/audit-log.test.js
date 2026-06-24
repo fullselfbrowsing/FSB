@@ -11,6 +11,7 @@
  *   STORAGE_KEY = 'fsbAuditLog'   PAYLOAD_VERSION = 1   MAX_ENTRIES = 200
  *   append(entry) -> Promise<void>   // field-WHITELIST { ts, origin, slug, method, sideEffectClass, consentDecision, outcome, error? }
  *   getEntries(opts) -> Promise<{ entries, clearedAt? }>   // opts.clear === true clears
+ *   getDistinctOrigins() -> Promise<string[]>   // distinct origins (drives the consent opt-out list)
  *   _reset()
  *
  * GOV-05 sampled (clone of tests/diagnostics-ring-buffer.test.js):
@@ -75,6 +76,7 @@ const OPTIONAL_KEYS = ['error'];
   check(Audit.MAX_ENTRIES === 200, 'MAX_ENTRIES === 200');
   check(typeof Audit.append === 'function', 'exports append');
   check(typeof Audit.getEntries === 'function', 'exports getEntries');
+  check(typeof Audit.getDistinctOrigins === 'function', 'exports getDistinctOrigins');
   check(typeof Audit._reset === 'function', 'exports _reset (test hook)');
 
   if (typeof Audit._reset === 'function') Audit._reset();
@@ -124,6 +126,21 @@ const OPTIONAL_KEYS = ['error'];
   check(typeof r3.clearedAt === 'number', 'clear returns a clearedAt timestamp');
   const r4 = await Audit.getEntries({});
   check(r4.entries.length === 0, 'after clear the ring is empty');
+
+  // ---- getDistinctOrigins(): distinct, non-empty origins across outcomes ----
+  // Drives the per-origin consent list -- a BLOCKED invoke still registers its
+  // origin so the user can opt it out (the github.com-never-appears fix).
+  if (typeof Audit._reset === 'function') Audit._reset();
+  if (typeof Audit.getDistinctOrigins === 'function') {
+    await Audit.append({ ts: 1, origin: 'https://github.com', slug: 'a', method: 'GET', sideEffectClass: 'read', consentDecision: 'allow', outcome: 'ok' });
+    await Audit.append({ ts: 2, origin: 'https://github.com', slug: 'b', method: 'POST', sideEffectClass: 'mutate', consentDecision: 'off', outcome: 'blocked', error: 'RECIPE_CONSENT_REQUIRED' });
+    await Audit.append({ ts: 3, origin: 'https://slack.com', slug: 'c', method: 'GET', sideEffectClass: 'read', consentDecision: 'allow', outcome: 'ok' });
+    const origins = await Audit.getDistinctOrigins();
+    check(Array.isArray(origins), 'getDistinctOrigins returns an array');
+    check(origins.length === 2, 'getDistinctOrigins de-duplicates (2 distinct origins from 3 entries)');
+    check(origins.indexOf('https://github.com') !== -1, 'a BLOCKED-outcome origin (github.com) is included (opt-out visibility)');
+    check(origins.indexOf('https://slack.com') !== -1, 'a second distinct origin (slack.com) is included');
+  }
 
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);

@@ -1,20 +1,16 @@
 'use strict';
 
 /**
- * Phase 30 plan 01 (v0.9.99 -- GOV-03) -- mutation-gate RED contract.
+ * Phase 30 plan 01 (GOV-03, relaxed) -- mutation-gate under the OPT-OUT posture.
  *
- * Wave 0 RED test: FsbConsentGate (Plan 02) does NOT exist yet. Turns GREEN when
- * Plan 02 wires the mutation step (step 5 of the LOCKED decision order). Fails
- * loudly today; never silently passes.
- *
- * GOV-03 / D-04: read-Auto does NOT imply write-Auto. The side-effect class is
- * derived from MUTATING_METHODS ({POST,PUT,PATCH,DELETE}, capability-fetch.js:228)
- * + recipe/handler sideEffectClass. On an origin set to read-Auto (mode 'auto',
- * mutating false):
+ * Under the "fully open" (opt-out) default, read-Auto == write-Auto: the former
+ * mutating-elevation gate (GOV-03/D-04) is NO LONGER applied at the invoke gate.
+ * On an origin under mode 'auto' (or the global 'auto' default):
  *   - a GET slug is allowed,
- *   - a POST slug yields decision !== 'allow' with error.code
- *     'RECIPE_CONSENT_MUTATING_REQUIRED',
- *   - after setOriginMutating(origin, true) the SAME POST is allowed.
+ *   - a POST/PUT/PATCH/DELETE slug is ALSO allowed (no separate opt-in),
+ *   - the per-origin `mutating` flag is retained in storage but inert at the gate,
+ *   - but an explicitly Off origin still blocks (the per-origin opt-out path).
+ * The denylist remains the one hard block.
  *
  * Stubs: in-memory chrome.storage.local + injected non-sensitive FsbServiceDenylist.
  *
@@ -57,7 +53,7 @@ function installChromeStorageStub() {
 }
 
 (async () => {
-  console.log('--- GOV-03 mutation gate: read-Auto != write-Auto (RED until Plan 02) ---');
+  console.log('--- GOV-03 (relaxed): read-Auto == write-Auto under opt-out ---');
   installChromeStorageStub();
 
   const STORE_PATH = path.resolve(__dirname, '..', 'extension', 'utils', 'consent-policy-store.js');
@@ -92,46 +88,51 @@ function installChromeStorageStub() {
   });
   check(getGate && getGate.decision === 'allow', 'GET on read-Auto origin -> allow');
 
-  // ---- a POST on read-Auto is BLOCKED with the mutating-required code ----
+  // ---- a POST on Auto is now ALLOWED (write-Auto == read-Auto under opt-out) ----
   const postGate = await Gate.evaluate({
     origin: ORIGIN, slug: 'github.issues.create', method: 'POST',
     entry: { tier: 'T1a', sideEffectClass: 'mutating' }
   });
-  check(postGate && postGate.decision !== 'allow', 'POST on read-Auto origin -> NOT allow (write != read)');
-  check(postGate && postGate.error && postGate.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
-    'POST on read-Auto -> error.code RECIPE_CONSENT_MUTATING_REQUIRED');
-  check(postGate && (postGate.decision === 'mutating' || postGate.sideEffectClass === 'mutating'),
-    "the blocked POST is classified mutating (decision 'mutating' / sideEffectClass 'mutating')");
+  check(postGate && postGate.decision === 'allow',
+    'POST on Auto origin -> allow (mutating-elevation no longer gates invoke)');
 
-  // ---- T1a handler descriptors use sideEffectClass:'write' and default to GET ----
+  // ---- a T1a 'write' descriptor on Auto is also ALLOWED now ----
   const writeDescriptorGate = await Gate.evaluate({
     origin: ORIGIN, slug: 'slack.chat.postMessage',
     entry: { tier: 'T1a', descriptor: { sideEffectClass: 'write' } }
   });
-  check(writeDescriptorGate && writeDescriptorGate.decision !== 'allow',
-    "T1a descriptor sideEffectClass:'write' on read-Auto origin -> NOT allow");
-  check(writeDescriptorGate && writeDescriptorGate.error && writeDescriptorGate.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
-    "T1a descriptor sideEffectClass:'write' -> error.code RECIPE_CONSENT_MUTATING_REQUIRED");
+  check(writeDescriptorGate && writeDescriptorGate.decision === 'allow',
+    "T1a 'write' descriptor on Auto origin -> allow (write no longer requires elevation)");
 
-  // ---- after the elevated opt-in, the SAME POST is allowed ----
+  // ---- the per-origin mutating flag is now inert: setting it does not change the
+  //      decision (the POST was already allowed) ----
   await Store.setOriginMutating(ORIGIN, true);
   const postGate2 = await Gate.evaluate({
     origin: ORIGIN, slug: 'github.issues.create', method: 'POST',
     entry: { tier: 'T1a', sideEffectClass: 'mutating' }
   });
   check(postGate2 && postGate2.decision === 'allow',
-    'after setOriginMutating(origin,true) the same POST is allowed (elevated opt-in)');
+    'POST stays allowed regardless of the (now-inert) per-origin mutating flag');
 
-  // ---- every MUTATING_METHODS verb is gated under read-Auto ----
-  await Store.setOriginMutating(ORIGIN, false); // revoke the elevated opt-in
+  // ---- every MUTATING_METHODS verb is ALLOWED under Auto (opt-out) ----
+  await Store.setOriginMutating(ORIGIN, false); // even with the flag false
   for (const m of ['POST', 'PUT', 'PATCH', 'DELETE']) {
     const g = await Gate.evaluate({
       origin: ORIGIN, slug: 'github.issues.mutate', method: m,
       entry: { tier: 'T1a', sideEffectClass: 'mutating' }
     });
-    check(g && g.decision !== 'allow' && g.error && g.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
-      m + ' on read-Auto origin -> RECIPE_CONSENT_MUTATING_REQUIRED (MUTATING_METHODS coverage)');
+    check(g && g.decision === 'allow',
+      m + ' on Auto origin -> allow (writes no longer gated under the opt-out default)');
   }
+
+  // ---- but an explicitly Off origin still blocks writes (the opt-out path) ----
+  await Store.setOriginMode(ORIGIN, 'off');
+  const offPost = await Gate.evaluate({
+    origin: ORIGIN, slug: 'github.issues.create', method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'mutating' }
+  });
+  check(offPost && offPost.decision !== 'allow' && offPost.error && offPost.error.code === 'RECIPE_CONSENT_REQUIRED',
+    'an explicitly Off origin still blocks writes (per-origin opt-out)');
 
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);

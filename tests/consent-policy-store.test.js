@@ -11,16 +11,17 @@
  *
  * Asserts the LOCKED interface (from 30-01-PLAN.md <interfaces>):
  *   STORAGE_KEY = 'fsbConsentPolicies'   PAYLOAD_VERSION = 1
- *   envelope: { v:1, defaultMode:'off', policies: { [origin]: { mode, mutating } } }
- *   getConsentForOrigin(envelope, origin) -> { mode, mutating }  (DEFAULT mode 'off', mutating false)
+ *   envelope: { v:1, defaultMode:'auto', policies: { [origin]: { mode, mutating } } }
+ *   getConsentForOrigin(envelope, origin) -> { mode, mutating }  (falls back to defaultMode; mutating false)
  *   readPolicies() -> Promise<envelope>   (chrome.storage.local; null-safe)
  *   setOriginMode(origin, mode) -> Promise<void>
  *   setOriginMutating(origin, allowed) -> Promise<void>
  *   _reset() test hook
  *
- * Behavior sampled (GOV-02): default-OFF on an empty envelope; Off/Ask/Auto
- * round-trip through setOriginMode + readPolicies; Auto is per-origin (NO global
- * enable key in the envelope).
+ * Behavior sampled: the shipped default is now OPT-OUT (defaultMode 'auto');
+ * Off/Ask/Auto round-trip through setOriginMode + readPolicies; setDefaultMode
+ * sets the global default; an explicit per-origin policy overrides it; the
+ * envelope still carries NO forbidden global enable key (GOV-02).
  *
  * Chrome stub: in-memory chrome.storage.local, cloned from
  * tests/diagnostics-ring-buffer.test.js's storage idiom (a Map-backed get/set).
@@ -87,6 +88,7 @@ function installChromeStorageStub() {
   check(typeof Store.readPolicies === 'function', 'exports readPolicies');
   check(typeof Store.setOriginMode === 'function', 'exports setOriginMode');
   check(typeof Store.setOriginMutating === 'function', 'exports setOriginMutating');
+  check(typeof Store.setDefaultMode === 'function', 'exports setDefaultMode');
   check(typeof Store._reset === 'function', 'exports _reset (test hook)');
 
   if (typeof Store._reset === 'function') Store._reset();
@@ -100,9 +102,9 @@ function installChromeStorageStub() {
   // ---- an unseen origin on a freshly read store is OFF ----
   const env0 = await Store.readPolicies();
   check(env0 && env0.v === 1, 'readPolicies() returns a versioned envelope (v:1)');
-  check(env0 && env0.defaultMode === 'off', 'readPolicies() defaultMode is off');
+  check(env0 && env0.defaultMode === 'auto', 'readPolicies() defaultMode is auto (shipped opt-out default)');
   const unseen = Store.getConsentForOrigin(env0, 'https://unseen.example.com');
-  check(unseen && unseen.mode === 'off', 'unseen origin is OFF after a fresh read');
+  check(unseen && unseen.mode === 'auto', 'unseen origin inherits the shipped default (auto) after a fresh read');
 
   // ---- Off/Ask/Auto round-trip through setOriginMode + readPolicies ----
   const ORIGIN = 'https://github.com';
@@ -130,9 +132,36 @@ function installChromeStorageStub() {
     check(!Object.prototype.hasOwnProperty.call(env, k),
       "envelope has NO global enable key '" + k + "' (Auto is per-origin only)");
   }
-  // a DIFFERENT origin is unaffected by github.com being Auto (no global bleed)
-  check(Store.getConsentForOrigin(env, 'https://other.example.com').mode === 'off',
-    'a different origin stays OFF while github.com is Auto (per-origin isolation)');
+  // a DIFFERENT origin with no explicit policy inherits the GLOBAL default (now
+  // 'auto', opt-out) and is NOT affected by github.com's specific settings.
+  check(Store.getConsentForOrigin(env, 'https://other.example.com').mode === 'auto',
+    'a different origin inherits the global default (auto) while github.com is explicitly Auto');
+  check(Store.getConsentForOrigin(env, 'https://other.example.com').mutating === false,
+    'github.com mutating:true does NOT bleed to other origins (per-origin isolation)');
+
+  // ---- setDefaultMode sets the GLOBAL default (the opt-out toggle) ----
+  if (typeof Store._reset === 'function') Store._reset();
+  if (typeof Store.setDefaultMode === 'function') {
+    await Store.setDefaultMode('off');
+    let envD = await Store.readPolicies();
+    check(envD && envD.defaultMode === 'off', "setDefaultMode('off') -> envelope defaultMode 'off'");
+    check(Store.getConsentForOrigin(envD, 'https://fresh-a.example.com').mode === 'off',
+      "after setDefaultMode('off') an unseen origin is OFF (opt-in restored)");
+    await Store.setDefaultMode('ask');
+    envD = await Store.readPolicies();
+    check(Store.getConsentForOrigin(envD, 'https://fresh-b.example.com').mode === 'ask',
+      "setDefaultMode('ask') -> unseen origins resolve to 'ask'");
+    await Store.setDefaultMode('bogus');
+    envD = await Store.readPolicies();
+    check(envD && envD.defaultMode === 'ask', "setDefaultMode('bogus') is a no-op (default unchanged)");
+    // an explicit per-origin policy OVERRIDES the global default.
+    await Store.setOriginMode('https://explicit.example.com', 'auto');
+    envD = await Store.readPolicies();
+    check(Store.getConsentForOrigin(envD, 'https://explicit.example.com').mode === 'auto',
+      'an explicit per-origin policy overrides the global default');
+    check(Store.getConsentForOrigin(envD, 'https://still-default.example.com').mode === 'ask',
+      'an unconfigured origin still follows the global default (ask)');
+  }
 
   // ---- ME-03: a prototype-shaped origin key round-trips as OWN data ----
   // Probed class: setOriginMode('__proto__', ...) on a normal {} policies map

@@ -12,7 +12,8 @@
  * passes.
  *
  * Asserts (30-UI-SPEC Acceptance Criteria, verbatim load-bearing strings):
- *   - nav + section shell (data-section="consent-audit", id="consent-audit", h2),
+ *   - section shell (id="consent-audit", h2) merged under Advanced (data-section="advanced"),
+ *   - the global "Default for New Sites" toggle (consentDefaultModeToggle, data-default-mode),
  *   - per-origin consent (consentOriginList, Off/Ask/Auto data-mode in a radiogroup,
  *     the mutating toggle, Sensitive/Blocked/Per-Origin Consent strings, empty copy),
  *   - pending-Ask (pendingRequestList, Pending Requests/Grant/Deny, .control-btn.danger),
@@ -44,8 +45,8 @@ function ok(cond, msg) {
   const opts = fs.readFileSync(optsPath, 'utf8');
 
   // ---- Nav + section ----
-  ok(/data-section=["']consent-audit["']/.test(html), 'nav contains data-section="consent-audit"');
-  ok(/<section[^>]*id=["']consent-audit["']/.test(html), 'a <section id="consent-audit"> exists');
+  ok(/data-section=["']advanced["']/.test(html), 'nav contains data-section="advanced" (Consent & Audit merged under it)');
+  ok(/<section[^>]*id=["']consent-audit["']/.test(html), 'a <section id="consent-audit"> exists (rendered under Advanced)');
   ok(/<h2[^>]*>\s*Consent &amp; Audit\s*<\/h2>/.test(html) || /<h2[^>]*>\s*Consent & Audit\s*<\/h2>/.test(html),
     'section header <h2>Consent & Audit</h2> present');
   ok(/<span[^>]*>\s*Consent & Audit\s*<\/span>/.test(html) || /Consent &amp; Audit/.test(html),
@@ -60,7 +61,15 @@ function ok(cond, msg) {
   ok(/Per-Origin Consent/.test(html), 'string "Per-Origin Consent" present');
   ok(/Sensitive/.test(html), 'string "Sensitive" present (sensitive badge)');
   ok(/Blocked/.test(html), 'string "Blocked" present (denylisted badge)');
-  ok(/No origins seen yet\./.test(html), 'per-origin empty-state copy "No origins seen yet." present');
+  ok(/No sites yet\./.test(html), 'per-origin empty-state copy "No sites yet." present');
+  ok(!/read access does not imply write access/i.test(html),
+    'stale write-gating copy is absent from the consent UI');
+
+  // ---- Default for New Sites (global consent default; opt-out toggle) ----
+  ok(/id=["']consentDefaultModeToggle["']/.test(html), 'element id="consentDefaultModeToggle" exists');
+  ok(/data-default-mode=["']off["']/.test(html) && /data-default-mode=["']ask["']/.test(html) && /data-default-mode=["']auto["']/.test(html),
+    'Default-for-new-sites control present as three data-default-mode buttons (off/ask/auto)');
+  ok(/Default for New Sites/.test(html), 'string "Default for New Sites" present');
 
   // ---- Pending-Ask ----
   ok(/id=["']pendingRequestList["']/.test(html), 'element id="pendingRequestList" exists');
@@ -111,8 +120,18 @@ function ok(cond, msg) {
     'setupEventListeners attaches a click handler to auditExportBtn');
   ok(/elements\.auditClearBtn[\s\S]{0,200}addEventListener\(['"]click['"]/.test(opts),
     'setupEventListeners attaches a click handler to auditClearBtn');
+  ok(/elements\.consentDefaultModeToggle\s*=\s*document\.getElementById\(['"]consentDefaultModeToggle['"]\)/.test(opts),
+    'cacheElements wires elements.consentDefaultModeToggle');
+  ok(/setDefaultMode/.test(opts),
+    'options.js calls setDefaultMode (the global default-mode handler)');
   ok(/chrome\.storage\.onChanged/.test(opts),
     'a render/refresh path subscribes to chrome.storage.onChanged (consent + audit stores)');
+  ok(!/sensitive\+Auto downgrade/i.test(opts) && !/Auto is disabled/i.test(opts),
+    'options.js no longer contains stale sensitive Auto downgrade/disable copy');
+  ok(!/cls\.sensitive\s*\?\s*['"]ask['"]\s*:\s*['"]auto['"]/.test(opts),
+    'Grant no longer writes ask for sensitive non-denied origins');
+  ok(/const\s+grantMode\s*=\s*['"]auto['"]/.test(opts),
+    'Grant writes auto for all non-denied origins');
 
   // ---- Legal ----
   ok(/Legal & Service Policy/.test(html), 'string "Legal & Service Policy" present');

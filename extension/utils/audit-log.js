@@ -236,6 +236,27 @@
     });
   }
 
+  // ---- getDistinctOrigins() -> Promise<string[]> ---------------------------
+  // Returns the DISTINCT, non-empty origins seen in the audit ring (caller sorts).
+  // Drives the per-origin consent list so an origin FSB merely ATTEMPTED (even a
+  // blocked invoke) is surfaced for opt-out, not only origins with a stored policy.
+  // Reads the same ring as getEntries; degrades to [] on any hiccup (never throws).
+  function getDistinctOrigins() {
+    return Promise.resolve(getEntries()).then(function(result) {
+      var entries = (result && Array.isArray(result.entries)) ? result.entries : [];
+      var seen = Object.create(null);
+      var out = [];
+      for (var i = 0; i < entries.length; i++) {
+        var o = entries[i] && entries[i].origin;
+        if (typeof o === 'string' && o && !Object.prototype.hasOwnProperty.call(seen, o)) {
+          seen[o] = true;
+          out.push(o);
+        }
+      }
+      return out;
+    }).catch(function() { return []; });
+  }
+
   // ---- _reset() -- test hook (mirror diagnostics-ring _resetRing) -----------
   function _reset() {
     _inMemoryRing = [];
@@ -248,6 +269,7 @@
     MAX_ENTRIES: MAX_ENTRIES,
     append: append,
     getEntries: getEntries,
+    getDistinctOrigins: getDistinctOrigins,
     _reset: _reset
   };
 

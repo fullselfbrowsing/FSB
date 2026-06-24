@@ -220,12 +220,11 @@
   // Returns ok:true to proceed, or ok:false + a RECIPE_CONSENT_* reason.
   async function _runGate(origin, opts) {
     // (0) LO-02: explicit null/empty/non-http origin rejection -- fail CLOSED on
-    // un-resolvable input BEFORE any consent read or attach. Without this the gate
-    // leaned on getConsentForOrigin(envelope, null) returning the envelope
-    // defaultMode (safe under the shipped 'off' default, but a GLOBAL default of
-    // 'auto' would let a null origin pass the consent check and classify(null)
-    // .sensitive === false, so the gate would proceed to attach with origin===null).
-    // A capture origin MUST be a concrete http(s) origin; anything else stops here.
+    // un-resolvable input BEFORE any consent read or attach. This guard is now
+    // LOAD-BEARING: the shipped global default is 'auto', so without this a null
+    // origin would pass getConsentForOrigin(envelope, null) (-> 'auto') and
+    // classify(null).sensitive === false, and the gate would attach with
+    // origin===null. A capture origin MUST be a concrete http(s) origin.
     if (typeof origin !== 'string' || !/^https?:\/\//.test(origin)) {
       return { ok: false, reason: REASON_REQUIRED };
     }
@@ -239,8 +238,11 @@
       if (d && d.denied) { return { ok: false, reason: REASON_DENIED }; }
     }
     var store = _consentStore();
-    // (2) Consent: default-OFF is rejected (DISC-04). If the consent store is
-    // absent, fail CLOSED (treat as OFF) -- never attach without a consent read.
+    // (2) Consent: a per-origin Off (or a reverted global default) is rejected
+    // (DISC-04). The shipped global default is now 'auto' (opt-out), so an unseen
+    // origin passes here. If the consent store is absent, fail CLOSED (treat as
+    // OFF) -- never attach without a consent read. Note: the discovery path KEEPS
+    // its sensitive-confirm at (3) below, unlike the fully-open invoke gate.
     if (!store || typeof store.readPolicies !== 'function' || typeof store.getConsentForOrigin !== 'function') {
       return { ok: false, reason: REASON_REQUIRED };
     }
