@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9.99
-milestone_name: Native Capability Catalog (FSB API Execution)
-status: ready_to_plan
-stopped_at: Phase 34 (explicit file-upload tool, upload_file) execution-complete — milestone extension
-last_updated: 2026-06-23T13:30:00.000Z
-last_activity: 2026-06-23
+milestone: v1.0.0
+milestone_name: Full App Catalog (OpenTabs Parity)
+status: planning
+last_updated: "2026-06-24T03:57:46.677Z"
+last_activity: 2026-06-24
 progress:
-  total_phases: 10
-  completed_phases: 9
-  total_plans: 32
-  completed_plans: 34
-  percent: 90
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -29,12 +28,10 @@ See: .planning/MILESTONES.md (prior milestones; v0.12.0 ended at Phase 25)
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-23 - Completed quick task 260623-941: Patch learned replay placeholders and unpacked dev capability catalog snapshot
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-24 — Milestone v1.0.0 started
 
 ## Roadmap At A Glance (v0.9.99, Phases 26-34)
 
