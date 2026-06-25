@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: Completed 36-04-PLAN.md (catalog inlining shape-lock + smoke eval re-pass + cold-start budget, CGEN-04) -- Phase 36 all 4 plans executed
-last_updated: "2026-06-24T21:18:19.947Z"
-last_activity: 2026-06-24 -- Phase 37 planning complete
+stopped_at: Completed 37-01-PLAN.md (breadth contract machinery -- importer batch-enumeration + STEM_OVERRIDES + MED-03 synonyms + backing + merge-time batch gate + eval seed-feeding; vendored linear/asana; generalized no-dead-entry loader; 3 Wave-0 proof tests; snapshot regen) -- Phase 37 plan 1 of 4
+last_updated: "2026-06-25T00:00:00.000Z"
+last_activity: 2026-06-25 -- Phase 37 plan 01 executed (BRDTH-01/02/03 machinery + Wave-0 tests)
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 92
 ---
 
 # Project State
@@ -30,12 +30,12 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 ## Current Position
 
-Phase: 37 of 43 (Breadth A — Dev / Productivity) — not started
-Plan: —
-Status: Ready to execute
-Last activity: 2026-06-24 -- Phase 37 planning complete
+Phase: 37 (Breadth A — Dev / Productivity (least-sensitive)) — EXECUTING
+Plan: 2 of 4 (37-01 complete; 37-02 next)
+Status: Executing Phase 37 (1/4 plans complete)
+Last activity: 2026-06-25 -- Phase 37 plan 01 executed (breadth contract machinery + Wave-0 proof tests)
 
-Progress: [██░░░░░░░░] 22% (2/9 phases)
+Progress: [██░░░░░░░░] 22% (2/9 phases; Phase 37 in progress 1/4 plans)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -43,7 +43,7 @@ Progress: [██░░░░░░░░] 22% (2/9 phases)
 |-------|------|--------------|--------|
 | 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
 | 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | ✓ Complete (2026-06-24) |
-| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | Not started |
+| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | In Progress (1/4 plans, 2026-06-25) |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | Not started |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | Not started |
 | 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
@@ -106,6 +106,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 36]: Phase 36-03 (CGEN-02): verify-catalog-crosscheck.mjs is the REAL fail-safe-high derived-vs-declared gate (replaces the Plan-01 stub). deriveClass(signals,slug) MAX-merges (read<write<destructive) the GraphQL/RPC carve-out (FIRST; transport graphql/gql/rpc -> method uninformative -> classify by op-name verb; ambiguous -> write; NEVER auto-read), the named-verb helper (apiGet/apiPost/apiPut/apiPatch/apiDelete), the generic api({method}) literal (GET->read/POST,PUT,PATCH->write/DELETE->destructive), the op-name verb, and an UPGRADE-only override-table FLOOR (void_invoice/delete_customer/cancel_subscription/refund_charge/delete_record/archive_project->destructive; merge_pull_request->write; keyed by op-name OR slug-suffix so a known-destructive op with NO signals is still caught). crossCheck(descriptors)->{failures} FAILS the build when declared < derived (under-states a destructive op); over-stating is the safe direction (no failure). Dual-exported crossCheck+deriveClass (importer may call inline) + CLI chained into validate:extension AFTER verify-classification-gate.mjs. The real 7-descriptor todoist corpus passes (no 36-01 mis-class). Sample test (tests/catalog-crosscheck.test.js, via the REAL crossCheck export): void_invoice/archiveIssue (declared read) FAIL; delete_customer/linear.issues (declared destructive/read) PASS -- proving a GraphQL POST is never classed read. package.json untouched (Plan-01 stubs already chain it).
 - [Phase 36]: Phase 36-04 (CGEN-04): Plan 04 is a VERIFIER -- tests/catalog-inline-shape.test.js reads/asserts the Plan-01-committed recipe-index.generated.js (IIFE wrapper + global.FsbRecipeIndex=DATA + module.exports dual-export tail structurally byte-stable via regex NOT byte-diff so the 8->15 descriptor growth does not falsely red; all 7 todoist slugs inlined; in-memory readJsonDir+IIFE regen reproduces the committed bytes EXACTLY proving idempotent restore-not-rebuild WITHOUT rewriting the file; djb2 _computeCatalogVersion deterministic over the same corpus + shifts on a slug-set change). It never lists the snapshot in files_modified, never regenerates-and-commits it, never asserts a pre-emit baseline; confirmed git-clean before+after the end-to-end package-extension.mjs idempotency verify.
 - [Phase 36]: Phase 36-04 (CGEN-04): head-handler-cap.test.js parses HEAD_HANDLER_MODULES from capability-catalog.js SOURCE (it is a private var, not exported) and asserts length<=30 (==3 today: github/slack/notion) -- the stronger freeze that locks the source declaration the head is built against, immune to runtime registration. Smoke eval re-pass uses _fixtures/-only descriptor-only near-neighbors (7 todoist ops + asana create/list + linear create -> cross-app create_* wrong-invoke pressure) with NO seed-recipes added; the existing harness re-passes recall@5=1.000 wrong-invoke=0.000 over 58 fixtures and the +2 cold-start asserts (serialized 9.9KB<50KB; loadJSON+first-search 0.58ms<10ms) prove the SCALE-01 data-layout (params NOT indexed/stored) before breadth lands. _fixtures excluded by readJsonDir non-recursion so the shipped snapshot + validate:extension stay green.
+- [Phase 37]: Phase 37-01 (BRDTH-01/02/03 -- the breadth CONTRACT machinery 02/03/04 reuse): the importer (scripts/import-opentabs-catalog.mjs) replaces the hardcoded SMOKE_APPS=['todoist'] with enumerateBatchApps() (readdirSync of the vendored plugins, excluding head-owned github/slack/notion + already-imported todoist + e2e/prescript fixtures), adds STEM_OVERRIDES={jira,confluence,cloudflare,datadog} via displayServiceStem(app,derived) so the four collision hosts (*.atlassian.net jira/confluence collision; dash.cloudflare.com; app.datadoghq.com) emit DISTINCT canonical slugs (02/04 rely on this), rewrites synthSynonyms to put the serviceStem token in EVERY phrase + drop the broken "<verb> a <plural-noun>" form (MED-03 fix, carried from 36-REVIEW), stamps backing via backingFor(app,service)='dom' for this data batch (canonical enum recipe/handler/learn/dom -- 'learn' NOT 'learn-pending'), aborts the build via a merge-time classifyGate batch-coverage assertion on any unclassified origin, and feeds each emitted descriptor's searchable shape into _fixtures/seed-descriptors.json (feedSeedDescriptors) so the eval has an indexed descriptor for every emitted slug. capability-search.js carries `backing` through INDEX_OPTIONS.storeFields + buildIndex + annotates each search() hit with invocable (true iff handler/recipe) + backingStatus (display label: dom->'discovery-pending', learn->'learn-pending') so a pending-only descriptor is never a confident invocable hit (T-37-02). The shipped corpus is backfilled (github/slack/notion heads -> 'handler'; declarative tail -> 'dom'). no-dead-entry.test.js loader GENERALIZED from opentabs__todoist__ to ALL opentabs__*.json (the Phase-36 todoist-only filter was a false-green for every new app) + line-74 backing assertion widened to {dom,handler,learn,absent}. Snapshot regenerated via package-extension.mjs (INV-01 IIFE/djb2 unchanged; DATA grows). Three Wave-0 proof tests land: breadth-search-return (the GENUINE MED-03 proof over the REAL emitted corpus -- recall@5=1.000, wrong-invoke=0 on the cross-app create_* set; eval-side intent-cases a redundant secondary signal), breadth-batch-gate (classifyGate fails-closed on the wallet.acme-pay.example fixture, passes the safe linear/asana batch), backing-status-annotation (handler invocable=true vs dom invocable=false/discovery-pending). All 3 registered in the npm test chain after head-handler-cap.test.js. Eval recall@5=1.000 wrong-invoke=0.000 over 64 fixtures (58 + 6 linear/asana create); validate:extension + crosscheck + no-dead-entry green. (Tasks 1-3 + the importer/search/corpus machinery landed in commits 05e1a0e1/2f031c2d/347fb67b; Task-4 proof tests + registration in 586d4421/2b668afa after a transient-socket interruption.)
 
 ### Pending Todos
 
@@ -138,10 +139,14 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-24T17:34:24.916Z
-Stopped at: Completed 36-04-PLAN.md (catalog inlining shape-lock + smoke eval re-pass + cold-start budget, CGEN-04) -- Phase 36 all 4 plans executed
+Last session: 2026-06-25T00:00:00.000Z
+Stopped at: Completed 37-01-PLAN.md (breadth contract machinery + vendored linear/asana + generalized no-dead-entry loader + 3 Wave-0 proof tests + snapshot regen) -- Phase 37 plan 1 of 4
 Resume file: None
 
 ## Next Actions
+
+Execute 37-02-PLAN.md (vendor clickup/jira/confluence/airtable as data-only slices reusing the now-frozen 37-01 contract -- enumerateBatchApps picks them up automatically; STEM_OVERRIDES already gives jira/confluence distinct stems; regen snapshot + extend the eval). 37-01 froze the breadth machinery (importer enumeration + STEM_OVERRIDES + MED-03 synonyms + backing enum + merge-time batch gate + eval seed-feeding + generalized no-dead-entry loader) so 37-02/03/04 are genuinely data-only against corrected, frozen machinery. Recommended: continue Phase 37 execution.
+
+### (historical) Phase 37 planning context
 
 Plan Phase 37 (Breadth A — Dev / Productivity, least-sensitive — BRDTH-01/02/03). Phases 35 + 36 are complete and verified. Phase 36 shipped the load-bearing pipeline: the tsx `scripts/import-opentabs-catalog.mjs` (z.toJSONSchema→closed flat descriptors, recursive forbidden-field pre-scan, classifyGate-before-emit), the shared `scripts/lib/side-effect-class.mjs` (verb-map + GraphQL/RPC carve-out + override floor + fail-safe-high, used by BOTH importer and the `verify-catalog-crosscheck.mjs` gate so they can't diverge), the one-branch `resolve()` no-dead-entry fallback (descriptor-only → T3/T2, zero router edits), and the catalog inlining (IIFE/djb2 byte-stable, INV-01). Smoke proof on todoist: recall@5=1.000, wrong-invoke=0, cold-start 9.9KB/0.4ms. Phase 37 reuses this pipeline to import the FIRST real breadth batch (dev/PM/cloud/observability apps), establishing the BRDTH contract: all real apps return from `search_capabilities` with intent synonyms + side-effect class + a backing-status signal; each batch gated on its origins being denylist-classified (DENY-03) before merge. **CARRY-FORWARD into Phase 37 (from 36 code review MED-03): the intent-synonym generator has a synonym-collision/grammar weakness that bites at breadth scale (cross-app `create_*` near-neighbors) — address it in Phase 37 with the asana/linear near-neighbor eval fixtures.** Recommended: `/gsd-plan-phase 37`. Side Phase 999.1 (click heuristics) is Backlog — NOT part of v1.0.0 (35-43); the autonomous run skips it. Existing live-browser UAT + release/publish actions remain carried-forward, user-gated debt.
