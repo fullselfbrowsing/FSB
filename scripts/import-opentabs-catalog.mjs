@@ -170,9 +170,21 @@ function enumerateBatchApps() {
 // confluence/threads already use (a DATA-MAP extension of the 37-01 per-app extension
 // point, NOT a logic change, so INV-01 holds). The `service` field keeps the real host;
 // only the stem/slug/filename is canonicalized. 39-01's classifications are NOT changed.
+//
+// PHASE 39 (39-03, retail + marketplace): the 7 retail/marketplace apps amazon/ebay/
+// etsy/bestbuy/costco/walmart/target all vendor *://www.<app>.com/* (the EXACT www
+// origins 39-01 classified SENSITIVE on the payment/money-movement axis -- each places
+// PAID orders / binding bids), so readPluginMeta strips nothing and derives the host
+// stem 'www' for EVERY one. The dir-name-keyed override canonicalizes each slug to
+// opentabs__<app>__* (0 opentabs__www__*) -- the SAME first-label-isn't-the-app-name
+// canonicalization as doordash/ubereats/grubhub/instacart (39-02) and cloudflare/
+// datadog/threads (a DATA-MAP extension of the 37-01 per-app extension point, NOT a
+// logic change, so INV-01 holds). The `service` field keeps the real www-host; only the
+// stem/slug/filename is canonicalized. 39-01's classifications are NOT changed.
 const STEM_OVERRIDES = {
   jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog', threads: 'threads',
   doordash: 'doordash', ubereats: 'ubereats', grubhub: 'grubhub', instacart: 'instacart', uber: 'uber', lyft: 'lyft',
+  amazon: 'amazon', ebay: 'ebay', etsy: 'etsy', bestbuy: 'bestbuy', costco: 'costco', walmart: 'walmart', target: 'target',
 };
 
 function displayServiceStem(app, derivedStem) {

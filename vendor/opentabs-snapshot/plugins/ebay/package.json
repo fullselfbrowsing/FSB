@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs ebay plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.ebay.com/* -> service www.ebay.com). www.ebay.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {ebay:'ebay'} canonicalizes the slug to opentabs__ebay__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.ebay.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- a winning bid / Buy It Now charges the saved payment method) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, ebay-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; place_bid (api {method:'POST'}) and buy_now (api {method:'POST'}) are the PAYMENT ops. Both are DOM-only on a sensitive origin -> the payment-op CI guard PASSES (not safe-and-API-invocable).",
+  "name": "@opentabs-dev/opentabs-plugin-ebay",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "eBay",
+    "description": "OpenTabs plugin for eBay",
+    "urlPatterns": [
+      "*://www.ebay.com/*"
+    ],
+    "homepage": "https://www.ebay.com"
+  },
+  "license": "MIT"
+}
