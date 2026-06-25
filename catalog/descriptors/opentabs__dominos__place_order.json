@@ -1,0 +1,81 @@
+{
+  "slug": "dominos.place_order",
+  "service": "www.dominos.com",
+  "intentSynonyms": [
+    "place an order in dominos",
+    "place order in dominos",
+    "order pizza on dominos in dominos"
+  ],
+  "description": "Place a paid Domino’s order: submit a cart of menu items to a store for delivery or carryout. This charges your saved payment method -- a real money-moving action.",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The store to order from"
+      },
+      "items": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "Menu item ID"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "Quantity of this item"
+            }
+          },
+          "required": [
+            "item_id",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        "description": "The cart items to order"
+      },
+      "service": {
+        "type": "string",
+        "enum": [
+          "delivery",
+          "carryout"
+        ],
+        "description": "Delivery or carryout"
+      },
+      "address": {
+        "description": "Delivery address (required for delivery)",
+        "type": "string"
+      },
+      "payment_method_id": {
+        "description": "Optional saved payment method ID to charge",
+        "type": "string"
+      }
+    },
+    "required": [
+      "store_id",
+      "items",
+      "service"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/place-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "place"
+    }
+  }
+}

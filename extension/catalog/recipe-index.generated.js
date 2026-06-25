@@ -2450,6 +2450,217 @@
       }
     },
     {
+      "slug": "chipotle.get_menu",
+      "service": "www.chipotle.com",
+      "intentSynonyms": [
+        "get a menu in chipotle",
+        "look up a menu in chipotle",
+        "fetch a single menu in chipotle",
+        "view one specific menu in chipotle",
+        "get menu in chipotle",
+        "look up a single chipotle menu in chipotle"
+      ],
+      "description": "Get the full menu (entrees, sides, drinks, and prices) for a single Chipotle location by its restaurant ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant ID whose menu to fetch"
+          }
+        },
+        "required": [
+          "restaurant_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chipotle/src/tools/get-menu.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "chipotle.list_locations",
+      "service": "www.chipotle.com",
+      "intentSynonyms": [
+        "list locations in chipotle",
+        "show me my locations in chipotle",
+        "view my locations in chipotle",
+        "see all my locations in chipotle",
+        "find nearby chipotle locations in chipotle"
+      ],
+      "description": "List nearby Chipotle locations by address or ZIP code, with their hours and pickup availability.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Address or ZIP code to search near"
+          },
+          "radius_miles": {
+            "description": "Search radius in miles",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chipotle/src/tools/list-locations.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "chipotle.list_orders",
+      "service": "www.chipotle.com",
+      "intentSynonyms": [
+        "list orders in chipotle",
+        "show me my orders in chipotle",
+        "view my orders in chipotle",
+        "see all my orders in chipotle",
+        "show me my chipotle order history in chipotle"
+      ],
+      "description": "List your recent Chipotle orders. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chipotle/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "chipotle.place_order",
+      "service": "www.chipotle.com",
+      "intentSynonyms": [
+        "place an order in chipotle",
+        "place order in chipotle",
+        "place a chipotle order in chipotle"
+      ],
+      "description": "Place a paid Chipotle order: submit a cart of menu items to a location for pickup or delivery. This charges your saved payment method -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The location to order from"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "description": "Menu item ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "fulfillment": {
+            "type": "string",
+            "enum": [
+              "pickup",
+              "delivery"
+            ],
+            "description": "Pickup or delivery"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "restaurant_id",
+          "items",
+          "fulfillment"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chipotle/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
       "slug": "circleci.get_pipeline",
       "service": "app.circleci.com",
       "intentSynonyms": [
@@ -3712,6 +3923,204 @@
       }
     },
     {
+      "slug": "craigslist.delete_listing",
+      "service": "www.craigslist.org",
+      "intentSynonyms": [
+        "delete a listing in craigslist",
+        "remove a listing in craigslist",
+        "trash a listing in craigslist",
+        "permanently delete a listing in craigslist",
+        "delete listing in craigslist",
+        "delete my craigslist listing in craigslist"
+      ],
+      "description": "Delete one of your Craigslist listings by its ID. This permanently removes the classified ad.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing ID to delete"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/craigslist/src/tools/delete-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "craigslist.get_listing",
+      "service": "www.craigslist.org",
+      "intentSynonyms": [
+        "get a listing in craigslist",
+        "look up a listing in craigslist",
+        "fetch a single listing in craigslist",
+        "view one specific listing in craigslist",
+        "get listing in craigslist",
+        "look up a single craigslist listing in craigslist"
+      ],
+      "description": "Get the full detail (title, price, description, contact, and posting date) of a single Craigslist listing by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing ID to fetch"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/craigslist/src/tools/get-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "craigslist.post_listing",
+      "service": "www.craigslist.org",
+      "intentSynonyms": [
+        "post a listing in craigslist",
+        "post listing in craigslist",
+        "post a new listing on craigslist in craigslist"
+      ],
+      "description": "Post a new Craigslist classified listing in a region and category. NOTE this is NOT a payment op, but Craigslist is a sensitive marketplace origin so the write is consent-gated.",
+      "actionVerb": "post",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing title"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing body/description"
+          },
+          "region": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City or region subdomain to post in (e.g. sfbay)"
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Category to post under (e.g. for-sale)"
+          },
+          "price": {
+            "description": "Optional asking price",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "region",
+          "category"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/craigslist/src/tools/post-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "post"
+        }
+      }
+    },
+    {
+      "slug": "craigslist.search_listings",
+      "service": "www.craigslist.org",
+      "intentSynonyms": [
+        "search listings in craigslist",
+        "search listings on craigslist in craigslist",
+        "search craigslist classified listings by keyword within a city/region and category (for-sale, housing, jobs, services) in craigslist"
+      ],
+      "description": "Search Craigslist classified listings by keyword within a city/region and category (for-sale, housing, jobs, services).",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (what to look for)"
+          },
+          "region": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City or region subdomain to search in (e.g. sfbay, newyork)"
+          },
+          "category": {
+            "description": "Category to filter by (e.g. for-sale, housing, jobs)",
+            "type": "string"
+          },
+          "max_price": {
+            "description": "Maximum price filter",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "query",
+          "region"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/craigslist/src/tools/search-listings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "datadog.get_monitor",
       "service": "app.datadoghq.com",
       "intentSynonyms": [
@@ -4089,6 +4498,261 @@
           "transportHelper": "api",
           "httpMethod": "POST",
           "opNameVerb": "send"
+        }
+      }
+    },
+    {
+      "slug": "dominos.get_menu",
+      "service": "www.dominos.com",
+      "intentSynonyms": [
+        "get a menu in dominos",
+        "look up a menu in dominos",
+        "fetch a single menu in dominos",
+        "view one specific menu in dominos",
+        "get menu in dominos",
+        "look up a single dominos menu in dominos"
+      ],
+      "description": "Get the full menu (pizzas, sides, drinks, prices, and coupons) for a single Domino’s store by its store ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The store ID whose menu to fetch"
+          }
+        },
+        "required": [
+          "store_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/dominos/src/tools/get-menu.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "dominos.list_orders",
+      "service": "www.dominos.com",
+      "intentSynonyms": [
+        "list orders in dominos",
+        "show me my orders in dominos",
+        "view my orders in dominos",
+        "see all my orders in dominos",
+        "show me my dominos order history in dominos"
+      ],
+      "description": "List your recent Domino’s orders. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/dominos/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "dominos.list_stores",
+      "service": "www.dominos.com",
+      "intentSynonyms": [
+        "list stores in dominos",
+        "show me my stores in dominos",
+        "view my stores in dominos",
+        "see all my stores in dominos",
+        "find nearby dominos stores in dominos"
+      ],
+      "description": "List nearby Domino’s stores by address or ZIP code, with their hours and delivery/carryout availability.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Address or ZIP code to search near"
+          },
+          "service": {
+            "description": "Filter by service type",
+            "type": "string",
+            "enum": [
+              "delivery",
+              "carryout"
+            ]
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/dominos/src/tools/list-stores.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "dominos.place_order",
+      "service": "www.dominos.com",
+      "intentSynonyms": [
+        "place an order in dominos",
+        "place order in dominos",
+        "order pizza on dominos in dominos"
+      ],
+      "description": "Place a paid Domino’s order: submit a cart of menu items to a store for delivery or carryout. This charges your saved payment method -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The store to order from"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "description": "Menu item ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "carryout"
+            ],
+            "description": "Delivery or carryout"
+          },
+          "address": {
+            "description": "Delivery address (required for delivery)",
+            "type": "string"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "store_id",
+          "items",
+          "service"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/dominos/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "dominos.track_order",
+      "service": "www.dominos.com",
+      "intentSynonyms": [
+        "track an order in dominos",
+        "track order in dominos",
+        "track my dominos order in dominos"
+      ],
+      "description": "Track the live status of a single Domino’s order by its ID (prep, baking, out for delivery, delivered).",
+      "actionVerb": "track",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to track"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/dominos/src/tools/track-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "track"
         }
       }
     },
@@ -5611,6 +6275,145 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "grafana.get_dashboard",
+      "service": "grafana.com",
+      "intentSynonyms": [
+        "get a dashboard in grafana",
+        "look up a dashboard in grafana",
+        "fetch a single dashboard in grafana",
+        "view one specific dashboard in grafana",
+        "get dashboard in grafana",
+        "look up a single grafana dashboard in grafana"
+      ],
+      "description": "Get the full definition (panels, variables, and layout) of a single Grafana dashboard by its UID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dashboard UID to fetch"
+          }
+        },
+        "required": [
+          "uid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grafana/src/tools/get-dashboard.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "grafana.list_dashboards",
+      "service": "grafana.com",
+      "intentSynonyms": [
+        "list dashboards in grafana",
+        "show me my dashboards in grafana",
+        "view my dashboards in grafana",
+        "see all my dashboards in grafana",
+        "list dashboards on grafana in grafana"
+      ],
+      "description": "List the Grafana dashboards in your organization. Optionally filter by folder or tag.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "description": "Folder ID or title to filter by",
+            "type": "string"
+          },
+          "tag": {
+            "description": "Dashboard tag to filter by",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of dashboards to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grafana/src/tools/list-dashboards.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "grafana.query_metrics",
+      "service": "grafana.com",
+      "intentSynonyms": [
+        "query metrics in grafana",
+        "query metrics on grafana in grafana",
+        "run a metric query against a grafana data source and return the timeseries result over a time range in grafana"
+      ],
+      "description": "Run a metric query against a Grafana data source and return the timeseries result over a time range.",
+      "actionVerb": "query",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "datasource": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The data source UID or name to query"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The query expression (e.g. a PromQL/Loki expression)"
+          },
+          "from": {
+            "description": "Range start (ISO timestamp or relative, e.g. now-6h)",
+            "type": "string"
+          },
+          "to": {
+            "description": "Range end (ISO timestamp or relative, e.g. now)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "datasource",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grafana/src/tools/query-metrics.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "query"
         }
       }
     },
@@ -8345,6 +9148,254 @@
       }
     },
     {
+      "slug": "shopify.cancel_order",
+      "service": "shopify.com",
+      "intentSynonyms": [
+        "cancel an order in shopify",
+        "cancel order in shopify",
+        "cancel my shopify order in shopify"
+      ],
+      "description": "Cancel a Shopify order by its ID. This may be irreversible once the order has been fulfilled.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/shopify/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "shopify.create_order",
+      "service": "shopify.com",
+      "intentSynonyms": [
+        "create an order in shopify",
+        "add an order in shopify",
+        "make a new order in shopify",
+        "open a new order in shopify",
+        "create order in shopify",
+        "create an order on shopify in shopify"
+      ],
+      "description": "Create a paid Shopify order: submit line items and a shipping address. This charges the saved payment method and dispatches the order -- a real money-moving action.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "line_items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "variant_id": {
+                  "type": "string",
+                  "description": "The product variant ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this variant"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The line items to order"
+          },
+          "shipping_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to ship to"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_items",
+          "shipping_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/shopify/src/tools/create-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "shopify.get_product",
+      "service": "shopify.com",
+      "intentSynonyms": [
+        "get a product in shopify",
+        "look up a product in shopify",
+        "fetch a single product in shopify",
+        "view one specific product in shopify",
+        "get product in shopify",
+        "look up a single shopify product in shopify"
+      ],
+      "description": "Get the full detail (title, price, variants, inventory, and description) of a single Shopify product by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product ID to fetch"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/shopify/src/tools/get-product.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "shopify.list_orders",
+      "service": "shopify.com",
+      "intentSynonyms": [
+        "list orders in shopify",
+        "show me my orders in shopify",
+        "view my orders in shopify",
+        "see all my orders in shopify",
+        "show me my shopify order history in shopify"
+      ],
+      "description": "List the orders in a Shopify store. Optionally filter by fulfillment or financial status.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "cancelled",
+              "any"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/shopify/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "shopify.list_products",
+      "service": "shopify.com",
+      "intentSynonyms": [
+        "list products in shopify",
+        "show me my products in shopify",
+        "view my products in shopify",
+        "see all my products in shopify",
+        "list products on shopify in shopify"
+      ],
+      "description": "List the products in a Shopify store. Optionally filter by collection or search term and limit the result count.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "description": "Collection handle or ID to filter by",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search term to filter products by title",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/shopify/src/tools/list-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
       "slug": "stubhub.buy_tickets",
       "service": "www.stubhub.com",
       "intentSynonyms": [
@@ -10712,6 +11763,153 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/yelp/src/tools/search-businesses.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "zillow.get_home_value",
+      "service": "www.zillow.com",
+      "intentSynonyms": [
+        "get a home value in zillow",
+        "look up a home value in zillow",
+        "fetch a single home value in zillow",
+        "view one specific home value in zillow",
+        "get home value in zillow",
+        "look up a home value on zillow in zillow"
+      ],
+      "description": "Look up the estimated market value (Zestimate) and value history of a home by its address or Zillow listing ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "The home address to value",
+            "type": "string"
+          },
+          "listing_id": {
+            "description": "The Zillow listing ID (zpid) to value",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/zillow/src/tools/get-home-value.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "zillow.get_listing",
+      "service": "www.zillow.com",
+      "intentSynonyms": [
+        "get a listing in zillow",
+        "look up a listing in zillow",
+        "fetch a single listing in zillow",
+        "view one specific listing in zillow",
+        "get listing in zillow",
+        "look up a single zillow listing in zillow"
+      ],
+      "description": "Get the full detail (address, price, photos, beds/baths, and description) of a single Zillow listing by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zillow listing ID (zpid) to fetch"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/zillow/src/tools/get-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "zillow.search_listings",
+      "service": "www.zillow.com",
+      "intentSynonyms": [
+        "search listings in zillow",
+        "search listings on zillow in zillow",
+        "search zillow real-estate listings for sale or rent in a location, with optional price, beds, and home-type filters in zillow"
+      ],
+      "description": "Search Zillow real-estate listings for sale or rent in a location, with optional price, beds, and home-type filters.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, neighborhood, or ZIP code to search in"
+          },
+          "listing_type": {
+            "description": "For-sale, for-rent, or sold listings",
+            "type": "string",
+            "enum": [
+              "for_sale",
+              "for_rent",
+              "sold"
+            ]
+          },
+          "min_price": {
+            "description": "Minimum price filter",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "max_price": {
+            "description": "Maximum price filter",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "beds": {
+            "description": "Minimum number of bedrooms",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/zillow/src/tools/search-listings.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",

@@ -327,5 +327,33 @@
 
   { "intent": "list my calendly event types", "expectedSlug": "calendly.list_event_types" },
   { "intent": "check my calendly availability", "expectedSlug": "calendly.get_availability" },
-  { "intent": "show me my calendly scheduled events", "expectedSlug": "calendly.list_scheduled_events" }
+  { "intent": "show me my calendly scheduled events", "expectedSlug": "calendly.list_scheduled_events" },
+
+  { "intent": "list products on shopify", "expectedSlug": "shopify.list_products" },
+  { "intent": "look up a single shopify product", "expectedSlug": "shopify.get_product" },
+  { "intent": "show me my shopify order history", "expectedSlug": "shopify.list_orders" },
+  { "intent": "create an order on shopify", "expectedSlug": "shopify.create_order" },
+  { "intent": "cancel my shopify order", "expectedSlug": "shopify.cancel_order" },
+
+  { "intent": "search listings on craigslist", "expectedSlug": "craigslist.search_listings" },
+  { "intent": "look up a single craigslist listing", "expectedSlug": "craigslist.get_listing" },
+  { "intent": "post a new listing on craigslist", "expectedSlug": "craigslist.post_listing" },
+  { "intent": "delete my craigslist listing", "expectedSlug": "craigslist.delete_listing" },
+
+  { "intent": "find nearby dominos stores", "expectedSlug": "dominos.list_stores" },
+  { "intent": "look up a single dominos menu", "expectedSlug": "dominos.get_menu" },
+  { "intent": "order pizza on dominos", "expectedSlug": "dominos.place_order" },
+  { "intent": "track my dominos order", "expectedSlug": "dominos.track_order" },
+
+  { "intent": "find nearby chipotle locations", "expectedSlug": "chipotle.list_locations" },
+  { "intent": "look up a single chipotle menu", "expectedSlug": "chipotle.get_menu" },
+  { "intent": "place a chipotle order", "expectedSlug": "chipotle.place_order" },
+
+  { "intent": "search listings on zillow", "expectedSlug": "zillow.search_listings" },
+  { "intent": "look up a single zillow listing", "expectedSlug": "zillow.get_listing" },
+  { "intent": "look up a home value on zillow", "expectedSlug": "zillow.get_home_value" },
+
+  { "intent": "list dashboards on grafana", "expectedSlug": "grafana.list_dashboards" },
+  { "intent": "look up a single grafana dashboard", "expectedSlug": "grafana.get_dashboard" },
+  { "intent": "query metrics on grafana", "expectedSlug": "grafana.query_metrics" }
 ]

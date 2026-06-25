@@ -1,0 +1,41 @@
+{
+  "slug": "dominos.get_menu",
+  "service": "www.dominos.com",
+  "intentSynonyms": [
+    "get a menu in dominos",
+    "look up a menu in dominos",
+    "fetch a single menu in dominos",
+    "view one specific menu in dominos",
+    "get menu in dominos",
+    "look up a single dominos menu in dominos"
+  ],
+  "description": "Get the full menu (pizzas, sides, drinks, prices, and coupons) for a single Domino’s store by its store ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The store ID whose menu to fetch"
+      }
+    },
+    "required": [
+      "store_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-menu.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -152,6 +152,20 @@
       ]
     },
     {
+      "app": "chipotle",
+      "service": "www.chipotle.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/chipotle/",
+      "descriptors": [
+        "chipotle.get_menu",
+        "chipotle.list_locations",
+        "chipotle.list_orders",
+        "chipotle.place_order"
+      ]
+    },
+    {
       "app": "circleci",
       "service": "app.circleci.com",
       "source": "opentabs",
@@ -235,6 +249,20 @@
       ]
     },
     {
+      "app": "craigslist",
+      "service": "www.craigslist.org",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/craigslist/",
+      "descriptors": [
+        "craigslist.delete_listing",
+        "craigslist.get_listing",
+        "craigslist.post_listing",
+        "craigslist.search_listings"
+      ]
+    },
+    {
       "app": "datadog",
       "service": "app.datadoghq.com",
       "source": "opentabs",
@@ -260,6 +288,21 @@
         "discord.list_channels",
         "discord.list_messages",
         "discord.send_message"
+      ]
+    },
+    {
+      "app": "dominos",
+      "service": "www.dominos.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/dominos/",
+      "descriptors": [
+        "dominos.get_menu",
+        "dominos.list_orders",
+        "dominos.list_stores",
+        "dominos.place_order",
+        "dominos.track_order"
       ]
     },
     {
@@ -349,6 +392,19 @@
         "gitlab.create_merge_request",
         "gitlab.get_issue",
         "gitlab.list_issues"
+      ]
+    },
+    {
+      "app": "grafana",
+      "service": "grafana.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/grafana/",
+      "descriptors": [
+        "grafana.get_dashboard",
+        "grafana.list_dashboards",
+        "grafana.query_metrics"
       ]
     },
     {
@@ -525,6 +581,21 @@
       ]
     },
     {
+      "app": "shopify",
+      "service": "shopify.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/shopify/",
+      "descriptors": [
+        "shopify.cancel_order",
+        "shopify.create_order",
+        "shopify.get_product",
+        "shopify.list_orders",
+        "shopify.list_products"
+      ]
+    },
+    {
       "app": "stubhub",
       "service": "www.stubhub.com",
       "source": "opentabs",
@@ -679,6 +750,19 @@
         "yelp.get_business",
         "yelp.list_reviews",
         "yelp.search_businesses"
+      ]
+    },
+    {
+      "app": "zillow",
+      "service": "www.zillow.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/zillow/",
+      "descriptors": [
+        "zillow.get_home_value",
+        "zillow.get_listing",
+        "zillow.search_listings"
       ]
     }
   ]

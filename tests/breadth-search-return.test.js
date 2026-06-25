@@ -116,7 +116,7 @@ global.MiniSearch = MiniSearch;
 // retail/marketplace sub-batch.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft|amazon|ebay|etsy|bestbuy|costco|walmart|target|booking|airbnb|expedia|kayak|opentable|ticketmaster|stubhub|eventbrite|yelp|tripadvisor|calendly)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft|amazon|ebay|etsy|bestbuy|costco|walmart|target|booking|airbnb|expedia|kayak|opentable|ticketmaster|stubhub|eventbrite|yelp|tripadvisor|calendly|shopify|craigslist|dominos|chipotle|zillow|grafana)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -124,8 +124,21 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 204,
-  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace + travel/transport + events/local-services/scheduling corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads + 4 discord + 3 reddit] + 31 food-delivery/rideshare [6 doordash + 5 ubereats + 5 grubhub + 5 instacart + 5 uber + 5 lyft] + 34 retail/marketplace [6 amazon + 5 ebay + 5 etsy + 5 bestbuy + 4 costco + 5 walmart + 4 target] + 24 travel/transport [5 booking + 5 airbnb + 5 expedia + 4 kayak + 5 opentable] + 21 events/local-services/scheduling [4 ticketmaster + 4 stubhub + 4 eventbrite + 3 yelp + 3 tripadvisor + 3 calendly -- Phase-39 batch C sub-batch 4; the ticket apps backing:dom on SENSITIVE origins with buy_tickets/register_for_event payment ops DOM-only-on-sensitive; yelp/tripadvisor/calendly read-only-safe (no payment verb)])');
+// Phase-39 batch C sub-batch 5 (39-06, COMPLETION -- remaining commerce + read-only misc) GROWS the
+// corpus with the FINAL real apps, CLOSING real-app coverage. The PAYMENT-bearing commerce apps shopify
+// (list_products/get_product/list_orders reads + create_order PAYMENT + cancel_order DESTRUCTIVE) +
+// dominos/chipotle (list/get/track reads + place_order PAYMENT) are screened SENSITIVE (39-01; 39-06 adds
+// *.myshopify.com) and craigslist (search/get reads + post_listing WRITE + delete_listing DESTRUCTIVE) is
+// SENSITIVE (39-06 widens the denylist to apex-suffix *.craigslist.org) -- ALL backing:'dom'. shopify/grafana
+// derive their brand stem correctly (pinned in STEM_OVERRIDES for stability); craigslist/dominos/chipotle/
+// zillow vendor *://www.<app>.<tld>/* and canonicalize via STEM_OVERRIDES (0 opentabs__www__*). The PAYMENT
+// ops create_order/place_order class WRITE on a sensitive origin (the payment-op guard PASSES DOM-only-on-
+// sensitive). The READ-ONLY misc apps zillow (search_listings/get_listing/get_home_value) + grafana
+// (list_dashboards/get_dashboard/query_metrics) are SAFE + in READ_ONLY_SAFE_SERVICES (no payment verb). The
+// cross-app place_order (dominos/chipotle), real-estate-vs-classifieds (zillow/craigslist), and
+// observability dashboards (grafana/datadog) collisions are the new wrong-invoke=0 probes in COLLISION_SET.
+check(corpus.length >= 228,
+  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace + travel/transport + events/local-services/scheduling + COMPLETION commerce/misc corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity + 24 comms/social/content + 31 food-delivery/rideshare + 34 retail/marketplace + 24 travel/transport + 21 events/local-services/scheduling + 24 completion commerce/misc [5 shopify + 4 craigslist + 5 dominos + 4 chipotle + 3 zillow + 3 grafana -- Phase-39 batch C sub-batch 5; shopify/dominos/chipotle backing:dom on SENSITIVE origins with create_order/place_order payment ops DOM-only-on-sensitive, craigslist SENSITIVE marketplace, zillow/grafana read-only-safe (no payment verb)] -- real-app coverage COMPLETE)');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -353,6 +366,41 @@ const COLLISION_SET = [
   // vocabulary; "check my open availability" must top calendly.get_availability (not list_event_types
   // / list_scheduled_events). The "open slots" tail is a held-out paraphrase of "check my availability".
   { query: 'check my calendly availability for open meeting slots', expected: 'calendly.get_availability' },
+  // Phase-39 batch C sub-batch 5 (39-06, COMPLETION -- remaining commerce + read-only misc): the headline
+  // cross-app disambiguation probes that CLOSE real-app coverage. place_order is the IDENTICAL payment
+  // op-name on dominos AND chipotle (the two food-order apps in this sub-batch -- a swapped stem would
+  // charge a card on the WRONG food-order account/origin); each query carries the place-order intent ("order
+  // and pay for") so it disambiguates from its same-app reads (list_stores/get_menu/list_orders/track_order),
+  // the app token keeping each on its OWN slug. The queries are HELD-OUT paraphrases ("get my food order
+  // placed and paid for" is NOT byte-identical to any indexed synonym), so wrong-invoke=0 is genuine retrieval.
+  { query: 'get my food order placed and paid for on dominos', expected: 'dominos.place_order' },
+  { query: 'get my food order placed and paid for on chipotle', expected: 'chipotle.place_order' },
+  // shopify.create_order (the e-commerce PAYMENT op) vs the food-order place_order family: "submit my order
+  // and charge the card" must top shopify.create_order, never a food-delivery/retail place_order (the
+  // create-vs-place verb split + the shopify app token route it). Held-out ("submit ... and charge the card").
+  { query: 'submit my order and charge the card on shopify', expected: 'shopify.create_order' },
+  // The marketplace-listings collision: craigslist.search_listings (classifieds) vs ebay.search_listings
+  // (auction/fixed-price marketplace) -- the IDENTICAL search op-name across two marketplaces; "search the
+  // classified ads" must top craigslist (not ebay), and an ebay marketplace search tops ebay -- the app token
+  // disambiguates. Held-out paraphrases ("classified ads"/"marketplace listings for sale" are NOT indexed synonyms).
+  { query: 'search the classified ads for something to buy on craigslist', expected: 'craigslist.search_listings' },
+  { query: 'search the marketplace listings for sale on ebay', expected: 'ebay.search_listings' },
+  // The real-estate-vs-classifieds collision: zillow.search_listings (homes) vs craigslist.search_listings
+  // (classifieds) -- both "search listings" but distinct domains; "search for homes/properties" must top
+  // zillow, "search classified ads" tops craigslist (above). Held-out ("homes for sale"/"properties" framing).
+  { query: 'search for homes and properties for sale on zillow', expected: 'zillow.search_listings' },
+  // zillow.get_home_value (the Zestimate read) -- distinct from zillow.search_listings/get_listing; "what is
+  // this home worth" must top get_home_value (the valuation read), never a listing search. Held-out paraphrase.
+  { query: 'find out what this home is worth on zillow', expected: 'zillow.get_home_value' },
+  // The observability-dashboards collision: grafana.list_dashboards vs datadog.list_dashboards (IDENTICAL
+  // op-name across two observability apps -- the closest same-op cross-app collision in this sub-batch); a
+  // swapped stem would pull the wrong tool's dashboards. "show me the dashboards" + the app token keeps each
+  // on its OWN slug. Held-out paraphrases (the "pull up ... monitoring dashboards" framing is not an indexed synonym).
+  { query: 'pull up my monitoring dashboards on grafana', expected: 'grafana.list_dashboards' },
+  // grafana.query_metrics vs datadog.query_metrics: the IDENTICAL metric-query op-name across the two
+  // observability apps; "run a metric query" must top its OWN app's query_metrics. Held-out ("graph a
+  // metric over time" framing is not an indexed synonym).
+  { query: 'graph a metric timeseries over time on grafana', expected: 'grafana.query_metrics' },
 ];
 
 // Build a slug -> lowercased-intentSynonyms map for the held-out guards (MED-01/MED-02).

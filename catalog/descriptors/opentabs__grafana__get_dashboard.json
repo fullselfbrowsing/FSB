@@ -1,0 +1,41 @@
+{
+  "slug": "grafana.get_dashboard",
+  "service": "grafana.com",
+  "intentSynonyms": [
+    "get a dashboard in grafana",
+    "look up a dashboard in grafana",
+    "fetch a single dashboard in grafana",
+    "view one specific dashboard in grafana",
+    "get dashboard in grafana",
+    "look up a single grafana dashboard in grafana"
+  ],
+  "description": "Get the full definition (panels, variables, and layout) of a single Grafana dashboard by its UID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The dashboard UID to fetch"
+      }
+    },
+    "required": [
+      "uid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/grafana/src/tools/get-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

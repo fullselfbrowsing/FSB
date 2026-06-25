@@ -1,0 +1,41 @@
+{
+  "slug": "zillow.get_home_value",
+  "service": "www.zillow.com",
+  "intentSynonyms": [
+    "get a home value in zillow",
+    "look up a home value in zillow",
+    "fetch a single home value in zillow",
+    "view one specific home value in zillow",
+    "get home value in zillow",
+    "look up a home value on zillow in zillow"
+  ],
+  "description": "Look up the estimated market value (Zestimate) and value history of a home by its address or Zillow listing ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "description": "The home address to value",
+        "type": "string"
+      },
+      "listing_id": {
+        "description": "The Zillow listing ID (zpid) to value",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/get-home-value.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

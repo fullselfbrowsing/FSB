@@ -1,0 +1,54 @@
+{
+  "slug": "craigslist.search_listings",
+  "service": "www.craigslist.org",
+  "intentSynonyms": [
+    "search listings in craigslist",
+    "search listings on craigslist in craigslist",
+    "search craigslist classified listings by keyword within a city/region and category (for-sale, housing, jobs, services) in craigslist"
+  ],
+  "description": "Search Craigslist classified listings by keyword within a city/region and category (for-sale, housing, jobs, services).",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search keywords (what to look for)"
+      },
+      "region": {
+        "type": "string",
+        "minLength": 1,
+        "description": "City or region subdomain to search in (e.g. sfbay, newyork)"
+      },
+      "category": {
+        "description": "Category to filter by (e.g. for-sale, housing, jobs)",
+        "type": "string"
+      },
+      "max_price": {
+        "description": "Maximum price filter",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query",
+      "region"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/search-listings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

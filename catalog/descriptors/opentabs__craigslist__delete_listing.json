@@ -1,0 +1,41 @@
+{
+  "slug": "craigslist.delete_listing",
+  "service": "www.craigslist.org",
+  "intentSynonyms": [
+    "delete a listing in craigslist",
+    "remove a listing in craigslist",
+    "trash a listing in craigslist",
+    "permanently delete a listing in craigslist",
+    "delete listing in craigslist",
+    "delete my craigslist listing in craigslist"
+  ],
+  "description": "Delete one of your Craigslist listings by its ID. This permanently removes the classified ad.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "listing_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The listing ID to delete"
+      }
+    },
+    "required": [
+      "listing_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/delete-listing.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

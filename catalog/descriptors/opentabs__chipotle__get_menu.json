@@ -1,0 +1,41 @@
+{
+  "slug": "chipotle.get_menu",
+  "service": "www.chipotle.com",
+  "intentSynonyms": [
+    "get a menu in chipotle",
+    "look up a menu in chipotle",
+    "fetch a single menu in chipotle",
+    "view one specific menu in chipotle",
+    "get menu in chipotle",
+    "look up a single chipotle menu in chipotle"
+  ],
+  "description": "Get the full menu (entrees, sides, drinks, and prices) for a single Chipotle location by its restaurant ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The restaurant ID whose menu to fetch"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-menu.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}
