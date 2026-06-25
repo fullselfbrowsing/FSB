@@ -1,0 +1,70 @@
+{
+  "slug": "cloudflare.purge_cache",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "purge a cache in cloudflare",
+    "purge cache in cloudflare",
+    "purge the zone cache in cloudflare"
+  ],
+  "description": "Purge cached content for a Cloudflare zone. Purge everything, or selectively purge by URL, host, tag, or prefix. This evicts cache entries and cannot be undone.",
+  "actionVerb": "purge",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Cloudflare zone ID whose cache to purge"
+      },
+      "purge_everything": {
+        "description": "Purge the entire cache for the zone",
+        "type": "boolean"
+      },
+      "files": {
+        "description": "Specific URLs to purge from cache",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "tags": {
+        "description": "Cache-Tags to purge",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "hosts": {
+        "description": "Hostnames to purge",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "prefixes": {
+        "description": "URL prefixes to purge",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/purge-cache.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "purge"
+    }
+  }
+}

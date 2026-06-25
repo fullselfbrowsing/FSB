@@ -1,0 +1,44 @@
+{
+  "slug": "circleci.list_workflows",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "list workflows in circleci",
+    "show me my workflows in circleci",
+    "view my workflows in circleci",
+    "see all my workflows in circleci",
+    "list workflows for a pipeline in circleci"
+  ],
+  "description": "List the workflows for a CircleCI pipeline by its pipeline ID.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pipeline_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "CircleCI pipeline ID the workflows belong to"
+      },
+      "page_token": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "pipeline_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/list-workflows.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

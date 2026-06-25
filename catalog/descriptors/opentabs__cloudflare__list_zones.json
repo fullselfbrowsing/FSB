@@ -1,0 +1,60 @@
+{
+  "slug": "cloudflare.list_zones",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list zones in cloudflare",
+    "show me my zones in cloudflare",
+    "view my zones in cloudflare",
+    "see all my zones in cloudflare",
+    "list zones in the account in cloudflare"
+  ],
+  "description": "List the zones (domains) in your Cloudflare account. Optionally filter by name or status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Filter zones by exact domain name",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by zone status",
+        "type": "string",
+        "enum": [
+          "active",
+          "pending",
+          "initializing",
+          "moved",
+          "deleted",
+          "deactivated"
+        ]
+      },
+      "page": {
+        "description": "Page number for pagination (1-indexed)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Results per page (max 50)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-zones.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

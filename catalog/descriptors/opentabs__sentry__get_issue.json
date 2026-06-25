@@ -1,0 +1,41 @@
+{
+  "slug": "sentry.get_issue",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "get a issue in sentry",
+    "look up a issue in sentry",
+    "fetch a single issue in sentry",
+    "view one specific issue in sentry",
+    "get issue in sentry",
+    "get an issue by id in sentry"
+  ],
+  "description": "Get detailed information about a single Sentry error issue by its issue ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Sentry issue ID"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/get-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -933,6 +933,193 @@
       }
     },
     {
+      "slug": "circleci.get_pipeline",
+      "service": "app.circleci.com",
+      "intentSynonyms": [
+        "get a pipeline in circleci",
+        "look up a pipeline in circleci",
+        "fetch a single pipeline in circleci",
+        "view one specific pipeline in circleci",
+        "get pipeline in circleci",
+        "get a pipeline by id in circleci"
+      ],
+      "description": "Get detailed information about a single CircleCI pipeline by its pipeline ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CircleCI pipeline ID (UUID)"
+          }
+        },
+        "required": [
+          "pipeline_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/circleci/src/tools/get-pipeline.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "circleci.list_pipelines",
+      "service": "app.circleci.com",
+      "intentSynonyms": [
+        "list pipelines in circleci",
+        "show me my pipelines in circleci",
+        "view my pipelines in circleci",
+        "see all my pipelines in circleci",
+        "list pipelines for a project in circleci"
+      ],
+      "description": "List the pipelines for a CircleCI project. Optionally filter by branch.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project slug (vcs-type/org-name/repo-name, e.g. gh/acme/app)"
+          },
+          "branch": {
+            "description": "Filter pipelines by branch name",
+            "type": "string"
+          },
+          "page_token": {
+            "description": "Pagination cursor for the next page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/circleci/src/tools/list-pipelines.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "circleci.list_workflows",
+      "service": "app.circleci.com",
+      "intentSynonyms": [
+        "list workflows in circleci",
+        "show me my workflows in circleci",
+        "view my workflows in circleci",
+        "see all my workflows in circleci",
+        "list workflows for a pipeline in circleci"
+      ],
+      "description": "List the workflows for a CircleCI pipeline by its pipeline ID.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CircleCI pipeline ID the workflows belong to"
+          },
+          "page_token": {
+            "description": "Pagination cursor for the next page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pipeline_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/circleci/src/tools/list-workflows.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "circleci.trigger_pipeline",
+      "service": "app.circleci.com",
+      "intentSynonyms": [
+        "trigger a pipeline in circleci",
+        "trigger pipeline in circleci",
+        "trigger a new pipeline in circleci"
+      ],
+      "description": "Trigger a new pipeline run for a CircleCI project on a given branch or tag. Optionally pass pipeline parameters.",
+      "actionVerb": "trigger",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project slug (vcs-type/org-name/repo-name, e.g. gh/acme/app)"
+          },
+          "branch": {
+            "description": "Branch to run the pipeline on",
+            "type": "string"
+          },
+          "tag": {
+            "description": "Tag to run the pipeline on (mutually exclusive with branch)",
+            "type": "string"
+          },
+          "parameters": {
+            "description": "Pipeline parameters to pass",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "project_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/circleci/src/tools/trigger-pipeline.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "trigger"
+        }
+      }
+    },
+    {
       "slug": "clickup.create_task",
       "service": "app.clickup.com",
       "intentSynonyms": [
@@ -1202,6 +1389,241 @@
       }
     },
     {
+      "slug": "cloudflare.get_zone",
+      "service": "dash.cloudflare.com",
+      "intentSynonyms": [
+        "get a zone in cloudflare",
+        "look up a zone in cloudflare",
+        "fetch a single zone in cloudflare",
+        "view one specific zone in cloudflare",
+        "get zone in cloudflare",
+        "get a zone by id in cloudflare"
+      ],
+      "description": "Get detailed information about a single Cloudflare zone (domain) by its zone ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloudflare zone ID"
+          }
+        },
+        "required": [
+          "zone_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/cloudflare/src/tools/get-zone.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "cloudflare.list_dns_records",
+      "service": "dash.cloudflare.com",
+      "intentSynonyms": [
+        "list dns records in cloudflare",
+        "show me my dns records in cloudflare",
+        "view my dns records in cloudflare",
+        "see all my dns records in cloudflare",
+        "list dns records for a zone in cloudflare"
+      ],
+      "description": "List the DNS records for a Cloudflare zone. Optionally filter by record type, name, or content.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloudflare zone ID the records belong to"
+          },
+          "type": {
+            "description": "Filter by DNS record type",
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CNAME",
+              "TXT",
+              "MX",
+              "NS",
+              "SRV",
+              "CAA"
+            ]
+          },
+          "name": {
+            "description": "Filter by record name (FQDN)",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "zone_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/cloudflare/src/tools/list-dns-records.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "cloudflare.list_zones",
+      "service": "dash.cloudflare.com",
+      "intentSynonyms": [
+        "list zones in cloudflare",
+        "show me my zones in cloudflare",
+        "view my zones in cloudflare",
+        "see all my zones in cloudflare",
+        "list zones in the account in cloudflare"
+      ],
+      "description": "List the zones (domains) in your Cloudflare account. Optionally filter by name or status.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Filter zones by exact domain name",
+            "type": "string"
+          },
+          "status": {
+            "description": "Filter by zone status",
+            "type": "string",
+            "enum": [
+              "active",
+              "pending",
+              "initializing",
+              "moved",
+              "deleted",
+              "deactivated"
+            ]
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "per_page": {
+            "description": "Results per page (max 50)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/cloudflare/src/tools/list-zones.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "cloudflare.purge_cache",
+      "service": "dash.cloudflare.com",
+      "intentSynonyms": [
+        "purge a cache in cloudflare",
+        "purge cache in cloudflare",
+        "purge the zone cache in cloudflare"
+      ],
+      "description": "Purge cached content for a Cloudflare zone. Purge everything, or selectively purge by URL, host, tag, or prefix. This evicts cache entries and cannot be undone.",
+      "actionVerb": "purge",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloudflare zone ID whose cache to purge"
+          },
+          "purge_everything": {
+            "description": "Purge the entire cache for the zone",
+            "type": "boolean"
+          },
+          "files": {
+            "description": "Specific URLs to purge from cache",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "description": "Cache-Tags to purge",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hosts": {
+            "description": "Hostnames to purge",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prefixes": {
+            "description": "URL prefixes to purge",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "zone_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/cloudflare/src/tools/purge-cache.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "POST",
+          "opNameVerb": "purge"
+        }
+      }
+    },
+    {
       "slug": "confluence.create_page",
       "service": "atlassian.net",
       "intentSynonyms": [
@@ -1423,6 +1845,196 @@
           "transportHelper": "api",
           "httpMethod": "PUT",
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "datadog.get_monitor",
+      "service": "app.datadoghq.com",
+      "intentSynonyms": [
+        "get a monitor in datadog",
+        "look up a monitor in datadog",
+        "fetch a single monitor in datadog",
+        "view one specific monitor in datadog",
+        "get monitor in datadog",
+        "get a monitor by id in datadog"
+      ],
+      "description": "Get detailed information about a single Datadog monitor by its monitor ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Datadog monitor ID"
+          }
+        },
+        "required": [
+          "monitor_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/get-monitor.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "datadog.list_dashboards",
+      "service": "app.datadoghq.com",
+      "intentSynonyms": [
+        "list dashboards in datadog",
+        "show me my dashboards in datadog",
+        "view my dashboards in datadog",
+        "see all my dashboards in datadog",
+        "list dashboards in the account in datadog"
+      ],
+      "description": "List the dashboards in your Datadog account. Optionally filter to shared or your own dashboards.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "filter_shared": {
+            "description": "Only return shared dashboards",
+            "type": "boolean"
+          },
+          "filter_deleted": {
+            "description": "Only return deleted dashboards",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/list-dashboards.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "datadog.list_monitors",
+      "service": "app.datadoghq.com",
+      "intentSynonyms": [
+        "list monitors in datadog",
+        "show me my monitors in datadog",
+        "view my monitors in datadog",
+        "see all my monitors in datadog",
+        "list monitors in the account in datadog"
+      ],
+      "description": "List the monitors in your Datadog account. Optionally filter by name, tags, or monitor tags.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Filter monitors by name substring",
+            "type": "string"
+          },
+          "tags": {
+            "description": "Filter by monitor scope tags",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "monitor_tags": {
+            "description": "Filter by monitor (management) tags",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "page": {
+            "description": "Page number for pagination (0-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/list-monitors.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "datadog.query_metrics",
+      "service": "app.datadoghq.com",
+      "intentSynonyms": [
+        "query metrics in datadog",
+        "query metric timeseries in datadog",
+        "query metrics datadog"
+      ],
+      "description": "Query timeseries points for a Datadog metric over a time window using a metric query string.",
+      "actionVerb": "query",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datadog metric query (e.g. avg:system.cpu.user{*})"
+          },
+          "from": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Start of the window as a Unix timestamp (seconds)"
+          },
+          "to": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "End of the window as a Unix timestamp (seconds)"
+          }
+        },
+        "required": [
+          "query",
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/query-metrics.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "query"
         }
       }
     },
@@ -2459,6 +3071,405 @@
       }
     },
     {
+      "slug": "posthog.get_insight",
+      "service": "app.posthog.com",
+      "intentSynonyms": [
+        "get a insight in posthog",
+        "look up a insight in posthog",
+        "fetch a single insight in posthog",
+        "view one specific insight in posthog",
+        "get insight in posthog",
+        "get an insight by id in posthog"
+      ],
+      "description": "Get detailed information about a single PostHog insight by its insight ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "PostHog project ID"
+          },
+          "insight_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "PostHog insight ID"
+          }
+        },
+        "required": [
+          "project_id",
+          "insight_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/posthog/src/tools/get-insight.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "posthog.list_dashboards",
+      "service": "app.posthog.com",
+      "intentSynonyms": [
+        "list dashboards in posthog",
+        "show me my dashboards in posthog",
+        "view my dashboards in posthog",
+        "see all my dashboards in posthog",
+        "list dashboards in a project in posthog"
+      ],
+      "description": "List the dashboards in a PostHog project. Optionally filter by pinned or search term.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "PostHog project ID"
+          },
+          "pinned": {
+            "description": "Only return pinned dashboards",
+            "type": "boolean"
+          },
+          "search": {
+            "description": "Filter dashboards by name search term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/posthog/src/tools/list-dashboards.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "posthog.list_insights",
+      "service": "app.posthog.com",
+      "intentSynonyms": [
+        "list insights in posthog",
+        "show me my insights in posthog",
+        "view my insights in posthog",
+        "see all my insights in posthog",
+        "list insights in a project in posthog"
+      ],
+      "description": "List the saved insights in a PostHog project. Optionally filter by search term or favorited.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "PostHog project ID"
+          },
+          "search": {
+            "description": "Filter insights by name search term",
+            "type": "string"
+          },
+          "favorited": {
+            "description": "Only return favorited insights",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of insights to return",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/posthog/src/tools/list-insights.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "posthog.query_events",
+      "service": "app.posthog.com",
+      "intentSynonyms": [
+        "query events in posthog",
+        "query captured events in posthog",
+        "query events posthog"
+      ],
+      "description": "Query the captured events for a PostHog project. Optionally filter by event name, distinct ID, or time range.",
+      "actionVerb": "query",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "PostHog project ID"
+          },
+          "event": {
+            "description": "Filter by event name",
+            "type": "string"
+          },
+          "distinct_id": {
+            "description": "Filter by the distinct (person) ID",
+            "type": "string"
+          },
+          "after": {
+            "description": "Only events after this ISO 8601 timestamp",
+            "type": "string"
+          },
+          "before": {
+            "description": "Only events before this ISO 8601 timestamp",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of events to return",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/posthog/src/tools/query-events.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "query"
+        }
+      }
+    },
+    {
+      "slug": "sentry.get_issue",
+      "service": "sentry.io",
+      "intentSynonyms": [
+        "get a issue in sentry",
+        "look up a issue in sentry",
+        "fetch a single issue in sentry",
+        "view one specific issue in sentry",
+        "get issue in sentry",
+        "get an issue by id in sentry"
+      ],
+      "description": "Get detailed information about a single Sentry error issue by its issue ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sentry issue ID"
+          }
+        },
+        "required": [
+          "issue_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/sentry/src/tools/get-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "sentry.list_issues",
+      "service": "sentry.io",
+      "intentSynonyms": [
+        "list issues in sentry",
+        "show me my issues in sentry",
+        "view my issues in sentry",
+        "see all my issues in sentry",
+        "list issues for a project in sentry"
+      ],
+      "description": "List the error issues for a Sentry project. Optionally filter by query, status, or environment.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "organization_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sentry organization slug"
+          },
+          "project_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sentry project slug"
+          },
+          "query": {
+            "description": "Sentry search query (e.g. is:unresolved)",
+            "type": "string"
+          },
+          "environment": {
+            "description": "Filter by environment name",
+            "type": "string"
+          },
+          "cursor": {
+            "description": "Pagination cursor for the next page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_slug",
+          "project_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/sentry/src/tools/list-issues.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "sentry.list_projects",
+      "service": "sentry.io",
+      "intentSynonyms": [
+        "list projects in sentry",
+        "show me my projects in sentry",
+        "view my projects in sentry",
+        "see all my projects in sentry",
+        "list projects in the organization in sentry"
+      ],
+      "description": "List the projects for a Sentry organization.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "organization_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sentry organization slug"
+          },
+          "cursor": {
+            "description": "Pagination cursor for the next page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/sentry/src/tools/list-projects.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "sentry.resolve_issue",
+      "service": "sentry.io",
+      "intentSynonyms": [
+        "resolve a issue in sentry",
+        "resolve issue in sentry",
+        "resolve an issue in sentry"
+      ],
+      "description": "Mark a Sentry error issue as resolved. Optionally resolve in the next release. This updates the issue status.",
+      "actionVerb": "resolve",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sentry issue ID to resolve"
+          },
+          "in_next_release": {
+            "description": "Resolve the issue in the next release instead of immediately",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "issue_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/sentry/src/tools/resolve-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "PUT",
+          "opNameVerb": "resolve"
+        }
+      }
+    },
+    {
       "slug": "todoist.close_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
@@ -2686,7 +3697,7 @@
         "show me my tasks in todoist",
         "view my tasks in todoist",
         "see all my tasks in todoist",
-        "list tasks with optional filters in todoist"
+        "show me what tasks i have in todoist"
       ],
       "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
       "actionVerb": "list",

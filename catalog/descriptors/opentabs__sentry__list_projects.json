@@ -1,0 +1,44 @@
+{
+  "slug": "sentry.list_projects",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list projects in sentry",
+    "show me my projects in sentry",
+    "view my projects in sentry",
+    "see all my projects in sentry",
+    "list projects in the organization in sentry"
+  ],
+  "description": "List the projects for a Sentry organization.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Sentry organization slug"
+      },
+      "cursor": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "organization_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

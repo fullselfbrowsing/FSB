@@ -1,0 +1,54 @@
+{
+  "slug": "circleci.trigger_pipeline",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "trigger a pipeline in circleci",
+    "trigger pipeline in circleci",
+    "trigger a new pipeline in circleci"
+  ],
+  "description": "Trigger a new pipeline run for a CircleCI project on a given branch or tag. Optionally pass pipeline parameters.",
+  "actionVerb": "trigger",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project slug (vcs-type/org-name/repo-name, e.g. gh/acme/app)"
+      },
+      "branch": {
+        "description": "Branch to run the pipeline on",
+        "type": "string"
+      },
+      "tag": {
+        "description": "Tag to run the pipeline on (mutually exclusive with branch)",
+        "type": "string"
+      },
+      "parameters": {
+        "description": "Pipeline parameters to pass",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/trigger-pipeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "trigger"
+    }
+  }
+}

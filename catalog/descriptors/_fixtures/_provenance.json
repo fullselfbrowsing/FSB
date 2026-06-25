@@ -51,6 +51,20 @@
       ]
     },
     {
+      "app": "circleci",
+      "service": "app.circleci.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/circleci/",
+      "descriptors": [
+        "circleci.get_pipeline",
+        "circleci.list_pipelines",
+        "circleci.list_workflows",
+        "circleci.trigger_pipeline"
+      ]
+    },
+    {
       "app": "clickup",
       "service": "app.clickup.com",
       "source": "opentabs",
@@ -65,6 +79,20 @@
       ]
     },
     {
+      "app": "cloudflare",
+      "service": "dash.cloudflare.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/cloudflare/",
+      "descriptors": [
+        "cloudflare.get_zone",
+        "cloudflare.list_dns_records",
+        "cloudflare.list_zones",
+        "cloudflare.purge_cache"
+      ]
+    },
+    {
       "app": "confluence",
       "service": "atlassian.net",
       "source": "opentabs",
@@ -76,6 +104,20 @@
         "confluence.get_page",
         "confluence.search_pages",
         "confluence.update_page"
+      ]
+    },
+    {
+      "app": "datadog",
+      "service": "app.datadoghq.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/datadog/",
+      "descriptors": [
+        "datadog.get_monitor",
+        "datadog.list_dashboards",
+        "datadog.list_monitors",
+        "datadog.query_metrics"
       ]
     },
     {
@@ -134,6 +176,34 @@
         "netlify.get_site",
         "netlify.list_deploys",
         "netlify.list_sites"
+      ]
+    },
+    {
+      "app": "posthog",
+      "service": "app.posthog.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/posthog/",
+      "descriptors": [
+        "posthog.get_insight",
+        "posthog.list_dashboards",
+        "posthog.list_insights",
+        "posthog.query_events"
+      ]
+    },
+    {
+      "app": "sentry",
+      "service": "sentry.io",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/sentry/",
+      "descriptors": [
+        "sentry.get_issue",
+        "sentry.list_issues",
+        "sentry.list_projects",
+        "sentry.resolve_issue"
       ]
     },
     {

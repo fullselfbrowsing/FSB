@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.list_dashboards",
+  "service": "app.datadoghq.com",
+  "intentSynonyms": [
+    "list dashboards in datadog",
+    "show me my dashboards in datadog",
+    "view my dashboards in datadog",
+    "see all my dashboards in datadog",
+    "list dashboards in the account in datadog"
+  ],
+  "description": "List the dashboards in your Datadog account. Optionally filter to shared or your own dashboards.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "filter_shared": {
+        "description": "Only return shared dashboards",
+        "type": "boolean"
+      },
+      "filter_deleted": {
+        "description": "Only return deleted dashboards",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-dashboards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

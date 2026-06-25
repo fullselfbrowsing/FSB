@@ -1,0 +1,64 @@
+{
+  "slug": "cloudflare.list_dns_records",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list dns records in cloudflare",
+    "show me my dns records in cloudflare",
+    "view my dns records in cloudflare",
+    "see all my dns records in cloudflare",
+    "list dns records for a zone in cloudflare"
+  ],
+  "description": "List the DNS records for a Cloudflare zone. Optionally filter by record type, name, or content.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Cloudflare zone ID the records belong to"
+      },
+      "type": {
+        "description": "Filter by DNS record type",
+        "type": "string",
+        "enum": [
+          "A",
+          "AAAA",
+          "CNAME",
+          "TXT",
+          "MX",
+          "NS",
+          "SRV",
+          "CAA"
+        ]
+      },
+      "name": {
+        "description": "Filter by record name (FQDN)",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number for pagination (1-indexed)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-dns-records.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

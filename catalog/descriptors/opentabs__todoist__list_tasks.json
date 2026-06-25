@@ -6,7 +6,7 @@
     "show me my tasks in todoist",
     "view my tasks in todoist",
     "see all my tasks in todoist",
-    "list tasks with optional filters in todoist"
+    "show me what tasks i have in todoist"
   ],
   "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
   "actionVerb": "list",

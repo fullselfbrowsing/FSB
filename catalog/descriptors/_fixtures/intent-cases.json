@@ -145,5 +145,39 @@
   { "intent": "list deploys for a site in netlify", "expectedSlug": "netlify.list_deploys" },
 
   { "intent": "trigger a new deploy in netlify", "expectedSlug": "netlify.create_deploy" },
-  { "intent": "create a deploy in netlify", "expectedSlug": "netlify.create_deploy" }
+  { "intent": "create a deploy in netlify", "expectedSlug": "netlify.create_deploy" },
+
+  { "intent": "list zones in cloudflare", "expectedSlug": "cloudflare.list_zones" },
+  { "intent": "show me my cloudflare zones", "expectedSlug": "cloudflare.list_zones" },
+
+  { "intent": "list dns records in cloudflare", "expectedSlug": "cloudflare.list_dns_records" },
+
+  { "intent": "purge the cloudflare cache", "expectedSlug": "cloudflare.purge_cache" },
+  { "intent": "purge cache in cloudflare", "expectedSlug": "cloudflare.purge_cache" },
+
+  { "intent": "list pipelines in circleci", "expectedSlug": "circleci.list_pipelines" },
+  { "intent": "show me my circleci pipelines", "expectedSlug": "circleci.list_pipelines" },
+
+  { "intent": "trigger a circleci pipeline", "expectedSlug": "circleci.trigger_pipeline" },
+  { "intent": "trigger pipeline in circleci", "expectedSlug": "circleci.trigger_pipeline" },
+
+  { "intent": "query datadog metrics", "expectedSlug": "datadog.query_metrics" },
+  { "intent": "query metrics in datadog", "expectedSlug": "datadog.query_metrics" },
+
+  { "intent": "list monitors in datadog", "expectedSlug": "datadog.list_monitors" },
+
+  { "intent": "list dashboards in datadog", "expectedSlug": "datadog.list_dashboards" },
+
+  { "intent": "list issues in sentry", "expectedSlug": "sentry.list_issues" },
+  { "intent": "show me my sentry issues", "expectedSlug": "sentry.list_issues" },
+
+  { "intent": "resolve an issue in sentry", "expectedSlug": "sentry.resolve_issue" },
+  { "intent": "mark a sentry issue as resolved", "expectedSlug": "sentry.resolve_issue" },
+
+  { "intent": "list insights in posthog", "expectedSlug": "posthog.list_insights" },
+  { "intent": "show me my posthog insights", "expectedSlug": "posthog.list_insights" },
+
+  { "intent": "query events in posthog", "expectedSlug": "posthog.query_events" },
+
+  { "intent": "list dashboards in posthog", "expectedSlug": "posthog.list_dashboards" }
 ]

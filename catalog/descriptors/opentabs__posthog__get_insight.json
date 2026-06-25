@@ -1,0 +1,49 @@
+{
+  "slug": "posthog.get_insight",
+  "service": "app.posthog.com",
+  "intentSynonyms": [
+    "get a insight in posthog",
+    "look up a insight in posthog",
+    "fetch a single insight in posthog",
+    "view one specific insight in posthog",
+    "get insight in posthog",
+    "get an insight by id in posthog"
+  ],
+  "description": "Get detailed information about a single PostHog insight by its insight ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "PostHog project ID"
+      },
+      "insight_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "PostHog insight ID"
+      }
+    },
+    "required": [
+      "project_id",
+      "insight_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-insight.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

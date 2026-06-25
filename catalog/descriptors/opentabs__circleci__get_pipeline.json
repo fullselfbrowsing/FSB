@@ -1,0 +1,41 @@
+{
+  "slug": "circleci.get_pipeline",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get a pipeline in circleci",
+    "look up a pipeline in circleci",
+    "fetch a single pipeline in circleci",
+    "view one specific pipeline in circleci",
+    "get pipeline in circleci",
+    "get a pipeline by id in circleci"
+  ],
+  "description": "Get detailed information about a single CircleCI pipeline by its pipeline ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pipeline_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "CircleCI pipeline ID (UUID)"
+      }
+    },
+    "required": [
+      "pipeline_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-pipeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

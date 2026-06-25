@@ -1,0 +1,55 @@
+{
+  "slug": "posthog.list_insights",
+  "service": "app.posthog.com",
+  "intentSynonyms": [
+    "list insights in posthog",
+    "show me my insights in posthog",
+    "view my insights in posthog",
+    "see all my insights in posthog",
+    "list insights in a project in posthog"
+  ],
+  "description": "List the saved insights in a PostHog project. Optionally filter by search term or favorited.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "PostHog project ID"
+      },
+      "search": {
+        "description": "Filter insights by name search term",
+        "type": "string"
+      },
+      "favorited": {
+        "description": "Only return favorited insights",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Maximum number of insights to return",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/list-insights.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

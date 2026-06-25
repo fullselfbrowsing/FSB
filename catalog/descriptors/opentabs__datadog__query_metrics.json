@@ -1,0 +1,52 @@
+{
+  "slug": "datadog.query_metrics",
+  "service": "app.datadoghq.com",
+  "intentSynonyms": [
+    "query metrics in datadog",
+    "query metric timeseries in datadog",
+    "query metrics datadog"
+  ],
+  "description": "Query timeseries points for a Datadog metric over a time window using a metric query string.",
+  "actionVerb": "query",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Datadog metric query (e.g. avg:system.cpu.user{*})"
+      },
+      "from": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Start of the window as a Unix timestamp (seconds)"
+      },
+      "to": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "End of the window as a Unix timestamp (seconds)"
+      }
+    },
+    "required": [
+      "query",
+      "from",
+      "to"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/query-metrics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "query"
+    }
+  }
+}

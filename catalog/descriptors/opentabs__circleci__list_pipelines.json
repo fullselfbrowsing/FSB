@@ -1,0 +1,48 @@
+{
+  "slug": "circleci.list_pipelines",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "list pipelines in circleci",
+    "show me my pipelines in circleci",
+    "view my pipelines in circleci",
+    "see all my pipelines in circleci",
+    "list pipelines for a project in circleci"
+  ],
+  "description": "List the pipelines for a CircleCI project. Optionally filter by branch.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project slug (vcs-type/org-name/repo-name, e.g. gh/acme/app)"
+      },
+      "branch": {
+        "description": "Filter pipelines by branch name",
+        "type": "string"
+      },
+      "page_token": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/list-pipelines.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

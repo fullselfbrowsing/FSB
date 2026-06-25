@@ -62,9 +62,13 @@ global.MiniSearch = MiniSearch;
 // package-extension.mjs inlines; this test indexes the live shipped data, not a
 // hand-written stand-in. The jira/confluence pair (both *.atlassian.net) is the
 // STEM_OVERRIDES distinctness proof: each must top its OWN slug, never the sibling's.
+// Sub-batch 4 (37-04) completes the category: cloudflare/circleci/datadog/sentry/
+// posthog (cloud + observability + CI/analytics). cloudflare/datadog emit canonical
+// stems via STEM_OVERRIDES (dash/datadoghq would be wrong); the whole dev/productivity
+// batch is now present and this test indexes ALL of it.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -72,8 +76,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 50,
-  'loaded the REAL emitted dev/productivity corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify)');
+check(corpus.length >= 70,
+  'loaded the REAL emitted dev/productivity corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog -- the COMPLETE category)');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -111,6 +115,24 @@ const COLLISION_SET = [
   // closest cross-app near-neighbor pair in this sub-batch; each must top its own slug.
   { query: 'trigger a new deployment in vercel', expected: 'vercel.create_deployment' },
   { query: 'trigger a new deploy in netlify', expected: 'netlify.create_deploy' },
+  // Phase-37 sub-batch-4 (cloud + observability + CI/analytics) cross-app near-neighbors.
+  // list_dashboards is emitted by BOTH datadog AND posthog (identical op name, different
+  // app) -- the closest same-op collision in this sub-batch; the app token MUST keep
+  // each on its OWN slug (a swapped/colliding stem would cross-invoke).
+  { query: 'list dashboards in datadog', expected: 'datadog.list_dashboards' },
+  { query: 'list dashboards in posthog', expected: 'posthog.list_dashboards' },
+  // query_* near-neighbors: datadog.query_metrics vs posthog.query_events.
+  { query: 'query metrics in datadog', expected: 'datadog.query_metrics' },
+  { query: 'query events in posthog', expected: 'posthog.query_events' },
+  // sentry.list_issues / get_issue are error-tracking "issues" -- direct near-neighbors
+  // of the gitlab/linear/jira tracker "issues"; the app token must disambiguate.
+  { query: 'list issues in sentry', expected: 'sentry.list_issues' },
+  // The sub-batch-4 write/destructive ops must top their OWN slug (T-37-06 routing).
+  { query: 'trigger a circleci pipeline', expected: 'circleci.trigger_pipeline' },
+  { query: 'resolve an issue in sentry', expected: 'sentry.resolve_issue' },
+  // cloudflare.purge_cache: the sub-batch-4 DESTRUCTIVE op -- its own canonical
+  // (STEM_OVERRIDES) slug, never opentabs__dash__purge_cache.
+  { query: 'purge the cloudflare cache', expected: 'cloudflare.purge_cache' },
 ];
 
 (async function run() {

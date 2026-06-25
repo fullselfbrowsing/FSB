@@ -1,0 +1,58 @@
+{
+  "slug": "sentry.list_issues",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list issues in sentry",
+    "show me my issues in sentry",
+    "view my issues in sentry",
+    "see all my issues in sentry",
+    "list issues for a project in sentry"
+  ],
+  "description": "List the error issues for a Sentry project. Optionally filter by query, status, or environment.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Sentry organization slug"
+      },
+      "project_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Sentry project slug"
+      },
+      "query": {
+        "description": "Sentry search query (e.g. is:unresolved)",
+        "type": "string"
+      },
+      "environment": {
+        "description": "Filter by environment name",
+        "type": "string"
+      },
+      "cursor": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "organization_slug",
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

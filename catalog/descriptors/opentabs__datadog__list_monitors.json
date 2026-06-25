@@ -1,0 +1,56 @@
+{
+  "slug": "datadog.list_monitors",
+  "service": "app.datadoghq.com",
+  "intentSynonyms": [
+    "list monitors in datadog",
+    "show me my monitors in datadog",
+    "view my monitors in datadog",
+    "see all my monitors in datadog",
+    "list monitors in the account in datadog"
+  ],
+  "description": "List the monitors in your Datadog account. Optionally filter by name, tags, or monitor tags.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Filter monitors by name substring",
+        "type": "string"
+      },
+      "tags": {
+        "description": "Filter by monitor scope tags",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "monitor_tags": {
+        "description": "Filter by monitor (management) tags",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "page": {
+        "description": "Page number for pagination (0-indexed)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-monitors.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}
