@@ -1,49 +1,45 @@
-// Vendored metadata slice of the OpenTabs doordash plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// DoorDash is a PAYMENT-bearing food-delivery app -- its upstream host is
-// www.doordash.com, the EXACT origin Phase 39-01 classified SENSITIVE (the payment/
-// money-movement axis: placing an order charges a card), so the merge-time
-// classifyGate passes on a screened origin. The host-derived stem ('www') is WRONG,
-// so the dir-name STEM_OVERRIDES {doordash:'doordash'} canonicalizes the slug to
-// opentabs__doordash__*. Part of Phase-39 batch C sub-batch 1 (food delivery +
-// rideshare). Its ops list/search restaurants + a restaurant detail + the user's
-// orders + a single order's live tracking (reads), PLACE a paid order (place_order ->
-// the PAYMENT WRITE -- the DOM-only-on-sensitive payment-op-guard subject), and CANCEL
-// an order (cancel_order -> DESTRUCTIVE). posture-B re-gates the writes because the
-// origin is sensitive. backing:'dom' (the frozen default) -> DOM-only routing (the
-// payment op is NOT API-invocable -> the payment-op CI guard passes).
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { listRestaurants } from './tools/list-restaurants.js';
-import { getRestaurant } from './tools/get-restaurant.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './doordash-api.js';
+import { bookmarkStore } from './tools/bookmark-store.js';
+import { getCurrentUser } from './tools/get-current-user.js';
+import { getNotifications } from './tools/get-notifications.js';
+import { getOrder } from './tools/get-order.js';
+import { listAddresses } from './tools/list-addresses.js';
 import { listOrders } from './tools/list-orders.js';
-import { trackOrder } from './tools/track-order.js';
-import { placeOrder } from './tools/place-order.js';
-import { cancelOrder } from './tools/cancel-order.js';
+import { listPaymentMethods } from './tools/list-payment-methods.js';
+import { markNotificationsRead } from './tools/mark-notifications-read.js';
+import { unbookmarkStore } from './tools/unbookmark-store.js';
+import { updateDefaultAddress } from './tools/update-default-address.js';
+import { updateProfile } from './tools/update-profile.js';
 
-class DoordashPlugin extends OpenTabsPlugin {
+class DoorDashPlugin extends OpenTabsPlugin {
   readonly name = 'doordash';
-  readonly description =
-    'OpenTabs plugin for DoorDash — browse restaurants, read a menu, track your orders, place a paid order, and cancel an order';
+  readonly description = 'OpenTabs plugin for DoorDash';
   override readonly displayName = 'DoorDash';
-  readonly urlPatterns = ['*://www.doordash.com/*'];
+  readonly urlPatterns = ['*://*.doordash.com/*'];
   override readonly homepage = 'https://www.doordash.com';
   readonly tools: ToolDefinition[] = [
-    // Restaurants + orders (reads), placing the paid order (the payment write), cancelling (destructive).
-    listRestaurants,
-    getRestaurant,
+    // Account
+    getCurrentUser,
+    updateProfile,
+    listAddresses,
+    updateDefaultAddress,
+    listPaymentMethods,
+    getNotifications,
+    markNotificationsRead,
+    // Orders
     listOrders,
-    trackOrder,
-    placeOrder,
-    cancelOrder,
+    getOrder,
+    // Stores
+    bookmarkStore,
+    unbookmarkStore,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new DoordashPlugin();
-export default plugin;
-export { plugin };
+export default new DoorDashPlugin();

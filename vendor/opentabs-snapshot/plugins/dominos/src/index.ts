@@ -1,47 +1,75 @@
-// Vendored metadata slice of the OpenTabs dominos plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Domino's is a PAYMENT-bearing food-order app -- its upstream host is www.dominos.com,
-// classified SENSITIVE by Phase 39-01 (the payment/money-movement axis: placing an order
-// charges a card), so the merge-time classifyGate passes on a screened origin. The
-// host-derived stem ('www') is WRONG, so the dir-name STEM_OVERRIDES {dominos:'dominos'}
-// canonicalizes the slug to opentabs__dominos__*. Part of Phase-39 batch C sub-batch 5
-// (completion -- remaining commerce + read-only misc). Its ops list nearby stores + a
-// store's menu + the user's orders + a single order's live tracking (reads) and PLACE a
-// paid order (place_order -> the PAYMENT WRITE -- 'place' in 39-01 PAYMENT_VERBS,
-// place_order in PAYMENT_OP_NAMES; the DOM-only-on-sensitive payment-op-guard subject for
-// food-order). posture-B re-gates the writes because the origin is sensitive.
-// backing:'dom' (the frozen default) -> DOM-only routing (the payment op is NOT
-// API-invocable -> the payment-op CI guard passes).
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { listStores } from './tools/list-stores.js';
-import { getMenu } from './tools/get-menu.js';
-import { listOrders } from './tools/list-orders.js';
-import { placeOrder } from './tools/place-order.js';
-import { trackOrder } from './tools/track-order.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './dominos-api.js';
+
+// Account
+import { getCustomer } from './tools/get-customer.js';
+import { getSavedAddresses } from './tools/get-saved-addresses.js';
+import { getSavedCards } from './tools/get-saved-cards.js';
+import { getLoyaltyPoints } from './tools/get-loyalty-points.js';
+import { getLoyaltyRewards } from './tools/get-loyalty-rewards.js';
+
+// Stores
+import { searchAddress } from './tools/search-address.js';
+import { findStoresByAddress } from './tools/find-stores-by-address.js';
+
+// Menu
+import { getMenuCategories } from './tools/get-menu-categories.js';
+import { getCategoryProducts } from './tools/get-category-products.js';
+import { getProduct } from './tools/get-product.js';
+import { getDeal } from './tools/get-deal.js';
+
+// Cart & Ordering
+import { createCart } from './tools/create-cart.js';
+import { getCart } from './tools/get-cart.js';
+import { addProductToCart } from './tools/add-product-to-cart.js';
+import { updateProductQuantity } from './tools/update-product-quantity.js';
+import { addDealToCart } from './tools/add-deal-to-cart.js';
+import { removeDealFromCart } from './tools/remove-deal-from-cart.js';
+import { getCheckoutSummary } from './tools/get-checkout-summary.js';
+import { navigateToCheckout } from './tools/navigate-to-checkout.js';
+import { placeOrderCash } from './tools/place-order-cash.js';
 
 class DominosPlugin extends OpenTabsPlugin {
   readonly name = 'dominos';
-  readonly description =
-    'OpenTabs plugin for Domino’s — find nearby stores, read a store menu, track your orders, and place a paid order';
-  override readonly displayName = 'Domino’s';
-  readonly urlPatterns = ['*://www.dominos.com/*'];
+  readonly description = "OpenTabs plugin for Domino's Pizza";
+  override readonly displayName = "Domino's";
+  readonly urlPatterns = ['*://*.dominos.com/*'];
   override readonly homepage = 'https://www.dominos.com';
   readonly tools: ToolDefinition[] = [
-    // Stores + menu + orders + tracking (reads), placing the paid order (the payment write).
-    listStores,
-    getMenu,
-    listOrders,
-    placeOrder,
-    trackOrder,
+    // Account
+    getCustomer,
+    getSavedAddresses,
+    getSavedCards,
+    getLoyaltyPoints,
+    getLoyaltyRewards,
+
+    // Stores
+    searchAddress,
+    findStoresByAddress,
+
+    // Menu
+    getMenuCategories,
+    getCategoryProducts,
+    getProduct,
+    getDeal,
+
+    // Cart & Ordering
+    createCart,
+    getCart,
+    addProductToCart,
+    updateProductQuantity,
+    addDealToCart,
+    removeDealFromCart,
+    getCheckoutSummary,
+    navigateToCheckout,
+    placeOrderCash,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new DominosPlugin();
-export default plugin;
-export { plugin };
+export default new DominosPlugin();

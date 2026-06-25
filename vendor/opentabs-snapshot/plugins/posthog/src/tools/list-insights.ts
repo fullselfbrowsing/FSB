@@ -1,31 +1,46 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../posthog-api.js';
+import { api, getTeamId } from '../posthog-api.js';
+import {
+  type PaginatedResponse,
+  type RawInsight,
+  insightSchema,
+  mapInsight,
+  paginationInput,
+  paginationOutput,
+} from './schemas.js';
 
 export const listInsights = defineTool({
   name: 'list_insights',
   displayName: 'List Insights',
-  description: 'List the saved insights in a PostHog project. Optionally filter by search term or favorited.',
-  summary: 'List insights in a project',
-  icon: 'list',
+  description:
+    'List insights (trends, funnels, retention, paths, etc.) in the current PostHog project. Insights are the core analytics visualizations.',
+  summary: 'List insights in the project',
+  icon: 'bar-chart-3',
   group: 'Insights',
   input: z.object({
-    project_id: z.number().int().describe('PostHog project ID'),
-    search: z.string().optional().describe('Filter insights by name search term'),
-    favorited: z.boolean().optional().describe('Only return favorited insights'),
-    limit: z.number().int().optional().describe('Maximum number of insights to return'),
+    ...paginationInput.shape,
+    short_id: z.string().optional().describe('Filter by short ID'),
+    saved: z.boolean().optional().describe('Filter by saved status'),
   }),
   output: z.object({
-    insights: z
-      .array(z.object({ id: z.number(), name: z.string() }))
-      .describe('List of insights'),
+    insights: z.array(insightSchema).describe('List of insights'),
+    ...paginationOutput.shape,
   }),
-  handle: async (params: { project_id: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /projects/:id/insights/ (default method).
-    const data = await api<{ insights: Array<{ id: number; name: string }> }>(
-      `/projects/${params.project_id}/insights/`
-    );
-    return data;
+  handle: async params => {
+    const teamId = getTeamId();
+    const data = await api<PaginatedResponse<RawInsight>>(`/api/environments/${teamId}/insights/`, {
+      query: {
+        limit: params.limit,
+        offset: params.offset,
+        short_id: params.short_id,
+        saved: params.saved,
+      },
+    });
+    return {
+      insights: (data.results ?? []).map(mapInsight),
+      count: data.count ?? 0,
+      has_next: data.next != null,
+    };
   },
 });

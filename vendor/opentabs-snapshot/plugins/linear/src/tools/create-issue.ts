@@ -1,43 +1,77 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
-import { z } from 'zod';
 import { graphql } from '../linear-api.js';
+import { ToolError, defineTool } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+import { issueSchema, mapIssue } from './schemas.js';
 
 export const createIssue = defineTool({
   name: 'create_issue',
   displayName: 'Create Issue',
-  description:
-    'Create a new issue in Linear. Requires a team and a title at minimum. Optionally set description, assignee, priority, labels, project, and estimate.',
-  summary: 'Create a new issue',
-  icon: 'plus',
+  description: 'Create a new issue in Linear. Requires a team ID and title at minimum.',
+  summary: 'Create a new issue in Linear',
+  icon: 'plus-circle',
   group: 'Issues',
   input: z.object({
-    teamId: z.string().min(1).describe('Team ID to create the issue in'),
-    title: z.string().min(1).describe('Issue title'),
+    team_id: z.string().describe('Team UUID to create the issue in (use list_teams to find team IDs)'),
+    title: z.string().describe('Issue title'),
     description: z.string().optional().describe('Issue description in markdown'),
-    assigneeId: z.string().optional().describe('User ID to assign the issue to'),
-    priority: z.number().int().min(0).max(4).optional().describe('Priority from 0 (none) to 4 (urgent)'),
-    labelIds: z.array(z.string()).optional().describe('List of label IDs to apply'),
-    projectId: z.string().optional().describe('Project ID to associate the issue with'),
-    estimate: z.number().optional().describe('Estimate points for the issue'),
+    priority: z.number().optional().describe('Priority level (0=none, 1=urgent, 2=high, 3=medium, 4=low)'),
+    assignee_id: z.string().optional().describe('UUID of the user to assign (use list_users to find user IDs)'),
+    state_id: z.string().optional().describe('Workflow state UUID (use list_workflow_states to find state IDs)'),
+    label_ids: z
+      .array(z.string())
+      .optional()
+      .describe('Array of label UUIDs to apply (use list_labels to find label IDs)'),
+    project_id: z.string().optional().describe('Project UUID to add the issue to (use list_projects to find IDs)'),
+    cycle_id: z.string().optional().describe('Cycle UUID to add the issue to (use list_cycles to find IDs)'),
+    due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
+    estimate: z.number().optional().describe('Estimate points'),
+    parent_id: z.string().optional().describe('Parent issue UUID for creating a sub-issue'),
   }),
   output: z.object({
-    issue: z
-      .object({
-        id: z.string(),
-        identifier: z.string().optional(),
-        title: z.string(),
-        url: z.string().optional(),
-      })
-      .describe('The created issue'),
+    issue: issueSchema.describe('The newly created issue'),
   }),
-  handle: async (params: { teamId: string; title: string }) => {
-    // NEVER executed by the importer (metadata-only read).
-    // Upstream: graphql `issueCreate` mutation (always POST) -> write.
-    const data = await graphql<{ issueCreate: { issue: { id: string; title: string } } }>(
-      'mutation IssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { issue { id title } } }',
-      { input: { teamId: params.teamId, title: params.title } }
+  handle: async params => {
+    const input: Record<string, unknown> = {
+      teamId: params.team_id,
+      title: params.title,
+    };
+    if (params.description !== undefined) input.description = params.description;
+    if (params.priority !== undefined) input.priority = params.priority;
+    if (params.assignee_id) input.assigneeId = params.assignee_id;
+    if (params.state_id) input.stateId = params.state_id;
+    if (params.label_ids) input.labelIds = params.label_ids;
+    if (params.project_id) input.projectId = params.project_id;
+    if (params.cycle_id) input.cycleId = params.cycle_id;
+    if (params.due_date) input.dueDate = params.due_date;
+    if (params.estimate !== undefined) input.estimate = params.estimate;
+    if (params.parent_id) input.parentId = params.parent_id;
+
+    const data = await graphql<{
+      issueCreate: {
+        success: boolean;
+        issue: Record<string, unknown>;
+      };
+    }>(
+      `mutation CreateIssue($input: IssueCreateInput!) {
+        issueCreate(input: $input) {
+          success
+          issue {
+            id identifier title description priority priorityLabel url
+            createdAt updatedAt dueDate estimate
+            state { name type }
+            assignee { name displayName }
+            team { key name }
+            labels { nodes { name } }
+            project { name }
+            cycle { number }
+          }
+        }
+      }`,
+      { input },
     );
-    return { issue: data.issueCreate.issue };
+
+    if (!data.issueCreate?.issue) throw ToolError.internal('Issue creation failed — no issue returned');
+
+    return { issue: mapIssue(data.issueCreate.issue as Parameters<typeof mapIssue>[0]) };
   },
 });

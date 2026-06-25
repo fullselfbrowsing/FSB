@@ -1,42 +1,108 @@
-// Hermetic transport-helper stub for the vendored jira metadata slice.
-//
-// Upstream jira-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the Jira
-// Cloud platform REST API v3. The importer NEVER executes a handle() body (Wall 1),
-// but the tool modules reference `api` / `apiVoid` in their (never-run) handle
-// closures, so these symbols must RESOLVE at module-eval time. This stub provides
-// inert no-op implementations that throw if ever actually called -- they never are
-// during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): Jira Cloud is a REST app --
-// `api` defaults to GET (reads: get_issue, search_issues) and is called with
-// {method:'POST'} for create/add and {method:'PUT'} for update.
+import {
+  getAuthCache,
+  getMetaContent,
+  parseRetryAfterMs,
+  setAuthCache,
+  ToolError,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+interface JiraAuth {
+  accountId: string;
+  cloudId: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `jira-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const getAuth = (): JiraAuth | null => {
+  const persisted = getAuthCache<JiraAuth>('jira');
+  if (persisted) return persisted;
+
+  const accountId = getMetaContent('ajs-atlassian-account-id');
+  const cloudId = getMetaContent('ajs-cloud-id');
+
+  if (!accountId || !cloudId) return null;
+
+  const auth: JiraAuth = { accountId, cloudId };
+  setAuthCache('jira', auth);
+  return auth;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST/PUT for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for
-// destructive ops. Jira's vendored slice exposes no destructive op this sub-batch.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: Record<string, unknown>;
+    rawBody?: string;
+    query?: Record<string, string | number | boolean | undefined>;
+    basePath?: string;
+  } = {},
+): Promise<T> => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Jira.');
+
+  const base = options.basePath ?? '/rest/api/3';
+  let url = `${base}${endpoint}`;
+  if (options.query) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(options.query)) {
+      if (value !== undefined) params.append(key, String(value));
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  const headers: Record<string, string> = {};
+  let fetchBody: string | undefined;
+  if (options.rawBody !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    fetchBody = options.rawBody;
+  } else if (options.body) {
+    headers['Content-Type'] = 'application/json';
+    fetchBody = JSON.stringify(options.body);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: options.method ?? 'GET',
+      headers,
+      body: fetchBody,
+      credentials: 'include',
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'TimeoutError')
+      throw ToolError.timeout(`API request timed out: ${endpoint}`);
+    if (err instanceof DOMException && err.name === 'AbortError') throw ToolError.timeout('Request was aborted');
+    throw new ToolError(`Network error: ${err instanceof Error ? err.message : String(err)}`, 'network_error', {
+      category: 'internal',
+      retryable: true,
+    });
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.text().catch(() => '')).substring(0, 512);
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const retryMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
+      throw ToolError.rateLimited(`Rate limited: ${endpoint} — ${errorBody}`, retryMs);
+    }
+    if (response.status === 401 || response.status === 403)
+      throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
+    if (response.status === 404) throw ToolError.notFound(`Not found: ${endpoint} — ${errorBody}`);
+    if (response.status === 400) {
+      throw ToolError.validation(`Bad request: ${endpoint} — ${errorBody}`);
+    }
+    throw ToolError.internal(`API error (${response.status}): ${endpoint} — ${errorBody}`);
+  }
+
+  if (response.status === 204) return {} as T;
+  return (await response.json()) as T;
+};

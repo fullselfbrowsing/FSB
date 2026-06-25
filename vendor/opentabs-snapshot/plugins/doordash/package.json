@@ -1,16 +1,68 @@
 {
-  "_role": "opentabs-metadata-snapshot",
-  "_note": "Metadata-only slice of the OpenTabs doordash plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.doordash.com/* -> service www.doordash.com). www.doordash.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {doordash:'doordash'} canonicalizes the slug to opentabs__doordash__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads). www.doordash.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- doordash places PAID orders) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, doordash-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; place_order is the PAYMENT op (api {method:'POST'}) and cancel_order the DESTRUCTIVE op (apiVoid {method:'DELETE'}). place_order is DOM-only on a sensitive origin -> the payment-op CI guard PASSES (not safe-and-API-invocable).",
   "name": "@opentabs-dev/opentabs-plugin-doordash",
-  "version": "0.0.42",
+  "description": "OpenTabs plugin for DoorDash",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.87",
   "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
   "opentabs": {
     "displayName": "DoorDash",
     "description": "OpenTabs plugin for DoorDash",
     "urlPatterns": [
-      "*://www.doordash.com/*"
+      "*://*.doordash.com/*"
     ],
-    "homepage": "https://www.doordash.com"
+    "homepage": "https://www.doordash.com",
+    "iconSvg": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M23.071 8.409a6.09 6.09 0 00-5.396-3.228H.584A.589.589 0 00.17 6.184L3.894 9.93a1.752 1.752 0 001.242.516h12.049a1.554 1.554 0 11.031 3.108H8.91a.589.589 0 00-.415 1.003l3.725 3.747a1.75 1.75 0 001.242.516h3.757c4.887 0 8.584-5.225 5.852-10.413\" fill=\"#FF3008\"/></svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M23.071 8.409a6.09 6.09 0 00-5.396-3.228H.584A.589.589 0 00.17 6.184L3.894 9.93a1.752 1.752 0 001.242.516h12.049a1.554 1.554 0 11.031 3.108H8.91a.589.589 0 00-.415 1.003l3.725 3.747a1.75 1.75 0 001.242.516h3.757c4.887 0 8.584-5.225 5.852-10.413\" fill=\"#FF3008\"/></svg>"
   },
-  "license": "MIT"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/doordash"
+  }
 }

@@ -1,16 +1,79 @@
 {
-  "_role": "opentabs-metadata-snapshot",
-  "_note": "Metadata-only slice of the OpenTabs jira plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://*.atlassian.net/* -> service atlassian.net). NOTE: jira AND confluence both host on *.atlassian.net; the importer canonicalizes the slug STEM from the vendored DIR NAME via STEM_OVERRIDES ({jira:'jira', confluence:'confluence', ...}), NOT from the shared host, so jira emits DISTINCT opentabs__jira__* slugs (never colliding with confluence). defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, jira-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node.",
   "name": "@opentabs-dev/opentabs-plugin-jira",
-  "version": "0.0.58",
+  "description": "OpenTabs plugin for Jira",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.87",
   "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
   "opentabs": {
     "displayName": "Jira",
     "description": "OpenTabs plugin for Jira",
     "urlPatterns": [
       "*://*.atlassian.net/*"
     ],
-    "homepage": "https://www.atlassian.com/software/jira"
+    "excludePatterns": [
+      "*://*.atlassian.net/wiki/*"
+    ],
+    "configSchema": {
+      "instanceUrl": {
+        "type": "url",
+        "label": "Jira URL",
+        "description": "The URL of your self-hosted Jira instance (e.g., https://jira.example.com). Leave empty to use Jira Cloud on atlassian.net.",
+        "required": false,
+        "placeholder": "https://jira.example.com"
+      }
+    },
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"> <defs> <linearGradient x1=\"98.031%\" y1=\"0.161%\" x2=\"58.888%\" y2=\"40.766%\" id=\"@opentabs-dev/opentabs-plugin-jira-a\"> <stop stop-color=\"#0052CC\" offset=\"18%\"/> <stop stop-color=\"#2684FF\" offset=\"100%\"/> </linearGradient> <linearGradient x1=\"100.665%\" y1=\"0.455%\" x2=\"55.402%\" y2=\"44.727%\" id=\"@opentabs-dev/opentabs-plugin-jira-b\"> <stop stop-color=\"#0052CC\" offset=\"18%\"/> <stop stop-color=\"#2684FF\" offset=\"100%\"/> </linearGradient> </defs> <g> <path d=\"M244.658 0H121.707c0 14.72 5.847 28.837 16.256 39.246 10.409 10.409 24.526 16.256 39.246 16.256h22.649v21.867c.02 30.625 24.841 55.447 55.467 55.466V10.667C255.324 4.776 250.549 0 244.658 0z\" fill=\"#2684FF\"/> <path d=\"M183.822 61.262H60.871c.02 30.625 24.841 55.447 55.467 55.467h22.649v21.938c.039 30.625 24.877 55.431 55.502 55.431V71.929c0-5.891-4.776-10.667-10.667-10.667z\" fill=\"url(#@opentabs-dev/opentabs-plugin-jira-a)\"/> <path d=\"M122.951 122.489H0c0 30.653 24.849 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667z\" fill=\"url(#@opentabs-dev/opentabs-plugin-jira-b)\"/> </g> </svg>",
+    "iconDarkSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"> <defs> <linearGradient x1=\"98.031%\" y1=\"0.161%\" x2=\"58.888%\" y2=\"40.766%\" id=\"@opentabs-dev/opentabs-plugin-jira-a\"> <stop stop-color=\"#3385ff\" offset=\"18%\"/> <stop stop-color=\"#2684FF\" offset=\"100%\"/> </linearGradient> <linearGradient x1=\"100.665%\" y1=\"0.455%\" x2=\"55.402%\" y2=\"44.727%\" id=\"@opentabs-dev/opentabs-plugin-jira-b\"> <stop stop-color=\"#3385ff\" offset=\"18%\"/> <stop stop-color=\"#2684FF\" offset=\"100%\"/> </linearGradient> </defs> <g> <path d=\"M244.658 0H121.707c0 14.72 5.847 28.837 16.256 39.246 10.409 10.409 24.526 16.256 39.246 16.256h22.649v21.867c.02 30.625 24.841 55.447 55.467 55.466V10.667C255.324 4.776 250.549 0 244.658 0z\" fill=\"#2684FF\"/> <path d=\"M183.822 61.262H60.871c.02 30.625 24.841 55.447 55.467 55.467h22.649v21.938c.039 30.625 24.877 55.431 55.502 55.431V71.929c0-5.891-4.776-10.667-10.667-10.667z\" fill=\"url(#@opentabs-dev/opentabs-plugin-jira-a)\"/> <path d=\"M122.951 122.489H0c0 30.653 24.849 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667z\" fill=\"url(#@opentabs-dev/opentabs-plugin-jira-b)\"/> </g> </svg>"
   },
-  "license": "MIT"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "@biomejs/biome": "2.4.6",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/jira"
+  }
 }

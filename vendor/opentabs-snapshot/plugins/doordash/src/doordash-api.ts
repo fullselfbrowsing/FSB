@@ -1,48 +1,92 @@
-// Hermetic transport-helper stub for the vendored doordash metadata slice.
-//
-// Upstream doordash-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// DoorDash web app on www.doordash.com. The importer NEVER executes a handle()
-// body (Wall 1), but the tool modules reference `api` / `apiVoid` in their
-// (never-run) handle closures, so these symbols must RESOLVE at module-eval time.
-// This stub provides inert no-op implementations that throw if ever actually
-// called -- they never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): DoorDash lists/searches
-// restaurants + a restaurant's detail + the user's orders + a single order's
-// tracking via `api` (default GET, reads); PLACING an order POSTs the cart
-// (place_order -> the PAYMENT WRITE; the {method:'POST'} literal reinforces write on
-// both axes -- a paid order is money moved); CANCELLING an order is the DESTRUCTIVE
-// op (cancel_order -> apiVoid {method:'DELETE'} -> apiDelete/destructive).
-// www.doordash.com is SENSITIVE (39-01) -> posture-B re-gates the writes, and
-// backing:'dom' keeps place_order DOM-only (NOT API-invocable -> the payment-op
-// guard passes).
+import { ToolError, getCookie, getLocalStorage, parseRetryAfterMs, waitUntil } from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
-}
+const GRAPHQL_BASE = '/graphql';
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `doordash-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+// --- Auth detection ---
+// DoorDash uses HttpOnly session cookies (dd_session_id) sent automatically
+// via credentials: 'include'. Auth is detected via the dd_cx_logged_in cookie
+// and consumerId in localStorage.
+
+const getAuth = (): { consumerId: string } | null => {
+  const loggedIn = getCookie('dd_cx_logged_in') !== null;
+  if (!loggedIn) return null;
+
+  const consumerId = getLocalStorage('consumerId');
+  if (!consumerId) return null;
+
+  return { consumerId };
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for the
-// destructive cancel_order op.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+const getCsrfToken = (): string | null => getCookie('csrf_token');
+
+// --- GraphQL caller ---
+
+interface GraphQLResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string; extensions?: { code?: string } }>;
+}
+
+export const gql = async <T>(
+  operationName: string,
+  query: string,
+  variables: Record<string, unknown> = {},
+): Promise<T> => {
+  if (!getAuth()) throw ToolError.auth('Not authenticated — please log in to DoorDash.');
+
+  const csrf = getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-channel-id': 'marketplace',
+    'x-experience-id': 'doordash',
+  };
+  if (csrf) headers['x-csrftoken'] = csrf;
+
+  let response: Response;
+  try {
+    response = await fetch(`${GRAPHQL_BASE}/${operationName}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ operationName, variables, query }),
+      credentials: 'include',
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'TimeoutError')
+      throw ToolError.timeout(`API request timed out: ${operationName}`);
+    throw new ToolError(`Network error: ${err instanceof Error ? err.message : String(err)}`, 'network_error', {
+      category: 'internal',
+      retryable: true,
+    });
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.text().catch(() => '')).substring(0, 512);
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const retryMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
+      throw ToolError.rateLimited(`Rate limited: ${operationName} — ${errorBody}`, retryMs);
+    }
+    if (response.status === 401 || response.status === 403)
+      throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
+    if (response.status === 404) throw ToolError.notFound(`Not found: ${operationName} — ${errorBody}`);
+    // 400 from GraphQL usually means query validation error
+    if (response.status === 400) throw ToolError.validation(`GraphQL validation error: ${errorBody}`);
+    throw ToolError.internal(`API error (${response.status}): ${operationName} — ${errorBody}`);
+  }
+
+  const json = (await response.json()) as GraphQLResponse<T>;
+  if (json.errors?.length) {
+    const msg = json.errors.map(e => e.message).join('; ');
+    throw ToolError.internal(`GraphQL error: ${msg}`);
+  }
+  if (!json.data) throw ToolError.internal(`Empty response from ${operationName}`);
+  return json.data;
+};

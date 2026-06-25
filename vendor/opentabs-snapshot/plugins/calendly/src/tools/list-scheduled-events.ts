@@ -1,31 +1,59 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../calendly-api.js';
+import { mapPagination, mapScheduledEvent, paginationSchema, scheduledEventSchema } from './schemas.js';
+
+interface DateGroup {
+  events?: Record<string, unknown>[];
+}
+
+interface ScheduledEventsResponse {
+  results?: DateGroup[];
+  pagination?: Record<string, unknown>;
+}
 
 export const listScheduledEvents = defineTool({
   name: 'list_scheduled_events',
   displayName: 'List Scheduled Events',
-  description: 'List your upcoming and past Calendly scheduled meetings. Returns each meeting with its invitee, time, and status.',
-  summary: 'show me my calendly scheduled events',
-  icon: 'list',
-  group: 'Scheduling',
+  description:
+    'List scheduled events (meetings) with optional status filter. Defaults to showing all events. Supports pagination with 20 events per page.',
+  summary: 'List your scheduled meetings',
+  icon: 'calendar-clock',
+  group: 'Scheduled Events',
   input: z.object({
-    status: z.enum(['active', 'canceled']).optional().describe('Filter by meeting status'),
-    limit: z.number().int().min(1).max(100).optional().describe('Maximum number of meetings to return'),
+    status: z
+      .enum(['active', 'upcoming', 'past', 'canceled', 'completed', 'pending'])
+      .optional()
+      .describe('Filter by status: "active" (current), "upcoming", "past", "canceled", "completed", or "pending"'),
+    page: z.number().int().min(1).optional().describe('Page number (default 1)'),
   }),
   output: z.object({
-    events: z.array(z.object({
-      id: z.string(),
-      start_time: z.string(),
-      status: z.string(),
-    })).describe('Your scheduled meetings'),
+    events: z.array(scheduledEventSchema).describe('List of scheduled events'),
+    pagination: paginationSchema,
   }),
-  handle: async (params: { status?: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /scheduled_events (default method, a READ).
-    const data = await api<{ events: unknown[] }>('/scheduled_events', {
-      query: { status: params.status, count: params.limit },
+  handle: async params => {
+    const data = await api<ScheduledEventsResponse>('/scheduled_events/events', {
+      query: { status: params.status, page: params.page },
     });
-    return { events: data.events as { id: string; start_time: string; status: string }[] };
+
+    // Results are grouped by date — flatten all events from all date groups
+    const allEvents: Record<string, unknown>[] = [];
+    for (const group of data.results ?? []) {
+      for (const event of group.events ?? []) {
+        allEvents.push(event);
+      }
+    }
+
+    return {
+      events: allEvents.map(mapScheduledEvent),
+      pagination: mapPagination(
+        (data.pagination ?? {}) as {
+          total_count?: number;
+          current_page?: number;
+          total_pages?: number;
+          next_page?: number | null;
+        },
+      ),
+    };
   },
 });

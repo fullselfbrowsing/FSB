@@ -1,18 +1,57 @@
-// Hermetic transport-helper stub for the vendored todoist metadata slice.
-//
-// Upstream todoist-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage. The importer
-// NEVER executes a handle() body (Wall 1), but the tool modules reference `api` /
-// `apiVoid` in their (never-run) handle closures, so these symbols must RESOLVE at
-// module-eval time. This stub provides inert no-op implementations that throw if
-// ever actually called -- they never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata, NOT from
-// executing these helpers. The upstream verb facts (preserved here as comments for
-// auditability): `api` defaults to GET (reads) and is called with {method:'POST'}
-// for create/update; `apiVoid` defaults to POST and is called with
-// {method:'DELETE'} for delete -- close/reopen use apiVoid POST.
+import {
+  type FetchFromPageOptions,
+  ToolError,
+  buildQueryString,
+  fetchFromPage,
+  fetchJSON,
+  getAuthCache,
+  getLocalStorage,
+  setAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
+
+// --- Auth ---
+
+interface TodoistAuth {
+  token: string;
+}
+
+const getAuth = (): TodoistAuth | null => {
+  const cached = getAuthCache<TodoistAuth>('todoist');
+  if (cached) return cached;
+
+  const raw = getLocalStorage('User');
+  if (!raw) return null;
+
+  try {
+    const user = JSON.parse(raw) as { token?: string };
+    if (!user.token) return null;
+
+    const auth: TodoistAuth = { token: user.token };
+    setAuthCache('todoist', auth);
+    return auth;
+  } catch {
+    return null;
+  }
+};
+
+export const isAuthenticated = (): boolean => getAuth() !== null;
+
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), {
+      interval: 500,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// --- API ---
+
+const API_BASE = '/api/v1';
 
 interface ApiOptions {
   method?: string;
@@ -20,22 +59,44 @@ interface ApiOptions {
   query?: Record<string, string | number | boolean | undefined>;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `todoist-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+export const api = async <T>(endpoint: string, options: ApiOptions = {}): Promise<T> => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Todoist.');
+
+  const qs = options.query ? buildQueryString(options.query) : '';
+  const url = qs ? `${API_BASE}${endpoint}?${qs}` : `${API_BASE}${endpoint}`;
+
+  const method = options.method ?? 'GET';
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${auth.token}`,
+  };
+
+  const init: FetchFromPageOptions = { method, headers };
+
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(options.body);
+  }
+
+  return fetchJSON<T>(url, init) as Promise<T>;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+// For endpoints that return 204 No Content (close, reopen, delete, archive)
+export const apiVoid = async (endpoint: string, options: ApiOptions = {}): Promise<void> => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Todoist.');
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for
-// destructive ops (delete_*). close/reopen call it with the default POST.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+  const method = options.method ?? 'POST';
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${auth.token}`,
+  };
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+  const init: FetchFromPageOptions = { method, headers };
+
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(options.body);
+  }
+
+  await fetchFromPage(`${API_BASE}${endpoint}`, init);
+};

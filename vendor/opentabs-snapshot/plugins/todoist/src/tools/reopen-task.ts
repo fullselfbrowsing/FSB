@@ -1,5 +1,4 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { apiVoid } from '../todoist-api.js';
 
@@ -16,8 +15,7 @@ export const reopenTask = defineTool({
   output: z.object({
     success: z.boolean().describe('Whether the task was successfully reopened'),
   }),
-  handle: async (params: { task_id: string }) => {
-    // NEVER executed by the importer. Upstream: apiVoid POST /tasks/:id/reopen (write).
+  handle: async params => {
     await apiVoid(`/tasks/${params.task_id}/reopen`);
     return { success: true };
   },

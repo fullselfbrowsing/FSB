@@ -1,29 +1,27 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../jira-api.js';
+import { buildAdfText, commentSchema, mapComment } from './schemas.js';
 
 export const addComment = defineTool({
   name: 'add_comment',
   displayName: 'Add Comment',
-  description: 'Add a comment to an existing Jira issue.',
+  description: 'Add a comment to a Jira issue.',
   summary: 'Add a comment to an issue',
   icon: 'message-square',
-  group: 'Issues',
+  group: 'Comments',
   input: z.object({
-    issue_id_or_key: z.string().min(1).describe('Issue ID or key to comment on (e.g. ENG-123)'),
-    body: z.string().min(1).describe('Comment body text in markdown'),
+    issue_key: z.string().describe('Issue key (e.g. "KAN-1") or issue ID'),
+    body: z.string().describe('Comment text in plain text'),
   }),
   output: z.object({
-    id: z.string().describe('The created comment ID'),
-    self: z.string().optional().describe('The created comment API URL'),
+    comment: commentSchema.describe('The created comment'),
   }),
-  handle: async (params: { issue_id_or_key: string; body: string }) => {
-    // NEVER executed by the importer. Upstream: api POST /rest/api/3/issue/:idOrKey/comment (write).
-    const data = await api<{ id: string }>(`/rest/api/3/issue/${params.issue_id_or_key}/comment`, {
+  handle: async params => {
+    const data = await api<Record<string, unknown>>(`/issue/${encodeURIComponent(params.issue_key)}/comment`, {
       method: 'POST',
-      body: { body: params.body },
+      body: { body: buildAdfText(params.body) },
     });
-    return data;
+    return { comment: mapComment(data) };
   },
 });

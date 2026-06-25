@@ -1,33 +1,41 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool, ToolError } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../instacart-api.js';
+import { getLocationContext, gqlQuery } from '../instacart-api.js';
+import { type RawSearchSuggestion, mapSearchSuggestion, searchSuggestionSchema } from './schemas.js';
 
 export const searchProducts = defineTool({
   name: 'search_products',
   displayName: 'Search Products',
-  description: 'Search the products available in a single Instacart store by a query term.',
-  summary: 'search for groceries on instacart',
+  description:
+    "Search for products across all available retailers near the delivery address. Returns suggested items with thumbnails. Use get_location_context first if you need the zone ID. The search uses the user's current delivery location automatically.",
+  summary: 'Search for grocery products',
   icon: 'search',
-  group: 'Products',
+  group: 'Shopping',
   input: z.object({
-    store_id: z.string().min(1).describe('The store to search within'),
-    query: z.string().min(1).describe('The product search term'),
-    limit: z.number().int().min(1).max(50).optional().describe('Maximum number of products to return'),
+    query: z.string().describe('Search query (e.g. "milk", "organic eggs", "chicken breast")'),
+    limit: z.number().int().min(1).max(20).optional().describe('Max results (default 10)'),
   }),
   output: z.object({
-    products: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
-    })).describe('Matching products'),
+    suggestions: z.array(searchSuggestionSchema).describe('Search suggestions'),
   }),
-  handle: async (params: { store_id: string; query: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/stores/:id/products (default method, read).
-    const data = await api<{ products: unknown[] }>(`/v1/stores/${params.store_id}/products`, {
-      method: 'GET',
-      query: { query: params.query, limit: params.limit },
+  handle: async params => {
+    const loc = getLocationContext();
+    if (!loc) {
+      throw ToolError.validation('No delivery location set. The user needs to set a delivery address first.');
+    }
+
+    const data = await gqlQuery<{
+      crossRetailerSearchAutosuggestions: RawSearchSuggestion[];
+    }>('CrossRetailerSearchAutosuggestions', {
+      query: params.query,
+      limit: params.limit ?? 10,
+      retailerIds: loc.retailerIds,
+      zoneId: loc.zoneId,
+      autosuggestionSessionId: crypto.randomUUID(),
     });
-    return { products: data.products as { id: string; name: string; price: number }[] };
+
+    return {
+      suggestions: (data.crossRetailerSearchAutosuggestions ?? []).map(mapSearchSuggestion),
+    };
   },
 });

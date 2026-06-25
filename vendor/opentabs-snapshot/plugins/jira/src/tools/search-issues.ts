@@ -1,32 +1,43 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../jira-api.js';
+import { ISSUE_FIELDS, issueSchema, mapIssue } from './schemas.js';
 
 export const searchIssues = defineTool({
   name: 'search_issues',
   displayName: 'Search Issues',
-  description: 'Search for Jira issues using a JQL (Jira Query Language) query string.',
-  summary: 'Search issues with JQL',
+  description:
+    'Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.',
+  summary: 'Search issues using JQL',
   icon: 'search',
   group: 'Issues',
   input: z.object({
-    jql: z.string().min(1).describe('JQL query string (e.g. project = ENG AND status = "In Progress")'),
-    max_results: z.number().int().min(1).max(100).optional().describe('Maximum number of issues to return'),
-    start_at: z.number().int().min(0).optional().describe('Index of the first issue to return (pagination)'),
-    fields: z.array(z.string()).optional().describe('Issue field names to include in the response'),
+    jql: z.string().describe('JQL query string (e.g. "project = KAN AND status = \'In Progress\'")'),
+    max_results: z.number().optional().describe('Maximum number of results to return (default 20, max 100)'),
+    start_at: z.number().optional().describe('Index of the first result to return for pagination'),
   }),
   output: z.object({
-    issues: z
-      .array(z.object({ id: z.string(), key: z.string() }))
-      .describe('Matching issues'),
-    total: z.number().optional().describe('Total number of matching issues'),
+    issues: z.array(issueSchema).describe('Matching issues'),
+    total: z.number().describe('Total number of matching issues'),
+    start_at: z.number().describe('Starting index of returned results'),
   }),
-  handle: async (params: { jql: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /rest/api/3/search (default method, read).
-    const data = await api<{ issues: Array<{ id: string; key: string }> }>('/rest/api/3/search', {
-      query: { jql: params.jql },
+  handle: async params => {
+    const data = await api<{
+      issues?: Record<string, unknown>[];
+      total?: number;
+      startAt?: number;
+    }>('/search/jql', {
+      query: {
+        jql: params.jql,
+        maxResults: params.max_results ?? 20,
+        startAt: params.start_at ?? 0,
+        fields: ISSUE_FIELDS.join(','),
+      },
     });
-    return data;
+    return {
+      issues: (data.issues ?? []).map(mapIssue),
+      total: data.total ?? 0,
+      start_at: data.startAt ?? 0,
+    };
   },
 });

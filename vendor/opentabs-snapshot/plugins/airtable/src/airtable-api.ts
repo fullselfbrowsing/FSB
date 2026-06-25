@@ -1,44 +1,175 @@
-// Hermetic transport-helper stub for the vendored airtable metadata slice.
-//
-// Upstream airtable-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Airtable Web API. The importer NEVER executes a handle() body (Wall 1), but the
-// tool modules reference `api` / `apiVoid` in their (never-run) handle closures, so
-// these symbols must RESOLVE at module-eval time. This stub provides inert no-op
-// implementations that throw if ever actually called -- they never are during a
-// metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): Airtable is a REST app --
-// `api` defaults to GET (reads: list_records, get_record) and is called with
-// {method:'POST'} for create and {method:'PATCH'} for update; `apiVoid` is the
-// destructive helper, called with {method:'DELETE'} for delete_record (DELETE +
-// the delete_record override floor both class it destructive).
+import { ToolError, getPageGlobal, parseRetryAfterMs, waitUntil } from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+// --- Types ---
+
+interface AirtableAuth {
+  userId: string;
+  csrfToken: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `airtable-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+// --- Auth detection ---
+// Airtable uses HttpOnly session cookies. Auth is detected via window.initData
+// which contains sessionUserId and csrfToken for authenticated users.
+
+const getAuth = (): AirtableAuth | null => {
+  const sessionUserId = getPageGlobal('initData.sessionUserId');
+  const csrfToken = getPageGlobal('initData.csrfToken');
+  if (typeof sessionUserId !== 'string' || typeof csrfToken !== 'string') return null;
+  // Public share context users start with usrPAGESHARE — these are not real users
+  if (sessionUserId.startsWith('usrPAGESHARE')) return null;
+  return { userId: sessionUserId, csrfToken };
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST/PATCH for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; called with
-// {method:'DELETE'} for the destructive delete_record op.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const getUserId = (): string => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Airtable.');
+  return auth.userId;
+};
+
+const getCsrf = (): string => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Airtable.');
+  return auth.csrfToken;
+};
+
+// --- Request helpers ---
+
+const COMMON_HEADERS: Record<string, string> = {
+  'x-airtable-inter-service-client': 'webClient',
+  'x-requested-with': 'XMLHttpRequest',
+};
+
+const getTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+};
+
+// --- API callers ---
+
+/** GET request to Airtable internal API with stringifiedObjectParams query */
+export const apiGet = async <T>(
+  endpoint: string,
+  params: Record<string, unknown> = {},
+  options: { appId?: string } = {},
+): Promise<T> => {
+  if (!getAuth()) throw ToolError.auth('Not authenticated — please log in to Airtable.');
+
+  const qs = new URLSearchParams({
+    stringifiedObjectParams: JSON.stringify(params),
+    requestId: `req${Math.random().toString(36).slice(2, 10)}`,
+  });
+
+  const headers: Record<string, string> = {
+    ...COMMON_HEADERS,
+    'x-time-zone': getTimezone(),
+  };
+  if (options.appId) headers['x-airtable-application-id'] = options.appId;
+
+  let response: Response;
+  try {
+    response = await fetch(`/v0.3/${endpoint}?${qs}`, {
+      credentials: 'include',
+      headers,
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'TimeoutError')
+      throw ToolError.timeout(`API request timed out: ${endpoint}`);
+    throw new ToolError(`Network error: ${err instanceof Error ? err.message : String(err)}`, 'network_error', {
+      category: 'internal',
+      retryable: true,
+    });
+  }
+
+  return handleResponse<T>(response, endpoint);
+};
+
+/** POST request to Airtable internal API with stringifiedObjectParams body + CSRF */
+export const apiPost = async <T>(
+  endpoint: string,
+  params: Record<string, unknown> = {},
+  options: { appId?: string } = {},
+): Promise<T> => {
+  if (!getAuth()) throw ToolError.auth('Not authenticated — please log in to Airtable.');
+
+  const headers: Record<string, string> = {
+    ...COMMON_HEADERS,
+    'Content-Type': 'application/json',
+    'x-time-zone': getTimezone(),
+  };
+  if (options.appId) headers['x-airtable-application-id'] = options.appId;
+
+  let response: Response;
+  try {
+    response = await fetch(`/v0.3/${endpoint}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        stringifiedObjectParams: JSON.stringify(params),
+        requestId: `req${Math.random().toString(36).slice(2, 10)}`,
+        _csrf: getCsrf(),
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'TimeoutError')
+      throw ToolError.timeout(`API request timed out: ${endpoint}`);
+    throw new ToolError(`Network error: ${err instanceof Error ? err.message : String(err)}`, 'network_error', {
+      category: 'internal',
+      retryable: true,
+    });
+  }
+
+  return handleResponse<T>(response, endpoint);
+};
+
+// --- Response handler ---
+
+const handleResponse = async <T>(response: Response, endpoint: string): Promise<T> => {
+  if (!response.ok) {
+    const errorBody = (await response.text().catch(() => '')).substring(0, 512);
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const retryMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
+      throw ToolError.rateLimited(`Rate limited: ${endpoint} — ${errorBody}`, retryMs);
+    }
+    if (response.status === 401) throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
+    if (response.status === 403) {
+      // Airtable uses 403 for both auth and permission errors — distinguish by error body
+      if (errorBody.includes('INVALID_PERMISSIONS'))
+        throw ToolError.validation(`Permission denied: ${endpoint} — ${errorBody}`);
+      throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
+    }
+    if (response.status === 404) throw ToolError.notFound(`Not found: ${endpoint} — ${errorBody}`);
+    if (response.status === 422) throw ToolError.validation(`Invalid request: ${endpoint} — ${errorBody}`);
+    throw ToolError.internal(`API error (${response.status}): ${endpoint} — ${errorBody}`);
+  }
+
+  if (response.status === 204) return {} as T;
+
+  const json = (await response.json()) as { msg?: string; data?: T; error?: { type?: string; message?: string } };
+
+  if (json.error) {
+    const errMsg = json.error.message ?? json.error.type ?? 'Unknown error';
+    if (json.error.type === 'NOT_FOUND' || json.error.type === 'MODEL_ID_NOT_FOUND')
+      throw ToolError.notFound(`Not found: ${endpoint} — ${errMsg}`);
+    if (json.error.type === 'INVALID_REQUEST' || json.error.type === 'INVALID_MODEL_ID')
+      throw ToolError.validation(`Invalid request: ${endpoint} — ${errMsg}`);
+    throw ToolError.internal(`API error: ${endpoint} — ${errMsg}`);
+  }
+
+  return (json.data ?? json) as T;
+};

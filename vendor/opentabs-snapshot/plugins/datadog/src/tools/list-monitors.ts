@@ -1,29 +1,32 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../datadog-api.js';
+import { apiGet } from '../datadog-api.js';
+import { monitorSchema, mapMonitor } from './schemas.js';
 
 export const listMonitors = defineTool({
   name: 'list_monitors',
   displayName: 'List Monitors',
-  description: 'List the monitors in your Datadog account. Optionally filter by name, tags, or monitor tags.',
-  summary: 'List monitors in the account',
-  icon: 'list',
+  description:
+    'List monitors in the Datadog organization. Supports filtering by tags and pagination. Returns monitor details including name, type, query, state, and tags.',
+  summary: 'List Datadog monitors with optional tag filters',
+  icon: 'monitor',
   group: 'Monitors',
   input: z.object({
-    name: z.string().optional().describe('Filter monitors by name substring'),
-    tags: z.array(z.string()).optional().describe('Filter by monitor scope tags'),
-    monitor_tags: z.array(z.string()).optional().describe('Filter by monitor (management) tags'),
-    page: z.number().int().optional().describe('Page number for pagination (0-indexed)'),
+    tags: z.string().optional().describe('Comma-separated tags to filter monitors (e.g., "env:prod,team:backend")'),
+    page: z.number().int().min(0).optional().describe('Page number for pagination (default 0)'),
+    per_page: z.number().int().min(1).max(100).optional().describe('Monitors per page (default 50, max 100)'),
   }),
   output: z.object({
-    monitors: z
-      .array(z.object({ id: z.number(), name: z.string() }))
-      .describe('List of monitors'),
+    monitors: z.array(monitorSchema),
   }),
-  handle: async (_params: { name?: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /monitor (default method).
-    const data = await api<{ monitors: Array<{ id: number; name: string }> }>(`/monitor`);
-    return data;
+  handle: async params => {
+    const query: Record<string, string | number | boolean | undefined> = {
+      page: params.page ?? 0,
+      per_page: params.per_page ?? 50,
+    };
+    if (params.tags) query.tags = params.tags;
+
+    const data = await apiGet<Array<Record<string, unknown>>>('/api/v1/monitor', query);
+    return { monitors: (data ?? []).map(mapMonitor) };
   },
 });

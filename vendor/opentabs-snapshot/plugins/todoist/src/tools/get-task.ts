@@ -1,5 +1,4 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../todoist-api.js';
 import { type RawTask, mapTask, taskSchema } from './schemas.js';
@@ -17,8 +16,7 @@ export const getTask = defineTool({
   output: z.object({
     task: taskSchema.describe('Task details'),
   }),
-  handle: async (params: { task_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /tasks/:id (default method).
+  handle: async params => {
     const data = await api<RawTask>(`/tasks/${params.task_id}`);
     return { task: mapTask(data) };
   },

@@ -1,26 +1,23 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../datadog-api.js';
+import { apiGet } from '../datadog-api.js';
+import { monitorSchema, mapMonitor } from './schemas.js';
 
 export const getMonitor = defineTool({
   name: 'get_monitor',
   displayName: 'Get Monitor',
-  description: 'Get detailed information about a single Datadog monitor by its monitor ID.',
-  summary: 'Get a monitor by id',
-  icon: 'bell',
+  description: 'Get detailed information about a specific Datadog monitor by its ID.',
+  summary: 'Get a monitor by ID',
+  icon: 'monitor',
   group: 'Monitors',
   input: z.object({
-    monitor_id: z.number().int().describe('Datadog monitor ID'),
+    monitor_id: z.number().int().describe('Monitor ID'),
   }),
   output: z.object({
-    id: z.number().describe('Monitor ID'),
-    name: z.string().describe('Monitor name'),
-    overall_state: z.string().optional().describe('Monitor overall state'),
+    monitor: monitorSchema,
   }),
-  handle: async (params: { monitor_id: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /monitor/:id (default method).
-    const data = await api<{ id: number; name: string }>(`/monitor/${params.monitor_id}`);
-    return data;
+  handle: async params => {
+    const data = await apiGet<Record<string, unknown>>(`/api/v1/monitor/${params.monitor_id}`);
+    return { monitor: mapMonitor(data) };
   },
 });

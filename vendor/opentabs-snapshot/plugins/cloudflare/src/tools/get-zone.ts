@@ -1,28 +1,21 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../cloudflare-api.js';
+import { cloudflareApi } from '../cloudflare-api.js';
+import { mapZone, zoneSchema } from './schemas.js';
 
 export const getZone = defineTool({
   name: 'get_zone',
   displayName: 'Get Zone',
-  description: 'Get detailed information about a single Cloudflare zone (domain) by its zone ID.',
-  summary: 'Get a zone by id',
+  description: 'Get detailed information about a specific zone (domain) by its zone ID.',
+  summary: 'Get zone details',
   icon: 'globe',
   group: 'Zones',
   input: z.object({
-    zone_id: z.string().min(1).describe('Cloudflare zone ID'),
+    zone_id: z.string().describe('Zone ID (32-char hex string)'),
   }),
-  output: z.object({
-    id: z.string().describe('Zone ID'),
-    name: z.string().describe('Zone (domain) name'),
-    status: z.string().optional().describe('Zone status'),
-  }),
-  handle: async (params: { zone_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /zones/:id (default method).
-    const data = await api<{ id: string; name: string }>(
-      `/zones/${encodeURIComponent(params.zone_id)}`
-    );
-    return data;
+  output: zoneSchema,
+  handle: async params => {
+    const data = await cloudflareApi<Record<string, unknown>>(`/zones/${encodeURIComponent(params.zone_id)}`);
+    return mapZone(data.result as Record<string, unknown>);
   },
 });

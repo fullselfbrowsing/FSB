@@ -1,16 +1,68 @@
 {
-  "_role": "opentabs-metadata-snapshot",
-  "_note": "Metadata-only slice of the OpenTabs costco plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.costco.com/* -> service www.costco.com). www.costco.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {costco:'costco'} canonicalizes the slug to opentabs__costco__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.costco.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- Costco places PAID orders) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, costco-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; place_order is the PAYMENT op (api {method:'POST'}). place_order is DOM-only on a sensitive origin -> the payment-op CI guard PASSES (not safe-and-API-invocable).",
   "name": "@opentabs-dev/opentabs-plugin-costco",
-  "version": "0.0.42",
+  "description": "OpenTabs plugin for Costco Wholesale",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.87",
   "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
   "opentabs": {
     "displayName": "Costco",
-    "description": "OpenTabs plugin for Costco",
+    "description": "OpenTabs plugin for Costco Wholesale",
     "urlPatterns": [
-      "*://www.costco.com/*"
+      "*://*.costco.com/*"
     ],
-    "homepage": "https://www.costco.com"
+    "homepage": "https://www.costco.com",
+    "iconSvg": "<svg viewBox=\"0 0 90 90\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M82.113 11.983c-6.419-1.862-13.702-2.886-20.96-2.886-25.87 0-49.381 16.386-53.456 36.87-3.982 20.017 12.588 35.561 37.752 35.561 5.736 0 17.845-.837 23.383-2.788l6.16-26.26C69.047 56.487 62.693 59 55.32 59c-9.598 0-16.723-5.96-15.185-13.691 1.52-7.633 10.568-13.688 20.162-13.688 7.254 0 13.045 3.26 17.437 7.076l4.38-26.714Z\" fill=\"#E31837\"/></svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 0 90 90\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M82.113 11.983c-6.419-1.862-13.702-2.886-20.96-2.886-25.87 0-49.381 16.386-53.456 36.87-3.982 20.017 12.588 35.561 37.752 35.561 5.736 0 17.845-.837 23.383-2.788l6.16-26.26C69.047 56.487 62.693 59 55.32 59c-9.598 0-16.723-5.96-15.185-13.691 1.52-7.633 10.568-13.688 20.162-13.688 7.254 0 13.045 3.26 17.437 7.076l4.38-26.714Z\" fill=\"#E31837\"/></svg>"
   },
-  "license": "MIT"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/costco"
+  }
 }

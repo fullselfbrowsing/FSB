@@ -1,28 +1,31 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../netlify-api.js';
+import { deploySchema, type RawDeploy, mapDeploy } from './schemas.js';
 
 export const listDeploys = defineTool({
   name: 'list_deploys',
   displayName: 'List Deploys',
-  description: 'List deploys for a Netlify site. Optionally filter by state (new, building, ready, error).',
-  summary: 'List deploys for a site',
+  description:
+    'List deploys for a Netlify site. Returns deploy state, branch, commit info, context, framework, and timestamps. Supports pagination.',
+  summary: 'List site deploys',
   icon: 'list',
   group: 'Deploys',
   input: z.object({
-    site_id: z.string().min(1).describe('Site ID to list deploys for'),
-    state: z.enum(['new', 'building', 'ready', 'error']).optional().describe('Filter by deploy state'),
-    page: z.number().int().optional().describe('Page number for pagination (1-indexed)'),
+    site_id: z.string().describe('The site ID to list deploys for'),
+    page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+    per_page: z.number().optional().describe('Number of deploys per page (default 20)'),
   }),
   output: z.object({
-    deploys: z
-      .array(z.object({ id: z.string(), state: z.string() }))
-      .describe('List of deploys'),
+    items: z.array(deploySchema).describe('List of deploys'),
   }),
-  handle: async (params: { site_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /sites/:site_id/deploys (default method).
-    const data = await api<{ deploys: Array<{ id: string; state: string }> }>(`/sites/${params.site_id}/deploys`);
-    return data;
+  handle: async params => {
+    const raw = await api<RawDeploy[]>(`/sites/${params.site_id}/deploys`, {
+      query: {
+        page: params.page,
+        per_page: params.per_page,
+      },
+    });
+    return { items: raw.map(mapDeploy) };
   },
 });

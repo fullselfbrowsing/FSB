@@ -1,34 +1,49 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../target-api.js';
+import { redskyApi } from '../target-api.js';
+import { productSummarySchema, mapProductSummary } from './schemas.js';
+import type { RawProductSummary } from './schemas.js';
+
+interface SearchResponse {
+  data?: {
+    search?: {
+      products?: RawProductSummary[];
+      search_response?: {
+        typed_metadata?: { total_results?: number };
+      };
+    };
+  };
+}
 
 export const searchProducts = defineTool({
   name: 'search_products',
   displayName: 'Search Products',
   description:
-    'Search the Target catalog by keyword. Optionally filter by department/category and sort the results.',
-  summary: 'search for products on target',
+    "Search the Target product catalog by keyword. Returns product name, price, brand, rating, and image. Results are personalized to the user's preferred store for pricing and availability.",
+  summary: 'Search for products on Target',
   icon: 'search',
-  group: 'Catalog',
+  group: 'Products',
   input: z.object({
-    query: z.string().min(1).describe('Search keywords (product name, brand, or description)'),
-    category: z.string().optional().describe('Department or category to filter by'),
-    sort: z.enum(['relevance', 'price_low_to_high', 'price_high_to_low', 'best_seller']).optional().describe('Result ordering'),
-    limit: z.number().int().min(1).max(50).optional().describe('Maximum number of products to return'),
+    keyword: z.string().describe('Search keyword (e.g., "airpods", "paper towels")'),
+    count: z.number().int().min(1).max(24).optional().describe('Number of results (default 10, max 24)'),
+    offset: z.number().int().min(0).optional().describe('Result offset for pagination (default 0)'),
   }),
   output: z.object({
-    products: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      price: z.number(),
-    })).describe('Matching products'),
+    products: z.array(productSummarySchema),
+    total_results: z.number().int().describe('Total number of matching products'),
   }),
-  handle: async (params: { query: string; category?: string; sort?: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/products/search (default method, read).
-    const data = await api<{ products: unknown[] }>('/v1/products/search', {
-      query: { query: params.query, category: params.category, sort: params.sort, limit: params.limit },
+  handle: async params => {
+    const data = await redskyApi<SearchResponse>('redsky_aggregations/v1/web/plp_search_v2', {
+      keyword: params.keyword,
+      count: params.count ?? 10,
+      offset: params.offset ?? 0,
+      default_purchasability_filter: true,
+      include_dmc_dmr: true,
+      page: `/s/${encodeURIComponent(params.keyword)}`,
     });
-    return { products: data.products as { id: string; title: string; price: number }[] };
+    return {
+      products: (data.data?.search?.products ?? []).map(mapProductSummary),
+      total_results: data.data?.search?.search_response?.typed_metadata?.total_results ?? 0,
+    };
   },
 });

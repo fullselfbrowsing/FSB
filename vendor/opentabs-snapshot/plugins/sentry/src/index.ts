@@ -1,40 +1,80 @@
-// Vendored metadata slice of the OpenTabs sentry plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Sentry is a REST app (host sentry.io -> derived stem 'sentry', NOT in
-// STEM_OVERRIDES). Its ops GET against the Sentry REST API (reads: list_issues /
-// get_issue / list_projects) and PUT to /issues/:id/ to resolve an issue.
-// resolve_issue carries a {method:'PUT'} signal in its (never-run) handle so the
-// importer floors it to write (`resolve` is not a recognized side-effect verb).
-// This is part of the Phase-37 dev/productivity batch-A sub-batch 4 (cloudflare/
-// circleci/datadog/sentry/posthog -- cloud + observability, completing the category).
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { listIssues } from './tools/list-issues.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ConfigSchema, ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isSentryAuthenticated, waitForSentryAuth } from './sentry-api.js';
+import { createComment } from './tools/create-comment.js';
+import { getEvent } from './tools/get-event.js';
 import { getIssue } from './tools/get-issue.js';
+import { getOrganization } from './tools/get-organization.js';
+import { getProject } from './tools/get-project.js';
+import { getProjectKeys } from './tools/get-project-keys.js';
+import { getRelease } from './tools/get-release.js';
+import { listAlerts } from './tools/list-alerts.js';
+import { listComments } from './tools/list-comments.js';
+import { listIssueEvents } from './tools/list-issue-events.js';
+import { listIssueTags } from './tools/list-issue-tags.js';
+import { listMembers } from './tools/list-members.js';
+import { listMonitors } from './tools/list-monitors.js';
+import { listOrganizations } from './tools/list-organizations.js';
+import { listProjectEnvironments } from './tools/list-project-environments.js';
 import { listProjects } from './tools/list-projects.js';
-import { resolveIssue } from './tools/resolve-issue.js';
+import { listReleases } from './tools/list-releases.js';
+import { listReplays } from './tools/list-replays.js';
+import { listTeams } from './tools/list-teams.js';
+import { searchIssues } from './tools/search-issues.js';
+import { updateIssue } from './tools/update-issue.js';
 
 class SentryPlugin extends OpenTabsPlugin {
   readonly name = 'sentry';
-  readonly description =
-    'OpenTabs plugin for Sentry — inspect issues and projects and resolve issues via the Sentry REST API';
+  readonly description = 'OpenTabs plugin for Sentry';
   override readonly displayName = 'Sentry';
-  readonly urlPatterns = ['*://sentry.io/*'];
+  readonly urlPatterns = ['*://*.sentry.io/*'];
   override readonly homepage = 'https://sentry.io';
+  override readonly configSchema: ConfigSchema = {
+    instanceUrl: {
+      type: 'url' as const,
+      label: 'Sentry URL',
+      description:
+        'The URL of your self-hosted Sentry instance (e.g., https://sentry.example.com). Leave empty to use sentry.io.',
+      required: false,
+      placeholder: 'https://sentry.example.com',
+    },
+  };
   readonly tools: ToolDefinition[] = [
-    // Issues + projects (reads) and issue resolution (write) -- sub-batch-4 observability slice.
-    listIssues,
+    // Issues
+    searchIssues,
     getIssue,
+    updateIssue,
+    listIssueEvents,
+    getEvent,
+    listIssueTags,
+    listComments,
+    createComment,
+    // Projects
     listProjects,
-    resolveIssue,
+    getProject,
+    getProjectKeys,
+    listProjectEnvironments,
+    // Organizations
+    listOrganizations,
+    getOrganization,
+    listMembers,
+    // Teams
+    listTeams,
+    // Releases
+    listReleases,
+    getRelease,
+    // Alerts
+    listAlerts,
+    // Monitors (Crons)
+    listMonitors,
+    // Replays
+    listReplays,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isSentryAuthenticated()) return true;
+    return waitForSentryAuth();
+  }
 }
 
-const plugin = new SentryPlugin();
-export default plugin;
-export { plugin };
+export default new SentryPlugin();

@@ -1,16 +1,67 @@
 {
-  "_role": "opentabs-metadata-snapshot",
-  "_note": "Metadata-only slice of the OpenTabs tripadvisor plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.tripadvisor.com/* -> service www.tripadvisor.com). www.tripadvisor.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {tripadvisor:'tripadvisor'} canonicalizes the slug to opentabs__tripadvisor__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.tripadvisor.com is left UNCLASSIFIED (SAFE) in extension/config/service-denylist.json -- it is a read-only travel-reviews app (location search + reviews are reads; reads run under Auto with no mutating re-gate). It is added to verify-catalog-crosscheck.mjs READ_ONLY_SAFE_SERVICES (the 38 MED-02 guard) SPECIFICALLY because its vendored ops are read-only, so a FUTURE re-vendor adding a write op for tripadvisor would FAIL the build (forcing an explicit re-classification). NOTE: TripAdvisor surfaces partner hotel-booking, but THIS slice vendors ONLY the read surface (search/get/reviews) -- a booking op is out of scope; if one were ever vendored it would be a write -> the READ_ONLY_SAFE guard would FAIL the build, forcing the origin to be reclassified sensitive first. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, tripadvisor-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing. ALL ops are read (api {method:'GET'}); NO write op, NO payment verb -> the READ_ONLY_SAFE guard PASSES and the payment-op guard never keys on tripadvisor.",
   "name": "@opentabs-dev/opentabs-plugin-tripadvisor",
-  "version": "0.0.42",
+  "description": "OpenTabs plugin for Tripadvisor",
+  "version": "0.0.87",
   "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "opentabs": {
     "displayName": "Tripadvisor",
     "description": "OpenTabs plugin for Tripadvisor",
     "urlPatterns": [
-      "*://www.tripadvisor.com/*"
+      "*://*.tripadvisor.com/*"
     ],
-    "homepage": "https://www.tripadvisor.com"
+    "homepage": "https://www.tripadvisor.com",
+    "iconSvg": "<svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M12.006 4.295c-2.67 0-5.338.784-7.645 2.353H0l1.963 2.135a5.997 5.997 0 0 0 4.04 10.43 5.976 5.976 0 0 0 4.075-1.6L12 19.705l1.922-2.09a5.972 5.972 0 0 0 4.072 1.598 6 6 0 0 0 6-5.998 5.982 5.982 0 0 0-1.957-4.432L24 6.648h-4.35a13.573 13.573 0 0 0-7.644-2.353zM12 6.255c1.531 0 3.063.303 4.504.903C13.943 8.138 12 10.43 12 13.1c0-2.671-1.942-4.962-4.504-5.942A11.72 11.72 0 0 1 12 6.256zM6.002 9.157a4.059 4.059 0 1 1 0 8.118 4.059 4.059 0 0 1 0-8.118zm11.992.002a4.057 4.057 0 1 1 .003 8.115 4.057 4.057 0 0 1-.003-8.115zm-11.992 1.93a2.128 2.128 0 0 0 0 4.256 2.128 2.128 0 0 0 0-4.256zm11.992 0a2.128 2.128 0 0 0 0 4.256 2.128 2.128 0 0 0 0-4.256z\" fill=\"#34E0A1\"/></svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M12.006 4.295c-2.67 0-5.338.784-7.645 2.353H0l1.963 2.135a5.997 5.997 0 0 0 4.04 10.43 5.976 5.976 0 0 0 4.075-1.6L12 19.705l1.922-2.09a5.972 5.972 0 0 0 4.072 1.598 6 6 0 0 0 6-5.998 5.982 5.982 0 0 0-1.957-4.432L24 6.648h-4.35a13.573 13.573 0 0 0-7.644-2.353zM12 6.255c1.531 0 3.063.303 4.504.903C13.943 8.138 12 10.43 12 13.1c0-2.671-1.942-4.962-4.504-5.942A11.72 11.72 0 0 1 12 6.256zM6.002 9.157a4.059 4.059 0 1 1 0 8.118 4.059 4.059 0 0 1 0-8.118zm11.992.002a4.057 4.057 0 1 1 .003 8.115 4.057 4.057 0 0 1-.003-8.115zm-11.992 1.93a2.128 2.128 0 0 0 0 4.256 2.128 2.128 0 0 0 0-4.256zm11.992 0a2.128 2.128 0 0 0 0 4.256 2.128 2.128 0 0 0 0-4.256z\" fill=\"#34E0A1\"/></svg>"
   },
-  "license": "MIT"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.5",
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/tripadvisor"
+  }
 }

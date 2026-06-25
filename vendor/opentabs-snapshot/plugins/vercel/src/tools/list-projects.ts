@@ -1,28 +1,46 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../vercel-api.js';
+import { vercelApi } from '../vercel-api.js';
+import { mapProject, projectSchema } from './schemas.js';
 
 export const listProjects = defineTool({
   name: 'list_projects',
   displayName: 'List Projects',
-  description: 'List projects in a Vercel team or personal account. Optionally search by project name.',
-  summary: 'List projects',
+  description:
+    'List all projects in the current Vercel team/account. Returns project names, frameworks, Git repos, and deployment status. Supports pagination.',
+  summary: 'List all Vercel projects',
   icon: 'folder',
   group: 'Projects',
   input: z.object({
-    team_id: z.string().optional().describe('Team ID that owns the projects'),
-    search: z.string().optional().describe('Search string to filter projects by name'),
-    limit: z.number().int().optional().describe('Maximum number of projects to return'),
+    limit: z.number().optional().describe('Maximum number of projects to return (default 20, max 100)'),
+    from: z.string().optional().describe('Pagination cursor — project ID to start from (from previous response)'),
+    search: z.string().optional().describe('Search projects by name'),
   }),
   output: z.object({
-    projects: z
-      .array(z.object({ id: z.string(), name: z.string() }))
-      .describe('List of projects'),
+    projects: z.array(projectSchema).describe('List of projects'),
+    pagination: z
+      .object({
+        count: z.number().describe('Number of projects returned'),
+        next: z.string().nullable().describe('Next page cursor (pass as "from" for next page)'),
+      })
+      .describe('Pagination info'),
   }),
-  handle: async (_params: { team_id?: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /v9/projects (default method).
-    const data = await api<{ projects: Array<{ id: string; name: string }> }>(`/v9/projects`);
-    return data;
+  handle: async params => {
+    const data = await vercelApi<Record<string, unknown>>('/v9/projects', {
+      query: {
+        limit: params.limit ?? 20,
+        from: params.from,
+        search: params.search,
+      },
+    });
+    const projects = Array.isArray(data.projects) ? (data.projects as Record<string, unknown>[]) : [];
+    const pagination = data.pagination as Record<string, unknown> | undefined;
+    return {
+      projects: projects.map(p => mapProject(p)),
+      pagination: {
+        count: (pagination?.count as number) ?? projects.length,
+        next: (pagination?.next as string) ?? null,
+      },
+    };
   },
 });

@@ -1,33 +1,62 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool, ToolError } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../booking-api.js';
+import { fetchPage, extractApolloCache, buildSearchUrl } from '../booking-api.js';
+import { propertySchema, mapProperty } from './schemas.js';
+import type { RawSearchResult } from './schemas.js';
 
 export const getProperty = defineTool({
   name: 'get_property',
   displayName: 'Get Property',
-  description: 'Get the full details, room options, and availability of a single Booking.com property by its ID.',
-  summary: 'look up a booking property',
+  description:
+    'Get detailed information about a specific property on Booking.com by searching for it. Provide the property name and city to find it, along with check-in/check-out dates for pricing.',
+  summary: 'Get property details by name and location',
   icon: 'building',
-  group: 'Stays',
+  group: 'Properties',
   input: z.object({
-    property_id: z.string().min(1).describe('The property ID to fetch'),
-    check_in: z.string().optional().describe('Check-in date (YYYY-MM-DD) for live availability'),
-    check_out: z.string().optional().describe('Check-out date (YYYY-MM-DD) for live availability'),
+    property_name: z.string().describe('Property name or partial name to search for'),
+    city: z.string().describe('City where the property is located'),
+    checkin: z.string().describe('Check-in date in YYYY-MM-DD format (for pricing)'),
+    checkout: z.string().describe('Check-out date in YYYY-MM-DD format (for pricing)'),
   }),
   output: z.object({
-    property: z.object({
-      id: z.string(),
-      name: z.string(),
-      rooms: z.array(z.object({ id: z.string(), name: z.string(), price: z.number() })),
-    }).describe('The property detail + room options'),
+    property: propertySchema,
   }),
-  handle: async (params: { property_id: string; check_in?: string; check_out?: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/properties/:id (default method).
-    const data = await api<{ property: { id: string; name: string; rooms: unknown[] } }>(
-      `/v1/properties/${params.property_id}`,
-      { query: { check_in: params.check_in, check_out: params.check_out } }
-    );
-    return { property: data.property as { id: string; name: string; rooms: { id: string; name: string; price: number }[] } };
+  handle: async params => {
+    // Search for the property by name + city
+    const searchUrl = buildSearchUrl({
+      destination: `${params.property_name} ${params.city}`,
+      checkin: params.checkin,
+      checkout: params.checkout,
+    });
+
+    const doc = await fetchPage(searchUrl);
+    const cache = extractApolloCache(doc);
+
+    if (!cache?.ROOT_QUERY) {
+      throw ToolError.notFound(`No results found for "${params.property_name}" in ${params.city}`);
+    }
+
+    const searchQueries = cache.ROOT_QUERY.searchQueries as Record<string, unknown> | undefined;
+    if (!searchQueries) {
+      throw ToolError.notFound(`No results found for "${params.property_name}" in ${params.city}`);
+    }
+
+    const searchKey = Object.keys(searchQueries).find(k => k.startsWith('search('));
+    const searchData = searchKey ? (searchQueries[searchKey] as Record<string, unknown>) : null;
+    const results = (searchData?.results as RawSearchResult[] | undefined) ?? [];
+
+    if (results.length === 0) {
+      throw ToolError.notFound(`No results found for "${params.property_name}" in ${params.city}`);
+    }
+
+    // Find the best matching property by name
+    const nameNorm = params.property_name.toLowerCase();
+    const match = results.find(r => r.displayName?.text?.toLowerCase().includes(nameNorm));
+    const result = match ?? results[0];
+    if (!result) {
+      throw ToolError.notFound(`No results found for "${params.property_name}" in ${params.city}`);
+    }
+
+    return { property: mapProperty(result) };
   },
 });

@@ -1,43 +1,109 @@
-// Hermetic transport-helper stub for the vendored chatgpt metadata slice.
-//
-// Upstream chatgpt-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// ChatGPT web app on chatgpt.com. The importer NEVER executes a handle() body
-// (Wall 1), but the tool modules reference `api` in their (never-run) handle
-// closures, so these symbols must RESOLVE at module-eval time. This stub provides
-// inert no-op implementations that throw if ever actually called -- they never are
-// during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): ChatGPT lists conversations +
-// reads one conversation via `api` (default GET); sending a message POSTs to the
-// conversation endpoint (send_message -> the sensitive AI-chat WRITE; `send` is in
-// the shared WRITE_VERBS set and the {method:'POST'} literal reinforces the write
-// class on both the verb AND method axes).
+import {
+  ToolError,
+  fetchJSON,
+  buildQueryString,
+  getCookie,
+  getAuthCache,
+  setAuthCache,
+  clearAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
+import type { FetchFromPageOptions } from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+const API_BASE = 'https://chatgpt.com/backend-api';
+const SESSION_URL = 'https://chatgpt.com/api/auth/session';
+
+// --- Auth ---
+
+interface ChatGPTAuth {
+  accessToken: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `chatgpt-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const fetchAccessToken = async (): Promise<string | null> => {
+  try {
+    const session = await fetchJSON<{
+      accessToken?: string;
+    }>(SESSION_URL);
+    return session?.accessToken ?? null;
+  } catch {
+    return null;
+  }
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+const getAuth = (): ChatGPTAuth | null => {
+  const cached = getAuthCache<ChatGPTAuth>('chatgpt');
+  if (cached) return cached;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+  // The access token requires an async fetch from /api/auth/session.
+  // For synchronous isAuthenticated checks, we rely on the oai-client-auth-info
+  // cookie as a presence indicator — the actual token is fetched lazily on first API call.
+  return null;
+};
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+const ensureAuth = async (): Promise<ChatGPTAuth> => {
+  const cached = getAuthCache<ChatGPTAuth>('chatgpt');
+  if (cached) return cached;
+
+  const accessToken = await fetchAccessToken();
+  if (!accessToken) throw ToolError.auth('Not authenticated — please log in to ChatGPT.');
+
+  const auth: ChatGPTAuth = { accessToken };
+  setAuthCache('chatgpt', auth);
+  return auth;
+};
+
+/** Synchronous auth presence check using the non-HttpOnly user info cookie. */
+export const isAuthenticated = (): boolean => {
+  if (getAuth()) return true;
+  // oai-client-auth-info cookie is set for logged-in users
+  const authCookie = getCookie('oai-client-auth-info');
+  return authCookie !== null && authCookie.length > 0;
+};
+
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
+
+// --- API caller ---
+
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  const auth = await ensureAuth();
+
+  const qs = options.query ? buildQueryString(options.query) : '';
+  const url = qs ? `${API_BASE}${endpoint}?${qs}` : `${API_BASE}${endpoint}`;
+
+  const method = options.method ?? 'GET';
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${auth.accessToken}`,
+  };
+
+  const init: FetchFromPageOptions = { method, headers };
+
+  if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(options.body);
+  }
+
+  try {
+    const data = await fetchJSON<T>(url, init);
+    return data as T;
+  } catch (err: unknown) {
+    // On 401/403, clear cached token so it re-fetches on next call
+    if (
+      err instanceof ToolError &&
+      (err.code === 'auth' || err.message.includes('401') || err.message.includes('403'))
+    ) {
+      clearAuthCache('chatgpt');
+    }
+    throw err;
+  }
+};

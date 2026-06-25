@@ -1,30 +1,33 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool, ToolError } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../walmart-api.js';
+import { fetchPageData, isAuthenticated } from '../walmart-api.js';
+import { mapOrder, orderSchema, type RawOrder } from './schemas.js';
 
 export const listOrders = defineTool({
   name: 'list_orders',
   displayName: 'List Orders',
-  description: 'List your recent Walmart orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).',
-  summary: 'show me my walmart order history',
-  icon: 'receipt',
+  description: 'List recent Walmart purchase history. Returns orders with items, status, and delivery information.',
+  summary: 'List recent purchase history',
+  icon: 'package',
   group: 'Orders',
-  input: z.object({
-    status: z.enum(['open', 'shipped', 'ready_for_pickup', 'delivered', 'cancelled']).optional().describe('Filter orders by status'),
-    limit: z.number().int().min(1).max(50).optional().describe('Maximum number of orders to return'),
-  }),
+  input: z.object({}),
   output: z.object({
-    orders: z.array(z.object({
-      id: z.string(),
-      status: z.string(),
-    })).describe('Your recent orders'),
+    orders: z.array(orderSchema),
   }),
-  handle: async (params: { status?: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/orders (default method, read).
-    const data = await api<{ orders: unknown[] }>('/v1/orders', {
-      query: { status: params.status, limit: params.limit },
-    });
-    return { orders: data.orders as { id: string; status: string }[] };
+  handle: async () => {
+    if (!isAuthenticated()) {
+      throw ToolError.auth('Not logged in to Walmart.');
+    }
+
+    const data = await fetchPageData('/orders');
+
+    const phData = data.phRedesignInitialData as Record<string, unknown> | undefined;
+    const phInner = phData?.data as Record<string, unknown> | undefined;
+    const purchaseHistory = phInner?.purchaseHistory as Record<string, unknown> | undefined;
+    const rawOrders = (purchaseHistory?.orders ?? []) as RawOrder[];
+
+    return {
+      orders: rawOrders.map(mapOrder),
+    };
   },
 });

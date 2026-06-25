@@ -1,49 +1,113 @@
-// Hermetic transport-helper stub for the vendored craigslist metadata slice.
-//
-// Upstream craigslist-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Craigslist web app on www.craigslist.org. The importer NEVER executes a handle()
-// body (Wall 1), but the tool modules reference `api` / `apiVoid` in their (never-run)
-// handle closures, so these symbols must RESOLVE at module-eval time. This stub
-// provides inert no-op implementations that throw if ever actually called -- they
-// never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): Craigslist searches classified
-// listings + a single listing detail via `api` (default GET, reads); POSTING a listing
-// PUTs/POSTs a new classified ad (post_listing -> a WRITE via the {method:'POST'}
-// literal; NOTE post_listing is NOT a payment op -- 'post' is not a payment verb and
-// 'post_listing' is not a payment op-name -- but craigslist is SENSITIVE so the write
-// is posture-B gated regardless); DELETING a listing is the DESTRUCTIVE op
-// (delete_listing -> apiVoid {method:'DELETE'} -> apiDelete/destructive).
-// www.craigslist.org (and the apex craigslist.org, after the 39-06 apex-suffix
-// widening) is SENSITIVE -> posture-B re-gates the writes, and backing:'dom' keeps the
-// write DOM-only (the payment-op guard never keys on post_listing -- no payment verb).
+import { ToolError, buildQueryString, getCookie, fetchFromPage, fetchJSON, waitUntil } from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
-}
+// --- Auth detection ---
+// Craigslist uses HttpOnly session cookies (`cl_session`) for API auth.
+// The non-HttpOnly `cl_login` cookie indicates the user is logged in and
+// contains the user ID and email in the format "userId:email".
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `craigslist-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
+export const isAuthenticated = (): boolean => getCookie('cl_login') !== null;
+
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
   );
+
+/** Parse the cl_login cookie into userId and email. */
+const parseLoginCookie = (): { userId: string; email: string } | null => {
+  const raw = getCookie('cl_login');
+  if (!raw) return null;
+  const decoded = decodeURIComponent(raw);
+  const colonIdx = decoded.indexOf(':');
+  if (colonIdx === -1) return null;
+  return {
+    userId: decoded.substring(0, colonIdx),
+    email: decoded.substring(colonIdx + 1),
+  };
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for the post_listing write.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const getUserEmail = (): string => {
+  const parsed = parseLoginCookie();
+  if (!parsed) throw ToolError.auth('Not authenticated — please log in to Craigslist.');
+  return parsed.email;
+};
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for the
-// destructive delete_listing op.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+export const getUserId = (): string => {
+  const parsed = parseLoginCookie();
+  if (!parsed) throw ToolError.auth('Not authenticated — please log in to Craigslist.');
+  return parsed.userId;
+};
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+// --- Craigslist API response envelope ---
+
+interface CraigslistResponse<T> {
+  apiVersion: number;
+  data: T;
+  errors: Array<{ code?: number; message: string }>;
+}
+
+// --- API callers ---
+// Craigslist has two API subdomains:
+//   wapi.craigslist.org — write/account APIs (user info, payment cards, posting actions)
+//   capi.craigslist.org — chat APIs
+
+const WAPI_BASE = 'https://wapi.craigslist.org/web/v8';
+const CAPI_BASE = 'https://capi.craigslist.org/web/v8';
+
+const callApi = async <T>(
+  base: string,
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: FormData | string;
+    contentType?: string;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  if (!isAuthenticated()) throw ToolError.auth('Not authenticated — please log in to Craigslist.');
+
+  const query = { lang: 'en', ...options.query };
+  const qs = buildQueryString(query);
+  const url = `${base}${endpoint}?${qs}`;
+
+  const headers: Record<string, string> = {};
+  const method = options.method ?? 'GET';
+
+  if (options.body && typeof options.body === 'string') {
+    headers['Content-Type'] = options.contentType ?? 'application/json';
+  }
+
+  const response = await fetchFromPage(url, { method, headers, body: options.body });
+  if (response.status === 204) return {} as T;
+  return (await response.json()) as T;
+};
+
+/** Call the write/account API (wapi.craigslist.org). */
+export const wapi = async <T>(
+  endpoint: string,
+  options?: {
+    method?: string;
+    body?: FormData | string;
+    contentType?: string;
+    query?: Record<string, string | number | boolean | undefined>;
+  },
+): Promise<CraigslistResponse<T>> => callApi<CraigslistResponse<T>>(WAPI_BASE, endpoint, options);
+
+/** Call the chat API (capi.craigslist.org). */
+export const capi = async <T>(
+  endpoint: string,
+  options?: {
+    method?: string;
+    body?: FormData | string;
+    contentType?: string;
+    query?: Record<string, string | number | boolean | undefined>;
+  },
+): Promise<CraigslistResponse<T>> => callApi<CraigslistResponse<T>>(CAPI_BASE, endpoint, options);
+
+/** Call the accounts.craigslist.org JSON endpoint (saved searches). */
+export const accountsApi = async <T>(endpoint: string): Promise<T> => {
+  if (!isAuthenticated()) throw ToolError.auth('Not authenticated — please log in to Craigslist.');
+
+  const data = await fetchJSON<T>(`https://accounts.craigslist.org${endpoint}`);
+  return data as T;
+};

@@ -1,41 +1,103 @@
-// Hermetic transport-helper stub for the vendored asana metadata slice.
-//
-// Upstream asana-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage. The importer
-// NEVER executes a handle() body (Wall 1), but the tool modules reference `api` /
-// `apiVoid` in their (never-run) handle closures, so these symbols must RESOLVE at
-// module-eval time. This stub provides inert no-op implementations that throw if
-// ever actually called -- they never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the {method:'...'} literal in the tool source, NOT from
-// executing these helpers. The upstream verb facts (preserved here as comments for
-// auditability): `api` is the generic REST helper -- GET for reads (list/get),
-// {method:'POST'} for create, {method:'PUT'} for update; `apiVoid` is the
-// 204-No-Content helper (default POST; DELETE for destructive ops).
+import { ToolError, getPageGlobal, parseRetryAfterMs, waitUntil } from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
-}
+const API_BASE = 'https://app.asana.com/api/1.0';
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `asana-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+// --- Auth detection ---
+// Asana uses HttpOnly cookies (auth_token) that aren't accessible via JS.
+// Auth is detected via window.env._user_id, a numeric global that Asana
+// injects on every page for logged-in users. The actual API auth uses
+// session cookies sent automatically via credentials: 'include'.
+
+const getUserId = (): number | null => {
+  const envUserId = getPageGlobal('env._user_id');
+  if (typeof envUserId === 'number') return envUserId;
+  const globalUserId = getPageGlobal('page_load_globals.user_id');
+  if (typeof globalUserId === 'number') return globalUserId;
+  return null;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST/PUT for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getUserId() !== null;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for
-// destructive ops.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+// --- API caller ---
+
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: Record<string, unknown>;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  if (!isAuthenticated()) throw ToolError.auth('Not authenticated — please log in to Asana.');
+
+  const method = options.method ?? 'GET';
+
+  let url = `${API_BASE}${endpoint}`;
+  if (options.query) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(options.query)) {
+      if (value !== undefined) params.append(key, String(value));
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+
+  // POST/PUT/DELETE requests require this header for write auth
+  if (method !== 'GET') {
+    headers['X-Allow-Asana-Client'] = '1';
+  }
+
+  let fetchBody: string | undefined;
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+    fetchBody = JSON.stringify(options.body);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: fetchBody,
+      credentials: 'include',
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'TimeoutError')
+      throw ToolError.timeout(`API request timed out: ${endpoint}`);
+    if (err instanceof DOMException && err.name === 'AbortError') throw new ToolError('Request was aborted', 'aborted');
+    throw new ToolError(`Network error: ${err instanceof Error ? err.message : String(err)}`, 'network_error', {
+      category: 'internal',
+      retryable: true,
+    });
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.text().catch(() => '')).substring(0, 512);
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const retryMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
+      throw ToolError.rateLimited(`Rate limited: ${endpoint} — ${errorBody}`, retryMs);
+    }
+    if (response.status === 401 || response.status === 403)
+      throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
+    if (response.status === 404) throw ToolError.notFound(`Not found: ${endpoint} — ${errorBody}`);
+    if (response.status === 400 || response.status === 422)
+      throw ToolError.validation(`Validation error: ${endpoint} — ${errorBody}`);
+    throw ToolError.internal(`API error (${response.status}): ${endpoint} — ${errorBody}`);
+  }
+
+  if (response.status === 204) return {} as T;
+  return (await response.json()) as T;
+};

@@ -1,42 +1,123 @@
-// Hermetic transport-helper stub for the vendored chipotle metadata slice.
-//
-// Upstream chipotle-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Chipotle web app on www.chipotle.com. The importer NEVER executes a handle() body
-// (Wall 1), but the tool modules reference `api` in their (never-run) handle closures,
-// so this symbol must RESOLVE at module-eval time. This stub provides an inert no-op
-// implementation that throws if ever actually called -- it never is during a
-// metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing this helper. The upstream verb facts
-// (preserved here as comments for auditability): Chipotle lists nearby locations + a
-// location's menu + the user's orders via `api` (default GET, reads); PLACING an order
-// POSTs the cart (place_order -> the PAYMENT WRITE; the {method:'POST'} literal classes
-// it write -- 'place' is NOT a side-effect WRITE_VERB, so the POST is what classes it
-// write, AND 'place' is in 39-01 PAYMENT_VERBS + place_order in PAYMENT_OP_NAMES -- a
-// placed order charges the saved card). www.chipotle.com is SENSITIVE (39-01) ->
-// posture-B re-gates the writes, and backing:'dom' keeps place_order DOM-only (NOT
-// API-invocable -> the payment-op guard passes).
+import {
+  type FetchFromPageOptions,
+  ToolError,
+  buildQueryString,
+  fetchJSON,
+  getAuthCache,
+  getLocalStorage,
+  setAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+const GATEWAY_URL = 'https://services.chipotle.com';
+const SUBSCRIPTION_KEY = 'b4d9f36380184a3788857063bce25d6a';
+
+interface ChipotleAuth {
+  jwt: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `chipotle-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const getAuth = (): ChipotleAuth | null => {
+  const cached = getAuthCache<ChipotleAuth>('chipotle');
+  if (cached?.jwt) return cached;
+
+  const vuex = getLocalStorage('cmg-vuex');
+  if (!vuex) return null;
+
+  try {
+    const state = JSON.parse(vuex);
+    const jwt = state?.customer?.jwt;
+    if (!jwt) return null;
+
+    const auth: ChipotleAuth = { jwt };
+    setAuthCache('chipotle', auth);
+    return auth;
+  } catch {
+    return null;
+  }
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for the place_order write.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), {
+      interval: 500,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Makes an authenticated GET request to the Chipotle API.
+ * KPSDK (Kasada bot protection) automatically injects x-kpsdk-ct/h/v headers
+ * via its fetch/XHR interceptor — no manual header injection needed.
+ */
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to chipotle.com.');
+
+  const qs = options.query ? buildQueryString(options.query) : '';
+  const url = qs ? `${GATEWAY_URL}${endpoint}?${qs}` : `${GATEWAY_URL}${endpoint}`;
+
+  const headers: Record<string, string> = {
+    'Ocp-Apim-Subscription-Key': SUBSCRIPTION_KEY,
+    'Content-Type': 'application/json',
+    'Chipotle-CorrelationId': crypto.randomUUID(),
+    Authorization: `Bearer ${auth.jwt}`,
+  };
+
+  const init: FetchFromPageOptions = {
+    method: options.method ?? 'GET',
+    headers,
+  };
+
+  if (options.body) {
+    init.body = JSON.stringify(options.body);
+  }
+
+  const data = await fetchJSON<T>(url, init);
+  return data as T;
+};
+
+/**
+ * Makes a POST request. Shorthand for api() with method: 'POST'.
+ */
+export const apiPost = async <T>(
+  endpoint: string,
+  body: unknown,
+  query?: Record<string, string | number | boolean | undefined>,
+): Promise<T> => {
+  return api<T>(endpoint, { method: 'POST', body, query });
+};
+
+/**
+ * Reads a slice of the Vuex store from localStorage.
+ * Useful for accessing cached menu data and order state.
+ */
+export const getVuexSlice = <T>(path: string): T | null => {
+  const vuex = getLocalStorage('cmg-vuex');
+  if (!vuex) return null;
+
+  try {
+    const state = JSON.parse(vuex);
+    const parts = path.split('.');
+    let current: unknown = state;
+    for (const part of parts) {
+      if (current == null || typeof current !== 'object') return null;
+      current = (current as Record<string, unknown>)[part];
+    }
+    return current as T;
+  } catch {
+    return null;
+  }
+};

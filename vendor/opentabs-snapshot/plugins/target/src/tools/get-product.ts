@@ -1,31 +1,31 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../target-api.js';
+import { redskyApi } from '../target-api.js';
+import { productDetailSchema, mapProductDetail } from './schemas.js';
+import type { RawProductDetail } from './schemas.js';
+
+interface ProductResponse {
+  data?: { product?: RawProductDetail };
+}
 
 export const getProduct = defineTool({
   name: 'get_product',
   displayName: 'Get Product',
-  description: 'Get the full detail (title, price, availability, and description) of a single Target product by its TCIN/product ID.',
-  summary: 'look up a single target product',
+  description:
+    'Get detailed information about a Target product by its TCIN (Target item number). Returns title, description, price, brand, rating, reviews, bullet features, and image. Use search_products to find TCINs.',
+  summary: 'Get product details by TCIN',
   icon: 'package',
-  group: 'Catalog',
+  group: 'Products',
   input: z.object({
-    product_id: z.string().min(1).describe('The TCIN / product ID to fetch'),
+    tcin: z.string().describe('Target item number (TCIN) — e.g., "85978618"'),
   }),
-  output: z.object({
-    product: z.object({
-      id: z.string(),
-      title: z.string(),
-      price: z.number(),
-      in_stock: z.boolean(),
-    }).describe('The product detail'),
-  }),
-  handle: async (params: { product_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/products/:id (default method, read).
-    const data = await api<{ product: { id: string; title: string; price: number; in_stock: boolean } }>(
-      `/v1/products/${params.product_id}`
-    );
-    return { product: data.product };
+  output: z.object({ product: productDetailSchema }),
+  handle: async params => {
+    const data = await redskyApi<ProductResponse>('redsky_aggregations/v1/web/pdp_client_v1', {
+      tcin: params.tcin,
+      has_pricing_store_id: true,
+      has_store_positions_store_id: true,
+    });
+    return { product: mapProductDetail(data.data?.product ?? {}) };
   },
 });

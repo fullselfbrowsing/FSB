@@ -1,34 +1,39 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../cloudflare-api.js';
+import { cloudflareApi } from '../cloudflare-api.js';
+import { mapPagination, mapZone, paginationSchema, zoneSchema } from './schemas.js';
 
 export const listZones = defineTool({
   name: 'list_zones',
   displayName: 'List Zones',
-  description: 'List the zones (domains) in your Cloudflare account. Optionally filter by name or status.',
-  summary: 'List zones in the account',
+  description:
+    'List all zones (domains) in the Cloudflare account. Returns domain names, status, plan, nameservers, and configuration. Supports filtering by name and status, with pagination.',
+  summary: 'List all domains/zones',
   icon: 'globe',
   group: 'Zones',
   input: z.object({
-    name: z.string().optional().describe('Filter zones by exact domain name'),
-    status: z
-      .enum(['active', 'pending', 'initializing', 'moved', 'deleted', 'deactivated'])
-      .optional()
-      .describe('Filter by zone status'),
-    page: z.number().int().optional().describe('Page number for pagination (1-indexed)'),
-    per_page: z.number().int().optional().describe('Results per page (max 50)'),
+    name: z.string().optional().describe('Filter by domain name (supports partial match)'),
+    status: z.enum(['active', 'pending', 'initializing', 'moved']).optional().describe('Filter by zone status'),
+    page: z.number().int().min(1).optional().describe('Page number (default 1)'),
+    per_page: z.number().int().min(5).max(50).optional().describe('Results per page (default 20, max 50)'),
   }),
   output: z.object({
-    zones: z
-      .array(z.object({ id: z.string(), name: z.string() }))
-      .describe('List of zones'),
+    zones: z.array(zoneSchema).describe('List of zones'),
+    pagination: paginationSchema.describe('Pagination info'),
   }),
-  handle: async (params: { name?: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /zones (default method).
-    const data = await api<{ zones: Array<{ id: string; name: string }> }>(
-      `/zones${params.name ? `?name=${encodeURIComponent(params.name)}` : ''}`
-    );
-    return data;
+  handle: async params => {
+    const data = await cloudflareApi<Record<string, unknown>[]>('/zones', {
+      query: {
+        name: params.name,
+        status: params.status,
+        page: params.page ?? 1,
+        per_page: params.per_page ?? 20,
+      },
+    });
+    const zones = Array.isArray(data.result) ? (data.result as Record<string, unknown>[]) : [];
+    return {
+      zones: zones.map(z => mapZone(z)),
+      pagination: mapPagination(data.result_info as Record<string, unknown> | undefined),
+    };
   },
 });

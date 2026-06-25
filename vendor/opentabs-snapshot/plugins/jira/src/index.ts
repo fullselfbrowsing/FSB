@@ -1,43 +1,75 @@
-// Vendored metadata slice of the OpenTabs jira plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Jira AND Confluence both host on *.atlassian.net. The importer derives each app's
-// slug STEM from the vendored DIR NAME via STEM_OVERRIDES ({jira:'jira',
-// confluence:'confluence', ...}) -- NOT from the shared host -- so this slice emits
-// DISTINCT opentabs__jira__* slugs that never collide with confluence's
-// opentabs__confluence__*. Jira Cloud is a REST app (platform REST API v3): the
-// side-effect class derives from the named-verb helper + {method:'...'} literal +
-// the op-name verb (api GET=read for get/search; api {method:'POST'/'PUT'}=write for
-// create/update/add). Part of the Phase-37 dev/productivity batch-A sub-batch 2.
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { createIssue } from './tools/create-issue.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ConfigSchema, ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './jira-api.js';
 import { searchIssues } from './tools/search-issues.js';
 import { getIssue } from './tools/get-issue.js';
+import { createIssue } from './tools/create-issue.js';
 import { updateIssue } from './tools/update-issue.js';
+import { deleteIssue } from './tools/delete-issue.js';
+import { transitionIssue } from './tools/transition-issue.js';
+import { getTransitions } from './tools/get-transitions.js';
+import { assignIssue } from './tools/assign-issue.js';
+import { linkIssues } from './tools/link-issues.js';
+import { addWatcher } from './tools/add-watcher.js';
+import { listIssueTypes } from './tools/list-issue-types.js';
+import { listPriorities } from './tools/list-priorities.js';
 import { addComment } from './tools/add-comment.js';
+import { listComments } from './tools/list-comments.js';
+import { listProjects } from './tools/list-projects.js';
+import { getProject } from './tools/get-project.js';
+import { listBoards } from './tools/list-boards.js';
+import { listSprints } from './tools/list-sprints.js';
+import { searchUsers } from './tools/search-users.js';
+import { getMyself } from './tools/get-myself.js';
 
 class JiraPlugin extends OpenTabsPlugin {
   readonly name = 'jira';
-  readonly description =
-    'OpenTabs plugin for Jira — manage issues and comments via the Jira Cloud platform REST API';
+  readonly description = 'OpenTabs plugin for Jira';
   override readonly displayName = 'Jira';
   readonly urlPatterns = ['*://*.atlassian.net/*'];
-  override readonly homepage = 'https://www.atlassian.com/software/jira';
+  override readonly excludePatterns = ['*://*.atlassian.net/wiki/*'];
+  override readonly configSchema: ConfigSchema = {
+    instanceUrl: {
+      type: 'url' as const,
+      label: 'Jira URL',
+      description:
+        'The URL of your self-hosted Jira instance (e.g., https://jira.example.com). Leave empty to use Jira Cloud on atlassian.net.',
+      required: false,
+      placeholder: 'https://jira.example.com',
+    },
+  };
   readonly tools: ToolDefinition[] = [
-    // Issues (the vendored dev/productivity batch-A sub-batch-2 slice)
+    // Issues
     searchIssues,
     getIssue,
     createIssue,
     updateIssue,
+    deleteIssue,
+    transitionIssue,
+    getTransitions,
+    assignIssue,
+    linkIssues,
+    addWatcher,
+    listIssueTypes,
+    listPriorities,
+    // Comments
     addComment,
+    listComments,
+    // Projects
+    listProjects,
+    getProject,
+    // Boards
+    listBoards,
+    listSprints,
+    // Users
+    searchUsers,
+    getMyself,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new JiraPlugin();
-export default plugin;
-export { plugin };
+export default new JiraPlugin();

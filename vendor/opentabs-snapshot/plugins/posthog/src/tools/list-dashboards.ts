@@ -1,30 +1,37 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../posthog-api.js';
+import { api, getTeamId } from '../posthog-api.js';
+import {
+  type PaginatedResponse,
+  type RawDashboard,
+  dashboardSchema,
+  mapDashboard,
+  paginationInput,
+  paginationOutput,
+} from './schemas.js';
 
 export const listDashboards = defineTool({
   name: 'list_dashboards',
   displayName: 'List Dashboards',
-  description: 'List the dashboards in a PostHog project. Optionally filter by pinned or search term.',
-  summary: 'List dashboards in a project',
+  description: 'List all dashboards in the current PostHog project. Returns dashboard names, tags, and tile counts.',
+  summary: 'List dashboards in the project',
   icon: 'layout-dashboard',
   group: 'Dashboards',
   input: z.object({
-    project_id: z.number().int().describe('PostHog project ID'),
-    pinned: z.boolean().optional().describe('Only return pinned dashboards'),
-    search: z.string().optional().describe('Filter dashboards by name search term'),
+    ...paginationInput.shape,
   }),
   output: z.object({
-    dashboards: z
-      .array(z.object({ id: z.number(), name: z.string() }))
-      .describe('List of dashboards'),
+    dashboards: z.array(dashboardSchema).describe('List of dashboards'),
+    ...paginationOutput.shape,
   }),
-  handle: async (params: { project_id: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /projects/:id/dashboards/ (default method).
-    const data = await api<{ dashboards: Array<{ id: number; name: string }> }>(
-      `/projects/${params.project_id}/dashboards/`
-    );
-    return data;
+  handle: async params => {
+    const data = await api<PaginatedResponse<RawDashboard>>(`/api/environments/${getTeamId()}/dashboards/`, {
+      query: { limit: params.limit, offset: params.offset },
+    });
+    return {
+      dashboards: (data.results ?? []).map(mapDashboard),
+      count: data.count ?? 0,
+      has_next: data.next != null,
+    };
   },
 });

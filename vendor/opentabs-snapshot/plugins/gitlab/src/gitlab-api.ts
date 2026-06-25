@@ -1,43 +1,157 @@
-// Hermetic transport-helper stub for the vendored gitlab metadata slice.
-//
-// Upstream gitlab-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// GitLab REST API v4 (https://gitlab.com/api/v4). The importer NEVER executes a
-// handle() body (Wall 1), but the tool modules reference `api` / `apiVoid` in their
-// (never-run) handle closures, so these symbols must RESOLVE at module-eval time.
-// This stub provides inert no-op implementations that throw if ever actually
-// called -- they never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): GitLab is a REST app --
-// `api` defaults to GET (reads) and is called with {method:'POST'} for create ops
-// (create_issue, create_merge_request); `apiVoid` is the 204 mutating helper. The
-// op-name verb (create/list/get) is the signal the shared side-effect-class.mjs
-// recognizes (create -> write; list/get -> read).
+import {
+  ToolError,
+  getConfig,
+  getMetaContent,
+  getPageGlobal,
+  parseRetryAfterMs,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
-}
-
-const inert = (helper: string): never => {
-  throw new Error(
-    `gitlab-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const getApiBase = (): string => {
+  const instanceUrl = getConfig('instanceUrl') as string | undefined;
+  if (instanceUrl) return `${instanceUrl.replace(/\/+$/, '')}/api/v4`;
+  return 'https://gitlab.com/api/v4';
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for create ops.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+interface GitLabAuth {
+  username: string;
+}
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+// --- Auth detection ---
+// GitLab injects a <meta name="csrf-token"> tag for CSRF protection on
+// mutating requests, and user info is embedded in the gon global object
+// (window.gon). Auth is detected via the gon object which contains the
+// current user's username when logged in.
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+const getAuth = (): GitLabAuth | null => {
+  const username = getPageGlobal('gon.current_username') as string | undefined;
+  if (typeof username !== 'string' || !username) return null;
+  return { username };
+};
+
+export const isAuthenticated = (): boolean => getAuth() !== null;
+
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
+
+export const getUsername = (): string => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to GitLab.');
+  return auth.username;
+};
+
+const getCsrfToken = (): string | null => getMetaContent('csrf-token');
+
+// --- Shared fetch helpers ---
+
+const buildUrl = (endpoint: string, query?: Record<string, string | number | boolean | undefined>): string => {
+  let url = `${getApiBase()}${endpoint}`;
+  if (query) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) params.append(key, String(value));
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+  }
+  return url;
+};
+
+const handleFetchError = (err: unknown, endpoint: string): never => {
+  if (err instanceof DOMException && err.name === 'TimeoutError')
+    throw ToolError.timeout(`API request timed out: ${endpoint}`);
+  if (err instanceof DOMException && err.name === 'AbortError') throw ToolError.timeout('Request was aborted');
+  throw new ToolError(`Network error: ${err instanceof Error ? err.message : String(err)}`, 'network_error', {
+    category: 'internal',
+    retryable: true,
+  });
+};
+
+const handleHttpError = async (response: Response, endpoint: string): Promise<never> => {
+  const errorBody = (await response.text().catch(() => '')).substring(0, 512);
+
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After');
+    const retryMs = retryAfter !== null ? parseRetryAfterMs(retryAfter) : undefined;
+    throw ToolError.rateLimited(`Rate limited: ${endpoint} — ${errorBody}`, retryMs);
+  }
+  if (response.status === 401 || response.status === 403)
+    throw ToolError.auth(`Auth error (${response.status}): ${errorBody}`);
+  if (response.status === 404) throw ToolError.notFound(`Not found: ${endpoint} — ${errorBody}`);
+  if (response.status === 422) throw ToolError.validation(`Validation error: ${endpoint} — ${errorBody}`);
+  throw ToolError.internal(`API error (${response.status}): ${endpoint} — ${errorBody}`);
+};
+
+const requireAuth = (): void => {
+  if (!getAuth()) throw ToolError.auth('Not authenticated — please log in to GitLab.');
+};
+
+// --- Shared fetch wrapper ---
+
+const doFetch = async (url: string, endpoint: string, init: RequestInit): Promise<Response> => {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      credentials: 'include',
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err: unknown) {
+    // handleFetchError always throws; re-throw to satisfy control flow analysis.
+    throw handleFetchError(err, endpoint);
+  }
+
+  if (!response.ok) await handleHttpError(response, endpoint);
+  return response;
+};
+
+// --- API callers ---
+
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: Record<string, unknown>;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  requireAuth();
+
+  const url = buildUrl(endpoint, options.query);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+
+  let fetchBody: string | undefined;
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+    fetchBody = JSON.stringify(options.body);
+  }
+
+  // GitLab requires a CSRF token for mutating requests when using session cookies.
+  const method = options.method ?? 'GET';
+  if (method !== 'GET') {
+    const csrf = getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
+
+  const response = await doFetch(url, endpoint, { method, headers, body: fetchBody });
+  if (response.status === 204) return {} as T;
+  return (await response.json()) as T;
+};
+
+// Variant that returns raw text (for job logs, etc.)
+export const apiRaw = async (
+  endpoint: string,
+  options: {
+    method?: string;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<string> => {
+  requireAuth();
+
+  const url = buildUrl(endpoint, options.query);
+  const response = await doFetch(url, endpoint, { method: options.method ?? 'GET' });
+  return response.text();
+};

@@ -1,31 +1,38 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../bitbucket-api.js';
+import { type RawPR, pullRequestSchema, mapPullRequest } from './schemas.js';
 
 export const listPullRequests = defineTool({
   name: 'list_pull_requests',
   displayName: 'List Pull Requests',
-  description: 'List pull requests in a Bitbucket repository. Optionally filter by state (OPEN, MERGED, DECLINED, SUPERSEDED).',
-  summary: 'List pull requests in a repository',
-  icon: 'list',
+  description:
+    'List pull requests for a Bitbucket repository. By default returns open pull requests. Supports pagination and state filtering.',
+  summary: 'List pull requests for a repository',
+  icon: 'git-pull-request',
   group: 'Pull Requests',
   input: z.object({
-    workspace: z.string().min(1).describe('Workspace ID or slug that owns the repository'),
-    repo_slug: z.string().min(1).describe('Repository slug'),
-    state: z.enum(['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED']).optional().describe('Filter by pull request state'),
-    page: z.number().int().optional().describe('Page number for pagination (1-indexed)'),
+    workspace: z.string().describe('Workspace slug or UUID'),
+    repo_slug: z.string().describe('Repository slug'),
+    state: z
+      .enum(['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED'])
+      .optional()
+      .describe('Pull request state filter (default OPEN)'),
+    page: z.number().int().optional().describe('Page number for pagination (default 1)'),
+    pagelen: z.number().int().optional().describe('Number of results per page (default 25, max 100)'),
   }),
   output: z.object({
-    pullrequests: z
-      .array(z.object({ id: z.number(), title: z.string() }))
-      .describe('List of pull requests'),
+    pull_requests: z.array(pullRequestSchema).describe('Array of pull requests'),
   }),
-  handle: async (params: { workspace: string; repo_slug: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /repositories/:ws/:repo/pullrequests (default method).
-    const data = await api<{ pullrequests: Array<{ id: number; title: string }> }>(
-      `/repositories/${params.workspace}/${params.repo_slug}/pullrequests`
-    );
-    return data;
+  handle: async params => {
+    const query: Record<string, string | number | undefined> = {
+      state: params.state,
+      page: params.page,
+      pagelen: params.pagelen,
+    };
+    const data = await api<{ values: RawPR[] }>(`/repositories/${params.workspace}/${params.repo_slug}/pullrequests`, {
+      query,
+    });
+    return { pull_requests: (data.values ?? []).map(mapPullRequest) };
   },
 });

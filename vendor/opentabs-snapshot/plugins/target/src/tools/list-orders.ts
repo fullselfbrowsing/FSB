@@ -1,30 +1,43 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../target-api.js';
+import { orderSchema, mapOrder } from './schemas.js';
+import type { RawOrder } from './schemas.js';
+
+interface OrderHistoryResponse {
+  total_orders?: number;
+  total_pages?: number;
+  orders?: RawOrder[];
+}
 
 export const listOrders = defineTool({
   name: 'list_orders',
   displayName: 'List Orders',
-  description: 'List your recent Target orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).',
-  summary: 'show me my target order history',
+  description:
+    "List the user's Target order history with order number, date, total, and line items. Supports pagination. Returns both online and in-store orders.",
+  summary: 'List order history',
   icon: 'receipt',
   group: 'Orders',
   input: z.object({
-    status: z.enum(['open', 'shipped', 'ready_for_pickup', 'delivered', 'cancelled']).optional().describe('Filter orders by status'),
-    limit: z.number().int().min(1).max(50).optional().describe('Maximum number of orders to return'),
+    page: z.number().int().min(1).optional().describe('Page number (default 1)'),
+    per_page: z.number().int().min(1).max(20).optional().describe('Orders per page (default 10, max 20)'),
   }),
   output: z.object({
-    orders: z.array(z.object({
-      id: z.string(),
-      status: z.string(),
-    })).describe('Your recent orders'),
+    orders: z.array(orderSchema),
+    total_orders: z.number().int().describe('Total number of orders'),
+    total_pages: z.number().int().describe('Total number of pages'),
   }),
-  handle: async (params: { status?: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/orders (default method, read).
-    const data = await api<{ orders: unknown[] }>('/v1/orders', {
-      query: { status: params.status, limit: params.limit },
+  handle: async params => {
+    const data = await api<OrderHistoryResponse>('guest_order_aggregations/v1/order_history', {
+      query: {
+        page: params.page ?? 1,
+        per_page: params.per_page ?? 10,
+      },
     });
-    return { orders: data.orders as { id: string; status: string }[] };
+    return {
+      orders: (data.orders ?? []).map(mapOrder),
+      total_orders: data.total_orders ?? 0,
+      total_pages: data.total_pages ?? 0,
+    };
   },
 });

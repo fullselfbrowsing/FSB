@@ -1,34 +1,29 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../asana-api.js';
+import { type AsanaResponse, type RawTask, TASK_OPT_FIELDS, mapTask, taskSchema } from './schemas.js';
 
 export const getTask = defineTool({
   name: 'get_task',
   displayName: 'Get Task',
-  description: 'Get a single task from Asana by its GID.',
-  summary: 'Get a single task',
-  icon: 'file',
+  description: 'Get detailed information about a specific task by its GID.',
+  summary: 'Get details of a specific task',
+  icon: 'square-check-big',
   group: 'Tasks',
   input: z.object({
-    task_gid: z.string().min(1).describe('Task GID to fetch'),
+    task_gid: z.string().min(1).describe('Task GID to retrieve'),
+    opt_fields: z
+      .string()
+      .optional()
+      .describe('Comma-separated list of fields to return (defaults to standard task fields)'),
   }),
   output: z.object({
-    task: z
-      .object({
-        gid: z.string(),
-        name: z.string(),
-        notes: z.string().optional(),
-        completed: z.boolean().optional(),
-      })
-      .describe('The requested task'),
+    task: taskSchema.describe('Task details'),
   }),
-  handle: async (params: { task_gid: string }) => {
-    // NEVER executed by the importer.
-    // Upstream: api GET /tasks/:gid (default method GET) -> read.
-    const data = await api<{ data: { gid: string; name: string } }>(`/tasks/${params.task_gid}`, {
-      method: 'GET',
+  handle: async params => {
+    const data = await api<AsanaResponse<RawTask>>(`/tasks/${params.task_gid}`, {
+      query: { opt_fields: params.opt_fields ?? TASK_OPT_FIELDS },
     });
-    return { task: data.data };
+    return { task: mapTask(data.data) };
   },
 });

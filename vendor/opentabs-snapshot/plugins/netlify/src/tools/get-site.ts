@@ -1,26 +1,22 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../netlify-api.js';
+import { siteSchema, type RawSite, mapSite } from './schemas.js';
 
 export const getSite = defineTool({
   name: 'get_site',
   displayName: 'Get Site',
-  description: 'Get detailed information about a specific Netlify site by its site ID.',
-  summary: 'Get a site by ID',
+  description:
+    'Get detailed information about a specific Netlify site by its ID. Returns name, URLs, custom domain, framework, repo settings, SSL, and build configuration.',
+  summary: 'Get site details by ID',
   icon: 'globe',
   group: 'Sites',
   input: z.object({
-    site_id: z.string().min(1).describe('Site ID to retrieve'),
+    site_id: z.string().describe('The site ID to retrieve'),
   }),
-  output: z.object({
-    id: z.string().describe('Site ID'),
-    name: z.string().describe('Site name'),
-    url: z.string().optional().describe('Site URL'),
-  }),
-  handle: async (params: { site_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /sites/:site_id (default method).
-    const data = await api<{ id: string; name: string }>(`/sites/${params.site_id}`);
-    return data;
+  output: siteSchema,
+  handle: async params => {
+    const raw = await api<RawSite>(`/sites/${params.site_id}`);
+    return mapSite(raw);
   },
 });

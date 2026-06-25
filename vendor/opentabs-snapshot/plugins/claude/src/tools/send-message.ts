@@ -1,34 +1,37 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../claude-api.js';
+import { apiStream, getOrgId } from '../claude-api.js';
 
 export const sendMessage = defineTool({
   name: 'send_message',
   displayName: 'Send Message',
   description:
-    'Send a message to Claude. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.',
-  summary: 'send a message in claude',
+    'Send a message in an existing Claude conversation and get the assistant response. Uses the streaming completion endpoint to generate a reply.',
+  summary: 'Send a message and get a response',
   icon: 'send',
   group: 'Conversations',
   input: z.object({
-    message: z.string().min(1).describe('The message text to send to Claude'),
-    conversation_id: z.string().optional().describe('Conversation to continue (omit to start a new one)'),
-    model: z.string().optional().describe('Model slug to use for the reply'),
+    conversation_uuid: z.string().describe('UUID of the conversation to send the message in'),
+    message: z.string().describe('Message text to send'),
+    model: z.string().optional().describe('Model to use (default claude-sonnet-4-6)'),
   }),
   output: z.object({
-    reply: z.object({
-      conversation_id: z.string(),
-      content: z.string(),
-    }).describe('The assistant reply'),
+    response: z.string().describe('The assistant response text'),
   }),
-  handle: async (params: { message: string; conversation_id?: string; model?: string }) => {
-    // NEVER executed by the importer. Upstream: api POST /chat_conversations (send -> WRITE;
-    // the {method:'POST'} literal reinforces the write class on both the verb AND method axes).
-    const data = await api<{ reply: { conversation_id: string; content: string } }>('/chat_conversations', {
-      method: 'POST',
-      body: { message: params.message, conversation_id: params.conversation_id, model: params.model },
-    });
-    return { reply: data.reply };
+  handle: async params => {
+    const orgId = getOrgId();
+    const response = await apiStream(
+      `/organizations/${orgId}/chat_conversations/${params.conversation_uuid}/completion`,
+      {
+        prompt: params.message,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        model: params.model ?? 'claude-sonnet-4-6',
+        attachments: [],
+        files: [],
+        rendering_mode: 'text',
+      },
+    );
+
+    return { response };
   },
 });

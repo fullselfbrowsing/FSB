@@ -1,31 +1,29 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool, fetchJSON, ToolError } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../bestbuy-api.js';
+import { mapProduct, productSchema, type RawPriceBlock } from './schemas.js';
 
 export const getProduct = defineTool({
   name: 'get_product',
   displayName: 'Get Product',
-  description: 'Get the full detail (title, price, availability, and specs) of a single Best Buy product by its SKU/product ID.',
-  summary: 'look up a single bestbuy product',
+  description:
+    'Get detailed information about a Best Buy product by its SKU ID. Returns description, pricing, availability, fulfillment options, and reviews. Use search_products to find SKU IDs.',
+  summary: 'Get product details by SKU ID',
   icon: 'package',
-  group: 'Catalog',
+  group: 'Products',
   input: z.object({
-    product_id: z.string().min(1).describe('The SKU / product ID to fetch'),
+    sku_id: z.string().describe('Best Buy SKU ID (e.g., "6612975")'),
   }),
   output: z.object({
-    product: z.object({
-      id: z.string(),
-      title: z.string(),
-      price: z.number(),
-      in_stock: z.boolean(),
-    }).describe('The product detail'),
+    product: productSchema.describe('Product details'),
   }),
-  handle: async (params: { product_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/products/:id (default method, read).
-    const data = await api<{ product: { id: string; title: string; price: number; in_stock: boolean } }>(
-      `/v1/products/${params.product_id}`
-    );
-    return { product: data.product };
+  handle: async params => {
+    const blocks = await fetchJSON<RawPriceBlock[]>(`/api/3.0/priceBlocks?skus=${params.sku_id}`);
+    const block = blocks?.[0];
+
+    if (!block?.sku) {
+      throw ToolError.notFound(`Product with SKU ID "${params.sku_id}" not found`);
+    }
+
+    return { product: mapProduct(block) };
   },
 });

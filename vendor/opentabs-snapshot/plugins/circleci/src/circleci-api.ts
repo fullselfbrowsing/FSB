@@ -1,22 +1,40 @@
-// Hermetic transport-helper stub for the vendored circleci metadata slice.
-//
-// Upstream circleci-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// CircleCI REST API v2 (https://circleci.com/api/v2). The importer NEVER executes a
-// handle() body (Wall 1), but the tool modules reference `api` in their (never-run)
-// handle closures, so this symbol must RESOLVE at module-eval time. This stub
-// provides inert no-op implementations that throw if ever actually called -- they
-// never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): CircleCI is a REST app --
-// `api` defaults to GET (reads: list_pipelines / get_pipeline / list_workflows) and
-// is called with {method:'POST'} to trigger a pipeline. `trigger` is NOT in the
-// shared side-effect verb sets, so trigger_pipeline relies on the {method:'POST'}
-// literal (methodClass POST -> write) to floor it to write -- do NOT add `trigger`
-// to the shared side-effect-class.mjs verb sets.
+import {
+  type FetchFromPageOptions,
+  buildQueryString,
+  fetchFromPage,
+  fetchJSON,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
+
+// --- Auth detection ---
+// CircleCI uses HttpOnly session cookies — no explicit token needed.
+// Auth is detected via __NEXT_DATA__.props.pageProps presence (populated by Next.js SSR).
+// The session cookie is sent automatically via credentials: 'include'.
+
+export const isAuthenticated = (): boolean => {
+  // Check for the CircleCI page context — the pipelines page has __NEXT_DATA__
+  // with pageProps containing user/org info. A simple presence check is sufficient.
+  const nextData = (globalThis as Record<string, unknown>).__NEXT_DATA__ as
+    | { props?: { pageProps?: Record<string, unknown> } }
+    | undefined;
+  return nextData?.props?.pageProps !== undefined;
+};
+
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), {
+      interval: 500,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// --- API helpers ---
+
+const API_V2 = '/api/v2';
 
 interface ApiOptions {
   method?: string;
@@ -24,17 +42,39 @@ interface ApiOptions {
   query?: Record<string, string | number | boolean | undefined>;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `circleci-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+export const api = async <T>(endpoint: string, options: ApiOptions = {}): Promise<T> => {
+  const qs = options.query ? buildQueryString(options.query) : '';
+  const url = qs ? `${API_V2}${endpoint}?${qs}` : `${API_V2}${endpoint}`;
+
+  const init: FetchFromPageOptions = {
+    method: options.method ?? 'GET',
+  };
+
+  if (options.body) {
+    init.headers = { 'Content-Type': 'application/json' };
+    init.body = JSON.stringify(options.body);
+  }
+
+  return fetchJSON<T>(url, init) as Promise<T>;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for trigger.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+// For endpoints that return 204 No Content on success (cancel, delete, etc.)
+export const apiVoid = async (endpoint: string, options: ApiOptions = {}): Promise<void> => {
+  const qs = options.query ? buildQueryString(options.query) : '';
+  const url = qs ? `${API_V2}${endpoint}?${qs}` : `${API_V2}${endpoint}`;
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+  const init: FetchFromPageOptions = {
+    method: options.method ?? 'POST',
+  };
+
+  if (options.body) {
+    init.headers = { 'Content-Type': 'application/json' };
+    init.body = JSON.stringify(options.body);
+  }
+
+  const resp = await fetchFromPage(url, init);
+  if (resp.status === 202 || resp.status === 200) {
+    // Some CircleCI endpoints return 202 with a JSON body — consume it
+    await resp.text();
+  }
+};

@@ -1,44 +1,76 @@
-// Vendored metadata slice of the OpenTabs reddit plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Reddit is the content-read app -- the SAFE tier of this batch. Its urlPatterns
-// host is the APEX *://reddit.com/* DELIBERATELY (so the frozen split('.')[0] derives
-// the stem 'reddit', not the 'www' that www.reddit.com would derive) -> slug
-// opentabs__reddit__* with NO STEM_OVERRIDES entry. reddit.com is NOT in
-// service-denylist.json and the heuristic does not flag it -> classify() returns
-// {sensitive:false,denied:false}, so the merge-time classifyGate passes a benign-safe
-// origin. This slice carries ONLY read ops (list_subreddit_posts/get_post/
-// search_posts); NO write op (submit/comment/vote are out of scope -- a reddit write
-// would require reclassifying reddit.com sensitive). The existing hand-authored
-// catalog/descriptors/reddit-inbox.json (slug 'reddit.inbox', backing 'recipe',
-// service www.reddit.com) is a DISTINCT filename/slug -- these opentabs__reddit__*
-// (backing 'dom') land ALONGSIDE it, NO clobber. Part of Phase-38 batch B sub-batch
-// 2 (messaging + content-reads). backing:'dom' (the frozen default) -> DOM-only.
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { listSubredditPosts } from './tools/list-subreddit-posts.js';
+import { clearSessionCache, isAuthenticated, waitForAuth } from './reddit-api.js';
+import { deleteThing } from './tools/delete-thing.js';
+import { editText } from './tools/edit-text.js';
+import { getCommentThread } from './tools/get-comment-thread.js';
+import { getMe } from './tools/get-me.js';
 import { getPost } from './tools/get-post.js';
+import { getSubreddit } from './tools/get-subreddit.js';
+import { listFlairs } from './tools/list-flairs.js';
+import { getUser } from './tools/get-user.js';
+import { hide } from './tools/hide.js';
+import { listPopularSubreddits } from './tools/list-popular-subreddits.js';
+import { listPosts } from './tools/list-posts.js';
+import { listSubscriptions } from './tools/list-subscriptions.js';
+import { listUserContent } from './tools/list-user-content.js';
+import { readInbox } from './tools/read-inbox.js';
+import { report } from './tools/report.js';
+import { save } from './tools/save.js';
 import { searchPosts } from './tools/search-posts.js';
+import { searchSubreddits } from './tools/search-subreddits.js';
+import { sendMessage } from './tools/send-message.js';
+import { submitComment } from './tools/submit-comment.js';
+import { submitPost } from './tools/submit-post.js';
+import { subscribe } from './tools/subscribe.js';
+import { vote } from './tools/vote.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
 
 class RedditPlugin extends OpenTabsPlugin {
   readonly name = 'reddit';
-  readonly description =
-    'OpenTabs plugin for Reddit — list a subreddit’s posts, read a single post with its comments, and search posts (read-only)';
+  readonly description = 'OpenTabs plugin for Reddit';
   override readonly displayName = 'Reddit';
-  readonly urlPatterns = ['*://reddit.com/*'];
+  readonly urlPatterns = ['*://www.reddit.com/*', '*://old.reddit.com/*', '*://new.reddit.com/*'];
   override readonly homepage = 'https://www.reddit.com';
   readonly tools: ToolDefinition[] = [
-    // Content reads only (the safe tier): subreddit posts, a single post, and search.
-    listSubredditPosts,
+    getMe,
+    listPosts,
     getPost,
     searchPosts,
+    submitPost,
+    submitComment,
+    getCommentThread,
+    editText,
+    deleteThing,
+    vote,
+    save,
+    hide,
+    report,
+    listUserContent,
+    getSubreddit,
+    listFlairs,
+    searchSubreddits,
+    listSubscriptions,
+    listPopularSubreddits,
+    subscribe,
+    getUser,
+    sendMessage,
+    readInbox,
   ];
+
+  /**
+   * Check if the Reddit session is authenticated. The new Reddit SPA
+   * hydrates asynchronously, so the `user-logged-in` attribute on
+   * `<shreddit-app>` may not be set on first check. Retries briefly
+   * at 500ms intervals for up to 3 seconds.
+   */
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
+
+  override teardown(): void {
+    clearSessionCache();
+  }
 }
 
-const plugin = new RedditPlugin();
-export default plugin;
-export { plugin };
+export default new RedditPlugin();

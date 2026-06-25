@@ -1,27 +1,29 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../datadog-api.js';
+import { apiGet } from '../datadog-api.js';
+import { dashboardSummarySchema, mapDashboardSummary } from './schemas.js';
 
 export const listDashboards = defineTool({
   name: 'list_dashboards',
   displayName: 'List Dashboards',
-  description: 'List the dashboards in your Datadog account. Optionally filter to shared or your own dashboards.',
-  summary: 'List dashboards in the account',
-  icon: 'layout-dashboard',
+  description:
+    'List all dashboards in the Datadog organization. Returns dashboard summaries with titles, authors, and URLs.',
+  summary: 'List all Datadog dashboards',
+  icon: 'layout',
   group: 'Dashboards',
   input: z.object({
-    filter_shared: z.boolean().optional().describe('Only return shared dashboards'),
-    filter_deleted: z.boolean().optional().describe('Only return deleted dashboards'),
+    filter_shared: z.boolean().optional().describe('Filter to only shared dashboards'),
   }),
   output: z.object({
-    dashboards: z
-      .array(z.object({ id: z.string(), title: z.string() }))
-      .describe('List of dashboards'),
+    dashboards: z.array(dashboardSummarySchema),
+    total: z.number().describe('Total number of dashboards'),
   }),
-  handle: async (_params: { filter_shared?: boolean }) => {
-    // NEVER executed by the importer. Upstream: api GET /dashboard (default method).
-    const data = await api<{ dashboards: Array<{ id: string; title: string }> }>(`/dashboard`);
-    return data;
+  handle: async params => {
+    const query: Record<string, string | number | boolean | undefined> = {};
+    if (params.filter_shared !== undefined) query['filter[shared]'] = params.filter_shared;
+
+    const data = await apiGet<{ dashboards?: Array<Record<string, unknown>> }>('/api/v1/dashboard', query);
+    const dashboards = (data.dashboards ?? []).map(mapDashboardSummary);
+    return { dashboards, total: dashboards.length };
   },
 });

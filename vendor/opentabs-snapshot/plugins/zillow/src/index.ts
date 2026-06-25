@@ -1,43 +1,49 @@
-// Vendored metadata slice of the OpenTabs zillow plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Zillow is a real-estate-listing / home-value app -- its upstream host is
-// www.zillow.com, left UNCLASSIFIED (SAFE) in service-denylist.json because every
-// vendored op is a READ (listing search + listing detail + home-value estimate; reads
-// run under Auto with no mutating re-gate). The host-derived stem ('www') is WRONG, so
-// the dir-name STEM_OVERRIDES {zillow:'zillow'} canonicalizes the slug to
-// opentabs__zillow__*. Part of Phase-39 batch C sub-batch 5 (completion -- remaining
-// commerce + read-only misc). ALL ops are reads -- search_listings / get_listing /
-// get_home_value -- NO write op, NO payment verb. www.zillow.com is added to
-// verify-catalog-crosscheck.mjs READ_ONLY_SAFE_SERVICES SPECIFICALLY because it is
-// read-only, so a future write op would FAIL the build (the 38 MED-02 invariant); the
-// payment-op guard never keys on zillow (no payment-verb op-name). backing:'dom' (the
-// frozen default) -> DOM-only routing.
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { searchListings } from './tools/search-listings.js';
-import { getListing } from './tools/get-listing.js';
-import { getHomeValue } from './tools/get-home-value.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './zillow-api.js';
+import { getCurrentUser } from './tools/get-current-user.js';
+import { getMarketOverview } from './tools/get-market-overview.js';
+import { getSavedHomes } from './tools/get-saved-homes.js';
+import { searchByAddress } from './tools/search-by-address.js';
+import { searchByOwner } from './tools/search-by-owner.js';
+import { searchForRent } from './tools/search-for-rent.js';
+import { searchForSale } from './tools/search-for-sale.js';
+import { searchForeclosures } from './tools/search-foreclosures.js';
+import { searchLocations } from './tools/search-locations.js';
+import { searchNewConstruction } from './tools/search-new-construction.js';
+import { searchOpenHouses } from './tools/search-open-houses.js';
+import { searchRecentlySold } from './tools/search-recently-sold.js';
 
 class ZillowPlugin extends OpenTabsPlugin {
   readonly name = 'zillow';
-  readonly description =
-    'OpenTabs plugin for Zillow — search real-estate listings, read a listing, and look up a home’s value estimate (read-only)';
+  readonly description = 'OpenTabs plugin for Zillow real estate search';
   override readonly displayName = 'Zillow';
-  readonly urlPatterns = ['*://www.zillow.com/*'];
+  readonly urlPatterns = ['*://*.zillow.com/*'];
   override readonly homepage = 'https://www.zillow.com';
   readonly tools: ToolDefinition[] = [
-    // Real-estate listing search + detail + home-value -- ALL reads (no write, no payment verb).
-    searchListings,
-    getListing,
-    getHomeValue,
+    // Account
+    getCurrentUser,
+    // Search
+    searchLocations,
+    searchForSale,
+    searchForRent,
+    searchRecentlySold,
+    searchOpenHouses,
+    searchNewConstruction,
+    searchForeclosures,
+    searchByOwner,
+    // Properties
+    searchByAddress,
+    // Saved Homes
+    getSavedHomes,
+    // Market
+    getMarketOverview,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new ZillowPlugin();
-export default plugin;
-export { plugin };
+export default new ZillowPlugin();

@@ -1,41 +1,97 @@
-// Vendored metadata slice of the OpenTabs cloudflare plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Cloudflare is a REST app. Its upstream host is dash.cloudflare.com, whose
-// host-derived stem ('dash') is WRONG; the vendored DIR NAME is exactly `cloudflare`
-// so it matches the Plan-01 STEM_OVERRIDES key and the importer canonicalizes the
-// stem to 'cloudflare' (emitting opentabs__cloudflare__*, NOT opentabs__dash__*).
-// Its ops GET against the Cloudflare REST API v4 (reads) and POST to
-// /zones/:id/purge_cache (purge_cache -> DESTRUCTIVE via the shared `purge` verb).
-// This is part of the Phase-37 dev/productivity batch-A sub-batch 4 (cloudflare/
-// circleci/datadog/sentry/posthog -- cloud + observability, completing the category).
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { listZones } from './tools/list-zones.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isCloudflareAuthenticated, waitForCloudflareAuth } from './cloudflare-api.js';
+import { createDnsRecord } from './tools/create-dns-record.js';
+import { deleteDnsRecord } from './tools/delete-dns-record.js';
+import { getRuleset } from './tools/get-ruleset.js';
+import { getUser } from './tools/get-user.js';
+import { getZoneSettings } from './tools/get-zone-settings.js';
 import { getZone } from './tools/get-zone.js';
+import { graphqlQuery } from './tools/graphql-query.js';
+import { listAiModels } from './tools/list-ai-models.js';
+import { listAlertingPolicies } from './tools/list-alerting-policies.js';
+import { listD1Databases } from './tools/list-d1-databases.js';
 import { listDnsRecords } from './tools/list-dns-records.js';
+import { listEmailAddresses } from './tools/list-email-addresses.js';
+import { listEmailRoutingRules } from './tools/list-email-routing-rules.js';
+import { listFirewallRules } from './tools/list-firewall-rules.js';
+import { listKvNamespaces } from './tools/list-kv-namespaces.js';
+import { listPageRules } from './tools/list-page-rules.js';
+import { listPagesProjects } from './tools/list-pages-projects.js';
+import { listQueues } from './tools/list-queues.js';
+import { listRulesLists } from './tools/list-rules-lists.js';
+import { listRulesets } from './tools/list-rulesets.js';
+import { listSslCertificates } from './tools/list-ssl-certificates.js';
+import { listTunnels } from './tools/list-tunnels.js';
+import { listVectorizeIndexes } from './tools/list-vectorize-indexes.js';
+import { listWaitingRooms } from './tools/list-waiting-rooms.js';
+import { listWorkerRoutes } from './tools/list-worker-routes.js';
+import { listWorkers } from './tools/list-workers.js';
+import { listZones } from './tools/list-zones.js';
 import { purgeCache } from './tools/purge-cache.js';
+import { updateDnsRecord } from './tools/update-dns-record.js';
+import { updateZoneSetting } from './tools/update-zone-setting.js';
 
 class CloudflarePlugin extends OpenTabsPlugin {
   readonly name = 'cloudflare';
-  readonly description =
-    'OpenTabs plugin for Cloudflare — inspect zones and DNS records and purge the cache via the Cloudflare REST API';
+  readonly description = 'OpenTabs plugin for Cloudflare';
   override readonly displayName = 'Cloudflare';
   readonly urlPatterns = ['*://dash.cloudflare.com/*'];
   override readonly homepage = 'https://dash.cloudflare.com';
   readonly tools: ToolDefinition[] = [
-    // Zones + DNS (reads) and cache purge (destructive) -- the sub-batch-4 cloud slice.
+    // Zones (Domains)
     listZones,
     getZone,
+    // Zone Settings
+    getZoneSettings,
+    updateZoneSetting,
+    // DNS
     listDnsRecords,
+    createDnsRecord,
+    updateDnsRecord,
+    deleteDnsRecord,
+    // Security
+    listRulesets,
+    getRuleset,
+    listFirewallRules,
+    listRulesLists,
+    // Rules
+    listPageRules,
+    // SSL
+    listSslCertificates,
+    // Cache
     purgeCache,
+    // Workers
+    listWorkers,
+    listWorkerRoutes,
+    // Pages
+    listPagesProjects,
+    // Storage
+    listKvNamespaces,
+    listD1Databases,
+    listQueues,
+    // AI
+    listAiModels,
+    listVectorizeIndexes,
+    // Network
+    listTunnels,
+    // Email
+    listEmailRoutingRules,
+    listEmailAddresses,
+    // Traffic
+    listWaitingRooms,
+    // Notifications
+    listAlertingPolicies,
+    // Analytics
+    graphqlQuery,
+    // Account
+    getUser,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isCloudflareAuthenticated()) return true;
+    return waitForCloudflareAuth();
+  }
 }
 
-const plugin = new CloudflarePlugin();
-export default plugin;
-export { plugin };
+export default new CloudflarePlugin();

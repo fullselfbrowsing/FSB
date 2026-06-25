@@ -1,38 +1,69 @@
-// Vendored metadata slice of the OpenTabs clickup plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// ClickUp is a REST app (host app.clickup.com -> derived stem 'clickup', NOT in
-// STEM_OVERRIDES). Its ops POST/PUT/GET against the ClickUp REST API v2, so the
-// side-effect class derives from the named-verb helper + {method:'...'} literal +
-// the op-name verb (api GET=read, api {method:'POST'/'PUT'}=write). This is part of
-// the Phase-37 dev/productivity batch-A sub-batch 2 (clickup/jira/confluence/airtable).
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { createTask } from './tools/create-task.js';
-import { listTasks } from './tools/list-tasks.js';
-import { getTask } from './tools/get-task.js';
-import { updateTask } from './tools/update-task.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './clickup-api.js';
+
+// User
+import { getCurrentUser } from './tools/get-current-user.js';
+
+// Workspaces
+import { getWorkspace } from './tools/get-workspace.js';
+import { getWorkspaceMembers } from './tools/get-workspace-members.js';
+
+// Spaces
+import { getSpaces } from './tools/get-spaces.js';
+import { getSpace } from './tools/get-space.js';
+
+// Folders
+import { getFolders } from './tools/get-folders.js';
+import { getFolder } from './tools/get-folder.js';
+
+// Lists
+import { getLists } from './tools/get-lists.js';
+import { getList } from './tools/get-list.js';
+
+// Goals
+import { getGoals } from './tools/get-goals.js';
+
+// Custom Fields
+import { getCustomFields } from './tools/get-custom-fields.js';
 
 class ClickUpPlugin extends OpenTabsPlugin {
   readonly name = 'clickup';
-  readonly description =
-    'OpenTabs plugin for ClickUp — manage tasks, lists, and spaces via the ClickUp REST API';
+  readonly description = 'OpenTabs plugin for ClickUp';
   override readonly displayName = 'ClickUp';
   readonly urlPatterns = ['*://app.clickup.com/*'];
   override readonly homepage = 'https://app.clickup.com';
   readonly tools: ToolDefinition[] = [
-    // Tasks (the vendored dev/productivity batch-A sub-batch-2 slice)
-    listTasks,
-    getTask,
-    createTask,
-    updateTask,
+    // User
+    getCurrentUser,
+
+    // Workspaces
+    getWorkspace,
+    getWorkspaceMembers,
+
+    // Spaces
+    getSpaces,
+    getSpace,
+
+    // Folders
+    getFolders,
+    getFolder,
+
+    // Lists
+    getLists,
+    getList,
+
+    // Goals
+    getGoals,
+
+    // Custom Fields
+    getCustomFields,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new ClickUpPlugin();
-export default plugin;
-export { plugin };
+export default new ClickUpPlugin();

@@ -1,31 +1,26 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { ToolError, defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../costco-api.js';
+import { fetchProducts } from '../costco-api.js';
+import { mapProduct, productSchema } from './schemas.js';
 
 export const getProduct = defineTool({
   name: 'get_product',
   displayName: 'Get Product',
-  description: 'Get the full detail (title, price, availability, and description) of a single Costco product by its item number.',
-  summary: 'look up a single costco product',
+  description:
+    'Get detailed information about a Costco product by its item number. Returns pricing, description, rating, availability, and more.',
+  summary: 'Get product details by item number',
   icon: 'package',
-  group: 'Catalog',
+  group: 'Products',
   input: z.object({
-    product_id: z.string().min(1).describe('The Costco item number / product ID to fetch'),
+    item_number: z.string().describe('Costco item number (e.g., "4000369340")'),
+    warehouse_number: z.string().optional().describe('Warehouse number for pricing (defaults to nearest warehouse)'),
   }),
-  output: z.object({
-    product: z.object({
-      id: z.string(),
-      title: z.string(),
-      price: z.number(),
-      in_stock: z.boolean(),
-    }).describe('The product detail'),
-  }),
-  handle: async (params: { product_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/products/:id (default method, read).
-    const data = await api<{ product: { id: string; title: string; price: number; in_stock: boolean } }>(
-      `/v1/products/${params.product_id}`
-    );
-    return { product: data.product };
+  output: z.object({ product: productSchema }),
+  handle: async params => {
+    const resp = await fetchProducts([params.item_number], params.warehouse_number);
+    const catalog = resp.data?.products?.catalogData?.[0];
+    if (!catalog) throw ToolError.notFound(`Product ${params.item_number} not found.`);
+    const fulfillment = resp.data?.products?.fulfillmentData?.[0];
+    return { product: mapProduct(catalog, fulfillment) };
   },
 });

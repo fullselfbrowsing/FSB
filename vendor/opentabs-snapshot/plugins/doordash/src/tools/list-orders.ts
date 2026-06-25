@@ -1,30 +1,52 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../doordash-api.js';
+import { gql } from '../doordash-api.js';
+import { orderSchema, mapOrder } from './schemas.js';
+
+const QUERY = `query getConsumerOrdersWithDetails($offset: Int!, $limit: Int!, $includeCancelled: Boolean) {
+  getConsumerOrdersWithDetails(offset: $offset, limit: $limit, includeCancelled: $includeCancelled) {
+    id orderUuid deliveryUuid createdAt submittedAt cancelledAt fulfilledAt
+    specialInstructions isGroup isGift isPickup isRetail fulfillmentType isReorderable
+    creator { id firstName lastName }
+    deliveryAddress { id formattedAddress }
+    store { id name business { id name } phoneNumber }
+    orders {
+      id
+      creator { id firstName lastName }
+      items {
+        id name quantity specialInstructions originalItemPrice
+        purchaseQuantity { discreteQuantity { quantity unit } }
+      }
+    }
+    paymentCard { id last4 type }
+    grandTotal { unitAmount currency displayString }
+  }
+}`;
+
+interface OrdersResponse {
+  getConsumerOrdersWithDetails: Array<Record<string, unknown>>;
+}
 
 export const listOrders = defineTool({
   name: 'list_orders',
   displayName: 'List Orders',
-  description: 'List your recent DoorDash orders. Optionally filter by status (active, completed, cancelled).',
-  summary: 'show me my doordash order history',
+  description:
+    'List DoorDash order history with full details including items, store, payment, and delivery info. Supports pagination via offset/limit. Returns orders sorted by most recent first.',
+  summary: 'List your order history',
   icon: 'receipt',
   group: 'Orders',
   input: z.object({
-    status: z.enum(['active', 'completed', 'cancelled']).optional().describe('Filter orders by status'),
-    limit: z.number().int().min(1).max(50).optional().describe('Maximum number of orders to return'),
+    offset: z.number().int().min(0).optional().describe('Pagination offset (default 0)'),
+    limit: z.number().int().min(1).max(50).optional().describe('Number of orders to return (default 10, max 50)'),
+    include_cancelled: z.boolean().optional().describe('Include cancelled orders (default true)'),
   }),
-  output: z.object({
-    orders: z.array(z.object({
-      id: z.string(),
-      status: z.string(),
-    })).describe('Your recent orders'),
-  }),
-  handle: async (params: { status?: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/orders (default method).
-    const data = await api<{ orders: unknown[] }>('/v1/orders', {
-      query: { status: params.status, limit: params.limit },
+  output: z.object({ orders: z.array(orderSchema).describe('Order history') }),
+  handle: async params => {
+    const data = await gql<OrdersResponse>('getConsumerOrdersWithDetails', QUERY, {
+      offset: params.offset ?? 0,
+      limit: params.limit ?? 10,
+      includeCancelled: params.include_cancelled ?? true,
     });
-    return { orders: data.orders as { id: string; status: string }[] };
+    return { orders: (data.getConsumerOrdersWithDetails ?? []).map(mapOrder) };
   },
 });

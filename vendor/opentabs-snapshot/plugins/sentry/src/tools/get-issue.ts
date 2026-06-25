@@ -1,28 +1,26 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../sentry-api.js';
+import { getOrgSlug, sentryApi } from '../sentry-api.js';
+import { issueSchema, mapIssue } from './schemas.js';
 
 export const getIssue = defineTool({
   name: 'get_issue',
   displayName: 'Get Issue',
-  description: 'Get detailed information about a single Sentry error issue by its issue ID.',
-  summary: 'Get an issue by id',
+  description:
+    'Get detailed information about a specific Sentry issue by its ID. ' +
+    'Returns title, status, priority, event count, user count, assigned user, and more.',
+  summary: 'Get details for a specific issue',
   icon: 'bug',
   group: 'Issues',
   input: z.object({
-    issue_id: z.string().min(1).describe('Sentry issue ID'),
+    issue_id: z.string().describe('The issue ID to retrieve'),
   }),
   output: z.object({
-    id: z.string().describe('Issue ID'),
-    title: z.string().describe('Issue title'),
-    status: z.string().optional().describe('Issue status'),
+    issue: issueSchema.describe('The issue details'),
   }),
-  handle: async (params: { issue_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /issues/:id/ (default method).
-    const data = await api<{ id: string; title: string }>(
-      `/issues/${encodeURIComponent(params.issue_id)}/`
-    );
-    return data;
+  handle: async params => {
+    const orgSlug = getOrgSlug();
+    const { data } = await sentryApi<Record<string, unknown>>(`/organizations/${orgSlug}/issues/${params.issue_id}/`);
+    return { issue: mapIssue(data) };
   },
 });

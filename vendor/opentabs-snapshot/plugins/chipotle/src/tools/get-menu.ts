@@ -1,29 +1,39 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../chipotle-api.js';
+import { type RawMenuItem, mapMenuItem, menuItemSchema } from './schemas.js';
+
+interface MenuResponse {
+  restaurantId?: number;
+  entrees?: RawMenuItem[];
+}
 
 export const getMenu = defineTool({
   name: 'get_menu',
   displayName: 'Get Menu',
-  description: 'Get the full menu (entrees, sides, drinks, and prices) for a single Chipotle location by its restaurant ID.',
-  summary: 'look up a single chipotle menu',
-  icon: 'book-open',
-  group: 'Locations',
+  description:
+    'Get the full online menu for a specific Chipotle restaurant. Returns all entrees with item name, price, calorie range, availability, and thumbnail image.',
+  summary: 'Get restaurant menu with prices and calories',
+  icon: 'utensils',
+  group: 'Menu',
   input: z.object({
-    restaurant_id: z.string().min(1).describe('The restaurant ID whose menu to fetch'),
+    restaurant_id: z.number().int().describe('Restaurant ID (from find_restaurants)'),
   }),
   output: z.object({
-    menu: z.object({
-      restaurant_id: z.string(),
-      items: z.array(z.object({ id: z.string(), name: z.string(), price: z.number() })),
-    }).describe('The location menu'),
+    restaurant_id: z.number().describe('Restaurant the menu belongs to'),
+    items: z.array(menuItemSchema).describe('Menu entrees'),
   }),
-  handle: async (params: { restaurant_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /restaurants/:id/menu (default method, read).
-    const data = await api<{ menu: { restaurant_id: string; items: { id: string; name: string; price: number }[] } }>(
-      `/restaurants/${params.restaurant_id}/menu`
-    );
-    return { menu: data.menu };
+  handle: async params => {
+    const data = await api<MenuResponse>(`/menuinnovation/v1/restaurants/${params.restaurant_id}/onlinemenu`, {
+      query: {
+        channelId: 'web',
+        includeUnavailableItems: true,
+      },
+    });
+
+    return {
+      restaurant_id: data.restaurantId ?? params.restaurant_id,
+      items: (data.entrees ?? []).map(mapMenuItem),
+    };
   },
 });

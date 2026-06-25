@@ -1,41 +1,194 @@
-// Hermetic transport-helper stub for the vendored yelp metadata slice.
-//
-// Upstream yelp-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the Yelp
-// web app on www.yelp.com. The importer NEVER executes a handle() body (Wall 1), but
-// the tool modules reference `api` in their (never-run) handle closures, so this
-// symbol must RESOLVE at module-eval time. This stub provides an inert no-op
-// implementation that throws if ever actually called -- it never is during a
-// metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing this helper. The upstream verb
-// facts (preserved here as comments for auditability): Yelp searches businesses + a
-// business's detail + a business's reviews ALL via `api` (default GET -- every op is a
-// READ). There is NO write op (no apiVoid, no {method:'POST'}) and NO payment-verb
-// op-name (search/get/list only). www.yelp.com is left SAFE (read-only local-reviews
-// app); it is in READ_ONLY_SAFE_SERVICES (the 38 MED-02 guard) so a future write op
-// would FAIL the build -- and because no op carries a payment verb, the payment-op
-// guard never keys on yelp.
+import {
+  ToolError,
+  fetchText,
+  fetchJSON,
+  buildQueryString,
+  getPageGlobal,
+  getAuthCache,
+  setAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+// --- Auth ---
+
+interface YelpAuth {
+  userId: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `yelp-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const getAuth = (): YelpAuth | null => {
+  const cached = getAuthCache<YelpAuth>('yelp');
+  if (cached) return cached;
+
+  const userId = getPageGlobal('yelp.react_root_props.userId') as string | undefined;
+  if (!userId) return null;
+
+  const auth: YelpAuth = { userId };
+  setAuthCache('yelp', auth);
+  return auth;
 };
 
-// `api` -- generic helper, upstream default method GET. EVERY yelp op is a read (no POST).
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), {
+      interval: 500,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const getUserId = (): string => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Yelp.');
+  return auth.userId;
+};
+
+// --- Page data extraction ---
+
+const REACT_ROOT_PROPS_REGEX =
+  /window\.yelp\s*=\s*window\.yelp\s*\|\|\s*\{\};\s*window\.yelp\.react_root_props\s*=\s*(\{[\s\S]*?\});\s*(?:window\.yelp\.|<\/script>)/;
+
+/**
+ * Fetch a Yelp page and extract the embedded react_root_props JSON.
+ * All Yelp pages are server-rendered with data embedded in a script tag.
+ */
+export const fetchPageData = async <T = Record<string, unknown>>(
+  path: string,
+  query?: Record<string, string | number | boolean | undefined>,
+): Promise<T> => {
+  const qs = query ? buildQueryString(query) : '';
+  const url = qs ? `${path}?${qs}` : path;
+
+  const html = await fetchText(url, {
+    headers: { Accept: 'text/html' },
+  });
+
+  const match = html.match(REACT_ROOT_PROPS_REGEX);
+  if (!match?.[1]) {
+    throw ToolError.internal(
+      'Failed to extract page data — the page may have changed or a captcha is blocking the request.',
+    );
+  }
+
+  try {
+    return JSON.parse(match[1]) as T;
+  } catch {
+    throw ToolError.internal('Failed to parse page data JSON.');
+  }
+};
+
+// --- Autocomplete API ---
+
+interface AutocompleteResponse {
+  response?: Array<{
+    prefix?: string;
+    suggestions?: Array<{
+      query?: string;
+      title?: string;
+      subtitle?: string;
+      type?: string;
+      redirect_url?: string;
+      thumbnail?: string;
+    }>;
+  }>;
+}
+
+export const fetchAutocompleteSuggestions = async (prefix: string, location: string): Promise<AutocompleteResponse> => {
+  const data = await fetchJSON<AutocompleteResponse>(
+    `/search_suggest/v2/prefetch?${buildQueryString({ prefix, loc: location })}`,
+    { headers: { Accept: 'application/json' } },
+  );
+  return data ?? {};
+};
+
+// --- Page data types ---
+
+export interface SearchPageData {
+  userId?: string;
+  legacyProps?: {
+    searchAppProps?: {
+      searchPageProps?: {
+        mainContentComponentsListProps?: Record<string, SearchResultItem>;
+        searchContext?: {
+          totalResults?: number;
+          startResult?: number;
+          resultsPerPage?: number;
+          searchCategory?: string;
+        };
+      };
+    };
+  };
+}
+
+export interface SearchResultItem {
+  bizId?: string;
+  searchResultBusiness?: RawSearchBusiness;
+  scrollablePhotos?: {
+    photoList?: Array<{ src?: string; srcset?: string }>;
+  };
+  searchResultLayoutType?: string;
+  type?: string;
+}
+
+export interface RawSearchBusiness {
+  alias?: string;
+  name?: string;
+  businessUrl?: string;
+  rating?: number;
+  reviewCount?: number;
+  phone?: string;
+  priceRange?: string;
+  categories?: Array<{ title?: string; url?: string }>;
+  neighborhoods?: string[];
+  formattedAddress?: string;
+  isAd?: boolean;
+  ranking?: number;
+  serviceArea?: string;
+}
+
+export interface BizDetailsPageData {
+  userId?: string;
+  legacyProps?: {
+    bizDetailsProps?: {
+      bizDetailsPageProps?: {
+        businessId?: string;
+        businessName?: string;
+        shouldFetchPropsFromClient?: boolean;
+      };
+      bizDetailsMetaProps?: {
+        businessId?: string;
+        staticUrl?: string;
+      };
+    };
+  };
+}
+
+/**
+ * Extract search results from page data. Shared by search-businesses and
+ * get-current-page-businesses tools.
+ */
+export const extractSearchResults = (
+  data: SearchPageData,
+): {
+  items: SearchResultItem[];
+  totalResults: number;
+  startResult: number;
+  resultsPerPage: number;
+} => {
+  const searchProps = data.legacyProps?.searchAppProps?.searchPageProps;
+  const components = searchProps?.mainContentComponentsListProps ?? {};
+  const context = searchProps?.searchContext;
+
+  const items = Object.values(components).filter((item): item is SearchResultItem => !!item?.bizId);
+
+  return {
+    items,
+    totalResults: context?.totalResults ?? 0,
+    startResult: context?.startResult ?? 0,
+    resultsPerPage: context?.resultsPerPage ?? 10,
+  };
+};

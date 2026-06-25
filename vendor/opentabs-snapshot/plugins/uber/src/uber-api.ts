@@ -1,47 +1,88 @@
-// Hermetic transport-helper stub for the vendored uber metadata slice.
-//
-// Upstream uber-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Uber web app on *.uber.com. The importer NEVER executes a handle() body (Wall 1),
-// but the tool modules reference `api` / `apiVoid` in their (never-run) handle
-// closures, so these symbols must RESOLVE at module-eval time. This stub provides
-// inert no-op implementations that throw if ever actually called -- they never are
-// during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): Uber lists ride options + a
-// fare estimate + the user's trips via `api` (default GET, reads); REQUESTING a ride
-// POSTs the booking (request_ride -> the PAYMENT WRITE; the {method:'POST'} literal
-// reinforces write on both axes -- a requested ride charges a card); CANCELLING a
-// ride is the DESTRUCTIVE op (cancel_ride -> apiVoid {method:'DELETE'} ->
-// apiDelete/destructive). *.uber.com is SENSITIVE (39-01) -> posture-B re-gates the
-// writes, and backing:'dom' keeps request_ride DOM-only (NOT API-invocable -> the
-// payment-op guard passes).
+import {
+  type FetchFromPageOptions,
+  ToolError,
+  fetchFromPage,
+  getPageGlobal,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
-}
+/**
+ * Uber uses HttpOnly session cookies (`sid`) for authentication.
+ * All API calls go to same-origin `/api/*` endpoints with `credentials: 'include'`.
+ * A `x-csrf-token` header is required on all requests — Uber validates its presence,
+ * not its value, so any non-empty string works.
+ *
+ * Auth detection reads the `__preload_cache__` global, which contains the bootstrapped
+ * getCurrentUser response for logged-in users.
+ */
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `uber-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+export const isAuthenticated = (): boolean => {
+  const cache = getPageGlobal('__preload_cache__') as
+    | Record<string, { data?: { status?: string; data?: { user?: unknown } } }>
+    | undefined;
+  if (!cache) return false;
+
+  for (const key of Object.keys(cache)) {
+    if (key.includes('getCurrentUser')) {
+      const entry = cache[key];
+      if (entry?.data?.status === 'success' && entry?.data?.data?.user) {
+        return true;
+      }
+    }
+  }
+  return false;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), {
+      interval: 500,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for the
-// destructive cancel_ride op.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+const CSRF_TOKEN = 'x';
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: unknown;
+  } = {},
+): Promise<T> => {
+  if (!isAuthenticated()) {
+    throw ToolError.auth('Not authenticated — please log in to Uber.');
+  }
+
+  const url = `/api${endpoint}`;
+  const method = options.method ?? 'POST';
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-csrf-token': CSRF_TOKEN,
+  };
+
+  const init: FetchFromPageOptions = { method, headers };
+
+  if (options.body !== undefined) {
+    init.body = JSON.stringify(options.body);
+  } else {
+    init.body = '{}';
+  }
+
+  const response = await fetchFromPage(url, init);
+
+  if (response.status === 204) return {} as T;
+
+  const json = (await response.json()) as { status?: string; data?: T };
+
+  if (json.status === 'success' && json.data !== undefined) {
+    return json.data;
+  }
+
+  return json as T;
+};

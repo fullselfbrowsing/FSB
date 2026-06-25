@@ -1,30 +1,22 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../chatgpt-api.js';
+import { conversationDetailSchema, mapConversationDetail } from './schemas.js';
 
 export const getConversation = defineTool({
   name: 'get_conversation',
   displayName: 'Get Conversation',
-  description: 'Get the full message history of a single ChatGPT conversation by its ID.',
-  summary: 'open a chatgpt conversation',
+  description:
+    'Get a ChatGPT conversation with its full message history. Messages are returned in chronological order following the active branch of the conversation tree.',
+  summary: 'Get a conversation with messages',
   icon: 'message-square',
   group: 'Conversations',
   input: z.object({
-    conversation_id: z.string().min(1).describe('Conversation ID to retrieve'),
+    conversation_id: z.string().describe('Conversation ID (UUID)'),
   }),
-  output: z.object({
-    conversation: z.object({
-      id: z.string(),
-      title: z.string(),
-      messages: z.array(z.object({ role: z.string(), content: z.string() })),
-    }).describe('The conversation and its messages'),
-  }),
-  handle: async (params: { conversation_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /conversation/:id (default method).
-    const data = await api<{ conversation: { id: string; title: string; messages: { role: string; content: string }[] } }>(
-      `/conversation/${encodeURIComponent(params.conversation_id)}`
-    );
-    return { conversation: data.conversation };
+  output: z.object({ conversation: conversationDetailSchema }),
+  handle: async params => {
+    const data = await api<Record<string, unknown>>(`/conversation/${params.conversation_id}`);
+    return { conversation: mapConversationDetail(data as Parameters<typeof mapConversationDetail>[0]) };
   },
 });

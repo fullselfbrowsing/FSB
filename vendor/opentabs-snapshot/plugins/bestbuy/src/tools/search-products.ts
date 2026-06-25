@@ -1,34 +1,49 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool, fetchJSON, fetchText } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../bestbuy-api.js';
+import { mapProduct, productSchema, type RawPriceBlock } from './schemas.js';
 
 export const searchProducts = defineTool({
   name: 'search_products',
   displayName: 'Search Products',
   description:
-    'Search the Best Buy electronics catalog by keyword. Optionally filter by category and sort the results.',
-  summary: 'search for products on bestbuy',
+    "Search the Best Buy product catalog by keyword. Returns product name, price, brand, rating, and availability. Results are from the user's local store for pricing and availability.",
+  summary: 'Search for products on Best Buy',
   icon: 'search',
-  group: 'Catalog',
+  group: 'Products',
   input: z.object({
-    query: z.string().min(1).describe('Search keywords (product name, brand, or model)'),
-    category: z.string().optional().describe('Category to filter by'),
-    sort: z.enum(['relevance', 'price_low_to_high', 'price_high_to_low', 'rating']).optional().describe('Result ordering'),
-    limit: z.number().int().min(1).max(50).optional().describe('Maximum number of products to return'),
+    keyword: z.string().describe('Search keyword (e.g., "airpods", "4K TV", "laptop")'),
+    count: z.number().int().min(1).max(24).optional().describe('Number of results (default 10, max 24)'),
   }),
   output: z.object({
-    products: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      price: z.number(),
-    })).describe('Matching products'),
+    products: z.array(productSchema).describe('Matching products with pricing and availability'),
   }),
-  handle: async (params: { query: string; category?: string; sort?: string; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/products/search (default method, read).
-    const data = await api<{ products: unknown[] }>('/v1/products/search', {
-      query: { query: params.query, category: params.category, sort: params.sort, limit: params.limit },
-    });
-    return { products: data.products as { id: string; title: string; price: number }[] };
+  handle: async params => {
+    const max = params.count ?? 10;
+    const searchUrl = `/site/searchpage.jsp?st=${encodeURIComponent(params.keyword)}`;
+    const html = await fetchText(searchUrl);
+
+    // Extract SKU IDs from the search results HTML
+    const skuIds = new Set<string>();
+    for (const m of html.matchAll(/data-sku-id="(\d+)"/g)) {
+      if (m[1]) skuIds.add(m[1]);
+    }
+
+    // Fallback: look for "skuId":"XXXXXX" patterns in embedded JSON
+    if (skuIds.size === 0) {
+      for (const m of html.matchAll(/"skuId"\s*:\s*"(\d+)"/g)) {
+        if (m[1]) skuIds.add(m[1]);
+      }
+    }
+
+    if (skuIds.size === 0) {
+      return { products: [] };
+    }
+
+    // Limit to requested count and fetch product details
+    const limitedSkus = [...skuIds].slice(0, max);
+    const blocks = await fetchJSON<RawPriceBlock[]>(`/api/3.0/priceBlocks?skus=${limitedSkus.join(',')}`);
+
+    const products = (blocks ?? []).map(mapProduct).filter(p => p.name !== '');
+    return { products };
   },
 });

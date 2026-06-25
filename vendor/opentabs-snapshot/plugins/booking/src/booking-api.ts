@@ -1,47 +1,198 @@
-// Hermetic transport-helper stub for the vendored booking metadata slice.
-//
-// Upstream booking-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Booking.com web app on www.booking.com. The importer NEVER executes a handle()
-// body (Wall 1), but the tool modules reference `api` / `apiVoid` in their
-// (never-run) handle closures, so these symbols must RESOLVE at module-eval time.
-// This stub provides inert no-op implementations that throw if ever actually
-// called -- they never are during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): Booking.com searches stays +
-// a property's detail + the user's bookings via `api` (default GET, reads);
-// COMPLETING a booking POSTs the reservation (complete_booking -> the PAYMENT WRITE;
-// the {method:'POST'} literal reinforces write on both axes -- a confirmed booking
-// charges a card); CANCELLING a booking is the DESTRUCTIVE op (cancel_booking ->
-// apiVoid {method:'DELETE'} -> apiDelete/destructive). www.booking.com is SENSITIVE
-// (39-01) -> posture-B re-gates the writes, and backing:'dom' keeps complete_booking
-// DOM-only (NOT API-invocable -> the payment-op guard passes).
+import {
+  ToolError,
+  fetchFromPage,
+  getAuthCache,
+  setAuthCache,
+  clearAuthCache,
+  waitUntil,
+  buildQueryString,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+// --- Types ---
+
+interface BookingAuth {
+  userId: number;
+  isGenius: boolean;
+  authLevel: number;
+  csrfToken: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `booking-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+interface SsrStoreData {
+  userIdentity?: {
+    userId?: number;
+    isGenius?: boolean;
+    authLevel?: number;
+    type?: string;
+  };
+  csrfToken?: string;
+  language?: string;
+  currency?: string;
+  pageviewId?: string;
+  etSerializedState?: string;
+}
+
+// --- Auth ---
+// Booking.com uses HttpOnly session cookies for API auth (automatic via credentials: 'include').
+// Auth is detected via the SSR'd userIdentity object in <script type="application/json"> tags.
+// The CSRF token (x-booking-csrf-token) is a JWT embedded in the same SSR store data.
+
+const extractSsrStoreData = (): SsrStoreData | null => {
+  if (typeof document === 'undefined') return null;
+  const scripts = document.querySelectorAll('script[type="application/json"]');
+  for (const s of scripts) {
+    try {
+      const d = JSON.parse(s.textContent ?? '') as SsrStoreData;
+      if (d.userIdentity || d.csrfToken) return d;
+    } catch {
+      /* skip non-JSON scripts */
+    }
+  }
+  return null;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+const getAuth = (): BookingAuth | null => {
+  const cached = getAuthCache<BookingAuth>('booking');
+  if (cached) return cached;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST; DELETE for the
-// destructive cancel_booking op.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+  const store = extractSsrStoreData();
+  if (!store?.userIdentity?.userId || !store.csrfToken) return null;
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+  const auth: BookingAuth = {
+    userId: store.userIdentity.userId,
+    isGenius: store.userIdentity.isGenius ?? false,
+    authLevel: store.userIdentity.authLevel ?? 0,
+    csrfToken: store.csrfToken,
+  };
+  setAuthCache('booking', auth);
+  return auth;
+};
+
+export const isAuthenticated = (): boolean => getAuth() !== null;
+
+export const waitForAuth = (): Promise<boolean> =>
+  waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
+
+const requireAuth = (): BookingAuth => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Booking.com.');
+  return auth;
+};
+
+// --- GraphQL API ---
+// Booking.com's primary API is GraphQL at /dml/graphql. Requests require specific headers
+// extracted from the SSR store: CSRF token, affiliate ID, site type, and page topic.
+
+const GQL_URL = '/dml/graphql?lang=en-us';
+
+const getGraphqlHeaders = (auth: BookingAuth): Record<string, string> => ({
+  'content-type': 'application/json',
+  'x-booking-csrf-token': auth.csrfToken,
+  'x-booking-context-aid': '304142',
+  'x-booking-site-type-id': '1',
+  'x-booking-topic': 'capla_browser_b-index-lp-web-mfe',
+});
+
+export const graphql = async <T>(
+  operationName: string,
+  query: string,
+  variables: Record<string, unknown> = {},
+): Promise<T> => {
+  const auth = requireAuth();
+
+  const response = await fetchFromPage(GQL_URL, {
+    method: 'POST',
+    headers: getGraphqlHeaders(auth),
+    body: JSON.stringify({ operationName, query, variables }),
+  });
+
+  const data = (await response.json()) as { data?: T; errors?: Array<{ message: string }> };
+
+  if (data.errors?.length && !data.data) {
+    const msg = data.errors.map(e => e.message).join('; ');
+    if (
+      msg.includes('UNAUTHENTICATED') ||
+      msg.includes('401') ||
+      msg.includes('403') ||
+      msg.includes('CSRF') ||
+      msg.includes('FORBIDDEN')
+    ) {
+      clearAuthCache('booking');
+      throw ToolError.auth(`GraphQL auth error: ${msg}`);
+    }
+    throw ToolError.internal(`GraphQL error: ${msg}`);
+  }
+
+  return data.data as T;
+};
+
+// --- SSR Page Fetch ---
+// Many Booking.com pages SSR their Apollo cache in <script type="application/json"> tags.
+// This is the primary data access method for search results, trips, and wishlists.
+
+export interface ApolloCache {
+  ROOT_QUERY: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export const fetchPage = async (path: string): Promise<Document> => {
+  requireAuth();
+
+  const response = await fetchFromPage(path, {
+    headers: { accept: 'text/html' },
+  });
+
+  const html = await response.text();
+  return new DOMParser().parseFromString(html, 'text/html');
+};
+
+export const extractApolloCache = (doc: Document): ApolloCache | null => {
+  const scripts = doc.querySelectorAll('script[type="application/json"]');
+  for (const s of scripts) {
+    try {
+      const d = JSON.parse(s.textContent ?? '') as Record<string, unknown>;
+      if ('ROOT_QUERY' in d) return d as ApolloCache;
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+};
+
+export const extractSsrStore = (doc: Document): SsrStoreData | null => {
+  const scripts = doc.querySelectorAll('script[type="application/json"]');
+  for (const s of scripts) {
+    try {
+      const d = JSON.parse(s.textContent ?? '') as SsrStoreData;
+      if (d.userIdentity) return d;
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+};
+
+// --- URL Builders ---
+
+export const buildSearchUrl = (params: {
+  destination: string;
+  checkin: string;
+  checkout: string;
+  adults?: number;
+  children?: number;
+  rooms?: number;
+  offset?: number;
+}): string => {
+  const qs = buildQueryString({
+    ss: params.destination,
+    checkin: params.checkin,
+    checkout: params.checkout,
+    group_adults: params.adults ?? 2,
+    group_children: params.children ?? 0,
+    no_rooms: params.rooms ?? 1,
+    offset: params.offset,
+  });
+  return `/searchresults.html?${qs}`;
+};

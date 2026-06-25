@@ -1,29 +1,46 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../confluence-api.js';
+import { apiV2 } from '../confluence-api.js';
+import { type RawPage, mapPage, pageSchema } from './schemas.js';
 
 export const getPage = defineTool({
   name: 'get_page',
   displayName: 'Get Page',
-  description: 'Get detailed information about a specific Confluence page by its ID, optionally including the body.',
+  description:
+    'Get a Confluence page by its ID, including title, metadata, and optionally the page body content in storage format (HTML)',
   summary: 'Get a page by ID',
-  icon: 'file',
+  icon: 'file-text',
   group: 'Pages',
   input: z.object({
     page_id: z.string().min(1).describe('Page ID to retrieve'),
-    body_format: z
-      .enum(['storage', 'atlas_doc_format', 'view'])
+    include_body: z
+      .boolean()
       .optional()
-      .describe('Body content format to return'),
+      .describe('Whether to include the page body content (default false — set to true to read page content)'),
   }),
   output: z.object({
-    id: z.string().describe('Page ID'),
-    title: z.string().describe('Page title'),
+    page: pageSchema
+      .extend({
+        body: z.string().nullable().describe('Page body in storage format (HTML), or null if not requested'),
+      })
+      .describe('The requested page'),
   }),
-  handle: async (params: { page_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /wiki/api/v2/pages/:id (default method).
-    const data = await api<{ id: string; title: string }>(`/wiki/api/v2/pages/${params.page_id}`);
-    return data;
+  handle: async params => {
+    const query: Record<string, string | number | boolean | undefined> = {};
+    if (params.include_body) query['body-format'] = 'storage';
+
+    const data = await apiV2<
+      RawPage & {
+        body?: { storage?: { value?: string } };
+      }
+    >(`/pages/${params.page_id}`, { query });
+
+    const page = mapPage(data);
+    return {
+      page: {
+        ...page,
+        body: data.body?.storage?.value ?? null,
+      },
+    };
   },
 });

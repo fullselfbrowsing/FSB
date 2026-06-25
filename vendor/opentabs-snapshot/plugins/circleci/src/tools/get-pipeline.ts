@@ -1,28 +1,24 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../circleci-api.js';
+import { type RawPipeline, mapPipeline, pipelineSchema } from './schemas.js';
 
 export const getPipeline = defineTool({
   name: 'get_pipeline',
   displayName: 'Get Pipeline',
-  description: 'Get detailed information about a single CircleCI pipeline by its pipeline ID.',
-  summary: 'Get a pipeline by id',
-  icon: 'git-commit',
+  description:
+    'Get a single pipeline by its UUID. Returns pipeline details including state, trigger info, and VCS data.',
+  summary: 'Get a pipeline by ID',
+  icon: 'git-branch',
   group: 'Pipelines',
   input: z.object({
-    pipeline_id: z.string().min(1).describe('CircleCI pipeline ID (UUID)'),
+    pipeline_id: z.string().describe('Pipeline UUID'),
   }),
   output: z.object({
-    id: z.string().describe('Pipeline ID'),
-    number: z.number().describe('Pipeline number'),
-    state: z.string().optional().describe('Pipeline state'),
+    pipeline: pipelineSchema,
   }),
-  handle: async (params: { pipeline_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /pipeline/:id (default method).
-    const data = await api<{ id: string; number: number }>(
-      `/pipeline/${encodeURIComponent(params.pipeline_id)}`
-    );
-    return data;
+  handle: async ({ pipeline_id }) => {
+    const data = await api<RawPipeline>(`/pipeline/${pipeline_id}`);
+    return { pipeline: mapPipeline(data) };
   },
 });

@@ -1,44 +1,47 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../gitlab-api.js';
+import { mapMergeRequest, mergeRequestSchema } from './schemas.js';
 
 export const createMergeRequest = defineTool({
   name: 'create_merge_request',
   displayName: 'Create Merge Request',
-  description:
-    'Open a new merge request in a GitLab project from a source branch into a target branch. Requires a project, source_branch, target_branch, and title.',
-  summary: 'Open a new merge request',
-  icon: 'git-merge',
+  description: 'Create a new merge request in a project.',
+  summary: 'Create a new merge request',
+  icon: 'git-pull-request-arrow',
   group: 'Merge Requests',
   input: z.object({
-    project_id: z.string().min(1).describe('Project ID or URL-encoded path (group/project)'),
-    source_branch: z.string().min(1).describe('Source branch name to merge from'),
-    target_branch: z.string().min(1).describe('Target branch name to merge into'),
+    project: z.string().min(1).describe('Project path (e.g., "group/project") or numeric project ID'),
     title: z.string().min(1).describe('Merge request title'),
-    description: z.string().optional().describe('Merge request description in markdown'),
-    assignee_ids: z.array(z.number()).optional().describe('User IDs to assign as reviewers'),
-    labels: z.array(z.string()).optional().describe('Label names to apply'),
-    remove_source_branch: z.boolean().optional().describe('Delete the source branch on merge'),
+    source_branch: z.string().min(1).describe('Source branch name'),
+    target_branch: z.string().min(1).describe('Target branch name'),
+    description: z.string().optional().describe('MR description in Markdown'),
+    labels: z.string().optional().describe('Comma-separated list of label names'),
+    assignee_id: z.number().optional().describe('User ID to assign'),
+    milestone_id: z.number().optional().describe('Milestone ID'),
+    remove_source_branch: z.boolean().optional().describe('Delete source branch after merge'),
+    squash: z.boolean().optional().describe('Squash commits when merging'),
   }),
   output: z.object({
-    iid: z.number().describe('The created merge request IID'),
-    title: z.string().describe('The created merge request title'),
-    web_url: z.string().optional().describe('The created merge request URL'),
+    merge_request: mergeRequestSchema.describe('The created merge request'),
   }),
-  handle: async (params: { project_id: string; source_branch: string; target_branch: string; title: string }) => {
-    // NEVER executed by the importer. Upstream: api POST /projects/:id/merge_requests.
-    const data = await api<{ iid: number; title: string }>(
-      `/projects/${encodeURIComponent(params.project_id)}/merge_requests`,
-      {
-        method: 'POST',
-        body: {
-          source_branch: params.source_branch,
-          target_branch: params.target_branch,
-          title: params.title,
-        },
-      }
-    );
-    return data;
+  handle: async params => {
+    const body: Record<string, unknown> = {
+      title: params.title,
+      source_branch: params.source_branch,
+      target_branch: params.target_branch,
+    };
+    if (params.description !== undefined) body.description = params.description;
+    if (params.labels !== undefined) body.labels = params.labels;
+    if (params.assignee_id !== undefined) body.assignee_id = params.assignee_id;
+    if (params.milestone_id !== undefined) body.milestone_id = params.milestone_id;
+    if (params.remove_source_branch !== undefined) body.remove_source_branch = params.remove_source_branch;
+    if (params.squash !== undefined) body.squash = params.squash;
+
+    const data = await api<Record<string, unknown>>(`/projects/${encodeURIComponent(params.project)}/merge_requests`, {
+      method: 'POST',
+      body,
+    });
+    return { merge_request: mapMergeRequest(data) };
   },
 });

@@ -1,39 +1,58 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../yelp-api.js';
+import { fetchPageData, extractSearchResults } from '../yelp-api.js';
+import type { SearchPageData } from '../yelp-api.js';
+import { businessSchema, mapBusiness } from './schemas.js';
 
 export const searchBusinesses = defineTool({
   name: 'search_businesses',
   displayName: 'Search Businesses',
   description:
-    'Search Yelp for local businesses (restaurants, shops, services) by term and location. Returns matching businesses with ratings, price level, and categories.',
-  summary: 'search businesses on yelp',
-  icon: 'magnifying-glass',
+    'Search for businesses on Yelp by keyword and location. Returns up to 10 results per page with business name, rating, review count, price range, categories, phone, and address. Use the start parameter to paginate through results.',
+  summary: 'Search for businesses by keyword and location',
+  icon: 'search',
   group: 'Businesses',
   input: z.object({
-    term: z.string().min(1).describe('What to search for (e.g. coffee, plumber, sushi)'),
-    location: z.string().min(1).describe('City, neighborhood, or address to search near'),
-    price: z.enum(['1', '2', '3', '4']).optional().describe('Price level filter (1=$ to 4=$$$$)'),
-    open_now: z.boolean().optional().describe('Only return businesses open now'),
+    query: z.string().describe('Search keywords (e.g., "pizza", "plumber", "coffee shop")'),
+    location: z.string().describe('Location to search near (e.g., "San Jose, CA", "10001", "Manhattan")'),
+    start: z.number().int().min(0).optional().describe('Result offset for pagination (default 0, increment by 10)'),
+    sort_by: z
+      .enum(['recommended', 'rating', 'review_count'])
+      .optional()
+      .describe('Sort order (default "recommended")'),
+    price: z
+      .string()
+      .optional()
+      .describe(
+        'Price filter — comma-separated levels: "1" ($), "2" ($$), "3" ($$$), "4" ($$$$). Example: "1,2" for $ and $$',
+      ),
+    open_now: z.boolean().optional().describe('Filter to only businesses that are currently open'),
   }),
   output: z.object({
-    businesses: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      rating: z.number(),
-    })).describe('Matching local businesses'),
+    businesses: z.array(businessSchema).describe('List of matching businesses'),
+    total_results: z.number().int().describe('Total number of results available'),
+    start: z.number().int().describe('Current result offset'),
+    results_per_page: z.number().int().describe('Number of results per page'),
   }),
-  handle: async (params: { term: string; location: string; price?: string; open_now?: boolean }) => {
-    // NEVER executed by the importer. Upstream: api GET /v3/businesses/search (default method, a READ).
-    const data = await api<{ businesses: unknown[] }>('/v3/businesses/search', {
-      query: {
-        term: params.term,
-        location: params.location,
-        price: params.price,
-        open_now: params.open_now,
-      },
-    });
-    return { businesses: data.businesses as { id: string; name: string; rating: number }[] };
+  handle: async params => {
+    const query: Record<string, string | number | boolean | undefined> = {
+      find_desc: params.query,
+      find_loc: params.location,
+    };
+
+    if (params.start) query.start = params.start;
+    if (params.sort_by) query.sortby = params.sort_by;
+    if (params.price) query.attrs = `RestaurantsPriceRange2.${params.price}`;
+    if (params.open_now) query.open_now = true;
+
+    const data = await fetchPageData<SearchPageData>('/search', query);
+    const { items, totalResults, startResult, resultsPerPage } = extractSearchResults(data);
+
+    return {
+      businesses: items.map(mapBusiness),
+      total_results: totalResults,
+      start: startResult,
+      results_per_page: resultsPerPage,
+    };
   },
 });

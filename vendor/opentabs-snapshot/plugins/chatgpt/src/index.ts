@@ -1,38 +1,67 @@
-// Vendored metadata slice of the OpenTabs chatgpt plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// ChatGPT is the OpenAI AI-chat app. Its upstream host is chatgpt.com -- the EXACT
-// origin Plan 38-01 classified SENSITIVE -- so the merge-time classifyGate passes on
-// a screened origin. The host-derived stem ('chatgpt') is CORRECT -> NO STEM_OVERRIDES
-// entry. Part of Phase-38 batch B sub-batch 1 (AI-chat + microblog/fediverse). Its
-// ops GET the conversation list + a single conversation (reads) and POST a message
-// (send_message -> the sensitive AI-chat WRITE; posture-B re-gates it because the
-// origin is sensitive). backing:'dom' (the frozen default) -> DOM-only routing.
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
-import { listConversations } from './tools/list-conversations.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './chatgpt-api.js';
+import { archiveConversation } from './tools/archive-conversation.js';
+import { deleteConversation } from './tools/delete-conversation.js';
+import { discoverGpts } from './tools/discover-gpts.js';
+import { getAccountInfo } from './tools/get-account-info.js';
+import { getBetaFeatures } from './tools/get-beta-features.js';
 import { getConversation } from './tools/get-conversation.js';
-import { sendMessage } from './tools/send-message.js';
+import { getCurrentUser } from './tools/get-current-user.js';
+import { getCustomInstructions } from './tools/get-custom-instructions.js';
+import { getGpt } from './tools/get-gpt.js';
+import { getMemories } from './tools/get-memories.js';
+import { getPromptLibrary } from './tools/get-prompt-library.js';
+import { listConversations } from './tools/list-conversations.js';
+import { listModels } from './tools/list-models.js';
+import { listSharedConversations } from './tools/list-shared-conversations.js';
+import { renameConversation } from './tools/rename-conversation.js';
+import { searchConversations } from './tools/search-conversations.js';
+import { starConversation } from './tools/star-conversation.js';
+import { unarchiveConversation } from './tools/unarchive-conversation.js';
+import { unstarConversation } from './tools/unstar-conversation.js';
+import { updateCustomInstructions } from './tools/update-custom-instructions.js';
 
-class ChatgptPlugin extends OpenTabsPlugin {
+class ChatGPTPlugin extends OpenTabsPlugin {
   readonly name = 'chatgpt';
-  readonly description =
-    'OpenTabs plugin for ChatGPT — list your conversations, read a conversation, and send a message to ChatGPT';
+  readonly description = 'OpenTabs plugin for ChatGPT';
   override readonly displayName = 'ChatGPT';
-  readonly urlPatterns = ['*://chatgpt.com/*'];
+  readonly urlPatterns = ['*://*.chatgpt.com/*'];
   override readonly homepage = 'https://chatgpt.com';
   readonly tools: ToolDefinition[] = [
-    // Conversation list + one conversation (reads) and sending a message (the sensitive write).
+    // Account
+    getCurrentUser,
+    getAccountInfo,
+    // Models
+    listModels,
+    // Conversations
     listConversations,
     getConversation,
-    sendMessage,
+    searchConversations,
+    renameConversation,
+    archiveConversation,
+    unarchiveConversation,
+    starConversation,
+    unstarConversation,
+    deleteConversation,
+    listSharedConversations,
+    // Memories
+    getMemories,
+    // Settings
+    getCustomInstructions,
+    updateCustomInstructions,
+    getBetaFeatures,
+    // Prompts
+    getPromptLibrary,
+    // GPTs
+    getGpt,
+    discoverGpts,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new ChatgptPlugin();
-export default plugin;
-export { plugin };
+export default new ChatGPTPlugin();

@@ -1,38 +1,98 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../expedia-api.js';
+import { graphql } from '../expedia-api.js';
+import { hotelListingSchema, mapHotelListing } from './schemas.js';
+import type { RawLodgingCard } from './schemas.js';
+
+interface PropertySearchResponse {
+  propertySearch?: {
+    __typename?: string;
+    summary?: { matchedPropertiesSize?: number };
+    propertySearchListings?: RawLodgingCard[];
+  };
+}
+
+const SEARCH_QUERY = `query HotelSearch($context: ContextInput!, $criteria: PropertySearchCriteriaInput) {
+  propertySearch(context: $context, criteria: $criteria) {
+    ... on PropertySearchResults {
+      summary { matchedPropertiesSize }
+      propertySearchListings {
+        ... on LodgingCard {
+          headingSection { heading }
+          priceSection {
+            priceSummary {
+              displayMessages {
+                lineItems {
+                  ... on DisplayPrice { price { formatted } }
+                  ... on LodgingEnrichedMessage { value }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
 
 export const searchHotels = defineTool({
   name: 'search_hotels',
   displayName: 'Search Hotels',
   description:
-    'Search Expedia for hotels in a destination for a set of dates and number of guests. Returns matching hotels with nightly prices.',
-  summary: 'search hotels on expedia',
-  icon: 'building',
+    'Search for hotels in a destination. Requires a region ID from search_locations. Returns hotel names and pricing. Results are sorted by "RECOMMENDED" by default.',
+  summary: 'Search for hotels by destination and dates',
+  icon: 'building-2',
   group: 'Hotels',
   input: z.object({
-    destination: z.string().min(1).describe('City, region, or hotel name to search'),
-    check_in: z.string().min(1).describe('Check-in date (YYYY-MM-DD)'),
-    check_out: z.string().min(1).describe('Check-out date (YYYY-MM-DD)'),
-    guests: z.number().int().min(1).optional().describe('Number of guests'),
+    region_id: z.string().describe('Gaia region ID from search_locations (e.g. "178293" for New York)'),
+    check_in_date: z.string().describe('Check-in date in YYYY-MM-DD format'),
+    check_out_date: z.string().describe('Check-out date in YYYY-MM-DD format'),
+    adults: z.number().int().min(1).max(14).optional().describe('Number of adults (default 2)'),
+    children_ages: z
+      .array(z.number().int().min(0).max(17))
+      .optional()
+      .describe('Ages of children (empty array if none)'),
+    sort: z
+      .enum(['RECOMMENDED', 'PRICE_LOW_TO_HIGH', 'PRICE_HIGH_TO_LOW', 'DISTANCE', 'REVIEW'])
+      .optional()
+      .describe('Sort order (default "RECOMMENDED")'),
   }),
   output: z.object({
-    hotels: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-    })).describe('Matching hotels'),
+    matched_count: z.number().int().describe('Total number of matching hotels'),
+    hotels: z.array(hotelListingSchema).describe('Hotel listings'),
   }),
-  handle: async (params: { destination: string; check_in: string; check_out: string; guests?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /v1/hotels/search (default method).
-    const data = await api<{ hotels: unknown[] }>('/v1/hotels/search', {
-      query: {
-        destination: params.destination,
-        check_in: params.check_in,
-        check_out: params.check_out,
-        guests: params.guests,
+  handle: async params => {
+    const [year, month, day] = params.check_in_date.split('-').map(Number);
+    const [year2, month2, day2] = params.check_out_date.split('-').map(Number);
+
+    const children = (params.children_ages ?? []).map(age => ({ age }));
+    const adults = params.adults ?? 2;
+
+    const data = await graphql<PropertySearchResponse>('HotelSearch', SEARCH_QUERY, {
+      criteria: {
+        primary: {
+          dateRange: {
+            checkInDate: { day, month, year },
+            checkOutDate: { day: day2, month: month2, year: year2 },
+          },
+          destination: { regionId: params.region_id },
+          rooms: [{ adults, children }],
+        },
+        secondary: {
+          booleans: [],
+          ranges: [],
+          selections: [{ id: 'sort', value: params.sort ?? 'RECOMMENDED' }],
+        },
       },
     });
-    return { hotels: data.hotels as { id: string; name: string }[] };
+
+    const listings = (data.propertySearch?.propertySearchListings ?? [])
+      .filter(card => card.headingSection?.heading)
+      .map(mapHotelListing);
+
+    return {
+      matched_count: data.propertySearch?.summary?.matchedPropertiesSize ?? 0,
+      hotels: listings,
+    };
   },
 });

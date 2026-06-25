@@ -1,31 +1,42 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { apiVoid } from '../cloudflare-api.js';
+import { cloudflareApi } from '../cloudflare-api.js';
 
 export const purgeCache = defineTool({
   name: 'purge_cache',
   displayName: 'Purge Cache',
   description:
-    'Purge cached content for a Cloudflare zone. Purge everything, or selectively purge by URL, host, tag, or prefix. This evicts cache entries and cannot be undone.',
-  summary: 'Purge the zone cache',
-  icon: 'trash-2',
+    'Purge cached content for a zone. Can purge everything, specific URLs, or by tags/prefixes/hosts. Use purge_everything=true to clear all cached files.',
+  summary: 'Purge zone cache',
+  icon: 'eraser',
   group: 'Cache',
   input: z.object({
-    zone_id: z.string().min(1).describe('Cloudflare zone ID whose cache to purge'),
-    purge_everything: z.boolean().optional().describe('Purge the entire cache for the zone'),
-    files: z.array(z.string()).optional().describe('Specific URLs to purge from cache'),
-    tags: z.array(z.string()).optional().describe('Cache-Tags to purge'),
-    hosts: z.array(z.string()).optional().describe('Hostnames to purge'),
-    prefixes: z.array(z.string()).optional().describe('URL prefixes to purge'),
+    zone_id: z.string().describe('Zone ID (32-char hex string)'),
+    purge_everything: z.boolean().optional().describe('Purge all cached files (default false)'),
+    files: z.array(z.string()).optional().describe('Array of URLs to purge (max 30)'),
+    tags: z.array(z.string()).optional().describe('Array of cache tags to purge (Enterprise only)'),
+    hosts: z.array(z.string()).optional().describe('Array of hostnames to purge (Enterprise only)'),
+    prefixes: z.array(z.string()).optional().describe('Array of URL prefixes to purge (Enterprise only)'),
   }),
   output: z.object({
-    success: z.boolean().describe('Whether the purge request was accepted'),
+    id: z.string().describe('Purge request ID'),
   }),
-  handle: async (params: { zone_id: string }) => {
-    // NEVER executed by the importer. Upstream: apiVoid POST /zones/:id/purge_cache
-    // (purge -> DESTRUCTIVE via the shared verb set; the {method:'POST'} literal only escalates).
-    await apiVoid(`/zones/${encodeURIComponent(params.zone_id)}/purge_cache`, { method: 'POST' });
-    return { success: true };
+  handle: async params => {
+    const body: Record<string, unknown> = {};
+    if (params.purge_everything) {
+      body.purge_everything = true;
+    } else {
+      if (params.files) body.files = params.files;
+      if (params.tags) body.tags = params.tags;
+      if (params.hosts) body.hosts = params.hosts;
+      if (params.prefixes) body.prefixes = params.prefixes;
+    }
+
+    const data = await cloudflareApi<Record<string, unknown>>(
+      `/zones/${encodeURIComponent(params.zone_id)}/purge_cache`,
+      { method: 'POST', body },
+    );
+    const result = data.result as Record<string, unknown> | undefined;
+    return { id: (result?.id as string) ?? '' };
   },
 });

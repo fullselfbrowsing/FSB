@@ -1,0 +1,34 @@
+import { defineTool } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+import { getPlanId, syncBudget } from '../ynab-api.js';
+import type { BudgetEntities } from './schemas.js';
+import { buildLookups, mapScheduledTransaction, notTombstone, scheduledTransactionSchema } from './schemas.js';
+
+export const listScheduledTransactions = defineTool({
+  name: 'list_scheduled_transactions',
+  displayName: 'List Scheduled Transactions',
+  description:
+    'List all scheduled (recurring) transactions in the active YNAB plan. Returns frequency, next occurrence date, amount, payee, and category for each.',
+  summary: 'List scheduled/recurring transactions',
+  icon: 'clock',
+  group: 'Transactions',
+  input: z.object({}),
+  output: z.object({
+    scheduled_transactions: z.array(scheduledTransactionSchema).describe('List of scheduled transactions'),
+  }),
+  handle: async () => {
+    const planId = getPlanId();
+    const result = await syncBudget<BudgetEntities>(planId);
+
+    const entities = result.changed_entities;
+    const raw = entities?.be_scheduled_transactions ?? [];
+    const lookups = buildLookups(entities ?? {});
+
+    const scheduledTransactions = raw
+      .filter(notTombstone)
+      .map(s => mapScheduledTransaction(s, lookups))
+      .sort((a, b) => a.date_next.localeCompare(b.date_next));
+
+    return { scheduled_transactions: scheduledTransactions };
+  },
+});

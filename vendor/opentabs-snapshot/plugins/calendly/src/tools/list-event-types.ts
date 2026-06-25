@@ -1,32 +1,54 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../calendly-api.js';
+import { eventTypeSchema, mapEventType, mapPagination, paginationSchema } from './schemas.js';
+
+interface EventTypesResponse {
+  results?: {
+    event_types?: Record<string, unknown>[];
+    next_page?: number | null;
+    next_page_count?: number;
+  }[];
+  pagination?: Record<string, unknown>;
+}
 
 export const listEventTypes = defineTool({
   name: 'list_event_types',
   displayName: 'List Event Types',
   description:
-    'List the Calendly event types (meeting templates) for your account. Returns each event type with its name, duration, and scheduling URL.',
-  summary: 'list my calendly event types',
+    'List all event types for the current user. Event types define the scheduling templates (e.g. "30 Minute Meeting", "Discovery Call"). Returns paginated results with up to 10 event types per page.',
+  summary: 'List your scheduling event types',
   icon: 'calendar-days',
-  group: 'Scheduling',
+  group: 'Event Types',
   input: z.object({
-    active: z.boolean().optional().describe('Only return active (bookable) event types'),
-    limit: z.number().int().min(1).max(100).optional().describe('Maximum number of event types to return'),
+    page: z.number().int().min(1).optional().describe('Page number (default 1)'),
   }),
   output: z.object({
-    event_types: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      duration: z.number(),
-    })).describe('Your Calendly event types'),
+    event_types: z.array(eventTypeSchema).describe('List of event types'),
+    pagination: paginationSchema,
   }),
-  handle: async (params: { active?: boolean; limit?: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /event_types (default method, a READ).
-    const data = await api<{ event_types: unknown[] }>('/event_types', {
-      query: { active: params.active, count: params.limit },
+  handle: async params => {
+    const data = await api<EventTypesResponse>('/users/me/event_types', {
+      query: { scope: 'my_calendly', page: params.page },
     });
-    return { event_types: data.event_types as { id: string; name: string; duration: number }[] };
+
+    const allEventTypes: Record<string, unknown>[] = [];
+    for (const result of data.results ?? []) {
+      for (const et of result.event_types ?? []) {
+        allEventTypes.push(et);
+      }
+    }
+
+    return {
+      event_types: allEventTypes.map(mapEventType),
+      pagination: mapPagination(
+        (data.pagination ?? {}) as {
+          total_count?: number;
+          current_page?: number;
+          total_pages?: number;
+          next_page?: number | null;
+        },
+      ),
+    };
   },
 });

@@ -1,5 +1,4 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../todoist-api.js';
 import { type RawTask, mapTask, taskSchema } from './schemas.js';
@@ -27,9 +26,23 @@ export const updateTask = defineTool({
   output: z.object({
     task: taskSchema.describe('The updated task'),
   }),
-  handle: async (params: { task_id: string; content?: string }) => {
-    // NEVER executed by the importer. Upstream: api POST /tasks/:id.
-    const data = await api<RawTask>(`/tasks/${params.task_id}`, { method: 'POST', body: { content: params.content } });
+  handle: async params => {
+    const body: Record<string, unknown> = {};
+    if (params.content !== undefined) body.content = params.content;
+    if (params.description !== undefined) body.description = params.description;
+    if (params.labels !== undefined) body.labels = params.labels;
+    if (params.priority !== undefined) body.priority = params.priority;
+    if (params.due_string !== undefined) body.due_string = params.due_string;
+    if (params.due_date !== undefined) body.due_date = params.due_date;
+    if (params.due_datetime !== undefined) body.due_datetime = params.due_datetime;
+    if (params.assignee_id !== undefined) body.assignee_id = params.assignee_id;
+    if (params.duration !== undefined) body.duration = params.duration;
+    if (params.duration_unit !== undefined) body.duration_unit = params.duration_unit;
+
+    const data = await api<RawTask>(`/tasks/${params.task_id}`, {
+      method: 'POST',
+      body,
+    });
     return { task: mapTask(data) };
   },
 });

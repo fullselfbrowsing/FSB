@@ -1,39 +1,39 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../gitlab-api.js';
+import { issueSchema, mapIssue } from './schemas.js';
 
 export const createIssue = defineTool({
   name: 'create_issue',
   displayName: 'Create Issue',
-  description:
-    'Create a new issue in a GitLab project. Requires a project and a title at minimum. Optionally set description, assignees, labels, milestone, and due date.',
+  description: 'Create a new issue in a project.',
   summary: 'Create a new issue',
-  icon: 'plus',
+  icon: 'plus-circle',
   group: 'Issues',
   input: z.object({
-    project_id: z.string().min(1).describe('Project ID or URL-encoded path (group/project)'),
+    project: z.string().min(1).describe('Project path (e.g., "group/project") or numeric project ID'),
     title: z.string().min(1).describe('Issue title'),
-    description: z.string().optional().describe('Issue description in markdown'),
-    assignee_ids: z.array(z.number()).optional().describe('User IDs to assign the issue to'),
-    labels: z.array(z.string()).optional().describe('Label names to apply to the issue'),
-    milestone_id: z.number().optional().describe('Milestone ID to associate the issue with'),
-    due_date: z.string().optional().describe('Due date as an ISO 8601 date (YYYY-MM-DD)'),
+    description: z.string().optional().describe('Issue description in Markdown'),
+    labels: z.string().optional().describe('Comma-separated list of label names'),
+    assignee_ids: z.array(z.number()).optional().describe('User IDs to assign'),
+    milestone_id: z.number().optional().describe('Milestone ID'),
+    confidential: z.boolean().optional().describe('Whether the issue is confidential'),
   }),
   output: z.object({
-    iid: z.number().describe('The created issue IID'),
-    title: z.string().describe('The created issue title'),
-    web_url: z.string().optional().describe('The created issue URL'),
+    issue: issueSchema.describe('The created issue'),
   }),
-  handle: async (params: { project_id: string; title: string }) => {
-    // NEVER executed by the importer. Upstream: api POST /projects/:id/issues.
-    const data = await api<{ iid: number; title: string }>(
-      `/projects/${encodeURIComponent(params.project_id)}/issues`,
-      {
-        method: 'POST',
-        body: { title: params.title },
-      }
-    );
-    return data;
+  handle: async params => {
+    const body: Record<string, unknown> = { title: params.title };
+    if (params.description !== undefined) body.description = params.description;
+    if (params.labels !== undefined) body.labels = params.labels;
+    if (params.assignee_ids !== undefined) body.assignee_ids = params.assignee_ids;
+    if (params.milestone_id !== undefined) body.milestone_id = params.milestone_id;
+    if (params.confidential !== undefined) body.confidential = params.confidential;
+
+    const data = await api<Record<string, unknown>>(`/projects/${encodeURIComponent(params.project)}/issues`, {
+      method: 'POST',
+      body,
+    });
+    return { issue: mapIssue(data) };
   },
 });

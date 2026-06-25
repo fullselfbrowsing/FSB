@@ -1,25 +1,33 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { apiVoid } from '../bluesky-api.js';
+import { api, getDid } from '../bluesky-api.js';
 
 export const deletePost = defineTool({
   name: 'delete_post',
   displayName: 'Delete Post',
-  description: 'Permanently delete one of your Bluesky posts by its AT-URI. This action cannot be undone.',
-  summary: 'delete a bluesky post permanently',
+  description:
+    'Delete a post by its AT URI. Only the post author can delete their own posts. The rkey is extracted from the URI.',
+  summary: 'Delete a post',
   icon: 'trash-2',
-  group: 'Feed',
+  group: 'Posts',
   input: z.object({
-    uri: z.string().min(1).describe('AT-URI of the post to delete'),
+    uri: z.string().describe('AT URI of the post to delete'),
   }),
   output: z.object({
     success: z.boolean().describe('Whether the post was successfully deleted'),
   }),
-  handle: async (params: { uri: string }) => {
-    // NEVER executed by the importer. Upstream: apiVoid DELETE com.atproto.repo.deleteRecord
-    // (delete -> DESTRUCTIVE via the shared verb set; apiVoid {method:'DELETE'} -> apiDelete/destructive).
-    await apiVoid('/xrpc/com.atproto.repo.deleteRecord', { method: 'DELETE', body: { uri: params.uri } });
+  handle: async params => {
+    const rkey = params.uri.split('/').pop() ?? '';
+
+    await api('com.atproto.repo.deleteRecord', {
+      method: 'POST',
+      body: {
+        repo: getDid(),
+        collection: 'app.bsky.feed.post',
+        rkey,
+      },
+    });
+
     return { success: true };
   },
 });

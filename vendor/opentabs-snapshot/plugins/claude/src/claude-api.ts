@@ -1,43 +1,130 @@
-// Hermetic transport-helper stub for the vendored claude metadata slice.
-//
-// Upstream claude-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Claude web app on claude.ai. The importer NEVER executes a handle() body (Wall 1),
-// but the tool modules reference `api` in their (never-run) handle closures, so these
-// symbols must RESOLVE at module-eval time. This stub provides inert no-op
-// implementations that throw if ever actually called -- they never are during a
-// metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing these helpers. The upstream verb
-// facts (preserved here as comments for auditability): Claude lists conversations +
-// reads one conversation via `api` (default GET); sending a message POSTs to the
-// conversation endpoint (send_message -> the sensitive AI-chat WRITE; `send` is in
-// the shared WRITE_VERBS set and the {method:'POST'} literal reinforces the write
-// class on both the verb AND method axes).
+import {
+  type FetchFromPageOptions,
+  ToolError,
+  buildQueryString,
+  fetchFromPage,
+  fetchJSON,
+  getAuthCache,
+  getCookie,
+  setAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+// --- Auth ---
+// Claude.ai uses HttpOnly session cookies — requests with credentials: 'include'
+// are automatically authenticated. We detect auth via the intercomSettings global
+// or the lastActiveOrg cookie.
+
+interface ClaudeAuth {
+  orgId: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `claude-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const getAuth = (): ClaudeAuth | null => {
+  const cached = getAuthCache<ClaudeAuth>('claude');
+  if (cached) return cached;
+
+  const orgId = getCookie('lastActiveOrg');
+  if (!orgId) return null;
+
+  const auth: ClaudeAuth = { orgId };
+  setAuthCache('claude', auth);
+  return auth;
 };
 
-// `api` -- generic helper, upstream default method GET (reads); POST for writes.
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-// `apiVoid` -- 204-No-Content helper, upstream default method POST.
-export const apiVoid = async (_endpoint: string, _options: ApiOptions = {}): Promise<void> =>
-  inert('apiVoid');
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), {
+      interval: 500,
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const getOrgId = (): string => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Claude.');
+  return auth.orgId;
+};
+
+// --- API caller ---
+
+const API_BASE = '/api';
+
+export const api = async <T>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Claude.');
+
+  const qs = options.query ? buildQueryString(options.query) : '';
+  const url = qs ? `${API_BASE}${endpoint}?${qs}` : `${API_BASE}${endpoint}`;
+
+  const method = options.method ?? 'GET';
+  const headers: Record<string, string> = {};
+  const init: FetchFromPageOptions = { method, headers };
+
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(options.body);
+  }
+
+  const data = await fetchJSON<T>(url, init);
+  return data as T;
+};
+
+// For the streaming completion endpoint — collects SSE chunks into a full response
+export const apiStream = async (endpoint: string, body: unknown): Promise<string> => {
+  const auth = getAuth();
+  if (!auth) throw ToolError.auth('Not authenticated — please log in to Claude.');
+
+  const url = `${API_BASE}${endpoint}`;
+  const response = await fetchFromPage(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+
+  // Parse SSE events and concatenate completion text
+  let fullText = '';
+  for (const line of text.split('\n')) {
+    if (!line.startsWith('data: ')) continue;
+    try {
+      const data = JSON.parse(line.slice(6)) as {
+        type?: string;
+        completion?: string;
+      };
+      if (data.type === 'completion' && data.completion) {
+        fullText += data.completion;
+      }
+    } catch {
+      // Skip malformed SSE lines
+    }
+  }
+
+  return fullText;
+};
+
+// Org-scoped API shorthand
+export const orgApi = async <T>(
+  path: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    query?: Record<string, string | number | boolean | undefined>;
+  } = {},
+): Promise<T> => {
+  const orgId = getOrgId();
+  return api<T>(`/organizations/${orgId}${path}`, options);
+};

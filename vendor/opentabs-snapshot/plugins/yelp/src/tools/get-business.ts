@@ -1,31 +1,43 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../yelp-api.js';
+import { fetchPageData } from '../yelp-api.js';
+import type { BizDetailsPageData } from '../yelp-api.js';
+
+const businessDetailSchema = z.object({
+  id: z.string().describe('Yelp encrypted business ID'),
+  name: z.string().describe('Business name'),
+  url: z.string().describe('Canonical URL of the business page'),
+});
 
 export const getBusiness = defineTool({
   name: 'get_business',
   displayName: 'Get Business',
-  description: 'Get the full details, hours, photos, rating, and contact info of a single Yelp business by its ID.',
-  summary: 'look up a business on yelp',
+  description:
+    'Get details about a specific Yelp business by its URL alias (e.g., "a-slice-of-new-york-san-jose"). Returns the business ID, name, and canonical URL. Use search_businesses to find business aliases.',
+  summary: 'Get business details by alias',
   icon: 'store',
   group: 'Businesses',
   input: z.object({
-    business_id: z.string().min(1).describe('The Yelp business ID to fetch'),
+    alias: z
+      .string()
+      .describe(
+        'Business URL alias (e.g., "a-slice-of-new-york-san-jose"). Found in business URLs: yelp.com/biz/{alias}',
+      ),
   }),
-  output: z.object({
-    business: z.object({
-      id: z.string(),
-      name: z.string(),
-      rating: z.number(),
-    }).describe('The business detail'),
-  }),
-  handle: async (params: { business_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /v3/businesses/:id (default method, a READ).
-    const data = await api<{ business: { id: string; name: string; rating: number } }>(
-      `/v3/businesses/${params.business_id}`,
-      {}
-    );
-    return { business: data.business };
+  output: z.object({ business: businessDetailSchema }),
+  handle: async params => {
+    const data = await fetchPageData<BizDetailsPageData>(`/biz/${params.alias}`);
+
+    const details = data.legacyProps?.bizDetailsProps;
+    const pageProps = details?.bizDetailsPageProps;
+    const metaProps = details?.bizDetailsMetaProps;
+
+    return {
+      business: {
+        id: pageProps?.businessId ?? metaProps?.businessId ?? '',
+        name: pageProps?.businessName ?? '',
+        url: metaProps?.staticUrl ?? `/biz/${params.alias}`,
+      },
+    };
   },
 });

@@ -1,42 +1,139 @@
-// Hermetic transport-helper stub for the vendored tripadvisor metadata slice.
-//
-// Upstream tripadvisor-api.ts (SHA 4b170216) imports the real SDK's fetchJSON /
-// fetchFromPage / storage helpers and reads document/localStorage against the
-// Tripadvisor web app on www.tripadvisor.com. The importer NEVER executes a handle()
-// body (Wall 1), but the tool modules reference `api` in their (never-run) handle
-// closures, so this symbol must RESOLVE at module-eval time. This stub provides an
-// inert no-op implementation that throws if ever actually called -- it never is
-// during a metadata-only import.
-//
-// The TRANSPORT SIGNALS the importer's side-effect inference uses are derived from
-// the op NAME verb + the descriptor's stamped transport metadata (the helper name +
-// any {method:'...'} literal), NOT from executing this helper. The upstream verb
-// facts (preserved here as comments for auditability): Tripadvisor searches locations
-// (hotels/restaurants/attractions) + a location's detail + a location's reviews ALL
-// via `api` (default GET -- every op is a READ). There is NO write op (no apiVoid, no
-// {method:'POST'}) and NO payment-verb op-name (search/get/list only) -- partner
-// hotel-booking is OUT OF SCOPE for this read-only slice. www.tripadvisor.com is left
-// SAFE (read-only travel-reviews app); it is in READ_ONLY_SAFE_SERVICES (the 38 MED-02
-// guard) so a future write/booking op would FAIL the build -- and because no op carries
-// a payment verb, the payment-op guard never keys on tripadvisor.
+import {
+  ToolError,
+  fetchText,
+  fetchFromPage,
+  getCookie,
+  getAuthCache,
+  setAuthCache,
+  waitUntil,
+} from '@opentabs-dev/plugin-sdk';
 
-interface ApiOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+const GRAPHQL_URL = '/data/graphql/ids';
+
+interface TripAdvisorAuth {
+  userId: string;
 }
 
-const inert = (helper: string): never => {
-  throw new Error(
-    `tripadvisor-api stub: ${helper} is metadata-only and must never execute at ` +
-      'import time (Wall 1 -- the importer reads .input/.name only).'
-  );
+const getAuth = (): TripAdvisorAuth | null => {
+  const cached = getAuthCache<TripAdvisorAuth>('tripadvisor');
+  if (cached) return cached;
+
+  const tasid = getCookie('TASID');
+  const taautheat = getCookie('TAAUTHEAT');
+  if (!tasid && !taautheat) return null;
+
+  const auth: TripAdvisorAuth = { userId: tasid ?? '' };
+  setAuthCache('tripadvisor', auth);
+  return auth;
 };
 
-// `api` -- generic helper, upstream default method GET. EVERY tripadvisor op is a read (no POST).
-// biome-ignore lint/suspicious/noExplicitAny: inert stub, never executed.
-export const api = async <T>(_endpoint: string, _options: ApiOptions = {}): Promise<T> =>
-  inert('api') as unknown as Promise<T>;
+export const isAuthenticated = (): boolean => getAuth() !== null;
 
-export const isAuthenticated = (): boolean => false;
-export const waitForAuth = async (): Promise<boolean> => false;
+export const waitForAuth = async (): Promise<boolean> => {
+  try {
+    await waitUntil(() => isAuthenticated(), { interval: 500, timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Call TripAdvisor's GraphQL API with pre-registered query IDs.
+ * Requests are batched as JSON arrays.
+ */
+export const graphql = async <T>(
+  queries: Array<{
+    variables: Record<string, unknown>;
+    queryId: string;
+  }>,
+): Promise<T[]> => {
+  const body = queries.map(q => ({
+    variables: q.variables,
+    extensions: { preRegisteredQueryId: q.queryId },
+  }));
+
+  const response = await fetchFromPage(GRAPHQL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const results = (await response.json()) as Array<{ data: T }>;
+  return results.map(r => r.data);
+};
+
+/**
+ * Fetch an SSR-rendered page and extract the urqlSsrData bootstrap.
+ * Returns a record of numeric keys → parsed data objects.
+ */
+export const fetchSsrData = async (path: string): Promise<Record<string, Record<string, unknown>>> => {
+  const html = await fetchText(path, {
+    headers: { Accept: 'text/html' },
+  });
+
+  const dataUriMatch = html.match(/src="data:text\/javascript,([^"]+)"/);
+  const dataUriContent = dataUriMatch?.[1];
+  if (!dataUriContent) throw ToolError.internal('Could not extract SSR bootstrap data.');
+
+  const decoded = decodeURIComponent(dataUriContent);
+  const jsonMatch = decoded.match(/JSON\.parse\("((?:[^"\\]|\\.)*)"\)\)/);
+  const jsonContent = jsonMatch?.[1];
+  if (!jsonContent) throw ToolError.internal('Could not parse SSR bootstrap JSON.');
+
+  const str = jsonContent.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  const bootstrap = JSON.parse(str) as {
+    urqlSsrData?: {
+      results: Record<string, { data: string }>;
+    };
+  };
+
+  if (!bootstrap.urqlSsrData) throw ToolError.internal('No urqlSsrData in bootstrap.');
+
+  const results: Record<string, Record<string, unknown>> = {};
+  for (const [key, entry] of Object.entries(bootstrap.urqlSsrData.results)) {
+    try {
+      results[key] = JSON.parse(entry.data) as Record<string, unknown>;
+    } catch {
+      // Skip malformed entries
+    }
+  }
+
+  return results;
+};
+
+/**
+ * Extract LD+JSON structured data from an SSR-rendered page.
+ */
+export const fetchLdJson = async (path: string): Promise<Record<string, unknown>[]> => {
+  const html = await fetchText(path, {
+    headers: { Accept: 'text/html' },
+  });
+
+  const matches = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g);
+  if (!matches) return [];
+
+  const results: Record<string, unknown>[] = [];
+  for (const m of matches) {
+    try {
+      const json = m.replace(/<script type="application\/ld\+json">/, '').replace(/<\/script>/, '');
+      results.push(JSON.parse(json) as Record<string, unknown>);
+    } catch {
+      // Skip malformed entries
+    }
+  }
+
+  return results;
+};
+
+/**
+ * Find an SSR query result by matching a specific operation name.
+ */
+export const findSsrOperation = (ssrData: Record<string, Record<string, unknown>>, operationName: string): unknown => {
+  for (const entry of Object.values(ssrData)) {
+    if (operationName in entry) {
+      return entry[operationName];
+    }
+  }
+  return null;
+};

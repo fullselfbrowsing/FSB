@@ -1,39 +1,132 @@
-// Vendored metadata slice of the OpenTabs netlify plugin (SHA 4b170216).
-//
-// Wall 1: METADATA ONLY. NO dist/, NO handle() runtime is executed. The importer
-// (scripts/import-opentabs-catalog.mjs) does `await import()` on this module under
-// tsx and reads ONLY the instance's name/urlPatterns + each tool's
-// .name/.description/.input/.group/.summary. defineTool/OpenTabsPlugin resolve from
-// the local sdk-stub (not the real SDK's DOM/fetch surface).
-//
-// Netlify is a REST app (host app.netlify.com -> derived stem 'netlify' via the
-// leading 'app.' strip, NOT in STEM_OVERRIDES). Its ops GET/POST against the Netlify
-// REST API, so the side-effect class derives from the op-name verb + the
-// {method:'...'} literal (api GET=read; api {method:'POST'}=write). This is part of
-// the Phase-37 dev/productivity batch-A sub-batch 3 (gitlab/bitbucket/vercel/netlify
-// -- code-hosting + deploy).
-import { OpenTabsPlugin, type ToolDefinition } from './sdk-stub.js';
+import { OpenTabsPlugin } from '@opentabs-dev/plugin-sdk';
+import type { ToolDefinition } from '@opentabs-dev/plugin-sdk';
+import { isAuthenticated, waitForAuth } from './netlify-api.js';
+
+// Account
+import { getCurrentUser } from './tools/get-current-user.js';
+import { listAccounts } from './tools/list-accounts.js';
+import { getAccount } from './tools/get-account.js';
+import { listAuditEvents } from './tools/list-audit-events.js';
+
+// Members
+import { listMembers } from './tools/list-members.js';
+import { getMember } from './tools/get-member.js';
+
+// Sites
 import { listSites } from './tools/list-sites.js';
 import { getSite } from './tools/get-site.js';
+import { createSite } from './tools/create-site.js';
+import { updateSite } from './tools/update-site.js';
+import { deleteSite } from './tools/delete-site.js';
+
+// Deploys
 import { listDeploys } from './tools/list-deploys.js';
-import { createDeploy } from './tools/create-deploy.js';
+import { getDeploy } from './tools/get-deploy.js';
+import { lockDeploy } from './tools/lock-deploy.js';
+import { unlockDeploy } from './tools/unlock-deploy.js';
+import { restoreDeploy } from './tools/restore-deploy.js';
+import { rollbackDeploy } from './tools/rollback-deploy.js';
+
+// Builds
+import { listBuilds } from './tools/list-builds.js';
+import { createBuild } from './tools/create-build.js';
+
+// Environment Variables
+import { listEnvVars } from './tools/list-env-vars.js';
+import { getEnvVar } from './tools/get-env-var.js';
+import { createEnvVars } from './tools/create-env-vars.js';
+import { updateEnvVar } from './tools/update-env-var.js';
+import { deleteEnvVar } from './tools/delete-env-var.js';
+
+// DNS
+import { listDnsZones } from './tools/list-dns-zones.js';
+import { getDnsZone } from './tools/get-dns-zone.js';
+import { createDnsZone } from './tools/create-dns-zone.js';
+import { listDnsRecords } from './tools/list-dns-records.js';
+import { createDnsRecord } from './tools/create-dns-record.js';
+import { deleteDnsRecord } from './tools/delete-dns-record.js';
+
+// Hooks
+import { listHooks } from './tools/list-hooks.js';
+import { deleteHook } from './tools/delete-hook.js';
+
+// Build Hooks
+import { listBuildHooks } from './tools/list-build-hooks.js';
+import { createBuildHook } from './tools/create-build-hook.js';
+import { deleteBuildHook } from './tools/delete-build-hook.js';
+
+// Deploy Keys
+import { listDeployKeys } from './tools/list-deploy-keys.js';
+import { createDeployKey } from './tools/create-deploy-key.js';
+
+// Forms
+import { listForms } from './tools/list-forms.js';
+import { listFormSubmissions } from './tools/list-form-submissions.js';
+import { deleteSubmission } from './tools/delete-submission.js';
 
 class NetlifyPlugin extends OpenTabsPlugin {
   readonly name = 'netlify';
-  readonly description =
-    'OpenTabs plugin for Netlify — inspect sites and deploys and trigger deploys via the Netlify REST API';
+  readonly description = 'OpenTabs plugin for Netlify';
   override readonly displayName = 'Netlify';
   readonly urlPatterns = ['*://app.netlify.com/*'];
-  override readonly homepage = 'https://app.netlify.com';
   readonly tools: ToolDefinition[] = [
-    // Sites + deploys (the vendored dev/productivity batch-A sub-batch-3 slice)
+    // Account
+    getCurrentUser,
+    listAccounts,
+    getAccount,
+    listAuditEvents,
+    // Members
+    listMembers,
+    getMember,
+    // Sites
     listSites,
     getSite,
+    createSite,
+    updateSite,
+    deleteSite,
+    // Deploys
     listDeploys,
-    createDeploy,
+    getDeploy,
+    lockDeploy,
+    unlockDeploy,
+    restoreDeploy,
+    rollbackDeploy,
+    // Builds
+    listBuilds,
+    createBuild,
+    // Environment Variables
+    listEnvVars,
+    getEnvVar,
+    createEnvVars,
+    updateEnvVar,
+    deleteEnvVar,
+    // DNS
+    listDnsZones,
+    getDnsZone,
+    createDnsZone,
+    listDnsRecords,
+    createDnsRecord,
+    deleteDnsRecord,
+    // Hooks
+    listHooks,
+    deleteHook,
+    // Build Hooks
+    listBuildHooks,
+    createBuildHook,
+    deleteBuildHook,
+    // Deploy Keys
+    listDeployKeys,
+    createDeployKey,
+    // Forms
+    listForms,
+    listFormSubmissions,
+    deleteSubmission,
   ];
+
+  async isReady(): Promise<boolean> {
+    if (isAuthenticated()) return true;
+    return waitForAuth();
+  }
 }
 
-const plugin = new NetlifyPlugin();
-export default plugin;
-export { plugin };
+export default new NetlifyPlugin();

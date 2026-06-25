@@ -1,30 +1,38 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../claude-api.js';
+import { orgApi } from '../claude-api.js';
+import {
+  type RawConversation,
+  type RawMessage,
+  conversationDetailSchema,
+  mapConversation,
+  mapMessage,
+} from './schemas.js';
+
+interface RawConversationDetail extends RawConversation {
+  chat_messages?: RawMessage[];
+}
 
 export const getConversation = defineTool({
   name: 'get_conversation',
   displayName: 'Get Conversation',
-  description: 'Get the full message history of a single Claude conversation by its ID.',
-  summary: 'open a claude conversation',
+  description:
+    'Get a conversation by UUID including its full message history. Returns conversation metadata and all messages with their text content, sender, and ordering.',
+  summary: 'Get a conversation with messages',
   icon: 'message-square',
   group: 'Conversations',
   input: z.object({
-    conversation_id: z.string().min(1).describe('Conversation ID to retrieve'),
+    conversation_uuid: z.string().describe('UUID of the conversation to retrieve'),
   }),
-  output: z.object({
-    conversation: z.object({
-      id: z.string(),
-      name: z.string(),
-      messages: z.array(z.object({ role: z.string(), content: z.string() })),
-    }).describe('The conversation and its messages'),
-  }),
-  handle: async (params: { conversation_id: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /chat_conversations/:id (default method).
-    const data = await api<{ conversation: { id: string; name: string; messages: { role: string; content: string }[] } }>(
-      `/chat_conversations/${encodeURIComponent(params.conversation_id)}`
-    );
-    return { conversation: data.conversation };
+  output: conversationDetailSchema,
+  handle: async params => {
+    const data = await orgApi<RawConversationDetail>(`/chat_conversations/${params.conversation_uuid}`, {
+      query: { tree: 'True', rendering_mode: 'messages' },
+    });
+    const base = mapConversation(data);
+    return {
+      ...base,
+      messages: (data.chat_messages ?? []).map(mapMessage),
+    };
   },
 });

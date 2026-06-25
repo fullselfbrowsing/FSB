@@ -1,33 +1,54 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../jira-api.js';
+import { buildAdfText } from './schemas.js';
 
 export const updateIssue = defineTool({
   name: 'update_issue',
   displayName: 'Update Issue',
-  description: 'Update an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.',
+  description:
+    'Update fields on an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.',
   summary: 'Update an existing issue',
   icon: 'pencil',
   group: 'Issues',
   input: z.object({
-    issue_id_or_key: z.string().min(1).describe('Issue ID or key to update (e.g. ENG-123)'),
+    issue_key: z.string().describe('Issue key (e.g. "KAN-1") or issue ID'),
     summary: z.string().optional().describe('New issue summary/title'),
-    description: z.string().optional().describe('New issue description in markdown'),
-    assignee_account_id: z.string().optional().describe('Account ID of the new assignee'),
-    priority: z.string().optional().describe('New priority name (e.g. High, Medium, Low)'),
-    labels: z.array(z.string()).optional().describe('New labels (replaces existing)'),
+    description: z.string().optional().describe('New issue description in plain text'),
+    priority: z.string().optional().describe('New priority name (e.g. "Highest", "High", "Medium", "Low", "Lowest")'),
+    assignee_id: z
+      .string()
+      .optional()
+      .describe('New assignee account ID (use search_users to find IDs). Pass empty string to unassign.'),
+    labels: z.array(z.string()).optional().describe('Replace all labels with these values'),
   }),
   output: z.object({
-    id: z.string().describe('The updated issue ID'),
-    key: z.string().describe('The updated issue key'),
+    success: z.boolean().describe('Whether the update succeeded'),
   }),
-  handle: async (params: { issue_id_or_key: string; summary?: string }) => {
-    // NEVER executed by the importer. Upstream: api PUT /rest/api/3/issue/:idOrKey.
-    const data = await api<{ id: string; key: string }>(`/rest/api/3/issue/${params.issue_id_or_key}`, {
+  handle: async params => {
+    const fields: Record<string, unknown> = {};
+
+    if (params.summary !== undefined) {
+      fields.summary = params.summary;
+    }
+    if (params.description !== undefined) {
+      fields.description = buildAdfText(params.description);
+    }
+    if (params.priority !== undefined) {
+      fields.priority = { name: params.priority };
+    }
+    if (params.assignee_id !== undefined) {
+      fields.assignee = params.assignee_id ? { accountId: params.assignee_id } : null;
+    }
+    if (params.labels !== undefined) {
+      fields.labels = params.labels;
+    }
+
+    await api(`/issue/${encodeURIComponent(params.issue_key)}`, {
       method: 'PUT',
-      body: { fields: { summary: params.summary } },
+      body: { fields },
     });
-    return data;
+
+    return { success: true };
   },
 });

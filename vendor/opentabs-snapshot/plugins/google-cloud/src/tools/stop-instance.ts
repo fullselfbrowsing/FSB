@@ -1,0 +1,26 @@
+import { defineTool } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+import { gcpApi, resolveProjectId } from '../gcloud-api.js';
+
+export const stopInstance = defineTool({
+  name: 'stop_instance',
+  displayName: 'Stop Instance',
+  description: 'Stop a running Compute Engine VM instance. The instance must be in RUNNING state.',
+  summary: 'Stop a running VM instance',
+  icon: 'square',
+  group: 'Compute',
+  input: z.object({
+    zone: z.string().describe('Zone (e.g., "us-central1-a")'),
+    instance_name: z.string().describe('Instance name'),
+    project_id: z.string().optional().describe('Project ID (defaults to currently active project)'),
+  }),
+  output: z.object({ success: z.boolean().describe('Whether the operation was initiated') }),
+  handle: async params => {
+    const projectId = resolveProjectId(params.project_id);
+    await gcpApi(
+      `https://compute.googleapis.com/compute/v1/projects/${projectId}/zones/${params.zone}/instances/${params.instance_name}/stop`,
+      { method: 'POST' },
+    );
+    return { success: true };
+  },
+});

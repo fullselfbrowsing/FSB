@@ -1,5 +1,4 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
 import { api } from '../todoist-api.js';
 import { type RawTask, mapTask, taskSchema } from './schemas.js';
@@ -9,7 +8,7 @@ export const createTask = defineTool({
   displayName: 'Create Task',
   description:
     'Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.',
-  summary: 'add a new to-do item or task',
+  summary: 'Create a new task',
   icon: 'plus',
   group: 'Tasks',
   input: z.object({
@@ -30,9 +29,25 @@ export const createTask = defineTool({
   output: z.object({
     task: taskSchema.describe('The created task'),
   }),
-  handle: async (params: { content: string }) => {
-    // NEVER executed by the importer (metadata-only read). Upstream: api POST /tasks.
-    const data = await api<RawTask>('/tasks', { method: 'POST', body: { content: params.content } });
+  handle: async params => {
+    const body: Record<string, unknown> = { content: params.content };
+    if (params.description !== undefined) body.description = params.description;
+    if (params.project_id !== undefined) body.project_id = params.project_id;
+    if (params.section_id !== undefined) body.section_id = params.section_id;
+    if (params.parent_id !== undefined) body.parent_id = params.parent_id;
+    if (params.labels !== undefined) body.labels = params.labels;
+    if (params.priority !== undefined) body.priority = params.priority;
+    if (params.due_string !== undefined) body.due_string = params.due_string;
+    if (params.due_date !== undefined) body.due_date = params.due_date;
+    if (params.due_datetime !== undefined) body.due_datetime = params.due_datetime;
+    if (params.assignee_id !== undefined) body.assignee_id = params.assignee_id;
+    if (params.duration !== undefined) body.duration = params.duration;
+    if (params.duration_unit !== undefined) body.duration_unit = params.duration_unit;
+
+    const data = await api<RawTask>('/tasks', {
+      method: 'POST',
+      body,
+    });
     return { task: mapTask(data) };
   },
 });

@@ -1,35 +1,54 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../airtable-api.js';
+import { apiGet } from '../airtable-api.js';
+import { mapRecord, recordSchema } from './schemas.js';
+
+interface RawRecord {
+  id?: string;
+  createdTime?: string;
+  cellValuesByColumnId?: Record<string, unknown>;
+}
+
+interface RawTableData {
+  id?: string;
+  tableId?: string;
+  rows?: RawRecord[];
+}
+
+interface ReadResult {
+  tableDatas?: RawTableData[];
+}
 
 export const listRecords = defineTool({
   name: 'list_records',
   displayName: 'List Records',
-  description: 'List records from an Airtable table. Optionally filter, sort, and page through results.',
-  summary: 'List records in a table',
-  icon: 'list',
+  description:
+    'List all records (rows) in a table. Returns record IDs, creation times, and cell values keyed by field ID. Use get_base_schema first to learn the field IDs and their types.',
+  summary: 'List all records in a table',
+  icon: 'table',
   group: 'Records',
   input: z.object({
-    base_id: z.string().min(1).describe('Base ID containing the table'),
-    table_id_or_name: z.string().min(1).describe('Table ID or name to list records from'),
-    view: z.string().optional().describe('View ID or name to use for filtering/sorting'),
-    filter_by_formula: z.string().optional().describe('Airtable formula to filter records'),
-    max_records: z.number().int().min(1).optional().describe('Maximum number of records to return'),
-    page_size: z.number().int().min(1).max(100).optional().describe('Number of records per page'),
-    offset: z.string().optional().describe('Pagination offset token from a prior response'),
+    base_id: z.string().describe('Base ID (app prefix)'),
+    table_id: z.string().describe('Table ID (tbl prefix)'),
   }),
   output: z.object({
-    records: z
-      .array(z.object({ id: z.string(), fields: z.record(z.string(), z.unknown()) }))
-      .describe('List of records'),
-    offset: z.string().optional().describe('Pagination offset for the next page'),
+    records: z.array(recordSchema).describe('All records in the table'),
   }),
-  handle: async (params: { base_id: string; table_id_or_name: string }) => {
-    // NEVER executed by the importer. Upstream: api GET /:base_id/:table (default method, read).
-    const data = await api<{ records: Array<{ id: string; fields: Record<string, unknown> }> }>(
-      `/${params.base_id}/${params.table_id_or_name}`
+  handle: async params => {
+    const data = await apiGet<ReadResult>(
+      `application/${params.base_id}/read`,
+      {
+        includeDataForTableIds: [params.table_id],
+        shouldIncludeSchemaChecksum: false,
+        mayOnlyIncludeRowAndCellDataForIncludedViews: false,
+        allowMsgpackOfResult: false,
+      },
+      { appId: params.base_id },
     );
-    return data;
+
+    const tableData = (data.tableDatas ?? []).find(td => td.id === params.table_id || td.tableId === params.table_id);
+    const records = (tableData?.rows ?? []).map(mapRecord);
+
+    return { records };
   },
 });

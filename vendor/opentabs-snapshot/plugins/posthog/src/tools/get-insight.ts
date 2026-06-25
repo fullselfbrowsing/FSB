@@ -1,29 +1,25 @@
-// Vendored metadata slice (OpenTabs SHA 4b170216). Wall 1: handle() NEVER executed.
-import { defineTool } from '../sdk-stub.js';
+import { defineTool } from '@opentabs-dev/plugin-sdk';
 import { z } from 'zod';
-import { api } from '../posthog-api.js';
+import { api, getTeamId } from '../posthog-api.js';
+import { type RawInsight, insightSchema, mapInsight } from './schemas.js';
 
 export const getInsight = defineTool({
   name: 'get_insight',
   displayName: 'Get Insight',
-  description: 'Get detailed information about a single PostHog insight by its insight ID.',
-  summary: 'Get an insight by id',
-  icon: 'bar-chart',
+  description:
+    'Get detailed information about a specific insight including its query configuration and dashboard associations.',
+  summary: 'Get insight details',
+  icon: 'bar-chart-3',
   group: 'Insights',
   input: z.object({
-    project_id: z.number().int().describe('PostHog project ID'),
-    insight_id: z.number().int().describe('PostHog insight ID'),
+    insight_id: z.number().int().describe('Insight ID'),
   }),
   output: z.object({
-    id: z.number().describe('Insight ID'),
-    name: z.string().describe('Insight name'),
-    short_id: z.string().optional().describe('Insight short ID'),
+    insight: insightSchema.describe('The insight details'),
   }),
-  handle: async (params: { project_id: number; insight_id: number }) => {
-    // NEVER executed by the importer. Upstream: api GET /projects/:id/insights/:insight_id/ (default method).
-    const data = await api<{ id: number; name: string }>(
-      `/projects/${params.project_id}/insights/${params.insight_id}/`
-    );
-    return data;
+  handle: async params => {
+    const teamId = getTeamId();
+    const data = await api<RawInsight>(`/api/environments/${teamId}/insights/${params.insight_id}/`);
+    return { insight: mapInsight(data) };
   },
 });
