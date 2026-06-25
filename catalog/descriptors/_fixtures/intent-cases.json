@@ -52,6 +52,14 @@
   { "intent": "make a new todoist task", "expectedSlug": "todoist.create_task" },
   { "intent": "create a task on todoist", "expectedSlug": "todoist.create_task" },
 
+  { "intent": "create an issue in linear", "expectedSlug": "linear.create_issue" },
+  { "intent": "open a new linear issue", "expectedSlug": "linear.create_issue" },
+  { "intent": "file a new issue in linear", "expectedSlug": "linear.create_issue" },
+
+  { "intent": "create a task in asana", "expectedSlug": "asana.create_task" },
+  { "intent": "add a new asana task", "expectedSlug": "asana.create_task" },
+  { "intent": "make a task in asana", "expectedSlug": "asana.create_task" },
+
   { "intent": "list the tasks in my todoist", "expectedSlug": "todoist.list_tasks" },
   { "intent": "show me my todoist to-do list", "expectedSlug": "todoist.list_tasks" },
   { "intent": "what tasks do i have in todoist", "expectedSlug": "todoist.list_tasks" },
