@@ -44,6 +44,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const GATE_PATH = path.join(REPO_ROOT, 'scripts', 'verify-classification-gate.mjs');
 const FIXTURE_PATH = path.join(REPO_ROOT, 'catalog', 'descriptors', '_fixtures', 'batch-unclassified-origin.fixture.json');
 const SOCIAL_FIXTURE_PATH = path.join(REPO_ROOT, 'catalog', 'descriptors', '_fixtures', 'batch-unclassified-social-origin.fixture.json');
+const COMMERCE_FIXTURE_PATH = path.join(REPO_ROOT, 'catalog', 'descriptors', '_fixtures', 'batch-unclassified-commerce-origin.fixture.json');
 const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-denylist.js');
 
 (async () => {
@@ -124,6 +125,46 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   ]);
   check(screenedSocialBatch && screenedSocialBatch.failures.length === 0,
     '(d) classifyGate([chatgpt.com, claude.ai, discord.com]) -> 0 failures (the SCREENED comms/social batch is governed and passes)');
+
+  // ---- (e) FAIL-CLOSED on an unclassified COMMERCE/PAYMENT batch origin -------
+  // Phase-39 (BRDTH-02) commerce/travel/misc screening: a commerce/payment batch
+  // origin that trips the WIDENED finance/payment sensitivity axis (checkout/cart/
+  // place-order tokens) but is NOT classified must abort the merge -- the payment
+  // screening enforced as a build failure, distinct from the finance-axis (a) and
+  // social-axis (c) blocks above.
+  const commerceFixture = JSON.parse(fs.readFileSync(COMMERCE_FIXTURE_PATH, 'utf8'));
+  check(commerceFixture && commerceFixture.service === 'checkout.shopcorp.example',
+    'batch-unclassified-commerce-origin fixture present (service checkout.shopcorp.example)');
+  const commerceOrigin = 'https://' + commerceFixture.service;
+  const commerceItem = { origin: commerceOrigin, service: commerceFixture.service, slug: commerceFixture.slug, description: commerceFixture.description };
+
+  const commerceRejected = gate.classifyGate([commerceItem]);
+  check(commerceRejected && Array.isArray(commerceRejected.failures) && commerceRejected.failures.length > 0,
+    '(e) classifyGate([unclassified COMMERCE batch origin]) reports > 0 failures -> the commerce/payment batch merge ABORTS (fail-closed)');
+  check(commerceRejected.failures.length > 0 && /checkout\.shopcorp\.example/.test(commerceRejected.failures.join('\n')),
+    '(e) the failure NAMES the offending commerce batch origin checkout.shopcorp.example');
+  check(commerceRejected.failures.length > 0 && /finance\/payment/.test(commerceRejected.failures.join('\n')),
+    '(e) the failure cites the finance/payment sensitivity axis (the widened payment screening axis)');
+
+  // The commerce fixture is genuinely UNCLASSIFIED -> the failure is the gate doing
+  // its job over the committed roster, not stale data.
+  const commerceClass = Denylist.classify(commerceOrigin);
+  check(commerceClass && commerceClass.denied === false && commerceClass.sensitive === false,
+    '(e) the commerce fixture origin is genuinely UNCLASSIFIED in the denylist (denied:false, sensitive:false)');
+
+  // ---- (f) the SCREENED commerce batch origins PASS --------------------------
+  // Task-1 classified the commerce/travel payment origins sensitive (doordash/amazon/
+  // opentable) so the screened commerce batch is GOVERNED -> classifyGate continues
+  // past each payment origin with 0 failures, and a genuinely read-only commerce
+  // origin (calendly availability) is benign (no payment token trips it). The Phase-39
+  // import (02-06) will NOT abort on these origins.
+  const screenedCommerceBatch = gate.classifyGate([
+    { origin: 'https://www.doordash.com', service: 'www.doordash.com', slug: 'doordash.place_order', description: 'Place a food delivery order on DoorDash' },
+    { origin: 'https://www.opentable.com', service: 'www.opentable.com', slug: 'opentable.reserve_table', description: 'Reserve a table on OpenTable' },
+    { origin: 'https://calendly.com', service: 'calendly.com', slug: 'calendly.get_availability', description: 'Get availability for a Calendly link' },
+  ]);
+  check(screenedCommerceBatch && screenedCommerceBatch.failures.length === 0,
+    '(f) classifyGate([doordash (sensitive payment), opentable (sensitive), calendly (safe read)]) -> 0 failures (the SCREENED commerce batch passes)');
 
   console.log(`\nbreadth-batch-gate: ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
