@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_to_plan
-stopped_at: Completed 37-04-PLAN.md (FINAL dev/productivity data-only sub-batch -- cloudflare/circleci/datadog/sentry/posthog, 20 descriptors via the FROZEN machinery with NO importer edit; cloudflare/datadog emit canonical opentabs__cloudflare__*/opentabs__datadog__* via the 37-01 STEM_OVERRIDES (frozen host stem would be dash/datadoghq); purge_cache destructive, trigger_pipeline{POST}/resolve_issue{PUT} write, crosscheck PASS; snapshot regen 70 opentabs descriptors; eval recall@5=1.000 wrong-invoke=0 over 127 fixtures; breadth-search-return 70 ops/20 collision probes incl datadog-vs-posthog list_dashboards; cold-start 42.6KB/0.68ms within the smoke gate WITHOUT widening) -- Phase 37 ALL 4 plans complete, ready for verification
-last_updated: "2026-06-25T08:03:42.485Z"
-last_activity: 2026-06-25 -- Phase 37 plan 04 executed (FINAL breadth sub-batch; cloud/observability; category COMPLETE; BRDTH-01 done)
+status: executing
+stopped_at: "Completed 37-04-PLAN.md (FINAL dev/productivity data-only sub-batch -- cloudflare/circleci/datadog/sentry/posthog, 20 descriptors via the FROZEN machinery with NO importer edit; cloudflare/datadog emit canonical opentabs__cloudflare__*/opentabs__datadog__* via the 37-01 STEM_OVERRIDES (frozen host stem would be dash/datadoghq -- 0 dash./datadoghq. slugs in the snapshot, service field retains the real hosts); purge_cache destructive (purge verb), trigger_pipeline{POST}/resolve_issue{PUT} write (method-literal floor, no shared verb-set edit), crosscheck PASS over 70 descriptors; snapshot regen 70 opentabs descriptors (INV-01 unchanged); intent-cases +25, breadth-search-return 70 ops/20 collision probes incl datadog-vs-posthog list_dashboards same-op collision -- all wrong-invoke=0; eval recall@5=1.000 wrong-invoke=0 over 127 fixtures; cold-start 42.6KB/0.68ms WITHIN the smoke gate WITHOUT widening (SCALE-01 layout holds, params not indexed). One Rule-1 deviation: a corpus-growth IDF shift tipped a pre-existing list/close eval near-tie ('what tasks do i have in todoist'), fixed at the todoist metadata source -> wrong-invoke restored to 0) -- Phase 37 ALL 4 plans complete (BRDTH-01 category COMPLETE), ready for verification"
+last_updated: "2026-06-25T09:19:59.170Z"
+last_activity: 2026-06-25 -- Phase 38 planning complete
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 3
-  total_plans: 4
-  completed_plans: 4
-  percent: 33
+  total_plans: 15
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -32,8 +32,8 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 38 of 43 (Breadth B — Comms / Social / Content) — not started
 Plan: —
-Status: Phase 37 complete (verified passed, 22/22 must-haves); ready to plan Phase 38
-Last activity: 2026-06-25
+Status: Ready to execute
+Last activity: 2026-06-25 -- Phase 38 planning complete
 
 Progress: [███░░░░░░░] 33% (3/9 phases verified-complete)
 
