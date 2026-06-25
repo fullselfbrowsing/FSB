@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs datadog plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://app.datadoghq.com/* -> service app.datadoghq.com -> host-derived stem 'datadoghq', which is WRONG). The vendored DIR NAME is exactly `datadog` so it matches the Plan-01 STEM_OVERRIDES key ({datadog:'datadog'}) and the importer canonicalizes the stem to 'datadog' (emitting opentabs__datadog__*, NOT opentabs__datadoghq__*). defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, datadog-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. datadog is read-heavy observability -- a depth-shortlist app discoverable from breadth.",
+  "name": "@opentabs-dev/opentabs-plugin-datadog",
+  "version": "0.0.48",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Datadog",
+    "description": "OpenTabs plugin for Datadog",
+    "urlPatterns": [
+      "*://app.datadoghq.com/*"
+    ],
+    "homepage": "https://app.datadoghq.com"
+  },
+  "license": "MIT"
+}

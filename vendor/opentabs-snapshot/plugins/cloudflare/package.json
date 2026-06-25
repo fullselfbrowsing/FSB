@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs cloudflare plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://dash.cloudflare.com/* -> service dash.cloudflare.com -> host-derived stem 'dash', which is WRONG). The vendored DIR NAME is exactly `cloudflare` so it matches the Plan-01 STEM_OVERRIDES key ({cloudflare:'cloudflare'}) and the importer canonicalizes the stem to 'cloudflare' (emitting opentabs__cloudflare__*, NOT opentabs__dash__*). defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, cloudflare-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. cloudflare.purge_cache is the DESTRUCTIVE crosscheck proof for this sub-batch (purge is in the shared DESTRUCTIVE_VERBS set).",
+  "name": "@opentabs-dev/opentabs-plugin-cloudflare",
+  "version": "0.0.51",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Cloudflare",
+    "description": "OpenTabs plugin for Cloudflare",
+    "urlPatterns": [
+      "*://dash.cloudflare.com/*"
+    ],
+    "homepage": "https://dash.cloudflare.com"
+  },
+  "license": "MIT"
+}
