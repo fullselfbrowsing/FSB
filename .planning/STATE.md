@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: "Completed 39-02-PLAN.md (food-delivery + rideshare sub-batch [doordash/ubereats/grubhub/instacart/uber/lyft] imported DOM-only via the frozen machinery on the 39-01 screened-SENSITIVE origins, 94->125 descriptors all backing:dom; every payment op DOM-only-on-sensitive -> payment-op CI guard PASSES; snapshot regenerated INV-01 byte-stable, validate:extension exit 0; all per-wave gates green; 39-03 unblocked)"
-last_updated: "2026-06-25T14:25:19.370Z"
+stopped_at: "Completed 39-04-PLAN.md (travel/transport sub-batch [booking/airbnb/expedia/kayak/opentable] imported DOM-only via the frozen machinery on the 39-01 screened-SENSITIVE origins, 159->183 opentabs descriptors all backing:dom; every booking/reserve payment op DOM-only-on-sensitive -> payment-op CI guard PASSES [proven both directions]; opentable unconditionally sensitive so reserve_table passes with NO guard weakening; cold-start ceiling widened 96KB->512KB + per-descriptor flatness check added [39-03 blocker RESOLVED]; snapshot regenerated INV-01 byte-stable, validate:extension exit 0; all per-wave gates green + full npm test exit 0; 39-05 unblocked)"
+last_updated: "2026-06-25T14:47:48.191Z"
 last_activity: 2026-06-25
 progress:
-  total_phases: 10
+  total_phases: 9
   completed_phases: 4
-  total_plans: 22
-  completed_plans: 20
-  percent: 91
+  total_plans: 7
+  completed_plans: 4
+  percent: 33
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 39 (Breadth C — Commerce / Travel / Misc (most-sensitive)) — EXECUTING
-Plan: 4 of 7
-Status: Ready to execute
+Plan: 5 of 7
+Status: Ready to execute (39-04 complete; travel/transport sub-batch landed DOM-only, cold-start blocker resolved)
 Last activity: 2026-06-25
 
-Progress: [█████████░] 91%
+Progress: [███░░░░░░░] 33% (v1.0.0 phase-level: 4/9 phases complete; Phase 39 at 4/7 plans)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -117,6 +117,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 39]: Phase 39-01 (BRDTH-01/02/03): payment-screening machinery gating the commerce/travel/misc import (denylist + gates + doc + tests, NO importer edit). Classified the batch origins per the payment/money-movement axis in service-denylist.json -- 24 payment-bearing commerce/travel/paid-booking origins sensitive (opentable UNCONDITIONALLY, held-card); 5 money-movement apps (paypal/venmo/cashapp/wise/western-union) denied ahead of vendoring; read-only commerce (calendly/yelp/zillow/grafana) safe by design; DENY-01 + Phase-35/38 roster UNCHANGED. Widened the finance/payment heuristic with SPECIFIC payment tokens (checkout/cart/place[-_ ]order/charge/... -- separator-flexible so place_order trips; NO bare order; the 39 backstop). Added the headline payment-op CI guard checkPaymentOpsNotSafeInvocable to verify-catalog-crosscheck.mjs (dual-exported, in validate:extension): dual-path PAYMENT_VERBS-via-verbPrefix {buy,book,place,reserve,checkout,pay,purchase,charge,order,request,register} (NOT in WRITE_VERBS, defined in the guard) + literal PAYMENT_OP_NAMES (create_order/complete_booking/...) covering ALL 12 phase-39 payment op-names; FAILS a payment op that is backing recipe/handler OR on a safe origin; PASSES DOM-only on a sensitive origin (reserve_table/opentable). crossCheck/checkReadOnlySafeOrigins/side-effect-class.mjs/importer untouched. docs/LEGAL.md axis 3 extended (payment classification + triple money-no-movement-under-Auto mitigation). Proofs: batch-unclassified-commerce-origin fixture -> breadth-batch-gate (e) aborts citing finance/payment, (f) screened commerce passes (19/0); payment-op-safe-invocable fixture + tests/payment-op-guard.test.js per-verb-family proof (buy_tickets/book_flight/request_ride/place_bid/create_order/place_order each fail safe-invocable; DOM-only-on-sensitive passes; yelp/calendly read-only-safe pass; 20/0; registered after sensitive-write-import-gate). Committed corpus has zero payment ops yet (audited). validate:extension exit 0; regression sweep + eval (recall@5=1.000 wrong-invoke=0.000/154) green. Commits 38fb3213/41be2993/585ce074. 39-02..06 UNBLOCKED.
 - [Phase ?]: 39-03: 7 retail/marketplace apps (amazon/ebay/etsy/bestbuy/costco/walmart/target) imported DOM-only via the frozen importer (34 descriptors, 133->167); every payment op backing:'dom' on a 39-01 sensitive origin -> payment-op CI guard PASSES; 7 STEM_OVERRIDES data-map entries (0 opentabs__www__*)
 - [Phase ?]: 39-03 [Rule 1]: todoist.create_task summary -> 'add a new to-do item or task' (re-imported via frozen machinery) to restore the to-do-item intent that the new etsy add_to_cart op's broken auto-synonym ('add a to cart') tipped -- eval wrong-invoke 0.005->0.000, no cross-app create_* probe regressed
+- [Phase 39]: Phase 39-04 (BRDTH-01/02/03 -- the travel/transport sub-batch, imported DOM-only on SCREENED paid-booking/held-card origins via the frozen machinery; batch C sub-batch 3, the most-sensitive category): vendored booking (www.booking.com, 5 ops: search_stays/get_property/list_bookings + complete_booking + cancel_booking), airbnb (www.airbnb.com, 5 ops: search_listings/get_listing/list_trips + book_stay + cancel_reservation), expedia (www.expedia.com, 5 ops: search_flights/search_hotels/list_trips + book_flight + book_hotel), kayak (www.kayak.com, 4 ops: search_flights/search_hotels/get_price_alert + create_price_alert), opentable (www.opentable.com, 5 ops: search_restaurants/get_restaurant/list_reservations + reserve_table + cancel_reservation) as 5 hermetic metadata-only slices (verbatim sdk-stub identity factory + inert api/apiVoid throwers; NO dist/, NO executed handle(); provenance-scaffold clean). STEM RESOLUTION (the ONLY importer touch, a data-map entry): each vendors *://www.<app>.com/* (the exact www origins 39-01 screened sensitive) AND 5 STEM_OVERRIDES {booking,airbnb,expedia,kayak,opentable} canonicalize the 'www'-derived stems to opentabs__<app>__* (0 opentabs__www__* slugs; the SAME first-label-isn't-app-name canonicalization the 39-02/03 commerce apps + cloudflare/datadog/threads use -- a DATA-MAP extension, INV-01 holds). 39-01's classifications NOT changed. Ran the FROZEN importer with ZERO logic edit -> enumerateBatchApps auto-discovered the 5 dirs, emitted 24 descriptors (159->183 opentabs), EVERY one backing:'dom'; the merge-time classifyGate PASSED (all 5 origins sensitive via 39-01, opentable UNCONDITIONAL -- no abort). SECURITY (the headline): every booking/reserve op (complete_booking/book_stay/book_flight/book_hotel/reserve_table) is a PAYMENT op (book/reserve in PAYMENT_VERBS; complete_booking/book_flight/book_hotel/book_stay also in PAYMENT_OP_NAMES) classed WRITE via the {method:'POST'} literal (book/reserve are NOT side-effect WRITE_VERBS) AND backing:'dom' on a sensitive origin -> verify-catalog-crosscheck.mjs checkPaymentOpsNotSafeInvocable PASSES (DOM-only-on-sensitive, NOT safe-and-API-invocable); PROVEN BOTH DIRECTIONS (0 failures on-sensitive; the SAME 5 ops fire 5 failures on a synthetic safe origin -- no false-negative). kayak.create_price_alert is a NON-payment write ('create' not a PAYMENT_VERB, 'create_price_alert' not a PAYMENT_OP_NAME) -> correctly NOT keyed. cancel_booking/cancel_reservation class DESTRUCTIVE (apiVoid {method:'DELETE'}); search_*/get_*/list_* class read. NO guard weakening (T-39-07): opentable's unconditional sensitivity makes reserve_table DOM-only-on-sensitive. Snapshot regenerated via package-extension.mjs (191 descriptors; INV-01 IIFE first-line + djb2/dual-export tail byte-stable, only DATA grew); validate:extension exits 0 (191 corpus + 23 roster classified/benign; recipe-path-guard + classification-gate + crosscheck green). no-dead-entry green (9/0). intent-cases.json +23 read/payment-write/destructive cases; seed-descriptors.json importer-fed (171->195, NOT hand-edited). breadth-search-return widened (corpusFiles regex + floor->183; +8 cross-app travel collision probes: booking-vs-airbnb stay, expedia flight-vs-hotel, kayak-vs-expedia flight search, opentable dinner reservation) -> 70/0 recall@5=1.000 wrong-invoke=0.000 over 183 ops / 58 probes. capability-search-eval recall@5=1.000 wrong-invoke=0.000 over 227 fixtures. COLD-START (orchestrator decision applied, the 39-03 blocker RESOLVED): widened the smoke byte ceiling 96KB->512KB (108.6KB at flat 570 bytes/descriptor, legitimate LINEAR growth -- NO params leak), KEPT the tight <10ms load-time assert (1.36ms), ADDED a per-descriptor footprint flatness check (<700 bytes/descriptor -- the real params-leak regression signal, 570<700) and a comment noting the grown count + that the Phase-43 SCALE-01 full-corpus cold-start gate stays separate. 1 deviation: [Rule 1, scope-bounded, caused by this import] a PRE-EXISTING circleci collision probe ('kick off a pipeline on circleci' -> trigger_pipeline) tipped to get_pipeline by the +24-descriptor corpus-global IDF shift (was wrong-invoke=0 at 39-03), fixed at the circleci METADATA SOURCE (strengthened trigger_pipeline summary/description, re-imported via the frozen machinery, NO seed hand-edit -- the 37-04/39-02 precedent), restoring breadth wrong-invoke=0/58; the probe stays a held-out paraphrase (no-verbatim guard passes). Commits 718cb72e (5 slices + STEM_OVERRIDES + PIN.md) / 36d69ab3 (import + snapshot + intent-cases + breadth/eval gates + cold-start widening + Rule-1 fix). full npm test exit 0. 39-05 UNBLOCKED. (NOTE: state.update-progress + state.record-metric SDK handlers NOT run -- the 37-04/38-02/38-03/39-02 runs documented update-progress miscomputes the multi-milestone block; the Current Position + frontmatter progress are set by hand to the v1.0.0 phase-level framing total_phases=9/completed_phases=4/total_plans=7/completed_plans=4 per the established convention. record-metric rejected the positional args + this STATE.md has no Performance Metrics table, so it was skipped consistent with prior plans.)
 
 ### Pending Todos
 
@@ -124,10 +125,9 @@ None yet.
 
 ### Blockers/Concerns
 
-yet.
+None active.
 
-- test
-- 39-03 cold-start circuit-breaker FLAG: the eval smoke index reached 93.3KB / 96KB ceiling (2.9% headroom, below the ~15% threshold) after the retail/marketplace sub-batch (171 seed descriptors, flat ~558 bytes/descriptor, no params leak). The <96KB gate STILL PASSES so 39-03 completed all gates green; but 39-04 will likely exceed 96KB. DECISION before 39-04: widen the smoke ceiling (38-02/39-02 plan-authorized precedent for legitimate linear growth at a flat footprint) OR intervene on index layout. The plan forbids pre-emptive widening (only widen when the index EXCEEDS the gate), so 39-03 flagged-not-widened.
+- ~~39-03 cold-start circuit-breaker FLAG (the eval smoke index reached 93.3KB / 96KB after the retail/marketplace sub-batch)~~ **RESOLVED by 39-04** per the orchestrator decision: the smoke byte ceiling was widened 96KB->512KB (the 96KB ceiling was sized for a tiny corpus; 39-04 reached 108.6KB at a flat 570 bytes/descriptor -- legitimate linear corpus growth, NO params-leak/layout regression). The tight <10ms load-time assert (the real cold-start latency concern) is KEPT, and a NEW per-descriptor footprint flatness check (<700 bytes/descriptor -- the real params-leak regression signal) was ADDED. 512KB is well within the SCALE-01 ~1-2MB full-corpus target; the authoritative full-corpus SCALE-01 cold-start gate (size + load-time) remains Phase 43, kept separate. 39-05/06 have ample headroom under 512KB.
 
 ## Deferred Items
 
@@ -152,8 +152,8 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-25T14:24:56.158Z
-Stopped at: Completed 39-02-PLAN.md (food-delivery + rideshare sub-batch [doordash/ubereats/grubhub/instacart/uber/lyft] imported DOM-only via the frozen machinery on the 39-01 screened-SENSITIVE origins, 94->125 descriptors all backing:dom; every payment op DOM-only-on-sensitive -> payment-op CI guard PASSES; snapshot regenerated INV-01 byte-stable, validate:extension exit 0; all per-wave gates green; 39-03 unblocked)
+Last session: 2026-06-25T14:47:48.186Z
+Stopped at: Completed 39-04-PLAN.md (travel/transport sub-batch [booking/airbnb/expedia/kayak/opentable] imported DOM-only via the frozen machinery on the 39-01 screened-SENSITIVE origins, 159->183 opentabs descriptors all backing:dom; every booking/reserve payment op DOM-only-on-sensitive -> payment-op CI guard PASSES [proven both directions; opentable unconditional so reserve_table passes with NO guard weakening]; kayak.create_price_alert non-payment write not keyed; cold-start ceiling widened 96KB->512KB + per-descriptor flatness check added [39-03 blocker RESOLVED]; snapshot regenerated INV-01 byte-stable, validate:extension exit 0; all per-wave gates green + full npm test exit 0; 39-05 unblocked)
 Resume file: None
 
 ## Next Actions
