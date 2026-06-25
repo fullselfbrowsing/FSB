@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: verifying
+status: ready_to_plan
 stopped_at: "Completed 39-07-PLAN.md (Phase 39 CLOSE -- the full-corpus coverage report [success criterion 3] + the end-to-end payment-write proof + the full-corpus gate re-assert; NO new descriptors, report + proof only). scripts/coverage-report.mjs (dual-export reportCoverage()+CLI) emits the head(8)/learn-on-visit(0)/DOM-only(228)/dead(0) breakdown across the complete real-app set (236 descriptors, realAppCount=56 services vs the ~117 milestone target), bucketing by backing + cross-checking each slug via capability-catalog.js resolve() (heads seeded to T1a/T1b) -- zero dead entries asserted over the COMPLETE corpus. tests/coverage-report.test.js (18/0) drives the REAL reportCoverage + VERIFIES completeness against 39-06-REMAINING-APPS.md (every VENDORED+IMPORTED row -- shopify/craigslist/dominos/chipotle/zillow/grafana -- has a catalog descriptor, else FAIL naming the gap) + asserts the 30-app Phase-39 batch (134 descriptors) is DOM-only + no payment op (25) is API-invocable. THE HEADLINE: tests/sensitive-write-import-gate.test.js extended (30/0) with a doordash block mirroring the discord canary EXACTLY -- the REAL emitted opentabs__doordash__place_order.json (www.doordash.com sensitive, sideEffectClass write read from the JSON, backing dom) through the LIVE posture-B gate: read (list_orders) -> allow, payment write WITHOUT the per-origin mutating flag -> RECIPE_CONSENT_MUTATING_REQUIRED (dual-field byte-exact, INV-03), setOriginMutating(true) -> allow. No order placed under Auto -- money-no-movement proven on a SHIPPED payment descriptor. Full-corpus gate GREEN: validate:extension + crosscheck (incl payment-op guard) + no-dead-entry + capability-search-eval (recall@5=1.000 wrong-invoke=0.000) + coverage-report + full npm test ALL exit 0. Snapshot byte-identical to 39-06 (report+proof only), cold-start UNCHANGED 136.2KB/375.8KB headroom/73.4% of the 512KB budget; INV-01 untouched, no new packages, 0 deviations. Commits 2250ac57/42259696. PHASE 39 COMPLETE (all 7 plans) -- ready for verification, then Phase 40 (Depth 1 hand-ports)."
 last_updated: "2026-06-25T15:53:00.000Z"
 last_activity: 2026-06-25
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 7
   completed_plans: 7
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -26,16 +26,16 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 39 — Breadth C — Commerce / Travel / Misc (most-sensitive)
+**Current focus:** Phase 39.5 — Full OpenTabs Source Import (real ~117-plugin / ~2,374-op catalog) [INSERTED for true parity]
 
 ## Current Position
 
-Phase: 39 (Breadth C — Commerce / Travel / Misc (most-sensitive)) — COMPLETE
-Plan: 7 of 7 (all complete)
-Status: Phase complete — ready for verification
+Phase: 39.5 of 43 (Full OpenTabs Source Import — INSERTED) — not started
+Plan: —
+Status: Phase 39 complete (machinery verified; full ~117-app coverage → Phase 39.5 per user's full-parity choice); ready to plan Phase 39.5
 Last activity: 2026-06-25
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 50% (5/10 milestone phases complete — 39.5 inserted for full OpenTabs parity)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -46,6 +46,7 @@ Progress: [██████████] 100%
 | 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | ✓ Complete (2026-06-25) |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
+| 39.5 | Full OpenTabs Source Import (real ~117-plugin / ~2,374-op) [INSERTED] | (continues BRDTH-01..03; closes parity) | Not started |
 | 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
 | 41 | Depth 2 — Remaining Hand-Ports + Guarded Writes | DEPTH-02 (1) | Not started |
 | 42 | Discovery Seeding + Tail Learn | DSEED-01..02 (2) | Not started |
