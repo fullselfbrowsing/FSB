@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs vercel plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://vercel.com/* -> service vercel.com -> derived stem 'vercel'; NOT in STEM_OVERRIDES because the host derives correctly). defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, vercel-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node.",
+  "name": "@opentabs-dev/opentabs-plugin-vercel",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Vercel",
+    "description": "OpenTabs plugin for Vercel",
+    "urlPatterns": [
+      "*://vercel.com/*"
+    ],
+    "homepage": "https://vercel.com"
+  },
+  "license": "MIT"
+}
