@@ -118,7 +118,7 @@
   - [x] 39-04-PLAN.md -- Import the travel/transport sub-batch (booking, airbnb, expedia, kayak, opentable); regen snapshot; per-wave gates incl. the payment-op guard [wave 4] (BRDTH-01/02/03)
   - [x] 39-05-PLAN.md -- Import the events/local-services/scheduling sub-batch (ticketmaster, stubhub, eventbrite [sensitive]; yelp, tripadvisor, calendly [safe, read-only-locked]); extend the roster + READ_ONLY_SAFE; regen snapshot; per-wave gates [wave 5] (BRDTH-01/02/03)
   - [x] 39-06-PLAN.md -- Import the remaining commerce/misc apps (shopify, craigslist, dominos, chipotle [sensitive]; zillow, grafana [safe]) completing coverage of ALL real apps; regen snapshot; per-wave gates [wave 6] (BRDTH-01/02/03)
-  - [ ] 39-07-PLAN.md -- Full-corpus coverage report (head/learn-on-visit/DOM-only/dead across ~117 apps) + the END-TO-END payment-write proof on a REAL emitted payment descriptor (place_order -> RECIPE_CONSENT_MUTATING_REQUIRED, posture B) + the full-corpus gate re-assert [wave 7] (BRDTH-01/02/03)
+  - [x] 39-07-PLAN.md -- Full-corpus coverage report (head/learn-on-visit/DOM-only/dead across ~117 apps) + the END-TO-END payment-write proof on a REAL emitted payment descriptor (place_order -> RECIPE_CONSENT_MUTATING_REQUIRED, posture B) + the full-corpus gate re-assert [wave 7] (BRDTH-01/02/03)
 
 ### Phase 40: Depth 1 — Top READ Hand-Ports
 **Goal**: Upgrade the hot subset already discoverable from breadth by hand-porting the highest-value READ heads as first-class T1a/T1b handlers exactly like the shipped `github.js` — own first-party origin, `executeBoundSpec`-only, scraped tokens never logged — so the most-used reads run on the API fast path instead of DOM. This phase OWNS DEPTH-01 (the hand-port contract + the read heads); Phase 41 owns the guarded-write requirement.
@@ -172,7 +172,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete    | 2026-06-24 |
 | 37. Breadth A — Dev / Productivity | 4/4 | Complete    | 2026-06-25 |
 | 38. Breadth B — Comms / Social / Content | 3/3 | Complete    | 2026-06-25 |
-| 39. Breadth C — Commerce / Travel / Misc | 6/7 | In Progress|  |
+| 39. Breadth C — Commerce / Travel / Misc | 7/7 | Complete   | 2026-06-25 |
 | 40. Depth 1 — Top READ Hand-Ports | 0/TBD | Not started | - |
 | 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 0/TBD | Not started | - |
 | 42. Discovery Seeding + Tail Learn | 0/TBD | Not started | - |
