@@ -128,7 +128,12 @@
   2. STEM_OVERRIDES is extended for all ~40 wrong/colliding-stem apps (6 collision groups incl 4-way `console`) with a CI no-duplicate-stem assertion; 0 colliding `opentabs__<stem>__*` filenames.
   3. All ~114 origins are denylist-classified before merge (classifyGate fail-closed); linkedin.com + youtube.com classified; commerce/payment brands kept SENSITIVE (conservative — reads under Auto, future writes gated) so NO payment op is safe-and-API-invocable (the payment-op guard passes at full scale).
   4. The serialized search index + cold-start stay within the SCALE-01 budget (assert index < ~2MB + loadJSON+first-search < ~100ms at the full ~2,374-op corpus); crosscheck + no-dead-entry + eval (recall@5, wrong-invoke=0) + full `npm test` green; Wall 1 holds (no opentabs/sdk runtime shipped); INV-01 IIFE/djb2 shape intact.
-**Plans**: TBD (planned from FULL-PARITY-SPIKE.md)
+**Plans**: 5 plans (planned from FULL-PARITY-SPIKE.md)
+- [ ] 39.5-01-PLAN.md — Fetch the pinned-SHA tarball + vendor the 117 real plugin slices (augment-preserving: 13 hand-only + grafana preserved) + PIN/provenance + the Wave-0 augment guard test [wave 1]
+- [ ] 39.5-02-PLAN.md — Extend STEM_OVERRIDES (~40, collision-free) + the no-duplicate-stem CI gate + the target.apply_promo_code carve + the grafana/sqlpad skip [wave 2]
+- [ ] 39.5-03-PLAN.md — Re-screen: classify linkedin (sensitive) + youtube (denied) + the conservative commerce reconciliation + the full-corpus classifyGate test [wave 3]
+- [ ] 39.5-04-PLAN.md — Run the full import (~2,374 descriptors, augment) + regenerate the catalog + pass the full-scale gates (classifyGate / crosscheck+payment-op / no-dead-entry / no-dup-stem) + update the coverage test [wave 4]
+- [ ] 39.5-05-PLAN.md — Full-corpus SCALE assert (index <~2MB, cold-start <~100ms) + coverage close (realAppCount ~130) + full `npm test` green [wave 5]
 
 ### Phase 40: Depth 1 — Top READ Hand-Ports
 **Goal**: Upgrade the hot subset already discoverable from breadth by hand-porting the highest-value READ heads as first-class T1a/T1b handlers exactly like the shipped `github.js` — own first-party origin, `executeBoundSpec`-only, scraped tokens never logged — so the most-used reads run on the API fast path instead of DOM. This phase OWNS DEPTH-01 (the hand-port contract + the read heads); Phase 41 owns the guarded-write requirement.
