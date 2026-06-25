@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_for_verification
+status: ready_to_plan
 stopped_at: Completed 37-04-PLAN.md (FINAL dev/productivity data-only sub-batch -- cloudflare/circleci/datadog/sentry/posthog, 20 descriptors via the FROZEN machinery with NO importer edit; cloudflare/datadog emit canonical opentabs__cloudflare__*/opentabs__datadog__* via the 37-01 STEM_OVERRIDES (frozen host stem would be dash/datadoghq); purge_cache destructive, trigger_pipeline{POST}/resolve_issue{PUT} write, crosscheck PASS; snapshot regen 70 opentabs descriptors; eval recall@5=1.000 wrong-invoke=0 over 127 fixtures; breadth-search-return 70 ops/20 collision probes incl datadog-vs-posthog list_dashboards; cold-start 42.6KB/0.68ms within the smoke gate WITHOUT widening) -- Phase 37 ALL 4 plans complete, ready for verification
 last_updated: "2026-06-25T08:03:42.485Z"
 last_activity: 2026-06-25 -- Phase 37 plan 04 executed (FINAL breadth sub-batch; cloud/observability; category COMPLETE; BRDTH-01 done)
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 4
   completed_plans: 4
   percent: 33
@@ -26,16 +26,16 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 37 — Breadth A — Dev / Productivity (least-sensitive)
+**Current focus:** Phase 38 — Breadth B — Comms / Social / Content (sensitivity-screened)
 
 ## Current Position
 
-Phase: 37 (Breadth A — Dev / Productivity (least-sensitive)) — READY FOR VERIFICATION
-Plan: 4 of 4 (37-01 + 37-02 + 37-03 + 37-04 ALL complete)
-Status: Phase 37 execution complete (4/4 plans); ready for phase verification
-Last activity: 2026-06-25 -- Phase 37 plan 04 executed (FINAL breadth sub-batch; cloud/observability; BRDTH-01 category COMPLETE)
+Phase: 38 of 43 (Breadth B — Comms / Social / Content) — not started
+Plan: —
+Status: Phase 37 complete (verified passed, 22/22 must-haves); ready to plan Phase 38
+Last activity: 2026-06-25
 
-Progress: [███░░░░░░░] 33% (2/9 phases verified-complete; Phase 37 execution done 4/4 plans, pending verification)
+Progress: [███░░░░░░░] 33% (3/9 phases verified-complete)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -43,7 +43,7 @@ Progress: [███░░░░░░░] 33% (2/9 phases verified-complete; Ph
 |-------|------|--------------|--------|
 | 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
 | 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | ✓ Complete (2026-06-24) |
-| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | In Progress (3/4 plans, 2026-06-25) |
+| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | ✓ Complete (2026-06-25) |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | Not started |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | Not started |
 | 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
@@ -148,7 +148,7 @@ Resume file: None
 
 ## Next Actions
 
-Verify Phase 37 (Breadth A — Dev / Productivity, least-sensitive — BRDTH-01/02/03). All 4 plans are execution-complete: 37-01 built the breadth-contract machinery (enumerateBatchApps + STEM_OVERRIDES{jira,confluence,cloudflare,datadog} + synonyms + classifyGate + seed-feeding + generalized no-dead-entry loader); 37-02/03/04 are the three data-only sub-batches (clickup/jira/confluence/airtable; gitlab/bitbucket/vercel/netlify; cloudflare/circleci/datadog/sentry/posthog) that proved the contract reuses VERBATIM with zero machinery change FOUR times -- the full dev/PM/cloud/observability category is now imported (16 apps, 70 descriptors) and returns from search with synonyms + side-effect class + backing, crosscheck/no-dead-entry/eval/breadth-search-return/cold-start all green on the complete batch. Recommended: run the Phase 37 verifier, then plan Phase 38 (Breadth B — Comms / Social / Content, sensitivity-screened -- the same frozen contract for a new category). NOTE for verification: the state.update-progress SDK handler miscomputed this multi-milestone STATE.md's progress block (total_plans=12/completed_plans=14/percent=100); it was hand-corrected to the v1.0.0 phase-level framing (9 phases, 2 verified-complete, Phase 37 done 4/4 pending verification, percent 33).
+Plan Phase 38 (Breadth B — Comms / Social / Content, sensitivity-screened — continues BRDTH-01/02/03 for a new, more-sensitive category). Phase 37 is complete + verified (22/22): the full dev/PM/cloud/observability category (16 apps, 70 descriptors) imports via the frozen Phase-36 pipeline + the 37-01 breadth-contract machinery (enumerateBatchApps + STEM_OVERRIDES + synonyms with held-out-paraphrase wrong-invoke=0 proof + classifyGate merge-gate + seed-feeding + generalized no-dead-entry loader). The contract reused VERBATIM with zero machinery change across 37-02/03/04 — proving 38/39 can reuse it for new categories. Phase 38 is the FIRST batch where ToS-hostility + write-sensitivity bite: import comms/social/content apps ONLY after Phase-35 covers their origin (the classifyGate merge-gate enforces this fail-closed), and route ToS-hostile apps (the DENY-01 denied set: netflix/spotify/twitch/etc.) to DOM-only/denied rather than API-invocable. The sensitive set (IG/FB/TikTok/X, messaging writes) stays sensitive (reads under Auto, writes mutating-gated via posture B). NOTE (carry-forward from 37 review, LOW-03 fully fixed): the synonym backfill noise is closed; no carry-forward items remain. Recommended: `/gsd-plan-phase 38`. Side Phase 999.1 (click heuristics) is Backlog — NOT v1.0.0; the autonomous run skips it.
 
 ### (historical) Phase 37 planning context
 

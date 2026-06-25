@@ -24,8 +24,8 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 ### BRDTH -- Breadth: All-App Descriptor Import
 
 - [x] **BRDTH-01**: Descriptors for all real OpenTabs apps (excluding the e2e-test / prescript-test fixtures and the DENY-01 denied set) are imported and returned by `search_capabilities`, with intent synonyms and side-effect class per op.
-- [ ] **BRDTH-02**: Apps are imported in category batches ordered least-sensitive -> most-sensitive; each batch is gated on its origins being denylist-classified (DENY-03) before merge.
-- [ ] **BRDTH-03**: Each imported descriptor carries an invocability/backing-status signal (recipe / handler / learn-pending / DOM) so a user or agent can distinguish day-one-invocable apps from discovery-pending ones.
+- [x] **BRDTH-02**: Apps are imported in category batches ordered least-sensitive -> most-sensitive; each batch is gated on its origins being denylist-classified (DENY-03) before merge.
+- [x] **BRDTH-03**: Each imported descriptor carries an invocability/backing-status signal (recipe / handler / learn-pending / DOM) so a user or agent can distinguish day-one-invocable apps from discovery-pending ones.
 
 ### DEPTH -- Depth: Hand-Ported Handlers (~15-30 apps)
 
@@ -81,8 +81,8 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 | CGEN-03 | Phase 36 | Complete |
 | CGEN-04 | Phase 36 | Complete |
 | BRDTH-01 | Phase 37 | Complete |
-| BRDTH-02 | Phase 37 | Pending |
-| BRDTH-03 | Phase 37 | Pending |
+| BRDTH-02 | Phase 37 | Complete |
+| BRDTH-03 | Phase 37 | Complete |
 | DEPTH-01 | Phase 40 | Pending |
 | DEPTH-02 | Phase 41 | Pending |
 | DSEED-01 | Phase 42 | Pending |
