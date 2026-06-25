@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_to_plan
-stopped_at: "Completed 39-07-PLAN.md (Phase 39 CLOSE -- the full-corpus coverage report [success criterion 3] + the end-to-end payment-write proof + the full-corpus gate re-assert; NO new descriptors, report + proof only). scripts/coverage-report.mjs (dual-export reportCoverage()+CLI) emits the head(8)/learn-on-visit(0)/DOM-only(228)/dead(0) breakdown across the complete real-app set (236 descriptors, realAppCount=56 services vs the ~117 milestone target), bucketing by backing + cross-checking each slug via capability-catalog.js resolve() (heads seeded to T1a/T1b) -- zero dead entries asserted over the COMPLETE corpus. tests/coverage-report.test.js (18/0) drives the REAL reportCoverage + VERIFIES completeness against 39-06-REMAINING-APPS.md (every VENDORED+IMPORTED row -- shopify/craigslist/dominos/chipotle/zillow/grafana -- has a catalog descriptor, else FAIL naming the gap) + asserts the 30-app Phase-39 batch (134 descriptors) is DOM-only + no payment op (25) is API-invocable. THE HEADLINE: tests/sensitive-write-import-gate.test.js extended (30/0) with a doordash block mirroring the discord canary EXACTLY -- the REAL emitted opentabs__doordash__place_order.json (www.doordash.com sensitive, sideEffectClass write read from the JSON, backing dom) through the LIVE posture-B gate: read (list_orders) -> allow, payment write WITHOUT the per-origin mutating flag -> RECIPE_CONSENT_MUTATING_REQUIRED (dual-field byte-exact, INV-03), setOriginMutating(true) -> allow. No order placed under Auto -- money-no-movement proven on a SHIPPED payment descriptor. Full-corpus gate GREEN: validate:extension + crosscheck (incl payment-op guard) + no-dead-entry + capability-search-eval (recall@5=1.000 wrong-invoke=0.000) + coverage-report + full npm test ALL exit 0. Snapshot byte-identical to 39-06 (report+proof only), cold-start UNCHANGED 136.2KB/375.8KB headroom/73.4% of the 512KB budget; INV-01 untouched, no new packages, 0 deviations. Commits 2250ac57/42259696. PHASE 39 COMPLETE (all 7 plans) -- ready for verification, then Phase 40 (Depth 1 hand-ports)."
-last_updated: "2026-06-25T15:53:00.000Z"
-last_activity: 2026-06-25
+status: executing
+stopped_at: "Completed 39-06-PLAN.md (COMPLETION sub-batch -- the 6 remaining real apps imported DOM-only via the frozen machinery, 204->228 opentabs descriptors all backing:dom: shopify/dominos/chipotle sensitive+payment [create_order/place_order DOM-only-on-sensitive -> payment-op CI guard PASSES], craigslist sensitive marketplace, zillow/grafana safe+read-only [added to READ_ONLY_SAFE_SERVICES]; real-app coverage of the vendored OpenTabs surface COMPLETE [53 dirs, 0 unaccounted]; DERIVED completeness manifest 39-06-REMAINING-APPS.md produced [the contract 39-07 verifies against]; 2 Rule-2 screening fixes [craigslist -> apex-suffix *.craigslist.org; *.myshopify.com added -- the Shopify storefront payment origin]; 6 STEM_OVERRIDES data-map entries [0 opentabs__www__*]; snapshot regenerated INV-01 byte-stable [236 descriptors], validate:extension exit 0; all per-wave gates green + full npm test exit 0; cold-start headroom 375.8KB/73.4% of the 512KB budget -- circuit breaker NOT fired; 39-07 unblocked)"
+last_updated: "2026-06-25T19:59:55.141Z"
+last_activity: 2026-06-25 -- Phase 39.5 planning complete
 progress:
-  total_phases: 9
-  completed_phases: 6
-  total_plans: 7
-  completed_plans: 7
-  percent: 67
+  total_phases: 11
+  completed_phases: 5
+  total_plans: 27
+  completed_plans: 24
+  percent: 89
 ---
 
 # Project State
@@ -32,8 +32,8 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 39.5 of 43 (Full OpenTabs Source Import — INSERTED) — not started
 Plan: —
-Status: Phase 39 complete (machinery verified; full ~117-app coverage → Phase 39.5 per user's full-parity choice); ready to plan Phase 39.5
-Last activity: 2026-06-25
+Status: Ready to execute
+Last activity: 2026-06-25 -- Phase 39.5 planning complete
 
 Progress: [█████░░░░░] 50% (5/10 milestone phases complete — 39.5 inserted for full OpenTabs parity)
 
