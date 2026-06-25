@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: Completed 37-01-PLAN.md (breadth contract machinery -- importer batch-enumeration + STEM_OVERRIDES + MED-03 synonyms + backing + merge-time batch gate + eval seed-feeding; vendored linear/asana; generalized no-dead-entry loader; 3 Wave-0 proof tests; snapshot regen) -- Phase 37 plan 1 of 4
-last_updated: "2026-06-25T00:00:00.000Z"
-last_activity: 2026-06-25 -- Phase 37 plan 01 executed (BRDTH-01/02/03 machinery + Wave-0 tests)
+stopped_at: Completed 37-02-PLAN.md (clickup/jira/confluence/airtable data-only sub-batch -- 18 descriptors emitted via the FROZEN 37-01 machinery with NO importer edit; jira!=confluence distinct slugs via STEM_OVERRIDES on the shared *.atlassian.net host; airtable.delete_record destructive crosscheck; snapshot regen 42 descriptors; eval extended to 86 fixtures green) -- Phase 37 plan 2 of 4
+last_updated: "2026-06-25T07:26:35.788Z"
+last_activity: 2026-06-25 -- Phase 37 plan 02 executed (2nd breadth sub-batch; contract reused verbatim)
 progress:
-  total_phases: 10
+  total_phases: 9
   completed_phases: 2
-  total_plans: 12
-  completed_plans: 11
-  percent: 92
+  total_plans: 4
+  completed_plans: 2
+  percent: 22
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 37 (Breadth A — Dev / Productivity (least-sensitive)) — EXECUTING
-Plan: 2 of 4 (37-01 complete; 37-02 next)
-Status: Executing Phase 37 (1/4 plans complete)
-Last activity: 2026-06-25 -- Phase 37 plan 01 executed (breadth contract machinery + Wave-0 proof tests)
+Plan: 3 of 4 (37-01 + 37-02 complete; 37-03 next)
+Status: Executing Phase 37 (2/4 plans complete)
+Last activity: 2026-06-25 -- Phase 37 plan 02 executed (clickup/jira/confluence/airtable data-only sub-batch)
 
-Progress: [██░░░░░░░░] 22% (2/9 phases; Phase 37 in progress 1/4 plans)
+Progress: [██░░░░░░░░] 22% (2/9 phases; Phase 37 in progress 2/4 plans)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -43,7 +43,7 @@ Progress: [██░░░░░░░░] 22% (2/9 phases; Phase 37 in progress
 |-------|------|--------------|--------|
 | 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
 | 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | ✓ Complete (2026-06-24) |
-| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | In Progress (1/4 plans, 2026-06-25) |
+| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | In Progress (2/4 plans, 2026-06-25) |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | Not started |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | Not started |
 | 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
@@ -107,6 +107,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 36]: Phase 36-04 (CGEN-04): Plan 04 is a VERIFIER -- tests/catalog-inline-shape.test.js reads/asserts the Plan-01-committed recipe-index.generated.js (IIFE wrapper + global.FsbRecipeIndex=DATA + module.exports dual-export tail structurally byte-stable via regex NOT byte-diff so the 8->15 descriptor growth does not falsely red; all 7 todoist slugs inlined; in-memory readJsonDir+IIFE regen reproduces the committed bytes EXACTLY proving idempotent restore-not-rebuild WITHOUT rewriting the file; djb2 _computeCatalogVersion deterministic over the same corpus + shifts on a slug-set change). It never lists the snapshot in files_modified, never regenerates-and-commits it, never asserts a pre-emit baseline; confirmed git-clean before+after the end-to-end package-extension.mjs idempotency verify.
 - [Phase 36]: Phase 36-04 (CGEN-04): head-handler-cap.test.js parses HEAD_HANDLER_MODULES from capability-catalog.js SOURCE (it is a private var, not exported) and asserts length<=30 (==3 today: github/slack/notion) -- the stronger freeze that locks the source declaration the head is built against, immune to runtime registration. Smoke eval re-pass uses _fixtures/-only descriptor-only near-neighbors (7 todoist ops + asana create/list + linear create -> cross-app create_* wrong-invoke pressure) with NO seed-recipes added; the existing harness re-passes recall@5=1.000 wrong-invoke=0.000 over 58 fixtures and the +2 cold-start asserts (serialized 9.9KB<50KB; loadJSON+first-search 0.58ms<10ms) prove the SCALE-01 data-layout (params NOT indexed/stored) before breadth lands. _fixtures excluded by readJsonDir non-recursion so the shipped snapshot + validate:extension stay green.
 - [Phase 37]: Phase 37-01 (BRDTH-01/02/03 -- the breadth CONTRACT machinery 02/03/04 reuse): the importer (scripts/import-opentabs-catalog.mjs) replaces the hardcoded SMOKE_APPS=['todoist'] with enumerateBatchApps() (readdirSync of the vendored plugins, excluding head-owned github/slack/notion + already-imported todoist + e2e/prescript fixtures), adds STEM_OVERRIDES={jira,confluence,cloudflare,datadog} via displayServiceStem(app,derived) so the four collision hosts (*.atlassian.net jira/confluence collision; dash.cloudflare.com; app.datadoghq.com) emit DISTINCT canonical slugs (02/04 rely on this), rewrites synthSynonyms to put the serviceStem token in EVERY phrase + drop the broken "<verb> a <plural-noun>" form (MED-03 fix, carried from 36-REVIEW), stamps backing via backingFor(app,service)='dom' for this data batch (canonical enum recipe/handler/learn/dom -- 'learn' NOT 'learn-pending'), aborts the build via a merge-time classifyGate batch-coverage assertion on any unclassified origin, and feeds each emitted descriptor's searchable shape into _fixtures/seed-descriptors.json (feedSeedDescriptors) so the eval has an indexed descriptor for every emitted slug. capability-search.js carries `backing` through INDEX_OPTIONS.storeFields + buildIndex + annotates each search() hit with invocable (true iff handler/recipe) + backingStatus (display label: dom->'discovery-pending', learn->'learn-pending') so a pending-only descriptor is never a confident invocable hit (T-37-02). The shipped corpus is backfilled (github/slack/notion heads -> 'handler'; declarative tail -> 'dom'). no-dead-entry.test.js loader GENERALIZED from opentabs__todoist__ to ALL opentabs__*.json (the Phase-36 todoist-only filter was a false-green for every new app) + line-74 backing assertion widened to {dom,handler,learn,absent}. Snapshot regenerated via package-extension.mjs (INV-01 IIFE/djb2 unchanged; DATA grows). Three Wave-0 proof tests land: breadth-search-return (the GENUINE MED-03 proof over the REAL emitted corpus -- recall@5=1.000, wrong-invoke=0 on the cross-app create_* set; eval-side intent-cases a redundant secondary signal), breadth-batch-gate (classifyGate fails-closed on the wallet.acme-pay.example fixture, passes the safe linear/asana batch), backing-status-annotation (handler invocable=true vs dom invocable=false/discovery-pending). All 3 registered in the npm test chain after head-handler-cap.test.js. Eval recall@5=1.000 wrong-invoke=0.000 over 64 fixtures (58 + 6 linear/asana create); validate:extension + crosscheck + no-dead-entry green. (Tasks 1-3 + the importer/search/corpus machinery landed in commits 05e1a0e1/2f031c2d/347fb67b; Task-4 proof tests + registration in 586d4421/2b668afa after a transient-socket interruption.)
+- [Phase 37]: Phase 37-02 (BRDTH-01 continued -- data-only sub-batch proving the contract reuses verbatim): vendored clickup (REST, 4 ops), jira (REST, 5 ops), confluence (REST, 4 ops), airtable (REST, 5 ops incl destructive delete_record) as hermetic metadata-only slices (verbatim sdk-stub identity factory + inert api/apiVoid throwers; NO dist/, NO executed handle(), NO runtime .js). Ran `node scripts/import-opentabs-catalog.mjs` with ZERO machinery edit -- enumerateBatchApps picked up the 4 new dirs automatically and emitted 18 descriptors (24->42), the merge-time classifyGate passed (all 4 origins classify safe), and feedSeedDescriptors seed-fed seed-descriptors.json (28->46). The jira/confluence pair is the STEM_OVERRIDES proof: both derive to atlassian.net but the dir-name-keyed override gave each a distinct stem -> distinct opentabs__jira__*/opentabs__confluence__* slug families (T-37-08); breadth-search-return asserts each tops its OWN slug on the shared host (wrong-invoke=0). airtable.delete_record classes destructive (apiVoid {method:'DELETE'} + the delete_record override floor); create/update/add=write, get/list/search=read; verify-catalog-crosscheck.mjs PASS (34 descriptors, no under-statement). Atlassian uses REST (api/apiVoid + {method} literals), NOT GraphQL (linear's carve-out is reserved for genuine GraphQL apps). Snapshot regenerated (42 descriptors; INV-01 IIFE/djb2 unchanged, only DATA grew); intent-cases.json +22 new-app cases (incl jira AND confluence writes); breadth-search-return corpus 16->34 ops + a jira!=confluence distinctness block. package.json UNTOUCHED (the new assertions extend the already-registered breadth-search-return.test.js -- no new test file to register). capability-search-eval recall@5=1.000 wrong-invoke=0.000 over 86 fixtures (index 23.7KB<50KB, cold-start 0.55ms<10ms -- SCALE-01 holds); validate:extension + crosscheck + no-dead-entry + breadth-batch-gate + backing-status-annotation all exit 0. Commits 8c144510 (slices) / a55e9756 (import+snapshot+eval). The contract-reuse-with-zero-machinery-change is proven (the thing 37-03/04/38/39 inherit).
 
 ### Pending Todos
 
@@ -139,13 +140,13 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-25T00:00:00.000Z
-Stopped at: Completed 37-01-PLAN.md (breadth contract machinery + vendored linear/asana + generalized no-dead-entry loader + 3 Wave-0 proof tests + snapshot regen) -- Phase 37 plan 1 of 4
+Last session: 2026-06-25T07:25:27.650Z
+Stopped at: Completed 37-02-PLAN.md (clickup/jira/confluence/airtable data-only sub-batch -- 18 descriptors via the FROZEN machinery with NO importer edit; jira!=confluence distinct slugs via STEM_OVERRIDES on the shared *.atlassian.net host; airtable.delete_record destructive crosscheck; snapshot regen 42 descriptors; eval extended to 86 fixtures green) -- Phase 37 plan 2 of 4
 Resume file: None
 
 ## Next Actions
 
-Execute 37-02-PLAN.md (vendor clickup/jira/confluence/airtable as data-only slices reusing the now-frozen 37-01 contract -- enumerateBatchApps picks them up automatically; STEM_OVERRIDES already gives jira/confluence distinct stems; regen snapshot + extend the eval). 37-01 froze the breadth machinery (importer enumeration + STEM_OVERRIDES + MED-03 synonyms + backing enum + merge-time batch gate + eval seed-feeding + generalized no-dead-entry loader) so 37-02/03/04 are genuinely data-only against corrected, frozen machinery. Recommended: continue Phase 37 execution.
+Execute 37-03-PLAN.md (the next dev/productivity data-only sub-batch reusing the same frozen 37-01 contract -- enumerateBatchApps picks up any newly-vendored dirs automatically; STEM_OVERRIDES already covers the remaining collision hosts cloudflare/datadog; regen snapshot + extend the eval). 37-02 re-proved the contract reuses VERBATIM for a new sub-batch with zero machinery change (vendor the slices + run the importer was sufficient; classifyGate, seed-feeding, crosscheck, no-dead-entry, and the eval all stayed green on the grown 42-descriptor corpus). Recommended: continue Phase 37 execution.
 
 ### (historical) Phase 37 planning context
 
