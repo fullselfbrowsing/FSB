@@ -1,0 +1,42 @@
+{
+  "slug": "calendly.list_event_types",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "list event types in calendly",
+    "show me my event types in calendly",
+    "view my event types in calendly",
+    "see all my event types in calendly",
+    "list my calendly event types in calendly"
+  ],
+  "description": "List the Calendly event types (meeting templates) for your account. Returns each event type with its name, duration, and scheduling URL.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "active": {
+        "description": "Only return active (bookable) event types",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Maximum number of event types to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/list-event-types.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

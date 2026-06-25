@@ -126,6 +126,19 @@
       ]
     },
     {
+      "app": "calendly",
+      "service": "calendly.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/calendly/",
+      "descriptors": [
+        "calendly.get_availability",
+        "calendly.list_event_types",
+        "calendly.list_scheduled_events"
+      ]
+    },
+    {
       "app": "chatgpt",
       "service": "chatgpt.com",
       "source": "opentabs",
@@ -293,6 +306,20 @@
         "etsy.get_listing",
         "etsy.list_orders",
         "etsy.search_listings"
+      ]
+    },
+    {
+      "app": "eventbrite",
+      "service": "www.eventbrite.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/eventbrite/",
+      "descriptors": [
+        "eventbrite.get_event",
+        "eventbrite.list_orders",
+        "eventbrite.register_for_event",
+        "eventbrite.search_events"
       ]
     },
     {
@@ -498,6 +525,20 @@
       ]
     },
     {
+      "app": "stubhub",
+      "service": "www.stubhub.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/stubhub/",
+      "descriptors": [
+        "stubhub.buy_tickets",
+        "stubhub.get_listing",
+        "stubhub.list_orders",
+        "stubhub.search_events"
+      ]
+    },
+    {
       "app": "target",
       "service": "www.target.com",
       "source": "opentabs",
@@ -525,6 +566,20 @@
       ]
     },
     {
+      "app": "ticketmaster",
+      "service": "www.ticketmaster.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/ticketmaster/",
+      "descriptors": [
+        "ticketmaster.buy_tickets",
+        "ticketmaster.get_event",
+        "ticketmaster.list_orders",
+        "ticketmaster.search_events"
+      ]
+    },
+    {
       "app": "todoist",
       "service": "app.todoist.com",
       "source": "opentabs",
@@ -539,6 +594,19 @@
         "todoist.list_tasks",
         "todoist.reopen_task",
         "todoist.update_task"
+      ]
+    },
+    {
+      "app": "tripadvisor",
+      "service": "www.tripadvisor.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/tripadvisor/",
+      "descriptors": [
+        "tripadvisor.get_location",
+        "tripadvisor.list_reviews",
+        "tripadvisor.search_locations"
       ]
     },
     {
@@ -598,6 +666,19 @@
         "walmart.list_orders",
         "walmart.place_order",
         "walmart.search_products"
+      ]
+    },
+    {
+      "app": "yelp",
+      "service": "www.yelp.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/yelp/",
+      "descriptors": [
+        "yelp.get_business",
+        "yelp.list_reviews",
+        "yelp.search_businesses"
       ]
     }
   ]

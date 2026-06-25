@@ -1,0 +1,46 @@
+{
+  "slug": "calendly.list_scheduled_events",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "list scheduled events in calendly",
+    "show me my scheduled events in calendly",
+    "view my scheduled events in calendly",
+    "see all my scheduled events in calendly",
+    "show me my calendly scheduled events in calendly"
+  ],
+  "description": "List your upcoming and past Calendly scheduled meetings. Returns each meeting with its invitee, time, and status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter by meeting status",
+        "type": "string",
+        "enum": [
+          "active",
+          "canceled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of meetings to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/list-scheduled-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

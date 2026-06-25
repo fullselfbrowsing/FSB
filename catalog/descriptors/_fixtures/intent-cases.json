@@ -304,5 +304,28 @@
   { "intent": "look up an opentable restaurant", "expectedSlug": "opentable.get_restaurant" },
   { "intent": "show me my opentable reservations", "expectedSlug": "opentable.list_reservations" },
   { "intent": "reserve a table on opentable", "expectedSlug": "opentable.reserve_table" },
-  { "intent": "cancel my opentable reservation", "expectedSlug": "opentable.cancel_reservation" }
+  { "intent": "cancel my opentable reservation", "expectedSlug": "opentable.cancel_reservation" },
+
+  { "intent": "find events on ticketmaster", "expectedSlug": "ticketmaster.search_events" },
+  { "intent": "look up a ticketmaster event", "expectedSlug": "ticketmaster.get_event" },
+  { "intent": "show me my ticketmaster orders", "expectedSlug": "ticketmaster.list_orders" },
+  { "intent": "buy tickets on ticketmaster", "expectedSlug": "ticketmaster.buy_tickets" },
+
+  { "intent": "search events on stubhub", "expectedSlug": "stubhub.search_events" },
+  { "intent": "look up a stubhub listing", "expectedSlug": "stubhub.get_listing" },
+  { "intent": "buy tickets on stubhub", "expectedSlug": "stubhub.buy_tickets" },
+
+  { "intent": "find events on eventbrite", "expectedSlug": "eventbrite.search_events" },
+  { "intent": "register for an event on eventbrite", "expectedSlug": "eventbrite.register_for_event" },
+
+  { "intent": "find restaurants on yelp", "expectedSlug": "yelp.search_businesses" },
+  { "intent": "look up a business on yelp", "expectedSlug": "yelp.get_business" },
+  { "intent": "read reviews of a business on yelp", "expectedSlug": "yelp.list_reviews" },
+
+  { "intent": "search locations on tripadvisor", "expectedSlug": "tripadvisor.search_locations" },
+  { "intent": "read reviews of a location on tripadvisor", "expectedSlug": "tripadvisor.list_reviews" },
+
+  { "intent": "list my calendly event types", "expectedSlug": "calendly.list_event_types" },
+  { "intent": "check my calendly availability", "expectedSlug": "calendly.get_availability" },
+  { "intent": "show me my calendly scheduled events", "expectedSlug": "calendly.list_scheduled_events" }
 ]

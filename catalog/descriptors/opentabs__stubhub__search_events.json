@@ -1,0 +1,50 @@
+{
+  "slug": "stubhub.search_events",
+  "service": "www.stubhub.com",
+  "intentSynonyms": [
+    "search events in stubhub",
+    "search events on stubhub in stubhub",
+    "search stubhub for concerts, sports, and theater events with resale tickets by keyword, city, and date range in stubhub"
+  ],
+  "description": "Search StubHub for concerts, sports, and theater events with resale tickets by keyword, city, and date range. Returns matching events with the lowest available ticket prices.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Artist, team, event, or venue to search for"
+      },
+      "city": {
+        "description": "City to filter events by",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "Earliest event date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "end_date": {
+        "description": "Latest event date (YYYY-MM-DD)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "keyword"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stubhub/src/tools/search-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

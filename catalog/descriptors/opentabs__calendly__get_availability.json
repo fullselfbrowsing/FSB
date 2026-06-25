@@ -1,0 +1,53 @@
+{
+  "slug": "calendly.get_availability",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get an availability in calendly",
+    "look up an availability in calendly",
+    "fetch a single availability in calendly",
+    "view one specific availability in calendly",
+    "get availability in calendly",
+    "check my calendly availability in calendly"
+  ],
+  "description": "Get the available open time slots for a Calendly event type over a date range. Returns bookable start times.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The event type whose availability to check"
+      },
+      "start_date": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Range start date (YYYY-MM-DD)"
+      },
+      "end_date": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Range end date (YYYY-MM-DD)"
+      }
+    },
+    "required": [
+      "event_type_id",
+      "start_date",
+      "end_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-availability.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

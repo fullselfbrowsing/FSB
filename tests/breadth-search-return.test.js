@@ -116,7 +116,7 @@ global.MiniSearch = MiniSearch;
 // retail/marketplace sub-batch.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft|amazon|ebay|etsy|bestbuy|costco|walmart|target|booking|airbnb|expedia|kayak|opentable)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft|amazon|ebay|etsy|bestbuy|costco|walmart|target|booking|airbnb|expedia|kayak|opentable|ticketmaster|stubhub|eventbrite|yelp|tripadvisor|calendly)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -124,8 +124,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 183,
-  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace + travel/transport corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads + 4 discord + 3 reddit] + 31 food-delivery/rideshare [6 doordash + 5 ubereats + 5 grubhub + 5 instacart + 5 uber + 5 lyft] + 34 retail/marketplace [6 amazon + 5 ebay + 5 etsy + 5 bestbuy + 4 costco + 5 walmart + 4 target] + 24 travel/transport [5 booking + 5 airbnb + 5 expedia + 4 kayak + 5 opentable -- Phase-39 batch C sub-batch 3, all backing:dom on SENSITIVE paid-booking/held-card origins; complete_booking/book_stay/book_flight/book_hotel/reserve_table are payment ops DOM-only-on-sensitive])');
+check(corpus.length >= 204,
+  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace + travel/transport + events/local-services/scheduling corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads + 4 discord + 3 reddit] + 31 food-delivery/rideshare [6 doordash + 5 ubereats + 5 grubhub + 5 instacart + 5 uber + 5 lyft] + 34 retail/marketplace [6 amazon + 5 ebay + 5 etsy + 5 bestbuy + 4 costco + 5 walmart + 4 target] + 24 travel/transport [5 booking + 5 airbnb + 5 expedia + 4 kayak + 5 opentable] + 21 events/local-services/scheduling [4 ticketmaster + 4 stubhub + 4 eventbrite + 3 yelp + 3 tripadvisor + 3 calendly -- Phase-39 batch C sub-batch 4; the ticket apps backing:dom on SENSITIVE origins with buy_tickets/register_for_event payment ops DOM-only-on-sensitive; yelp/tripadvisor/calendly read-only-safe (no payment verb)])');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -313,6 +313,46 @@ const COLLISION_SET = [
   // airbnb/booking stay-booking payment op (the dining-reservation intent is distinct from a
   // lodging booking despite the shared book/reserve verb family).
   { query: 'book me a dinner table tonight on opentable', expected: 'opentable.reserve_table' },
+  // Phase-39 batch C sub-batch 4 (39-05, events + local-services/scheduling): the headline
+  // cross-app disambiguation probes for the MOST-sensitive ticket-purchase category. buy_tickets
+  // is the IDENTICAL payment op-name on ticketmaster AND stubhub (the closest same-op cross-app
+  // collision -- a swapped stem would charge a card on the WRONG ticketing account/origin), and
+  // register_for_event (eventbrite) is the paid-attendance payment op. Each query carries the op's
+  // core action words ("buy tickets" / "register ... for the event") so it disambiguates from its
+  // same-app neighbors (search_events / get_event / list_orders), with the app token keeping each
+  // on its OWN slug. The queries are HELD-OUT paraphrases (the "... and pay for them" / "... I want
+  // to attend" tails + reordering are NOT byte-identical to any indexed synonym), so wrong-invoke=0
+  // is a genuine retrieval measurement.
+  { query: 'buy tickets to the concert and pay for them on ticketmaster', expected: 'ticketmaster.buy_tickets' },
+  { query: 'buy resale tickets and pay for them on stubhub', expected: 'stubhub.buy_tickets' },
+  { query: 'register and pay for the eventbrite event I want to attend', expected: 'eventbrite.register_for_event' },
+  // search_events is the IDENTICAL op name across ticketmaster AND stubhub AND eventbrite -- a
+  // three-way same-op cross-app collision; each query carries "search ... events" so it tops the
+  // search op (not the same app's buy/get/list ops), the app token keeping each on its OWN slug.
+  // Held-out paraphrases (the "what events ..." framing + tail are NOT indexed synonyms).
+  { query: 'search for live events to go to on ticketmaster', expected: 'ticketmaster.search_events' },
+  { query: 'search for events with resale tickets on stubhub', expected: 'stubhub.search_events' },
+  { query: 'search for events workshops and classes on eventbrite', expected: 'eventbrite.search_events' },
+  // list_orders is the IDENTICAL read op-name on ticketmaster AND stubhub -- the ticket-order-history
+  // collision; "list my ticket orders" must top its OWN app's list_orders (not buy/get/search). The
+  // "go through" framing is a held-out paraphrase (NOT the indexed "show me my <app> orders").
+  { query: 'go through and list my past ticket orders on ticketmaster', expected: 'ticketmaster.list_orders' },
+  { query: 'go through and list my past ticket orders on stubhub', expected: 'stubhub.list_orders' },
+  // list_reviews is the IDENTICAL read op-name on yelp AND tripadvisor (the local-reviews-vs-travel-
+  // reviews collision) -- the headline read-only-app disambiguation; "read the reviews" must top its
+  // OWN app's list_reviews (not the same app's search/get). Held-out paraphrases (the "what other ...
+  // wrote" framing is NOT the indexed "read reviews of a business/location on <app>").
+  { query: 'read the reviews other diners wrote for this business on yelp', expected: 'yelp.list_reviews' },
+  { query: 'read the reviews other travelers wrote for this location on tripadvisor', expected: 'tripadvisor.list_reviews' },
+  // The local-business-search (yelp) vs travel-location-search (tripadvisor) split -- both are
+  // discovery reads but on distinct slugs; "search for businesses" must route to yelp's business
+  // search (not its reviews/get), "search for ... locations" to tripadvisor's (held-out, app-tagged).
+  { query: 'search for local businesses and restaurants on yelp', expected: 'yelp.search_businesses' },
+  { query: 'search for hotels restaurants and attraction locations on tripadvisor', expected: 'tripadvisor.search_locations' },
+  // calendly availability (a read) -- distinct from the ticket apps despite the shared "events"
+  // vocabulary; "check my open availability" must top calendly.get_availability (not list_event_types
+  // / list_scheduled_events). The "open slots" tail is a held-out paraphrase of "check my availability".
+  { query: 'check my calendly availability for open meeting slots', expected: 'calendly.get_availability' },
 ];
 
 // Build a slug -> lowercased-intentSynonyms map for the held-out guards (MED-01/MED-02).

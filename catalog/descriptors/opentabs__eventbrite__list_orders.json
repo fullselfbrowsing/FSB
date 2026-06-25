@@ -1,0 +1,47 @@
+{
+  "slug": "eventbrite.list_orders",
+  "service": "www.eventbrite.com",
+  "intentSynonyms": [
+    "list orders in eventbrite",
+    "show me my orders in eventbrite",
+    "view my orders in eventbrite",
+    "see all my orders in eventbrite",
+    "show me my eventbrite orders in eventbrite"
+  ],
+  "description": "List your Eventbrite orders and registrations. Optionally filter by status (upcoming, past, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter orders by status",
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "past",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of orders to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/eventbrite/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

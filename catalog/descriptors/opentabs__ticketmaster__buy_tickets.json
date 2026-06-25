@@ -1,0 +1,49 @@
+{
+  "slug": "ticketmaster.buy_tickets",
+  "service": "www.ticketmaster.com",
+  "intentSynonyms": [
+    "buy tickets in ticketmaster",
+    "buy tickets on ticketmaster in ticketmaster",
+    "buy tickets to a ticketmaster event for a given quantity and price level in ticketmaster"
+  ],
+  "description": "Buy tickets to a Ticketmaster event for a given quantity and price level. This charges your saved payment method and issues the tickets -- a money-movement action.",
+  "actionVerb": "buy",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The event to buy tickets for"
+      },
+      "quantity": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Number of tickets to buy"
+      },
+      "price_level": {
+        "description": "Seating section or price level",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id",
+      "quantity"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ticketmaster/src/tools/buy-tickets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "buy"
+    }
+  }
+}

@@ -587,6 +587,52 @@
     "sideEffectClass": "read"
   },
   {
+    "slug": "calendly.get_availability",
+    "service": "calendly.com",
+    "intentSynonyms": [
+      "get an availability in calendly",
+      "look up an availability in calendly",
+      "fetch a single availability in calendly",
+      "view one specific availability in calendly",
+      "get availability in calendly",
+      "check my calendly availability in calendly"
+    ],
+    "description": "Get the available open time slots for a Calendly event type over a date range. Returns bookable start times.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "calendly.list_event_types",
+    "service": "calendly.com",
+    "intentSynonyms": [
+      "list event types in calendly",
+      "show me my event types in calendly",
+      "view my event types in calendly",
+      "see all my event types in calendly",
+      "list my calendly event types in calendly"
+    ],
+    "description": "List the Calendly event types (meeting templates) for your account. Returns each event type with its name, duration, and scheduling URL.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "calendly.list_scheduled_events",
+    "service": "calendly.com",
+    "intentSynonyms": [
+      "list scheduled events in calendly",
+      "show me my scheduled events in calendly",
+      "view my scheduled events in calendly",
+      "see all my scheduled events in calendly",
+      "show me my calendly scheduled events in calendly"
+    ],
+    "description": "List your upcoming and past Calendly scheduled meetings. Returns each meeting with its invitee, time, and status.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "chatgpt.get_conversation",
     "service": "chatgpt.com",
     "intentSynonyms": [
@@ -1357,6 +1403,63 @@
       "search etsy handmade and vintage marketplace listings by keyword in etsy"
     ],
     "description": "Search Etsy handmade and vintage marketplace listings by keyword. Optionally filter by category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "eventbrite.get_event",
+    "service": "www.eventbrite.com",
+    "intentSynonyms": [
+      "get an event in eventbrite",
+      "look up an event in eventbrite",
+      "fetch a single event in eventbrite",
+      "view one specific event in eventbrite",
+      "get event in eventbrite",
+      "look up an eventbrite event in eventbrite"
+    ],
+    "description": "Get the details, organizer, schedule, and ticket types of a single Eventbrite event by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "eventbrite.list_orders",
+    "service": "www.eventbrite.com",
+    "intentSynonyms": [
+      "list orders in eventbrite",
+      "show me my orders in eventbrite",
+      "view my orders in eventbrite",
+      "see all my orders in eventbrite",
+      "show me my eventbrite orders in eventbrite"
+    ],
+    "description": "List your Eventbrite orders and registrations. Optionally filter by status (upcoming, past, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "eventbrite.register_for_event",
+    "service": "www.eventbrite.com",
+    "intentSynonyms": [
+      "register a for event in eventbrite",
+      "register for event in eventbrite",
+      "register for an event on eventbrite in eventbrite"
+    ],
+    "description": "Register for an Eventbrite event by selecting a ticket type and quantity. For paid events this charges your saved payment method and issues the tickets -- a money-movement action.",
+    "actionVerb": "register",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "eventbrite.search_events",
+    "service": "www.eventbrite.com",
+    "intentSynonyms": [
+      "search events in eventbrite",
+      "search events on eventbrite in eventbrite",
+      "search eventbrite for events, workshops, classes, and conferences by keyword, city, and date range in eventbrite"
+    ],
+    "description": "Search Eventbrite for events, workshops, classes, and conferences by keyword, city, and date range. Returns matching events with organizers and ticket types.",
     "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -2327,6 +2430,63 @@
     "sideEffectClass": "mutate"
   },
   {
+    "slug": "stubhub.buy_tickets",
+    "service": "www.stubhub.com",
+    "intentSynonyms": [
+      "buy tickets in stubhub",
+      "buy tickets on stubhub in stubhub",
+      "buy a stubhub resale ticket listing for a given quantity in stubhub"
+    ],
+    "description": "Buy a StubHub resale ticket listing for a given quantity. This charges your saved payment method and transfers the tickets -- a money-movement action.",
+    "actionVerb": "buy",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "stubhub.get_listing",
+    "service": "www.stubhub.com",
+    "intentSynonyms": [
+      "get a listing in stubhub",
+      "look up a listing in stubhub",
+      "fetch a single listing in stubhub",
+      "view one specific listing in stubhub",
+      "get listing in stubhub",
+      "look up a stubhub listing in stubhub"
+    ],
+    "description": "Get the seat, section, quantity, and price details of a single StubHub resale ticket listing by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "stubhub.list_orders",
+    "service": "www.stubhub.com",
+    "intentSynonyms": [
+      "list orders in stubhub",
+      "show me my orders in stubhub",
+      "view my orders in stubhub",
+      "see all my orders in stubhub",
+      "show me my stubhub orders in stubhub"
+    ],
+    "description": "List your StubHub ticket orders. Optionally filter by status (upcoming, past, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "stubhub.search_events",
+    "service": "www.stubhub.com",
+    "intentSynonyms": [
+      "search events in stubhub",
+      "search events on stubhub in stubhub",
+      "search stubhub for concerts, sports, and theater events with resale tickets by keyword, city, and date range in stubhub"
+    ],
+    "description": "Search StubHub for concerts, sports, and theater events with resale tickets by keyword, city, and date range. Returns matching events with the lowest available ticket prices.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "target.get_product",
     "service": "www.target.com",
     "intentSynonyms": [
@@ -2428,6 +2588,63 @@
     ],
     "description": "List recent posts from your Threads home timeline. Optionally page through with a cursor.",
     "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ticketmaster.buy_tickets",
+    "service": "www.ticketmaster.com",
+    "intentSynonyms": [
+      "buy tickets in ticketmaster",
+      "buy tickets on ticketmaster in ticketmaster",
+      "buy tickets to a ticketmaster event for a given quantity and price level in ticketmaster"
+    ],
+    "description": "Buy tickets to a Ticketmaster event for a given quantity and price level. This charges your saved payment method and issues the tickets -- a money-movement action.",
+    "actionVerb": "buy",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "ticketmaster.get_event",
+    "service": "www.ticketmaster.com",
+    "intentSynonyms": [
+      "get an event in ticketmaster",
+      "look up an event in ticketmaster",
+      "fetch a single event in ticketmaster",
+      "view one specific event in ticketmaster",
+      "get event in ticketmaster",
+      "look up a ticketmaster event in ticketmaster"
+    ],
+    "description": "Get the details, venue, lineup, and ticket price ranges of a single Ticketmaster event by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ticketmaster.list_orders",
+    "service": "www.ticketmaster.com",
+    "intentSynonyms": [
+      "list orders in ticketmaster",
+      "show me my orders in ticketmaster",
+      "view my orders in ticketmaster",
+      "see all my orders in ticketmaster",
+      "show me my ticketmaster orders in ticketmaster"
+    ],
+    "description": "List your Ticketmaster ticket orders. Optionally filter by status (upcoming, past, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ticketmaster.search_events",
+    "service": "www.ticketmaster.com",
+    "intentSynonyms": [
+      "search events in ticketmaster",
+      "search events on ticketmaster in ticketmaster",
+      "search ticketmaster for concerts, sports, theater, and other live events by keyword, city, and date range in ticketmaster"
+    ],
+    "description": "Search Ticketmaster for concerts, sports, theater, and other live events by keyword, city, and date range. Returns matching events with venues and on-sale dates.",
+    "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
   },
@@ -2568,6 +2785,50 @@
     "description": "List the cards on a Trello board",
     "actionVerb": "list",
     "sideEffectClass": "read"
+  },
+  {
+    "slug": "tripadvisor.get_location",
+    "service": "www.tripadvisor.com",
+    "intentSynonyms": [
+      "get a location in tripadvisor",
+      "look up a location in tripadvisor",
+      "fetch a single location in tripadvisor",
+      "view one specific location in tripadvisor",
+      "get location in tripadvisor",
+      "look up a location on tripadvisor in tripadvisor"
+    ],
+    "description": "Get the details, address, rating, amenities, and ranking of a single Tripadvisor location by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "tripadvisor.list_reviews",
+    "service": "www.tripadvisor.com",
+    "intentSynonyms": [
+      "list reviews in tripadvisor",
+      "show me my reviews in tripadvisor",
+      "view my reviews in tripadvisor",
+      "see all my reviews in tripadvisor",
+      "read reviews of a location on tripadvisor in tripadvisor"
+    ],
+    "description": "List the recent traveler reviews for a Tripadvisor location by its ID. Returns review text, rating, and trip type.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "tripadvisor.search_locations",
+    "service": "www.tripadvisor.com",
+    "intentSynonyms": [
+      "search locations in tripadvisor",
+      "search locations on tripadvisor in tripadvisor",
+      "search tripadvisor for hotels, restaurants, and attractions by query and place in tripadvisor"
+    ],
+    "description": "Search Tripadvisor for hotels, restaurants, and attractions by query and place. Returns matching locations with ratings and review counts.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
   },
   {
     "slug": "twitter.post-tweet",
@@ -2853,6 +3114,50 @@
       "search the walmart catalog by keyword in walmart"
     ],
     "description": "Search the Walmart catalog by keyword. Optionally filter by department/category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "yelp.get_business",
+    "service": "www.yelp.com",
+    "intentSynonyms": [
+      "get a business in yelp",
+      "look up a business in yelp",
+      "fetch a single business in yelp",
+      "view one specific business in yelp",
+      "get business in yelp",
+      "look up a business on yelp in yelp"
+    ],
+    "description": "Get the full details, hours, photos, rating, and contact info of a single Yelp business by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "yelp.list_reviews",
+    "service": "www.yelp.com",
+    "intentSynonyms": [
+      "list reviews in yelp",
+      "show me my reviews in yelp",
+      "view my reviews in yelp",
+      "see all my reviews in yelp",
+      "read reviews of a business on yelp in yelp"
+    ],
+    "description": "List the recent reviews for a Yelp business by its ID. Returns review text, rating, and author.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "yelp.search_businesses",
+    "service": "www.yelp.com",
+    "intentSynonyms": [
+      "search businesses in yelp",
+      "search businesses on yelp in yelp",
+      "search yelp for local businesses (restaurants, shops, services) by term and location in yelp"
+    ],
+    "description": "Search Yelp for local businesses (restaurants, shops, services) by term and location. Returns matching businesses with ratings, price level, and categories.",
     "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"

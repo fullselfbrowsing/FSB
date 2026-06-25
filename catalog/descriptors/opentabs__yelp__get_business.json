@@ -1,0 +1,41 @@
+{
+  "slug": "yelp.get_business",
+  "service": "www.yelp.com",
+  "intentSynonyms": [
+    "get a business in yelp",
+    "look up a business in yelp",
+    "fetch a single business in yelp",
+    "view one specific business in yelp",
+    "get business in yelp",
+    "look up a business on yelp in yelp"
+  ],
+  "description": "Get the full details, hours, photos, rating, and contact info of a single Yelp business by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "business_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The Yelp business ID to fetch"
+      }
+    },
+    "required": [
+      "business_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/yelp/src/tools/get-business.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "eventbrite.get_event",
+  "service": "www.eventbrite.com",
+  "intentSynonyms": [
+    "get an event in eventbrite",
+    "look up an event in eventbrite",
+    "fetch a single event in eventbrite",
+    "view one specific event in eventbrite",
+    "get event in eventbrite",
+    "look up an eventbrite event in eventbrite"
+  ],
+  "description": "Get the details, organizer, schedule, and ticket types of a single Eventbrite event by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The event ID to fetch"
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/eventbrite/src/tools/get-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

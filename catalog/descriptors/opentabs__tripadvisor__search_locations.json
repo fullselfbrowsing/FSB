@@ -1,0 +1,53 @@
+{
+  "slug": "tripadvisor.search_locations",
+  "service": "www.tripadvisor.com",
+  "intentSynonyms": [
+    "search locations in tripadvisor",
+    "search locations on tripadvisor in tripadvisor",
+    "search tripadvisor for hotels, restaurants, and attractions by query and place in tripadvisor"
+  ],
+  "description": "Search Tripadvisor for hotels, restaurants, and attractions by query and place. Returns matching locations with ratings and review counts.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What to search for (e.g. hotels, museums, a restaurant name)"
+      },
+      "place": {
+        "type": "string",
+        "minLength": 1,
+        "description": "City or area to search in"
+      },
+      "category": {
+        "description": "Filter by location category",
+        "type": "string",
+        "enum": [
+          "hotels",
+          "restaurants",
+          "attractions"
+        ]
+      }
+    },
+    "required": [
+      "query",
+      "place"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/search-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

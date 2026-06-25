@@ -1,0 +1,41 @@
+{
+  "slug": "tripadvisor.get_location",
+  "service": "www.tripadvisor.com",
+  "intentSynonyms": [
+    "get a location in tripadvisor",
+    "look up a location in tripadvisor",
+    "fetch a single location in tripadvisor",
+    "view one specific location in tripadvisor",
+    "get location in tripadvisor",
+    "look up a location on tripadvisor in tripadvisor"
+  ],
+  "description": "Get the details, address, rating, amenities, and ranking of a single Tripadvisor location by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "location_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The Tripadvisor location ID to fetch"
+      }
+    },
+    "required": [
+      "location_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-location.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

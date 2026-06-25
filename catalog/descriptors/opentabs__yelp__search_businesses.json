@@ -1,0 +1,58 @@
+{
+  "slug": "yelp.search_businesses",
+  "service": "www.yelp.com",
+  "intentSynonyms": [
+    "search businesses in yelp",
+    "search businesses on yelp in yelp",
+    "search yelp for local businesses (restaurants, shops, services) by term and location in yelp"
+  ],
+  "description": "Search Yelp for local businesses (restaurants, shops, services) by term and location. Returns matching businesses with ratings, price level, and categories.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "term": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What to search for (e.g. coffee, plumber, sushi)"
+      },
+      "location": {
+        "type": "string",
+        "minLength": 1,
+        "description": "City, neighborhood, or address to search near"
+      },
+      "price": {
+        "description": "Price level filter (1=$ to 4=$$$$)",
+        "type": "string",
+        "enum": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "open_now": {
+        "description": "Only return businesses open now",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "term",
+      "location"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/yelp/src/tools/search-businesses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

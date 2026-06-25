@@ -1,0 +1,45 @@
+{
+  "slug": "stubhub.buy_tickets",
+  "service": "www.stubhub.com",
+  "intentSynonyms": [
+    "buy tickets in stubhub",
+    "buy tickets on stubhub in stubhub",
+    "buy a stubhub resale ticket listing for a given quantity in stubhub"
+  ],
+  "description": "Buy a StubHub resale ticket listing for a given quantity. This charges your saved payment method and transfers the tickets -- a money-movement action.",
+  "actionVerb": "buy",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "listing_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The resale listing to buy"
+      },
+      "quantity": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Number of tickets to buy"
+      }
+    },
+    "required": [
+      "listing_id",
+      "quantity"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stubhub/src/tools/buy-tickets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "buy"
+    }
+  }
+}

@@ -2177,6 +2177,147 @@
       }
     },
     {
+      "slug": "calendly.get_availability",
+      "service": "calendly.com",
+      "intentSynonyms": [
+        "get an availability in calendly",
+        "look up an availability in calendly",
+        "fetch a single availability in calendly",
+        "view one specific availability in calendly",
+        "get availability in calendly",
+        "check my calendly availability in calendly"
+      ],
+      "description": "Get the available open time slots for a Calendly event type over a date range. Returns bookable start times.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "event_type_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event type whose availability to check"
+          },
+          "start_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Range start date (YYYY-MM-DD)"
+          },
+          "end_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Range end date (YYYY-MM-DD)"
+          }
+        },
+        "required": [
+          "event_type_id",
+          "start_date",
+          "end_date"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/calendly/src/tools/get-availability.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "calendly.list_event_types",
+      "service": "calendly.com",
+      "intentSynonyms": [
+        "list event types in calendly",
+        "show me my event types in calendly",
+        "view my event types in calendly",
+        "see all my event types in calendly",
+        "list my calendly event types in calendly"
+      ],
+      "description": "List the Calendly event types (meeting templates) for your account. Returns each event type with its name, duration, and scheduling URL.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "description": "Only return active (bookable) event types",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of event types to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/calendly/src/tools/list-event-types.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "calendly.list_scheduled_events",
+      "service": "calendly.com",
+      "intentSynonyms": [
+        "list scheduled events in calendly",
+        "show me my scheduled events in calendly",
+        "view my scheduled events in calendly",
+        "see all my scheduled events in calendly",
+        "show me my calendly scheduled events in calendly"
+      ],
+      "description": "List your upcoming and past Calendly scheduled meetings. Returns each meeting with its invitee, time, and status.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter by meeting status",
+            "type": "string",
+            "enum": [
+              "active",
+              "canceled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of meetings to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/calendly/src/tools/list-scheduled-events.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
       "slug": "chatgpt.get_conversation",
       "service": "chatgpt.com",
       "intentSynonyms": [
@@ -4717,6 +4858,195 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/etsy/src/tools/search-listings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "eventbrite.get_event",
+      "service": "www.eventbrite.com",
+      "intentSynonyms": [
+        "get an event in eventbrite",
+        "look up an event in eventbrite",
+        "fetch a single event in eventbrite",
+        "view one specific event in eventbrite",
+        "get event in eventbrite",
+        "look up an eventbrite event in eventbrite"
+      ],
+      "description": "Get the details, organizer, schedule, and ticket types of a single Eventbrite event by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event ID to fetch"
+          }
+        },
+        "required": [
+          "event_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/eventbrite/src/tools/get-event.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "eventbrite.list_orders",
+      "service": "www.eventbrite.com",
+      "intentSynonyms": [
+        "list orders in eventbrite",
+        "show me my orders in eventbrite",
+        "view my orders in eventbrite",
+        "see all my orders in eventbrite",
+        "show me my eventbrite orders in eventbrite"
+      ],
+      "description": "List your Eventbrite orders and registrations. Optionally filter by status (upcoming, past, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/eventbrite/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "eventbrite.register_for_event",
+      "service": "www.eventbrite.com",
+      "intentSynonyms": [
+        "register a for event in eventbrite",
+        "register for event in eventbrite",
+        "register for an event on eventbrite in eventbrite"
+      ],
+      "description": "Register for an Eventbrite event by selecting a ticket type and quantity. For paid events this charges your saved payment method and issues the tickets -- a money-movement action.",
+      "actionVerb": "register",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event to register for"
+          },
+          "ticket_type_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket type to purchase"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of tickets to register"
+          }
+        },
+        "required": [
+          "event_id",
+          "ticket_type_id",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/eventbrite/src/tools/register-for-event.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "register"
+        }
+      }
+    },
+    {
+      "slug": "eventbrite.search_events",
+      "service": "www.eventbrite.com",
+      "intentSynonyms": [
+        "search events in eventbrite",
+        "search events on eventbrite in eventbrite",
+        "search eventbrite for events, workshops, classes, and conferences by keyword, city, and date range in eventbrite"
+      ],
+      "description": "Search Eventbrite for events, workshops, classes, and conferences by keyword, city, and date range. Returns matching events with organizers and ticket types.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event, organizer, or topic to search for"
+          },
+          "city": {
+            "description": "City to filter events by",
+            "type": "string"
+          },
+          "start_date": {
+            "description": "Earliest event date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "end_date": {
+            "description": "Latest event date (YYYY-MM-DD)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyword"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/eventbrite/src/tools/search-events.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -8015,6 +8345,189 @@
       }
     },
     {
+      "slug": "stubhub.buy_tickets",
+      "service": "www.stubhub.com",
+      "intentSynonyms": [
+        "buy tickets in stubhub",
+        "buy tickets on stubhub in stubhub",
+        "buy a stubhub resale ticket listing for a given quantity in stubhub"
+      ],
+      "description": "Buy a StubHub resale ticket listing for a given quantity. This charges your saved payment method and transfers the tickets -- a money-movement action.",
+      "actionVerb": "buy",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resale listing to buy"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of tickets to buy"
+          }
+        },
+        "required": [
+          "listing_id",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stubhub/src/tools/buy-tickets.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "buy"
+        }
+      }
+    },
+    {
+      "slug": "stubhub.get_listing",
+      "service": "www.stubhub.com",
+      "intentSynonyms": [
+        "get a listing in stubhub",
+        "look up a listing in stubhub",
+        "fetch a single listing in stubhub",
+        "view one specific listing in stubhub",
+        "get listing in stubhub",
+        "look up a stubhub listing in stubhub"
+      ],
+      "description": "Get the seat, section, quantity, and price details of a single StubHub resale ticket listing by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing ID to fetch"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stubhub/src/tools/get-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "stubhub.list_orders",
+      "service": "www.stubhub.com",
+      "intentSynonyms": [
+        "list orders in stubhub",
+        "show me my orders in stubhub",
+        "view my orders in stubhub",
+        "see all my orders in stubhub",
+        "show me my stubhub orders in stubhub"
+      ],
+      "description": "List your StubHub ticket orders. Optionally filter by status (upcoming, past, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stubhub/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "stubhub.search_events",
+      "service": "www.stubhub.com",
+      "intentSynonyms": [
+        "search events in stubhub",
+        "search events on stubhub in stubhub",
+        "search stubhub for concerts, sports, and theater events with resale tickets by keyword, city, and date range in stubhub"
+      ],
+      "description": "Search StubHub for concerts, sports, and theater events with resale tickets by keyword, city, and date range. Returns matching events with the lowest available ticket prices.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Artist, team, event, or venue to search for"
+          },
+          "city": {
+            "description": "City to filter events by",
+            "type": "string"
+          },
+          "start_date": {
+            "description": "Earliest event date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "end_date": {
+            "description": "Latest event date (YYYY-MM-DD)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyword"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stubhub/src/tools/search-events.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "target.get_product",
       "service": "www.target.com",
       "intentSynonyms": [
@@ -8364,6 +8877,193 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "ticketmaster.buy_tickets",
+      "service": "www.ticketmaster.com",
+      "intentSynonyms": [
+        "buy tickets in ticketmaster",
+        "buy tickets on ticketmaster in ticketmaster",
+        "buy tickets to a ticketmaster event for a given quantity and price level in ticketmaster"
+      ],
+      "description": "Buy tickets to a Ticketmaster event for a given quantity and price level. This charges your saved payment method and issues the tickets -- a money-movement action.",
+      "actionVerb": "buy",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event to buy tickets for"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of tickets to buy"
+          },
+          "price_level": {
+            "description": "Seating section or price level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ticketmaster/src/tools/buy-tickets.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "buy"
+        }
+      }
+    },
+    {
+      "slug": "ticketmaster.get_event",
+      "service": "www.ticketmaster.com",
+      "intentSynonyms": [
+        "get an event in ticketmaster",
+        "look up an event in ticketmaster",
+        "fetch a single event in ticketmaster",
+        "view one specific event in ticketmaster",
+        "get event in ticketmaster",
+        "look up a ticketmaster event in ticketmaster"
+      ],
+      "description": "Get the details, venue, lineup, and ticket price ranges of a single Ticketmaster event by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event ID to fetch"
+          }
+        },
+        "required": [
+          "event_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ticketmaster/src/tools/get-event.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "ticketmaster.list_orders",
+      "service": "www.ticketmaster.com",
+      "intentSynonyms": [
+        "list orders in ticketmaster",
+        "show me my orders in ticketmaster",
+        "view my orders in ticketmaster",
+        "see all my orders in ticketmaster",
+        "show me my ticketmaster orders in ticketmaster"
+      ],
+      "description": "List your Ticketmaster ticket orders. Optionally filter by status (upcoming, past, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ticketmaster/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "ticketmaster.search_events",
+      "service": "www.ticketmaster.com",
+      "intentSynonyms": [
+        "search events in ticketmaster",
+        "search events on ticketmaster in ticketmaster",
+        "search ticketmaster for concerts, sports, theater, and other live events by keyword, city, and date range in ticketmaster"
+      ],
+      "description": "Search Ticketmaster for concerts, sports, theater, and other live events by keyword, city, and date range. Returns matching events with venues and on-sale dates.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Artist, team, event, or venue to search for"
+          },
+          "city": {
+            "description": "City to filter events by",
+            "type": "string"
+          },
+          "start_date": {
+            "description": "Earliest event date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "end_date": {
+            "description": "Latest event date (YYYY-MM-DD)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyword"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ticketmaster/src/tools/search-events.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },
@@ -8759,6 +9459,146 @@
           "transportHelper": "api",
           "httpMethod": "POST",
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "tripadvisor.get_location",
+      "service": "www.tripadvisor.com",
+      "intentSynonyms": [
+        "get a location in tripadvisor",
+        "look up a location in tripadvisor",
+        "fetch a single location in tripadvisor",
+        "view one specific location in tripadvisor",
+        "get location in tripadvisor",
+        "look up a location on tripadvisor in tripadvisor"
+      ],
+      "description": "Get the details, address, rating, amenities, and ranking of a single Tripadvisor location by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tripadvisor location ID to fetch"
+          }
+        },
+        "required": [
+          "location_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/tripadvisor/src/tools/get-location.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "tripadvisor.list_reviews",
+      "service": "www.tripadvisor.com",
+      "intentSynonyms": [
+        "list reviews in tripadvisor",
+        "show me my reviews in tripadvisor",
+        "view my reviews in tripadvisor",
+        "see all my reviews in tripadvisor",
+        "read reviews of a location on tripadvisor in tripadvisor"
+      ],
+      "description": "List the recent traveler reviews for a Tripadvisor location by its ID. Returns review text, rating, and trip type.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tripadvisor location ID whose reviews to read"
+          },
+          "limit": {
+            "description": "Maximum number of reviews to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "location_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/tripadvisor/src/tools/list-reviews.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "tripadvisor.search_locations",
+      "service": "www.tripadvisor.com",
+      "intentSynonyms": [
+        "search locations in tripadvisor",
+        "search locations on tripadvisor in tripadvisor",
+        "search tripadvisor for hotels, restaurants, and attractions by query and place in tripadvisor"
+      ],
+      "description": "Search Tripadvisor for hotels, restaurants, and attractions by query and place. Returns matching locations with ratings and review counts.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What to search for (e.g. hotels, museums, a restaurant name)"
+          },
+          "place": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City or area to search in"
+          },
+          "category": {
+            "description": "Filter by location category",
+            "type": "string",
+            "enum": [
+              "hotels",
+              "restaurants",
+              "attractions"
+            ]
+          }
+        },
+        "required": [
+          "query",
+          "place"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/tripadvisor/src/tools/search-locations.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },
@@ -9727,6 +10567,151 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/walmart/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "yelp.get_business",
+      "service": "www.yelp.com",
+      "intentSynonyms": [
+        "get a business in yelp",
+        "look up a business in yelp",
+        "fetch a single business in yelp",
+        "view one specific business in yelp",
+        "get business in yelp",
+        "look up a business on yelp in yelp"
+      ],
+      "description": "Get the full details, hours, photos, rating, and contact info of a single Yelp business by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Yelp business ID to fetch"
+          }
+        },
+        "required": [
+          "business_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/yelp/src/tools/get-business.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "yelp.list_reviews",
+      "service": "www.yelp.com",
+      "intentSynonyms": [
+        "list reviews in yelp",
+        "show me my reviews in yelp",
+        "view my reviews in yelp",
+        "see all my reviews in yelp",
+        "read reviews of a business on yelp in yelp"
+      ],
+      "description": "List the recent reviews for a Yelp business by its ID. Returns review text, rating, and author.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Yelp business ID whose reviews to read"
+          },
+          "limit": {
+            "description": "Maximum number of reviews to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "business_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/yelp/src/tools/list-reviews.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "yelp.search_businesses",
+      "service": "www.yelp.com",
+      "intentSynonyms": [
+        "search businesses in yelp",
+        "search businesses on yelp in yelp",
+        "search yelp for local businesses (restaurants, shops, services) by term and location in yelp"
+      ],
+      "description": "Search Yelp for local businesses (restaurants, shops, services) by term and location. Returns matching businesses with ratings, price level, and categories.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What to search for (e.g. coffee, plumber, sushi)"
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, neighborhood, or address to search near"
+          },
+          "price": {
+            "description": "Price level filter (1=$ to 4=$$$$)",
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4"
+            ]
+          },
+          "open_now": {
+            "description": "Only return businesses open now",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "term",
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/yelp/src/tools/search-businesses.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
