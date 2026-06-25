@@ -26,6 +26,7 @@
 
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { execFileSync } = require('node:child_process');
 
 let passed = 0;
 let failed = 0;
@@ -168,6 +169,73 @@ async function main() {
     cleanThrew = true;
   }
   check(!cleanThrew, 'assertCleanParams passes a clean schema (no false abort)');
+
+  // ---- Phase 39.5 carve proof: target.apply_promo_code code -> promo_code -----
+  // The importer renames target.apply_promo_code's BUSINESS `code` input field to
+  // `promo_code` BEFORE the pre-scan (a promo/coupon code, a false-positive of the
+  // eval-able FORBIDDEN token set). These rows prove the carve is NARROW + per-op: a
+  // generic `code` and the eval-able names stay ALWAYS-fatal; only this one op renames.
+
+  // (1) a generic top-level `code` field STILL trips preScanForbidden (FORBIDDEN intact).
+  const genericCode = {
+    type: 'object',
+    properties: { code: { type: 'string' }, title: { type: 'string' } },
+    additionalProperties: false,
+  };
+  check(sameSet(importer.preScanForbidden(genericCode), ['code']),
+    'carve is narrow: a generic top-level code field STILL trips preScanForbidden');
+  let genericThrew = false;
+  try {
+    importer.assertCleanParams(genericCode, 'generic_code_op');
+  } catch (_e) {
+    genericThrew = true;
+  }
+  check(genericThrew, 'carve is narrow: assertCleanParams STILL throws on a generic code op (not allowlisted)');
+
+  // (2) the eval-able names script/expr/transform/fn/js EACH still trip the pre-scan
+  //     (the carve did NOT weaken them -- they remain ALWAYS-fatal).
+  for (const evil of ['script', 'expr', 'transform', 'fn', 'js']) {
+    const planted = { type: 'object', properties: { [evil]: { type: 'string' } }, additionalProperties: false };
+    check(sameSet(importer.preScanForbidden(planted), [evil]),
+      'eval-able name "' + evil + '" STILL trips the pre-scan (always-fatal preserved)');
+  }
+
+  // (3) the REAL target.apply_promo_code descriptor emits promo_code (renamed) and NO
+  //     code, passing the pre-scan. extractDescriptors("target") imports the real plugin
+  //     .ts (which resolves sibling ".js" specifiers to ".ts"), so it runs under the tsx
+  //     loader -- the SAME `node --import tsx` run mode the importer documents. We spawn it
+  //     in a tsx subprocess so THIS test stays runnable under plain `node` (the npm chain).
+  //     (importerUrl is already declared above and points at the same importer module.)
+  const evalSrc =
+    'import(' + JSON.stringify(importerUrl) + ').then(function(m){return m.extractDescriptors("target");})' +
+    '.then(function(rows){var d=rows.find(function(r){return r.descriptor.slug==="target.apply_promo_code";});' +
+    'process.stdout.write(JSON.stringify(d?d.descriptor.params:null));})' +
+    '.catch(function(e){process.stderr.write(String(e&&e.message?e.message:e));process.exit(7);});';
+  let promoParams = null;
+  let spawnErr = '';
+  try {
+    const out = execFileSync('node', ['--import', 'tsx', '-e', evalSrc], {
+      cwd: path.resolve(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    promoParams = JSON.parse(out);
+  } catch (e) {
+    spawnErr = (e && e.stderr ? String(e.stderr) : '') || (e && e.message ? e.message : String(e));
+  }
+  check(spawnErr === '' && !!promoParams && typeof promoParams === 'object',
+    'extractDescriptors("target") emits the apply_promo_code descriptor WITHOUT throwing (the carve unblocks the op)'
+      + (spawnErr ? ' [' + spawnErr.trim() + ']' : ''));
+  check(!!(promoParams && promoParams.properties && promoParams.properties.promo_code),
+    'the carved descriptor exposes a promo_code property (renamed from code)');
+  check(!(promoParams && promoParams.properties && promoParams.properties.code),
+    'the carved descriptor has NO code property (the business token was renamed, not duplicated)');
+  check(!!(promoParams && Array.isArray(promoParams.required)
+      && promoParams.required.indexOf('promo_code') !== -1
+      && promoParams.required.indexOf('code') === -1),
+    'the carved required[] lists promo_code and not code');
+  check(!!promoParams && importer.preScanForbidden(promoParams).length === 0,
+    'the carved target.apply_promo_code params pass preScanForbidden (0 forbidden fields remain)');
 
   if (failed > 0) {
     console.error('import-forbidden-prescan.test: FAIL (' + failed + ' failure(s), ' + passed + ' passed)');
