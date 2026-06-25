@@ -78,8 +78,31 @@ const AXES = [
     // safe (the exact false-negative class DENY-03 must prevent). Adding the
     // inflections only WIDENS the net (fail-closed direction); a benign
     // false-positive is fixed via SAFE_ALLOWLIST per this module's stated policy.
+    //
+    // PHASE 39 (the commerce/payment backstop, mirroring the MED-01 social-axis
+    // widening): ADD commerce/payment tokens so the heuristic INDEPENDENTLY flags
+    // the commerce/payment category on host/slug/description alone -- the explicit
+    // service-denylist.json classification of a commerce/payment origin is no
+    // longer a SINGLE POINT OF FAILURE (an accidentally-dropped classification for
+    // a checkout/cart/place-order origin still trips classifyGate, the exact
+    // "gap == allow" failure the gate exists to prevent). The added tokens are
+    // deliberately SPECIFIC -- checkout / cart / basket / place-order / purchase /
+    // charge[s] / deposit / withdraw / remittance / money-transfer / cashapp /
+    // escrow -- chosen over a bare generic 'order'/'orders'/'buy'/'book'/'reserve':
+    // a bare 'order' would FALSE-TRIP a benign 'list_orders'/'get_order' READ op (a
+    // latent false-positive), so the COMPOUND 'place-order' is added instead -- a
+    // paid order op (place_order / place-order / "place order") trips while a
+    // list/get_order read does not, and a calendly availability read or a yelp
+    // business search (no payment token) stays safe. The compound tokens
+    // 'place-order' and 'money-transfer' match across the '-' / '_' / ' ' separators
+    // ([-_ ]) so they fire on a slug (place_order), a hyphenated host, OR a prose
+    // description equally -- the separator, not a bare 'order', is what distinguishes
+    // a paid-order op from a benign orders read. The fail-closed policy stands:
+    // widen never weaken; a benign false-positive is fixed via SAFE_ALLOWLIST, NEVER
+    // by removing a token. EVERY existing token and the \b...\b anchoring (each new
+    // token anchored) is kept.
     axis: 'finance/payment',
-    re: /\b(bank|banking|pay|payment|payments|wallet|invoice|billing|card|stripe|coinbase|crypto|broker|brokerage|trade|trading|fund|funds|portfolio|tax|budget|ynab|venmo|paypal|wise|fidelity|robinhood|schwab|carta|treasury)\b/i,
+    re: /\b(bank|banking|pay|payment|payments|wallet|invoice|billing|card|stripe|coinbase|crypto|broker|brokerage|trade|trading|fund|funds|portfolio|tax|budget|ynab|venmo|paypal|wise|fidelity|robinhood|schwab|carta|treasury|checkout|cart|basket|place[-_ ]order|purchase|charge|charges|deposit|withdraw|remittance|money[-_ ]transfer|cashapp|escrow)\b/i,
   },
   {
     axis: 'health',
