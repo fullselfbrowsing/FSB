@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs confluence plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://*.atlassian.net/* -> service atlassian.net). NOTE: confluence AND jira both host on *.atlassian.net; the importer canonicalizes the slug STEM from the vendored DIR NAME via STEM_OVERRIDES ({jira:'jira', confluence:'confluence', ...}), NOT from the shared host, so confluence emits DISTINCT opentabs__confluence__* slugs (never colliding with jira). defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, confluence-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node.",
+  "name": "@opentabs-dev/opentabs-plugin-confluence",
+  "version": "0.0.49",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Confluence",
+    "description": "OpenTabs plugin for Confluence",
+    "urlPatterns": [
+      "*://*.atlassian.net/*"
+    ],
+    "homepage": "https://www.atlassian.com/software/confluence"
+  },
+  "license": "MIT"
+}

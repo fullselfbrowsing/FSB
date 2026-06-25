@@ -64,6 +64,7 @@ append-only; closed phases are not edited retroactively.
 | Phase 35 | 2026-06-24 | 4b170216... | (none yet -- scaffold only; metadata files land in Phase 36) | PIN + license scaffold |
 | Phase 36 | 2026-06-24 | 4b170216... | plugins/todoist (7-op Tasks smoke slice: create/list/get/update/close/reopen/delete) | importer smoke (CGEN-01) |
 | Phase 37 | 2026-06-24 | 4b170216... | plugins/linear (5 ops: create/list/get/update_issue + create_comment; GraphQL), plugins/asana (4 ops: create/list/get/update_task; REST) | breadth batch A (BRDTH-01); the MED-03 create_* collision near-neighbors |
+| Phase 37 | 2026-06-25 | 4b170216... | plugins/clickup (4 ops: create/list/get/update_task; REST), plugins/jira (5 ops: create/search/get/update_issue + add_comment; REST), plugins/confluence (4 ops: create/get/search/update_page; REST), plugins/airtable (5 ops: list/get/create/update/delete_record; REST) | breadth batch A sub-batch 2 (BRDTH-01); jira/confluence share *.atlassian.net -> distinct slugs via STEM_OVERRIDES; airtable.delete_record is the destructive crosscheck proof |
 
 ## How this file gets used
 
