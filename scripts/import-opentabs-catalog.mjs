@@ -133,19 +133,30 @@ function enumerateBatchApps() {
 // serviceStem/displayService OVERRIDE (BRDTH-01) -- one-time machinery map.
 // ---------------------------------------------------------------------------
 // The frozen host-derived stem (`service.replace(/^app\./,'').split('.')[0]`) is
-// WRONG or COLLIDING for four later-batch apps:
+// WRONG or COLLIDING for several apps whose first host label is not the app name:
 //   - jira       (*.atlassian.net  -> the subdomain; COLLIDES with confluence)
 //   - confluence (*.atlassian.net  -> the subdomain; COLLIDES with jira)
 //   - cloudflare (dash.cloudflare.com -> 'dash')
 //   - datadog    (app.datadoghq.com   -> 'datadoghq')
+//   - threads    (www.threads.net     -> 'www')  [Phase 38]
 // STEM_OVERRIDES (keyed by the vendored DIR name) gives jira/confluence DISTINCT
-// canonical stems and cloudflare/datadog their brand stems. Every other
+// canonical stems and cloudflare/datadog/threads their brand stems. Every other
 // dev/productivity app (linear/asana/clickup/airtable/gitlab/bitbucket/vercel/
 // netlify/sentry/posthog/circleci) derives correctly and falls through unchanged.
 // Without this, 02/04 cannot emit the slugs they assert and jira would be
 // indistinguishable from confluence. The `service` field keeps the real host; only
 // the stem/slug/filename is canonicalized.
-const STEM_OVERRIDES = { jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog' };
+//
+// THREADS (Phase 38-02): the EXACT origin Plan 38-01 classified sensitive is
+// https://www.threads.net (the bare apex https://threads.net is NOT classified --
+// it would emit UNscreened). So the threads slice MUST vendor *://www.threads.net/*
+// to keep the gate-checked origin = the screened origin. But www.threads.net derives
+// the stem 'www', so the dir-name override 'threads' canonicalizes the slug to
+// opentabs__threads__* (NOT opentabs__www__*). This is the SAME designed
+// host-whose-first-label-isn't-the-app-name canonicalization cloudflare/datadog/jira/
+// confluence already use -- a DATA-MAP extension (STEM_OVERRIDES is the per-app
+// extension point Phase 37-01 built), NOT a logic change, so INV-01 holds.
+const STEM_OVERRIDES = { jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog', threads: 'threads' };
 
 function displayServiceStem(app, derivedStem) {
   return Object.prototype.hasOwnProperty.call(STEM_OVERRIDES, app) ? STEM_OVERRIDES[app] : derivedStem;

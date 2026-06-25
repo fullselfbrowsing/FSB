@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs mastodon plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://mastodon.social/* -> service mastodon.social -> host-derived stem 'mastodon', which is CORRECT -> NO STEM_OVERRIDES entry). mastodon.social is the EXACT origin Plan 38-01 classified SENSITIVE in extension/config/service-denylist.json (the flagship instance; per-instance fediverse hosts are out of scope for this batch), so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, mastodon-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; create_status is the sensitive social WRITE and delete_status the DESTRUCTIVE op posture-B gates.",
+  "name": "@opentabs-dev/opentabs-plugin-mastodon",
+  "version": "0.0.19",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Mastodon",
+    "description": "OpenTabs plugin for Mastodon",
+    "urlPatterns": [
+      "*://mastodon.social/*"
+    ],
+    "homepage": "https://mastodon.social"
+  },
+  "license": "MIT"
+}

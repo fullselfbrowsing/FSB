@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs bluesky plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://bsky.app/* -> service bsky.app -> host-derived stem 'bsky', which is CORRECT -> NO STEM_OVERRIDES entry). NOTE the vendored DIR NAME is `bluesky` but the host/stem/slug is `bsky` (the slug follows the HOST stem, not the dir name; the importer derives the stem from package.json.opentabs.urlPatterns, so this is fine -- the same dir!=stem situation as a generic dir rename). bsky.app is the EXACT origin Plan 38-01 classified SENSITIVE in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, bluesky-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; create_post is the sensitive social WRITE and delete_post the DESTRUCTIVE op posture-B gates.",
+  "name": "@opentabs-dev/opentabs-plugin-bluesky",
+  "version": "0.0.24",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Bluesky",
+    "description": "OpenTabs plugin for Bluesky",
+    "urlPatterns": [
+      "*://bsky.app/*"
+    ],
+    "homepage": "https://bsky.app"
+  },
+  "license": "MIT"
+}
