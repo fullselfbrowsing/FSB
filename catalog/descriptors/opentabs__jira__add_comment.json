@@ -1,0 +1,44 @@
+{
+  "slug": "jira.add_comment",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "add a comment in jira",
+    "add comment in jira",
+    "add a comment to an issue in jira"
+  ],
+  "description": "Add a comment to an existing Jira issue.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id_or_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue ID or key to comment on (e.g. ENG-123)"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment body text in markdown"
+      }
+    },
+    "required": [
+      "issue_id_or_key",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/add-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

@@ -157,6 +157,308 @@
       }
     },
     {
+      "slug": "airtable.create_record",
+      "service": "airtable.com",
+      "intentSynonyms": [
+        "create a record in airtable",
+        "add a record in airtable",
+        "make a new record in airtable",
+        "open a new record in airtable",
+        "create record in airtable",
+        "create a new record in airtable"
+      ],
+      "description": "Create a new record in an Airtable table with the provided field values.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID containing the table"
+          },
+          "table_id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or name to create the record in"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Field name/value pairs for the new record"
+          },
+          "typecast": {
+            "description": "Automatically typecast field values to match the column type",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id_or_name",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airtable/src/tools/create-record.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "airtable.delete_record",
+      "service": "airtable.com",
+      "intentSynonyms": [
+        "delete a record in airtable",
+        "remove a record in airtable",
+        "trash a record in airtable",
+        "permanently delete a record in airtable",
+        "delete record in airtable",
+        "delete a record permanently in airtable"
+      ],
+      "description": "Permanently delete a record from an Airtable table by its record ID. This action cannot be undone.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID containing the table"
+          },
+          "table_id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or name containing the record"
+          },
+          "record_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Record ID to delete"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id_or_name",
+          "record_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airtable/src/tools/delete-record.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "airtable.get_record",
+      "service": "airtable.com",
+      "intentSynonyms": [
+        "get a record in airtable",
+        "look up a record in airtable",
+        "fetch a single record in airtable",
+        "view one specific record in airtable",
+        "get record in airtable",
+        "get a record by id in airtable"
+      ],
+      "description": "Get a single record from an Airtable table by its record ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID containing the table"
+          },
+          "table_id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or name containing the record"
+          },
+          "record_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Record ID to retrieve"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id_or_name",
+          "record_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airtable/src/tools/get-record.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "airtable.list_records",
+      "service": "airtable.com",
+      "intentSynonyms": [
+        "list records in airtable",
+        "show me my records in airtable",
+        "view my records in airtable",
+        "see all my records in airtable",
+        "list records in a table in airtable"
+      ],
+      "description": "List records from an Airtable table. Optionally filter, sort, and page through results.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID containing the table"
+          },
+          "table_id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or name to list records from"
+          },
+          "view": {
+            "description": "View ID or name to use for filtering/sorting",
+            "type": "string"
+          },
+          "filter_by_formula": {
+            "description": "Airtable formula to filter records",
+            "type": "string"
+          },
+          "max_records": {
+            "description": "Maximum number of records to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "page_size": {
+            "description": "Number of records per page",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "offset": {
+            "description": "Pagination offset token from a prior response",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id_or_name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airtable/src/tools/list-records.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "airtable.update_record",
+      "service": "airtable.com",
+      "intentSynonyms": [
+        "update a record in airtable",
+        "edit a record in airtable",
+        "change the details of record in airtable",
+        "modify a record in airtable",
+        "update record in airtable",
+        "update an existing record in airtable"
+      ],
+      "description": "Update an existing Airtable record. A PATCH only changes the provided fields; omitted fields are left unchanged.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID containing the table"
+          },
+          "table_id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or name containing the record"
+          },
+          "record_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Record ID to update"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Field name/value pairs to update"
+          },
+          "typecast": {
+            "description": "Automatically typecast field values to match the column type",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id_or_name",
+          "record_id",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airtable/src/tools/update-record.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "PATCH",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
       "slug": "asana.create_task",
       "service": "app.asana.com",
       "intentSynonyms": [
@@ -367,6 +669,789 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/asana/src/tools/update-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "PUT",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "clickup.create_task",
+      "service": "app.clickup.com",
+      "intentSynonyms": [
+        "create a task in clickup",
+        "add a task in clickup",
+        "make a new task in clickup",
+        "open a new task in clickup",
+        "create task in clickup",
+        "create a new task in clickup"
+      ],
+      "description": "Create a new task in a ClickUp list. Requires a list_id and a name at minimum. Optionally set description, assignees, tags, status, priority, and due date.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List ID to create the task in"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task name/title"
+          },
+          "description": {
+            "description": "Task description in markdown",
+            "type": "string"
+          },
+          "assignees": {
+            "description": "User IDs to assign the task to",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "tags": {
+            "description": "Tag names to apply to the task",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "description": "Status name to set on the task",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority from 1 (urgent) to 4 (low)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "due_date": {
+            "description": "Due date as a Unix timestamp in milliseconds",
+            "type": "number"
+          },
+          "parent": {
+            "description": "Parent task ID to create a subtask",
+            "type": "string"
+          }
+        },
+        "required": [
+          "list_id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/clickup/src/tools/create-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "clickup.get_task",
+      "service": "app.clickup.com",
+      "intentSynonyms": [
+        "get a task in clickup",
+        "look up a task in clickup",
+        "fetch a single task in clickup",
+        "view one specific task in clickup",
+        "get task in clickup",
+        "get a task by id in clickup"
+      ],
+      "description": "Get detailed information about a specific ClickUp task by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to retrieve"
+          },
+          "include_subtasks": {
+            "description": "Include subtasks in the response",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/clickup/src/tools/get-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "clickup.list_tasks",
+      "service": "app.clickup.com",
+      "intentSynonyms": [
+        "list tasks in clickup",
+        "show me my tasks in clickup",
+        "view my tasks in clickup",
+        "see all my tasks in clickup",
+        "list tasks in a list in clickup"
+      ],
+      "description": "List tasks in a ClickUp list. Optionally filter by assignee, status, or archived state.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List ID to fetch tasks from"
+          },
+          "assignees": {
+            "description": "Filter tasks by assignee user IDs",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "statuses": {
+            "description": "Filter tasks by status names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "archived": {
+            "description": "Include archived tasks",
+            "type": "boolean"
+          },
+          "page": {
+            "description": "Page number for pagination (0-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/clickup/src/tools/list-tasks.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "clickup.update_task",
+      "service": "app.clickup.com",
+      "intentSynonyms": [
+        "update a task in clickup",
+        "edit a task in clickup",
+        "change the details of task in clickup",
+        "modify a task in clickup",
+        "update task in clickup",
+        "update an existing task in clickup"
+      ],
+      "description": "Update an existing ClickUp task. Only specified fields are changed; omitted fields remain unchanged.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID to update"
+          },
+          "name": {
+            "description": "New task name/title",
+            "type": "string"
+          },
+          "description": {
+            "description": "New task description in markdown",
+            "type": "string"
+          },
+          "status": {
+            "description": "New status name",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority from 1 (urgent) to 4 (low)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "due_date": {
+            "description": "Due date as a Unix timestamp in milliseconds",
+            "type": "number"
+          },
+          "assignees_add": {
+            "description": "User IDs to add as assignees",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "assignees_rem": {
+            "description": "User IDs to remove as assignees",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/clickup/src/tools/update-task.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "PUT",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "confluence.create_page",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "create a page in confluence",
+        "add a page in confluence",
+        "make a new page in confluence",
+        "open a new page in confluence",
+        "create page in confluence",
+        "create a new page in confluence"
+      ],
+      "description": "Create a new page in a Confluence space. Requires a space_id and a title at minimum. Optionally set the body content and a parent page.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "space_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Space ID to create the page in"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Page title"
+          },
+          "body": {
+            "description": "Page body content in storage (HTML) format",
+            "type": "string"
+          },
+          "parent_id": {
+            "description": "Parent page ID to nest this page under",
+            "type": "string"
+          },
+          "status": {
+            "description": "Page status: \"current\" or \"draft\"",
+            "type": "string",
+            "enum": [
+              "current",
+              "draft"
+            ]
+          }
+        },
+        "required": [
+          "space_id",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/confluence/src/tools/create-page.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "confluence.get_page",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "get a page in confluence",
+        "look up a page in confluence",
+        "fetch a single page in confluence",
+        "view one specific page in confluence",
+        "get page in confluence",
+        "get a page by id in confluence"
+      ],
+      "description": "Get detailed information about a specific Confluence page by its ID, optionally including the body.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Page ID to retrieve"
+          },
+          "body_format": {
+            "description": "Body content format to return",
+            "type": "string",
+            "enum": [
+              "storage",
+              "atlas_doc_format",
+              "view"
+            ]
+          }
+        },
+        "required": [
+          "page_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/confluence/src/tools/get-page.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "confluence.search_pages",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "search pages in confluence",
+        "search pages with cql in confluence",
+        "search pages confluence"
+      ],
+      "description": "Search for Confluence pages using a CQL (Confluence Query Language) query string.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "cql": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CQL query string (e.g. type = page AND space = ENG)"
+          },
+          "limit": {
+            "description": "Maximum number of results to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "description": "Opaque cursor for pagination",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cql"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/confluence/src/tools/search-pages.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "confluence.update_page",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "update a page in confluence",
+        "edit a page in confluence",
+        "change the details of page in confluence",
+        "modify a page in confluence",
+        "update page in confluence",
+        "update an existing page in confluence"
+      ],
+      "description": "Update an existing Confluence page. Confluence requires the new version number; only specified fields are changed.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Page ID to update"
+          },
+          "version_number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "New version number (the current version + 1)"
+          },
+          "title": {
+            "description": "New page title",
+            "type": "string"
+          },
+          "body": {
+            "description": "New page body content in storage (HTML) format",
+            "type": "string"
+          },
+          "status": {
+            "description": "Page status: \"current\" or \"draft\"",
+            "type": "string",
+            "enum": [
+              "current",
+              "draft"
+            ]
+          }
+        },
+        "required": [
+          "page_id",
+          "version_number"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/confluence/src/tools/update-page.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "PUT",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "jira.add_comment",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "add a comment in jira",
+        "add comment in jira",
+        "add a comment to an issue in jira"
+      ],
+      "description": "Add a comment to an existing Jira issue.",
+      "actionVerb": "add",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id_or_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID or key to comment on (e.g. ENG-123)"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comment body text in markdown"
+          }
+        },
+        "required": [
+          "issue_id_or_key",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/jira/src/tools/add-comment.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "add"
+        }
+      }
+    },
+    {
+      "slug": "jira.create_issue",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "create a issue in jira",
+        "add a issue in jira",
+        "make a new issue in jira",
+        "open a new issue in jira",
+        "create issue in jira",
+        "create a new issue in jira"
+      ],
+      "description": "Create a new issue in a Jira project. Requires a project key, a summary, and an issue type at minimum. Optionally set description, assignee, priority, and labels.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project key to create the issue in (e.g. ENG)"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue summary/title"
+          },
+          "issue_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue type name (e.g. Task, Bug, Story)"
+          },
+          "description": {
+            "description": "Issue description in markdown",
+            "type": "string"
+          },
+          "assignee_account_id": {
+            "description": "Account ID of the user to assign",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority name (e.g. High, Medium, Low)",
+            "type": "string"
+          },
+          "labels": {
+            "description": "Labels to apply to the issue",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "project_key",
+          "summary",
+          "issue_type"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/jira/src/tools/create-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "jira.get_issue",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "get a issue in jira",
+        "look up a issue in jira",
+        "fetch a single issue in jira",
+        "view one specific issue in jira",
+        "get issue in jira",
+        "get an issue by id or key in jira"
+      ],
+      "description": "Get detailed information about a specific Jira issue by its ID or key.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id_or_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID or key to retrieve (e.g. ENG-123)"
+          },
+          "fields": {
+            "description": "Issue field names to include in the response",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expand": {
+            "description": "Comma-separated list of fields to expand (e.g. changelog)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issue_id_or_key"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/jira/src/tools/get-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "jira.search_issues",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "search issues in jira",
+        "search issues with jql in jira",
+        "search issues jira"
+      ],
+      "description": "Search for Jira issues using a JQL (Jira Query Language) query string.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "jql": {
+            "type": "string",
+            "minLength": 1,
+            "description": "JQL query string (e.g. project = ENG AND status = \"In Progress\")"
+          },
+          "max_results": {
+            "description": "Maximum number of issues to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "start_at": {
+            "description": "Index of the first issue to return (pagination)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "fields": {
+            "description": "Issue field names to include in the response",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "jql"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/jira/src/tools/search-issues.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "jira.update_issue",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "update a issue in jira",
+        "edit a issue in jira",
+        "change the details of issue in jira",
+        "modify a issue in jira",
+        "update issue in jira",
+        "update an existing issue in jira"
+      ],
+      "description": "Update an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id_or_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID or key to update (e.g. ENG-123)"
+          },
+          "summary": {
+            "description": "New issue summary/title",
+            "type": "string"
+          },
+          "description": {
+            "description": "New issue description in markdown",
+            "type": "string"
+          },
+          "assignee_account_id": {
+            "description": "Account ID of the new assignee",
+            "type": "string"
+          },
+          "priority": {
+            "description": "New priority name (e.g. High, Medium, Low)",
+            "type": "string"
+          },
+          "labels": {
+            "description": "New labels (replaces existing)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "issue_id_or_key"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/jira/src/tools/update-issue.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",

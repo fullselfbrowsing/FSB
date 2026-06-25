@@ -1,0 +1,52 @@
+{
+  "slug": "jira.get_issue",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get a issue in jira",
+    "look up a issue in jira",
+    "fetch a single issue in jira",
+    "view one specific issue in jira",
+    "get issue in jira",
+    "get an issue by id or key in jira"
+  ],
+  "description": "Get detailed information about a specific Jira issue by its ID or key.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id_or_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue ID or key to retrieve (e.g. ENG-123)"
+      },
+      "fields": {
+        "description": "Issue field names to include in the response",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "expand": {
+        "description": "Comma-separated list of fields to expand (e.g. changelog)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_id_or_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/get-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

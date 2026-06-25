@@ -1,0 +1,53 @@
+{
+  "slug": "airtable.delete_record",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "delete a record in airtable",
+    "remove a record in airtable",
+    "trash a record in airtable",
+    "permanently delete a record in airtable",
+    "delete record in airtable",
+    "delete a record permanently in airtable"
+  ],
+  "description": "Permanently delete a record from an Airtable table by its record ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Base ID containing the table"
+      },
+      "table_id_or_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Table ID or name containing the record"
+      },
+      "record_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Record ID to delete"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id_or_name",
+      "record_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/delete-record.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

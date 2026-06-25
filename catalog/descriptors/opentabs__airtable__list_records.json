@@ -1,0 +1,70 @@
+{
+  "slug": "airtable.list_records",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "list records in airtable",
+    "show me my records in airtable",
+    "view my records in airtable",
+    "see all my records in airtable",
+    "list records in a table in airtable"
+  ],
+  "description": "List records from an Airtable table. Optionally filter, sort, and page through results.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Base ID containing the table"
+      },
+      "table_id_or_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Table ID or name to list records from"
+      },
+      "view": {
+        "description": "View ID or name to use for filtering/sorting",
+        "type": "string"
+      },
+      "filter_by_formula": {
+        "description": "Airtable formula to filter records",
+        "type": "string"
+      },
+      "max_records": {
+        "description": "Maximum number of records to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Number of records per page",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset token from a prior response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id_or_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/list-records.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

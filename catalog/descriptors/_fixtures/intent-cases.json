@@ -82,5 +82,36 @@
 
   { "intent": "delete a task from todoist", "expectedSlug": "todoist.delete_task" },
   { "intent": "permanently remove a todoist task", "expectedSlug": "todoist.delete_task" },
-  { "intent": "trash a todoist task for good", "expectedSlug": "todoist.delete_task" }
+  { "intent": "trash a todoist task for good", "expectedSlug": "todoist.delete_task" },
+
+  { "intent": "create a task in clickup", "expectedSlug": "clickup.create_task" },
+  { "intent": "add a new clickup task", "expectedSlug": "clickup.create_task" },
+  { "intent": "make a task in clickup", "expectedSlug": "clickup.create_task" },
+
+  { "intent": "list the tasks in clickup", "expectedSlug": "clickup.list_tasks" },
+  { "intent": "show me my clickup tasks", "expectedSlug": "clickup.list_tasks" },
+
+  { "intent": "create an issue in jira", "expectedSlug": "jira.create_issue" },
+  { "intent": "open a new jira issue", "expectedSlug": "jira.create_issue" },
+  { "intent": "file a new issue in jira", "expectedSlug": "jira.create_issue" },
+
+  { "intent": "search issues in jira", "expectedSlug": "jira.search_issues" },
+  { "intent": "find jira issues with jql", "expectedSlug": "jira.search_issues" },
+
+  { "intent": "create a page in confluence", "expectedSlug": "confluence.create_page" },
+  { "intent": "make a new confluence page", "expectedSlug": "confluence.create_page" },
+  { "intent": "add a new page in confluence", "expectedSlug": "confluence.create_page" },
+
+  { "intent": "update a page in confluence", "expectedSlug": "confluence.update_page" },
+  { "intent": "edit an existing confluence page", "expectedSlug": "confluence.update_page" },
+
+  { "intent": "list records in airtable", "expectedSlug": "airtable.list_records" },
+  { "intent": "show me the records in my airtable table", "expectedSlug": "airtable.list_records" },
+
+  { "intent": "create a record in airtable", "expectedSlug": "airtable.create_record" },
+  { "intent": "add a new airtable record", "expectedSlug": "airtable.create_record" },
+
+  { "intent": "delete a record in airtable", "expectedSlug": "airtable.delete_record" },
+  { "intent": "permanently remove an airtable record", "expectedSlug": "airtable.delete_record" },
+  { "intent": "trash a record from airtable for good", "expectedSlug": "airtable.delete_record" }
 ]

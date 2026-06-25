@@ -1,0 +1,50 @@
+{
+  "slug": "confluence.get_page",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get a page in confluence",
+    "look up a page in confluence",
+    "fetch a single page in confluence",
+    "view one specific page in confluence",
+    "get page in confluence",
+    "get a page by id in confluence"
+  ],
+  "description": "Get detailed information about a specific Confluence page by its ID, optionally including the body.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to retrieve"
+      },
+      "body_format": {
+        "description": "Body content format to return",
+        "type": "string",
+        "enum": [
+          "storage",
+          "atlas_doc_format",
+          "view"
+        ]
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/get-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "slug": "jira.create_issue",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "create a issue in jira",
+    "add a issue in jira",
+    "make a new issue in jira",
+    "open a new issue in jira",
+    "create issue in jira",
+    "create a new issue in jira"
+  ],
+  "description": "Create a new issue in a Jira project. Requires a project key, a summary, and an issue type at minimum. Optionally set description, assignee, priority, and labels.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project key to create the issue in (e.g. ENG)"
+      },
+      "summary": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue summary/title"
+      },
+      "issue_type": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue type name (e.g. Task, Bug, Story)"
+      },
+      "description": {
+        "description": "Issue description in markdown",
+        "type": "string"
+      },
+      "assignee_account_id": {
+        "description": "Account ID of the user to assign",
+        "type": "string"
+      },
+      "priority": {
+        "description": "Priority name (e.g. High, Medium, Low)",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Labels to apply to the issue",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "project_key",
+      "summary",
+      "issue_type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/create-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

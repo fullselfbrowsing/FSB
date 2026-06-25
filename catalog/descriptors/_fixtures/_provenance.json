@@ -8,6 +8,21 @@
   "pinnedAt": "2026-06-21T21:54:20Z",
   "apps": [
     {
+      "app": "airtable",
+      "service": "airtable.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/airtable/",
+      "descriptors": [
+        "airtable.create_record",
+        "airtable.delete_record",
+        "airtable.get_record",
+        "airtable.list_records",
+        "airtable.update_record"
+      ]
+    },
+    {
       "app": "asana",
       "service": "app.asana.com",
       "source": "opentabs",
@@ -19,6 +34,49 @@
         "asana.get_task",
         "asana.list_tasks",
         "asana.update_task"
+      ]
+    },
+    {
+      "app": "clickup",
+      "service": "app.clickup.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/clickup/",
+      "descriptors": [
+        "clickup.create_task",
+        "clickup.get_task",
+        "clickup.list_tasks",
+        "clickup.update_task"
+      ]
+    },
+    {
+      "app": "confluence",
+      "service": "atlassian.net",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/confluence/",
+      "descriptors": [
+        "confluence.create_page",
+        "confluence.get_page",
+        "confluence.search_pages",
+        "confluence.update_page"
+      ]
+    },
+    {
+      "app": "jira",
+      "service": "atlassian.net",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/jira/",
+      "descriptors": [
+        "jira.add_comment",
+        "jira.create_issue",
+        "jira.get_issue",
+        "jira.search_issues",
+        "jira.update_issue"
       ]
     },
     {

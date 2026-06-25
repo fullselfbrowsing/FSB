@@ -56,12 +56,14 @@ global.MiniSearch = MiniSearch;
 
 // ---- Load the REAL emitted dev/productivity collision corpus ----------------
 // linear (GraphQL/camelCase -- the MED-03 collision app) + asana (create_task --
-// the cross-app near-neighbor) + todoist (the Phase-36 smoke slice). These are the
-// EXACT flat descriptors package-extension.mjs inlines; this test indexes the live
-// shipped data, not a hand-written stand-in.
+// the cross-app near-neighbor) + todoist (the Phase-36 smoke slice) + the Phase-37
+// sub-batch-2 apps clickup/jira/confluence/airtable. These are the EXACT flat
+// descriptors package-extension.mjs inlines; this test indexes the live shipped data,
+// not a hand-written stand-in. The jira/confluence pair (both *.atlassian.net) is the
+// STEM_OVERRIDES distinctness proof: each must top its OWN slug, never the sibling's.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -69,8 +71,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 16,
-  'loaded the REAL emitted linear+asana+todoist corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist)');
+check(corpus.length >= 34,
+  'loaded the REAL emitted dev/productivity corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable)');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -87,6 +89,15 @@ const COLLISION_SET = [
   { query: 'create an issue in linear', expected: 'linear.create_issue' },
   { query: 'create a task in asana', expected: 'asana.create_task' },
   { query: 'create a task in todoist', expected: 'todoist.create_task' },
+  // Phase-37 sub-batch-2 cross-app create_* near-neighbors (clickup vs the other
+  // task apps; airtable.create_record vs the create_task family).
+  { query: 'create a task in clickup', expected: 'clickup.create_task' },
+  { query: 'create a record in airtable', expected: 'airtable.create_record' },
+  // The STEM_OVERRIDES distinctness proof: jira AND confluence both host on
+  // *.atlassian.net. Without the per-dir-name stem override they would collapse to
+  // one indistinguishable service; each MUST top its OWN slug here (T-37-08).
+  { query: 'create an issue in jira', expected: 'jira.create_issue' },
+  { query: 'create a page in confluence', expected: 'confluence.create_page' },
 ];
 
 (async function run() {
@@ -146,6 +157,21 @@ const COLLISION_SET = [
     if (!topOk) { wrongInvoke++; }
   }
   const wrongRate = wrongInvoke / COLLISION_SET.length;
+
+  // ---- jira != confluence STEM_OVERRIDES distinctness proof (T-37-08) ----------
+  // jira and confluence both derive from the shared *.atlassian.net host. The
+  // importer canonicalizes each app's slug stem from its vendored DIR NAME via
+  // STEM_OVERRIDES, so they MUST emit two distinct slug families and a jira-intent
+  // must NEVER top a confluence slug (or vice versa) -- otherwise an intent for one
+  // would route to the other's authenticated op on the same host.
+  const jiraSlugs = corpus.map(function (d) { return d.slug; }).filter(function (s) { return s.indexOf('jira.') === 0; });
+  const confluenceSlugs = corpus.map(function (d) { return d.slug; }).filter(function (s) { return s.indexOf('confluence.') === 0; });
+  check(jiraSlugs.length >= 5 && confluenceSlugs.length >= 4,
+    'jira and confluence emit DISTINCT slug families despite the shared *.atlassian.net host (jira: ' + jiraSlugs.length + ', confluence: ' + confluenceSlugs.length + ')');
+  const jiraCreateTop = (search('create an issue in jira', null, 5)[0] || {}).slug || 'none';
+  const confluenceCreateTop = (search('create a page in confluence', null, 5)[0] || {}).slug || 'none';
+  check(jiraCreateTop.indexOf('jira.') === 0 && confluenceCreateTop.indexOf('confluence.') === 0,
+    'jira-intent tops a jira.* slug (' + jiraCreateTop + ') and confluence-intent tops a confluence.* slug (' + confluenceCreateTop + ') -- never cross-invoke on the shared host (STEM_OVERRIDES)');
 
   // The METRICS line (mirrors the eval's grep-able format).
   console.log('  METRICS: recall@5=' + recall.toFixed(3) + ' wrong-invoke=' + wrongRate.toFixed(3)

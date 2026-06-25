@@ -1,0 +1,60 @@
+{
+  "slug": "airtable.create_record",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "create a record in airtable",
+    "add a record in airtable",
+    "make a new record in airtable",
+    "open a new record in airtable",
+    "create record in airtable",
+    "create a new record in airtable"
+  ],
+  "description": "Create a new record in an Airtable table with the provided field values.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Base ID containing the table"
+      },
+      "table_id_or_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Table ID or name to create the record in"
+      },
+      "fields": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Field name/value pairs for the new record"
+      },
+      "typecast": {
+        "description": "Automatically typecast field values to match the column type",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id_or_name",
+      "fields"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/create-record.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

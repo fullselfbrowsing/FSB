@@ -1,0 +1,63 @@
+{
+  "slug": "confluence.create_page",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "create a page in confluence",
+    "add a page in confluence",
+    "make a new page in confluence",
+    "open a new page in confluence",
+    "create page in confluence",
+    "create a new page in confluence"
+  ],
+  "description": "Create a new page in a Confluence space. Requires a space_id and a title at minimum. Optionally set the body content and a parent page.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "space_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Space ID to create the page in"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page title"
+      },
+      "body": {
+        "description": "Page body content in storage (HTML) format",
+        "type": "string"
+      },
+      "parent_id": {
+        "description": "Parent page ID to nest this page under",
+        "type": "string"
+      },
+      "status": {
+        "description": "Page status: \"current\" or \"draft\"",
+        "type": "string",
+        "enum": [
+          "current",
+          "draft"
+        ]
+      }
+    },
+    "required": [
+      "space_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/create-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

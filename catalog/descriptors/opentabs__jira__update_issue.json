@@ -1,0 +1,64 @@
+{
+  "slug": "jira.update_issue",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "update a issue in jira",
+    "edit a issue in jira",
+    "change the details of issue in jira",
+    "modify a issue in jira",
+    "update issue in jira",
+    "update an existing issue in jira"
+  ],
+  "description": "Update an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id_or_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue ID or key to update (e.g. ENG-123)"
+      },
+      "summary": {
+        "description": "New issue summary/title",
+        "type": "string"
+      },
+      "description": {
+        "description": "New issue description in markdown",
+        "type": "string"
+      },
+      "assignee_account_id": {
+        "description": "Account ID of the new assignee",
+        "type": "string"
+      },
+      "priority": {
+        "description": "New priority name (e.g. High, Medium, Low)",
+        "type": "string"
+      },
+      "labels": {
+        "description": "New labels (replaces existing)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "issue_id_or_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/update-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

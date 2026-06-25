@@ -1,0 +1,64 @@
+{
+  "slug": "confluence.update_page",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "update a page in confluence",
+    "edit a page in confluence",
+    "change the details of page in confluence",
+    "modify a page in confluence",
+    "update page in confluence",
+    "update an existing page in confluence"
+  ],
+  "description": "Update an existing Confluence page. Confluence requires the new version number; only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to update"
+      },
+      "version_number": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "New version number (the current version + 1)"
+      },
+      "title": {
+        "description": "New page title",
+        "type": "string"
+      },
+      "body": {
+        "description": "New page body content in storage (HTML) format",
+        "type": "string"
+      },
+      "status": {
+        "description": "Page status: \"current\" or \"draft\"",
+        "type": "string",
+        "enum": [
+          "current",
+          "draft"
+        ]
+      }
+    },
+    "required": [
+      "page_id",
+      "version_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/update-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

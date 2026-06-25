@@ -1,0 +1,83 @@
+{
+  "slug": "clickup.create_task",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "create a task in clickup",
+    "add a task in clickup",
+    "make a new task in clickup",
+    "open a new task in clickup",
+    "create task in clickup",
+    "create a new task in clickup"
+  ],
+  "description": "Create a new task in a ClickUp list. Requires a list_id and a name at minimum. Optionally set description, assignees, tags, status, priority, and due date.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID to create the task in"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task name/title"
+      },
+      "description": {
+        "description": "Task description in markdown",
+        "type": "string"
+      },
+      "assignees": {
+        "description": "User IDs to assign the task to",
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "tags": {
+        "description": "Tag names to apply to the task",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "status": {
+        "description": "Status name to set on the task",
+        "type": "string"
+      },
+      "priority": {
+        "description": "Priority from 1 (urgent) to 4 (low)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4
+      },
+      "due_date": {
+        "description": "Due date as a Unix timestamp in milliseconds",
+        "type": "number"
+      },
+      "parent": {
+        "description": "Parent task ID to create a subtask",
+        "type": "string"
+      }
+    },
+    "required": [
+      "list_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/create-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}
