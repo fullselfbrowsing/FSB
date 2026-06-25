@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: verifying
+status: ready_to_plan
 stopped_at: "Completed 38-03-PLAN.md (discord [messaging] + reddit [content-reads] imported DOM-only via the frozen machinery, 87->94 descriptors all backing:dom; the END-TO-END sensitive-write-import proof on the REAL emitted opentabs__discord__send_message descriptor is green [read allows, write -> RECIPE_CONSENT_MUTATING_REQUIRED dual-field, flag elevates]; reddit-inbox.json not clobbered; comms/social/content category COMPLETE -> Phase 38 all 3 plans done, ready for verification)"
 last_updated: "2026-06-25T10:24:01.816Z"
 last_activity: 2026-06-25 -- 38-03 complete (Phase 38 done; comms/social/content fully screened-and-imported)
 progress:
   total_phases: 9
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 3
   completed_plans: 3
   percent: 44
@@ -26,16 +26,16 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 38 — Breadth B — Comms / Social / Content (sensitivity-screened)
+**Current focus:** Phase 39 — Breadth C — Commerce / Travel / Misc (most-sensitive)
 
 ## Current Position
 
-Phase: 38 (Breadth B — Comms / Social / Content (sensitivity-screened)) — COMPLETE (ready for verification)
-Plan: 3 of 3 (all plans done)
-Status: Phase 38 complete (38-01 + 38-02 + 38-03 done) — ready for verification
-Last activity: 2026-06-25 -- 38-03 complete (discord + reddit imported DOM-only; the END-TO-END sensitive-write-import proof on the REAL emitted discord send_message descriptor is green; comms/social/content category COMPLETE)
+Phase: 39 of 43 (Breadth C — Commerce / Travel / Misc) — not started
+Plan: —
+Status: Phase 38 complete (verified passed, 5/5 must-haves); ready to plan Phase 39
+Last activity: 2026-06-25
 
-Progress: [████░░░░░░] 44% (3/9 v1.0.0 phases verified-complete; Phase 38 all 3 plans done, pending verification)
+Progress: [████░░░░░░] 44% (4/9 phases verified-complete)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -44,7 +44,7 @@ Progress: [████░░░░░░] 44% (3/9 v1.0.0 phases verified-compl
 | 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
 | 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | ✓ Complete (2026-06-24) |
 | 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | ✓ Complete (2026-06-25) |
-| 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | Complete — all 3 plans done (2026-06-25), pending verification |
+| 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | Not started |
 | 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
 | 41 | Depth 2 — Remaining Hand-Ports + Guarded Writes | DEPTH-02 (1) | Not started |
@@ -151,7 +151,7 @@ Resume file: None
 
 ## Next Actions
 
-Phase 38 (Breadth B — Comms / Social / Content) is COMPLETE: all 3 plans done (38-01 screening + 38-02 AI-chat/microblog + 38-03 messaging/content + the headline end-to-end proof) -> ready for verification. 38-03 vendored discord (discord.com SENSITIVE; list_channels/list_messages reads + send_message WRITE + delete_message DESTRUCTIVE) + reddit (reddit.com SAFE content tier; list_subreddit_posts/get_post/search_posts READ-ONLY) as hermetic metadata-only slices and imported them DOM-only via the FROZEN importer with ZERO machinery edit (enumerateBatchApps auto-discovered both dirs -> 87->94 descriptors, all backing:'dom'). reddit vendored at the APEX *://reddit.com/* so the frozen stem derives 'reddit' (not 'www') AND classifies benign-safe -> no STEM_OVERRIDES edit, classifyGate passes the safe origin; the hand-authored reddit-inbox.json (slug reddit.inbox, backing recipe) is NOT clobbered. HEADLINE (T-38-01) END-TO-END proof landed: tests/sensitive-write-import-gate.test.js loads the REAL emitted opentabs__discord__send_message.json FROM DISK and routes it through the LIVE posture-B consent gate over the COMMITTED roster (reading the descriptor's REAL sideEffectClass from the JSON) -> read allows under Auto, write without the per-origin mutating flag -> RECIPE_CONSENT_MUTATING_REQUIRED (code===errorCode===error byte-exact, INV-03), setOriginMutating(true) elevates -- the screening enforced on the descriptor that ACTUALLY SHIPS (registered in package.json after dom-only-default). Snapshot regenerated INV-01 byte-stable (364 insertions/0 deletions); validate:extension exit 0; crosscheck (94, no under-statement) + no-dead-entry + breadth-search-return (recall@5=1.000 wrong-invoke=0 over 94 ops / 34 probes incl discord-vs-slack messaging collision) + capability-search-eval (recall@5=1.000 wrong-invoke=0 over 154 fixtures, cold-start 55.6KB<64KB) all green. 2 deviations [both Rule 1, scope-bounded]: retargeted 1 stale Phase-28 discord fixture to the real emitted slug; replaced 1 self-introduced weak reddit collision probe. Recommended: verify Phase 38, then `/gsd-plan-phase 39` (Breadth C — Commerce / Travel / Misc, most-sensitive) which inherits the screen-then-import contract + the end-to-end-on-a-shipped-descriptor consent-proof pattern. Side Phase 999.1 (click heuristics) is Backlog — NOT v1.0.0; the autonomous run skips it. (NOTE: the state.update-progress SDK handler AGAIN miscomputed the multi-milestone progress block this run -- it set total_phases=10/completed_phases=4/total_plans=15/completed_plans=17/percent=100 conflating cross-phase SUMMARY counts; the human-readable Current Position + the frontmatter progress block were corrected by hand to the v1.0.0 phase-level framing total_phases=9/completed_phases=3/total_plans=3/completed_plans=3/percent=44. state.record-metric also no-op'd: 'Performance Metrics section not found in STATE.md' -- metrics captured in 38-03-SUMMARY.md instead.)
+Plan Phase 39 (Breadth C — Commerce / Travel / Misc, MOST-sensitive — continues BRDTH-01/02/03 for the payment-bearing category). Phases 35-38 are complete + verified (4/9). Phase 38 imported the comms/social/content batch (7 apps → 94 descriptors, all DOM-only) with per-app sensitivity screening: chatgpt/claude/bsky/mastodon/threads/discord → sensitive (writes posture-B gated), reddit → safe (read-only verified), DENY-01 set excluded. The headline write-sensitivity mitigation is proven end-to-end on the REAL emitted opentabs__discord__send_message via the live posture-B gate. Phase 39 reuses the SAME frozen screen-then-import contract + the end-to-end-on-a-shipped-descriptor consent-proof pattern for the most-sensitive batch — commerce/travel/misc apps that include PAYMENT-bearing flows: screen out or DENY money-moving operations so NO descriptor arms a money-moving op under Auto. **CARRY-FORWARD (from 38 review): the MED-01 social-axis token list + the MED-02 READ_ONLY_SAFE_SERVICES allowlist in the gates are curated sets — when Phase 39 vendors payment/commerce apps, revisit BOTH (add payment/checkout/charge tokens to the heuristic backstop; only add an origin to READ_ONLY_SAFE if its emitted ops are genuinely read-only). Payment WRITE ops must be sensitive-or-DENIED, never safe-and-writable-under-Auto.** Recommended: `/gsd-plan-phase 39`. Side Phase 999.1 (click heuristics) is Backlog — NOT v1.0.0; the autonomous run skips it.
 
 ### (historical) Phase 37 planning context
 
