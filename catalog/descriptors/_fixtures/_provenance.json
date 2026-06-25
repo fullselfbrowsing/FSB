@@ -51,6 +51,33 @@
       ]
     },
     {
+      "app": "bluesky",
+      "service": "bsky.app",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/bluesky/",
+      "descriptors": [
+        "bsky.create_post",
+        "bsky.delete_post",
+        "bsky.get_profile",
+        "bsky.list_timeline"
+      ]
+    },
+    {
+      "app": "chatgpt",
+      "service": "chatgpt.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/chatgpt/",
+      "descriptors": [
+        "chatgpt.get_conversation",
+        "chatgpt.list_conversations",
+        "chatgpt.send_message"
+      ]
+    },
+    {
       "app": "circleci",
       "service": "app.circleci.com",
       "source": "opentabs",
@@ -62,6 +89,19 @@
         "circleci.list_pipelines",
         "circleci.list_workflows",
         "circleci.trigger_pipeline"
+      ]
+    },
+    {
+      "app": "claude",
+      "service": "claude.ai",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/claude/",
+      "descriptors": [
+        "claude.get_conversation",
+        "claude.list_conversations",
+        "claude.send_message"
       ]
     },
     {
@@ -165,6 +205,20 @@
       ]
     },
     {
+      "app": "mastodon",
+      "service": "mastodon.social",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/mastodon/",
+      "descriptors": [
+        "mastodon.create_status",
+        "mastodon.delete_status",
+        "mastodon.get_status",
+        "mastodon.list_timeline"
+      ]
+    },
+    {
       "app": "netlify",
       "service": "app.netlify.com",
       "source": "opentabs",
@@ -204,6 +258,19 @@
         "sentry.list_issues",
         "sentry.list_projects",
         "sentry.resolve_issue"
+      ]
+    },
+    {
+      "app": "threads",
+      "service": "www.threads.net",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/threads/",
+      "descriptors": [
+        "threads.create_thread",
+        "threads.get_thread",
+        "threads.list_timeline"
       ]
     },
     {

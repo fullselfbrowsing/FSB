@@ -1,0 +1,41 @@
+{
+  "slug": "mastodon.delete_status",
+  "service": "mastodon.social",
+  "intentSynonyms": [
+    "delete a status in mastodon",
+    "remove a status in mastodon",
+    "trash a status in mastodon",
+    "permanently delete a status in mastodon",
+    "delete status in mastodon",
+    "delete a mastodon status permanently in mastodon"
+  ],
+  "description": "Permanently delete one of your Mastodon statuses (toots) by its ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Status ID to delete"
+      }
+    },
+    "required": [
+      "status_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mastodon/src/tools/delete-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

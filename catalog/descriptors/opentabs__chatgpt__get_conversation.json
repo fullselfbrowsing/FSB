@@ -1,0 +1,41 @@
+{
+  "slug": "chatgpt.get_conversation",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get a conversation in chatgpt",
+    "look up a conversation in chatgpt",
+    "fetch a single conversation in chatgpt",
+    "view one specific conversation in chatgpt",
+    "get conversation in chatgpt",
+    "open a chatgpt conversation in chatgpt"
+  ],
+  "description": "Get the full message history of a single ChatGPT conversation by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation ID to retrieve"
+      }
+    },
+    "required": [
+      "conversation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

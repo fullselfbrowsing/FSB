@@ -1,0 +1,43 @@
+{
+  "slug": "threads.list_timeline",
+  "service": "www.threads.net",
+  "intentSynonyms": [
+    "list a timeline in threads",
+    "show me my timeline in threads",
+    "view my timeline in threads",
+    "see all my timeline in threads",
+    "list timeline in threads",
+    "show me my threads timeline in threads"
+  ],
+  "description": "List recent posts from your Threads home timeline. Optionally page through with a cursor.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor from a previous page",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of posts to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/threads/src/tools/list-timeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

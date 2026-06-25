@@ -1,0 +1,41 @@
+{
+  "slug": "mastodon.get_status",
+  "service": "mastodon.social",
+  "intentSynonyms": [
+    "get a status in mastodon",
+    "look up a status in mastodon",
+    "fetch a single status in mastodon",
+    "view one specific status in mastodon",
+    "get status in mastodon",
+    "open a mastodon status in mastodon"
+  ],
+  "description": "Get a single Mastodon status (toot) by its ID, including content and engagement counts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Status ID to retrieve"
+      }
+    },
+    "required": [
+      "status_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mastodon/src/tools/get-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "slug": "chatgpt.send_message",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "send a message in chatgpt",
+    "post a message in chatgpt",
+    "write a new message in chatgpt",
+    "send message in chatgpt",
+    "send a message in chatgpt in chatgpt"
+  ],
+  "description": "Send a message to ChatGPT. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The message text to send to ChatGPT"
+      },
+      "conversation_id": {
+        "description": "Conversation to continue (omit to start a new one)",
+        "type": "string"
+      },
+      "model": {
+        "description": "Model slug to use for the reply",
+        "type": "string"
+      }
+    },
+    "required": [
+      "message"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

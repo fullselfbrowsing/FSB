@@ -1,0 +1,45 @@
+{
+  "slug": "threads.create_thread",
+  "service": "www.threads.net",
+  "intentSynonyms": [
+    "create a thread in threads",
+    "add a thread in threads",
+    "make a new thread in threads",
+    "open a new thread in threads",
+    "create thread in threads",
+    "post a new thread in threads"
+  ],
+  "description": "Post a new thread to Threads. Publishes the text to your account; this is publicly visible. Optionally reply to an existing thread.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The text content of the thread to post"
+      },
+      "reply_to_id": {
+        "description": "Thread ID to reply to (omit to start a new thread)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/threads/src/tools/create-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

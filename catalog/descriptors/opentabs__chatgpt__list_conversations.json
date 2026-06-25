@@ -1,0 +1,44 @@
+{
+  "slug": "chatgpt.list_conversations",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "list conversations in chatgpt",
+    "show me my conversations in chatgpt",
+    "view my conversations in chatgpt",
+    "see all my conversations in chatgpt",
+    "show me my chatgpt conversations in chatgpt"
+  ],
+  "description": "List your recent ChatGPT conversations. Optionally page through with an offset and limit.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "offset": {
+        "description": "Number of conversations to skip",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "limit": {
+        "description": "Maximum number of conversations to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

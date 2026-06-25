@@ -1,0 +1,41 @@
+{
+  "slug": "bsky.delete_post",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "delete a post in bsky",
+    "remove a post in bsky",
+    "trash a post in bsky",
+    "permanently delete a post in bsky",
+    "delete post in bsky",
+    "delete a bluesky post permanently in bsky"
+  ],
+  "description": "Permanently delete one of your Bluesky posts by its AT-URI. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "minLength": 1,
+        "description": "AT-URI of the post to delete"
+      }
+    },
+    "required": [
+      "uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/delete-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

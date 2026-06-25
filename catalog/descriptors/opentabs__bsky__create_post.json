@@ -1,0 +1,53 @@
+{
+  "slug": "bsky.create_post",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "create a post in bsky",
+    "add a post in bsky",
+    "make a new post in bsky",
+    "open a new post in bsky",
+    "create post in bsky",
+    "post to bluesky in bsky"
+  ],
+  "description": "Post a new entry to your Bluesky feed. Publishes the text to your account; this is publicly visible. Optionally reply to an existing post.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300,
+        "description": "The text content of the post (max 300 graphemes)"
+      },
+      "reply_to_uri": {
+        "description": "AT-URI of the post to reply to (omit to start a new post)",
+        "type": "string"
+      },
+      "langs": {
+        "description": "BCP-47 language tags for the post",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/create-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

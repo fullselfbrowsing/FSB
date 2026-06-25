@@ -1,0 +1,41 @@
+{
+  "slug": "bsky.get_profile",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get a profile in bsky",
+    "look up a profile in bsky",
+    "fetch a single profile in bsky",
+    "view one specific profile in bsky",
+    "get profile in bsky",
+    "look up a bluesky profile in bsky"
+  ],
+  "description": "Get a Bluesky profile by handle or DID, including display name, bio, and follower counts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "actor": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The handle (e.g. alice.bsky.social) or DID of the profile to fetch"
+      }
+    },
+    "required": [
+      "actor"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

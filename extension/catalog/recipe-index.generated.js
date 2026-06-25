@@ -933,6 +933,317 @@
       }
     },
     {
+      "slug": "bsky.create_post",
+      "service": "bsky.app",
+      "intentSynonyms": [
+        "create a post in bsky",
+        "add a post in bsky",
+        "make a new post in bsky",
+        "open a new post in bsky",
+        "create post in bsky",
+        "post to bluesky in bsky"
+      ],
+      "description": "Post a new entry to your Bluesky feed. Publishes the text to your account; this is publicly visible. Optionally reply to an existing post.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "The text content of the post (max 300 graphemes)"
+          },
+          "reply_to_uri": {
+            "description": "AT-URI of the post to reply to (omit to start a new post)",
+            "type": "string"
+          },
+          "langs": {
+            "description": "BCP-47 language tags for the post",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bluesky/src/tools/create-post.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "bsky.delete_post",
+      "service": "bsky.app",
+      "intentSynonyms": [
+        "delete a post in bsky",
+        "remove a post in bsky",
+        "trash a post in bsky",
+        "permanently delete a post in bsky",
+        "delete post in bsky",
+        "delete a bluesky post permanently in bsky"
+      ],
+      "description": "Permanently delete one of your Bluesky posts by its AT-URI. This action cannot be undone.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "minLength": 1,
+            "description": "AT-URI of the post to delete"
+          }
+        },
+        "required": [
+          "uri"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bluesky/src/tools/delete-post.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "bsky.get_profile",
+      "service": "bsky.app",
+      "intentSynonyms": [
+        "get a profile in bsky",
+        "look up a profile in bsky",
+        "fetch a single profile in bsky",
+        "view one specific profile in bsky",
+        "get profile in bsky",
+        "look up a bluesky profile in bsky"
+      ],
+      "description": "Get a Bluesky profile by handle or DID, including display name, bio, and follower counts.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The handle (e.g. alice.bsky.social) or DID of the profile to fetch"
+          }
+        },
+        "required": [
+          "actor"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bluesky/src/tools/get-profile.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "bsky.list_timeline",
+      "service": "bsky.app",
+      "intentSynonyms": [
+        "list a timeline in bsky",
+        "show me my timeline in bsky",
+        "view my timeline in bsky",
+        "see all my timeline in bsky",
+        "list timeline in bsky",
+        "show me my bluesky timeline in bsky"
+      ],
+      "description": "List recent posts from your Bluesky home timeline. Optionally page through with a cursor.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "description": "Pagination cursor from a previous page",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of posts to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bluesky/src/tools/list-timeline.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "chatgpt.get_conversation",
+      "service": "chatgpt.com",
+      "intentSynonyms": [
+        "get a conversation in chatgpt",
+        "look up a conversation in chatgpt",
+        "fetch a single conversation in chatgpt",
+        "view one specific conversation in chatgpt",
+        "get conversation in chatgpt",
+        "open a chatgpt conversation in chatgpt"
+      ],
+      "description": "Get the full message history of a single ChatGPT conversation by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID to retrieve"
+          }
+        },
+        "required": [
+          "conversation_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chatgpt/src/tools/get-conversation.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "chatgpt.list_conversations",
+      "service": "chatgpt.com",
+      "intentSynonyms": [
+        "list conversations in chatgpt",
+        "show me my conversations in chatgpt",
+        "view my conversations in chatgpt",
+        "see all my conversations in chatgpt",
+        "show me my chatgpt conversations in chatgpt"
+      ],
+      "description": "List your recent ChatGPT conversations. Optionally page through with an offset and limit.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "description": "Number of conversations to skip",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "description": "Maximum number of conversations to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chatgpt/src/tools/list-conversations.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "chatgpt.send_message",
+      "service": "chatgpt.com",
+      "intentSynonyms": [
+        "send a message in chatgpt",
+        "post a message in chatgpt",
+        "write a new message in chatgpt",
+        "send message in chatgpt",
+        "send a message in chatgpt in chatgpt"
+      ],
+      "description": "Send a message to ChatGPT. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
+      "actionVerb": "send",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message text to send to ChatGPT"
+          },
+          "conversation_id": {
+            "description": "Conversation to continue (omit to start a new one)",
+            "type": "string"
+          },
+          "model": {
+            "description": "Model slug to use for the reply",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chatgpt/src/tools/send-message.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "send"
+        }
+      }
+    },
+    {
       "slug": "circleci.get_pipeline",
       "service": "app.circleci.com",
       "intentSynonyms": [
@@ -1116,6 +1427,139 @@
           "transportHelper": "api",
           "httpMethod": "POST",
           "opNameVerb": "trigger"
+        }
+      }
+    },
+    {
+      "slug": "claude.get_conversation",
+      "service": "claude.ai",
+      "intentSynonyms": [
+        "get a conversation in claude",
+        "look up a conversation in claude",
+        "fetch a single conversation in claude",
+        "view one specific conversation in claude",
+        "get conversation in claude",
+        "open a claude conversation in claude"
+      ],
+      "description": "Get the full message history of a single Claude conversation by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID to retrieve"
+          }
+        },
+        "required": [
+          "conversation_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/claude/src/tools/get-conversation.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "claude.list_conversations",
+      "service": "claude.ai",
+      "intentSynonyms": [
+        "list conversations in claude",
+        "show me my conversations in claude",
+        "view my conversations in claude",
+        "see all my conversations in claude",
+        "show me my claude conversations in claude"
+      ],
+      "description": "List your recent Claude conversations. Optionally page through with an offset and limit.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "description": "Number of conversations to skip",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "description": "Maximum number of conversations to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/claude/src/tools/list-conversations.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "claude.send_message",
+      "service": "claude.ai",
+      "intentSynonyms": [
+        "send a message in claude",
+        "post a message in claude",
+        "write a new message in claude",
+        "send message in claude",
+        "send a message in claude in claude"
+      ],
+      "description": "Send a message to Claude. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
+      "actionVerb": "send",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message text to send to Claude"
+          },
+          "conversation_id": {
+            "description": "Conversation to continue (omit to start a new one)",
+            "type": "string"
+          },
+          "model": {
+            "description": "Model slug to use for the reply",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/claude/src/tools/send-message.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "send"
         }
       }
     },
@@ -2875,6 +3319,190 @@
       }
     },
     {
+      "slug": "mastodon.create_status",
+      "service": "mastodon.social",
+      "intentSynonyms": [
+        "create a status in mastodon",
+        "add a status in mastodon",
+        "make a new status in mastodon",
+        "open a new status in mastodon",
+        "create status in mastodon",
+        "post a status to mastodon in mastodon"
+      ],
+      "description": "Publish a new status (toot) to Mastodon. Posts the text to your account at the chosen visibility; this is visible to your audience. Optionally reply to an existing status.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text content of the status to publish"
+          },
+          "visibility": {
+            "description": "Status visibility",
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private",
+              "direct"
+            ]
+          },
+          "in_reply_to_id": {
+            "description": "Status ID to reply to (omit to start a new status)",
+            "type": "string"
+          },
+          "spoiler_text": {
+            "description": "Content-warning text shown above the status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/mastodon/src/tools/create-status.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "mastodon.delete_status",
+      "service": "mastodon.social",
+      "intentSynonyms": [
+        "delete a status in mastodon",
+        "remove a status in mastodon",
+        "trash a status in mastodon",
+        "permanently delete a status in mastodon",
+        "delete status in mastodon",
+        "delete a mastodon status permanently in mastodon"
+      ],
+      "description": "Permanently delete one of your Mastodon statuses (toots) by its ID. This action cannot be undone.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Status ID to delete"
+          }
+        },
+        "required": [
+          "status_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/mastodon/src/tools/delete-status.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "mastodon.get_status",
+      "service": "mastodon.social",
+      "intentSynonyms": [
+        "get a status in mastodon",
+        "look up a status in mastodon",
+        "fetch a single status in mastodon",
+        "view one specific status in mastodon",
+        "get status in mastodon",
+        "open a mastodon status in mastodon"
+      ],
+      "description": "Get a single Mastodon status (toot) by its ID, including content and engagement counts.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Status ID to retrieve"
+          }
+        },
+        "required": [
+          "status_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/mastodon/src/tools/get-status.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "mastodon.list_timeline",
+      "service": "mastodon.social",
+      "intentSynonyms": [
+        "list a timeline in mastodon",
+        "show me my timeline in mastodon",
+        "view my timeline in mastodon",
+        "see all my timeline in mastodon",
+        "list timeline in mastodon",
+        "show me my mastodon timeline in mastodon"
+      ],
+      "description": "List recent statuses from your Mastodon home timeline. Optionally page through with max_id.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "max_id": {
+            "description": "Return results older than this status ID",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of statuses to return (max 40)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/mastodon/src/tools/list-timeline.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
       "slug": "netlify.create_deploy",
       "service": "app.netlify.com",
       "intentSynonyms": [
@@ -3465,6 +4093,135 @@
           "transportHelper": "api",
           "httpMethod": "PUT",
           "opNameVerb": "resolve"
+        }
+      }
+    },
+    {
+      "slug": "threads.create_thread",
+      "service": "www.threads.net",
+      "intentSynonyms": [
+        "create a thread in threads",
+        "add a thread in threads",
+        "make a new thread in threads",
+        "open a new thread in threads",
+        "create thread in threads",
+        "post a new thread in threads"
+      ],
+      "description": "Post a new thread to Threads. Publishes the text to your account; this is publicly visible. Optionally reply to an existing thread.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text content of the thread to post"
+          },
+          "reply_to_id": {
+            "description": "Thread ID to reply to (omit to start a new thread)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/threads/src/tools/create-thread.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "threads.get_thread",
+      "service": "www.threads.net",
+      "intentSynonyms": [
+        "get a thread in threads",
+        "look up a thread in threads",
+        "fetch a single thread in threads",
+        "view one specific thread in threads",
+        "get thread in threads",
+        "open a thread on threads in threads"
+      ],
+      "description": "Get a single Threads post and its replies by thread ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Thread ID to retrieve"
+          }
+        },
+        "required": [
+          "thread_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/threads/src/tools/get-thread.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "threads.list_timeline",
+      "service": "www.threads.net",
+      "intentSynonyms": [
+        "list a timeline in threads",
+        "show me my timeline in threads",
+        "view my timeline in threads",
+        "see all my timeline in threads",
+        "list timeline in threads",
+        "show me my threads timeline in threads"
+      ],
+      "description": "List recent posts from your Threads home timeline. Optionally page through with a cursor.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "description": "Pagination cursor from a previous page",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of posts to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/threads/src/tools/list-timeline.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
         }
       }
     },

@@ -70,13 +70,19 @@ global.MiniSearch = MiniSearch;
 // package-extension.mjs inlines; this test indexes the live shipped data, not a
 // hand-written stand-in. The jira/confluence pair (both *.atlassian.net) is the
 // STEM_OVERRIDES distinctness proof: each must top its OWN slug, never the sibling's.
-// Sub-batch 4 (37-04) completes the category: cloudflare/circleci/datadog/sentry/
-// posthog (cloud + observability + CI/analytics). cloudflare/datadog emit canonical
-// stems via STEM_OVERRIDES (dash/datadoghq would be wrong); the whole dev/productivity
-// batch is now present and this test indexes ALL of it.
+// Sub-batch 4 (37-04) completes the dev/productivity category: cloudflare/circleci/
+// datadog/sentry/posthog (cloud + observability + CI/analytics). cloudflare/datadog
+// emit canonical stems via STEM_OVERRIDES (dash/datadoghq would be wrong).
+// Phase 38 batch B sub-batch 1 (38-02) GROWS the corpus with the AI-chat + microblog/
+// fediverse apps -- chatgpt/claude (AI-chat) + bsky/mastodon/threads (microblog) --
+// ALL screened SENSITIVE by 38-01 and ALL backing:'dom' (DOM-only). The bluesky DIR
+// emits the `bsky` HOST stem; threads vendors *://www.threads.net/* (the screened
+// origin) and canonicalizes to the `threads` stem via STEM_OVERRIDES (the host-derived
+// 'www' would be wrong), so the slug is opentabs__threads__* (NOT opentabs__www__*).
+// This test indexes the dev/productivity batch AND the comms/social sub-batch.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -84,8 +90,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 70,
-  'loaded the REAL emitted dev/productivity corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog -- the COMPLETE category)');
+check(corpus.length >= 87,
+  'loaded the REAL emitted dev/productivity + comms/social corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 17 comms/social [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads -- batch B sub-batch 1, all backing:dom])');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -153,6 +159,26 @@ const COLLISION_SET = [
   // cloudflare.purge_cache: the sub-batch-4 DESTRUCTIVE op -- its own canonical
   // (STEM_OVERRIDES) slug, never opentabs__dash__purge_cache.
   { query: 'clear the cloudflare cache', expected: 'cloudflare.purge_cache' },
+  // Phase-38 batch B sub-batch 1 (AI-chat + microblog/fediverse) cross-app near-neighbors.
+  // chatgpt.send_message vs claude.send_message: IDENTICAL op name across two AI-chat
+  // apps -- the app token MUST keep each on its OWN slug (a swapped stem would route a
+  // ChatGPT prompt to the Claude account, or vice versa, on a SENSITIVE origin).
+  { query: 'fire off a message in chatgpt', expected: 'chatgpt.send_message' },
+  { query: 'send a message to claude not chatgpt', expected: 'claude.send_message' },
+  // The 3-way microblog create_* near-neighbors (bsky/mastodon/threads all "post"):
+  // each social WRITE op must top its OWN slug, never cross-post to a sibling network.
+  { query: 'publish a post to my bluesky feed', expected: 'bsky.create_post' },
+  { query: 'publish a status on mastodon', expected: 'mastodon.create_status' },
+  { query: 'publish a new thread on threads', expected: 'threads.create_thread' },
+  // The microblog DESTRUCTIVE ops (bsky.delete_post / mastodon.delete_status): held-out
+  // paraphrases ("for good"/"permanently") must each top their OWN destructive slug.
+  { query: 'remove one of my bluesky posts for good', expected: 'bsky.delete_post' },
+  { query: 'take down a mastodon toot permanently', expected: 'mastodon.delete_status' },
+  // The 3-way microblog list_timeline near-neighbors -- "scroll my <app> home feed" is
+  // the closest same-op collision across the three networks; the app token disambiguates.
+  { query: 'scroll my bluesky home feed', expected: 'bsky.list_timeline' },
+  { query: 'scroll my mastodon home feed', expected: 'mastodon.list_timeline' },
+  { query: 'scroll my threads home feed', expected: 'threads.list_timeline' },
 ];
 
 // Build a slug -> lowercased-intentSynonyms map for the held-out guards (MED-01/MED-02).

@@ -1,0 +1,43 @@
+{
+  "slug": "mastodon.list_timeline",
+  "service": "mastodon.social",
+  "intentSynonyms": [
+    "list a timeline in mastodon",
+    "show me my timeline in mastodon",
+    "view my timeline in mastodon",
+    "see all my timeline in mastodon",
+    "list timeline in mastodon",
+    "show me my mastodon timeline in mastodon"
+  ],
+  "description": "List recent statuses from your Mastodon home timeline. Optionally page through with max_id.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_id": {
+        "description": "Return results older than this status ID",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of statuses to return (max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mastodon/src/tools/list-timeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

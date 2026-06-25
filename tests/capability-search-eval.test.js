@@ -126,12 +126,23 @@ check(wrongRate === 0, `wrong-invoke ${wrongRate.toFixed(3)} === 0 (non-negotiab
 // search stays fast. Serialize the SAME ms built above with INDEX_OPTIONS, then time
 // MiniSearch.loadJSON(serialized, INDEX_OPTIONS) + a first search (the cold-start
 // path: a freshly-woken SW restores the snapshot and answers one query). Generous
-// smoke gates (< 50KB, < 10ms) -- the point is that the asserts exist + the layout
+// smoke gates (< 64KB, < 10ms) -- the point is that the asserts exist + the layout
 // holds, not a tight benchmark.
+//
+// BUDGET WIDENED 50KB -> 64KB (Phase 38-02): the seed grew 82 -> 99 descriptors as
+// the comms/social sub-batch (chatgpt/claude/bsky/mastodon/threads, 17 ops) landed,
+// pushing the serialized index 42.6KB -> 51.8KB. This is LEGITIMATE LINEAR growth at
+// a FLAT per-descriptor footprint (~536 bytes/descriptor now vs ~532 at 37-04, an
+// equal cost), NOT a layout regression: the schema-on-hit discipline is intact --
+// storedFields are {slug, service, description, sideEffectClass, backing} only; params
+// are NEVER indexed/stored (no additionalProperties / "required":[ in the serialized
+// index). The 64KB ceiling keeps headroom for 38-03 while still being a real smoke
+// floor -- a params-leak layout regression would blow far past it (the full ~2,523-doc
+// corpus at this flat rate is ~1.3MB, the Phase-43 scale gate's concern, NOT this smoke).
 const { performance } = require('perf_hooks');
 const smokeSerialized = JSON.stringify(ms.toJSON()); // toJSON() returns an object; loadJSON wants a JSON string
-check(smokeSerialized.length < 50 * 1024,
-  `smoke index serialized < 50KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors)`);
+check(smokeSerialized.length < 64 * 1024,
+  `smoke index serialized < 64KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors; flat ~536 bytes/descriptor -- params schema-on-hit, NOT indexed)`);
 const _t0 = performance.now();
 const smokeRestored = MiniSearch.loadJSON(smokeSerialized, INDEX_OPTIONS); // SAME options -- mandatory
 smokeRestored.search('create a task'); // first search on the cold-restored index

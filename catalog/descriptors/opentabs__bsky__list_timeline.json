@@ -1,0 +1,43 @@
+{
+  "slug": "bsky.list_timeline",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "list a timeline in bsky",
+    "show me my timeline in bsky",
+    "view my timeline in bsky",
+    "see all my timeline in bsky",
+    "list timeline in bsky",
+    "show me my bluesky timeline in bsky"
+  ],
+  "description": "List recent posts from your Bluesky home timeline. Optionally page through with a cursor.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor from a previous page",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of posts to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/list-timeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

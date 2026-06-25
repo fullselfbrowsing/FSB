@@ -179,5 +179,30 @@
 
   { "intent": "query events in posthog", "expectedSlug": "posthog.query_events" },
 
-  { "intent": "list dashboards in posthog", "expectedSlug": "posthog.list_dashboards" }
+  { "intent": "list dashboards in posthog", "expectedSlug": "posthog.list_dashboards" },
+
+  { "intent": "show me my chatgpt conversations", "expectedSlug": "chatgpt.list_conversations" },
+  { "intent": "list my chatgpt conversations", "expectedSlug": "chatgpt.list_conversations" },
+  { "intent": "open a chatgpt conversation", "expectedSlug": "chatgpt.get_conversation" },
+  { "intent": "send a message in chatgpt", "expectedSlug": "chatgpt.send_message" },
+
+  { "intent": "show me my claude conversations", "expectedSlug": "claude.list_conversations" },
+  { "intent": "list my claude conversations", "expectedSlug": "claude.list_conversations" },
+  { "intent": "open a claude conversation", "expectedSlug": "claude.get_conversation" },
+  { "intent": "send a message to claude", "expectedSlug": "claude.send_message" },
+
+  { "intent": "show me my bluesky timeline", "expectedSlug": "bsky.list_timeline" },
+  { "intent": "scroll my bluesky feed", "expectedSlug": "bsky.list_timeline" },
+  { "intent": "look up a bluesky profile", "expectedSlug": "bsky.get_profile" },
+  { "intent": "post to bluesky", "expectedSlug": "bsky.create_post" },
+  { "intent": "delete one of my bluesky posts", "expectedSlug": "bsky.delete_post" },
+
+  { "intent": "show my mastodon timeline", "expectedSlug": "mastodon.list_timeline" },
+  { "intent": "read a single mastodon status by id", "expectedSlug": "mastodon.get_status" },
+  { "intent": "post a status to mastodon", "expectedSlug": "mastodon.create_status" },
+  { "intent": "delete a mastodon post", "expectedSlug": "mastodon.delete_status" },
+
+  { "intent": "show me my threads timeline", "expectedSlug": "threads.list_timeline" },
+  { "intent": "open a thread on threads", "expectedSlug": "threads.get_thread" },
+  { "intent": "publish a new thread on threads", "expectedSlug": "threads.create_thread" }
 ]
