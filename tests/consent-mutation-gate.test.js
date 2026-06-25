@@ -203,6 +203,70 @@ function installChromeStorageStub() {
     'POST on a SENSITIVE Auto origin WITH the per-origin mutating flag -> allow (the flag elevates)');
 
   // =====================================================================
+  // BRDTH-02 (Phase 38): the sensitive-write re-gate on a REAL SCREENED
+  // comms/social origin -- discord.com, classified sensitive in Phase 35 and
+  // confirmed by Phase-38 plan 01 Task 1.
+  // ---------------------------------------------------------------------
+  // The stripe block above uses a HAND-STUBBED classify() ({sensitive:true})
+  // to exercise the gate branch in isolation. THIS block loads the REAL
+  // committed roster (require service-denylist.js + await Denylist.load())
+  // and asserts classify('https://discord.com').sensitive === true BEFORE the
+  // gate calls -- so the proof exercises the actual classification this batch
+  // landed, not a fabricated verdict (mirrors the live-roster pattern in
+  // tests/breadth-batch-gate.test.js). The gate reads the LIVE global
+  // FsbServiceDenylist at call time (_denylist()), so assigning the loaded
+  // module to globalThis re-points it without a re-require.
+  // =====================================================================
+  console.log('\n--- BRDTH-02 (Phase 38): discord.com sensitive-write re-gate (LIVE committed roster) ---');
+
+  const DENYLIST_MODULE = path.resolve(__dirname, '..', 'extension', 'utils', 'service-denylist.js');
+  const Denylist = require(DENYLIST_MODULE);
+  await Denylist.load();
+  check(Denylist.isLoaded() === true,
+    'the REAL committed service-denylist roster is loaded (NOT a hand-stubbed classify)');
+  globalThis.FsbServiceDenylist = Denylist; // re-point the live gate accessor at the real module
+
+  const DISCORD_ORIGIN = 'https://discord.com';
+  const discordClass = Denylist.classify(DISCORD_ORIGIN);
+  check(discordClass && discordClass.sensitive === true && discordClass.denied === false,
+    'classify(https://discord.com) -> { sensitive:true, denied:false } in the LIVE roster (the screening this plan landed governs discord)');
+
+  if (typeof Store._reset === 'function') Store._reset();
+  await Store.setOriginMode(DISCORD_ORIGIN, 'auto'); // Auto, mutating flag false
+
+  // ---- a READ on the screened sensitive origin passes under Auto ----
+  const discordGet = await Gate.evaluate({
+    origin: DISCORD_ORIGIN, slug: 'discord.messages.read', method: 'GET',
+    entry: { tier: 'T1b', sideEffectClass: 'read' }
+  });
+  check(discordGet && discordGet.decision === 'allow',
+    'GET on discord.com (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
+
+  // ---- a WRITE (POST) WITHOUT the per-origin mutating flag is re-gated ----
+  const discordPost = await Gate.evaluate({
+    origin: DISCORD_ORIGIN, slug: 'discord.messages.create', method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'write' }
+  });
+  check(discordPost && discordPost.decision !== 'allow',
+    'POST on discord.com (no flag) -> NOT allow (posture B re-gates the screened sensitive write)');
+  // INV-03 dual-field byte-equality: the typed reason on code AND errorCode AND error.
+  check(discordPost && discordPost.error && discordPost.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'discord write -> error.code === RECIPE_CONSENT_MUTATING_REQUIRED (byte-exact)');
+  check(discordPost && discordPost.error && discordPost.error.errorCode === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'discord write -> error.errorCode === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+  check(discordPost && discordPost.error && discordPost.error.error === 'RECIPE_CONSENT_MUTATING_REQUIRED',
+    'discord write -> error.error === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+
+  // ---- the per-origin mutating flag ELEVATES the discord write back to allow ----
+  await Store.setOriginMutating(DISCORD_ORIGIN, true);
+  const discordPostElevated = await Gate.evaluate({
+    origin: DISCORD_ORIGIN, slug: 'discord.messages.create', method: 'POST',
+    entry: { tier: 'T1a', sideEffectClass: 'write' }
+  });
+  check(discordPostElevated && discordPostElevated.decision === 'allow',
+    'POST on discord.com WITH the per-origin mutating flag -> allow (the flag elevates the screened sensitive write)');
+
+  // =====================================================================
   // MD-01 regression: the re-gate FAILS CLOSED on a classify() error.
   // ---------------------------------------------------------------------
   // If the denylist IS present but its classify() THROWS for a mutating,

@@ -43,6 +43,7 @@ function check(cond, msg) {
 const REPO_ROOT = path.resolve(__dirname, '..');
 const GATE_PATH = path.join(REPO_ROOT, 'scripts', 'verify-classification-gate.mjs');
 const FIXTURE_PATH = path.join(REPO_ROOT, 'catalog', 'descriptors', '_fixtures', 'batch-unclassified-origin.fixture.json');
+const SOCIAL_FIXTURE_PATH = path.join(REPO_ROOT, 'catalog', 'descriptors', '_fixtures', 'batch-unclassified-social-origin.fixture.json');
 const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-denylist.js');
 
 (async () => {
@@ -85,6 +86,44 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   ]);
   check(safeBatch && safeBatch.failures.length === 0,
     '(b) classifyGate([linear.app, app.asana.com]) -> 0 failures (the safe least-sensitive batch passes)');
+
+  // ---- (c) FAIL-CLOSED on an unclassified SOCIAL/MESSAGING batch origin ------
+  // Phase-38 (BRDTH-02) comms/social screening: a social/messaging batch origin
+  // that trips the social/messaging sensitivity axis but is NOT classified must
+  // abort the merge -- the per-app comms/social screening enforced as a build
+  // failure, distinct from the finance-axis (a) block above.
+  const socialFixture = JSON.parse(fs.readFileSync(SOCIAL_FIXTURE_PATH, 'utf8'));
+  check(socialFixture && socialFixture.service === 'messenger.acme-social.example',
+    'batch-unclassified-social-origin fixture present (service messenger.acme-social.example)');
+  const socialOrigin = 'https://' + socialFixture.service;
+  const socialItem = { origin: socialOrigin, service: socialFixture.service, slug: socialFixture.slug, description: socialFixture.description };
+
+  const socialRejected = gate.classifyGate([socialItem]);
+  check(socialRejected && Array.isArray(socialRejected.failures) && socialRejected.failures.length > 0,
+    '(c) classifyGate([unclassified SOCIAL batch origin]) reports > 0 failures -> the comms/social batch merge ABORTS (fail-closed)');
+  check(socialRejected.failures.length > 0 && /messenger\.acme-social\.example/.test(socialRejected.failures.join('\n')),
+    '(c) the failure NAMES the offending social batch origin messenger.acme-social.example');
+  check(socialRejected.failures.length > 0 && /social\/messaging/.test(socialRejected.failures.join('\n')),
+    '(c) the failure cites the social/messaging sensitivity axis (the comms/social screening axis)');
+
+  // The social fixture is genuinely UNCLASSIFIED -> the failure is the gate doing
+  // its job over the committed roster, not stale data.
+  const socialClass = Denylist.classify(socialOrigin);
+  check(socialClass && socialClass.denied === false && socialClass.sensitive === false,
+    '(c) the social fixture origin is genuinely UNCLASSIFIED in the denylist (denied:false, sensitive:false)');
+
+  // ---- (d) the SCREENED comms/social batch origins PASS ----------------------
+  // Task-1 classified chatgpt.com / claude.ai sensitive (discord.com already
+  // sensitive in Phase 35), so the screened comms/social batch is GOVERNED ->
+  // classifyGate continues past each (classify()-matched) with 0 failures and the
+  // Phase-38 import (02/03) will NOT abort on these origins.
+  const screenedSocialBatch = gate.classifyGate([
+    { origin: 'https://chatgpt.com', service: 'chatgpt.com', slug: 'chatgpt.send_message', description: 'Send a message in ChatGPT' },
+    { origin: 'https://claude.ai', service: 'claude.ai', slug: 'claude.send_message', description: 'Send a message in Claude' },
+    { origin: 'https://discord.com', service: 'discord.com', slug: 'discord.post_message', description: 'Post a message in Discord' },
+  ]);
+  check(screenedSocialBatch && screenedSocialBatch.failures.length === 0,
+    '(d) classifyGate([chatgpt.com, claude.ai, discord.com]) -> 0 failures (the SCREENED comms/social batch is governed and passes)');
 
   console.log(`\nbreadth-batch-gate: ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

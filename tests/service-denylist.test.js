@@ -232,7 +232,14 @@ function installChromeStorageStub() {
     'https://web.telegram.org',          // exact
     'https://www.slack.com',             // via https://*.slack.com (suffix)
     'https://discord.com',               // exact
-    'https://teams.microsoft.com'        // exact (one of the three teams origins)
+    'https://teams.microsoft.com',       // exact (one of the three teams origins)
+    // Phase 38 (BRDTH-02) comms/social/content screening: AI-chat + microblog/
+    // fediverse classified sensitive (conservative default; writes mutating-gated).
+    'https://chatgpt.com',               // exact -- AI-chat
+    'https://claude.ai',                 // exact -- AI-chat
+    'https://bsky.app',                  // exact -- microblog social
+    'https://mastodon.social',           // exact -- fediverse social
+    'https://www.threads.net'            // exact -- microblog social
   ];
   for (const origin of sensitiveRoster) {
     const c = Denylist.classify(origin);
