@@ -161,6 +161,20 @@
       ]
     },
     {
+      "app": "discord",
+      "service": "discord.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/discord/",
+      "descriptors": [
+        "discord.delete_message",
+        "discord.list_channels",
+        "discord.list_messages",
+        "discord.send_message"
+      ]
+    },
+    {
       "app": "gitlab",
       "service": "gitlab.com",
       "source": "opentabs",
@@ -244,6 +258,19 @@
         "posthog.list_dashboards",
         "posthog.list_insights",
         "posthog.query_events"
+      ]
+    },
+    {
+      "app": "reddit",
+      "service": "reddit.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/reddit/",
+      "descriptors": [
+        "reddit.get_post",
+        "reddit.list_subreddit_posts",
+        "reddit.search_posts"
       ]
     },
     {

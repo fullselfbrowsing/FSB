@@ -1,0 +1,51 @@
+{
+  "slug": "discord.send_message",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "send a message in discord",
+    "post a message in discord",
+    "write a new message in discord",
+    "send message in discord",
+    "send a message in discord in discord"
+  ],
+  "description": "Send a message to a Discord channel. Posts the content to the channel on your behalf; this is visible to everyone in the channel. Optionally reply to an existing message.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The channel ID to send the message to"
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000,
+        "description": "The message text to send (max 2000 characters)"
+      },
+      "reply_to_message_id": {
+        "description": "Message ID to reply to (omit to send a standalone message)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

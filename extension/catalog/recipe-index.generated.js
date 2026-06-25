@@ -2483,6 +2483,198 @@
       }
     },
     {
+      "slug": "discord.delete_message",
+      "service": "discord.com",
+      "intentSynonyms": [
+        "delete a message in discord",
+        "remove a message in discord",
+        "trash a message in discord",
+        "permanently delete a message in discord",
+        "delete message in discord",
+        "delete a discord message permanently in discord"
+      ],
+      "description": "Permanently delete a message from a Discord channel by its ID. This action cannot be undone.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The channel ID the message lives in"
+          },
+          "message_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message ID to delete"
+          }
+        },
+        "required": [
+          "channel_id",
+          "message_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/discord/src/tools/delete-message.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "discord.list_channels",
+      "service": "discord.com",
+      "intentSynonyms": [
+        "list channels in discord",
+        "show me my channels in discord",
+        "view my channels in discord",
+        "see all my channels in discord",
+        "show me the channels in my discord server in discord"
+      ],
+      "description": "List the text channels in a Discord server (guild) you are a member of.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Discord server (guild) ID to list channels for"
+          }
+        },
+        "required": [
+          "guild_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/discord/src/tools/list-channels.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "discord.list_messages",
+      "service": "discord.com",
+      "intentSynonyms": [
+        "list messages in discord",
+        "show me my messages in discord",
+        "view my messages in discord",
+        "see all my messages in discord",
+        "read my discord messages in a channel in discord"
+      ],
+      "description": "List recent messages in a Discord channel. Optionally page through history with a before/after message ID.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The channel ID to read messages from"
+          },
+          "limit": {
+            "description": "Maximum number of messages to return (1-100)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "before": {
+            "description": "Return messages before this message ID (pagination)",
+            "type": "string"
+          },
+          "after": {
+            "description": "Return messages after this message ID (pagination)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/discord/src/tools/list-messages.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "discord.send_message",
+      "service": "discord.com",
+      "intentSynonyms": [
+        "send a message in discord",
+        "post a message in discord",
+        "write a new message in discord",
+        "send message in discord",
+        "send a message in discord in discord"
+      ],
+      "description": "Send a message to a Discord channel. Posts the content to the channel on your behalf; this is visible to everyone in the channel. Optionally reply to an existing message.",
+      "actionVerb": "send",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The channel ID to send the message to"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "The message text to send (max 2000 characters)"
+          },
+          "reply_to_message_id": {
+            "description": "Message ID to reply to (omit to send a standalone message)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel_id",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/discord/src/tools/send-message.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "send"
+        }
+      }
+    },
+    {
       "slug": "gitlab.create_issue",
       "service": "gitlab.com",
       "intentSynonyms": [
@@ -3908,6 +4100,178 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "query"
+        }
+      }
+    },
+    {
+      "slug": "reddit.get_post",
+      "service": "reddit.com",
+      "intentSynonyms": [
+        "get a post in reddit",
+        "look up a post in reddit",
+        "fetch a single post in reddit",
+        "view one specific post in reddit",
+        "get post in reddit",
+        "read a single reddit post and its comments in reddit"
+      ],
+      "description": "Get a single Reddit post by its ID, including its body and top-level comments.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subreddit the post lives in (without the r/ prefix)"
+          },
+          "post_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base-36 post ID to fetch"
+          },
+          "comment_limit": {
+            "description": "Maximum number of comments to include",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "subreddit",
+          "post_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/reddit/src/tools/get-post.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "reddit.list_subreddit_posts",
+      "service": "reddit.com",
+      "intentSynonyms": [
+        "list subreddit posts in reddit",
+        "show me my subreddit posts in reddit",
+        "view my subreddit posts in reddit",
+        "see all my subreddit posts in reddit",
+        "show posts in a subreddit on reddit in reddit"
+      ],
+      "description": "List posts in a subreddit, sorted hot/new/top/rising. Optionally page through with an after cursor.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subreddit name to list posts from (without the r/ prefix)"
+          },
+          "sort": {
+            "description": "Sort order for the posts",
+            "type": "string",
+            "enum": [
+              "hot",
+              "new",
+              "top",
+              "rising"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of posts to return (1-100)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "after": {
+            "description": "Fullname cursor of the last post on the previous page (pagination)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subreddit"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/reddit/src/tools/list-subreddit-posts.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "reddit.search_posts",
+      "service": "reddit.com",
+      "intentSynonyms": [
+        "search posts in reddit",
+        "search reddit for posts in reddit",
+        "search reddit posts by a query string, optionally restricted to a single subreddit in reddit"
+      ],
+      "description": "Search Reddit posts by a query string, optionally restricted to a single subreddit.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query text"
+          },
+          "subreddit": {
+            "description": "Restrict the search to this subreddit (omit to search all of Reddit)",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Sort order for the results",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "hot",
+              "top",
+              "new",
+              "comments"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of results to return (1-100)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/reddit/src/tools/search-posts.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },

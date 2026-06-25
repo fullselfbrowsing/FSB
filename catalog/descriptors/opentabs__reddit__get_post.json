@@ -1,0 +1,53 @@
+{
+  "slug": "reddit.get_post",
+  "service": "reddit.com",
+  "intentSynonyms": [
+    "get a post in reddit",
+    "look up a post in reddit",
+    "fetch a single post in reddit",
+    "view one specific post in reddit",
+    "get post in reddit",
+    "read a single reddit post and its comments in reddit"
+  ],
+  "description": "Get a single Reddit post by its ID, including its body and top-level comments.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The subreddit the post lives in (without the r/ prefix)"
+      },
+      "post_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The base-36 post ID to fetch"
+      },
+      "comment_limit": {
+        "description": "Maximum number of comments to include",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 500
+      }
+    },
+    "required": [
+      "subreddit",
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/get-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "discord.list_channels",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "list channels in discord",
+    "show me my channels in discord",
+    "view my channels in discord",
+    "see all my channels in discord",
+    "show me the channels in my discord server in discord"
+  ],
+  "description": "List the text channels in a Discord server (guild) you are a member of.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guild_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The Discord server (guild) ID to list channels for"
+      }
+    },
+    "required": [
+      "guild_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/list-channels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

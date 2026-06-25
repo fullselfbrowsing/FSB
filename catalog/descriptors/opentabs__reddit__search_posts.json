@@ -1,0 +1,59 @@
+{
+  "slug": "reddit.search_posts",
+  "service": "reddit.com",
+  "intentSynonyms": [
+    "search posts in reddit",
+    "search reddit for posts in reddit",
+    "search reddit posts by a query string, optionally restricted to a single subreddit in reddit"
+  ],
+  "description": "Search Reddit posts by a query string, optionally restricted to a single subreddit.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The search query text"
+      },
+      "subreddit": {
+        "description": "Restrict the search to this subreddit (omit to search all of Reddit)",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort order for the results",
+        "type": "string",
+        "enum": [
+          "relevance",
+          "hot",
+          "top",
+          "new",
+          "comments"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of results to return (1-100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/search-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

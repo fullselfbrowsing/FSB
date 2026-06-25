@@ -3,7 +3,7 @@
   { "intent": "post a slack message to the channel", "expectedSlug": "slack.post-message" },
   { "intent": "drop a note in our slack workspace", "expectedSlug": "slack.post-message" },
 
-  { "intent": "send a message on discord", "expectedSlug": "discord.send-message" },
+  { "intent": "send a message on discord", "expectedSlug": "discord.send_message" },
   { "intent": "post in the discord channel", "expectedSlug": "discord.send-message" },
   { "intent": "ping everyone in my discord server", "expectedSlug": "discord.send-message" },
 
@@ -204,5 +204,14 @@
 
   { "intent": "show me my threads timeline", "expectedSlug": "threads.list_timeline" },
   { "intent": "open a thread on threads", "expectedSlug": "threads.get_thread" },
-  { "intent": "publish a new thread on threads", "expectedSlug": "threads.create_thread" }
+  { "intent": "publish a new thread on threads", "expectedSlug": "threads.create_thread" },
+
+  { "intent": "show me the channels in my discord server", "expectedSlug": "discord.list_channels" },
+  { "intent": "read my discord messages in a channel", "expectedSlug": "discord.list_messages" },
+  { "intent": "send a discord message", "expectedSlug": "discord.send_message" },
+  { "intent": "delete a discord message", "expectedSlug": "discord.delete_message" },
+
+  { "intent": "show posts in a subreddit", "expectedSlug": "reddit.list_subreddit_posts" },
+  { "intent": "read a single reddit post", "expectedSlug": "reddit.get_post" },
+  { "intent": "search reddit", "expectedSlug": "reddit.search_posts" }
 ]

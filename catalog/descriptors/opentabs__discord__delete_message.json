@@ -1,0 +1,47 @@
+{
+  "slug": "discord.delete_message",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "delete a message in discord",
+    "remove a message in discord",
+    "trash a message in discord",
+    "permanently delete a message in discord",
+    "delete message in discord",
+    "delete a discord message permanently in discord"
+  ],
+  "description": "Permanently delete a message from a Discord channel by its ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The channel ID the message lives in"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The message ID to delete"
+      }
+    },
+    "required": [
+      "channel_id",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/delete-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

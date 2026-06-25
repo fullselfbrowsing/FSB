@@ -687,6 +687,67 @@
     "backing": "dom"
   },
   {
+    "slug": "discord.delete_message",
+    "service": "discord.com",
+    "intentSynonyms": [
+      "delete a message in discord",
+      "remove a message in discord",
+      "trash a message in discord",
+      "permanently delete a message in discord",
+      "delete message in discord",
+      "delete a discord message permanently in discord"
+    ],
+    "description": "Permanently delete a message from a Discord channel by its ID. This action cannot be undone.",
+    "actionVerb": "delete",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "discord.list_channels",
+    "service": "discord.com",
+    "intentSynonyms": [
+      "list channels in discord",
+      "show me my channels in discord",
+      "view my channels in discord",
+      "see all my channels in discord",
+      "show me the channels in my discord server in discord"
+    ],
+    "description": "List the text channels in a Discord server (guild) you are a member of.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "discord.list_messages",
+    "service": "discord.com",
+    "intentSynonyms": [
+      "list messages in discord",
+      "show me my messages in discord",
+      "view my messages in discord",
+      "see all my messages in discord",
+      "read my discord messages in a channel in discord"
+    ],
+    "description": "List recent messages in a Discord channel. Optionally page through history with a before/after message ID.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "discord.send_message",
+    "service": "discord.com",
+    "intentSynonyms": [
+      "send a message in discord",
+      "post a message in discord",
+      "write a new message in discord",
+      "send message in discord",
+      "send a message in discord in discord"
+    ],
+    "description": "Send a message to a Discord channel. Posts the content to the channel on your behalf; this is visible to everyone in the channel. Optionally reply to an existing message.",
+    "actionVerb": "send",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
     "slug": "discord.send-message",
     "service": "discord.com",
     "intentSynonyms": [
@@ -1151,6 +1212,50 @@
     ],
     "description": "Query the captured events for a PostHog project. Optionally filter by event name, distinct ID, or time range.",
     "actionVerb": "query",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "reddit.get_post",
+    "service": "reddit.com",
+    "intentSynonyms": [
+      "get a post in reddit",
+      "look up a post in reddit",
+      "fetch a single post in reddit",
+      "view one specific post in reddit",
+      "get post in reddit",
+      "read a single reddit post and its comments in reddit"
+    ],
+    "description": "Get a single Reddit post by its ID, including its body and top-level comments.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "reddit.list_subreddit_posts",
+    "service": "reddit.com",
+    "intentSynonyms": [
+      "list subreddit posts in reddit",
+      "show me my subreddit posts in reddit",
+      "view my subreddit posts in reddit",
+      "see all my subreddit posts in reddit",
+      "show posts in a subreddit on reddit in reddit"
+    ],
+    "description": "List posts in a subreddit, sorted hot/new/top/rising. Optionally page through with an after cursor.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "reddit.search_posts",
+    "service": "reddit.com",
+    "intentSynonyms": [
+      "search posts in reddit",
+      "search reddit for posts in reddit",
+      "search reddit posts by a query string, optionally restricted to a single subreddit in reddit"
+    ],
+    "description": "Search Reddit posts by a query string, optionally restricted to a single subreddit.",
+    "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
   },

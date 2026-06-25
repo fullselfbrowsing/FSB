@@ -79,10 +79,20 @@ global.MiniSearch = MiniSearch;
 // emits the `bsky` HOST stem; threads vendors *://www.threads.net/* (the screened
 // origin) and canonicalizes to the `threads` stem via STEM_OVERRIDES (the host-derived
 // 'www' would be wrong), so the slug is opentabs__threads__* (NOT opentabs__www__*).
-// This test indexes the dev/productivity batch AND the comms/social sub-batch.
+// Phase 38 batch B sub-batch 2 (38-03) COMPLETES the comms/social/content category
+// with the messaging + content-read apps -- discord (4 ops: list_channels/list_messages
+// reads + send_message WRITE + delete_message DESTRUCTIVE; discord.com classified
+// SENSITIVE) + reddit (3 read-only content ops: list_subreddit_posts/get_post/
+// search_posts; reddit.com is the SAFE content tier). Both backing:'dom'. The
+// discord-vs-slack messaging collision (both have a "send a message to a channel" op)
+// is the new wrong-invoke=0 probe in COLLISION_SET. reddit vendors *://reddit.com/* (the
+// apex) so the stem is 'reddit' (not 'www') -> opentabs__reddit__*; this is DISTINCT from
+// the hand-authored reddit-inbox.json (slug reddit.inbox, backing recipe), which this
+// corpus regex does NOT match (it is not an opentabs__reddit__* file -- no clobber).
+// This test indexes the dev/productivity batch AND the COMPLETE comms/social/content category.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -90,8 +100,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 87,
-  'loaded the REAL emitted dev/productivity + comms/social corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 17 comms/social [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads -- batch B sub-batch 1, all backing:dom])');
+check(corpus.length >= 94,
+  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads (sub-batch 1) + 4 discord + 3 reddit (sub-batch 2) -- all backing:dom])');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -179,6 +189,24 @@ const COLLISION_SET = [
   { query: 'scroll my bluesky home feed', expected: 'bsky.list_timeline' },
   { query: 'scroll my mastodon home feed', expected: 'mastodon.list_timeline' },
   { query: 'scroll my threads home feed', expected: 'threads.list_timeline' },
+  // Phase-38 batch B sub-batch 2 (38-03, COMPLETING comms/social/content): the
+  // discord-vs-slack messaging collision -- discord.send_message is a "send a message to
+  // a channel" op, the DIRECT near-neighbor of slack's chat.postMessage AND the
+  // chatgpt/claude send_message ops. A held-out paraphrase ("send a message to my team in
+  // discord" -- "to my team" is the colloquial slack/messaging phrasing, NOT an indexed
+  // discord synonym) MUST top discord.send_message and NEVER cross-invoke a sibling
+  // messaging/AI-chat send op (a cross-invoke would post to the wrong SENSITIVE account).
+  { query: 'send a message to my team in discord', expected: 'discord.send_message' },
+  // discord.list_messages (read a channel's messages) vs the discord WRITE -- the
+  // read/write split within the same app must keep "catch up on" reading, not sending.
+  { query: 'catch up on the messages in my discord channel', expected: 'discord.list_messages' },
+  // reddit content reads (the SAFE tier): "browse" a subreddit tops list_subreddit_posts
+  // (a held-out paraphrase of the indexed "show posts in a subreddit"), and a reddit
+  // KEYWORD SEARCH tops search_posts -- the "search ... for a keyword" intent token keeps
+  // it off get_post (whose verbs are get/look-up/fetch/read), so neither reddit read op
+  // cross-invokes the other.
+  { query: 'browse the posts in a subreddit on reddit', expected: 'reddit.list_subreddit_posts' },
+  { query: 'search reddit posts for a keyword', expected: 'reddit.search_posts' },
 ];
 
 // Build a slug -> lowercased-intentSynonyms map for the held-out guards (MED-01/MED-02).
