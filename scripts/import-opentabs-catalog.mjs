@@ -100,8 +100,21 @@ const SEED_DESCRIPTORS_PATH = resolve(ROOT, 'catalog/descriptors/_fixtures/seed-
 const EXISTING_HEAD_SERVICES = new Set(['github.com', 'app.slack.com', 'www.notion.so']);
 // OpenTabs ships e2e/prescript test-fixture plugin dirs; never import those.
 const FIXTURE_DIR_RE = /(^|[-_])(e2e|prescript)([-_]|$)|-test$/i;
+// SKIP_APPS (BLOCKER C, Phase 39.5 -- full-corpus import): self-hosted apps that ship
+// EMPTY urlPatterns (`package.json.opentabs.urlPatterns: []` + a runtime
+// `configSchema.instanceUrl`) have NO static origin -- readPluginMeta derives
+// service=='' for them, so they cannot be origin-classified by the denylist or
+// search-keyed the way a fixed-host app is. At the pinned SHA the real `grafana` +
+// `sqlpad` are the two such apps. enumerateBatchApps now skips SKIP_APPS AND any
+// empty-service app with a CLEAN continue (instead of the historical
+// extractDescriptors throw), so a self-hosted empty-origin app is skipped rather than
+// aborting the whole batch. The hand-authored grafana slice (real origin grafana.com)
+// is PRESERVED by Plan 39.5-01 and still imports normally -- only the real empty-origin
+// apps are skipped. This is a skip-set + enumeration-filter extension, NOT a change to
+// the load/transpile/extract/z.toJSONSchema/pre-scan/side-effect core path (INV-01 holds).
+const SKIP_APPS = new Set(['sqlpad']);
 
-function enumerateBatchApps() {
+export function enumerateBatchApps() {
   if (!existsSync(VENDOR_ROOT)) return [];
   const dirs = readdirSync(VENDOR_ROOT)
     .filter((name) => {
@@ -112,10 +125,14 @@ function enumerateBatchApps() {
       }
     })
     .filter((name) => !FIXTURE_DIR_RE.test(name))
+    // BLOCKER C: skip the explicit self-hosted skip-set up front.
+    .filter((name) => !SKIP_APPS.has(name))
     // Skip any app whose derived service is an existing head/REGISTRY origin so the
-    // importer never clobbers a shipped head descriptor (read the vendored
-    // package.json host; a missing/unreadable meta just falls through to import-attempt
-    // which throws a clear error later).
+    // importer never clobbers a shipped head descriptor, AND any app with an EMPTY
+    // service (empty urlPatterns -> no static origin): BOTH are a clean continue, not
+    // an abort. (Read the vendored package.json host; a missing/unreadable meta falls
+    // through to an empty service and is skipped here -- the empty-origin self-hosted
+    // app is dropped cleanly instead of throwing later in extractDescriptors.)
     .filter((name) => {
       let service = '';
       try {
@@ -123,6 +140,7 @@ function enumerateBatchApps() {
       } catch (_e) {
         service = '';
       }
+      if (!service) return false; // empty-origin self-hosted app (BLOCKER C) -> clean skip
       return !EXISTING_HEAD_SERVICES.has(service);
     })
     .sort();
@@ -232,9 +250,41 @@ const STEM_OVERRIDES = {
   ticketmaster: 'ticketmaster', stubhub: 'stubhub', eventbrite: 'eventbrite',
   yelp: 'yelp', tripadvisor: 'tripadvisor', calendly: 'calendly',
   shopify: 'shopify', craigslist: 'craigslist', dominos: 'dominos', chipotle: 'chipotle', zillow: 'zillow', grafana: 'grafana',
+  // PHASE 39.5 (full-corpus import): the real ~117-plugin OpenTabs source vendors many
+  // apps whose first host label is NOT the app name, so the frozen split('.')[0] derives
+  // a WRONG or COLLIDING stem. SIX collision groups would emit DUPLICATE
+  // opentabs__<stem>__*.json filenames that silently clobber each other -- the headline
+  // data-correctness risk the no-duplicate-stem CI gate (scripts/verify-no-duplicate-stem.mjs)
+  // now FAILS the build on. Each colliding group is disambiguated to DISTINCT canonical
+  // brand stems below, and the ~20 single wrong-stem apps get their brand stem. This is the
+  // SAME first-label-isn't-the-app-name canonicalization the 37-39 entries above already use
+  // (a DATA-MAP extension of the 37-01 per-app extension point, NOT a logic change -- INV-01
+  // holds); the `service` field keeps the real host, only the stem/slug/filename is
+  // canonicalized. The denied apps (fidelity/spotify/steam/youtube-music) are still gated
+  // denied at classifyGate -- they are pinned here only for slug stability + to keep the
+  // ENUMERATED set (which the no-dup-stem gate sweeps) collision-free regardless of dispo.
+  // ---- collision group `console` (4-way): aws-console/clickhouse/google-cloud/twilio ----
+  'aws-console': 'aws', clickhouse: 'clickhouse', 'google-cloud': 'gcloud', twilio: 'twilio',
+  // ---- collision group `www`: google-maps/npm/reddit (yelp already pinned above) ----
+  'google-maps': 'gmaps', npm: 'npm', reddit: 'reddit',
+  // ---- collision group `cloud`: mongodb-atlas/temporal-cloud ----
+  'mongodb-atlas': 'mongodb', 'temporal-cloud': 'temporal',
+  // ---- collision group `slack`: slack derives 'slack' (kept); slack-enterprise (app.slack.com
+  //      is an EXISTING_HEAD so it is enumerate-skipped) pinned 'slackent' defensively ----
+  'slack-enterprise': 'slackent',
+  // ---- collision group `web`: telegram/whatsapp ----
+  telegram: 'telegram', whatsapp: 'whatsapp',
+  // ---- the ~20 single wrong-stem apps -> brand stem ----
+  azure: 'azure', bluesky: 'bsky', cockroachdb: 'cockroachdb', 'docker-hub': 'dockerhub',
+  'excel-online': 'excel', fidelity: 'fidelity', 'google-analytics': 'ganalytics',
+  'google-calendar': 'gcal', 'google-docs': 'gdocs', 'google-drive': 'gdrive',
+  hackernews: 'hackernews', 'microsoft-word': 'msword', 'minimax-agent': 'minimax',
+  newrelic: 'newrelic', 'panda-express': 'pandaexpress', posthog: 'posthog',
+  spotify: 'spotify', steam: 'steam', stripe: 'stripe', 'terraform-cloud': 'terraform',
+  'youtube-music': 'ytmusic',
 };
 
-function displayServiceStem(app, derivedStem) {
+export function displayServiceStem(app, derivedStem) {
   return Object.prototype.hasOwnProperty.call(STEM_OVERRIDES, app) ? STEM_OVERRIDES[app] : derivedStem;
 }
 
@@ -312,6 +362,39 @@ export function assertCleanParams(params, opName) {
         `${hits.join(', ')} (script/expr/transform/code/fn/js are eval-able and ` +
         `must never appear in a shipped descriptor's params).`
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// BLOCKER B carve (Phase 39.5): the ONE business-`code` false-positive.
+// ---------------------------------------------------------------------------
+// target.apply_promo_code's input is z.object({ code: z.string() }) -- a promotion /
+// coupon code, a legitimate business field that happens to share the literal token
+// `code` with the eval-able FORBIDDEN set. It is the ONLY forbidden-in-INPUT hit in the
+// entire 2,374-op corpus (the spike proved the `code`/`script` tokens in
+// chipotle/dominos/leetcode/starbucks/ynab schemas + cloudflare/list-worker-routes live
+// ONLY in OUTPUT/shared schemas, which the importer never emits -- it emits tool.input).
+// carveBusinessCodeField renames the top-level `code` property (and its required[] entry)
+// to `promo_code` so the op survives the Wall-1 pre-scan. This does NOT weaken FORBIDDEN:
+// it is a NARROW, audited, per-op field rename keyed (in extractDescriptors) on the EXACT
+// (app === 'target' && tool.name === 'apply_promo_code') pair. The eval-able names
+// script/expr/transform/fn/js -- and a generic `code` on ANY other op -- stay ALWAYS-FATAL
+// (un-allowlisted): the FORBIDDEN set is untouched and assertCleanParams still THROWS for
+// every other occurrence. The op name / slug is unchanged; only the input FIELD token is
+// canonicalized, matching the real upstream handle() which maps params.code -> the API's
+// `promotion_code` body field.
+function carveBusinessCodeField(params) {
+  if (!params || typeof params !== 'object') return;
+  const props = params.properties;
+  if (
+    props && typeof props === 'object' && !Array.isArray(props) &&
+    Object.prototype.hasOwnProperty.call(props, 'code')
+  ) {
+    props.promo_code = props.code;
+    delete props.code;
+  }
+  if (Array.isArray(params.required)) {
+    params.required = params.required.map((r) => (r === 'code' ? 'promo_code' : r));
   }
 }
 
@@ -574,7 +657,7 @@ function synthSynonyms(tool, serviceStem) {
 // ---------------------------------------------------------------------------
 // service/origin from package.json.opentabs.urlPatterns
 // ---------------------------------------------------------------------------
-function readPluginMeta(app) {
+export function readPluginMeta(app) {
   const pkgPath = join(VENDOR_ROOT, app, 'package.json');
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   const ot = (pkg && pkg.opentabs) || {};
@@ -603,9 +686,12 @@ export async function gateItems(items) {
 export async function extractDescriptors(app) {
   const { service } = readPluginMeta(app);
   if (!service) throw new Error(`importer: ${app} has no opentabs.urlPatterns host`);
-  // Derive the host-based stem, then route it through the per-app OVERRIDE so the
-  // four collision apps (jira/confluence/cloudflare/datadog) get canonical DISTINCT
-  // stems before the stem is used to build the slug/filename (BRDTH-01).
+  // Derive the host-based stem, then route it through the per-app OVERRIDE so every
+  // wrong/colliding-stem app (the 6 collision groups -- console/www/cloud/web/slack/
+  // atlassian -- plus the ~20 single wrong-stem apps; see STEM_OVERRIDES) gets a
+  // canonical DISTINCT stem before the stem is used to build the slug/filename
+  // (BRDTH-01). The no-duplicate-stem CI gate enforces that no two enumerated apps
+  // share a stem.
   const derivedStem = service.replace(/^app\./, '').split('.')[0]; // app.todoist.com -> todoist
   const serviceStem = displayServiceStem(app, derivedStem);
 
@@ -620,6 +706,14 @@ export async function extractDescriptors(app) {
   for (const tool of plugin.tools) {
     if (!tool || !tool.name || !tool.input) continue;
     const params = toClosedParams(tool.input);
+
+    // BLOCKER B carve (Phase 39.5): rename target.apply_promo_code's business `code`
+    // input field to `promo_code` BEFORE the pre-scan so the op survives Wall-1. NARROW
+    // + per-op (keyed on the exact app+tool pair); the FORBIDDEN set is NOT weakened --
+    // script/expr/transform/fn/js and a generic `code` on any other op stay always-fatal.
+    if (app === 'target' && tool.name === 'apply_promo_code') {
+      carveBusinessCodeField(params);
+    }
 
     // Wall-1 recursive forbidden-field pre-scan, BETWEEN extraction and the
     // gate/emit: THROWS (emits nothing for this op) if a forbidden field name
