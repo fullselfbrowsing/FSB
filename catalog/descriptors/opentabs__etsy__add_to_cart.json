@@ -1,0 +1,48 @@
+{
+  "slug": "etsy.add_to_cart",
+  "service": "www.etsy.com",
+  "intentSynonyms": [
+    "add a to cart in etsy",
+    "add to cart in etsy",
+    "add an item to my etsy cart in etsy"
+  ],
+  "description": "Add an Etsy listing to your shopping cart. This does NOT charge -- it stages the item for a later checkout.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "listing_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The listing ID to add to the cart"
+      },
+      "quantity": {
+        "description": "Quantity to add (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "variation": {
+        "description": "Optional product variation (size, color)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "listing_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/etsy/src/tools/add-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

@@ -459,6 +459,301 @@
       }
     },
     {
+      "slug": "amazon.cancel_order",
+      "service": "www.amazon.com",
+      "intentSynonyms": [
+        "cancel an order in amazon",
+        "cancel order in amazon",
+        "cancel my amazon order in amazon"
+      ],
+      "description": "Cancel an Amazon order by its ID. This may be irreversible once the order has entered shipping.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/amazon/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "amazon.get_product",
+      "service": "www.amazon.com",
+      "intentSynonyms": [
+        "get a product in amazon",
+        "look up a product in amazon",
+        "fetch a single product in amazon",
+        "view one specific product in amazon",
+        "get product in amazon",
+        "look up a single amazon product in amazon"
+      ],
+      "description": "Get the full detail (title, price, availability, and description) of a single Amazon product by its ASIN/product ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ASIN / product ID to fetch"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/amazon/src/tools/get-product.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "amazon.list_orders",
+      "service": "www.amazon.com",
+      "intentSynonyms": [
+        "list orders in amazon",
+        "show me my orders in amazon",
+        "view my orders in amazon",
+        "see all my orders in amazon",
+        "show me my amazon order history in amazon"
+      ],
+      "description": "List your recent Amazon orders. Optionally filter by status (open, shipped, delivered, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "open",
+              "shipped",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/amazon/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "amazon.place_order",
+      "service": "www.amazon.com",
+      "intentSynonyms": [
+        "place an order in amazon",
+        "place order in amazon",
+        "order this on amazon in amazon"
+      ],
+      "description": "Place a paid Amazon order: submit a cart of products to a shipping address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product ASIN/ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "shipping_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to ship to"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "shipping_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/amazon/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "amazon.search_products",
+      "service": "www.amazon.com",
+      "intentSynonyms": [
+        "search products in amazon",
+        "search for products on amazon in amazon",
+        "search the amazon product catalog by keyword in amazon"
+      ],
+      "description": "Search the Amazon product catalog by keyword. Optionally filter by department/category and sort the results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (product name, brand, or description)"
+          },
+          "category": {
+            "description": "Department or category to filter by",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Result ordering",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "price_low_to_high",
+              "price_high_to_low",
+              "rating"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/amazon/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "amazon.track_order",
+      "service": "www.amazon.com",
+      "intentSynonyms": [
+        "track an order in amazon",
+        "track order in amazon",
+        "track my amazon order in amazon"
+      ],
+      "description": "Track the live shipment status and estimated delivery date of a single Amazon order by its ID.",
+      "actionVerb": "track",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to track"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/amazon/src/tools/track-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "track"
+        }
+      }
+    },
+    {
       "slug": "asana.create_task",
       "service": "app.asana.com",
       "intentSynonyms": [
@@ -674,6 +969,271 @@
           "transportHelper": "api",
           "httpMethod": "PUT",
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "bestbuy.cancel_order",
+      "service": "www.bestbuy.com",
+      "intentSynonyms": [
+        "cancel an order in bestbuy",
+        "cancel order in bestbuy",
+        "cancel my bestbuy order in bestbuy"
+      ],
+      "description": "Cancel a Best Buy order by its ID. This may be irreversible once the order has entered shipping or pickup prep.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bestbuy/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "bestbuy.get_product",
+      "service": "www.bestbuy.com",
+      "intentSynonyms": [
+        "get a product in bestbuy",
+        "look up a product in bestbuy",
+        "fetch a single product in bestbuy",
+        "view one specific product in bestbuy",
+        "get product in bestbuy",
+        "look up a single bestbuy product in bestbuy"
+      ],
+      "description": "Get the full detail (title, price, availability, and specs) of a single Best Buy product by its SKU/product ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SKU / product ID to fetch"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bestbuy/src/tools/get-product.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "bestbuy.list_orders",
+      "service": "www.bestbuy.com",
+      "intentSynonyms": [
+        "list orders in bestbuy",
+        "show me my orders in bestbuy",
+        "view my orders in bestbuy",
+        "see all my orders in bestbuy",
+        "show me my bestbuy order history in bestbuy"
+      ],
+      "description": "List your recent Best Buy orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "open",
+              "shipped",
+              "ready_for_pickup",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bestbuy/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "bestbuy.place_order",
+      "service": "www.bestbuy.com",
+      "intentSynonyms": [
+        "place an order in bestbuy",
+        "place order in bestbuy",
+        "order this on bestbuy in bestbuy"
+      ],
+      "description": "Place a paid Best Buy order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product SKU/ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "fulfillment": {
+            "type": "string",
+            "enum": [
+              "ship",
+              "pickup"
+            ],
+            "description": "Ship to an address or pick up in store"
+          },
+          "shipping_address": {
+            "description": "The address to ship to (required when fulfillment is ship)",
+            "type": "string"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "fulfillment"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bestbuy/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "bestbuy.search_products",
+      "service": "www.bestbuy.com",
+      "intentSynonyms": [
+        "search products in bestbuy",
+        "search for products on bestbuy in bestbuy",
+        "search the best buy electronics catalog by keyword in bestbuy"
+      ],
+      "description": "Search the Best Buy electronics catalog by keyword. Optionally filter by category and sort the results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (product name, brand, or model)"
+          },
+          "category": {
+            "description": "Category to filter by",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Result ordering",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "price_low_to_high",
+              "price_high_to_low",
+              "rating"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bestbuy/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },
@@ -2291,6 +2851,220 @@
       }
     },
     {
+      "slug": "costco.get_product",
+      "service": "www.costco.com",
+      "intentSynonyms": [
+        "get a product in costco",
+        "look up a product in costco",
+        "fetch a single product in costco",
+        "view one specific product in costco",
+        "get product in costco",
+        "look up a single costco product in costco"
+      ],
+      "description": "Get the full detail (title, price, availability, and description) of a single Costco product by its item number.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Costco item number / product ID to fetch"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/costco/src/tools/get-product.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "costco.list_orders",
+      "service": "www.costco.com",
+      "intentSynonyms": [
+        "list orders in costco",
+        "show me my orders in costco",
+        "view my orders in costco",
+        "see all my orders in costco",
+        "show me my costco order history in costco"
+      ],
+      "description": "List your recent Costco orders. Optionally filter by status (open, shipped, delivered, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "open",
+              "shipped",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/costco/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "costco.place_order",
+      "service": "www.costco.com",
+      "intentSynonyms": [
+        "place an order in costco",
+        "place order in costco",
+        "order this on costco in costco"
+      ],
+      "description": "Place a paid Costco order: submit a cart of products to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product item number/ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "shipping_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to ship to"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "shipping_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/costco/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "costco.search_products",
+      "service": "www.costco.com",
+      "intentSynonyms": [
+        "search products in costco",
+        "search for products on costco in costco",
+        "search the costco warehouse catalog by keyword in costco"
+      ],
+      "description": "Search the Costco warehouse catalog by keyword. Optionally filter by category and sort the results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (product name, brand, or description)"
+          },
+          "category": {
+            "description": "Category to filter by",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Result ordering",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "price_low_to_high",
+              "price_high_to_low"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/costco/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "datadog.get_monitor",
       "service": "app.datadoghq.com",
       "intentSynonyms": [
@@ -2956,6 +3730,492 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "track"
+        }
+      }
+    },
+    {
+      "slug": "ebay.buy_now",
+      "service": "www.ebay.com",
+      "intentSynonyms": [
+        "buy a now in ebay",
+        "buy now in ebay",
+        "buy it now on ebay in ebay"
+      ],
+      "description": "Buy an eBay fixed-price listing immediately (Buy It Now): submit the purchase to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+      "actionVerb": "buy",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The fixed-price listing ID to buy"
+          },
+          "quantity": {
+            "description": "Quantity to buy (default 1)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "shipping_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to ship to"
+          }
+        },
+        "required": [
+          "listing_id",
+          "shipping_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ebay/src/tools/buy-now.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "buy"
+        }
+      }
+    },
+    {
+      "slug": "ebay.get_listing",
+      "service": "www.ebay.com",
+      "intentSynonyms": [
+        "get a listing in ebay",
+        "look up a listing in ebay",
+        "fetch a single listing in ebay",
+        "view one specific listing in ebay",
+        "get listing in ebay",
+        "look up a single ebay listing in ebay"
+      ],
+      "description": "Get the full detail (title, current price, bids, time left, and seller) of a single eBay listing by its item ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The eBay item / listing ID to fetch"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ebay/src/tools/get-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "ebay.list_orders",
+      "service": "www.ebay.com",
+      "intentSynonyms": [
+        "list orders in ebay",
+        "show me my orders in ebay",
+        "view my orders in ebay",
+        "see all my orders in ebay",
+        "show me my ebay purchase history in ebay"
+      ],
+      "description": "List your recent eBay purchases / orders. Optionally filter by status (awaiting_payment, paid, shipped, delivered).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "paid",
+              "shipped",
+              "delivered"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ebay/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "ebay.place_bid",
+      "service": "www.ebay.com",
+      "intentSynonyms": [
+        "place a bid in ebay",
+        "place bid in ebay",
+        "bid on an ebay auction in ebay"
+      ],
+      "description": "Place a bid on an eBay auction listing. A winning bid is a binding obligation to pay -- this can charge your saved payment method if you win, a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The auction listing ID to bid on"
+          },
+          "max_bid": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Your maximum bid amount in dollars"
+          }
+        },
+        "required": [
+          "listing_id",
+          "max_bid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ebay/src/tools/place-bid.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "ebay.search_listings",
+      "service": "www.ebay.com",
+      "intentSynonyms": [
+        "search listings in ebay",
+        "search listings on ebay in ebay",
+        "search ebay marketplace listings by keyword in ebay"
+      ],
+      "description": "Search eBay marketplace listings by keyword. Optionally filter by category, condition, and buying format (auction or fixed-price).",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (item name, brand, or description)"
+          },
+          "category": {
+            "description": "Category to filter by",
+            "type": "string"
+          },
+          "condition": {
+            "description": "Item condition filter",
+            "type": "string",
+            "enum": [
+              "new",
+              "used",
+              "refurbished"
+            ]
+          },
+          "buying_format": {
+            "description": "Auction vs Buy It Now",
+            "type": "string",
+            "enum": [
+              "auction",
+              "fixed_price",
+              "all"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of listings to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ebay/src/tools/search-listings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "etsy.add_to_cart",
+      "service": "www.etsy.com",
+      "intentSynonyms": [
+        "add a to cart in etsy",
+        "add to cart in etsy",
+        "add an item to my etsy cart in etsy"
+      ],
+      "description": "Add an Etsy listing to your shopping cart. This does NOT charge -- it stages the item for a later checkout.",
+      "actionVerb": "add",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing ID to add to the cart"
+          },
+          "quantity": {
+            "description": "Quantity to add (default 1)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "variation": {
+            "description": "Optional product variation (size, color)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/etsy/src/tools/add-to-cart.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "add"
+        }
+      }
+    },
+    {
+      "slug": "etsy.checkout",
+      "service": "www.etsy.com",
+      "intentSynonyms": [
+        "checkout in etsy",
+        "checkout my etsy cart in etsy",
+        "check out your etsy cart in etsy"
+      ],
+      "description": "Check out your Etsy cart: submit the cart for payment to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+      "actionVerb": "checkout",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "shipping_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to ship to"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "shipping_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/etsy/src/tools/checkout.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "checkout"
+        }
+      }
+    },
+    {
+      "slug": "etsy.get_listing",
+      "service": "www.etsy.com",
+      "intentSynonyms": [
+        "get a listing in etsy",
+        "look up a listing in etsy",
+        "fetch a single listing in etsy",
+        "view one specific listing in etsy",
+        "get listing in etsy",
+        "look up a single etsy listing in etsy"
+      ],
+      "description": "Get the full detail (title, price, shop, and availability) of a single Etsy listing by its listing ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Etsy listing ID to fetch"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/etsy/src/tools/get-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "etsy.list_orders",
+      "service": "www.etsy.com",
+      "intentSynonyms": [
+        "list orders in etsy",
+        "show me my orders in etsy",
+        "view my orders in etsy",
+        "see all my orders in etsy",
+        "show me my etsy purchase history in etsy"
+      ],
+      "description": "List your recent Etsy purchases / orders. Optionally filter by status (paid, shipped, delivered, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "paid",
+              "shipped",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/etsy/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "etsy.search_listings",
+      "service": "www.etsy.com",
+      "intentSynonyms": [
+        "search listings in etsy",
+        "search listings on etsy in etsy",
+        "search etsy handmade and vintage marketplace listings by keyword in etsy"
+      ],
+      "description": "Search Etsy handmade and vintage marketplace listings by keyword. Optionally filter by category and sort the results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (item name, material, or style)"
+          },
+          "category": {
+            "description": "Category to filter by",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Result ordering",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "price_low_to_high",
+              "price_high_to_low",
+              "newest"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of listings to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/etsy/src/tools/search-listings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },
@@ -5497,6 +6757,230 @@
       }
     },
     {
+      "slug": "target.get_product",
+      "service": "www.target.com",
+      "intentSynonyms": [
+        "get a product in target",
+        "look up a product in target",
+        "fetch a single product in target",
+        "view one specific product in target",
+        "get product in target",
+        "look up a single target product in target"
+      ],
+      "description": "Get the full detail (title, price, availability, and description) of a single Target product by its TCIN/product ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TCIN / product ID to fetch"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/target/src/tools/get-product.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "target.list_orders",
+      "service": "www.target.com",
+      "intentSynonyms": [
+        "list orders in target",
+        "show me my orders in target",
+        "view my orders in target",
+        "see all my orders in target",
+        "show me my target order history in target"
+      ],
+      "description": "List your recent Target orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "open",
+              "shipped",
+              "ready_for_pickup",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/target/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "target.place_order",
+      "service": "www.target.com",
+      "intentSynonyms": [
+        "place an order in target",
+        "place order in target",
+        "order this on target in target"
+      ],
+      "description": "Place a paid Target order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product TCIN/ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "fulfillment": {
+            "type": "string",
+            "enum": [
+              "ship",
+              "pickup",
+              "drive_up"
+            ],
+            "description": "Ship, in-store pickup, or Drive Up"
+          },
+          "shipping_address": {
+            "description": "The address to ship to (required when fulfillment is ship)",
+            "type": "string"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "fulfillment"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/target/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "target.search_products",
+      "service": "www.target.com",
+      "intentSynonyms": [
+        "search products in target",
+        "search for products on target in target",
+        "search the target catalog by keyword in target"
+      ],
+      "description": "Search the Target catalog by keyword. Optionally filter by department/category and sort the results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (product name, brand, or description)"
+          },
+          "category": {
+            "description": "Department or category to filter by",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Result ordering",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "price_low_to_high",
+              "price_high_to_low",
+              "best_seller"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/target/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "threads.create_thread",
       "service": "www.threads.net",
       "intentSynonyms": [
@@ -5674,7 +7158,7 @@
         "make a new task in todoist",
         "open a new task in todoist",
         "create task in todoist",
-        "create a new task in todoist"
+        "add a new to-do item or task in todoist"
       ],
       "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
       "actionVerb": "create",
@@ -6725,6 +8209,271 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "walmart.cancel_order",
+      "service": "www.walmart.com",
+      "intentSynonyms": [
+        "cancel an order in walmart",
+        "cancel order in walmart",
+        "cancel my walmart order in walmart"
+      ],
+      "description": "Cancel a Walmart order by its ID. This may be irreversible once the order has entered shipping or pickup prep.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/walmart/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "walmart.get_product",
+      "service": "www.walmart.com",
+      "intentSynonyms": [
+        "get a product in walmart",
+        "look up a product in walmart",
+        "fetch a single product in walmart",
+        "view one specific product in walmart",
+        "get product in walmart",
+        "look up a single walmart product in walmart"
+      ],
+      "description": "Get the full detail (title, price, availability, and description) of a single Walmart product by its item ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item / product ID to fetch"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/walmart/src/tools/get-product.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "walmart.list_orders",
+      "service": "www.walmart.com",
+      "intentSynonyms": [
+        "list orders in walmart",
+        "show me my orders in walmart",
+        "view my orders in walmart",
+        "see all my orders in walmart",
+        "show me my walmart order history in walmart"
+      ],
+      "description": "List your recent Walmart orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "open",
+              "shipped",
+              "ready_for_pickup",
+              "delivered",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/walmart/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "walmart.place_order",
+      "service": "www.walmart.com",
+      "intentSynonyms": [
+        "place an order in walmart",
+        "place order in walmart",
+        "order this on walmart in walmart"
+      ],
+      "description": "Place a paid Walmart order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product item ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "fulfillment": {
+            "type": "string",
+            "enum": [
+              "ship",
+              "pickup"
+            ],
+            "description": "Ship to an address or pick up in store"
+          },
+          "shipping_address": {
+            "description": "The address to ship to (required when fulfillment is ship)",
+            "type": "string"
+          },
+          "payment_method_id": {
+            "description": "Optional saved payment method ID to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "fulfillment"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/walmart/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "walmart.search_products",
+      "service": "www.walmart.com",
+      "intentSynonyms": [
+        "search products in walmart",
+        "search for products on walmart in walmart",
+        "search the walmart catalog by keyword in walmart"
+      ],
+      "description": "Search the Walmart catalog by keyword. Optionally filter by department/category and sort the results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keywords (product name, brand, or description)"
+          },
+          "category": {
+            "description": "Department or category to filter by",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Result ordering",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "price_low_to_high",
+              "price_high_to_low",
+              "best_seller"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/walmart/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },

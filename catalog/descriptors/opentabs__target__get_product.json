@@ -1,0 +1,41 @@
+{
+  "slug": "target.get_product",
+  "service": "www.target.com",
+  "intentSynonyms": [
+    "get a product in target",
+    "look up a product in target",
+    "fetch a single product in target",
+    "view one specific product in target",
+    "get product in target",
+    "look up a single target product in target"
+  ],
+  "description": "Get the full detail (title, price, availability, and description) of a single Target product by its TCIN/product ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The TCIN / product ID to fetch"
+      }
+    },
+    "required": [
+      "product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

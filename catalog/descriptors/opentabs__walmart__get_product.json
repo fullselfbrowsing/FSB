@@ -1,0 +1,41 @@
+{
+  "slug": "walmart.get_product",
+  "service": "www.walmart.com",
+  "intentSynonyms": [
+    "get a product in walmart",
+    "look up a product in walmart",
+    "fetch a single product in walmart",
+    "view one specific product in walmart",
+    "get product in walmart",
+    "look up a single walmart product in walmart"
+  ],
+  "description": "Get the full detail (title, price, availability, and description) of a single Walmart product by its item ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The item / product ID to fetch"
+      }
+    },
+    "required": [
+      "product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/walmart/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

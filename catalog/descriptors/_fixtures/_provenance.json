@@ -23,6 +23,22 @@
       ]
     },
     {
+      "app": "amazon",
+      "service": "www.amazon.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/amazon/",
+      "descriptors": [
+        "amazon.cancel_order",
+        "amazon.get_product",
+        "amazon.list_orders",
+        "amazon.place_order",
+        "amazon.search_products",
+        "amazon.track_order"
+      ]
+    },
+    {
       "app": "asana",
       "service": "app.asana.com",
       "source": "opentabs",
@@ -34,6 +50,21 @@
         "asana.get_task",
         "asana.list_tasks",
         "asana.update_task"
+      ]
+    },
+    {
+      "app": "bestbuy",
+      "service": "www.bestbuy.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/bestbuy/",
+      "descriptors": [
+        "bestbuy.cancel_order",
+        "bestbuy.get_product",
+        "bestbuy.list_orders",
+        "bestbuy.place_order",
+        "bestbuy.search_products"
       ]
     },
     {
@@ -147,6 +178,20 @@
       ]
     },
     {
+      "app": "costco",
+      "service": "www.costco.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/costco/",
+      "descriptors": [
+        "costco.get_product",
+        "costco.list_orders",
+        "costco.place_order",
+        "costco.search_products"
+      ]
+    },
+    {
       "app": "datadog",
       "service": "app.datadoghq.com",
       "source": "opentabs",
@@ -188,6 +233,36 @@
         "doordash.list_restaurants",
         "doordash.place_order",
         "doordash.track_order"
+      ]
+    },
+    {
+      "app": "ebay",
+      "service": "www.ebay.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/ebay/",
+      "descriptors": [
+        "ebay.buy_now",
+        "ebay.get_listing",
+        "ebay.list_orders",
+        "ebay.place_bid",
+        "ebay.search_listings"
+      ]
+    },
+    {
+      "app": "etsy",
+      "service": "www.etsy.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/etsy/",
+      "descriptors": [
+        "etsy.add_to_cart",
+        "etsy.checkout",
+        "etsy.get_listing",
+        "etsy.list_orders",
+        "etsy.search_listings"
       ]
     },
     {
@@ -349,6 +424,20 @@
       ]
     },
     {
+      "app": "target",
+      "service": "www.target.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/target/",
+      "descriptors": [
+        "target.get_product",
+        "target.list_orders",
+        "target.place_order",
+        "target.search_products"
+      ]
+    },
+    {
       "app": "threads",
       "service": "www.threads.net",
       "source": "opentabs",
@@ -420,6 +509,21 @@
         "vercel.get_deployment",
         "vercel.list_deployments",
         "vercel.list_projects"
+      ]
+    },
+    {
+      "app": "walmart",
+      "service": "www.walmart.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/walmart/",
+      "descriptors": [
+        "walmart.cancel_order",
+        "walmart.get_product",
+        "walmart.list_orders",
+        "walmart.place_order",
+        "walmart.search_products"
       ]
     }
   ]

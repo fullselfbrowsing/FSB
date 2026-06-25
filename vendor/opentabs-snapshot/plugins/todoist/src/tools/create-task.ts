@@ -9,7 +9,7 @@ export const createTask = defineTool({
   displayName: 'Create Task',
   description:
     'Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.',
-  summary: 'Create a new task',
+  summary: 'add a new to-do item or task',
   icon: 'plus',
   group: 'Tasks',
   input: z.object({

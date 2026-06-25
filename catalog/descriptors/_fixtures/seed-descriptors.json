@@ -79,6 +79,89 @@
     "backing": "dom"
   },
   {
+    "slug": "amazon.cancel_order",
+    "service": "www.amazon.com",
+    "intentSynonyms": [
+      "cancel an order in amazon",
+      "cancel order in amazon",
+      "cancel my amazon order in amazon"
+    ],
+    "description": "Cancel an Amazon order by its ID. This may be irreversible once the order has entered shipping.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "amazon.get_product",
+    "service": "www.amazon.com",
+    "intentSynonyms": [
+      "get a product in amazon",
+      "look up a product in amazon",
+      "fetch a single product in amazon",
+      "view one specific product in amazon",
+      "get product in amazon",
+      "look up a single amazon product in amazon"
+    ],
+    "description": "Get the full detail (title, price, availability, and description) of a single Amazon product by its ASIN/product ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "amazon.list_orders",
+    "service": "www.amazon.com",
+    "intentSynonyms": [
+      "list orders in amazon",
+      "show me my orders in amazon",
+      "view my orders in amazon",
+      "see all my orders in amazon",
+      "show me my amazon order history in amazon"
+    ],
+    "description": "List your recent Amazon orders. Optionally filter by status (open, shipped, delivered, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "amazon.place_order",
+    "service": "www.amazon.com",
+    "intentSynonyms": [
+      "place an order in amazon",
+      "place order in amazon",
+      "order this on amazon in amazon"
+    ],
+    "description": "Place a paid Amazon order: submit a cart of products to a shipping address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "amazon.search_products",
+    "service": "www.amazon.com",
+    "intentSynonyms": [
+      "search products in amazon",
+      "search for products on amazon in amazon",
+      "search the amazon product catalog by keyword in amazon"
+    ],
+    "description": "Search the Amazon product catalog by keyword. Optionally filter by department/category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "amazon.track_order",
+    "service": "www.amazon.com",
+    "intentSynonyms": [
+      "track an order in amazon",
+      "track order in amazon",
+      "track my amazon order in amazon"
+    ],
+    "description": "Track the live shipment status and estimated delivery date of a single Amazon order by its ID.",
+    "actionVerb": "track",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "asana.create_task",
     "service": "app.asana.com",
     "intentSynonyms": [
@@ -138,6 +221,76 @@
     "description": "Update an existing Asana task. Provide the task GID and any fields to change.",
     "actionVerb": "update",
     "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "bestbuy.cancel_order",
+    "service": "www.bestbuy.com",
+    "intentSynonyms": [
+      "cancel an order in bestbuy",
+      "cancel order in bestbuy",
+      "cancel my bestbuy order in bestbuy"
+    ],
+    "description": "Cancel a Best Buy order by its ID. This may be irreversible once the order has entered shipping or pickup prep.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "bestbuy.get_product",
+    "service": "www.bestbuy.com",
+    "intentSynonyms": [
+      "get a product in bestbuy",
+      "look up a product in bestbuy",
+      "fetch a single product in bestbuy",
+      "view one specific product in bestbuy",
+      "get product in bestbuy",
+      "look up a single bestbuy product in bestbuy"
+    ],
+    "description": "Get the full detail (title, price, availability, and specs) of a single Best Buy product by its SKU/product ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "bestbuy.list_orders",
+    "service": "www.bestbuy.com",
+    "intentSynonyms": [
+      "list orders in bestbuy",
+      "show me my orders in bestbuy",
+      "view my orders in bestbuy",
+      "see all my orders in bestbuy",
+      "show me my bestbuy order history in bestbuy"
+    ],
+    "description": "List your recent Best Buy orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "bestbuy.place_order",
+    "service": "www.bestbuy.com",
+    "intentSynonyms": [
+      "place an order in bestbuy",
+      "place order in bestbuy",
+      "order this on bestbuy in bestbuy"
+    ],
+    "description": "Place a paid Best Buy order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "bestbuy.search_products",
+    "service": "www.bestbuy.com",
+    "intentSynonyms": [
+      "search products in bestbuy",
+      "search for products on bestbuy in bestbuy",
+      "search the best buy electronics catalog by keyword in bestbuy"
+    ],
+    "description": "Search the Best Buy electronics catalog by keyword. Optionally filter by category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -626,6 +779,63 @@
     "backing": "dom"
   },
   {
+    "slug": "costco.get_product",
+    "service": "www.costco.com",
+    "intentSynonyms": [
+      "get a product in costco",
+      "look up a product in costco",
+      "fetch a single product in costco",
+      "view one specific product in costco",
+      "get product in costco",
+      "look up a single costco product in costco"
+    ],
+    "description": "Get the full detail (title, price, availability, and description) of a single Costco product by its item number.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "costco.list_orders",
+    "service": "www.costco.com",
+    "intentSynonyms": [
+      "list orders in costco",
+      "show me my orders in costco",
+      "view my orders in costco",
+      "see all my orders in costco",
+      "show me my costco order history in costco"
+    ],
+    "description": "List your recent Costco orders. Optionally filter by status (open, shipped, delivered, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "costco.place_order",
+    "service": "www.costco.com",
+    "intentSynonyms": [
+      "place an order in costco",
+      "place order in costco",
+      "order this on costco in costco"
+    ],
+    "description": "Place a paid Costco order: submit a cart of products to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "costco.search_products",
+    "service": "www.costco.com",
+    "intentSynonyms": [
+      "search products in costco",
+      "search for products on costco in costco",
+      "search the costco warehouse catalog by keyword in costco"
+    ],
+    "description": "Search the Costco warehouse catalog by keyword. Optionally filter by category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "datadog.get_monitor",
     "service": "app.datadoghq.com",
     "intentSynonyms": [
@@ -858,6 +1068,76 @@
     "sideEffectClass": "destructive"
   },
   {
+    "slug": "ebay.buy_now",
+    "service": "www.ebay.com",
+    "intentSynonyms": [
+      "buy a now in ebay",
+      "buy now in ebay",
+      "buy it now on ebay in ebay"
+    ],
+    "description": "Buy an eBay fixed-price listing immediately (Buy It Now): submit the purchase to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+    "actionVerb": "buy",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "ebay.get_listing",
+    "service": "www.ebay.com",
+    "intentSynonyms": [
+      "get a listing in ebay",
+      "look up a listing in ebay",
+      "fetch a single listing in ebay",
+      "view one specific listing in ebay",
+      "get listing in ebay",
+      "look up a single ebay listing in ebay"
+    ],
+    "description": "Get the full detail (title, current price, bids, time left, and seller) of a single eBay listing by its item ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ebay.list_orders",
+    "service": "www.ebay.com",
+    "intentSynonyms": [
+      "list orders in ebay",
+      "show me my orders in ebay",
+      "view my orders in ebay",
+      "see all my orders in ebay",
+      "show me my ebay purchase history in ebay"
+    ],
+    "description": "List your recent eBay purchases / orders. Optionally filter by status (awaiting_payment, paid, shipped, delivered).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ebay.place_bid",
+    "service": "www.ebay.com",
+    "intentSynonyms": [
+      "place a bid in ebay",
+      "place bid in ebay",
+      "bid on an ebay auction in ebay"
+    ],
+    "description": "Place a bid on an eBay auction listing. A winning bid is a binding obligation to pay -- this can charge your saved payment method if you win, a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "ebay.search_listings",
+    "service": "www.ebay.com",
+    "intentSynonyms": [
+      "search listings in ebay",
+      "search listings on ebay in ebay",
+      "search ebay marketplace listings by keyword in ebay"
+    ],
+    "description": "Search eBay marketplace listings by keyword. Optionally filter by category, condition, and buying format (auction or fixed-price).",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "email.send",
     "service": "mail.google.com",
     "intentSynonyms": [
@@ -870,6 +1150,76 @@
     "description": "Compose and send an email",
     "actionVerb": "send",
     "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "etsy.add_to_cart",
+    "service": "www.etsy.com",
+    "intentSynonyms": [
+      "add a to cart in etsy",
+      "add to cart in etsy",
+      "add an item to my etsy cart in etsy"
+    ],
+    "description": "Add an Etsy listing to your shopping cart. This does NOT charge -- it stages the item for a later checkout.",
+    "actionVerb": "add",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "etsy.checkout",
+    "service": "www.etsy.com",
+    "intentSynonyms": [
+      "checkout in etsy",
+      "checkout my etsy cart in etsy",
+      "check out your etsy cart in etsy"
+    ],
+    "description": "Check out your Etsy cart: submit the cart for payment to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+    "actionVerb": "checkout",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "etsy.get_listing",
+    "service": "www.etsy.com",
+    "intentSynonyms": [
+      "get a listing in etsy",
+      "look up a listing in etsy",
+      "fetch a single listing in etsy",
+      "view one specific listing in etsy",
+      "get listing in etsy",
+      "look up a single etsy listing in etsy"
+    ],
+    "description": "Get the full detail (title, price, shop, and availability) of a single Etsy listing by its listing ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "etsy.list_orders",
+    "service": "www.etsy.com",
+    "intentSynonyms": [
+      "list orders in etsy",
+      "show me my orders in etsy",
+      "view my orders in etsy",
+      "see all my orders in etsy",
+      "show me my etsy purchase history in etsy"
+    ],
+    "description": "List your recent Etsy purchases / orders. Optionally filter by status (paid, shipped, delivered, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "etsy.search_listings",
+    "service": "www.etsy.com",
+    "intentSynonyms": [
+      "search listings in etsy",
+      "search listings on etsy in etsy",
+      "search etsy handmade and vintage marketplace listings by keyword in etsy"
+    ],
+    "description": "Search Etsy handmade and vintage marketplace listings by keyword. Optionally filter by category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
   },
   {
     "slug": "github.create-issue",
@@ -1642,6 +1992,63 @@
     "sideEffectClass": "mutate"
   },
   {
+    "slug": "target.get_product",
+    "service": "www.target.com",
+    "intentSynonyms": [
+      "get a product in target",
+      "look up a product in target",
+      "fetch a single product in target",
+      "view one specific product in target",
+      "get product in target",
+      "look up a single target product in target"
+    ],
+    "description": "Get the full detail (title, price, availability, and description) of a single Target product by its TCIN/product ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "target.list_orders",
+    "service": "www.target.com",
+    "intentSynonyms": [
+      "list orders in target",
+      "show me my orders in target",
+      "view my orders in target",
+      "see all my orders in target",
+      "show me my target order history in target"
+    ],
+    "description": "List your recent Target orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "target.place_order",
+    "service": "www.target.com",
+    "intentSynonyms": [
+      "place an order in target",
+      "place order in target",
+      "order this on target in target"
+    ],
+    "description": "Place a paid Target order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "target.search_products",
+    "service": "www.target.com",
+    "intentSynonyms": [
+      "search products in target",
+      "search for products on target in target",
+      "search the target catalog by keyword in target"
+    ],
+    "description": "Search the Target catalog by keyword. Optionally filter by department/category and sort the results.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "threads.create_thread",
     "service": "www.threads.net",
     "intentSynonyms": [
@@ -1713,7 +2120,7 @@
       "make a new task in todoist",
       "open a new task in todoist",
       "create task in todoist",
-      "create a new task in todoist"
+      "add a new to-do item or task in todoist"
     ],
     "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
     "actionVerb": "create",
@@ -2042,6 +2449,76 @@
     ],
     "description": "List projects in a Vercel team or personal account. Optionally search by project name.",
     "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "walmart.cancel_order",
+    "service": "www.walmart.com",
+    "intentSynonyms": [
+      "cancel an order in walmart",
+      "cancel order in walmart",
+      "cancel my walmart order in walmart"
+    ],
+    "description": "Cancel a Walmart order by its ID. This may be irreversible once the order has entered shipping or pickup prep.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "walmart.get_product",
+    "service": "www.walmart.com",
+    "intentSynonyms": [
+      "get a product in walmart",
+      "look up a product in walmart",
+      "fetch a single product in walmart",
+      "view one specific product in walmart",
+      "get product in walmart",
+      "look up a single walmart product in walmart"
+    ],
+    "description": "Get the full detail (title, price, availability, and description) of a single Walmart product by its item ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "walmart.list_orders",
+    "service": "www.walmart.com",
+    "intentSynonyms": [
+      "list orders in walmart",
+      "show me my orders in walmart",
+      "view my orders in walmart",
+      "see all my orders in walmart",
+      "show me my walmart order history in walmart"
+    ],
+    "description": "List your recent Walmart orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "walmart.place_order",
+    "service": "www.walmart.com",
+    "intentSynonyms": [
+      "place an order in walmart",
+      "place order in walmart",
+      "order this on walmart in walmart"
+    ],
+    "description": "Place a paid Walmart order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "walmart.search_products",
+    "service": "www.walmart.com",
+    "intentSynonyms": [
+      "search products in walmart",
+      "search for products on walmart in walmart",
+      "search the walmart catalog by keyword in walmart"
+    ],
+    "description": "Search the Walmart catalog by keyword. Optionally filter by department/category and sort the results.",
+    "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
   }

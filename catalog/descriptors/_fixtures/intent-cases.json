@@ -246,5 +246,35 @@
   { "intent": "show me lyft ride types", "expectedSlug": "lyft.list_ride_types" },
   { "intent": "estimate a lyft fare", "expectedSlug": "lyft.get_ride_estimate" },
   { "intent": "request a lyft ride", "expectedSlug": "lyft.request_ride" },
-  { "intent": "cancel my lyft ride", "expectedSlug": "lyft.cancel_ride" }
+  { "intent": "cancel my lyft ride", "expectedSlug": "lyft.cancel_ride" },
+
+  { "intent": "search for products on amazon", "expectedSlug": "amazon.search_products" },
+  { "intent": "look up a single amazon product", "expectedSlug": "amazon.get_product" },
+  { "intent": "show me my amazon order history", "expectedSlug": "amazon.list_orders" },
+  { "intent": "track my amazon order", "expectedSlug": "amazon.track_order" },
+  { "intent": "order this on amazon", "expectedSlug": "amazon.place_order" },
+  { "intent": "cancel my amazon order", "expectedSlug": "amazon.cancel_order" },
+
+  { "intent": "search listings on ebay", "expectedSlug": "ebay.search_listings" },
+  { "intent": "look up a single ebay listing", "expectedSlug": "ebay.get_listing" },
+  { "intent": "bid on an ebay auction", "expectedSlug": "ebay.place_bid" },
+  { "intent": "buy it now on ebay", "expectedSlug": "ebay.buy_now" },
+
+  { "intent": "search etsy listings", "expectedSlug": "etsy.search_listings" },
+  { "intent": "add an item to my etsy cart", "expectedSlug": "etsy.add_to_cart" },
+  { "intent": "checkout my etsy cart", "expectedSlug": "etsy.checkout" },
+
+  { "intent": "search for products on bestbuy", "expectedSlug": "bestbuy.search_products" },
+  { "intent": "order this on bestbuy", "expectedSlug": "bestbuy.place_order" },
+  { "intent": "cancel my bestbuy order", "expectedSlug": "bestbuy.cancel_order" },
+
+  { "intent": "search for products on costco", "expectedSlug": "costco.search_products" },
+  { "intent": "order this on costco", "expectedSlug": "costco.place_order" },
+
+  { "intent": "search for products on walmart", "expectedSlug": "walmart.search_products" },
+  { "intent": "order this on walmart", "expectedSlug": "walmart.place_order" },
+  { "intent": "cancel my walmart order", "expectedSlug": "walmart.cancel_order" },
+
+  { "intent": "search for products on target", "expectedSlug": "target.search_products" },
+  { "intent": "order this on target", "expectedSlug": "target.place_order" }
 ]

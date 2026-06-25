@@ -1,0 +1,44 @@
+{
+  "slug": "ebay.place_bid",
+  "service": "www.ebay.com",
+  "intentSynonyms": [
+    "place a bid in ebay",
+    "place bid in ebay",
+    "bid on an ebay auction in ebay"
+  ],
+  "description": "Place a bid on an eBay auction listing. A winning bid is a binding obligation to pay -- this can charge your saved payment method if you win, a real money-moving action.",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "listing_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The auction listing ID to bid on"
+      },
+      "max_bid": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "description": "Your maximum bid amount in dollars"
+      }
+    },
+    "required": [
+      "listing_id",
+      "max_bid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/place-bid.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "place"
+    }
+  }
+}

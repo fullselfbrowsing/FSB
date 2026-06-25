@@ -1,0 +1,58 @@
+{
+  "slug": "target.search_products",
+  "service": "www.target.com",
+  "intentSynonyms": [
+    "search products in target",
+    "search for products on target in target",
+    "search the target catalog by keyword in target"
+  ],
+  "description": "Search the Target catalog by keyword. Optionally filter by department/category and sort the results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search keywords (product name, brand, or description)"
+      },
+      "category": {
+        "description": "Department or category to filter by",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Result ordering",
+        "type": "string",
+        "enum": [
+          "relevance",
+          "price_low_to_high",
+          "price_high_to_low",
+          "best_seller"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of products to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

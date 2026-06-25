@@ -1,0 +1,48 @@
+{
+  "slug": "amazon.list_orders",
+  "service": "www.amazon.com",
+  "intentSynonyms": [
+    "list orders in amazon",
+    "show me my orders in amazon",
+    "view my orders in amazon",
+    "see all my orders in amazon",
+    "show me my amazon order history in amazon"
+  ],
+  "description": "List your recent Amazon orders. Optionally filter by status (open, shipped, delivered, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter orders by status",
+        "type": "string",
+        "enum": [
+          "open",
+          "shipped",
+          "delivered",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of orders to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amazon/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

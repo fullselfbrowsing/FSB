@@ -1,0 +1,49 @@
+{
+  "slug": "target.list_orders",
+  "service": "www.target.com",
+  "intentSynonyms": [
+    "list orders in target",
+    "show me my orders in target",
+    "view my orders in target",
+    "see all my orders in target",
+    "show me my target order history in target"
+  ],
+  "description": "List your recent Target orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter orders by status",
+        "type": "string",
+        "enum": [
+          "open",
+          "shipped",
+          "ready_for_pickup",
+          "delivered",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of orders to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

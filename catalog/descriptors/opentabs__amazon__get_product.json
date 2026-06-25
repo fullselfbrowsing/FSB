@@ -1,0 +1,41 @@
+{
+  "slug": "amazon.get_product",
+  "service": "www.amazon.com",
+  "intentSynonyms": [
+    "get a product in amazon",
+    "look up a product in amazon",
+    "fetch a single product in amazon",
+    "view one specific product in amazon",
+    "get product in amazon",
+    "look up a single amazon product in amazon"
+  ],
+  "description": "Get the full detail (title, price, availability, and description) of a single Amazon product by its ASIN/product ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The ASIN / product ID to fetch"
+      }
+    },
+    "required": [
+      "product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amazon/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "slug": "costco.place_order",
+  "service": "www.costco.com",
+  "intentSynonyms": [
+    "place an order in costco",
+    "place order in costco",
+    "order this on costco in costco"
+  ],
+  "description": "Place a paid Costco order: submit a cart of products to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "product_id": {
+              "type": "string",
+              "description": "Product item number/ID"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "Quantity of this item"
+            }
+          },
+          "required": [
+            "product_id",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        "description": "The cart items to order"
+      },
+      "shipping_address": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The address to ship to"
+      },
+      "payment_method_id": {
+        "description": "Optional saved payment method ID to charge",
+        "type": "string"
+      }
+    },
+    "required": [
+      "items",
+      "shipping_address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/place-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "place"
+    }
+  }
+}
