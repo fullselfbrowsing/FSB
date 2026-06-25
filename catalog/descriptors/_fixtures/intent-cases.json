@@ -276,5 +276,33 @@
   { "intent": "cancel my walmart order", "expectedSlug": "walmart.cancel_order" },
 
   { "intent": "search for products on target", "expectedSlug": "target.search_products" },
-  { "intent": "order this on target", "expectedSlug": "target.place_order" }
+  { "intent": "order this on target", "expectedSlug": "target.place_order" },
+
+  { "intent": "search stays on booking", "expectedSlug": "booking.search_stays" },
+  { "intent": "look up a booking property", "expectedSlug": "booking.get_property" },
+  { "intent": "show me my booking reservations", "expectedSlug": "booking.list_bookings" },
+  { "intent": "complete my booking.com reservation", "expectedSlug": "booking.complete_booking" },
+  { "intent": "cancel my booking", "expectedSlug": "booking.cancel_booking" },
+
+  { "intent": "search listings on airbnb", "expectedSlug": "airbnb.search_listings" },
+  { "intent": "look up an airbnb listing", "expectedSlug": "airbnb.get_listing" },
+  { "intent": "list my airbnb trips", "expectedSlug": "airbnb.list_trips" },
+  { "intent": "book a stay on airbnb", "expectedSlug": "airbnb.book_stay" },
+  { "intent": "cancel my airbnb reservation", "expectedSlug": "airbnb.cancel_reservation" },
+
+  { "intent": "search hotels on expedia", "expectedSlug": "expedia.search_hotels" },
+  { "intent": "list my expedia trips", "expectedSlug": "expedia.list_trips" },
+  { "intent": "book a flight on expedia", "expectedSlug": "expedia.book_flight" },
+  { "intent": "book a hotel on expedia", "expectedSlug": "expedia.book_hotel" },
+
+  { "intent": "find flights on kayak", "expectedSlug": "kayak.search_flights" },
+  { "intent": "find hotels on kayak", "expectedSlug": "kayak.search_hotels" },
+  { "intent": "look up a kayak price alert", "expectedSlug": "kayak.get_price_alert" },
+  { "intent": "create a price alert on kayak", "expectedSlug": "kayak.create_price_alert" },
+
+  { "intent": "search restaurants on opentable", "expectedSlug": "opentable.search_restaurants" },
+  { "intent": "look up an opentable restaurant", "expectedSlug": "opentable.get_restaurant" },
+  { "intent": "show me my opentable reservations", "expectedSlug": "opentable.list_reservations" },
+  { "intent": "reserve a table on opentable", "expectedSlug": "opentable.reserve_table" },
+  { "intent": "cancel my opentable reservation", "expectedSlug": "opentable.cancel_reservation" }
 ]

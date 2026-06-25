@@ -1,0 +1,47 @@
+{
+  "slug": "booking.list_bookings",
+  "service": "www.booking.com",
+  "intentSynonyms": [
+    "list bookings in booking",
+    "show me my bookings in booking",
+    "view my bookings in booking",
+    "see all my bookings in booking",
+    "show me my booking reservations in booking"
+  ],
+  "description": "List your Booking.com reservations. Optionally filter by status (upcoming, completed, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter bookings by status",
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "completed",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of bookings to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/list-bookings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

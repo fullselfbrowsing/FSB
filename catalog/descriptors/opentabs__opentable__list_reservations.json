@@ -1,0 +1,47 @@
+{
+  "slug": "opentable.list_reservations",
+  "service": "www.opentable.com",
+  "intentSynonyms": [
+    "list reservations in opentable",
+    "show me my reservations in opentable",
+    "view my reservations in opentable",
+    "see all my reservations in opentable",
+    "show me my opentable reservations in opentable"
+  ],
+  "description": "List your OpenTable reservations. Optionally filter by status (upcoming, completed, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter reservations by status",
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "completed",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of reservations to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/opentable/src/tools/list-reservations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "slug": "booking.complete_booking",
+  "service": "www.booking.com",
+  "intentSynonyms": [
+    "complete a booking in booking",
+    "complete booking in booking",
+    "complete my booking reservation in booking"
+  ],
+  "description": "Complete a paid Booking.com reservation: confirm a selected property and room for the chosen dates and guests. This charges your saved payment method and books the stay -- a real money-moving action.",
+  "actionVerb": "complete",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The property to book"
+      },
+      "room_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The selected room option"
+      },
+      "check_in": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Check-in date (YYYY-MM-DD)"
+      },
+      "check_out": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Check-out date (YYYY-MM-DD)"
+      },
+      "guests": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Number of guests"
+      }
+    },
+    "required": [
+      "property_id",
+      "room_id",
+      "check_in",
+      "check_out",
+      "guests"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/complete-booking.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "complete"
+    }
+  }
+}

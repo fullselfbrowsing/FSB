@@ -1,0 +1,47 @@
+{
+  "slug": "airbnb.list_trips",
+  "service": "www.airbnb.com",
+  "intentSynonyms": [
+    "list trips in airbnb",
+    "show me my trips in airbnb",
+    "view my trips in airbnb",
+    "see all my trips in airbnb",
+    "show me my airbnb trips in airbnb"
+  ],
+  "description": "List your Airbnb trips (booked reservations). Optionally filter by status (upcoming, completed, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter trips by status",
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "completed",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of trips to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/list-trips.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

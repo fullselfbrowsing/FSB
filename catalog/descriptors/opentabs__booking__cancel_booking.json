@@ -1,0 +1,42 @@
+{
+  "slug": "booking.cancel_booking",
+  "service": "www.booking.com",
+  "intentSynonyms": [
+    "cancel a booking in booking",
+    "cancel booking in booking",
+    "cancel my booking reservation in booking"
+  ],
+  "description": "Cancel a Booking.com reservation by its ID. This may be irreversible and may incur a cancellation fee depending on the rate.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "booking_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The booking ID to cancel"
+      },
+      "reason": {
+        "description": "Optional cancellation reason",
+        "type": "string"
+      }
+    },
+    "required": [
+      "booking_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/cancel-booking.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "cancel"
+    }
+  }
+}

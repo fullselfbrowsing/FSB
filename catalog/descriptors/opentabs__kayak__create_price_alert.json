@@ -1,0 +1,58 @@
+{
+  "slug": "kayak.create_price_alert",
+  "service": "www.kayak.com",
+  "intentSynonyms": [
+    "create a price alert in kayak",
+    "add a price alert in kayak",
+    "make a new price alert in kayak",
+    "open a new price alert in kayak",
+    "create price alert in kayak",
+    "create a price alert on kayak in kayak"
+  ],
+  "description": "Create a KAYAK price alert: track the price of a flight or hotel route and get notified when it changes. This stages a price-watch only -- it does NOT book anything or charge a card.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "kind": {
+        "type": "string",
+        "enum": [
+          "flight",
+          "hotel"
+        ],
+        "description": "Whether to watch a flight or a hotel route"
+      },
+      "origin": {
+        "description": "Departure airport or city (for a flight alert)",
+        "type": "string"
+      },
+      "destination": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Destination airport, city, or hotel area to watch"
+      },
+      "target_price": {
+        "description": "Optional price threshold to notify below",
+        "type": "number"
+      }
+    },
+    "required": [
+      "kind",
+      "destination"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/kayak/src/tools/create-price-alert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

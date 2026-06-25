@@ -157,6 +157,253 @@
       }
     },
     {
+      "slug": "airbnb.book_stay",
+      "service": "www.airbnb.com",
+      "intentSynonyms": [
+        "book a stay in airbnb",
+        "book stay in airbnb",
+        "book a stay on airbnb in airbnb"
+      ],
+      "description": "Book a paid Airbnb stay: reserve a listing for the chosen dates and guests. This charges your saved payment method and confirms the reservation -- a real money-moving action.",
+      "actionVerb": "book",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing to book"
+          },
+          "check_in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          "check_out": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          "guests": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of guests"
+          }
+        },
+        "required": [
+          "listing_id",
+          "check_in",
+          "check_out",
+          "guests"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airbnb/src/tools/book-stay.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "book"
+        }
+      }
+    },
+    {
+      "slug": "airbnb.cancel_reservation",
+      "service": "www.airbnb.com",
+      "intentSynonyms": [
+        "cancel a reservation in airbnb",
+        "cancel reservation in airbnb",
+        "cancel my airbnb reservation in airbnb"
+      ],
+      "description": "Cancel an Airbnb reservation by its ID. This may be irreversible and is subject to the listing cancellation policy.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "reservation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reservation ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airbnb/src/tools/cancel-reservation.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "airbnb.get_listing",
+      "service": "www.airbnb.com",
+      "intentSynonyms": [
+        "get a listing in airbnb",
+        "look up a listing in airbnb",
+        "fetch a single listing in airbnb",
+        "view one specific listing in airbnb",
+        "get listing in airbnb",
+        "look up an airbnb listing in airbnb"
+      ],
+      "description": "Get the full details, amenities, and availability of a single Airbnb listing by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The listing ID to fetch"
+          },
+          "check_in": {
+            "description": "Check-in date (YYYY-MM-DD) for live availability + price",
+            "type": "string"
+          },
+          "check_out": {
+            "description": "Check-out date (YYYY-MM-DD) for live availability + price",
+            "type": "string"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airbnb/src/tools/get-listing.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "airbnb.list_trips",
+      "service": "www.airbnb.com",
+      "intentSynonyms": [
+        "list trips in airbnb",
+        "show me my trips in airbnb",
+        "view my trips in airbnb",
+        "see all my trips in airbnb",
+        "show me my airbnb trips in airbnb"
+      ],
+      "description": "List your Airbnb trips (booked reservations). Optionally filter by status (upcoming, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter trips by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of trips to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airbnb/src/tools/list-trips.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "airbnb.search_listings",
+      "service": "www.airbnb.com",
+      "intentSynonyms": [
+        "search listings in airbnb",
+        "search listings on airbnb in airbnb",
+        "search airbnb for listings (homes, rooms, experiences) in a destination for a set of dates and number of guests in airbnb"
+      ],
+      "description": "Search Airbnb for listings (homes, rooms, experiences) in a destination for a set of dates and number of guests. Returns matching listings with nightly prices.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, region, or area to search"
+          },
+          "check_in": {
+            "description": "Check-in date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "check_out": {
+            "description": "Check-out date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "guests": {
+            "description": "Number of guests",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airbnb/src/tools/search-listings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "airtable.create_record",
       "service": "airtable.com",
       "intentSynonyms": [
@@ -1493,6 +1740,265 @@
       }
     },
     {
+      "slug": "booking.cancel_booking",
+      "service": "www.booking.com",
+      "intentSynonyms": [
+        "cancel a booking in booking",
+        "cancel booking in booking",
+        "cancel my booking reservation in booking"
+      ],
+      "description": "Cancel a Booking.com reservation by its ID. This may be irreversible and may incur a cancellation fee depending on the rate.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The booking ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "booking_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/booking/src/tools/cancel-booking.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "booking.complete_booking",
+      "service": "www.booking.com",
+      "intentSynonyms": [
+        "complete a booking in booking",
+        "complete booking in booking",
+        "complete my booking reservation in booking"
+      ],
+      "description": "Complete a paid Booking.com reservation: confirm a selected property and room for the chosen dates and guests. This charges your saved payment method and books the stay -- a real money-moving action.",
+      "actionVerb": "complete",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The property to book"
+          },
+          "room_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The selected room option"
+          },
+          "check_in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          "check_out": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          "guests": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of guests"
+          }
+        },
+        "required": [
+          "property_id",
+          "room_id",
+          "check_in",
+          "check_out",
+          "guests"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/booking/src/tools/complete-booking.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "complete"
+        }
+      }
+    },
+    {
+      "slug": "booking.get_property",
+      "service": "www.booking.com",
+      "intentSynonyms": [
+        "get a property in booking",
+        "look up a property in booking",
+        "fetch a single property in booking",
+        "view one specific property in booking",
+        "get property in booking",
+        "look up a booking property in booking"
+      ],
+      "description": "Get the full details, room options, and availability of a single Booking.com property by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The property ID to fetch"
+          },
+          "check_in": {
+            "description": "Check-in date (YYYY-MM-DD) for live availability",
+            "type": "string"
+          },
+          "check_out": {
+            "description": "Check-out date (YYYY-MM-DD) for live availability",
+            "type": "string"
+          }
+        },
+        "required": [
+          "property_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/booking/src/tools/get-property.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "booking.list_bookings",
+      "service": "www.booking.com",
+      "intentSynonyms": [
+        "list bookings in booking",
+        "show me my bookings in booking",
+        "view my bookings in booking",
+        "see all my bookings in booking",
+        "show me my booking reservations in booking"
+      ],
+      "description": "List your Booking.com reservations. Optionally filter by status (upcoming, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter bookings by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of bookings to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/booking/src/tools/list-bookings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "booking.search_stays",
+      "service": "www.booking.com",
+      "intentSynonyms": [
+        "search stays in booking",
+        "search stays on booking in booking",
+        "search booking in booking"
+      ],
+      "description": "Search Booking.com for places to stay (hotels, apartments, homes) in a destination for a set of dates and number of guests. Returns matching properties with prices.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, region, or property name to search"
+          },
+          "check_in": {
+            "description": "Check-in date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "check_out": {
+            "description": "Check-out date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "guests": {
+            "description": "Number of guests",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "rooms": {
+            "description": "Number of rooms",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/booking/src/tools/search-stays.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "bsky.create_post",
       "service": "bsky.app",
       "intentSynonyms": [
@@ -1941,9 +2447,9 @@
       "intentSynonyms": [
         "trigger a pipeline in circleci",
         "trigger pipeline in circleci",
-        "trigger a new pipeline in circleci"
+        "start a new pipeline run on circleci in circleci"
       ],
-      "description": "Trigger a new pipeline run for a CircleCI project on a given branch or tag. Optionally pass pipeline parameters.",
+      "description": "Start and run a new CircleCI pipeline for a project on a given branch or tag -- kick off a fresh pipeline build. Optionally pass pipeline parameters.",
       "actionVerb": "trigger",
       "sideEffectClass": "write",
       "params": {
@@ -4220,6 +4726,294 @@
       }
     },
     {
+      "slug": "expedia.book_flight",
+      "service": "www.expedia.com",
+      "intentSynonyms": [
+        "book a flight in expedia",
+        "book flight in expedia",
+        "book a flight on expedia in expedia"
+      ],
+      "description": "Book a paid Expedia flight: confirm a selected flight itinerary for the given passengers. This charges your saved payment method and tickets the flight -- a real money-moving action.",
+      "actionVerb": "book",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "flight_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The flight itinerary to book"
+          },
+          "passengers": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "full_name": {
+                  "type": "string",
+                  "description": "Passenger full name"
+                },
+                "date_of_birth": {
+                  "type": "string",
+                  "description": "Passenger date of birth (YYYY-MM-DD)"
+                }
+              },
+              "required": [
+                "full_name",
+                "date_of_birth"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The passengers to ticket"
+          }
+        },
+        "required": [
+          "flight_id",
+          "passengers"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/expedia/src/tools/book-flight.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "book"
+        }
+      }
+    },
+    {
+      "slug": "expedia.book_hotel",
+      "service": "www.expedia.com",
+      "intentSynonyms": [
+        "book a hotel in expedia",
+        "book hotel in expedia",
+        "book a hotel on expedia in expedia"
+      ],
+      "description": "Book a paid Expedia hotel: confirm a selected hotel and room for the chosen dates and guests. This charges your saved payment method and reserves the room -- a real money-moving action.",
+      "actionVerb": "book",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "hotel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The hotel to book"
+          },
+          "room_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The selected room option"
+          },
+          "check_in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          "check_out": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          "guests": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of guests"
+          }
+        },
+        "required": [
+          "hotel_id",
+          "room_id",
+          "check_in",
+          "check_out",
+          "guests"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/expedia/src/tools/book-hotel.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "book"
+        }
+      }
+    },
+    {
+      "slug": "expedia.list_trips",
+      "service": "www.expedia.com",
+      "intentSynonyms": [
+        "list trips in expedia",
+        "show me my trips in expedia",
+        "view my trips in expedia",
+        "see all my trips in expedia",
+        "show me my expedia trips in expedia"
+      ],
+      "description": "List your Expedia trips (booked flights and hotels). Optionally filter by status (upcoming, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter trips by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of trips to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/expedia/src/tools/list-trips.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "expedia.search_flights",
+      "service": "www.expedia.com",
+      "intentSynonyms": [
+        "search flights in expedia",
+        "search flights on expedia in expedia",
+        "search expedia for flights between an origin and destination on given dates in expedia"
+      ],
+      "description": "Search Expedia for flights between an origin and destination on given dates. Returns matching flight itineraries with fares.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Departure airport or city"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Arrival airport or city"
+          },
+          "depart_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Departure date (YYYY-MM-DD)"
+          },
+          "return_date": {
+            "description": "Return date (YYYY-MM-DD) for a round trip",
+            "type": "string"
+          },
+          "passengers": {
+            "description": "Number of passengers",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "depart_date"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/expedia/src/tools/search-flights.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "expedia.search_hotels",
+      "service": "www.expedia.com",
+      "intentSynonyms": [
+        "search hotels in expedia",
+        "search hotels on expedia in expedia",
+        "search expedia for hotels in a destination for a set of dates and number of guests in expedia"
+      ],
+      "description": "Search Expedia for hotels in a destination for a set of dates and number of guests. Returns matching hotels with nightly prices.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, region, or hotel name to search"
+          },
+          "check_in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          "check_out": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          "guests": {
+            "description": "Number of guests",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "destination",
+          "check_in",
+          "check_out"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/expedia/src/tools/search-hotels.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "gitlab.create_issue",
       "service": "gitlab.com",
       "intentSynonyms": [
@@ -5289,6 +6083,221 @@
       }
     },
     {
+      "slug": "kayak.create_price_alert",
+      "service": "www.kayak.com",
+      "intentSynonyms": [
+        "create a price alert in kayak",
+        "add a price alert in kayak",
+        "make a new price alert in kayak",
+        "open a new price alert in kayak",
+        "create price alert in kayak",
+        "create a price alert on kayak in kayak"
+      ],
+      "description": "Create a KAYAK price alert: track the price of a flight or hotel route and get notified when it changes. This stages a price-watch only -- it does NOT book anything or charge a card.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "flight",
+              "hotel"
+            ],
+            "description": "Whether to watch a flight or a hotel route"
+          },
+          "origin": {
+            "description": "Departure airport or city (for a flight alert)",
+            "type": "string"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination airport, city, or hotel area to watch"
+          },
+          "target_price": {
+            "description": "Optional price threshold to notify below",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "destination"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/kayak/src/tools/create-price-alert.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "kayak.get_price_alert",
+      "service": "www.kayak.com",
+      "intentSynonyms": [
+        "get a price alert in kayak",
+        "look up a price alert in kayak",
+        "fetch a single price alert in kayak",
+        "view one specific price alert in kayak",
+        "get price alert in kayak",
+        "look up a kayak price alert in kayak"
+      ],
+      "description": "Get the details and latest tracked price of a single saved KAYAK price alert by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "alert_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The price alert ID to fetch"
+          }
+        },
+        "required": [
+          "alert_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/kayak/src/tools/get-price-alert.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "kayak.search_flights",
+      "service": "www.kayak.com",
+      "intentSynonyms": [
+        "search flights in kayak",
+        "find flights on kayak in kayak",
+        "search kayak across providers for flights between an origin and destination on given dates in kayak"
+      ],
+      "description": "Search KAYAK across providers for flights between an origin and destination on given dates. Returns matching fares from multiple airlines and agencies.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Departure airport or city"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Arrival airport or city"
+          },
+          "depart_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Departure date (YYYY-MM-DD)"
+          },
+          "return_date": {
+            "description": "Return date (YYYY-MM-DD) for a round trip",
+            "type": "string"
+          },
+          "passengers": {
+            "description": "Number of passengers",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "depart_date"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/kayak/src/tools/search-flights.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "kayak.search_hotels",
+      "service": "www.kayak.com",
+      "intentSynonyms": [
+        "search hotels in kayak",
+        "find hotels on kayak in kayak",
+        "search kayak across providers for hotels in a destination for a set of dates and number of guests in kayak"
+      ],
+      "description": "Search KAYAK across providers for hotels in a destination for a set of dates and number of guests. Returns matching nightly prices from multiple agencies.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, region, or hotel name to search"
+          },
+          "check_in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          "check_out": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          "guests": {
+            "description": "Number of guests",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "destination",
+          "check_in",
+          "check_out"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/kayak/src/tools/search-hotels.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "linear.create_comment",
       "service": "linear.app",
       "intentSynonyms": [
@@ -6182,6 +7191,255 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "opentable.cancel_reservation",
+      "service": "www.opentable.com",
+      "intentSynonyms": [
+        "cancel a reservation in opentable",
+        "cancel reservation in opentable",
+        "cancel my opentable reservation in opentable"
+      ],
+      "description": "Cancel an OpenTable reservation by its ID. A late cancellation may incur a charge per the restaurant policy.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "reservation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reservation ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservation_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/opentable/src/tools/cancel-reservation.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "opentable.get_restaurant",
+      "service": "www.opentable.com",
+      "intentSynonyms": [
+        "get a restaurant in opentable",
+        "look up a restaurant in opentable",
+        "fetch a single restaurant in opentable",
+        "view one specific restaurant in opentable",
+        "get restaurant in opentable",
+        "look up an opentable restaurant in opentable"
+      ],
+      "description": "Get the details, menu, and available time slots of a single OpenTable restaurant by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant ID to fetch"
+          },
+          "date": {
+            "description": "Reservation date (YYYY-MM-DD) for live availability",
+            "type": "string"
+          },
+          "party_size": {
+            "description": "Party size for live availability",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "restaurant_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/opentable/src/tools/get-restaurant.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "opentable.list_reservations",
+      "service": "www.opentable.com",
+      "intentSynonyms": [
+        "list reservations in opentable",
+        "show me my reservations in opentable",
+        "view my reservations in opentable",
+        "see all my reservations in opentable",
+        "show me my opentable reservations in opentable"
+      ],
+      "description": "List your OpenTable reservations. Optionally filter by status (upcoming, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter reservations by status",
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of reservations to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/opentable/src/tools/list-reservations.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "opentable.reserve_table",
+      "service": "www.opentable.com",
+      "intentSynonyms": [
+        "reserve a table in opentable",
+        "reserve table in opentable",
+        "reserve a table on opentable in opentable"
+      ],
+      "description": "Reserve a table at an OpenTable restaurant for a date, time, and party size. This holds your card against the reservation (a no-show or late cancellation may be charged) -- a money-adjacent action.",
+      "actionVerb": "reserve",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant to reserve at"
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reservation date (YYYY-MM-DD)"
+          },
+          "time": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reservation time (HH:MM, 24h)"
+          },
+          "party_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Number of diners"
+          }
+        },
+        "required": [
+          "restaurant_id",
+          "date",
+          "time",
+          "party_size"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/opentable/src/tools/reserve-table.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "reserve"
+        }
+      }
+    },
+    {
+      "slug": "opentable.search_restaurants",
+      "service": "www.opentable.com",
+      "intentSynonyms": [
+        "search restaurants in opentable",
+        "search restaurants on opentable in opentable",
+        "search opentable for restaurants with availability in a location for a date, time, and party size in opentable"
+      ],
+      "description": "Search OpenTable for restaurants with availability in a location for a date, time, and party size. Returns matching restaurants with open time slots.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City, neighborhood, or restaurant name to search"
+          },
+          "date": {
+            "description": "Reservation date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "time": {
+            "description": "Desired time (HH:MM, 24h)",
+            "type": "string"
+          },
+          "party_size": {
+            "description": "Number of diners",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/opentable/src/tools/search-restaurants.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },

@@ -1,0 +1,60 @@
+{
+  "slug": "expedia.search_flights",
+  "service": "www.expedia.com",
+  "intentSynonyms": [
+    "search flights in expedia",
+    "search flights on expedia in expedia",
+    "search expedia for flights between an origin and destination on given dates in expedia"
+  ],
+  "description": "Search Expedia for flights between an origin and destination on given dates. Returns matching flight itineraries with fares.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "origin": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Departure airport or city"
+      },
+      "destination": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Arrival airport or city"
+      },
+      "depart_date": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Departure date (YYYY-MM-DD)"
+      },
+      "return_date": {
+        "description": "Return date (YYYY-MM-DD) for a round trip",
+        "type": "string"
+      },
+      "passengers": {
+        "description": "Number of passengers",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "origin",
+      "destination",
+      "depart_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-flights.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -7,8 +7,8 @@ export const triggerPipeline = defineTool({
   name: 'trigger_pipeline',
   displayName: 'Trigger Pipeline',
   description:
-    'Trigger a new pipeline run for a CircleCI project on a given branch or tag. Optionally pass pipeline parameters.',
-  summary: 'Trigger a new pipeline',
+    'Start and run a new CircleCI pipeline for a project on a given branch or tag -- kick off a fresh pipeline build. Optionally pass pipeline parameters.',
+  summary: 'start a new pipeline run on circleci',
   icon: 'play',
   group: 'Pipelines',
   input: z.object({

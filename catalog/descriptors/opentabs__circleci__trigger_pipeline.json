@@ -4,9 +4,9 @@
   "intentSynonyms": [
     "trigger a pipeline in circleci",
     "trigger pipeline in circleci",
-    "trigger a new pipeline in circleci"
+    "start a new pipeline run on circleci in circleci"
   ],
-  "description": "Trigger a new pipeline run for a CircleCI project on a given branch or tag. Optionally pass pipeline parameters.",
+  "description": "Start and run a new CircleCI pipeline for a project on a given branch or tag -- kick off a fresh pipeline build. Optionally pass pipeline parameters.",
   "actionVerb": "trigger",
   "sideEffectClass": "write",
   "params": {

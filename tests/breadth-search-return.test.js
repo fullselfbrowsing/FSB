@@ -116,7 +116,7 @@ global.MiniSearch = MiniSearch;
 // retail/marketplace sub-batch.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft|amazon|ebay|etsy|bestbuy|costco|walmart|target)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft|amazon|ebay|etsy|bestbuy|costco|walmart|target|booking|airbnb|expedia|kayak|opentable)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -124,8 +124,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 159,
-  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads + 4 discord + 3 reddit] + 31 food-delivery/rideshare [6 doordash + 5 ubereats + 5 grubhub + 5 instacart + 5 uber + 5 lyft] + 34 retail/marketplace [6 amazon + 5 ebay + 5 etsy + 5 bestbuy + 4 costco + 5 walmart + 4 target -- Phase-39 batch C sub-batch 2, all backing:dom on SENSITIVE payment origins])');
+check(corpus.length >= 183,
+  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace + travel/transport corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads + 4 discord + 3 reddit] + 31 food-delivery/rideshare [6 doordash + 5 ubereats + 5 grubhub + 5 instacart + 5 uber + 5 lyft] + 34 retail/marketplace [6 amazon + 5 ebay + 5 etsy + 5 bestbuy + 4 costco + 5 walmart + 4 target] + 24 travel/transport [5 booking + 5 airbnb + 5 expedia + 4 kayak + 5 opentable -- Phase-39 batch C sub-batch 3, all backing:dom on SENSITIVE paid-booking/held-card origins; complete_booking/book_stay/book_flight/book_hotel/reserve_table are payment ops DOM-only-on-sensitive])');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -285,6 +285,34 @@ const COLLISION_SET = [
   // app's slug ("find me a product in the <app> catalog" is a held-out paraphrase).
   { query: 'find me a product in the amazon catalog', expected: 'amazon.search_products' },
   { query: 'find me a product in the bestbuy catalog', expected: 'bestbuy.search_products' },
+  // Phase-39 batch C sub-batch 3 (39-04, travel + transport): the cross-app PAYMENT/booking-op
+  // collisions are the headline disambiguation probes for the most-sensitive travel category.
+  // The "confirm and pay for my stay/booking" intent is shared across booking.complete_booking
+  // AND airbnb.book_stay (both reserve+charge a place to stay) -- the app token MUST keep each
+  // paid booking on its OWN slug (a swapped stem would charge a card on the WRONG account/origin).
+  // The queries are HELD-OUT paraphrases ("confirm and pay for"/"lock in" are NOT indexed synonyms
+  // -- the indexed forms are "complete my booking.com reservation" / "book a stay on airbnb in
+  // airbnb"), so wrong-invoke=0 is a genuine retrieval measurement.
+  { query: 'confirm and pay for my stay on booking', expected: 'booking.complete_booking' },
+  { query: 'lock in and pay for my stay on airbnb', expected: 'airbnb.book_stay' },
+  // book_flight (expedia) is the flight-ticketing payment op -- its closest cross-app
+  // near-neighbor is expedia.book_hotel (the same app's hotel payment) AND airbnb.book_stay
+  // (the verb 'book' collides). "buy a plane ticket" must top expedia.book_flight, never the
+  // hotel/stay payment ops (the flight-vs-hotel intent split within + across apps must route).
+  { query: 'buy a plane ticket and book the flight on expedia', expected: 'expedia.book_flight' },
+  { query: 'confirm and pay for a hotel room on expedia', expected: 'expedia.book_hotel' },
+  // search_flights is emitted by kayak AND expedia (IDENTICAL op name across the two travel
+  // apps) -- the closest same-op cross-app collision in this sub-batch; the app token MUST keep
+  // each flight search on its OWN slug. Held-out paraphrases ("look for airfare"/"compare
+  // airfares" are NOT indexed synonyms -- the indexed forms are "search flights on expedia" /
+  // "find flights on kayak in kayak"), so both top their OWN search_flights.
+  { query: 'look for airfare between two cities on kayak', expected: 'kayak.search_flights' },
+  { query: 'look for airfare between two cities on expedia', expected: 'expedia.search_flights' },
+  // opentable.reserve_table (the held-card dining reservation -- a payment op via 'reserve')
+  // must top its OWN slug ("book me a dinner table" is a held-out paraphrase), never an
+  // airbnb/booking stay-booking payment op (the dining-reservation intent is distinct from a
+  // lodging booking despite the shared book/reserve verb family).
+  { query: 'book me a dinner table tonight on opentable', expected: 'opentable.reserve_table' },
 ];
 
 // Build a slug -> lowercased-intentSynonyms map for the held-out guards (MED-01/MED-02).

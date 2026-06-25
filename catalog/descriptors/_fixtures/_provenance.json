@@ -8,6 +8,21 @@
   "pinnedAt": "2026-06-21T21:54:20Z",
   "apps": [
     {
+      "app": "airbnb",
+      "service": "www.airbnb.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/airbnb/",
+      "descriptors": [
+        "airbnb.book_stay",
+        "airbnb.cancel_reservation",
+        "airbnb.get_listing",
+        "airbnb.list_trips",
+        "airbnb.search_listings"
+      ]
+    },
+    {
       "app": "airtable",
       "service": "airtable.com",
       "source": "opentabs",
@@ -93,6 +108,21 @@
         "bsky.delete_post",
         "bsky.get_profile",
         "bsky.list_timeline"
+      ]
+    },
+    {
+      "app": "booking",
+      "service": "www.booking.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/booking/",
+      "descriptors": [
+        "booking.cancel_booking",
+        "booking.complete_booking",
+        "booking.get_property",
+        "booking.list_bookings",
+        "booking.search_stays"
       ]
     },
     {
@@ -266,6 +296,21 @@
       ]
     },
     {
+      "app": "expedia",
+      "service": "www.expedia.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/expedia/",
+      "descriptors": [
+        "expedia.book_flight",
+        "expedia.book_hotel",
+        "expedia.list_trips",
+        "expedia.search_flights",
+        "expedia.search_hotels"
+      ]
+    },
+    {
       "app": "gitlab",
       "service": "gitlab.com",
       "source": "opentabs",
@@ -325,6 +370,20 @@
       ]
     },
     {
+      "app": "kayak",
+      "service": "www.kayak.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/kayak/",
+      "descriptors": [
+        "kayak.create_price_alert",
+        "kayak.get_price_alert",
+        "kayak.search_flights",
+        "kayak.search_hotels"
+      ]
+    },
+    {
       "app": "linear",
       "service": "linear.app",
       "source": "opentabs",
@@ -380,6 +439,21 @@
         "netlify.get_site",
         "netlify.list_deploys",
         "netlify.list_sites"
+      ]
+    },
+    {
+      "app": "opentable",
+      "service": "www.opentable.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/opentable/",
+      "descriptors": [
+        "opentable.cancel_reservation",
+        "opentable.get_restaurant",
+        "opentable.list_reservations",
+        "opentable.reserve_table",
+        "opentable.search_restaurants"
       ]
     },
     {

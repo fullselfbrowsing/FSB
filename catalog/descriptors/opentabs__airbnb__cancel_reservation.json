@@ -1,0 +1,42 @@
+{
+  "slug": "airbnb.cancel_reservation",
+  "service": "www.airbnb.com",
+  "intentSynonyms": [
+    "cancel a reservation in airbnb",
+    "cancel reservation in airbnb",
+    "cancel my airbnb reservation in airbnb"
+  ],
+  "description": "Cancel an Airbnb reservation by its ID. This may be irreversible and is subject to the listing cancellation policy.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "reservation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The reservation ID to cancel"
+      },
+      "reason": {
+        "description": "Optional cancellation reason",
+        "type": "string"
+      }
+    },
+    "required": [
+      "reservation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/cancel-reservation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "cancel"
+    }
+  }
+}

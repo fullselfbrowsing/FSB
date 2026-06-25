@@ -120,47 +120,58 @@ check(wrongRate === 0, `wrong-invoke ${wrongRate.toFixed(3)} === 0 (non-negotiab
 
 // ---- CGEN-04: serialized-index-size + SW cold-start budget (smoke proof) ------
 // Phase 36 Plan 04: add the MEASUREMENT MACHINERY before breadth lands (Phase 43
-// re-runs the same gate at the full ~2,523-descriptor scale). The data-layout
-// discipline this proves: params are NOT indexed/stored (schema-on-hit via the
-// slug->descriptor map), so the serialized index stays small and loadJSON+first
-// search stays fast. Serialize the SAME ms built above with INDEX_OPTIONS, then time
-// MiniSearch.loadJSON(serialized, INDEX_OPTIONS) + a first search (the cold-start
-// path: a freshly-woken SW restores the snapshot and answers one query). Generous
-// smoke gates (< 64KB, < 10ms) -- the point is that the asserts exist + the layout
-// holds, not a tight benchmark.
+// re-runs the AUTHORITATIVE full-corpus SCALE-01 cold-start gate -- size + load-time
+// -- at the full ~2,523-descriptor scale; THIS is a smoke proof, NOT that gate). The
+// data-layout discipline this proves: params are NOT indexed/stored (schema-on-hit via
+// the slug->descriptor map), so the serialized index grows LINEARLY at a FLAT
+// per-descriptor footprint and loadJSON+first search stays fast. Serialize the SAME ms
+// built above with INDEX_OPTIONS, then time MiniSearch.loadJSON(serialized,
+// INDEX_OPTIONS) + a first search (the cold-start path: a freshly-woken SW restores the
+// snapshot and answers one query).
 //
-// BUDGET WIDENED 50KB -> 64KB (Phase 38-02): the seed grew 82 -> 99 descriptors as
-// the comms/social sub-batch (chatgpt/claude/bsky/mastodon/threads, 17 ops) landed,
-// pushing the serialized index 42.6KB -> 51.8KB. This is LEGITIMATE LINEAR growth at
-// a FLAT per-descriptor footprint (~536 bytes/descriptor now vs ~532 at 37-04, an
-// equal cost), NOT a layout regression: the schema-on-hit discipline is intact --
-// storedFields are {slug, service, description, sideEffectClass, backing} only; params
-// are NEVER indexed/stored (no additionalProperties / "required":[ in the serialized
-// index).
+// THE TWO REAL COLD-START CONCERNS this smoke keeps tight (orchestrator decision, 39-04):
+//   1. LOAD-TIME (< 10ms): a freshly-woken SW must restore the snapshot + answer the
+//      first query fast. This is the real cold-start latency concern and stays TIGHT.
+//   2. PER-DESCRIPTOR FOOTPRINT FLATNESS (< 700 bytes/descriptor): the real REGRESSION
+//      signal. A params-leak (additionalProperties / nested schema bleeding into the
+//      indexed/stored fields) shows up as a SUDDEN JUMP in bytes-per-descriptor, NOT as
+//      a byte-ceiling breach. So the flatness assert -- not a tight byte ceiling -- is
+//      what catches the layout regression the byte ceiling was originally a proxy for.
 //
-// BUDGET WIDENED 64KB -> 96KB (Phase 39-02): the seed grew 106 -> 137 descriptors as
-// the food-delivery + rideshare sub-batch (doordash/ubereats/grubhub/instacart/uber/
-// lyft, 31 ops) landed, pushing the serialized index 55.6KB -> 73.6KB. STILL
-// LEGITIMATE LINEAR growth at a FLAT per-descriptor footprint (~550 bytes/descriptor
-// now vs ~536 at 38-02 -- the marginal rise is the slightly-longer payment-op
-// descriptions, genuine SEARCHABLE TEXT, NOT a layout change), NOT a regression: the
-// schema-on-hit discipline is intact -- storedFields are {slug, service, description,
-// sideEffectClass, backing} only; params remain NEVER indexed/stored (verified: no
-// additionalProperties / "required":[ in the serialized index). The 96KB ceiling keeps
-// headroom for the remaining Phase-39 commerce sub-batches (39-03..06) while still being
-// a real smoke floor -- a params-leak layout regression would blow far past it (the full
-// ~2,523-doc corpus at this flat rate is ~1.4MB, the Phase-43 scale gate's concern, NOT
-// this smoke). 39-CONTEXT requires FLAGGING this widening in the SUMMARY, which 39-02 does.
+// BYTE CEILING WIDENED 96KB -> 512KB (Phase 39-04, orchestrator decision): the 96KB
+// ceiling was sized for a tiny corpus and the SMOKE index reached 93.3KB/96KB at 39-03
+// (171 descriptors, flat ~558 bytes/descriptor -- legitimate LINEAR corpus growth, NO
+// layout/params-leak regression: storedFields are {slug, service, description,
+// sideEffectClass, backing} only; no additionalProperties / "required":[ in the
+// serialized index). The travel/transport sub-batch (39-04, +24 descriptors) pushes it
+// past 96KB at the SAME flat footprint, so the byte ceiling is widened to 512KB -- well
+// within the SCALE-01 full-corpus target of ~1-2MB (the full ~2,523-doc corpus at this
+// flat ~558 bytes/doc is ~1.4MB, the Phase-43 gate's concern). The byte ceiling is now a
+// generous OUTER backstop; the LOAD-TIME assert + the PER-DESCRIPTOR FLATNESS assert
+// below are the real cold-start gates (a params-leak regression trips the flatness assert
+// long before 512KB). 39-CONTEXT requires FLAGGING this widening in the SUMMARY, which
+// 39-04 does; the authoritative full-corpus SCALE-01 cold-start gate (size + load-time)
+// is Phase 43, kept separate.
 const { performance } = require('perf_hooks');
 const smokeSerialized = JSON.stringify(ms.toJSON()); // toJSON() returns an object; loadJSON wants a JSON string
-check(smokeSerialized.length < 96 * 1024,
-  `smoke index serialized < 96KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors; flat ~550 bytes/descriptor -- params schema-on-hit, NOT indexed)`);
+const smokeBytesPerDescriptor = smokeSerialized.length / SEED_DESCRIPTORS.length;
+check(smokeSerialized.length < 512 * 1024,
+  `smoke index serialized < 512KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors; flat ${smokeBytesPerDescriptor.toFixed(0)} bytes/descriptor -- params schema-on-hit, NOT indexed; generous OUTER backstop, the Phase-43 SCALE-01 full-corpus gate is separate)`);
+// PER-DESCRIPTOR FOOTPRINT FLATNESS (the real params-leak regression signal): the
+// serialized index must stay ~flat per descriptor (the schema-on-hit layout). A sudden
+// jump means params/additionalProperties leaked into the indexed/stored fields. The
+// observed footprint has held ~532 (37-04) -> ~536 (38-02) -> ~550 (39-02) -> ~558
+// (39-03) bytes/descriptor across every prior batch; 700 is a generous flatness ceiling
+// that a real params leak (which multiplies the per-descriptor bytes) would blow past
+// while legitimate searchable-text growth stays well under.
+check(smokeBytesPerDescriptor < 700,
+  `smoke per-descriptor footprint FLAT < 700 bytes/descriptor (got ${smokeBytesPerDescriptor.toFixed(0)} -- the real params-leak regression signal; a sudden jump = params leaked into the index, NOT linear corpus growth)`);
 const _t0 = performance.now();
 const smokeRestored = MiniSearch.loadJSON(smokeSerialized, INDEX_OPTIONS); // SAME options -- mandatory
 smokeRestored.search('create a task'); // first search on the cold-restored index
 const smokeElapsedMs = performance.now() - _t0;
 check(smokeElapsedMs < 10,
-  `smoke loadJSON(serialized, INDEX_OPTIONS) + first search < 10ms (got ${smokeElapsedMs.toFixed(2)}ms)`);
+  `smoke loadJSON(serialized, INDEX_OPTIONS) + first search < 10ms (got ${smokeElapsedMs.toFixed(2)}ms) -- the real cold-start latency concern, kept TIGHT`);
 
 // ---- SURF-04: toJSON -> loadJSON(json, INDEX_OPTIONS) round-trip -------------
 const sampleQuery = 'message my team on slack';

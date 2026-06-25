@@ -1,5 +1,75 @@
 [
   {
+    "slug": "airbnb.book_stay",
+    "service": "www.airbnb.com",
+    "intentSynonyms": [
+      "book a stay in airbnb",
+      "book stay in airbnb",
+      "book a stay on airbnb in airbnb"
+    ],
+    "description": "Book a paid Airbnb stay: reserve a listing for the chosen dates and guests. This charges your saved payment method and confirms the reservation -- a real money-moving action.",
+    "actionVerb": "book",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "airbnb.cancel_reservation",
+    "service": "www.airbnb.com",
+    "intentSynonyms": [
+      "cancel a reservation in airbnb",
+      "cancel reservation in airbnb",
+      "cancel my airbnb reservation in airbnb"
+    ],
+    "description": "Cancel an Airbnb reservation by its ID. This may be irreversible and is subject to the listing cancellation policy.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "airbnb.get_listing",
+    "service": "www.airbnb.com",
+    "intentSynonyms": [
+      "get a listing in airbnb",
+      "look up a listing in airbnb",
+      "fetch a single listing in airbnb",
+      "view one specific listing in airbnb",
+      "get listing in airbnb",
+      "look up an airbnb listing in airbnb"
+    ],
+    "description": "Get the full details, amenities, and availability of a single Airbnb listing by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "airbnb.list_trips",
+    "service": "www.airbnb.com",
+    "intentSynonyms": [
+      "list trips in airbnb",
+      "show me my trips in airbnb",
+      "view my trips in airbnb",
+      "see all my trips in airbnb",
+      "show me my airbnb trips in airbnb"
+    ],
+    "description": "List your Airbnb trips (booked reservations). Optionally filter by status (upcoming, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "airbnb.search_listings",
+    "service": "www.airbnb.com",
+    "intentSynonyms": [
+      "search listings in airbnb",
+      "search listings on airbnb in airbnb",
+      "search airbnb for listings (homes, rooms, experiences) in a destination for a set of dates and number of guests in airbnb"
+    ],
+    "description": "Search Airbnb for listings (homes, rooms, experiences) in a destination for a set of dates and number of guests. Returns matching listings with nightly prices.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "airtable.create_record",
     "service": "airtable.com",
     "intentSynonyms": [
@@ -355,6 +425,76 @@
     "backing": "dom"
   },
   {
+    "slug": "booking.cancel_booking",
+    "service": "www.booking.com",
+    "intentSynonyms": [
+      "cancel a booking in booking",
+      "cancel booking in booking",
+      "cancel my booking reservation in booking"
+    ],
+    "description": "Cancel a Booking.com reservation by its ID. This may be irreversible and may incur a cancellation fee depending on the rate.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "booking.complete_booking",
+    "service": "www.booking.com",
+    "intentSynonyms": [
+      "complete a booking in booking",
+      "complete booking in booking",
+      "complete my booking reservation in booking"
+    ],
+    "description": "Complete a paid Booking.com reservation: confirm a selected property and room for the chosen dates and guests. This charges your saved payment method and books the stay -- a real money-moving action.",
+    "actionVerb": "complete",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "booking.get_property",
+    "service": "www.booking.com",
+    "intentSynonyms": [
+      "get a property in booking",
+      "look up a property in booking",
+      "fetch a single property in booking",
+      "view one specific property in booking",
+      "get property in booking",
+      "look up a booking property in booking"
+    ],
+    "description": "Get the full details, room options, and availability of a single Booking.com property by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "booking.list_bookings",
+    "service": "www.booking.com",
+    "intentSynonyms": [
+      "list bookings in booking",
+      "show me my bookings in booking",
+      "view my bookings in booking",
+      "see all my bookings in booking",
+      "show me my booking reservations in booking"
+    ],
+    "description": "List your Booking.com reservations. Optionally filter by status (upcoming, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "booking.search_stays",
+    "service": "www.booking.com",
+    "intentSynonyms": [
+      "search stays in booking",
+      "search stays on booking in booking",
+      "search booking in booking"
+    ],
+    "description": "Search Booking.com for places to stay (hotels, apartments, homes) in a destination for a set of dates and number of guests. Returns matching properties with prices.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "bsky.create_post",
     "service": "bsky.app",
     "intentSynonyms": [
@@ -543,9 +683,9 @@
     "intentSynonyms": [
       "trigger a pipeline in circleci",
       "trigger pipeline in circleci",
-      "trigger a new pipeline in circleci"
+      "start a new pipeline run on circleci in circleci"
     ],
-    "description": "Trigger a new pipeline run for a CircleCI project on a given branch or tag. Optionally pass pipeline parameters.",
+    "description": "Start and run a new CircleCI pipeline for a project on a given branch or tag -- kick off a fresh pipeline build. Optionally pass pipeline parameters.",
     "actionVerb": "trigger",
     "sideEffectClass": "write",
     "backing": "dom"
@@ -1222,6 +1362,73 @@
     "backing": "dom"
   },
   {
+    "slug": "expedia.book_flight",
+    "service": "www.expedia.com",
+    "intentSynonyms": [
+      "book a flight in expedia",
+      "book flight in expedia",
+      "book a flight on expedia in expedia"
+    ],
+    "description": "Book a paid Expedia flight: confirm a selected flight itinerary for the given passengers. This charges your saved payment method and tickets the flight -- a real money-moving action.",
+    "actionVerb": "book",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "expedia.book_hotel",
+    "service": "www.expedia.com",
+    "intentSynonyms": [
+      "book a hotel in expedia",
+      "book hotel in expedia",
+      "book a hotel on expedia in expedia"
+    ],
+    "description": "Book a paid Expedia hotel: confirm a selected hotel and room for the chosen dates and guests. This charges your saved payment method and reserves the room -- a real money-moving action.",
+    "actionVerb": "book",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "expedia.list_trips",
+    "service": "www.expedia.com",
+    "intentSynonyms": [
+      "list trips in expedia",
+      "show me my trips in expedia",
+      "view my trips in expedia",
+      "see all my trips in expedia",
+      "show me my expedia trips in expedia"
+    ],
+    "description": "List your Expedia trips (booked flights and hotels). Optionally filter by status (upcoming, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "expedia.search_flights",
+    "service": "www.expedia.com",
+    "intentSynonyms": [
+      "search flights in expedia",
+      "search flights on expedia in expedia",
+      "search expedia for flights between an origin and destination on given dates in expedia"
+    ],
+    "description": "Search Expedia for flights between an origin and destination on given dates. Returns matching flight itineraries with fares.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "expedia.search_hotels",
+    "service": "www.expedia.com",
+    "intentSynonyms": [
+      "search hotels in expedia",
+      "search hotels on expedia in expedia",
+      "search expedia for hotels in a destination for a set of dates and number of guests in expedia"
+    ],
+    "description": "Search Expedia for hotels in a destination for a set of dates and number of guests. Returns matching hotels with nightly prices.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "github.create-issue",
     "service": "github.com",
     "intentSynonyms": [
@@ -1527,6 +1734,64 @@
     "backing": "dom"
   },
   {
+    "slug": "kayak.create_price_alert",
+    "service": "www.kayak.com",
+    "intentSynonyms": [
+      "create a price alert in kayak",
+      "add a price alert in kayak",
+      "make a new price alert in kayak",
+      "open a new price alert in kayak",
+      "create price alert in kayak",
+      "create a price alert on kayak in kayak"
+    ],
+    "description": "Create a KAYAK price alert: track the price of a flight or hotel route and get notified when it changes. This stages a price-watch only -- it does NOT book anything or charge a card.",
+    "actionVerb": "create",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "kayak.get_price_alert",
+    "service": "www.kayak.com",
+    "intentSynonyms": [
+      "get a price alert in kayak",
+      "look up a price alert in kayak",
+      "fetch a single price alert in kayak",
+      "view one specific price alert in kayak",
+      "get price alert in kayak",
+      "look up a kayak price alert in kayak"
+    ],
+    "description": "Get the details and latest tracked price of a single saved KAYAK price alert by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "kayak.search_flights",
+    "service": "www.kayak.com",
+    "intentSynonyms": [
+      "search flights in kayak",
+      "find flights on kayak in kayak",
+      "search kayak across providers for flights between an origin and destination on given dates in kayak"
+    ],
+    "description": "Search KAYAK across providers for flights between an origin and destination on given dates. Returns matching fares from multiple airlines and agencies.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "kayak.search_hotels",
+    "service": "www.kayak.com",
+    "intentSynonyms": [
+      "search hotels in kayak",
+      "find hotels on kayak in kayak",
+      "search kayak across providers for hotels in a destination for a set of dates and number of guests in kayak"
+    ],
+    "description": "Search KAYAK across providers for hotels in a destination for a set of dates and number of guests. Returns matching nightly prices from multiple agencies.",
+    "actionVerb": "search",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "linear.create_comment",
     "service": "linear.app",
     "intentSynonyms": [
@@ -1798,6 +2063,76 @@
     ],
     "description": "List sites in a Netlify account or team. Optionally filter by name or owning team slug.",
     "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "opentable.cancel_reservation",
+    "service": "www.opentable.com",
+    "intentSynonyms": [
+      "cancel a reservation in opentable",
+      "cancel reservation in opentable",
+      "cancel my opentable reservation in opentable"
+    ],
+    "description": "Cancel an OpenTable reservation by its ID. A late cancellation may incur a charge per the restaurant policy.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "opentable.get_restaurant",
+    "service": "www.opentable.com",
+    "intentSynonyms": [
+      "get a restaurant in opentable",
+      "look up a restaurant in opentable",
+      "fetch a single restaurant in opentable",
+      "view one specific restaurant in opentable",
+      "get restaurant in opentable",
+      "look up an opentable restaurant in opentable"
+    ],
+    "description": "Get the details, menu, and available time slots of a single OpenTable restaurant by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "opentable.list_reservations",
+    "service": "www.opentable.com",
+    "intentSynonyms": [
+      "list reservations in opentable",
+      "show me my reservations in opentable",
+      "view my reservations in opentable",
+      "see all my reservations in opentable",
+      "show me my opentable reservations in opentable"
+    ],
+    "description": "List your OpenTable reservations. Optionally filter by status (upcoming, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "opentable.reserve_table",
+    "service": "www.opentable.com",
+    "intentSynonyms": [
+      "reserve a table in opentable",
+      "reserve table in opentable",
+      "reserve a table on opentable in opentable"
+    ],
+    "description": "Reserve a table at an OpenTable restaurant for a date, time, and party size. This holds your card against the reservation (a no-show or late cancellation may be charged) -- a money-adjacent action.",
+    "actionVerb": "reserve",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "opentable.search_restaurants",
+    "service": "www.opentable.com",
+    "intentSynonyms": [
+      "search restaurants in opentable",
+      "search restaurants on opentable in opentable",
+      "search opentable for restaurants with availability in a location for a date, time, and party size in opentable"
+    ],
+    "description": "Search OpenTable for restaurants with availability in a location for a date, time, and party size. Returns matching restaurants with open time slots.",
+    "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
   },

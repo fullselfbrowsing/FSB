@@ -1,0 +1,58 @@
+{
+  "slug": "booking.search_stays",
+  "service": "www.booking.com",
+  "intentSynonyms": [
+    "search stays in booking",
+    "search stays on booking in booking",
+    "search booking in booking"
+  ],
+  "description": "Search Booking.com for places to stay (hotels, apartments, homes) in a destination for a set of dates and number of guests. Returns matching properties with prices.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "destination": {
+        "type": "string",
+        "minLength": 1,
+        "description": "City, region, or property name to search"
+      },
+      "check_in": {
+        "description": "Check-in date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "check_out": {
+        "description": "Check-out date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "guests": {
+        "description": "Number of guests",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "rooms": {
+        "description": "Number of rooms",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "destination"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/search-stays.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}
