@@ -1,0 +1,24 @@
+{
+  "slug": "reddit.submit_post",
+  "service": "reddit.com",
+  "description": "Submit a new post to a subreddit (MED-02 read-only-safe-origin gate fixture: a HYPOTHETICAL write op under reddit.com, the origin classified SAFE only because the vendored slice was read-only).",
+  "actionVerb": "submit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "provenance": {
+    "source": "opentabs",
+    "sha": "0000000000000000000000000000000000000000",
+    "sourcePath": "plugins/reddit/src/tools/submit-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiPost",
+      "httpMethod": "POST",
+      "opNameVerb": "submit"
+    }
+  },
+  "_fixture": "MED-02 (38-REVIEW): a hypothetical reddit WRITE descriptor. reddit.com is classified SAFE (absent from service-denylist.json sensitiveOrigins) ONLY because the vendored reddit slice exposes read ops alone. checkReadOnlySafeOrigins() in verify-catalog-crosscheck.mjs MUST flag this descriptor (service reddit.com + sideEffectClass write) so a future re-vendor that adds a reddit write FAILS the build (forcing a re-classification to sensitive) rather than shipping it writable-under-Auto. _fixtures/ is excluded by readJsonDir non-recursion so it never ships and never reaches the CLI corpus sweep."
+}

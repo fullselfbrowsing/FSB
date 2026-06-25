@@ -44,6 +44,7 @@
  */
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -166,6 +167,51 @@ async function main() {
     descriptor('github.getCurrentUser', 'read', { transportHelper: 'graphql', httpMethod: 'POST', opNameVerb: 'get' }),
   ]);
   check(Array.isArray(gRead.failures) && gRead.failures.length === 0, '(g) getCurrentUser (camelCase read verb, graphql) declared read PASSES (no false-fail)');
+
+  // ---- (h) MED-02: the read-only-safe-origin invariant ----------------------
+  // reddit.com is classified SAFE only because the vendored slice is read-only. The
+  // new checkReadOnlySafeOrigins gate makes that a checked invariant: a non-read op
+  // under reddit.com FAILS the build (forcing a re-classification to sensitive) so a
+  // future re-vendor that adds a reddit write cannot ship writable-under-Auto silently.
+  check(typeof gate.checkReadOnlySafeOrigins === 'function',
+    '(h) checkReadOnlySafeOrigins is a named export of the real gate (MED-02 safe-origin invariant)');
+
+  // The fixture: a HYPOTHETICAL reddit write descriptor (service reddit.com,
+  // sideEffectClass write). Loaded from disk so the proof is the real gate over the
+  // real fixture shape, not a fabricated inline object.
+  const SAFE_WRITE_FIXTURE = path.join(ROOT, 'catalog', 'descriptors', '_fixtures', 'safe-origin-write.fixture.json');
+  check(fs.existsSync(SAFE_WRITE_FIXTURE), '(h) the safe-origin-write fixture exists on disk (a hypothetical reddit write)');
+  const safeWriteFixture = JSON.parse(fs.readFileSync(SAFE_WRITE_FIXTURE, 'utf8'));
+  check(safeWriteFixture.service === 'reddit.com' && safeWriteFixture.sideEffectClass === 'write',
+    '(h) the fixture is service reddit.com + sideEffectClass write (a read-only-safe origin gaining a write)');
+  const hFail = gate.checkReadOnlySafeOrigins([safeWriteFixture]);
+  check(Array.isArray(hFail.failures) && hFail.failures.length === 1,
+    '(h) checkReadOnlySafeOrigins([reddit write]) yields exactly one failure -> the build ABORTS (the safe-because-read-only assumption, enforced)');
+  check(hFail.failures.length > 0 && hFail.failures[0].indexOf('reddit.submit_post') !== -1 && /reddit\.com/.test(hFail.failures[0]),
+    '(h) the failure NAMES the offending slug reddit.submit_post and its service reddit.com');
+
+  // A destructive op under the safe origin is ALSO caught (not only write).
+  const hDestructive = gate.checkReadOnlySafeOrigins([
+    { slug: 'reddit.delete_post', service: 'reddit.com', sideEffectClass: 'destructive' },
+  ]);
+  check(Array.isArray(hDestructive.failures) && hDestructive.failures.length === 1,
+    '(h) a destructive op under reddit.com is ALSO flagged (write AND destructive trip the invariant)');
+
+  // (i) NO FALSE-FAIL: the REAL emitted reddit READ descriptors PASS (they ARE
+  // read-only, the genuine current state). Loaded from disk -- the actual shipped ops.
+  const redditReads = ['opentabs__reddit__get_post.json', 'opentabs__reddit__list_subreddit_posts.json', 'opentabs__reddit__search_posts.json'];
+  const redditReadDescriptors = redditReads.map((n) => JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'descriptors', n), 'utf8')));
+  const iPass = gate.checkReadOnlySafeOrigins(redditReadDescriptors);
+  check(Array.isArray(iPass.failures) && iPass.failures.length === 0,
+    '(i) the 3 REAL emitted reddit READ descriptors PASS checkReadOnlySafeOrigins (no false-fail -- reddit is genuinely read-only today)');
+
+  // (j) a descriptor for an origin NOT in the read-only-safe set is ignored by this
+  // invariant (a discord write is governed by classification/crosscheck, not here).
+  const jIgnored = gate.checkReadOnlySafeOrigins([
+    { slug: 'discord.send_message', service: 'discord.com', sideEffectClass: 'write' },
+  ]);
+  check(Array.isArray(jIgnored.failures) && jIgnored.failures.length === 0,
+    '(j) a write under a NON-read-only-safe origin (discord.com, sensitive) is NOT flagged by this invariant (scoped to the curated safe set)');
 
   // ---- report ---------------------------------------------------------------
   if (failed > 0) {

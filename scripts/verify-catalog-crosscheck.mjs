@@ -143,6 +143,62 @@ export function crossCheck(descriptors) {
   return { failures };
 }
 
+// ---- MED-02 (38-REVIEW): the "safe-because-read-only" INVARIANT --------------
+// Several social/content origins are deliberately classified SAFE (absent from
+// service-denylist.json sensitiveOrigins) ONLY because the vendored slice happens to
+// expose read ops alone -- reddit is the canonical case (get_post / list_subreddit_
+// posts / search_posts, all GET reads). That safety is coupled to the CONTENT of the
+// vendored snapshot, not enforced anywhere: a future re-vendor that adds a reddit
+// write op (submit_post / reply / vote / send_message) would emit it under
+// service:reddit.com, which classifies NOT sensitive (writes run under Auto with no
+// mutating re-gate) AND is NOT caught by the classification heuristic (reddit is in no
+// axis, and post/submit are not -- and deliberately must not be -- axis tokens). So a
+// reddit write would ship writable-under-Auto silently (threat parallel to MED-01 but
+// for the intentionally-safe origin).
+//
+// This gate turns the "reddit is read-only" assumption into a CHECKED INVARIANT: every
+// emitted descriptor whose `service` is in READ_ONLY_SAFE_SERVICES MUST be
+// sideEffectClass 'read'. A re-vendored write/destructive op for one of these services
+// FAILS THE BUILD, forcing an explicit re-classification decision (add the origin to
+// sensitiveOrigins so its writes are posture-B gated) rather than shipping it
+// writable-under-Auto. The set is intentionally SMALL + curated: an origin earns a
+// place here ONLY when it is left safe SPECIFICALLY because it is content-read-only.
+const READ_ONLY_SAFE_SERVICES = new Set(['reddit.com', 'www.reddit.com']);
+
+/**
+ * checkReadOnlySafeOrigins(descriptors) -> { failures: string[] }
+ *
+ * For each emitted descriptor whose `service` is in READ_ONLY_SAFE_SERVICES, assert
+ * sideEffectClass === 'read'. Any write/destructive (or missing/other) class is a
+ * failure naming the slug + service + class -- the "safe is correct only while
+ * read-only" assumption, enforced. Operates on the DECLARED sideEffectClass over the
+ * committed corpus (the field crosscheck already proves is not understated), so a
+ * re-vendor adding a reddit write trips it regardless of signal shape.
+ */
+export function checkReadOnlySafeOrigins(descriptors) {
+  const failures = [];
+  const list = Array.isArray(descriptors) ? descriptors : [];
+  for (const d of list) {
+    if (!d || typeof d !== 'object') continue;
+    const service = typeof d.service === 'string' ? d.service.toLowerCase() : '';
+    if (!READ_ONLY_SAFE_SERVICES.has(service)) continue;
+    const slug = d.slug || '(unknown-slug)';
+    const cls = d.sideEffectClass;
+    if (cls !== 'read') {
+      failures.push(
+        slug + ' (service ' + service + ') has sideEffectClass "' + String(cls) +
+        '" but ' + service + ' is in the READ_ONLY_SAFE set -- it is classified SAFE ' +
+        '(reads run under Auto, NO mutating re-gate) ONLY because it was read-only. A ' +
+        'non-read op for this origin would ship writable-under-Auto silently. Either ' +
+        'classify ' + service + ' sensitive in extension/config/service-denylist.json ' +
+        '(so its writes are posture-B gated) and remove it from READ_ONLY_SAFE_SERVICES, ' +
+        'or do not emit this write op.'
+      );
+    }
+  }
+  return { failures };
+}
+
 // ---- Build the CLI corpus from the committed descriptor set -------------------
 // Read catalog/descriptors/*.json TOP-LEVEL ONLY (mirroring readJsonDir's
 // non-recursion; do NOT descend into _fixtures/, so seed/proof fixtures are
@@ -179,9 +235,14 @@ function runCli() {
     (d) => d && d.provenance && d.provenance.signals && typeof d.sideEffectClass === 'string'
   );
   const { failures } = crossCheck(checked);
-  if (failures.length > 0) {
-    console.error('verify-catalog-crosscheck: FAIL (a descriptor UNDER-states its side-effect class -- fail-safe-high)');
-    for (const f of failures) {
+  // MED-02: the read-only-safe-origin invariant runs over the WHOLE corpus (not just
+  // the signal-bearing subset) -- a re-vendored reddit write is caught by its declared
+  // class regardless of signal shape. Merge its failures into the same fail set.
+  const safeOnly = checkReadOnlySafeOrigins(corpus);
+  const allFailures = failures.concat(safeOnly.failures);
+  if (allFailures.length > 0) {
+    console.error('verify-catalog-crosscheck: FAIL (an under-stated side-effect class, or a non-read op on a read-only-safe origin)');
+    for (const f of allFailures) {
       console.error('  - ' + f);
     }
     process.exit(1);
@@ -189,7 +250,8 @@ function runCli() {
   console.log(
     'verify-catalog-crosscheck: PASS (' + checked.length +
     ' descriptors with signals; every declared sideEffectClass >= its derived ' +
-    'fail-safe-high class -- no under-stated destructive/mutating op)'
+    'fail-safe-high class -- no under-stated destructive/mutating op; and every ' +
+    'read-only-safe origin (reddit) emits read-only ops, MED-02)'
   );
   process.exit(0);
 }
