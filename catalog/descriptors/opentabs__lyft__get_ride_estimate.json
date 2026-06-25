@@ -1,0 +1,53 @@
+{
+  "slug": "lyft.get_ride_estimate",
+  "service": "lyft.com",
+  "intentSynonyms": [
+    "get a ride estimate in lyft",
+    "look up a ride estimate in lyft",
+    "fetch a single ride estimate in lyft",
+    "view one specific ride estimate in lyft",
+    "get ride estimate in lyft",
+    "estimate a lyft fare in lyft"
+  ],
+  "description": "Get the fare and ETA estimate for a single Lyft ride type between a pickup and dropoff.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pickup": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Pickup location or address"
+      },
+      "dropoff": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dropoff location or address"
+      },
+      "ride_type_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The ride type to estimate"
+      }
+    },
+    "required": [
+      "pickup",
+      "dropoff",
+      "ride_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lyft/src/tools/get-ride-estimate.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -260,7 +260,7 @@
       "list timeline in bsky",
       "show me my bluesky timeline in bsky"
     ],
-    "description": "List recent posts from your Bluesky home timeline. Optionally page through with a cursor.",
+    "description": "List recent posts from your Bluesky home timeline -- read your home feed of posts. Optionally page through with a cursor.",
     "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -759,6 +759,91 @@
     "sideEffectClass": "mutate"
   },
   {
+    "slug": "doordash.cancel_order",
+    "service": "www.doordash.com",
+    "intentSynonyms": [
+      "cancel an order in doordash",
+      "cancel order in doordash",
+      "cancel my doordash order in doordash"
+    ],
+    "description": "Cancel an in-progress DoorDash order by its ID. This may be irreversible once the restaurant has accepted it.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "doordash.get_restaurant",
+    "service": "www.doordash.com",
+    "intentSynonyms": [
+      "get a restaurant in doordash",
+      "look up a restaurant in doordash",
+      "fetch a single restaurant in doordash",
+      "view one specific restaurant in doordash",
+      "get restaurant in doordash",
+      "look up a doordash restaurant menu in doordash"
+    ],
+    "description": "Get the details and menu of a single DoorDash restaurant by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "doordash.list_orders",
+    "service": "www.doordash.com",
+    "intentSynonyms": [
+      "list orders in doordash",
+      "show me my orders in doordash",
+      "view my orders in doordash",
+      "see all my orders in doordash",
+      "show me my doordash order history in doordash"
+    ],
+    "description": "List your recent DoorDash orders. Optionally filter by status (active, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "doordash.list_restaurants",
+    "service": "www.doordash.com",
+    "intentSynonyms": [
+      "list restaurants in doordash",
+      "show me my restaurants in doordash",
+      "view my restaurants in doordash",
+      "see all my restaurants in doordash",
+      "show me restaurants on doordash in doordash"
+    ],
+    "description": "List or search DoorDash restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "doordash.place_order",
+    "service": "www.doordash.com",
+    "intentSynonyms": [
+      "place an order in doordash",
+      "place order in doordash",
+      "order food on doordash in doordash"
+    ],
+    "description": "Place a paid DoorDash order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "doordash.track_order",
+    "service": "www.doordash.com",
+    "intentSynonyms": [
+      "track an order in doordash",
+      "track order in doordash",
+      "track my doordash order in doordash"
+    ],
+    "description": "Track the live delivery status and ETA of a single DoorDash order by its ID.",
+    "actionVerb": "track",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "dropbox.delete-file",
     "service": "dropbox.com",
     "intentSynonyms": [
@@ -873,6 +958,147 @@
     ],
     "description": "List issues in a GitLab project. Optionally filter by state, labels, assignee, or milestone.",
     "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "grubhub.cancel_order",
+    "service": "www.grubhub.com",
+    "intentSynonyms": [
+      "cancel an order in grubhub",
+      "cancel order in grubhub",
+      "cancel my grubhub order in grubhub"
+    ],
+    "description": "Cancel an in-progress Grubhub order by its ID. This may be irreversible once the restaurant has accepted it.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "grubhub.get_restaurant",
+    "service": "www.grubhub.com",
+    "intentSynonyms": [
+      "get a restaurant in grubhub",
+      "look up a restaurant in grubhub",
+      "fetch a single restaurant in grubhub",
+      "view one specific restaurant in grubhub",
+      "get restaurant in grubhub",
+      "look up a grubhub restaurant menu in grubhub"
+    ],
+    "description": "Get the details and menu of a single Grubhub restaurant by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "grubhub.list_orders",
+    "service": "www.grubhub.com",
+    "intentSynonyms": [
+      "list orders in grubhub",
+      "show me my orders in grubhub",
+      "view my orders in grubhub",
+      "see all my orders in grubhub",
+      "show me my grubhub order history in grubhub"
+    ],
+    "description": "List your recent Grubhub orders. Optionally filter by status (active, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "grubhub.list_restaurants",
+    "service": "www.grubhub.com",
+    "intentSynonyms": [
+      "list restaurants in grubhub",
+      "show me my restaurants in grubhub",
+      "view my restaurants in grubhub",
+      "see all my restaurants in grubhub",
+      "show me restaurants on grubhub in grubhub"
+    ],
+    "description": "List or search Grubhub restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "grubhub.place_order",
+    "service": "www.grubhub.com",
+    "intentSynonyms": [
+      "place an order in grubhub",
+      "place order in grubhub",
+      "order food on grubhub in grubhub"
+    ],
+    "description": "Place a paid Grubhub order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "instacart.cancel_order",
+    "service": "www.instacart.com",
+    "intentSynonyms": [
+      "cancel an order in instacart",
+      "cancel order in instacart",
+      "cancel my instacart order in instacart"
+    ],
+    "description": "Cancel an in-progress Instacart order by its ID. This may be irreversible once the shopper has started.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "instacart.checkout",
+    "service": "www.instacart.com",
+    "intentSynonyms": [
+      "checkout in instacart",
+      "checkout my instacart cart in instacart",
+      "check out a paid instacart cart in instacart"
+    ],
+    "description": "Check out a paid Instacart cart: submit the cart of grocery items from a store to a delivery address. This charges your saved payment method and places the order -- a real money-moving action.",
+    "actionVerb": "checkout",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "instacart.list_orders",
+    "service": "www.instacart.com",
+    "intentSynonyms": [
+      "list orders in instacart",
+      "show me my orders in instacart",
+      "view my orders in instacart",
+      "see all my orders in instacart",
+      "show me my instacart order history in instacart"
+    ],
+    "description": "List your recent Instacart orders. Optionally filter by status (active, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "instacart.list_stores",
+    "service": "www.instacart.com",
+    "intentSynonyms": [
+      "list stores in instacart",
+      "show me my stores in instacart",
+      "view my stores in instacart",
+      "see all my stores in instacart",
+      "show me grocery stores on instacart in instacart"
+    ],
+    "description": "List Instacart grocery stores available for delivery to an address. Optionally filter by a search term (store or retailer name).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "instacart.search_products",
+    "service": "www.instacart.com",
+    "intentSynonyms": [
+      "search products in instacart",
+      "search for groceries on instacart in instacart",
+      "search the products available in a single instacart store by a query term in instacart"
+    ],
+    "description": "Search the products available in a single Instacart store by a query term.",
+    "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
   },
@@ -1025,6 +1251,78 @@
     ],
     "description": "Update an existing Linear issue. Provide the issue ID and any fields to change.",
     "actionVerb": "update",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "lyft.cancel_ride",
+    "service": "lyft.com",
+    "intentSynonyms": [
+      "cancel a ride in lyft",
+      "cancel ride in lyft",
+      "cancel my lyft ride in lyft"
+    ],
+    "description": "Cancel an in-progress Lyft ride by its ride ID. A cancellation fee may apply once a driver is en route.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "lyft.get_ride_estimate",
+    "service": "lyft.com",
+    "intentSynonyms": [
+      "get a ride estimate in lyft",
+      "look up a ride estimate in lyft",
+      "fetch a single ride estimate in lyft",
+      "view one specific ride estimate in lyft",
+      "get ride estimate in lyft",
+      "estimate a lyft fare in lyft"
+    ],
+    "description": "Get the fare and ETA estimate for a single Lyft ride type between a pickup and dropoff.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "lyft.list_ride_types",
+    "service": "lyft.com",
+    "intentSynonyms": [
+      "list ride types in lyft",
+      "show me my ride types in lyft",
+      "view my ride types in lyft",
+      "see all my ride types in lyft",
+      "show me lyft ride types in lyft"
+    ],
+    "description": "List the available Lyft ride types (Lyft, XL, Lux, Lux Black, ...) for a pickup and dropoff location.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "lyft.list_rides",
+    "service": "lyft.com",
+    "intentSynonyms": [
+      "list rides in lyft",
+      "show me my rides in lyft",
+      "view my rides in lyft",
+      "see all my rides in lyft",
+      "show me my lyft ride history in lyft"
+    ],
+    "description": "List your recent Lyft rides. Optionally filter by status (active, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "lyft.request_ride",
+    "service": "lyft.com",
+    "intentSynonyms": [
+      "request a ride in lyft",
+      "request ride in lyft",
+      "request a lyft ride in lyft"
+    ],
+    "description": "Request a paid Lyft ride: book a selected ride type from a pickup to a dropoff. This charges your saved payment method and dispatches a driver -- a real money-moving action.",
+    "actionVerb": "request",
     "sideEffectClass": "write",
     "backing": "dom"
   },
@@ -1542,6 +1840,150 @@
     "description": "Publish a tweet to your timeline",
     "actionVerb": "post",
     "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "uber.cancel_ride",
+    "service": "uber.com",
+    "intentSynonyms": [
+      "cancel a ride in uber",
+      "cancel ride in uber",
+      "cancel my uber ride in uber"
+    ],
+    "description": "Cancel an in-progress Uber ride by its trip ID. A cancellation fee may apply once a driver is en route.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "uber.get_ride_estimate",
+    "service": "uber.com",
+    "intentSynonyms": [
+      "get a ride estimate in uber",
+      "look up a ride estimate in uber",
+      "fetch a single ride estimate in uber",
+      "view one specific ride estimate in uber",
+      "get ride estimate in uber",
+      "estimate an uber fare in uber"
+    ],
+    "description": "Get the fare and ETA estimate for a single Uber ride option between a pickup and dropoff.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "uber.list_ride_options",
+    "service": "uber.com",
+    "intentSynonyms": [
+      "list ride options in uber",
+      "show me my ride options in uber",
+      "view my ride options in uber",
+      "see all my ride options in uber",
+      "show me uber ride options in uber"
+    ],
+    "description": "List the available Uber ride options (UberX, Comfort, XL, Black, ...) for a pickup and dropoff location.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "uber.list_trips",
+    "service": "uber.com",
+    "intentSynonyms": [
+      "list trips in uber",
+      "show me my trips in uber",
+      "view my trips in uber",
+      "see all my trips in uber",
+      "show me my uber trip history in uber"
+    ],
+    "description": "List your recent Uber trips. Optionally filter by status (active, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "uber.request_ride",
+    "service": "uber.com",
+    "intentSynonyms": [
+      "request a ride in uber",
+      "request ride in uber",
+      "request an uber ride in uber"
+    ],
+    "description": "Request a paid Uber ride: book a selected ride option from a pickup to a dropoff. This charges your saved payment method and dispatches a driver -- a real money-moving action.",
+    "actionVerb": "request",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "ubereats.cancel_order",
+    "service": "www.ubereats.com",
+    "intentSynonyms": [
+      "cancel an order in ubereats",
+      "cancel order in ubereats",
+      "cancel my ubereats order in ubereats"
+    ],
+    "description": "Cancel an in-progress Uber Eats order by its ID. This may be irreversible once the restaurant has accepted it.",
+    "actionVerb": "cancel",
+    "sideEffectClass": "destructive",
+    "backing": "dom"
+  },
+  {
+    "slug": "ubereats.get_menu",
+    "service": "www.ubereats.com",
+    "intentSynonyms": [
+      "get a menu in ubereats",
+      "look up a menu in ubereats",
+      "fetch a single menu in ubereats",
+      "view one specific menu in ubereats",
+      "get menu in ubereats",
+      "look up an ubereats restaurant menu in ubereats"
+    ],
+    "description": "Get the full menu of a single Uber Eats restaurant by its ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ubereats.list_orders",
+    "service": "www.ubereats.com",
+    "intentSynonyms": [
+      "list orders in ubereats",
+      "show me my orders in ubereats",
+      "view my orders in ubereats",
+      "see all my orders in ubereats",
+      "show me my ubereats order history in ubereats"
+    ],
+    "description": "List your recent Uber Eats orders. Optionally filter by status (active, completed, cancelled).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ubereats.list_restaurants",
+    "service": "www.ubereats.com",
+    "intentSynonyms": [
+      "list restaurants in ubereats",
+      "show me my restaurants in ubereats",
+      "view my restaurants in ubereats",
+      "see all my restaurants in ubereats",
+      "show me restaurants on ubereats in ubereats"
+    ],
+    "description": "List or search Uber Eats restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "ubereats.place_order",
+    "service": "www.ubereats.com",
+    "intentSynonyms": [
+      "place an order in ubereats",
+      "place order in ubereats",
+      "order food on ubereats in ubereats"
+    ],
+    "description": "Place a paid Uber Eats order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+    "actionVerb": "place",
+    "sideEffectClass": "write",
+    "backing": "dom"
   },
   {
     "slug": "vercel.create_deployment",

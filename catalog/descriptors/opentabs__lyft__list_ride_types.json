@@ -1,0 +1,46 @@
+{
+  "slug": "lyft.list_ride_types",
+  "service": "lyft.com",
+  "intentSynonyms": [
+    "list ride types in lyft",
+    "show me my ride types in lyft",
+    "view my ride types in lyft",
+    "see all my ride types in lyft",
+    "show me lyft ride types in lyft"
+  ],
+  "description": "List the available Lyft ride types (Lyft, XL, Lux, Lux Black, ...) for a pickup and dropoff location.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pickup": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Pickup location or address"
+      },
+      "dropoff": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dropoff location or address"
+      }
+    },
+    "required": [
+      "pickup",
+      "dropoff"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lyft/src/tools/list-ride-types.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

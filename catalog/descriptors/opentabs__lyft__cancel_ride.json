@@ -1,0 +1,42 @@
+{
+  "slug": "lyft.cancel_ride",
+  "service": "lyft.com",
+  "intentSynonyms": [
+    "cancel a ride in lyft",
+    "cancel ride in lyft",
+    "cancel my lyft ride in lyft"
+  ],
+  "description": "Cancel an in-progress Lyft ride by its ride ID. A cancellation fee may apply once a driver is en route.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ride_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The ride ID to cancel"
+      },
+      "reason": {
+        "description": "Optional cancellation reason",
+        "type": "string"
+      }
+    },
+    "required": [
+      "ride_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lyft/src/tools/cancel-ride.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "cancel"
+    }
+  }
+}

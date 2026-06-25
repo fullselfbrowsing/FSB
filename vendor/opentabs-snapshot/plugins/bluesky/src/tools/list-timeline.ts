@@ -6,7 +6,7 @@ import { api } from '../bluesky-api.js';
 export const listTimeline = defineTool({
   name: 'list_timeline',
   displayName: 'List Timeline',
-  description: 'List recent posts from your Bluesky home timeline. Optionally page through with a cursor.',
+  description: 'List recent posts from your Bluesky home timeline -- read your home feed of posts. Optionally page through with a cursor.',
   summary: 'show me my bluesky timeline',
   icon: 'list',
   group: 'Feed',

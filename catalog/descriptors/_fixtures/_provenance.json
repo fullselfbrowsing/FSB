@@ -175,6 +175,22 @@
       ]
     },
     {
+      "app": "doordash",
+      "service": "www.doordash.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/doordash/",
+      "descriptors": [
+        "doordash.cancel_order",
+        "doordash.get_restaurant",
+        "doordash.list_orders",
+        "doordash.list_restaurants",
+        "doordash.place_order",
+        "doordash.track_order"
+      ]
+    },
+    {
       "app": "gitlab",
       "service": "gitlab.com",
       "source": "opentabs",
@@ -186,6 +202,36 @@
         "gitlab.create_merge_request",
         "gitlab.get_issue",
         "gitlab.list_issues"
+      ]
+    },
+    {
+      "app": "grubhub",
+      "service": "www.grubhub.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/grubhub/",
+      "descriptors": [
+        "grubhub.cancel_order",
+        "grubhub.get_restaurant",
+        "grubhub.list_orders",
+        "grubhub.list_restaurants",
+        "grubhub.place_order"
+      ]
+    },
+    {
+      "app": "instacart",
+      "service": "www.instacart.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/instacart/",
+      "descriptors": [
+        "instacart.cancel_order",
+        "instacart.checkout",
+        "instacart.list_orders",
+        "instacart.list_stores",
+        "instacart.search_products"
       ]
     },
     {
@@ -216,6 +262,21 @@
         "linear.get_issue",
         "linear.list_issues",
         "linear.update_issue"
+      ]
+    },
+    {
+      "app": "lyft",
+      "service": "lyft.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/lyft/",
+      "descriptors": [
+        "lyft.cancel_ride",
+        "lyft.get_ride_estimate",
+        "lyft.list_ride_types",
+        "lyft.list_rides",
+        "lyft.request_ride"
       ]
     },
     {
@@ -315,6 +376,36 @@
         "todoist.list_tasks",
         "todoist.reopen_task",
         "todoist.update_task"
+      ]
+    },
+    {
+      "app": "uber",
+      "service": "uber.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/uber/",
+      "descriptors": [
+        "uber.cancel_ride",
+        "uber.get_ride_estimate",
+        "uber.list_ride_options",
+        "uber.list_trips",
+        "uber.request_ride"
+      ]
+    },
+    {
+      "app": "ubereats",
+      "service": "www.ubereats.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/ubereats/",
+      "descriptors": [
+        "ubereats.cancel_order",
+        "ubereats.get_menu",
+        "ubereats.list_orders",
+        "ubereats.list_restaurants",
+        "ubereats.place_order"
       ]
     },
     {

@@ -1,0 +1,47 @@
+{
+  "slug": "ubereats.list_orders",
+  "service": "www.ubereats.com",
+  "intentSynonyms": [
+    "list orders in ubereats",
+    "show me my orders in ubereats",
+    "view my orders in ubereats",
+    "see all my orders in ubereats",
+    "show me my ubereats order history in ubereats"
+  ],
+  "description": "List your recent Uber Eats orders. Optionally filter by status (active, completed, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter orders by status",
+        "type": "string",
+        "enum": [
+          "active",
+          "completed",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of orders to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ubereats/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

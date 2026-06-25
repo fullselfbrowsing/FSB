@@ -1,0 +1,41 @@
+{
+  "slug": "ubereats.get_menu",
+  "service": "www.ubereats.com",
+  "intentSynonyms": [
+    "get a menu in ubereats",
+    "look up a menu in ubereats",
+    "fetch a single menu in ubereats",
+    "view one specific menu in ubereats",
+    "get menu in ubereats",
+    "look up an ubereats restaurant menu in ubereats"
+  ],
+  "description": "Get the full menu of a single Uber Eats restaurant by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The restaurant ID to fetch the menu for"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ubereats/src/tools/get-menu.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "slug": "ubereats.place_order",
+  "service": "www.ubereats.com",
+  "intentSynonyms": [
+    "place an order in ubereats",
+    "place order in ubereats",
+    "order food on ubereats in ubereats"
+  ],
+  "description": "Place a paid Uber Eats order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The restaurant to order from"
+      },
+      "items": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "Menu item ID"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "Quantity of this item"
+            }
+          },
+          "required": [
+            "item_id",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        "description": "The cart items to order"
+      },
+      "delivery_address": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The address to deliver to"
+      },
+      "tip_amount": {
+        "description": "Optional tip amount in dollars",
+        "type": "number"
+      }
+    },
+    "required": [
+      "restaurant_id",
+      "items",
+      "delivery_address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ubereats/src/tools/place-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "place"
+    }
+  }
+}

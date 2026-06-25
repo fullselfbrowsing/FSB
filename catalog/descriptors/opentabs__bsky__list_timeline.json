@@ -9,7 +9,7 @@
     "list timeline in bsky",
     "show me my bluesky timeline in bsky"
   ],
-  "description": "List recent posts from your Bluesky home timeline. Optionally page through with a cursor.",
+  "description": "List recent posts from your Bluesky home timeline -- read your home feed of posts. Optionally page through with a cursor.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {

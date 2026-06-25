@@ -1,0 +1,46 @@
+{
+  "slug": "instacart.list_stores",
+  "service": "www.instacart.com",
+  "intentSynonyms": [
+    "list stores in instacart",
+    "show me my stores in instacart",
+    "view my stores in instacart",
+    "see all my stores in instacart",
+    "show me grocery stores on instacart in instacart"
+  ],
+  "description": "List Instacart grocery stores available for delivery to an address. Optionally filter by a search term (store or retailer name).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "description": "Delivery address to find stores for",
+        "type": "string"
+      },
+      "query": {
+        "description": "Search term (store or retailer name)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of stores to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/list-stores.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

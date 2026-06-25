@@ -136,13 +136,25 @@ check(wrongRate === 0, `wrong-invoke ${wrongRate.toFixed(3)} === 0 (non-negotiab
 // equal cost), NOT a layout regression: the schema-on-hit discipline is intact --
 // storedFields are {slug, service, description, sideEffectClass, backing} only; params
 // are NEVER indexed/stored (no additionalProperties / "required":[ in the serialized
-// index). The 64KB ceiling keeps headroom for 38-03 while still being a real smoke
-// floor -- a params-leak layout regression would blow far past it (the full ~2,523-doc
-// corpus at this flat rate is ~1.3MB, the Phase-43 scale gate's concern, NOT this smoke).
+// index).
+//
+// BUDGET WIDENED 64KB -> 96KB (Phase 39-02): the seed grew 106 -> 137 descriptors as
+// the food-delivery + rideshare sub-batch (doordash/ubereats/grubhub/instacart/uber/
+// lyft, 31 ops) landed, pushing the serialized index 55.6KB -> 73.6KB. STILL
+// LEGITIMATE LINEAR growth at a FLAT per-descriptor footprint (~550 bytes/descriptor
+// now vs ~536 at 38-02 -- the marginal rise is the slightly-longer payment-op
+// descriptions, genuine SEARCHABLE TEXT, NOT a layout change), NOT a regression: the
+// schema-on-hit discipline is intact -- storedFields are {slug, service, description,
+// sideEffectClass, backing} only; params remain NEVER indexed/stored (verified: no
+// additionalProperties / "required":[ in the serialized index). The 96KB ceiling keeps
+// headroom for the remaining Phase-39 commerce sub-batches (39-03..06) while still being
+// a real smoke floor -- a params-leak layout regression would blow far past it (the full
+// ~2,523-doc corpus at this flat rate is ~1.4MB, the Phase-43 scale gate's concern, NOT
+// this smoke). 39-CONTEXT requires FLAGGING this widening in the SUMMARY, which 39-02 does.
 const { performance } = require('perf_hooks');
 const smokeSerialized = JSON.stringify(ms.toJSON()); // toJSON() returns an object; loadJSON wants a JSON string
-check(smokeSerialized.length < 64 * 1024,
-  `smoke index serialized < 64KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors; flat ~536 bytes/descriptor -- params schema-on-hit, NOT indexed)`);
+check(smokeSerialized.length < 96 * 1024,
+  `smoke index serialized < 96KB (got ${(smokeSerialized.length / 1024).toFixed(1)}KB over ${SEED_DESCRIPTORS.length} descriptors; flat ~550 bytes/descriptor -- params schema-on-hit, NOT indexed)`);
 const _t0 = performance.now();
 const smokeRestored = MiniSearch.loadJSON(smokeSerialized, INDEX_OPTIONS); // SAME options -- mandatory
 smokeRestored.search('create a task'); // first search on the cold-restored index

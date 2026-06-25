@@ -213,5 +213,38 @@
 
   { "intent": "show posts in a subreddit", "expectedSlug": "reddit.list_subreddit_posts" },
   { "intent": "read a single reddit post", "expectedSlug": "reddit.get_post" },
-  { "intent": "search reddit", "expectedSlug": "reddit.search_posts" }
+  { "intent": "search reddit", "expectedSlug": "reddit.search_posts" },
+
+  { "intent": "show me restaurants on doordash", "expectedSlug": "doordash.list_restaurants" },
+  { "intent": "look up a doordash restaurant menu", "expectedSlug": "doordash.get_restaurant" },
+  { "intent": "show me my doordash order history", "expectedSlug": "doordash.list_orders" },
+  { "intent": "track my doordash order", "expectedSlug": "doordash.track_order" },
+  { "intent": "order food on doordash", "expectedSlug": "doordash.place_order" },
+  { "intent": "cancel my doordash order", "expectedSlug": "doordash.cancel_order" },
+
+  { "intent": "show me restaurants on ubereats", "expectedSlug": "ubereats.list_restaurants" },
+  { "intent": "look up an ubereats restaurant menu", "expectedSlug": "ubereats.get_menu" },
+  { "intent": "order food on ubereats", "expectedSlug": "ubereats.place_order" },
+  { "intent": "cancel my ubereats order", "expectedSlug": "ubereats.cancel_order" },
+
+  { "intent": "show me restaurants on grubhub", "expectedSlug": "grubhub.list_restaurants" },
+  { "intent": "show me my grubhub order history", "expectedSlug": "grubhub.list_orders" },
+  { "intent": "order food on grubhub", "expectedSlug": "grubhub.place_order" },
+  { "intent": "cancel my grubhub order", "expectedSlug": "grubhub.cancel_order" },
+
+  { "intent": "show me grocery stores on instacart", "expectedSlug": "instacart.list_stores" },
+  { "intent": "search for groceries on instacart", "expectedSlug": "instacart.search_products" },
+  { "intent": "checkout my instacart cart", "expectedSlug": "instacart.checkout" },
+  { "intent": "cancel my instacart order", "expectedSlug": "instacart.cancel_order" },
+
+  { "intent": "show me uber ride options", "expectedSlug": "uber.list_ride_options" },
+  { "intent": "estimate an uber fare", "expectedSlug": "uber.get_ride_estimate" },
+  { "intent": "list my uber trips", "expectedSlug": "uber.list_trips" },
+  { "intent": "request an uber ride", "expectedSlug": "uber.request_ride" },
+  { "intent": "cancel my uber ride", "expectedSlug": "uber.cancel_ride" },
+
+  { "intent": "show me lyft ride types", "expectedSlug": "lyft.list_ride_types" },
+  { "intent": "estimate a lyft fare", "expectedSlug": "lyft.get_ride_estimate" },
+  { "intent": "request a lyft ride", "expectedSlug": "lyft.request_ride" },
+  { "intent": "cancel my lyft ride", "expectedSlug": "lyft.cancel_ride" }
 ]

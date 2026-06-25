@@ -1078,7 +1078,7 @@
         "list timeline in bsky",
         "show me my bluesky timeline in bsky"
       ],
-      "description": "List recent posts from your Bluesky home timeline. Optionally page through with a cursor.",
+      "description": "List recent posts from your Bluesky home timeline -- read your home feed of posts. Optionally page through with a cursor.",
       "actionVerb": "list",
       "sideEffectClass": "read",
       "params": {
@@ -2672,6 +2672,294 @@
       }
     },
     {
+      "slug": "doordash.cancel_order",
+      "service": "www.doordash.com",
+      "intentSynonyms": [
+        "cancel an order in doordash",
+        "cancel order in doordash",
+        "cancel my doordash order in doordash"
+      ],
+      "description": "Cancel an in-progress DoorDash order by its ID. This may be irreversible once the restaurant has accepted it.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/doordash/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "doordash.get_restaurant",
+      "service": "www.doordash.com",
+      "intentSynonyms": [
+        "get a restaurant in doordash",
+        "look up a restaurant in doordash",
+        "fetch a single restaurant in doordash",
+        "view one specific restaurant in doordash",
+        "get restaurant in doordash",
+        "look up a doordash restaurant menu in doordash"
+      ],
+      "description": "Get the details and menu of a single DoorDash restaurant by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant ID to fetch"
+          }
+        },
+        "required": [
+          "restaurant_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/doordash/src/tools/get-restaurant.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "doordash.list_orders",
+      "service": "www.doordash.com",
+      "intentSynonyms": [
+        "list orders in doordash",
+        "show me my orders in doordash",
+        "view my orders in doordash",
+        "see all my orders in doordash",
+        "show me my doordash order history in doordash"
+      ],
+      "description": "List your recent DoorDash orders. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/doordash/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "doordash.list_restaurants",
+      "service": "www.doordash.com",
+      "intentSynonyms": [
+        "list restaurants in doordash",
+        "show me my restaurants in doordash",
+        "view my restaurants in doordash",
+        "see all my restaurants in doordash",
+        "show me restaurants on doordash in doordash"
+      ],
+      "description": "List or search DoorDash restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "Delivery address to find restaurants for",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search term (cuisine, dish, or restaurant name)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of restaurants to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/doordash/src/tools/list-restaurants.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "doordash.place_order",
+      "service": "www.doordash.com",
+      "intentSynonyms": [
+        "place an order in doordash",
+        "place order in doordash",
+        "order food on doordash in doordash"
+      ],
+      "description": "Place a paid DoorDash order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant to order from"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "description": "Menu item ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "delivery_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to deliver to"
+          },
+          "tip_amount": {
+            "description": "Optional tip amount in dollars",
+            "type": "number"
+          }
+        },
+        "required": [
+          "restaurant_id",
+          "items",
+          "delivery_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/doordash/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "doordash.track_order",
+      "service": "www.doordash.com",
+      "intentSynonyms": [
+        "track an order in doordash",
+        "track order in doordash",
+        "track my doordash order in doordash"
+      ],
+      "description": "Track the live delivery status and ETA of a single DoorDash order by its ID.",
+      "actionVerb": "track",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to track"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/doordash/src/tools/track-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "track"
+        }
+      }
+    },
+    {
       "slug": "gitlab.create_issue",
       "service": "gitlab.com",
       "intentSynonyms": [
@@ -2939,6 +3227,515 @@
           "transportHelper": "api",
           "httpMethod": "GET",
           "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "grubhub.cancel_order",
+      "service": "www.grubhub.com",
+      "intentSynonyms": [
+        "cancel an order in grubhub",
+        "cancel order in grubhub",
+        "cancel my grubhub order in grubhub"
+      ],
+      "description": "Cancel an in-progress Grubhub order by its ID. This may be irreversible once the restaurant has accepted it.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grubhub/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "grubhub.get_restaurant",
+      "service": "www.grubhub.com",
+      "intentSynonyms": [
+        "get a restaurant in grubhub",
+        "look up a restaurant in grubhub",
+        "fetch a single restaurant in grubhub",
+        "view one specific restaurant in grubhub",
+        "get restaurant in grubhub",
+        "look up a grubhub restaurant menu in grubhub"
+      ],
+      "description": "Get the details and menu of a single Grubhub restaurant by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant ID to fetch"
+          }
+        },
+        "required": [
+          "restaurant_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grubhub/src/tools/get-restaurant.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "grubhub.list_orders",
+      "service": "www.grubhub.com",
+      "intentSynonyms": [
+        "list orders in grubhub",
+        "show me my orders in grubhub",
+        "view my orders in grubhub",
+        "see all my orders in grubhub",
+        "show me my grubhub order history in grubhub"
+      ],
+      "description": "List your recent Grubhub orders. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grubhub/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "grubhub.list_restaurants",
+      "service": "www.grubhub.com",
+      "intentSynonyms": [
+        "list restaurants in grubhub",
+        "show me my restaurants in grubhub",
+        "view my restaurants in grubhub",
+        "see all my restaurants in grubhub",
+        "show me restaurants on grubhub in grubhub"
+      ],
+      "description": "List or search Grubhub restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "Delivery address to find restaurants for",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search term (cuisine, dish, or restaurant name)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of restaurants to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grubhub/src/tools/list-restaurants.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "grubhub.place_order",
+      "service": "www.grubhub.com",
+      "intentSynonyms": [
+        "place an order in grubhub",
+        "place order in grubhub",
+        "order food on grubhub in grubhub"
+      ],
+      "description": "Place a paid Grubhub order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant to order from"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "description": "Menu item ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "delivery_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to deliver to"
+          },
+          "tip_amount": {
+            "description": "Optional tip amount in dollars",
+            "type": "number"
+          }
+        },
+        "required": [
+          "restaurant_id",
+          "items",
+          "delivery_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/grubhub/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
+        }
+      }
+    },
+    {
+      "slug": "instacart.cancel_order",
+      "service": "www.instacart.com",
+      "intentSynonyms": [
+        "cancel an order in instacart",
+        "cancel order in instacart",
+        "cancel my instacart order in instacart"
+      ],
+      "description": "Cancel an in-progress Instacart order by its ID. This may be irreversible once the shopper has started.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instacart/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "instacart.checkout",
+      "service": "www.instacart.com",
+      "intentSynonyms": [
+        "checkout in instacart",
+        "checkout my instacart cart in instacart",
+        "check out a paid instacart cart in instacart"
+      ],
+      "description": "Check out a paid Instacart cart: submit the cart of grocery items from a store to a delivery address. This charges your saved payment method and places the order -- a real money-moving action.",
+      "actionVerb": "checkout",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The store the cart is from"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this product"
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to check out"
+          },
+          "delivery_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to deliver to"
+          },
+          "tip_amount": {
+            "description": "Optional tip amount in dollars",
+            "type": "number"
+          }
+        },
+        "required": [
+          "store_id",
+          "items",
+          "delivery_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instacart/src/tools/checkout.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "checkout"
+        }
+      }
+    },
+    {
+      "slug": "instacart.list_orders",
+      "service": "www.instacart.com",
+      "intentSynonyms": [
+        "list orders in instacart",
+        "show me my orders in instacart",
+        "view my orders in instacart",
+        "see all my orders in instacart",
+        "show me my instacart order history in instacart"
+      ],
+      "description": "List your recent Instacart orders. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instacart/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "instacart.list_stores",
+      "service": "www.instacart.com",
+      "intentSynonyms": [
+        "list stores in instacart",
+        "show me my stores in instacart",
+        "view my stores in instacart",
+        "see all my stores in instacart",
+        "show me grocery stores on instacart in instacart"
+      ],
+      "description": "List Instacart grocery stores available for delivery to an address. Optionally filter by a search term (store or retailer name).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "Delivery address to find stores for",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search term (store or retailer name)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of stores to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instacart/src/tools/list-stores.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "instacart.search_products",
+      "service": "www.instacart.com",
+      "intentSynonyms": [
+        "search products in instacart",
+        "search for groceries on instacart in instacart",
+        "search the products available in a single instacart store by a query term in instacart"
+      ],
+      "description": "Search the products available in a single Instacart store by a query term.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The store to search within"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product search term"
+          },
+          "limit": {
+            "description": "Maximum number of products to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "store_id",
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instacart/src/tools/search-products.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
         }
       }
     },
@@ -3504,6 +4301,248 @@
           "transportHelper": "graphql",
           "httpMethod": null,
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "lyft.cancel_ride",
+      "service": "lyft.com",
+      "intentSynonyms": [
+        "cancel a ride in lyft",
+        "cancel ride in lyft",
+        "cancel my lyft ride in lyft"
+      ],
+      "description": "Cancel an in-progress Lyft ride by its ride ID. A cancellation fee may apply once a driver is en route.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "ride_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ride ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ride_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/lyft/src/tools/cancel-ride.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "lyft.get_ride_estimate",
+      "service": "lyft.com",
+      "intentSynonyms": [
+        "get a ride estimate in lyft",
+        "look up a ride estimate in lyft",
+        "fetch a single ride estimate in lyft",
+        "view one specific ride estimate in lyft",
+        "get ride estimate in lyft",
+        "estimate a lyft fare in lyft"
+      ],
+      "description": "Get the fare and ETA estimate for a single Lyft ride type between a pickup and dropoff.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pickup location or address"
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dropoff location or address"
+          },
+          "ride_type_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ride type to estimate"
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff",
+          "ride_type_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/lyft/src/tools/get-ride-estimate.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "lyft.list_ride_types",
+      "service": "lyft.com",
+      "intentSynonyms": [
+        "list ride types in lyft",
+        "show me my ride types in lyft",
+        "view my ride types in lyft",
+        "see all my ride types in lyft",
+        "show me lyft ride types in lyft"
+      ],
+      "description": "List the available Lyft ride types (Lyft, XL, Lux, Lux Black, ...) for a pickup and dropoff location.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pickup location or address"
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dropoff location or address"
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/lyft/src/tools/list-ride-types.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "lyft.list_rides",
+      "service": "lyft.com",
+      "intentSynonyms": [
+        "list rides in lyft",
+        "show me my rides in lyft",
+        "view my rides in lyft",
+        "see all my rides in lyft",
+        "show me my lyft ride history in lyft"
+      ],
+      "description": "List your recent Lyft rides. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter rides by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of rides to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/lyft/src/tools/list-rides.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "lyft.request_ride",
+      "service": "lyft.com",
+      "intentSynonyms": [
+        "request a ride in lyft",
+        "request ride in lyft",
+        "request a lyft ride in lyft"
+      ],
+      "description": "Request a paid Lyft ride: book a selected ride type from a pickup to a dropoff. This charges your saved payment method and dispatches a driver -- a real money-moving action.",
+      "actionVerb": "request",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pickup location or address"
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dropoff location or address"
+          },
+          "ride_type_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ride type to book"
+          },
+          "payment_method_id": {
+            "description": "Optional payment method to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff",
+          "ride_type_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/lyft/src/tools/request-ride.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "request"
         }
       }
     },
@@ -4978,6 +6017,498 @@
           "transportHelper": "api",
           "httpMethod": "POST",
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "uber.cancel_ride",
+      "service": "uber.com",
+      "intentSynonyms": [
+        "cancel a ride in uber",
+        "cancel ride in uber",
+        "cancel my uber ride in uber"
+      ],
+      "description": "Cancel an in-progress Uber ride by its trip ID. A cancellation fee may apply once a driver is en route.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The trip ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/uber/src/tools/cancel-ride.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "uber.get_ride_estimate",
+      "service": "uber.com",
+      "intentSynonyms": [
+        "get a ride estimate in uber",
+        "look up a ride estimate in uber",
+        "fetch a single ride estimate in uber",
+        "view one specific ride estimate in uber",
+        "get ride estimate in uber",
+        "estimate an uber fare in uber"
+      ],
+      "description": "Get the fare and ETA estimate for a single Uber ride option between a pickup and dropoff.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pickup location or address"
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dropoff location or address"
+          },
+          "ride_option_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ride option to estimate"
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff",
+          "ride_option_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/uber/src/tools/get-ride-estimate.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "uber.list_ride_options",
+      "service": "uber.com",
+      "intentSynonyms": [
+        "list ride options in uber",
+        "show me my ride options in uber",
+        "view my ride options in uber",
+        "see all my ride options in uber",
+        "show me uber ride options in uber"
+      ],
+      "description": "List the available Uber ride options (UberX, Comfort, XL, Black, ...) for a pickup and dropoff location.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pickup location or address"
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dropoff location or address"
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/uber/src/tools/list-ride-options.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "uber.list_trips",
+      "service": "uber.com",
+      "intentSynonyms": [
+        "list trips in uber",
+        "show me my trips in uber",
+        "view my trips in uber",
+        "see all my trips in uber",
+        "show me my uber trip history in uber"
+      ],
+      "description": "List your recent Uber trips. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter trips by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of trips to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/uber/src/tools/list-trips.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "uber.request_ride",
+      "service": "uber.com",
+      "intentSynonyms": [
+        "request a ride in uber",
+        "request ride in uber",
+        "request an uber ride in uber"
+      ],
+      "description": "Request a paid Uber ride: book a selected ride option from a pickup to a dropoff. This charges your saved payment method and dispatches a driver -- a real money-moving action.",
+      "actionVerb": "request",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "pickup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pickup location or address"
+          },
+          "dropoff": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dropoff location or address"
+          },
+          "ride_option_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ride option to book"
+          },
+          "payment_method_id": {
+            "description": "Optional payment method to charge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pickup",
+          "dropoff",
+          "ride_option_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/uber/src/tools/request-ride.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "request"
+        }
+      }
+    },
+    {
+      "slug": "ubereats.cancel_order",
+      "service": "www.ubereats.com",
+      "intentSynonyms": [
+        "cancel an order in ubereats",
+        "cancel order in ubereats",
+        "cancel my ubereats order in ubereats"
+      ],
+      "description": "Cancel an in-progress Uber Eats order by its ID. This may be irreversible once the restaurant has accepted it.",
+      "actionVerb": "cancel",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The order ID to cancel"
+          },
+          "reason": {
+            "description": "Optional cancellation reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ubereats/src/tools/cancel-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apivoid",
+          "httpMethod": "DELETE",
+          "opNameVerb": "cancel"
+        }
+      }
+    },
+    {
+      "slug": "ubereats.get_menu",
+      "service": "www.ubereats.com",
+      "intentSynonyms": [
+        "get a menu in ubereats",
+        "look up a menu in ubereats",
+        "fetch a single menu in ubereats",
+        "view one specific menu in ubereats",
+        "get menu in ubereats",
+        "look up an ubereats restaurant menu in ubereats"
+      ],
+      "description": "Get the full menu of a single Uber Eats restaurant by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant ID to fetch the menu for"
+          }
+        },
+        "required": [
+          "restaurant_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ubereats/src/tools/get-menu.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "ubereats.list_orders",
+      "service": "www.ubereats.com",
+      "intentSynonyms": [
+        "list orders in ubereats",
+        "show me my orders in ubereats",
+        "view my orders in ubereats",
+        "see all my orders in ubereats",
+        "show me my ubereats order history in ubereats"
+      ],
+      "description": "List your recent Uber Eats orders. Optionally filter by status (active, completed, cancelled).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filter orders by status",
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ubereats/src/tools/list-orders.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "ubereats.list_restaurants",
+      "service": "www.ubereats.com",
+      "intentSynonyms": [
+        "list restaurants in ubereats",
+        "show me my restaurants in ubereats",
+        "view my restaurants in ubereats",
+        "see all my restaurants in ubereats",
+        "show me restaurants on ubereats in ubereats"
+      ],
+      "description": "List or search Uber Eats restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "Delivery address to find restaurants for",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search term (cuisine, dish, or restaurant name)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of restaurants to return",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ubereats/src/tools/list-restaurants.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "ubereats.place_order",
+      "service": "www.ubereats.com",
+      "intentSynonyms": [
+        "place an order in ubereats",
+        "place order in ubereats",
+        "order food on ubereats in ubereats"
+      ],
+      "description": "Place a paid Uber Eats order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
+      "actionVerb": "place",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The restaurant to order from"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "description": "Menu item ID"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991,
+                  "description": "Quantity of this item"
+                }
+              },
+              "required": [
+                "item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The cart items to order"
+          },
+          "delivery_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to deliver to"
+          },
+          "tip_amount": {
+            "description": "Optional tip amount in dollars",
+            "type": "number"
+          }
+        },
+        "required": [
+          "restaurant_id",
+          "items",
+          "delivery_address"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ubereats/src/tools/place-order.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "place"
         }
       }
     },

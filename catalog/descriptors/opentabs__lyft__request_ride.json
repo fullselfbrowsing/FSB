@@ -1,0 +1,54 @@
+{
+  "slug": "lyft.request_ride",
+  "service": "lyft.com",
+  "intentSynonyms": [
+    "request a ride in lyft",
+    "request ride in lyft",
+    "request a lyft ride in lyft"
+  ],
+  "description": "Request a paid Lyft ride: book a selected ride type from a pickup to a dropoff. This charges your saved payment method and dispatches a driver -- a real money-moving action.",
+  "actionVerb": "request",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pickup": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Pickup location or address"
+      },
+      "dropoff": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dropoff location or address"
+      },
+      "ride_type_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The ride type to book"
+      },
+      "payment_method_id": {
+        "description": "Optional payment method to charge",
+        "type": "string"
+      }
+    },
+    "required": [
+      "pickup",
+      "dropoff",
+      "ride_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lyft/src/tools/request-ride.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "request"
+    }
+  }
+}

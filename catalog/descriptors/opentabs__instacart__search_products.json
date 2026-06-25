@@ -1,0 +1,50 @@
+{
+  "slug": "instacart.search_products",
+  "service": "www.instacart.com",
+  "intentSynonyms": [
+    "search products in instacart",
+    "search for groceries on instacart in instacart",
+    "search the products available in a single instacart store by a query term in instacart"
+  ],
+  "description": "Search the products available in a single Instacart store by a query term.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The store to search within"
+      },
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The product search term"
+      },
+      "limit": {
+        "description": "Maximum number of products to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "store_id",
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

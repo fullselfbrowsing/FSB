@@ -89,10 +89,23 @@ global.MiniSearch = MiniSearch;
 // apex) so the stem is 'reddit' (not 'www') -> opentabs__reddit__*; this is DISTINCT from
 // the hand-authored reddit-inbox.json (slug reddit.inbox, backing recipe), which this
 // corpus regex does NOT match (it is not an opentabs__reddit__* file -- no clobber).
-// This test indexes the dev/productivity batch AND the COMPLETE comms/social/content category.
+// Phase 39 batch C sub-batch 1 (39-02) GROWS the corpus with the food-delivery +
+// rideshare apps -- doordash/ubereats/grubhub/instacart (food/grocery delivery) +
+// uber/lyft (rideshare) -- the MOST-sensitive PAYMENT-bearing category, ALL screened
+// SENSITIVE by 39-01 and ALL backing:'dom' (DOM-only, invocable=false). The
+// www-hosted apps (doordash/ubereats/grubhub/instacart vendor *://www.<app>.com/*)
+// derive the stem 'www' and canonicalize to the brand stem via STEM_OVERRIDES, so the
+// slug is opentabs__<app>__* (NOT opentabs__www__*); uber/lyft vendor *://*.uber.com/*
+// and *://*.lyft.com/* -> stem 'uber'/'lyft' (pinned in STEM_OVERRIDES). The PAYMENT
+// ops place_order/checkout/request_ride class WRITE and cancel_order/cancel_ride class
+// DESTRUCTIVE, all backing:'dom' on a sensitive origin (the payment-op guard PASSES).
+// The cross-app place_order (doordash/grubhub/ubereats) + request_ride (uber/lyft)
+// collisions are the new wrong-invoke=0 probes in COLLISION_SET.
+// This test indexes the dev/productivity batch, the COMPLETE comms/social/content
+// category, AND the food-delivery/rideshare sub-batch.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify|cloudflare|circleci|datadog|sentry|posthog|chatgpt|claude|bsky|mastodon|threads|discord|reddit|doordash|ubereats|grubhub|instacart|uber|lyft)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -100,8 +113,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 94,
-  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads (sub-batch 1) + 4 discord + 3 reddit (sub-batch 2) -- all backing:dom])');
+check(corpus.length >= 125,
+  'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity [5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify + 4 cloudflare + 4 circleci + 4 datadog + 4 sentry + 4 posthog] + 24 comms/social/content [3 chatgpt + 3 claude + 4 bsky + 4 mastodon + 3 threads + 4 discord + 3 reddit] + 31 food-delivery/rideshare [6 doordash + 5 ubereats + 5 grubhub + 5 instacart + 5 uber + 5 lyft -- Phase-39 batch C sub-batch 1, all backing:dom on SENSITIVE payment origins])');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -207,6 +220,28 @@ const COLLISION_SET = [
   // cross-invokes the other.
   { query: 'browse the posts in a subreddit on reddit', expected: 'reddit.list_subreddit_posts' },
   { query: 'search reddit posts for a keyword', expected: 'reddit.search_posts' },
+  // Phase-39 batch C sub-batch 1 (39-02, food-delivery + rideshare): the cross-app
+  // PAYMENT-op collisions are the headline disambiguation probes for the most-sensitive
+  // category. place_order is emitted by doordash AND grubhub AND ubereats (IDENTICAL
+  // op name across three food-delivery apps) -- the app token MUST keep each paid order
+  // on its OWN slug (a swapped stem would charge a card on the WRONG account/origin). The
+  // queries are HELD-OUT paraphrases ("submit my cart"/"for delivery"/"to my address"
+  // are NOT indexed synonyms -- the indexed forms are "place an order in <app>" / "order
+  // food on <app> in <app>"), so wrong-invoke=0 is a genuine retrieval measurement.
+  { query: 'submit my food cart for delivery on doordash', expected: 'doordash.place_order' },
+  { query: 'submit my food cart for delivery on grubhub', expected: 'grubhub.place_order' },
+  { query: 'submit my food cart for delivery on ubereats', expected: 'ubereats.place_order' },
+  // request_ride is emitted by uber AND lyft (IDENTICAL op name across the two rideshare
+  // apps) -- the closest same-op cross-app collision in this sub-batch; the app token must
+  // keep each paid ride on its OWN slug (a cross-invoke would book a ride on the wrong
+  // account). Held-out paraphrases ("request a car"/"pick me up" are NOT indexed synonyms
+  // -- the indexed forms are "request a ride in <app>" / "request a <app> ride in <app>");
+  // both top their OWN request_ride at a ~1.9x margin over the within-app read ops.
+  { query: 'request a car to pick me up on uber', expected: 'uber.request_ride' },
+  { query: 'request a car to pick me up on lyft', expected: 'lyft.request_ride' },
+  // instacart.checkout (the grocery PAYMENT op) vs the food-delivery place_order family:
+  // "check out my groceries" must top instacart.checkout, never a food-delivery order op.
+  { query: 'pay for my groceries and check out on instacart', expected: 'instacart.checkout' },
 ];
 
 // Build a slug -> lowercased-intentSynonyms map for the held-out guards (MED-01/MED-02).
