@@ -2,8 +2,8 @@
   "slug": "posthog.get_insight",
   "service": "app.posthog.com",
   "intentSynonyms": [
-    "get a insight in posthog",
-    "look up a insight in posthog",
+    "get an insight in posthog",
+    "look up an insight in posthog",
     "fetch a single insight in posthog",
     "view one specific insight in posthog",
     "get insight in posthog",

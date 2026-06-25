@@ -1742,7 +1742,7 @@
       "intentSynonyms": [
         "search pages in confluence",
         "search pages with cql in confluence",
-        "search pages confluence"
+        "search for confluence pages using a cql (confluence query language) query string in confluence"
       ],
       "description": "Search for Confluence pages using a CQL (Confluence Query Language) query string.",
       "actionVerb": "search",
@@ -1992,7 +1992,7 @@
       "intentSynonyms": [
         "query metrics in datadog",
         "query metric timeseries in datadog",
-        "query metrics datadog"
+        "query timeseries points for a datadog metric over a time window using a metric query string in datadog"
       ],
       "description": "Query timeseries points for a Datadog metric over a time window using a metric query string.",
       "actionVerb": "query",
@@ -2042,8 +2042,8 @@
       "slug": "gitlab.create_issue",
       "service": "gitlab.com",
       "intentSynonyms": [
-        "create a issue in gitlab",
-        "add a issue in gitlab",
+        "create an issue in gitlab",
+        "add an issue in gitlab",
         "make a new issue in gitlab",
         "open a new issue in gitlab",
         "create issue in gitlab",
@@ -2195,8 +2195,8 @@
       "slug": "gitlab.get_issue",
       "service": "gitlab.com",
       "intentSynonyms": [
-        "get a issue in gitlab",
-        "look up a issue in gitlab",
+        "get an issue in gitlab",
+        "look up an issue in gitlab",
         "fetch a single issue in gitlab",
         "view one specific issue in gitlab",
         "get issue in gitlab",
@@ -2357,8 +2357,8 @@
       "slug": "jira.create_issue",
       "service": "atlassian.net",
       "intentSynonyms": [
-        "create a issue in jira",
-        "add a issue in jira",
+        "create an issue in jira",
+        "add an issue in jira",
         "make a new issue in jira",
         "open a new issue in jira",
         "create issue in jira",
@@ -2429,8 +2429,8 @@
       "slug": "jira.get_issue",
       "service": "atlassian.net",
       "intentSynonyms": [
-        "get a issue in jira",
-        "look up a issue in jira",
+        "get an issue in jira",
+        "look up an issue in jira",
         "fetch a single issue in jira",
         "view one specific issue in jira",
         "get issue in jira",
@@ -2483,7 +2483,7 @@
       "intentSynonyms": [
         "search issues in jira",
         "search issues with jql in jira",
-        "search issues jira"
+        "search for jira issues using a jql (jira query language) query string in jira"
       ],
       "description": "Search for Jira issues using a JQL (Jira Query Language) query string.",
       "actionVerb": "search",
@@ -2538,10 +2538,10 @@
       "slug": "jira.update_issue",
       "service": "atlassian.net",
       "intentSynonyms": [
-        "update a issue in jira",
-        "edit a issue in jira",
+        "update an issue in jira",
+        "edit an issue in jira",
         "change the details of issue in jira",
-        "modify a issue in jira",
+        "modify an issue in jira",
         "update issue in jira",
         "update an existing issue in jira"
       ],
@@ -2649,8 +2649,8 @@
       "slug": "linear.create_issue",
       "service": "linear.app",
       "intentSynonyms": [
-        "create a issue in linear",
-        "add a issue in linear",
+        "create an issue in linear",
+        "add an issue in linear",
         "make a new issue in linear",
         "open a new issue in linear",
         "create issue in linear",
@@ -2725,8 +2725,8 @@
       "slug": "linear.get_issue",
       "service": "linear.app",
       "intentSynonyms": [
-        "get a issue in linear",
-        "look up a issue in linear",
+        "get an issue in linear",
+        "look up an issue in linear",
         "fetch a single issue in linear",
         "view one specific issue in linear",
         "get issue in linear",
@@ -2816,12 +2816,11 @@
       "slug": "linear.update_issue",
       "service": "linear.app",
       "intentSynonyms": [
-        "update a issue in linear",
-        "edit a issue in linear",
+        "update an issue in linear",
+        "edit an issue in linear",
         "change the details of issue in linear",
-        "modify a issue in linear",
-        "update issue in linear",
-        "update an issue in linear"
+        "modify an issue in linear",
+        "update issue in linear"
       ],
       "description": "Update an existing Linear issue. Provide the issue ID and any fields to change.",
       "actionVerb": "update",
@@ -3074,8 +3073,8 @@
       "slug": "posthog.get_insight",
       "service": "app.posthog.com",
       "intentSynonyms": [
-        "get a insight in posthog",
-        "look up a insight in posthog",
+        "get an insight in posthog",
+        "look up an insight in posthog",
         "fetch a single insight in posthog",
         "view one specific insight in posthog",
         "get insight in posthog",
@@ -3229,7 +3228,7 @@
       "intentSynonyms": [
         "query events in posthog",
         "query captured events in posthog",
-        "query events posthog"
+        "query the captured events for a posthog project in posthog"
       ],
       "description": "Query the captured events for a PostHog project. Optionally filter by event name, distinct ID, or time range.",
       "actionVerb": "query",
@@ -3288,8 +3287,8 @@
       "slug": "sentry.get_issue",
       "service": "sentry.io",
       "intentSynonyms": [
-        "get a issue in sentry",
-        "look up a issue in sentry",
+        "get an issue in sentry",
+        "look up an issue in sentry",
         "fetch a single issue in sentry",
         "view one specific issue in sentry",
         "get issue in sentry",
@@ -3431,9 +3430,9 @@
       "slug": "sentry.resolve_issue",
       "service": "sentry.io",
       "intentSynonyms": [
-        "resolve a issue in sentry",
+        "resolve an issue in sentry",
         "resolve issue in sentry",
-        "resolve an issue in sentry"
+        "mark a sentry error issue as resolved in sentry"
       ],
       "description": "Mark a Sentry error issue as resolved. Optionally resolve in the next release. This updates the issue status.",
       "actionVerb": "resolve",

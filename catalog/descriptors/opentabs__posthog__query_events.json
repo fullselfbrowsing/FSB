@@ -4,7 +4,7 @@
   "intentSynonyms": [
     "query events in posthog",
     "query captured events in posthog",
-    "query events posthog"
+    "query the captured events for a posthog project in posthog"
   ],
   "description": "Query the captured events for a PostHog project. Optionally filter by event name, distinct ID, or time range.",
   "actionVerb": "query",

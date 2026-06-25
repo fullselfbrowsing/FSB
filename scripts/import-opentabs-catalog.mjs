@@ -394,10 +394,19 @@ function synthSynonyms(tool, serviceStem) {
     ? INTENT_VERB_SYNONYMS[verb]
     : [verb]).filter(Boolean);
 
+  // LOW-02 (37-REVIEW): article agreement before a vowel-initial noun. "create a
+  // issue" / "add a invoice" are ungrammatical -- choose "an" when the singular noun
+  // begins with a vowel sound, "a" otherwise. Applied wherever a bare "a" article is
+  // synthesized before the singular noun (the bare-verb branch below). The MED-03
+  // rewrite set out to eliminate broken phrases ("list a tasks"); the a/an case
+  // slipped through. Heuristic on the LEADING LETTER (the op-name nouns we synthesize
+  // over -- issue/insight/invoice/deployment/record -- have no silent-h / "u-as-you"
+  // exceptions, so a leading-vowel test is correct for this vocabulary).
+  const article = (w) => /^[aeiou]/i.test(String(w || '').trim()) ? 'an' : 'a';
   // 1. Curated alternate phrases, app-tagged. For a plural-noun op (list_tasks) use
   //    the plain "<alt> <noun> in <stem>" form; for a singular-noun op use the
-  //    "<alt> a <noun> in <stem>" article form -- UNLESS the alternate already ends in
-  //    an article/determiner word (a / an / new / my / of / specific), in which case
+  //    "<alt> a/an <noun> in <stem>" article form -- UNLESS the alternate already ends
+  //    in an article/determiner word (a / an / new / my / of / specific), in which case
   //    the bare-noun form is grammatically clean ("make a new issue", not "make a new
   //    a issue"; "fetch a single task", not "fetch a single a task").
   const endsWithDeterminer = (alt) => /\b(a|an|new|my|of|specific|single)$/i.test(String(alt || '').trim());
@@ -412,8 +421,9 @@ function synthSynonyms(tool, serviceStem) {
       // single") -> bare singular noun, no extra article ("make a new issue").
       push(`${alt} ${singular} in ${stem}`);
     } else {
-      // a bare verb alternate ("create"/"edit") -> add the article ("create a issue").
-      push(`${alt} a ${singular} in ${stem}`);
+      // a bare verb alternate ("create"/"edit") -> add the a/an article, agreeing with
+      // a vowel-initial noun ("create an issue", "edit a record").
+      push(`${alt} ${article(singular)} ${singular} in ${stem}`);
     }
   }
   // 2. The canonical "<verb> <noun> in <service>" form (covers the literal op name).
@@ -423,10 +433,37 @@ function synthSynonyms(tool, serviceStem) {
   // 3. summary + service ("create a new issue in linear") -- a natural full phrasing.
   if (summary) push(`${summary} in ${stem}`);
 
-  // Guarantee at least 3 entries (every fallback still carries the stem).
+  // LOW-03 (37-REVIEW): meaningful backfill before any numeric filler. The >=3 floor
+  // must be reached with REAL intent phrases, not bare "<verb> <stem> <digit>" noise
+  // (which passes the stem guard + the >=3 contract but dilutes the index). For an op
+  // that synthesized < 3 phrases above (a no-noun, unmapped-verb op shape), pull real
+  // alternates IN PRIORITY ORDER -- description-derived phrasing, then an app-framed
+  // intent phrase -- and only fall to a digit-free generic phrase. The numeric filler
+  // is retained ONLY as a defensive last resort (it should now be unreachable for any
+  // real op). breadth-search-return.test.js asserts no shipped synonym is a bare
+  // verb+stem+digit filler, so these meaningful phrases MUST precede the numeric loop.
+  if (out.length < 3) {
+    // (a) description-derived: the first clause of the human description, app-tagged.
+    //     This is genuine user-facing intent text, never filler.
+    const descFirstClause = String(tool.description || '')
+      .split(/[.\n;:]/)[0]
+      .toLowerCase()
+      .trim();
+    if (descFirstClause) push(`${descFirstClause} in ${stem}`);
+  }
+  if (out.length < 3 && verb) {
+    // (b) an app-framed intent phrase ("trigger a build in the circleci app") -- a real
+    //     colloquial phrasing for a no-noun op, carrying the stem, no digits.
+    push(`${verb} ${noun ? singular + ' ' : ''}in the ${stem} app`.replace(/\s+/g, ' ').trim());
+    push(`use ${stem} to ${verb}${noun ? ' a ' + singular : ''}`.replace(/\s+/g, ' ').trim());
+  }
+  // Defensive-only numeric filler: retained so the >=3 floor can NEVER be unmet, but
+  // it is now reached only if every meaningful source above is empty (no description,
+  // no verb) -- a shape no current emitted op has. (No trailing digit on the first
+  // pass so even this last resort stays as clean as possible.)
   let i = 0;
   while (out.length < 3) {
-    push(`${verb || 'use'} ${noun || ''} ${stem} ${i || ''}`.trim());
+    push(`${verb || 'use'} ${noun || ''} in ${stem}${i ? ' ' + i : ''}`.replace(/\s+/g, ' ').trim());
     i++;
     if (i > 8) break; // defensive: never loop forever
   }

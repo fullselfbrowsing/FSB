@@ -2,8 +2,8 @@
   "slug": "gitlab.get_issue",
   "service": "gitlab.com",
   "intentSynonyms": [
-    "get a issue in gitlab",
-    "look up a issue in gitlab",
+    "get an issue in gitlab",
+    "look up an issue in gitlab",
     "fetch a single issue in gitlab",
     "view one specific issue in gitlab",
     "get issue in gitlab",

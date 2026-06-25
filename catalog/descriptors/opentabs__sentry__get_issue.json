@@ -2,8 +2,8 @@
   "slug": "sentry.get_issue",
   "service": "sentry.io",
   "intentSynonyms": [
-    "get a issue in sentry",
-    "look up a issue in sentry",
+    "get an issue in sentry",
+    "look up an issue in sentry",
     "fetch a single issue in sentry",
     "view one specific issue in sentry",
     "get issue in sentry",

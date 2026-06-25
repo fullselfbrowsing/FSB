@@ -2,8 +2,8 @@
   "slug": "jira.create_issue",
   "service": "atlassian.net",
   "intentSynonyms": [
-    "create a issue in jira",
-    "add a issue in jira",
+    "create an issue in jira",
+    "add an issue in jira",
     "make a new issue in jira",
     "open a new issue in jira",
     "create issue in jira",

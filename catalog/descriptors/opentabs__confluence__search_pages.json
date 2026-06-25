@@ -4,7 +4,7 @@
   "intentSynonyms": [
     "search pages in confluence",
     "search pages with cql in confluence",
-    "search pages confluence"
+    "search for confluence pages using a cql (confluence query language) query string in confluence"
   ],
   "description": "Search for Confluence pages using a CQL (Confluence Query Language) query string.",
   "actionVerb": "search",

@@ -2,8 +2,8 @@
   "slug": "jira.get_issue",
   "service": "atlassian.net",
   "intentSynonyms": [
-    "get a issue in jira",
-    "look up a issue in jira",
+    "get an issue in jira",
+    "look up an issue in jira",
     "fetch a single issue in jira",
     "view one specific issue in jira",
     "get issue in jira",

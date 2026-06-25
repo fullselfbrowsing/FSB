@@ -2,10 +2,10 @@
   "slug": "jira.update_issue",
   "service": "atlassian.net",
   "intentSynonyms": [
-    "update a issue in jira",
-    "edit a issue in jira",
+    "update an issue in jira",
+    "edit an issue in jira",
     "change the details of issue in jira",
-    "modify a issue in jira",
+    "modify an issue in jira",
     "update issue in jira",
     "update an existing issue in jira"
   ],

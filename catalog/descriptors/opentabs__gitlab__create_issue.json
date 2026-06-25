@@ -2,8 +2,8 @@
   "slug": "gitlab.create_issue",
   "service": "gitlab.com",
   "intentSynonyms": [
-    "create a issue in gitlab",
-    "add a issue in gitlab",
+    "create an issue in gitlab",
+    "add an issue in gitlab",
     "make a new issue in gitlab",
     "open a new issue in gitlab",
     "create issue in gitlab",

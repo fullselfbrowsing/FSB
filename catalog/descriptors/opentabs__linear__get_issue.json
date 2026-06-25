@@ -2,8 +2,8 @@
   "slug": "linear.get_issue",
   "service": "linear.app",
   "intentSynonyms": [
-    "get a issue in linear",
-    "look up a issue in linear",
+    "get an issue in linear",
+    "look up an issue in linear",
     "fetch a single issue in linear",
     "view one specific issue in linear",
     "get issue in linear",

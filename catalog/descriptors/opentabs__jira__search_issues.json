@@ -4,7 +4,7 @@
   "intentSynonyms": [
     "search issues in jira",
     "search issues with jql in jira",
-    "search issues jira"
+    "search for jira issues using a jql (jira query language) query string in jira"
   ],
   "description": "Search for Jira issues using a JQL (Jira Query Language) query string.",
   "actionVerb": "search",
