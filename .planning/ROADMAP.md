@@ -101,7 +101,7 @@
   3. The crosscheck CI gate and the eval harness stay green as the corpus grows; descriptor-only slugs in this batch resolve to a non-null tier.
 **Plans**: 3 plans (sensitivity-ascending; the screening lands first and gates the import)
 - [x] 38-01-PLAN.md — Per-app sensitivity screening: classify every comms/social/content batch origin (denied/sensitive/safe) in service-denylist.json + extend the docs/LEGAL.md Categorization Axes; prove the fail-closed merge gate (unclassified social origin aborts), the posture-B sensitive-write re-gate (discord), and the conservative DOM-only default (frozen backing:'dom', no machinery edit)
-- [ ] 38-02-PLAN.md — Import the AI-chat + microblog/fediverse sub-batch (chatgpt, claude, bluesky, mastodon, threads) as DOM-only data via the frozen importer (gated on 38-01); regen snapshot; per-wave crosscheck + no-dead-entry + eval + cold-start green
+- [x] 38-02-PLAN.md — Import the AI-chat + microblog/fediverse sub-batch (chatgpt, claude, bluesky, mastodon, threads) as DOM-only data via the frozen importer (gated on 38-01); regen snapshot; per-wave crosscheck + no-dead-entry + eval + cold-start green
 - [ ] 38-03-PLAN.md — Import the messaging + content-read sub-batch (discord writes, reddit reads) completing the category; prove the sensitive-write gating END-TO-END on the REAL emitted opentabs__discord__send_message descriptor through the live consent gate; regen snapshot; full-category gates green
 
 ### Phase 39: Breadth C — Commerce / Travel / Misc (most-sensitive)
@@ -164,7 +164,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 35. Denylist Expansion + Import-Time Classification Gate | 4/4 | Complete    | 2026-06-24 |
 | 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete    | 2026-06-24 |
 | 37. Breadth A — Dev / Productivity | 4/4 | Complete    | 2026-06-25 |
-| 38. Breadth B — Comms / Social / Content | 1/3 | In Progress|  |
+| 38. Breadth B — Comms / Social / Content | 2/3 | In Progress|  |
 | 39. Breadth C — Commerce / Travel / Misc | 0/TBD | Not started | - |
 | 40. Depth 1 — Top READ Hand-Ports | 0/TBD | Not started | - |
 | 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 0/TBD | Not started | - |
