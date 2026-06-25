@@ -114,7 +114,7 @@
 **Plans**: 7 plans (7 waves -- sequential; the payment screening lands first and gates every import; each import sub-batch regenerates the shared catalog snapshot; the coverage report + the end-to-end payment-write proof close the phase)
   - [x] 39-01-PLAN.md -- Payment-screening machinery: classify the commerce/travel/misc origins per the payment/money-movement axis (payment->sensitive, money-movement->denied, read-only->safe) in service-denylist.json; widen the classification-gate heuristic with payment tokens; add the payment-op CI guard (no payment op safe-and-API-invocable) to the crosscheck; LEGAL axis; fail-closed fixtures + proofs [wave 1] (BRDTH-01/02/03)
   - [x] 39-02-PLAN.md -- Import the food-delivery + rideshare sub-batch (doordash, ubereats, uber, lyft, grubhub, instacart) as DOM-only data on sensitive origins via the frozen importer; regen snapshot; per-wave gates incl. the payment-op guard [wave 2] (BRDTH-01/02/03)
-  - [ ] 39-03-PLAN.md -- Import the retail/marketplace sub-batch (amazon, ebay, etsy, bestbuy, costco, walmart, target); regen snapshot; per-wave gates incl. the payment-op guard [wave 3] (BRDTH-01/02/03)
+  - [x] 39-03-PLAN.md -- Import the retail/marketplace sub-batch (amazon, ebay, etsy, bestbuy, costco, walmart, target); regen snapshot; per-wave gates incl. the payment-op guard [wave 3] (BRDTH-01/02/03)
   - [ ] 39-04-PLAN.md -- Import the travel/transport sub-batch (booking, airbnb, expedia, kayak, opentable); regen snapshot; per-wave gates incl. the payment-op guard [wave 4] (BRDTH-01/02/03)
   - [ ] 39-05-PLAN.md -- Import the events/local-services/scheduling sub-batch (ticketmaster, stubhub, eventbrite [sensitive]; yelp, tripadvisor, calendly [safe, read-only-locked]); extend the roster + READ_ONLY_SAFE; regen snapshot; per-wave gates [wave 5] (BRDTH-01/02/03)
   - [ ] 39-06-PLAN.md -- Import the remaining commerce/misc apps (shopify, craigslist, dominos, chipotle [sensitive]; zillow, grafana [safe]) completing coverage of ALL real apps; regen snapshot; per-wave gates [wave 6] (BRDTH-01/02/03)
@@ -172,7 +172,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete    | 2026-06-24 |
 | 37. Breadth A — Dev / Productivity | 4/4 | Complete    | 2026-06-25 |
 | 38. Breadth B — Comms / Social / Content | 3/3 | Complete    | 2026-06-25 |
-| 39. Breadth C — Commerce / Travel / Misc | 2/7 | In Progress|  |
+| 39. Breadth C — Commerce / Travel / Misc | 3/7 | In Progress|  |
 | 40. Depth 1 — Top READ Hand-Ports | 0/TBD | Not started | - |
 | 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 0/TBD | Not started | - |
 | 42. Discovery Seeding + Tail Learn | 0/TBD | Not started | - |
