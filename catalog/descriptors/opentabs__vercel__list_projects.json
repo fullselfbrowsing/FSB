@@ -1,0 +1,45 @@
+{
+  "slug": "vercel.list_projects",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "list projects in vercel",
+    "show me my projects in vercel",
+    "view my projects in vercel",
+    "see all my projects in vercel"
+  ],
+  "description": "List projects in a Vercel team or personal account. Optionally search by project name.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "description": "Team ID that owns the projects",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search string to filter projects by name",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of projects to return",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

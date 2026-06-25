@@ -37,6 +37,20 @@
       ]
     },
     {
+      "app": "bitbucket",
+      "service": "bitbucket.org",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/bitbucket/",
+      "descriptors": [
+        "bitbucket.create_pull_request",
+        "bitbucket.get_pull_request",
+        "bitbucket.list_pull_requests",
+        "bitbucket.list_repositories"
+      ]
+    },
+    {
       "app": "clickup",
       "service": "app.clickup.com",
       "source": "opentabs",
@@ -62,6 +76,20 @@
         "confluence.get_page",
         "confluence.search_pages",
         "confluence.update_page"
+      ]
+    },
+    {
+      "app": "gitlab",
+      "service": "gitlab.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/gitlab/",
+      "descriptors": [
+        "gitlab.create_issue",
+        "gitlab.create_merge_request",
+        "gitlab.get_issue",
+        "gitlab.list_issues"
       ]
     },
     {
@@ -95,6 +123,20 @@
       ]
     },
     {
+      "app": "netlify",
+      "service": "app.netlify.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/netlify/",
+      "descriptors": [
+        "netlify.create_deploy",
+        "netlify.get_site",
+        "netlify.list_deploys",
+        "netlify.list_sites"
+      ]
+    },
+    {
       "app": "todoist",
       "service": "app.todoist.com",
       "source": "opentabs",
@@ -109,6 +151,20 @@
         "todoist.list_tasks",
         "todoist.reopen_task",
         "todoist.update_task"
+      ]
+    },
+    {
+      "app": "vercel",
+      "service": "vercel.com",
+      "source": "opentabs",
+      "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/vercel/",
+      "descriptors": [
+        "vercel.create_deployment",
+        "vercel.get_deployment",
+        "vercel.list_deployments",
+        "vercel.list_projects"
       ]
     }
   ]

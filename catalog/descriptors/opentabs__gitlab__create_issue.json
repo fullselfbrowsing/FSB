@@ -1,0 +1,73 @@
+{
+  "slug": "gitlab.create_issue",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "create a issue in gitlab",
+    "add a issue in gitlab",
+    "make a new issue in gitlab",
+    "open a new issue in gitlab",
+    "create issue in gitlab",
+    "create a new issue in gitlab"
+  ],
+  "description": "Create a new issue in a GitLab project. Requires a project and a title at minimum. Optionally set description, assignees, labels, milestone, and due date.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID or URL-encoded path (group/project)"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue title"
+      },
+      "description": {
+        "description": "Issue description in markdown",
+        "type": "string"
+      },
+      "assignee_ids": {
+        "description": "User IDs to assign the issue to",
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "labels": {
+        "description": "Label names to apply to the issue",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "milestone_id": {
+        "description": "Milestone ID to associate the issue with",
+        "type": "number"
+      },
+      "due_date": {
+        "description": "Due date as an ISO 8601 date (YYYY-MM-DD)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/create-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

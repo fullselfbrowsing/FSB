@@ -141,6 +141,67 @@
     "backing": "dom"
   },
   {
+    "slug": "bitbucket.create_pull_request",
+    "service": "bitbucket.org",
+    "intentSynonyms": [
+      "create a pull request in bitbucket",
+      "add a pull request in bitbucket",
+      "make a new pull request in bitbucket",
+      "open a new pull request in bitbucket",
+      "create pull request in bitbucket"
+    ],
+    "description": "Open a new pull request in a Bitbucket repository from a source branch into a destination branch. Requires a workspace, repo_slug, source branch, destination branch, and title.",
+    "actionVerb": "create",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "bitbucket.get_pull_request",
+    "service": "bitbucket.org",
+    "intentSynonyms": [
+      "get a pull request in bitbucket",
+      "look up a pull request in bitbucket",
+      "fetch a single pull request in bitbucket",
+      "view one specific pull request in bitbucket",
+      "get pull request in bitbucket",
+      "get a pull request by id in bitbucket"
+    ],
+    "description": "Get detailed information about a specific Bitbucket pull request by its repository and ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "bitbucket.list_pull_requests",
+    "service": "bitbucket.org",
+    "intentSynonyms": [
+      "list pull requests in bitbucket",
+      "show me my pull requests in bitbucket",
+      "view my pull requests in bitbucket",
+      "see all my pull requests in bitbucket",
+      "list pull requests in a repository in bitbucket"
+    ],
+    "description": "List pull requests in a Bitbucket repository. Optionally filter by state (OPEN, MERGED, DECLINED, SUPERSEDED).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "bitbucket.list_repositories",
+    "service": "bitbucket.org",
+    "intentSynonyms": [
+      "list repositories in bitbucket",
+      "show me my repositories in bitbucket",
+      "view my repositories in bitbucket",
+      "see all my repositories in bitbucket",
+      "list repositories in a workspace in bitbucket"
+    ],
+    "description": "List repositories in a Bitbucket workspace. Optionally filter by role or query the repository name.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "calendar.create-event",
     "service": "calendar.google.com",
     "intentSynonyms": [
@@ -363,6 +424,68 @@
     "sideEffectClass": "destructive"
   },
   {
+    "slug": "gitlab.create_issue",
+    "service": "gitlab.com",
+    "intentSynonyms": [
+      "create a issue in gitlab",
+      "add a issue in gitlab",
+      "make a new issue in gitlab",
+      "open a new issue in gitlab",
+      "create issue in gitlab",
+      "create a new issue in gitlab"
+    ],
+    "description": "Create a new issue in a GitLab project. Requires a project and a title at minimum. Optionally set description, assignees, labels, milestone, and due date.",
+    "actionVerb": "create",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "gitlab.create_merge_request",
+    "service": "gitlab.com",
+    "intentSynonyms": [
+      "create a merge request in gitlab",
+      "add a merge request in gitlab",
+      "make a new merge request in gitlab",
+      "open a new merge request in gitlab",
+      "create merge request in gitlab"
+    ],
+    "description": "Open a new merge request in a GitLab project from a source branch into a target branch. Requires a project, source_branch, target_branch, and title.",
+    "actionVerb": "create",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "gitlab.get_issue",
+    "service": "gitlab.com",
+    "intentSynonyms": [
+      "get a issue in gitlab",
+      "look up a issue in gitlab",
+      "fetch a single issue in gitlab",
+      "view one specific issue in gitlab",
+      "get issue in gitlab",
+      "get an issue by iid in gitlab"
+    ],
+    "description": "Get detailed information about a specific GitLab issue by its project and internal IID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "gitlab.list_issues",
+    "service": "gitlab.com",
+    "intentSynonyms": [
+      "list issues in gitlab",
+      "show me my issues in gitlab",
+      "view my issues in gitlab",
+      "see all my issues in gitlab",
+      "list issues in a project in gitlab"
+    ],
+    "description": "List issues in a GitLab project. Optionally filter by state, labels, assignee, or milestone.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
     "slug": "jira.add_comment",
     "service": "atlassian.net",
     "intentSynonyms": [
@@ -513,6 +636,67 @@
     "description": "Update an existing Linear issue. Provide the issue ID and any fields to change.",
     "actionVerb": "update",
     "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "netlify.create_deploy",
+    "service": "app.netlify.com",
+    "intentSynonyms": [
+      "create a deploy in netlify",
+      "add a deploy in netlify",
+      "make a new deploy in netlify",
+      "open a new deploy in netlify",
+      "create deploy in netlify",
+      "trigger a new deploy in netlify"
+    ],
+    "description": "Trigger a new deploy for a Netlify site. Requires a site_id; optionally set the deploy title and target branch.",
+    "actionVerb": "create",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "netlify.get_site",
+    "service": "app.netlify.com",
+    "intentSynonyms": [
+      "get a site in netlify",
+      "look up a site in netlify",
+      "fetch a single site in netlify",
+      "view one specific site in netlify",
+      "get site in netlify",
+      "get a site by id in netlify"
+    ],
+    "description": "Get detailed information about a specific Netlify site by its site ID.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "netlify.list_deploys",
+    "service": "app.netlify.com",
+    "intentSynonyms": [
+      "list deploys in netlify",
+      "show me my deploys in netlify",
+      "view my deploys in netlify",
+      "see all my deploys in netlify",
+      "list deploys for a site in netlify"
+    ],
+    "description": "List deploys for a Netlify site. Optionally filter by state (new, building, ready, error).",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "netlify.list_sites",
+    "service": "app.netlify.com",
+    "intentSynonyms": [
+      "list sites in netlify",
+      "show me my sites in netlify",
+      "view my sites in netlify",
+      "see all my sites in netlify"
+    ],
+    "description": "List sites in a Netlify account or team. Optionally filter by name or owning team slug.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -694,5 +878,65 @@
     "description": "Publish a tweet to your timeline",
     "actionVerb": "post",
     "sideEffectClass": "mutate"
+  },
+  {
+    "slug": "vercel.create_deployment",
+    "service": "vercel.com",
+    "intentSynonyms": [
+      "create a deployment in vercel",
+      "add a deployment in vercel",
+      "make a new deployment in vercel",
+      "open a new deployment in vercel",
+      "create deployment in vercel",
+      "trigger a new deployment in vercel"
+    ],
+    "description": "Trigger a new Vercel deployment for a project. Requires a project name; optionally set the git source ref and target environment.",
+    "actionVerb": "create",
+    "sideEffectClass": "write",
+    "backing": "dom"
+  },
+  {
+    "slug": "vercel.get_deployment",
+    "service": "vercel.com",
+    "intentSynonyms": [
+      "get a deployment in vercel",
+      "look up a deployment in vercel",
+      "fetch a single deployment in vercel",
+      "view one specific deployment in vercel",
+      "get deployment in vercel",
+      "get a deployment by id in vercel"
+    ],
+    "description": "Get detailed information about a specific Vercel deployment by its ID or URL.",
+    "actionVerb": "get",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "vercel.list_deployments",
+    "service": "vercel.com",
+    "intentSynonyms": [
+      "list deployments in vercel",
+      "show me my deployments in vercel",
+      "view my deployments in vercel",
+      "see all my deployments in vercel"
+    ],
+    "description": "List recent deployments for a Vercel project or team. Optionally filter by project, target, or state.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
+  },
+  {
+    "slug": "vercel.list_projects",
+    "service": "vercel.com",
+    "intentSynonyms": [
+      "list projects in vercel",
+      "show me my projects in vercel",
+      "view my projects in vercel",
+      "see all my projects in vercel"
+    ],
+    "description": "List projects in a Vercel team or personal account. Optionally search by project name.",
+    "actionVerb": "list",
+    "sideEffectClass": "read",
+    "backing": "dom"
   }
 ]

@@ -1,0 +1,45 @@
+{
+  "slug": "vercel.get_deployment",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "get a deployment in vercel",
+    "look up a deployment in vercel",
+    "fetch a single deployment in vercel",
+    "view one specific deployment in vercel",
+    "get deployment in vercel",
+    "get a deployment by id in vercel"
+  ],
+  "description": "Get detailed information about a specific Vercel deployment by its ID or URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Deployment ID or URL to retrieve"
+      },
+      "team_id": {
+        "description": "Team ID that owns the deployment",
+        "type": "string"
+      }
+    },
+    "required": [
+      "deployment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/get-deployment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

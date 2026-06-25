@@ -1,0 +1,60 @@
+{
+  "slug": "bitbucket.list_repositories",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "list repositories in bitbucket",
+    "show me my repositories in bitbucket",
+    "view my repositories in bitbucket",
+    "see all my repositories in bitbucket",
+    "list repositories in a workspace in bitbucket"
+  ],
+  "description": "List repositories in a Bitbucket workspace. Optionally filter by role or query the repository name.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace ID or slug to list repositories for"
+      },
+      "role": {
+        "description": "Filter by the caller role on the repository",
+        "type": "string",
+        "enum": [
+          "owner",
+          "admin",
+          "contributor",
+          "member"
+        ]
+      },
+      "q": {
+        "description": "Query string to filter repositories (BBQL)",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number for pagination (1-indexed)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "workspace"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/list-repositories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

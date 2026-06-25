@@ -1,0 +1,62 @@
+{
+  "slug": "bitbucket.list_pull_requests",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "list pull requests in bitbucket",
+    "show me my pull requests in bitbucket",
+    "view my pull requests in bitbucket",
+    "see all my pull requests in bitbucket",
+    "list pull requests in a repository in bitbucket"
+  ],
+  "description": "List pull requests in a Bitbucket repository. Optionally filter by state (OPEN, MERGED, DECLINED, SUPERSEDED).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace ID or slug that owns the repository"
+      },
+      "repo_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Repository slug"
+      },
+      "state": {
+        "description": "Filter by pull request state",
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "MERGED",
+          "DECLINED",
+          "SUPERSEDED"
+        ]
+      },
+      "page": {
+        "description": "Page number for pagination (1-indexed)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/list-pull-requests.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

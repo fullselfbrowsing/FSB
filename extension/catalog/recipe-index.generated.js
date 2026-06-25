@@ -678,6 +678,261 @@
       }
     },
     {
+      "slug": "bitbucket.create_pull_request",
+      "service": "bitbucket.org",
+      "intentSynonyms": [
+        "create a pull request in bitbucket",
+        "add a pull request in bitbucket",
+        "make a new pull request in bitbucket",
+        "open a new pull request in bitbucket",
+        "create pull request in bitbucket"
+      ],
+      "description": "Open a new pull request in a Bitbucket repository from a source branch into a destination branch. Requires a workspace, repo_slug, source branch, destination branch, and title.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Workspace ID or slug that owns the repository"
+          },
+          "repo_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository slug"
+          },
+          "source_branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source branch name to merge from"
+          },
+          "destination_branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination branch name to merge into"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pull request title"
+          },
+          "description": {
+            "description": "Pull request description in markdown",
+            "type": "string"
+          },
+          "reviewers": {
+            "description": "Reviewer account UUIDs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "close_source_branch": {
+            "description": "Delete the source branch on merge",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspace",
+          "repo_slug",
+          "source_branch",
+          "destination_branch",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bitbucket/src/tools/create-pull-request.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "bitbucket.get_pull_request",
+      "service": "bitbucket.org",
+      "intentSynonyms": [
+        "get a pull request in bitbucket",
+        "look up a pull request in bitbucket",
+        "fetch a single pull request in bitbucket",
+        "view one specific pull request in bitbucket",
+        "get pull request in bitbucket",
+        "get a pull request by id in bitbucket"
+      ],
+      "description": "Get detailed information about a specific Bitbucket pull request by its repository and ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Workspace ID or slug that owns the repository"
+          },
+          "repo_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository slug"
+          },
+          "pull_request_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Pull request ID within the repository"
+          }
+        },
+        "required": [
+          "workspace",
+          "repo_slug",
+          "pull_request_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bitbucket/src/tools/get-pull-request.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "bitbucket.list_pull_requests",
+      "service": "bitbucket.org",
+      "intentSynonyms": [
+        "list pull requests in bitbucket",
+        "show me my pull requests in bitbucket",
+        "view my pull requests in bitbucket",
+        "see all my pull requests in bitbucket",
+        "list pull requests in a repository in bitbucket"
+      ],
+      "description": "List pull requests in a Bitbucket repository. Optionally filter by state (OPEN, MERGED, DECLINED, SUPERSEDED).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Workspace ID or slug that owns the repository"
+          },
+          "repo_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository slug"
+          },
+          "state": {
+            "description": "Filter by pull request state",
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "MERGED",
+              "DECLINED",
+              "SUPERSEDED"
+            ]
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "workspace",
+          "repo_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bitbucket/src/tools/list-pull-requests.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "bitbucket.list_repositories",
+      "service": "bitbucket.org",
+      "intentSynonyms": [
+        "list repositories in bitbucket",
+        "show me my repositories in bitbucket",
+        "view my repositories in bitbucket",
+        "see all my repositories in bitbucket",
+        "list repositories in a workspace in bitbucket"
+      ],
+      "description": "List repositories in a Bitbucket workspace. Optionally filter by role or query the repository name.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Workspace ID or slug to list repositories for"
+          },
+          "role": {
+            "description": "Filter by the caller role on the repository",
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "contributor",
+              "member"
+            ]
+          },
+          "q": {
+            "description": "Query string to filter repositories (BBQL)",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bitbucket/src/tools/list-repositories.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
       "slug": "clickup.create_task",
       "service": "app.clickup.com",
       "intentSynonyms": [
@@ -1168,6 +1423,277 @@
           "transportHelper": "api",
           "httpMethod": "PUT",
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "gitlab.create_issue",
+      "service": "gitlab.com",
+      "intentSynonyms": [
+        "create a issue in gitlab",
+        "add a issue in gitlab",
+        "make a new issue in gitlab",
+        "open a new issue in gitlab",
+        "create issue in gitlab",
+        "create a new issue in gitlab"
+      ],
+      "description": "Create a new issue in a GitLab project. Requires a project and a title at minimum. Optionally set description, assignees, labels, milestone, and due date.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID or URL-encoded path (group/project)"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue title"
+          },
+          "description": {
+            "description": "Issue description in markdown",
+            "type": "string"
+          },
+          "assignee_ids": {
+            "description": "User IDs to assign the issue to",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "labels": {
+            "description": "Label names to apply to the issue",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "milestone_id": {
+            "description": "Milestone ID to associate the issue with",
+            "type": "number"
+          },
+          "due_date": {
+            "description": "Due date as an ISO 8601 date (YYYY-MM-DD)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/gitlab/src/tools/create-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "gitlab.create_merge_request",
+      "service": "gitlab.com",
+      "intentSynonyms": [
+        "create a merge request in gitlab",
+        "add a merge request in gitlab",
+        "make a new merge request in gitlab",
+        "open a new merge request in gitlab",
+        "create merge request in gitlab"
+      ],
+      "description": "Open a new merge request in a GitLab project from a source branch into a target branch. Requires a project, source_branch, target_branch, and title.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID or URL-encoded path (group/project)"
+          },
+          "source_branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source branch name to merge from"
+          },
+          "target_branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target branch name to merge into"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Merge request title"
+          },
+          "description": {
+            "description": "Merge request description in markdown",
+            "type": "string"
+          },
+          "assignee_ids": {
+            "description": "User IDs to assign as reviewers",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "labels": {
+            "description": "Label names to apply",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "remove_source_branch": {
+            "description": "Delete the source branch on merge",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project_id",
+          "source_branch",
+          "target_branch",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/gitlab/src/tools/create-merge-request.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "gitlab.get_issue",
+      "service": "gitlab.com",
+      "intentSynonyms": [
+        "get a issue in gitlab",
+        "look up a issue in gitlab",
+        "fetch a single issue in gitlab",
+        "view one specific issue in gitlab",
+        "get issue in gitlab",
+        "get an issue by iid in gitlab"
+      ],
+      "description": "Get detailed information about a specific GitLab issue by its project and internal IID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID or URL-encoded path (group/project)"
+          },
+          "issue_iid": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Internal issue IID within the project"
+          }
+        },
+        "required": [
+          "project_id",
+          "issue_iid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/gitlab/src/tools/get-issue.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "gitlab.list_issues",
+      "service": "gitlab.com",
+      "intentSynonyms": [
+        "list issues in gitlab",
+        "show me my issues in gitlab",
+        "view my issues in gitlab",
+        "see all my issues in gitlab",
+        "list issues in a project in gitlab"
+      ],
+      "description": "List issues in a GitLab project. Optionally filter by state, labels, assignee, or milestone.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID or URL-encoded path (group/project)"
+          },
+          "state": {
+            "description": "Filter by issue state",
+            "type": "string",
+            "enum": [
+              "opened",
+              "closed",
+              "all"
+            ]
+          },
+          "labels": {
+            "description": "Filter by label names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assignee_username": {
+            "description": "Filter by assignee username",
+            "type": "string"
+          },
+          "milestone": {
+            "description": "Filter by milestone title",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/gitlab/src/tools/list-issues.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
         }
       }
     },
@@ -1738,6 +2264,201 @@
       }
     },
     {
+      "slug": "netlify.create_deploy",
+      "service": "app.netlify.com",
+      "intentSynonyms": [
+        "create a deploy in netlify",
+        "add a deploy in netlify",
+        "make a new deploy in netlify",
+        "open a new deploy in netlify",
+        "create deploy in netlify",
+        "trigger a new deploy in netlify"
+      ],
+      "description": "Trigger a new deploy for a Netlify site. Requires a site_id; optionally set the deploy title and target branch.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site ID to deploy"
+          },
+          "title": {
+            "description": "Deploy title",
+            "type": "string"
+          },
+          "branch": {
+            "description": "Git branch to deploy",
+            "type": "string"
+          },
+          "clear_cache": {
+            "description": "Clear the build cache before deploying",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/netlify/src/tools/create-deploy.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "netlify.get_site",
+      "service": "app.netlify.com",
+      "intentSynonyms": [
+        "get a site in netlify",
+        "look up a site in netlify",
+        "fetch a single site in netlify",
+        "view one specific site in netlify",
+        "get site in netlify",
+        "get a site by id in netlify"
+      ],
+      "description": "Get detailed information about a specific Netlify site by its site ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site ID to retrieve"
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/netlify/src/tools/get-site.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "netlify.list_deploys",
+      "service": "app.netlify.com",
+      "intentSynonyms": [
+        "list deploys in netlify",
+        "show me my deploys in netlify",
+        "view my deploys in netlify",
+        "see all my deploys in netlify",
+        "list deploys for a site in netlify"
+      ],
+      "description": "List deploys for a Netlify site. Optionally filter by state (new, building, ready, error).",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site ID to list deploys for"
+          },
+          "state": {
+            "description": "Filter by deploy state",
+            "type": "string",
+            "enum": [
+              "new",
+              "building",
+              "ready",
+              "error"
+            ]
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/netlify/src/tools/list-deploys.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "netlify.list_sites",
+      "service": "app.netlify.com",
+      "intentSynonyms": [
+        "list sites in netlify",
+        "show me my sites in netlify",
+        "view my sites in netlify",
+        "see all my sites in netlify"
+      ],
+      "description": "List sites in a Netlify account or team. Optionally filter by name or owning team slug.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "team_slug": {
+            "description": "Team slug that owns the sites",
+            "type": "string"
+          },
+          "name": {
+            "description": "Filter sites by name substring",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page number for pagination (1-indexed)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/netlify/src/tools/list-sites.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
       "slug": "todoist.close_task",
       "service": "app.todoist.com",
       "intentSynonyms": [
@@ -2129,6 +2850,222 @@
           "transportHelper": "api",
           "httpMethod": "POST",
           "opNameVerb": "update"
+        }
+      }
+    },
+    {
+      "slug": "vercel.create_deployment",
+      "service": "vercel.com",
+      "intentSynonyms": [
+        "create a deployment in vercel",
+        "add a deployment in vercel",
+        "make a new deployment in vercel",
+        "open a new deployment in vercel",
+        "create deployment in vercel",
+        "trigger a new deployment in vercel"
+      ],
+      "description": "Trigger a new Vercel deployment for a project. Requires a project name; optionally set the git source ref and target environment.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name to deploy"
+          },
+          "project_id": {
+            "description": "Project ID to deploy",
+            "type": "string"
+          },
+          "team_id": {
+            "description": "Team ID that owns the project",
+            "type": "string"
+          },
+          "target": {
+            "description": "Deployment target environment",
+            "type": "string",
+            "enum": [
+              "production",
+              "preview"
+            ]
+          },
+          "git_ref": {
+            "description": "Git branch, tag, or commit SHA to deploy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/vercel/src/tools/create-deployment.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "vercel.get_deployment",
+      "service": "vercel.com",
+      "intentSynonyms": [
+        "get a deployment in vercel",
+        "look up a deployment in vercel",
+        "fetch a single deployment in vercel",
+        "view one specific deployment in vercel",
+        "get deployment in vercel",
+        "get a deployment by id in vercel"
+      ],
+      "description": "Get detailed information about a specific Vercel deployment by its ID or URL.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "deployment_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Deployment ID or URL to retrieve"
+          },
+          "team_id": {
+            "description": "Team ID that owns the deployment",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deployment_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/vercel/src/tools/get-deployment.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "vercel.list_deployments",
+      "service": "vercel.com",
+      "intentSynonyms": [
+        "list deployments in vercel",
+        "show me my deployments in vercel",
+        "view my deployments in vercel",
+        "see all my deployments in vercel"
+      ],
+      "description": "List recent deployments for a Vercel project or team. Optionally filter by project, target, or state.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "description": "Project ID or name to scope deployments to",
+            "type": "string"
+          },
+          "team_id": {
+            "description": "Team ID that owns the deployments",
+            "type": "string"
+          },
+          "target": {
+            "description": "Filter by deployment target",
+            "type": "string",
+            "enum": [
+              "production",
+              "preview"
+            ]
+          },
+          "state": {
+            "description": "Filter by deployment state",
+            "type": "string",
+            "enum": [
+              "BUILDING",
+              "ERROR",
+              "INITIALIZING",
+              "QUEUED",
+              "READY",
+              "CANCELED"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of deployments to return",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/vercel/src/tools/list-deployments.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
+        }
+      }
+    },
+    {
+      "slug": "vercel.list_projects",
+      "service": "vercel.com",
+      "intentSynonyms": [
+        "list projects in vercel",
+        "show me my projects in vercel",
+        "view my projects in vercel",
+        "see all my projects in vercel"
+      ],
+      "description": "List projects in a Vercel team or personal account. Optionally search by project name.",
+      "actionVerb": "list",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "description": "Team ID that owns the projects",
+            "type": "string"
+          },
+          "search": {
+            "description": "Search string to filter projects by name",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of projects to return",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/vercel/src/tools/list-projects.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "list"
         }
       }
     },

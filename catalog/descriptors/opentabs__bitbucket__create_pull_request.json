@@ -1,0 +1,79 @@
+{
+  "slug": "bitbucket.create_pull_request",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "create a pull request in bitbucket",
+    "add a pull request in bitbucket",
+    "make a new pull request in bitbucket",
+    "open a new pull request in bitbucket",
+    "create pull request in bitbucket"
+  ],
+  "description": "Open a new pull request in a Bitbucket repository from a source branch into a destination branch. Requires a workspace, repo_slug, source branch, destination branch, and title.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace ID or slug that owns the repository"
+      },
+      "repo_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Repository slug"
+      },
+      "source_branch": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Source branch name to merge from"
+      },
+      "destination_branch": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Destination branch name to merge into"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Pull request title"
+      },
+      "description": {
+        "description": "Pull request description in markdown",
+        "type": "string"
+      },
+      "reviewers": {
+        "description": "Reviewer account UUIDs",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "close_source_branch": {
+        "description": "Delete the source branch on merge",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "source_branch",
+      "destination_branch",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/create-pull-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

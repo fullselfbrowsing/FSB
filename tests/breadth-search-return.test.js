@@ -57,13 +57,14 @@ global.MiniSearch = MiniSearch;
 // ---- Load the REAL emitted dev/productivity collision corpus ----------------
 // linear (GraphQL/camelCase -- the MED-03 collision app) + asana (create_task --
 // the cross-app near-neighbor) + todoist (the Phase-36 smoke slice) + the Phase-37
-// sub-batch-2 apps clickup/jira/confluence/airtable. These are the EXACT flat
-// descriptors package-extension.mjs inlines; this test indexes the live shipped data,
-// not a hand-written stand-in. The jira/confluence pair (both *.atlassian.net) is the
+// sub-batch-2 apps clickup/jira/confluence/airtable + the sub-batch-3 code-hosting +
+// deploy apps gitlab/bitbucket/vercel/netlify. These are the EXACT flat descriptors
+// package-extension.mjs inlines; this test indexes the live shipped data, not a
+// hand-written stand-in. The jira/confluence pair (both *.atlassian.net) is the
 // STEM_OVERRIDES distinctness proof: each must top its OWN slug, never the sibling's.
 const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter(function (name) {
-    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable)__/.test(name) && name.endsWith('.json');
+    return /^opentabs__(linear|asana|todoist|clickup|jira|confluence|airtable|gitlab|bitbucket|vercel|netlify)__/.test(name) && name.endsWith('.json');
   })
   .sort();
 
@@ -71,8 +72,8 @@ const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
 
-check(corpus.length >= 34,
-  'loaded the REAL emitted dev/productivity corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable)');
+check(corpus.length >= 50,
+  'loaded the REAL emitted dev/productivity corpus (got ' + corpus.length + ' descriptors: 5 linear + 4 asana + 7 todoist + 4 clickup + 5 jira + 4 confluence + 5 airtable + 4 gitlab + 4 bitbucket + 4 vercel + 4 netlify)');
 
 // Plant the build-time catalog global the module's buildOrRestore() reads.
 global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
@@ -98,6 +99,18 @@ const COLLISION_SET = [
   // one indistinguishable service; each MUST top its OWN slug here (T-37-08).
   { query: 'create an issue in jira', expected: 'jira.create_issue' },
   { query: 'create a page in confluence', expected: 'confluence.create_page' },
+  // Phase-37 sub-batch-3 (code-hosting + deploy) cross-app create_* near-neighbors.
+  // gitlab.create_issue is a direct near-neighbor of linear.create_issue AND
+  // jira.create_issue (all "create an issue ..."); the app token MUST disambiguate.
+  { query: 'create an issue in gitlab', expected: 'gitlab.create_issue' },
+  // merge-request (gitlab) vs pull-request (bitbucket): the two code-review write ops
+  // -- distinct nouns + distinct stems must each top their OWN slug, never cross.
+  { query: 'open a merge request in gitlab', expected: 'gitlab.create_merge_request' },
+  { query: 'open a pull request in bitbucket', expected: 'bitbucket.create_pull_request' },
+  // deployment (vercel) vs deploy (netlify): the two deploy-trigger write ops -- the
+  // closest cross-app near-neighbor pair in this sub-batch; each must top its own slug.
+  { query: 'trigger a new deployment in vercel', expected: 'vercel.create_deployment' },
+  { query: 'trigger a new deploy in netlify', expected: 'netlify.create_deploy' },
 ];
 
 (async function run() {

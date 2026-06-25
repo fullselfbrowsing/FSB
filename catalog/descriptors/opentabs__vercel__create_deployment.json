@@ -1,0 +1,61 @@
+{
+  "slug": "vercel.create_deployment",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "create a deployment in vercel",
+    "add a deployment in vercel",
+    "make a new deployment in vercel",
+    "open a new deployment in vercel",
+    "create deployment in vercel",
+    "trigger a new deployment in vercel"
+  ],
+  "description": "Trigger a new Vercel deployment for a project. Requires a project name; optionally set the git source ref and target environment.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project name to deploy"
+      },
+      "project_id": {
+        "description": "Project ID to deploy",
+        "type": "string"
+      },
+      "team_id": {
+        "description": "Team ID that owns the project",
+        "type": "string"
+      },
+      "target": {
+        "description": "Deployment target environment",
+        "type": "string",
+        "enum": [
+          "production",
+          "preview"
+        ]
+      },
+      "git_ref": {
+        "description": "Git branch, tag, or commit SHA to deploy",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/create-deployment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "slug": "gitlab.list_issues",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list issues in gitlab",
+    "show me my issues in gitlab",
+    "view my issues in gitlab",
+    "see all my issues in gitlab",
+    "list issues in a project in gitlab"
+  ],
+  "description": "List issues in a GitLab project. Optionally filter by state, labels, assignee, or milestone.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID or URL-encoded path (group/project)"
+      },
+      "state": {
+        "description": "Filter by issue state",
+        "type": "string",
+        "enum": [
+          "opened",
+          "closed",
+          "all"
+        ]
+      },
+      "labels": {
+        "description": "Filter by label names",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "assignee_username": {
+        "description": "Filter by assignee username",
+        "type": "string"
+      },
+      "milestone": {
+        "description": "Filter by milestone title",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number for pagination (1-indexed)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

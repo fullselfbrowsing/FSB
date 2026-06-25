@@ -113,5 +113,37 @@
 
   { "intent": "delete a record in airtable", "expectedSlug": "airtable.delete_record" },
   { "intent": "permanently remove an airtable record", "expectedSlug": "airtable.delete_record" },
-  { "intent": "trash a record from airtable for good", "expectedSlug": "airtable.delete_record" }
+  { "intent": "trash a record from airtable for good", "expectedSlug": "airtable.delete_record" },
+
+  { "intent": "list issues in gitlab", "expectedSlug": "gitlab.list_issues" },
+  { "intent": "show me my gitlab issues", "expectedSlug": "gitlab.list_issues" },
+
+  { "intent": "create an issue in gitlab", "expectedSlug": "gitlab.create_issue" },
+
+  { "intent": "open a merge request in gitlab", "expectedSlug": "gitlab.create_merge_request" },
+  { "intent": "create a merge request in gitlab", "expectedSlug": "gitlab.create_merge_request" },
+
+  { "intent": "list pull requests in bitbucket", "expectedSlug": "bitbucket.list_pull_requests" },
+  { "intent": "show me my bitbucket pull requests", "expectedSlug": "bitbucket.list_pull_requests" },
+
+  { "intent": "list repositories in bitbucket", "expectedSlug": "bitbucket.list_repositories" },
+
+  { "intent": "open a pull request in bitbucket", "expectedSlug": "bitbucket.create_pull_request" },
+  { "intent": "create a pull request in bitbucket", "expectedSlug": "bitbucket.create_pull_request" },
+
+  { "intent": "list my vercel deployments", "expectedSlug": "vercel.list_deployments" },
+  { "intent": "show me my deployments in vercel", "expectedSlug": "vercel.list_deployments" },
+
+  { "intent": "list projects in vercel", "expectedSlug": "vercel.list_projects" },
+
+  { "intent": "trigger a new deployment in vercel", "expectedSlug": "vercel.create_deployment" },
+  { "intent": "create a deployment in vercel", "expectedSlug": "vercel.create_deployment" },
+
+  { "intent": "list sites in netlify", "expectedSlug": "netlify.list_sites" },
+  { "intent": "show me my netlify sites", "expectedSlug": "netlify.list_sites" },
+
+  { "intent": "list deploys for a site in netlify", "expectedSlug": "netlify.list_deploys" },
+
+  { "intent": "trigger a new deploy in netlify", "expectedSlug": "netlify.create_deploy" },
+  { "intent": "create a deploy in netlify", "expectedSlug": "netlify.create_deploy" }
 ]
