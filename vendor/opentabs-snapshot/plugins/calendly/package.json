@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs calendly plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://calendly.com/* -> service calendly.com). calendly.com is the APEX (NOT www.calendly.com -- the apex derives the stem 'calendly' directly), so the dir-name STEM_OVERRIDES {calendly:'calendly'} pins the slug to opentabs__calendly__* for stability (same as reddit's apex pattern; the stem already derives correctly). calendly.com is left UNCLASSIFIED (SAFE) in extension/config/service-denylist.json -- it is a read-only scheduling/availability app (listing event types + availability + scheduled events are reads; reads run under Auto with no mutating re-gate). It is added to verify-catalog-crosscheck.mjs READ_ONLY_SAFE_SERVICES (the 38 MED-02 guard) SPECIFICALLY because its vendored ops are read-only, so a FUTURE re-vendor adding a write op for calendly would FAIL the build (forcing an explicit re-classification). NOTE: booking a Calendly slot is the INVITEE flow (out of scope per 39-CONTEXT); this slice vendors ONLY the read surface. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, calendly-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing. ALL ops are read (api {method:'GET'}); NO write op, NO payment verb -> the READ_ONLY_SAFE guard PASSES and the payment-op guard never keys on calendly.",
+  "name": "@opentabs-dev/opentabs-plugin-calendly",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Calendly",
+    "description": "OpenTabs plugin for Calendly",
+    "urlPatterns": [
+      "*://calendly.com/*"
+    ],
+    "homepage": "https://calendly.com"
+  },
+  "license": "MIT"
+}

@@ -192,11 +192,27 @@ function enumerateBatchApps() {
 // cloudflare/datadog/threads (a DATA-MAP extension of the 37-01 per-app extension point,
 // NOT a logic change, so INV-01 holds). The `service` field keeps the real www-host;
 // only the stem/slug/filename is canonicalized. 39-01's classifications are NOT changed.
+//
+// PHASE 39 (39-05, events + local-services/scheduling): the 6 apps span BOTH tiers. The
+// PAYMENT-bearing event apps ticketmaster/stubhub/eventbrite vendor *://www.<app>.com/* (the
+// EXACT www origins 39-05 screened SENSITIVE on the payment/money-movement axis -- buy_tickets/
+// register_for_event move money) and derive the host stem 'www'. The READ-ONLY apps yelp/
+// tripadvisor vendor *://www.<app>.com/* (left SAFE -- read-only reviews/listings) and also
+// derive 'www'; calendly vendors the APEX *://calendly.com/* (like reddit -- the apex derives
+// 'calendly' directly). The dir-name-keyed override canonicalizes each slug to opentabs__<app>__*
+// (0 opentabs__www__*) -- the SAME first-label-isn't-the-app-name canonicalization as the
+// 39-02/03/04 commerce/travel apps and cloudflare/datadog/threads (a DATA-MAP extension of the
+// 37-01 per-app extension point, NOT a logic change, so INV-01 holds; calendly's apex already
+// derives correctly but is pinned for slug stability, as reddit's apex pattern). The `service`
+// field keeps the real host; only the stem/slug/filename is canonicalized. 39-01's
+// classifications are NOT changed.
 const STEM_OVERRIDES = {
   jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog', threads: 'threads',
   doordash: 'doordash', ubereats: 'ubereats', grubhub: 'grubhub', instacart: 'instacart', uber: 'uber', lyft: 'lyft',
   amazon: 'amazon', ebay: 'ebay', etsy: 'etsy', bestbuy: 'bestbuy', costco: 'costco', walmart: 'walmart', target: 'target',
   booking: 'booking', airbnb: 'airbnb', expedia: 'expedia', kayak: 'kayak', opentable: 'opentable',
+  ticketmaster: 'ticketmaster', stubhub: 'stubhub', eventbrite: 'eventbrite',
+  yelp: 'yelp', tripadvisor: 'tripadvisor', calendly: 'calendly',
 };
 
 function displayServiceStem(app, derivedStem) {

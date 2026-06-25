@@ -167,7 +167,24 @@ export function crossCheck(descriptors) {
 // sensitiveOrigins so its writes are posture-B gated) rather than shipping it
 // writable-under-Auto. The set is intentionally SMALL + curated: an origin earns a
 // place here ONLY when it is left safe SPECIFICALLY because it is content-read-only.
-const READ_ONLY_SAFE_SERVICES = new Set(['reddit.com', 'www.reddit.com']);
+//
+// Phase 39-05 (BRDTH-02) extends the set with the genuinely-read-only local-services /
+// scheduling apps the events sub-batch imports -- www.yelp.com + www.tripadvisor.com
+// (local/travel reviews + listings: search_*/get_*/list_reviews, all GET reads) and
+// calendly.com (scheduling availability: list_event_types/get_availability/
+// list_scheduled_events, all GET reads). Each is left SAFE (absent from
+// sensitiveOrigins) SPECIFICALLY because its vendored ops are read-only -- so a FUTURE
+// re-vendor that adds a write op for one (a yelp/tripadvisor review POST, a calendly
+// booking, a partner hotel-booking) would emit it under that service, classify NOT
+// sensitive, and ship writable-under-Auto. Listing them here turns that into a CHECKED
+// invariant: any non-read op for these origins FAILS the build, forcing an explicit
+// re-classification (add the origin to sensitiveOrigins) rather than a silent
+// writable-under-Auto ship. The hosts are the EXACT services each app vendors,
+// lowercased (www.yelp.com / www.tripadvisor.com / calendly.com).
+const READ_ONLY_SAFE_SERVICES = new Set([
+  'reddit.com', 'www.reddit.com',
+  'www.yelp.com', 'www.tripadvisor.com', 'calendly.com',
+]);
 
 /**
  * checkReadOnlySafeOrigins(descriptors) -> { failures: string[] }
