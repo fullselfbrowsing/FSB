@@ -222,7 +222,17 @@
   // ---- A deterministic catalogVersion stamp (count + slug-content hash) -------
   function _computeCatalogVersion(descriptors, recipes, declaredVersion) {
     var parts = (descriptors || []).map(function(d) { return d && d.slug ? d.slug : ''; }).sort();
-    var seed = parts.join('|') + '#' + (recipes ? recipes.length : 0) + '#' + (declaredVersion || '');
+    // LOW-01 (37-REVIEW): fold the INDEX shape (the searchable `fields` + the
+    // returned-on-hit `storeFields`) into the version seed. MiniSearch.loadJSON does
+    // NOT validate storeFields, so a snapshot serialized BEFORE a storeFields-only
+    // edit (e.g. before `backing` was added) whose slug set still matches would
+    // restore cleanly and carry the field as `undefined` -- a stale snapshot with
+    // backing===undefined mis-annotating an invocable head slug. Including the shape
+    // here makes any fields/storeFields change shift the version -> the stale snapshot
+    // is rejected and the index rebuilds. INV-01: ONLY the seed string widens; the
+    // djb2 loop and the IIFE wrapper shape are byte-stable.
+    var seed = parts.join('|') + '#' + (recipes ? recipes.length : 0) + '#' + (declaredVersion || '')
+             + '#' + INDEX_OPTIONS.storeFields.join(',') + '#' + INDEX_OPTIONS.fields.join(',');
     // Simple, dependency-free 32-bit string hash (djb2). Pure arithmetic -- no
     // dynamic-code constructs on the recipe path.
     var hash = 5381;
