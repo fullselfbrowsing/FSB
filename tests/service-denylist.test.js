@@ -239,7 +239,7 @@ function installChromeStorageStub() {
     'https://claude.ai',                 // exact -- AI-chat
     'https://bsky.app',                  // exact -- microblog social
     'https://mastodon.social',           // exact -- fediverse social
-    'https://www.threads.net'            // exact -- microblog social
+    'https://www.threads.net'            // via https://*.threads.net (suffix; LOW-01) -- microblog social
   ];
   for (const origin of sensitiveRoster) {
     const c = Denylist.classify(origin);
@@ -263,6 +263,22 @@ function installChromeStorageStub() {
   const cBenign = Denylist.classify('https://github.com');
   check(cBenign && cBenign.sensitive === false && cBenign.denied === false,
     "negative control: a benign non-roster origin (github.com) stays { sensitive:false, denied:false }");
+
+  // LOW-01 (38-REVIEW): threads broadened from the EXACT https://www.threads.net to
+  // the https://*.threads.net subdomain-wildcard so the screened set covers the bare
+  // apex + www + any subdomain (matching the '*.'-form used for the other apex-bearing
+  // social brands). Before, the bare apex https://threads.net classified
+  // { sensitive:false } -- an uncovered origin the user could be on. All three forms
+  // must now classify sensitive; the importer stays pinned to www.threads.net for slug
+  // derivation (the descriptor's service field is unaffected by this classify change).
+  check(Denylist.classify('https://threads.net').sensitive === true,
+    "LOW-01: classify('https://threads.net') (bare apex) -> sensitive:true (was false under the exact-host form; now covered by *.threads.net)");
+  check(Denylist.classify('https://www.threads.net').sensitive === true,
+    "LOW-01: classify('https://www.threads.net') (www) still -> sensitive:true (the emitted importer origin stays screened)");
+  check(Denylist.classify('https://m.threads.net').sensitive === true,
+    "LOW-01: classify('https://m.threads.net') (an arbitrary subdomain) -> sensitive:true (the wildcard covers any subdomain)");
+  check(Denylist.classify('https://threads.net').denied === false,
+    "LOW-01: classify('https://threads.net') -> denied:false (sensitive, not denied -- reads under Auto, writes posture-B gated)");
 
   // Regression guard: the existing FSB seed survived the expansion.
   check(Denylist.classify('https://www.chase.com').denied === true,
