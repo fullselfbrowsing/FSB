@@ -86,8 +86,25 @@ const AXES = [
     re: /\b(health|clinic|patient|medical|pharmacy|rx|insur|insurance|dental|therapy|medicare|medicaid)\b/i,
   },
   {
+    // MED-01 (38-REVIEW): widen the social/messaging vocabulary so the heuristic
+    // INDEPENDENTLY backstops the Phase-38 comms/social write category -- the AI-chat
+    // (chatgpt/claude), microblog/fediverse (bluesky/bsky/mastodon/threads), and the
+    // general-class (fediverse/microblog/ai-assistant) tokens. Before this, only
+    // `discord` of the 6 new write origins tripped the axis, so the explicit
+    // sensitiveOrigins line was a SINGLE POINT OF FAILURE: an accidentally-dropped
+    // classification for chatgpt/claude/bsky/mastodon/threads would have PASSED the
+    // gate and shipped that app's send_message/create_post/create_status/create_thread
+    // writable-under-Auto -- the exact "gap == allow" failure the gate exists to
+    // prevent. The added tokens are deliberately BRAND-SPECIFIC (+ two general-class
+    // nouns) and were verified against the full corpus to trip ALL 6 social write
+    // origins WITHOUT false-positiving benign dev apps: a bare `post`/`feed`/`dm` was
+    // REJECTED because reddit's READ descriptors ("reddit post", "posts in a
+    // subreddit") would have falsely tripped -- reddit stays safe-by-default (it is in
+    // no axis), per this module's fail-closed policy (widen, never weaken; a benign
+    // false-positive is fixed via SAFE_ALLOWLIST). slack.chat.postMessage is already
+    // classified sensitive, so the gate continues past it before the heuristic runs.
     axis: 'social/messaging',
-    re: /\b(instagram|facebook|tiktok|twitter|whatsapp|telegram|messenger|snapchat|discord|linkedin|direct-message|slack|signal)\b/i,
+    re: /\b(instagram|facebook|tiktok|twitter|whatsapp|telegram|messenger|snapchat|discord|linkedin|direct-message|slack|signal|chatgpt|claude|ai-assistant|bluesky|bsky|mastodon|threads|fediverse|microblog)\b/i,
   },
   {
     axis: 'media',

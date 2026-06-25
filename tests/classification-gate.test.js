@@ -132,6 +132,49 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   check(benignShipped && benignShipped.failures.length === 0,
     '(f) benign [reddit.inbox, github.notifications, airtable, wikipedia] -> 0 failures (MD-02 widening kept no-false-positive)');
 
+  // (g) MED-01 (38-REVIEW) BACKSTOP: the heuristic now INDEPENDENTLY flags all 6 of
+  //     the Phase-38 comms/social WRITE origins on host+slug+description alone -- so an
+  //     accidentally-dropped explicit sensitiveOrigins line for chatgpt/claude/bsky/
+  //     mastodon/threads (discord already tripped) would FAIL the build instead of
+  //     silently re-enabling writes. This loads each REAL EMITTED write descriptor
+  //     FROM DISK and asserts sensitivityHeuristic(host, slug, description) returns
+  //     { suspect:true, axis:'social/messaging' } -- the safety net, proven, not the
+  //     current shipped state (which is correct: all 6 are explicitly classified).
+  check(typeof gate.sensitivityHeuristic === 'function',
+    '(g) verify-classification-gate.mjs exports sensitivityHeuristic (the backstop under test)');
+  const DESCRIPTORS_DIR = path.join(REPO_ROOT, 'catalog', 'descriptors');
+  const socialWriteDescriptors = [
+    'opentabs__chatgpt__send_message.json',
+    'opentabs__claude__send_message.json',
+    'opentabs__bsky__create_post.json',
+    'opentabs__mastodon__create_status.json',
+    'opentabs__threads__create_thread.json',
+    'opentabs__discord__send_message.json',
+  ];
+  for (const fileName of socialWriteDescriptors) {
+    const filePath = path.join(DESCRIPTORS_DIR, fileName);
+    check(fs.existsSync(filePath), '(g) the REAL emitted ' + fileName + ' exists on disk (the screened write descriptor)');
+    const d = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const host = String(d.service || '').toLowerCase();
+    const verdict = gate.sensitivityHeuristic(host, d.slug, d.description);
+    check(verdict && verdict.suspect === true && verdict.axis === 'social/messaging',
+      '(g) sensitivityHeuristic trips social/messaging for ' + d.slug + ' (' + host + ') [matched "' + (verdict && verdict.keyword) + '"] -- the explicit-classification SPOF is now backstopped');
+  }
+  // (g) NO-FALSE-POSITIVE REASSERTED for the MED-01 widening: reddit READS carry
+  // "post"/"posts" heavily ("reddit post", "posts in a subreddit") but reddit is
+  // safe-by-default (in NO axis), so the heuristic must NOT trip on them -- the
+  // widening deliberately added brand tokens (chatgpt/claude/bsky/mastodon/threads),
+  // never a bare `post`/`feed`/`dm`. Proven directly over the real reddit read shapes.
+  const redditReadHay = [
+    ['reddit.com', 'reddit.get_post', 'Get a single Reddit post by its ID, including its body and top-level comments.'],
+    ['reddit.com', 'reddit.list_subreddit_posts', 'List posts in a subreddit, sorted hot/new/top/rising.'],
+  ];
+  for (const [host, slug, desc] of redditReadHay) {
+    const verdict = gate.sensitivityHeuristic(host, slug, desc);
+    check(verdict && verdict.suspect === false,
+      '(g) sensitivityHeuristic does NOT trip on the reddit READ ' + slug + ' (reddit stays safe-by-default; the MED-01 widening added no bare post/feed/dm token)');
+  }
+
   // The package.json chain wiring is asserted separately (acceptance check 4 in
   // the plan): validate:extension contains verify-classification-gate.mjs and the
   // test chain contains this file. Assert it here too so the test self-guards the
