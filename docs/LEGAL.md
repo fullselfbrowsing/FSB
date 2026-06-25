@@ -188,6 +188,48 @@ of truth that resolves an origin to denied / sensitive / safe.
    learn-seeded -- so a ToS-hostile or AI-chat app is never auto-driven through a
    fabricated API call from guessed auth.
 
+   **Payment / money-movement classification (the commerce / travel / misc
+   batch).** The most-sensitive import batch is screened along a payment dimension
+   layered onto these three axes, because **a payment-bearing op writable under Auto
+   = money moved without consent** (an order placed, a card charged, a paid
+   reservation booked). The classification follows the money:
+   - **Payment-bearing commerce / travel / paid-booking origins -> sensitive.** Food
+     delivery and rideshare (**doordash**, **ubereats**, **uber**, **lyft**,
+     **grubhub**, **instacart**, **dominos**, **chipotle**), retail / marketplace
+     checkout (**amazon**, **ebay**, **etsy**, **bestbuy**, **costco**, **walmart**,
+     **target**, **craigslist**, **shopify**), and travel / transport paid bookings
+     (**booking**, **airbnb**, **expedia**, **kayak**, **opentable**) are classified
+     **sensitive** -- their reads run under Auto, their writes (place-order /
+     checkout / book) re-enforce the per-origin mutating opt-in (posture B). This is
+     the **conservative default** for the category: an unknown commerce / payment app
+     defaults toward LESS reach (sensitive, never safe-writable). **opentable** is
+     sensitive **unconditionally** -- an OpenTable reservation holds a card, so a
+     held-card / paid reservation is payment-adjacent even when no "checkout" op is
+     present.
+   - **Pure money-movement apps -> denied.** Standalone peer-to-peer money-transfer /
+     wallet apps whose primary function is direct money movement with no benign read
+     surface (**paypal**, **venmo**, **cash app**, **wise**, **western union**) are
+     **denied** on the money-harm basis (axes 1/2) -- never imported, even DOM-only,
+     like the DENY-01 brokerage set.
+   - **Read-only commerce browsing -> safe.** Pure-availability or read-only apps
+     whose vendored ops are all reads (**calendly** availability links, **yelp** /
+     **tripadvisor** business search, **zillow** listings, **grafana** dashboards)
+     stay **safe** (unclassified, reads run under Auto). The import-time heuristic's
+     payment tokens are deliberately SPECIFIC (checkout / cart / place-order / charge,
+     NOT a bare order / book / reserve) so a benign commerce read is not false-tripped;
+     a safe commerce origin is added to the read-only-safe invariant set ONLY when its
+     emitted ops are verified read-only.
+
+   What makes **money-movement-under-Auto impossible** is a **triple mitigation**,
+   established for this batch before any payment descriptor lands: (a) every breadth
+   descriptor is **DOM-only** (not API-invocable -- the frozen backing default);
+   (b) an import-time **payment-op CI guard** fails the build if any payment-bearing
+   op (checkout / pay / place_order / charge / complete_booking / buy_tickets /
+   book_flight / request_ride / place_bid / create_order / ...) is ever classified
+   **safe-and-API-invocable**; and (c) payment origins are **sensitive** (posture-B
+   gated) or **denied**. A payment write therefore can only flow as a DOM-path action
+   on a sensitive origin, where the per-origin mutating opt-in re-gates it.
+
 The denial axes (1 and 2) make an origin non-enableable; the sensitivity axis (3)
 keeps the origin usable but re-applies write-time friction. An import-time
 classification gate fails the build if a sensitivity-suspect origin is left
