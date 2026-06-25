@@ -61,10 +61,23 @@ check(/THE SOFTWARE IS PROVIDED "AS IS"/.test(pin),
 
 // ---- the two _provenance.json scaffolds MATCH on the pinned SHA ----
 const vprov = JSON.parse(fs.readFileSync(VENDOR_PROV, 'utf8'));
-check(vprov.sha === SHA && vprov.license === 'MIT' && Array.isArray(vprov.apps) && vprov.apps.length === 0,
-  'vendor _provenance.json: { sha: pinned, license: "MIT", apps: [] }');
+check(vprov.sha === SHA && vprov.license === 'MIT' && Array.isArray(vprov.apps),
+  'vendor _provenance.json: { sha: pinned, license: "MIT", apps: [...] }');
 check(vprov.source === 'opentabs',
   'vendor _provenance.json source === "opentabs"');
+// Phase 39.5-01 (BRDTH-01) AUGMENT: the vendor-side provenance now records the 13
+// hand-authored-only apps (NO upstream at the pinned SHA) as explicit no-upstream
+// markers (source: 'hand-authored') so a future full import never mistakes them for
+// real-source. Real opentabs apps are NOT pre-populated here -- the importer's
+// fillProvenance() fills the CATALOG-side provenance
+// (catalog/descriptors/_fixtures/_provenance.json) at import time (Plan 39.5-04).
+const vHandOnly = vprov.apps.filter((a) => a && /hand/i.test(String(a.source || '')));
+check(vHandOnly.length >= 13,
+  'vendor _provenance.json records >= 13 hand-authored-only (no-upstream@SHA) app markers (the augment preserve set)');
+check(vHandOnly.every((a) => a && (a.upstreamSha === SHA || a.upstream === 'none')),
+  'each hand-only marker pins the no-upstream@SHA provenance (auditable)');
+check(vprov.apps.every((a) => a && a.source !== 'opentabs'),
+  'vendor _provenance.json does NOT pre-populate any real-source (opentabs) app (the importer fills the catalog-side provenance at Plan 39.5-04)');
 
 const cprov = JSON.parse(fs.readFileSync(CATALOG_PROV, 'utf8'));
 // Phase 36 (CGEN-01) FILLS the catalog-side scaffold's apps[] with per-app
