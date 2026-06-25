@@ -166,6 +166,28 @@ of truth that resolves an origin to denied / sensitive / safe.
    Auto). Payments (e.g. `dashboard.stripe.com`, coinbase, twilio), budgeting
    (ynab), and messaging-app writes are classified on this axis as well.
 
+   The **comms / social / content** import batch extends this axis. The AI-chat
+   apps (**chatgpt**, **claude**) and the microblog / fediverse social apps
+   (**bluesky**, **mastodon**, **threads**) are classified **sensitive** -- their
+   reads run under Auto, their writes (post / send / publish) re-enforce the
+   per-origin mutating opt-in. This is the **conservative default** for the
+   category: an unknown social / AI app defaults toward LESS reach, because a
+   mis-classification that read as "safe" would make the app writable-under-Auto
+   (able to post or message on someone's account). These hosts contain no generic
+   category keyword the import-time heuristic flags, so they are classified
+   explicitly on this axis rather than relying on the heuristic to catch them.
+   By contrast, **reddit content-reads** are **safe** (read-only browsing of public
+   content runs normally, unclassified). The **discord** messaging origin remains
+   sensitive (writes mutating-gated). The ToS-hostile media / social set on axis 2
+   (netflix / spotify / twitch / steam / youtube-music / tinder / onlyfans) stays
+   **denied** -- it is never imported, even DOM-only.
+
+   Independent of this axis, every comms / social / content descriptor the batch
+   imports is **DOM-only** (the conservative backing default): it is surfaced as a
+   discovery-pending hit, never a confident API-invocable hit, and is never
+   learn-seeded -- so a ToS-hostile or AI-chat app is never auto-driven through a
+   fabricated API call from guessed auth.
+
 The denial axes (1 and 2) make an origin non-enableable; the sensitivity axis (3)
 keeps the origin usable but re-applies write-time friction. An import-time
 classification gate fails the build if a sensitivity-suspect origin is left

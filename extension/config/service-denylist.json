@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "_comment": "Phase 30 (GOV-08, D-15/D-16) conservative service denylist + sensitive-origin seed. deniedOrigins: services where automation is categorically prohibited (rendered non-enableable by the consent gate, checked BEFORE per-origin policy). sensitiveOrigins: services that force extra friction (Ask / confirm) even under Auto but are not necessarily hard-denied. This is a CONSERVATIVE category seed, NOT an aggressive broad blocklist, and is USER-EXTENSIBLE. Host patterns use a leading 'https://*.' subdomain-wildcard form: 'https://*.chase.com' matches any subdomain of chase.com (and the bare apex); 'https://*.gov' matches any host ending in '.gov'. A pattern with no '*' matches that exact origin. See docs/LEGAL.md for the policy rationale. Phase 35 (v1.0.0, DENY-01/02) expands the roster ahead of OpenTabs descriptor import (opt-out Auto makes the denylist the ONE hard floor): brokerage/trading + ToS-hostile media/social are added to deniedOrigins; payments/budgeting + IG/FB/TikTok/X + messaging are added to sensitiveOrigins (reads under Auto, writes mutating-gated by posture B). Several roster origins use the EXACT-host form (digital.fidelity.com, dashboard.stripe.com, music.youtube.com NOT *.youtube.com, etc.) so a pattern is never broader than OpenTabs' own urlPattern host scope.",
+  "_comment": "Phase 30 (GOV-08, D-15/D-16) conservative service denylist + sensitive-origin seed. deniedOrigins: services where automation is categorically prohibited (rendered non-enableable by the consent gate, checked BEFORE per-origin policy). sensitiveOrigins: services that force extra friction (Ask / confirm) even under Auto but are not necessarily hard-denied. This is a CONSERVATIVE category seed, NOT an aggressive broad blocklist, and is USER-EXTENSIBLE. Host patterns use a leading 'https://*.' subdomain-wildcard form: 'https://*.chase.com' matches any subdomain of chase.com (and the bare apex); 'https://*.gov' matches any host ending in '.gov'. A pattern with no '*' matches that exact origin. See docs/LEGAL.md for the policy rationale. Phase 35 (v1.0.0, DENY-01/02) expands the roster ahead of OpenTabs descriptor import (opt-out Auto makes the denylist the ONE hard floor): brokerage/trading + ToS-hostile media/social are added to deniedOrigins; payments/budgeting + IG/FB/TikTok/X + messaging are added to sensitiveOrigins (reads under Auto, writes mutating-gated by posture B). Several roster origins use the EXACT-host form (digital.fidelity.com, dashboard.stripe.com, music.youtube.com NOT *.youtube.com, etc.) so a pattern is never broader than OpenTabs' own urlPattern host scope. Phase 38 (v1.0.0, BRDTH-02/03) screens the comms/social/content import batch ahead of plans 02/03: the AI-chat apps (chatgpt.com, claude.ai) and the microblog/fediverse social apps (bsky.app, mastodon.social, www.threads.net) are added to sensitiveOrigins as the CONSERVATIVE default for this category (reads run under Auto, writes are mutating-gated by posture B) -- they do NOT trip the classifyGate sensitivity heuristic on host alone, so they are classified explicitly here, fail-safe toward LESS reach. discord.com is already sensitive (Phase 35). The DENY-01 ToS-hostile media/social set (netflix/spotify/twitch/steam/youtube-music/tinder/onlyfans) stays in deniedOrigins (never imported even DOM-only); reddit content-reads are SAFE (not added here -- reads run normally). The new comms/social additions use the EXACT-host form (no '*.' broadening) so each pattern is no broader than the app's own origin.",
   "deniedReason": "Automation prohibited for this service category (financial / government). See docs/LEGAL.md.",
   "deniedOrigins": [
     "https://*.chase.com",
@@ -40,6 +40,11 @@
     "https://discord.com",
     "https://teams.live.com",
     "https://teams.microsoft.com",
-    "https://teams.cloud.microsoft"
+    "https://teams.cloud.microsoft",
+    "https://chatgpt.com",
+    "https://claude.ai",
+    "https://bsky.app",
+    "https://mastodon.social",
+    "https://www.threads.net"
   ]
 }
