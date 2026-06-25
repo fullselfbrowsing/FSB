@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs discord plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://discord.com/* -> service discord.com -> host-derived stem 'discord', which is CORRECT -> NO STEM_OVERRIDES entry). discord.com is classified SENSITIVE (Phase 35 + reconfirmed by Phase 38-01) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, discord-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; send_message is the sensitive messaging WRITE and delete_message the DESTRUCTIVE op posture-B gates -- send_message is the END-TO-END sensitive-write-import proof origin (Plan 38-03 Task 3).",
+  "name": "@opentabs-dev/opentabs-plugin-discord",
+  "version": "0.0.31",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Discord",
+    "description": "OpenTabs plugin for Discord",
+    "urlPatterns": [
+      "*://discord.com/*"
+    ],
+    "homepage": "https://discord.com"
+  },
+  "license": "MIT"
+}

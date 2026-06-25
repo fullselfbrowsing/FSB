@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs reddit plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value: it is *://reddit.com/* (the APEX, NOT www.reddit.com) DELIBERATELY -- the frozen host-derived stem is service.replace(/^app./,'').split('.')[0], so reddit.com -> 'reddit' (CORRECT) while www.reddit.com would derive 'www' (WRONG). Using the apex keeps the stem 'reddit' -> slug opentabs__reddit__* -> NO STEM_OVERRIDES entry needed. reddit.com is the SAFE content tier -- the sensitivityHeuristic does NOT flag it and it is NOT in service-denylist.json (classify('https://reddit.com') -> {sensitive:false,denied:false}), so the merge-time classifyGate passes a benign-safe origin (reads run under Auto). This slice carries ONLY read ops (list_subreddit_posts/get_post/search_posts -> the safe content reads); NO write op (submit/comment/vote are out of scope -- if a reddit write op is ever added, reddit MUST be reclassified sensitive so its writes are posture-B gated). IMPORTANT: the existing hand-authored catalog/descriptors/reddit-inbox.json (slug 'reddit.inbox', service www.reddit.com, backing 'recipe') is a DISTINCT filename/slug -- opentabs__reddit__* (backing 'dom') lands ALONGSIDE it, NO clobber. defineTool/OpenTabsPlugin and the api transport helper resolve from local stubs (sdk-stub.ts, reddit-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing. Part of Phase-38 batch B sub-batch 2 (messaging + content-reads).",
+  "name": "@opentabs-dev/opentabs-plugin-reddit",
+  "version": "0.0.27",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Reddit",
+    "description": "OpenTabs plugin for Reddit",
+    "urlPatterns": [
+      "*://reddit.com/*"
+    ],
+    "homepage": "https://www.reddit.com"
+  },
+  "license": "MIT"
+}
