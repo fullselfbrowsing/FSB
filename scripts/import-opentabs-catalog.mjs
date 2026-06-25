@@ -206,6 +206,24 @@ function enumerateBatchApps() {
 // derives correctly but is pinned for slug stability, as reddit's apex pattern). The `service`
 // field keeps the real host; only the stem/slug/filename is canonicalized. 39-01's
 // classifications are NOT changed.
+//
+// PHASE 39 (39-06, COMPLETION -- remaining commerce + read-only misc): the final
+// sub-batch closes real-app coverage. The PAYMENT-bearing commerce apps shopify
+// (*.shopify.com) + dominos/chipotle (www.dominos.com/www.chipotle.com) were screened
+// SENSITIVE by 39-01 (create_order/place_order move money); craigslist vendors
+// *://www.craigslist.org/* (the screened origin -- the denylist host was WIDENED to the
+// apex-suffix *.craigslist.org in 39-06 so apex+www are both sensitive). The READ-ONLY
+// misc apps zillow (www.zillow.com) + grafana (grafana.com) emit ONLY reads and are
+// left SAFE + added to verify-catalog-crosscheck.mjs READ_ONLY_SAFE_SERVICES. The
+// www-hosted apps (craigslist/dominos/chipotle/zillow vendor *://www.<app>.<tld>/*)
+// derive the stem 'www' -> the dir-name STEM_OVERRIDES {craigslist:'craigslist',
+// dominos:'dominos',chipotle:'chipotle',zillow:'zillow'} canonicalizes each slug to
+// opentabs__<app>__* (0 opentabs__www__*). shopify (*.shopify.com -> strip '*.' ->
+// 'shopify') and grafana (grafana.com -> 'grafana') already derive correctly but are
+// pinned for slug stability -- the SAME first-label-isn't-the-app-name canonicalization
+// as the 39-02..05 commerce apps and cloudflare/datadog/threads (a DATA-MAP extension
+// of the 37-01 per-app extension point, NOT a logic change, so INV-01 holds). The
+// `service` field keeps the real host; only the stem/slug/filename is canonicalized.
 const STEM_OVERRIDES = {
   jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog', threads: 'threads',
   doordash: 'doordash', ubereats: 'ubereats', grubhub: 'grubhub', instacart: 'instacart', uber: 'uber', lyft: 'lyft',
@@ -213,6 +231,7 @@ const STEM_OVERRIDES = {
   booking: 'booking', airbnb: 'airbnb', expedia: 'expedia', kayak: 'kayak', opentable: 'opentable',
   ticketmaster: 'ticketmaster', stubhub: 'stubhub', eventbrite: 'eventbrite',
   yelp: 'yelp', tripadvisor: 'tripadvisor', calendly: 'calendly',
+  shopify: 'shopify', craigslist: 'craigslist', dominos: 'dominos', chipotle: 'chipotle', zillow: 'zillow', grafana: 'grafana',
 };
 
 function displayServiceStem(app, derivedStem) {

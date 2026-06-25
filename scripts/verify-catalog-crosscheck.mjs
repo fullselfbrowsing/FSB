@@ -181,9 +181,24 @@ export function crossCheck(descriptors) {
 // re-classification (add the origin to sensitiveOrigins) rather than a silent
 // writable-under-Auto ship. The hosts are the EXACT services each app vendors,
 // lowercased (www.yelp.com / www.tripadvisor.com / calendly.com).
+//
+// Phase 39-06 (BRDTH-02) extends the set with the genuinely-read-only misc apps the
+// completion sub-batch imports -- www.zillow.com (real-estate: search_listings/
+// get_listing/get_home_value, all GET reads) and grafana.com (observability:
+// list_dashboards/get_dashboard/query_metrics, all GET reads). Each is left SAFE
+// (absent from sensitiveOrigins) SPECIFICALLY because its vendored ops are read-only --
+// so a FUTURE re-vendor that adds a write op for one (a zillow saved-search POST, a
+// grafana dashboard create/update) would emit it under that service, classify NOT
+// sensitive, and ship writable-under-Auto. Listing them here turns that into a CHECKED
+// invariant: any non-read op for these origins FAILS the build, forcing an explicit
+// re-classification (add the origin to sensitiveOrigins) rather than a silent
+// writable-under-Auto ship. The hosts are the EXACT services each app vendors,
+// lowercased (www.zillow.com / grafana.com). Because every emitted op carries NO
+// payment verb, the payment-op guard never keys on zillow/grafana either.
 const READ_ONLY_SAFE_SERVICES = new Set([
   'reddit.com', 'www.reddit.com',
   'www.yelp.com', 'www.tripadvisor.com', 'calendly.com',
+  'www.zillow.com', 'grafana.com',
 ]);
 
 /**

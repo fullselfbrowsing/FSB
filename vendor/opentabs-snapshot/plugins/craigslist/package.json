@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs craigslist plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.craigslist.org/* -> service www.craigslist.org). www.craigslist.org derives the host stem 'www', so the dir-name STEM_OVERRIDES {craigslist:'craigslist'} canonicalizes the slug to opentabs__craigslist__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). craigslist is classified SENSITIVE: 39-01 listed www.craigslist.org sensitive, and 39-06 WIDENED the denylist host to the apex-suffix 'https://*.craigslist.org' so both the bare apex (craigslist.org) AND www are screened (a classifieds marketplace -- posting a listing / contacting a paid listing is transact-adjacent), so the merge-time classifyGate sees a screened origin and does NOT abort. post_listing is NOT a payment op ('post' is not a payment verb and 'post_listing' is not a payment op-name) -- but craigslist is sensitive so its write is posture-B gated regardless. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, craigslist-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; post_listing is the WRITE op (api {method:'POST'}) and delete_listing the DESTRUCTIVE op (apiVoid {method:'DELETE'}).",
+  "name": "@opentabs-dev/opentabs-plugin-craigslist",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Craigslist",
+    "description": "OpenTabs plugin for Craigslist",
+    "urlPatterns": [
+      "*://www.craigslist.org/*"
+    ],
+    "homepage": "https://www.craigslist.org"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs zillow plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.zillow.com/* -> service www.zillow.com). www.zillow.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {zillow:'zillow'} canonicalizes the slug to opentabs__zillow__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.zillow.com is left UNCLASSIFIED (SAFE) in extension/config/service-denylist.json -- it is a read-only real-estate-listing app (listing search + a single listing + a home-value estimate are reads; reads run under Auto with no mutating re-gate). It is added to verify-catalog-crosscheck.mjs READ_ONLY_SAFE_SERVICES (the 38 MED-02 guard) SPECIFICALLY because its vendored ops are read-only, so a FUTURE re-vendor adding a write op for zillow would FAIL the build (forcing an explicit re-classification). defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, zillow-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing. ALL ops are read (api {method:'GET'}); NO write op, NO payment verb -> the READ_ONLY_SAFE guard PASSES and the payment-op guard never keys on zillow.",
+  "name": "@opentabs-dev/opentabs-plugin-zillow",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Zillow",
+    "description": "OpenTabs plugin for Zillow",
+    "urlPatterns": [
+      "*://www.zillow.com/*"
+    ],
+    "homepage": "https://www.zillow.com"
+  },
+  "license": "MIT"
+}

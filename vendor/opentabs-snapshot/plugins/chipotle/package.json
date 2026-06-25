@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs chipotle plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.chipotle.com/* -> service www.chipotle.com). www.chipotle.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {chipotle:'chipotle'} canonicalizes the slug to opentabs__chipotle__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.chipotle.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- placing a Chipotle order charges a card) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, chipotle-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; place_order is the PAYMENT op (api {method:'POST'} -- 'place' is in 39-01 PAYMENT_VERBS AND place_order is in PAYMENT_OP_NAMES). place_order is DOM-only on a sensitive origin -> the payment-op CI guard PASSES (not safe-and-API-invocable).",
+  "name": "@opentabs-dev/opentabs-plugin-chipotle",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Chipotle",
+    "description": "OpenTabs plugin for Chipotle",
+    "urlPatterns": [
+      "*://www.chipotle.com/*"
+    ],
+    "homepage": "https://www.chipotle.com"
+  },
+  "license": "MIT"
+}
