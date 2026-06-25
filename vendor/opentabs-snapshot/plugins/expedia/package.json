@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs expedia plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.expedia.com/* -> service www.expedia.com). www.expedia.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {expedia:'expedia'} canonicalizes the slug to opentabs__expedia__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.expedia.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- booking a flight/hotel charges a card) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, expedia-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; book_flight AND book_hotel are PAYMENT ops (api {method:'POST'}). Both are payment ops (verbPrefix 'book' is in the guard's PAYMENT_VERBS set; book_flight/book_hotel are also in PAYMENT_OP_NAMES) DOM-only on a sensitive origin -> the payment-op CI guard PASSES (not safe-and-API-invocable). This slice has NO destructive op (the two booking writes + three reads are the full op set).",
+  "name": "@opentabs-dev/opentabs-plugin-expedia",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Expedia",
+    "description": "OpenTabs plugin for Expedia",
+    "urlPatterns": [
+      "*://www.expedia.com/*"
+    ],
+    "homepage": "https://www.expedia.com"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs kayak plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.kayak.com/* -> service www.kayak.com). www.kayak.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {kayak:'kayak'} canonicalizes the slug to opentabs__kayak__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash). www.kayak.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- a paid-booking travel origin) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, kayak-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing. KAYAK is primarily a META-SEARCH read app: its create_price_alert is a BENIGN write (api {method:'POST'}) -- the verb 'create' is NOT in the guard's PAYMENT_VERBS set and 'create_price_alert' is NOT in PAYMENT_OP_NAMES, so it is NOT a payment op for the guard (it stages a price-watch, no card charged). The origin is still sensitive per 39-01, so the write is posture-B gated. This slice has NO payment op and NO destructive op (three reads + the one non-payment price-alert write).",
+  "name": "@opentabs-dev/opentabs-plugin-kayak",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "KAYAK",
+    "description": "OpenTabs plugin for KAYAK",
+    "urlPatterns": [
+      "*://www.kayak.com/*"
+    ],
+    "homepage": "https://www.kayak.com"
+  },
+  "license": "MIT"
+}
