@@ -156,7 +156,24 @@ function enumerateBatchApps() {
 // host-whose-first-label-isn't-the-app-name canonicalization cloudflare/datadog/jira/
 // confluence already use -- a DATA-MAP extension (STEM_OVERRIDES is the per-app
 // extension point Phase 37-01 built), NOT a logic change, so INV-01 holds.
-const STEM_OVERRIDES = { jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog', threads: 'threads' };
+//
+// PHASE 39 (39-02, food-delivery + rideshare): the screened-sensitive origins 39-01
+// classified are the www/apex forms of the payment-bearing commerce apps, whose
+// frozen split('.')[0] is WRONG. doordash/ubereats/grubhub/instacart vendor
+// *://www.<app>.com/* -> the host stem 'www'; uber/lyft vendor *://*.uber.com/* and
+// *://*.lyft.com/* (the bare-apex wildcards the *.uber.com/*.lyft.com sensitive entries
+// cover) whose readPluginMeta strips the leading '*.' to service 'uber.com'/'lyft.com'
+// -> stem 'uber'/'lyft' (already correct), but they are pinned here too so the slug is
+// canonical and stable regardless of the vendored host form. The dir-name-keyed
+// override canonicalizes each slug to opentabs__<app>__* (0 opentabs__www__*) -- the
+// SAME first-label-isn't-the-app-name canonicalization cloudflare/datadog/jira/
+// confluence/threads already use (a DATA-MAP extension of the 37-01 per-app extension
+// point, NOT a logic change, so INV-01 holds). The `service` field keeps the real host;
+// only the stem/slug/filename is canonicalized. 39-01's classifications are NOT changed.
+const STEM_OVERRIDES = {
+  jira: 'jira', confluence: 'confluence', cloudflare: 'cloudflare', datadog: 'datadog', threads: 'threads',
+  doordash: 'doordash', ubereats: 'ubereats', grubhub: 'grubhub', instacart: 'instacart', uber: 'uber', lyft: 'lyft',
+};
 
 function displayServiceStem(app, derivedStem) {
   return Object.prototype.hasOwnProperty.call(STEM_OVERRIDES, app) ? STEM_OVERRIDES[app] : derivedStem;

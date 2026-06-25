@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs instacart plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.instacart.com/* -> service www.instacart.com). www.instacart.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {instacart:'instacart'} canonicalizes the slug to opentabs__instacart__*. www.instacart.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- Instacart checks out PAID grocery carts) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, instacart-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; checkout is the PAYMENT op (api {method:'POST'}) and cancel_order the DESTRUCTIVE op (apiVoid {method:'DELETE'}). checkout is DOM-only on a sensitive origin -> the payment-op CI guard PASSES.",
+  "name": "@opentabs-dev/opentabs-plugin-instacart",
+  "version": "0.0.27",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Instacart",
+    "description": "OpenTabs plugin for Instacart",
+    "urlPatterns": [
+      "*://www.instacart.com/*"
+    ],
+    "homepage": "https://www.instacart.com"
+  },
+  "license": "MIT"
+}

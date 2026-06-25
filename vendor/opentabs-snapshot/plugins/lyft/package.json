@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs lyft plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://*.lyft.com/* -> readPluginMeta strips the leading '*.' to service lyft.com). lyft.com derives the host stem 'lyft' (already correct), but the dir-name STEM_OVERRIDES {lyft:'lyft'} pins the slug canonically regardless of host form. *.lyft.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- requesting a ride charges a card) in extension/config/service-denylist.json (the '*.lyft.com' subdomain-wildcard entry covers this host), so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, lyft-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; request_ride is the PAYMENT op (api {method:'POST'}) and cancel_ride the DESTRUCTIVE op (apiVoid {method:'DELETE'}). request_ride is DOM-only on a sensitive origin -> the payment-op CI guard PASSES.",
+  "name": "@opentabs-dev/opentabs-plugin-lyft",
+  "version": "0.0.26",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Lyft",
+    "description": "OpenTabs plugin for Lyft",
+    "urlPatterns": [
+      "*://*.lyft.com/*"
+    ],
+    "homepage": "https://www.lyft.com"
+  },
+  "license": "MIT"
+}
