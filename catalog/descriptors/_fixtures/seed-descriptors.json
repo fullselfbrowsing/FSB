@@ -331,8 +331,7 @@
       "send a message in chatgpt",
       "post a message in chatgpt",
       "write a new message in chatgpt",
-      "send message in chatgpt",
-      "send a message in chatgpt in chatgpt"
+      "send message in chatgpt"
     ],
     "description": "Send a message to ChatGPT. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
     "actionVerb": "send",
@@ -436,8 +435,7 @@
       "send a message in claude",
       "post a message in claude",
       "write a new message in claude",
-      "send message in claude",
-      "send a message in claude in claude"
+      "send message in claude"
     ],
     "description": "Send a message to Claude. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
     "actionVerb": "send",
@@ -739,8 +737,7 @@
       "send a message in discord",
       "post a message in discord",
       "write a new message in discord",
-      "send message in discord",
-      "send a message in discord in discord"
+      "send message in discord"
     ],
     "description": "Send a message to a Discord channel. Posts the content to the channel on your behalf; this is visible to everyone in the channel. Optionally reply to an existing message.",
     "actionVerb": "send",

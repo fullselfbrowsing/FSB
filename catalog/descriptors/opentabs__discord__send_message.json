@@ -5,8 +5,7 @@
     "send a message in discord",
     "post a message in discord",
     "write a new message in discord",
-    "send message in discord",
-    "send a message in discord in discord"
+    "send message in discord"
   ],
   "description": "Send a message to a Discord channel. Posts the content to the channel on your behalf; this is visible to everyone in the channel. Optionally reply to an existing message.",
   "actionVerb": "send",

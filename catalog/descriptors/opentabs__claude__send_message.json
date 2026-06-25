@@ -5,8 +5,7 @@
     "send a message in claude",
     "post a message in claude",
     "write a new message in claude",
-    "send message in claude",
-    "send a message in claude in claude"
+    "send message in claude"
   ],
   "description": "Send a message to Claude. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
   "actionVerb": "send",

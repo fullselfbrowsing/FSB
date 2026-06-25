@@ -5,8 +5,7 @@
     "send a message in chatgpt",
     "post a message in chatgpt",
     "write a new message in chatgpt",
-    "send message in chatgpt",
-    "send a message in chatgpt in chatgpt"
+    "send message in chatgpt"
   ],
   "description": "Send a message to ChatGPT. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
   "actionVerb": "send",

@@ -442,7 +442,19 @@ function synthSynonyms(tool, serviceStem) {
     push(`${verb} ${noun} in ${stem}`);
   }
   // 3. summary + service ("create a new issue in linear") -- a natural full phrasing.
-  if (summary) push(`${summary} in ${stem}`);
+  // LOW-02 (38-REVIEW): when the op summary ALREADY ends in the app-tagged " in <stem>"
+  // form (discord/threads/bsky/mastodon summaries do: "send a message in discord"),
+  // appending another " in <stem>" double-tagged it ("send a message in discord in
+  // discord") -- ungrammatical, and the stem-guard + dedup in push() do not catch it
+  // because the doubled string differs from the single one. Strip a trailing
+  // " in <stem>" (case-insensitive) from the summary before re-appending exactly one,
+  // so the phrase stays app-tagged (push() still requires the stem token) without the
+  // duplication. A summary that does NOT already end in " in <stem>" is unchanged.
+  if (summary) {
+    const trailingStemRe = new RegExp('\\s+in\\s+' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i');
+    const summaryBase = summary.replace(trailingStemRe, '').trim();
+    if (summaryBase) push(`${summaryBase} in ${stem}`);
+  }
 
   // LOW-03 (37-REVIEW): meaningful backfill before any numeric filler. The >=3 floor
   // must be reached with REAL intent phrases, not bare "<verb> <stem> <digit>" noise
