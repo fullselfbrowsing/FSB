@@ -210,6 +210,43 @@ export function overrideFloor(opName, slug) {
   return null;
 }
 
+// ---- CONFIRMED-READ allowlist (HI-01, 39.5-REVIEW; the INVERSE-narrow of the --------
+//      override floor) -----------------------------------------------------------------
+// A GraphQL/RPC op whose op-name verb is AMBIGUOUS (not in any verb set) fails SAFE to
+// WRITE (the GraphQL carve-out -- the method is always POST, so a read cannot be proven
+// from the transport). That fail-safe-high default is CORRECT as a default, but it
+// MISLABELS the handful of GraphQL *queries* whose verb happens to be ambiguous (e.g.
+// `check`). tripadvisor.check_saved is the canonical case the review flagged: its handle
+// is a GraphQL `graphql([{ queryId }])` READ that returns `is_saved` (a saved-status
+// lookup, NOT a mutation -- verified against vendor/opentabs-snapshot/plugins/tripadvisor/
+// src/tools/check-saved.ts). Left as derived 'write', it BREAKS the READ_ONLY_SAFE
+// invariant for the apex tripadvisor.com (a write shipping safe-under-Auto).
+//
+// This allowlist corrects ONLY exact, source-audited slugs to a READ CEILING -- it is
+// keyed by the FULL `<stem>.<op>` slug (NOT a bare op-name or verb) so it can NEVER touch
+// any other app's op, and it is applied ONLY to pull a GraphQL-ambiguous fail-safe DOWN
+// to read; it does NOT override a genuine write/destructive SIGNAL (a real apiPost helper,
+// a POST/DELETE method literal, or a recognized write/destructive verb still wins -- see
+// deriveClass). So it canNOT mask meticulous.check_for_flakes (a real GraphQL MUTATION:
+// `graphql(mutations.CHECK_FOR_FLAKES)` that re-runs tests -- deliberately NOT listed) or
+// any future real write. Adding an entry here REQUIRES verifying the op's handle is a pure
+// read against the vendored source. The same op-name on a DIFFERENT app is unaffected.
+export const SIDE_EFFECT_READ_CONFIRMED = new Set([
+  'tripadvisor.check_saved',
+]);
+
+/**
+ * isConfirmedRead(slug) -> boolean
+ *
+ * True when the FULL slug (`<stem>.<op>`, lowercased) is an exact, source-audited
+ * GraphQL/RPC read in SIDE_EFFECT_READ_CONFIRMED. Only consulted by deriveClass to pull a
+ * GraphQL-AMBIGUOUS fail-safe-high default down to read -- never to downgrade a real
+ * write/destructive transport/verb signal.
+ */
+export function isConfirmedRead(slug) {
+  return SIDE_EFFECT_READ_CONFIRMED.has(String(slug || '').toLowerCase());
+}
+
 /**
  * opNameFromSlug(slug) -> the trailing op-name token of a slug, or ''.
  *
@@ -267,6 +304,14 @@ export function deriveClass(signals, slug) {
     // fails-safe to WRITE -- never auto-classed read because the method is POST.
     if (nameVerbCls) {
       derived = maxClass(derived, nameVerbCls);
+    } else if (isConfirmedRead(slug)) {
+      // HI-01: an EXACT, source-audited GraphQL READ whose verb is merely ambiguous
+      // (e.g. tripadvisor.check_saved -- a saved-status query, not a mutation). Stay at
+      // the read floor instead of the ambiguous-GraphQL fail-safe WRITE. This applies
+      // ONLY to the allowlisted full slugs (SIDE_EFFECT_READ_CONFIRMED) and ONLY when no
+      // recognized verb class fired -- it cannot affect any unlisted op or downgrade a
+      // real write/destructive verb signal.
+      derived = maxClass(derived, 'read');
     } else {
       derived = maxClass(derived, 'write');
     }

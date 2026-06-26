@@ -207,10 +207,37 @@ export function crossCheck(descriptors) {
 // writable-under-Auto ship. The hosts are the EXACT services each app vendors,
 // lowercased (www.zillow.com / grafana.com). Because every emitted op carries NO
 // payment verb, the payment-op guard never keys on zillow/grafana either.
+// HI-01 (39.5-REVIEW): the set lists the EMITTED host form for each read-only-safe brand.
+// tripadvisor's real slice vendors urlPatterns ["*://*.tripadvisor.com/*"], so
+// readPluginMeta strips the leading "*." and the importer emits its ops under the APEX
+// tripadvisor.com (NOT www.tripadvisor.com -- the 3 stale www descriptors were orphans
+// pruned by the HI-02 fix). So the apex tripadvisor.com is the form that must be covered
+// (the same apex/www robustness zillow got -- it carries BOTH forms). The membership test
+// in checkReadOnlySafeOrigins is ALSO made host-form-agnostic (a leading "www." is
+// stripped before the lookup) so a brand listed in either form covers both, closing this
+// apex-vs-www bug class for the whole roster (MED-01). yelp emits under www.yelp.com (its
+// slice vendors *://www.yelp.com/*, no "*." to strip), so www.yelp.com is its emitted form.
 const READ_ONLY_SAFE_SERVICES = new Set([
-  'www.yelp.com', 'www.tripadvisor.com',
+  'www.yelp.com',
+  'www.tripadvisor.com', 'tripadvisor.com',
   'www.zillow.com', 'zillow.com', 'grafana.com',
 ]);
+
+// Host-form-agnostic membership (HI-01/MED-01): a service is read-only-safe if EITHER its
+// exact host OR its www.-stripped / www.-prefixed form is in READ_ONLY_SAFE_SERVICES. This
+// gives the read-only-safe roster the SAME apex+www robustness the commerce path gets for
+// free from the denylist '*.' patterns -- so a brand listed in one host form covers the
+// other emitted form, and a re-vendor that swaps www<->apex cannot slip a write past this
+// invariant on the host form the set happened not to list.
+function isReadOnlySafeService(service) {
+  const h = typeof service === 'string' ? service.toLowerCase() : '';
+  if (!h) return false;
+  if (READ_ONLY_SAFE_SERVICES.has(h)) return true;
+  const stripped = h.replace(/^www\./, '');
+  if (READ_ONLY_SAFE_SERVICES.has(stripped)) return true;
+  if (READ_ONLY_SAFE_SERVICES.has('www.' + stripped)) return true;
+  return false;
+}
 
 /**
  * checkReadOnlySafeOrigins(descriptors) -> { failures: string[] }
@@ -228,7 +255,8 @@ export function checkReadOnlySafeOrigins(descriptors) {
   for (const d of list) {
     if (!d || typeof d !== 'object') continue;
     const service = typeof d.service === 'string' ? d.service.toLowerCase() : '';
-    if (!READ_ONLY_SAFE_SERVICES.has(service)) continue;
+    // HI-01/MED-01: host-form-agnostic membership (apex AND www both covered).
+    if (!isReadOnlySafeService(service)) continue;
     const slug = d.slug || '(unknown-slug)';
     const cls = d.sideEffectClass;
     if (cls !== 'read') {
@@ -324,7 +352,9 @@ export function checkCommerceSensitiveClassified(classifyFn) {
 
   for (const service of COMMERCE_SENSITIVE_SERVICES) {
     // Disjointness: a commerce-sensitive brand must NOT also be in READ_ONLY_SAFE.
-    if (READ_ONLY_SAFE_SERVICES.has(service)) {
+    // MED-01: host-form-agnostic membership (apex AND www both), so a commerce brand
+    // listed www in one set and apex in the other still trips the disjointness assertion.
+    if (isReadOnlySafeService(service)) {
       failures.push(
         service + ' is on BOTH the COMMERCE_SENSITIVE roster and READ_ONLY_SAFE_SERVICES ' +
         '-- a brand cannot be both conservatively-sensitive (commerce) and safe-because-' +
@@ -333,23 +363,37 @@ export function checkCommerceSensitiveClassified(classifyFn) {
       );
     }
 
-    let cls = { sensitive: false, denied: false };
-    if (classify) {
-      try { cls = classify('https://' + service) || cls; } catch (_e) { cls = { sensitive: false, denied: false }; }
-    }
-    const governed = !!(cls && (cls.sensitive === true || cls.denied === true));
-    if (!governed) {
-      failures.push(
-        service + ' is on the COMMERCE_SENSITIVE roster but classifies SAFE (NOT ' +
-        'sensitive/denied) -- a commerce/payment/travel/marketplace brand must be ' +
-        'sensitive so its writes are posture-B gated, and so a future op-set change ' +
-        'cannot silently make it writable-under-Auto. classifyGate (no payment token ' +
-        'on its host) and the payment-op guard (no payment verb in a read-only op set) ' +
-        'CANNOT catch a missed read-only commerce brand -- this roster is the only gate ' +
-        'that can. FIX: classify ' + service + ' sensitive in extension/config/' +
-        'service-denylist.json (the pattern MUST cover this exact emitted host), or ' +
-        'remove it from COMMERCE_SENSITIVE_SERVICES if it is genuinely non-commerce.'
-      );
+    // MED-02 (39.5-REVIEW): assert classify() is sensitive/denied for BOTH the apex AND
+    // the www. form of each roster brand -- not just the single host string the roster
+    // lists. Today every commerce denylist entry is the apex-suffix '*.' form (covers
+    // apex + www), so this passes; but if a future editor NARROWS a pattern to an EXACT
+    // host (e.g. https://www.amazon.com, dropping the '*.'), the apex amazon.com -- which
+    // ebay/walmart/target/booking/airbnb/expedia/instacart/dominos/chipotle/costco/bestbuy
+    // all ALSO emit -- would classify SAFE and the old single-form check would MISS it.
+    // Asserting both emitted forms makes the backstop robust to that narrowing.
+    const stripped = service.replace(/^www\./, '');
+    const formsToCheck = new Set(['https://' + stripped, 'https://www.' + stripped]);
+    for (const origin of formsToCheck) {
+      let cls = { sensitive: false, denied: false };
+      if (classify) {
+        try { cls = classify(origin) || cls; } catch (_e) { cls = { sensitive: false, denied: false }; }
+      }
+      const governed = !!(cls && (cls.sensitive === true || cls.denied === true));
+      if (!governed) {
+        failures.push(
+          service + ' is on the COMMERCE_SENSITIVE roster but its emitted-form origin ' +
+          origin + ' classifies SAFE (NOT sensitive/denied) -- a commerce/payment/travel/' +
+          'marketplace brand must be sensitive on EVERY host form it can emit (apex AND ' +
+          'www) so its writes are posture-B gated and a future op-set change (or an exact-' +
+          'host pattern narrowing) cannot silently make it writable-under-Auto. classifyGate ' +
+          '(no payment token on its host) and the payment-op guard (no payment verb in a ' +
+          'read-only op set) CANNOT catch a missed read-only commerce brand -- this roster ' +
+          'is the only gate that can. FIX: classify ' + service + ' sensitive in extension/' +
+          'config/service-denylist.json with a pattern that covers BOTH ' + origin + ' and ' +
+          'the other host form (the apex-suffix https://*.' + stripped + ' form does), or ' +
+          'remove it from COMMERCE_SENSITIVE_SERVICES if it is genuinely non-commerce.'
+        );
+      }
     }
   }
   return { failures };
