@@ -54,6 +54,36 @@
     },
     additionalProperties: false
   };
+  // ---- Phase 40 (DEPTH-01) closed params schemas for the 3 new READ slugs ----
+  // From the opentabs__slack__*.json descriptor props. additionalProperties:false.
+  var LIST_CHANNELS_PARAMS = {
+    type: 'object',
+    properties: {
+      limit: { type: 'integer', minimum: 1, maximum: 1000 },
+      types: { type: 'string', minLength: 1 },
+      cursor: { type: 'string' },
+      exclude_archived: { type: 'boolean' }
+    },
+    additionalProperties: false
+  };
+  var LIST_MEMBERS_PARAMS = {
+    type: 'object',
+    properties: {
+      channel: { type: 'string', minLength: 1 },
+      limit: { type: 'integer', minimum: 1, maximum: 1000 },
+      cursor: { type: 'string' }
+    },
+    required: ['channel'],
+    additionalProperties: false
+  };
+  var CHANNEL_INFO_PARAMS = {
+    type: 'object',
+    properties: {
+      channel: { type: 'string', minLength: 1 }
+    },
+    required: ['channel'],
+    additionalProperties: false
+  };
   var POST_MESSAGE_PARAMS = {
     type: 'object',
     properties: {
@@ -185,6 +215,61 @@
         return await callSlackMethod('slack.conversations.list', 'conversations.list', {
           types: a.types || 'public_channel,private_channel',
           limit: a.limit || 100
+        }, ctx);
+      }
+    },
+
+    // ---- Phase 40 (DEPTH-01) -- the 3 opentabs READ slugs ------------------
+    // EXACT opentabs dot-form slugs so resolve() UPGRADES each breadth descriptor
+    // dom->T1a (distinct from slack.conversations.list above -- no collision). Each
+    // reuses callSlackMethod: scrape xoxc, POST same-origin /api/<method> with the
+    // token in the BODY (never a header, never logged); a missing token fails closed
+    // to RECIPE_DOM_FALLBACK_PENDING. READ-only (conversations.* read methods); slack
+    // writes are Phase 41.
+
+    // ---- slack.list_channels (read) ----------------------------------------
+    'slack.list_channels': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: LIST_CHANNELS_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        return await callSlackMethod('slack.list_channels', 'conversations.list', {
+          types: a.types || 'public_channel,private_channel',
+          limit: a.limit || 100,
+          cursor: a.cursor,
+          exclude_archived: a.exclude_archived
+        }, ctx);
+      }
+    },
+
+    // ---- slack.list_members (read) -----------------------------------------
+    'slack.list_members': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: LIST_MEMBERS_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        return await callSlackMethod('slack.list_members', 'conversations.members', {
+          channel: a.channel,
+          limit: a.limit || 100,
+          cursor: a.cursor
+        }, ctx);
+      }
+    },
+
+    // ---- slack.get_channel_info (read) -------------------------------------
+    'slack.get_channel_info': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: CHANNEL_INFO_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        return await callSlackMethod('slack.get_channel_info', 'conversations.info', {
+          channel: a.channel
         }, ctx);
       }
     },
