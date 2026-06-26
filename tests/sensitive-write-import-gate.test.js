@@ -35,16 +35,19 @@
  * sideEffectClass alone (the emitted class is what gates).
  *
  * Phase 39-07 (BRDTH-02, THE HEADLINE) EXTENDS this with a SECOND end-to-end block
- * on a REAL emitted PAYMENT descriptor (opentabs__doordash__place_order.json --
- * service www.doordash.com, sideEffectClass write, backing dom). The 39-01 screening
- * classified www.doordash.com SENSITIVE (a payment origin), so its writes flow through
- * the SAME posture-B re-gate. The block proves: the read (list_orders) runs under Auto;
- * the payment WRITE (place_order) WITHOUT the mutating flag -> RECIPE_CONSENT_MUTATING_
+ * on a REAL emitted PAYMENT descriptor (opentabs__amazon__place_order.json -- service
+ * www.amazon.com, sideEffectClass write, backing dom). The 39-01 screening classified
+ * www.amazon.com SENSITIVE (a payment origin), so its writes flow through the SAME
+ * posture-B re-gate. The block proves: the read (list_orders) runs under Auto; the
+ * payment WRITE (place_order) WITHOUT the mutating flag -> RECIPE_CONSENT_MUTATING_
  * REQUIRED (dual-field byte-exact) -- NO money moves, no order placed under Auto; the
  * per-origin mutating flag elevates it. This is the money-no-movement-under-Auto
  * mitigation proven on the descriptor that ACTUALLY SHIPS for the payment-bearing
  * category -- the most catastrophic threat of the commerce/travel batch (T-39-01). The
  * discord block stays the comms/social canary; the two blocks share the EXACT shape.
+ * (39.5-REVIEW HI-02: this block originally used doordash.place_order, but that was a
+ * stale ORPHAN from the old hand slice -- the real upstream doordash plugin has no
+ * place_order op; swapped to the genuinely-shipped amazon.place_order.)
  *
  * Zero-framework FSB convention: a check(cond,msg) counter, PASS=/FAIL= summary,
  * process.exit(failed>0?1:0). ASCII-only, NO emojis.
@@ -127,9 +130,11 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
   // ---- (b) load the REAL emitted descriptors FROM DISK -----------------------
   // These are the ACTUAL shipped descriptors the 38-03 import produced, not hand-built.
   const sendPath = path.join(DESCRIPTORS_DIR, 'opentabs__discord__send_message.json');
-  const readPath = path.join(DESCRIPTORS_DIR, 'opentabs__discord__list_messages.json');
+  // 39.5-REVIEW HI-02: the prune removed the stale orphan opentabs__discord__list_messages.json
+  // (the real discord slice exposes read_messages, not list_messages). Use the live read op.
+  const readPath = path.join(DESCRIPTORS_DIR, 'opentabs__discord__read_messages.json');
   check(fs.existsSync(sendPath), 'the REAL emitted opentabs__discord__send_message.json exists on disk (the shipped write descriptor)');
-  check(fs.existsSync(readPath), 'the REAL emitted opentabs__discord__list_messages.json exists on disk (the shipped read descriptor)');
+  check(fs.existsSync(readPath), 'the REAL emitted opentabs__discord__read_messages.json exists on disk (the shipped read descriptor)');
 
   const sendDescriptor = JSON.parse(fs.readFileSync(sendPath, 'utf8'));
   const readDescriptor = JSON.parse(fs.readFileSync(readPath, 'utf8'));
@@ -143,7 +148,7 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
   check(sendDescriptor.backing === 'dom',
     'send descriptor backing is dom (BRDTH-03: DOM-only, invocable=false -- AND its write is posture-B gated)');
   check(readDescriptor.service === 'discord.com' && readDescriptor.sideEffectClass === 'read',
-    'read descriptor (list_messages) is service discord.com + sideEffectClass read (the emitted read op)');
+    'read descriptor (read_messages) is service discord.com + sideEffectClass read (the emitted read op)');
 
   // ---- (c) route the REAL descriptors through the LIVE gate -------------------
   if (typeof Store._reset === 'function') Store._reset();
@@ -156,7 +161,7 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
     entry: { tier: 'T3', descriptor: { sideEffectClass: readDescriptor.sideEffectClass } }
   });
   check(readGate && readGate.decision === 'allow',
-    'the REAL discord.list_messages (read) on discord.com (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
+    'the REAL discord.read_messages (read) on discord.com (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
 
   // The WRITE op WITHOUT the per-origin mutating flag -> re-gated. The descriptor's
   // REAL sideEffectClass ('write', read from the loaded JSON) triggers the re-gate
@@ -188,56 +193,60 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
 
   // ===========================================================================
   // Phase 39-07 (BRDTH-02, THE HEADLINE): the END-TO-END payment-write proof on a
-  // REAL emitted PAYMENT descriptor (opentabs__doordash__place_order). Mirrors the
-  // discord block EXACTLY, swapping in a SHIPPED money-moving write -- the most
-  // catastrophic threat of the commerce/travel batch (T-39-01). The discord block
-  // above stays the comms/social canary; this block proves money-no-movement-under-
-  // Auto on the descriptor that ACTUALLY SHIPS for the payment-bearing category.
-  // The committed roster (loaded above) classifies www.doordash.com sensitive (39-01),
-  // so its writes flow through the SAME posture-B re-gate; the descriptor's REAL
-  // sideEffectClass ('write', read from the loaded JSON) is what fires the re-gate.
+  // REAL emitted PAYMENT descriptor. Mirrors the discord block EXACTLY, swapping in a
+  // SHIPPED money-moving write -- the most catastrophic threat of the commerce/travel
+  // batch (T-39-01). The discord block above stays the comms/social canary; this block
+  // proves money-no-movement-under-Auto on the descriptor that ACTUALLY SHIPS for the
+  // payment-bearing category.
+  //
+  // 39.5-REVIEW HI-02: the prune removed the stale orphan opentabs__doordash__place_order.json
+  // -- the REAL upstream doordash slice (apex *://*.doordash.com/*) has NO place_order op
+  // (it emits bookmark_store/update_profile/get_order/...); place_order was a leftover from
+  // the OLD hand-authored www.doordash.com slice and was NOT actually backed by the real
+  // source (the 39.5-04 claim that "doordash's place_order is regenerated from real source"
+  // was the orphan masquerading as live -- exactly HI-02). The genuine SHIPPED payment write
+  // at this SHA is amazon.place_order (the hand-authored amazon slice, service www.amazon.com,
+  // sensitive via '*.amazon.com', class write, backing dom) -- swap to it so this proves the
+  // re-gate on a payment descriptor that REALLY exists in the corpus. amazon.list_orders is
+  // its read counterpart on the SAME origin.
   // ===========================================================================
-  console.log('\n--- BRDTH-02 (Phase 39-07): END-TO-END payment-write proof on the REAL emitted doordash place_order descriptor ---');
+  console.log('\n--- BRDTH-02 (Phase 39-07): END-TO-END payment-write proof on the REAL emitted amazon place_order descriptor ---');
 
-  const DOORDASH_ORIGIN = 'https://www.doordash.com';
-  const doordashClass = Denylist.classify(DOORDASH_ORIGIN);
-  check(doordashClass && doordashClass.sensitive === true && doordashClass.denied === false,
-    'classify(https://www.doordash.com) -> { sensitive:true, denied:false } in the LIVE roster (the 39-01 payment screening governs doordash) -- the write-gating precondition');
+  const AMAZON_ORIGIN = 'https://www.amazon.com';
+  const amazonClass = Denylist.classify(AMAZON_ORIGIN);
+  check(amazonClass && amazonClass.sensitive === true && amazonClass.denied === false,
+    'classify(https://www.amazon.com) -> { sensitive:true, denied:false } in the LIVE roster (the 39-01 payment screening governs amazon) -- the write-gating precondition');
 
   // Load the REAL emitted payment WRITE + read descriptors FROM DISK (the ACTUAL
-  // shipped descriptors the 39-02 import produced, not hand-built).
-  const payWritePath = path.join(DESCRIPTORS_DIR, 'opentabs__doordash__place_order.json');
-  const payReadPath = path.join(DESCRIPTORS_DIR, 'opentabs__doordash__list_orders.json');
-  check(fs.existsSync(payWritePath), 'the REAL emitted opentabs__doordash__place_order.json exists on disk (the shipped PAYMENT write descriptor)');
-  check(fs.existsSync(payReadPath), 'the REAL emitted opentabs__doordash__list_orders.json exists on disk (the shipped read descriptor)');
+  // shipped descriptors the import produced, not hand-built).
+  const payWritePath = path.join(DESCRIPTORS_DIR, 'opentabs__amazon__place_order.json');
+  const payReadPath = path.join(DESCRIPTORS_DIR, 'opentabs__amazon__list_orders.json');
+  check(fs.existsSync(payWritePath), 'the REAL emitted opentabs__amazon__place_order.json exists on disk (the shipped PAYMENT write descriptor)');
+  check(fs.existsSync(payReadPath), 'the REAL emitted opentabs__amazon__list_orders.json exists on disk (the shipped read descriptor)');
 
   const payWriteDescriptor = JSON.parse(fs.readFileSync(payWritePath, 'utf8'));
   const payReadDescriptor = JSON.parse(fs.readFileSync(payReadPath, 'utf8'));
 
-  check(payWriteDescriptor.slug === 'doordash.place_order',
-    'payment write descriptor slug is doordash.place_order (the real emitted slug)');
-  check(payWriteDescriptor.service === 'www.doordash.com',
-    'payment write descriptor service is www.doordash.com (the SENSITIVE screened payment origin)');
+  check(payWriteDescriptor.slug === 'amazon.place_order',
+    'payment write descriptor slug is amazon.place_order (the real emitted slug)');
+  check(payWriteDescriptor.service === 'www.amazon.com',
+    'payment write descriptor service is www.amazon.com (the SENSITIVE screened payment origin)');
   check(payWriteDescriptor.sideEffectClass === 'write',
     'payment write descriptor sideEffectClass is write (the emitted class crosscheck verified -- drives the re-gate; a money-moving order placement)');
   check(payWriteDescriptor.backing === 'dom',
     'payment write descriptor backing is dom (BRDTH-03: DOM-only on a sensitive origin -- the payment-op CI guard PASSES -- AND its write is posture-B gated)');
-  // 39.5-04 full-source import: the REAL doordash plugin emits list_orders on the bare
-  // apex doordash.com (place_order stays on www.doordash.com). BOTH classify SENSITIVE
-  // (the '*.doordash.com' apex-suffix covers apex + www), so the read-runs-under-Auto
-  // proof holds either way. Assert the read op is a doordash origin that is SENSITIVE +
-  // read (host-agnostic so the apex/www split the real plugin uses is not brittle).
+  // Assert the read op is a SENSITIVE amazon origin + read (host-agnostic so an apex/www
+  // re-vendor split would not be brittle).
   const payReadClass = Denylist.classify('https://' + payReadDescriptor.service);
-  check(/(^|\.)doordash\.com$/.test(payReadDescriptor.service) && payReadClass && payReadClass.sensitive === true && payReadDescriptor.sideEffectClass === 'read',
-    'read descriptor (list_orders) is a SENSITIVE doordash origin (' + payReadDescriptor.service + ') + sideEffectClass read (the emitted read op -- real plugin emits it on the apex doordash.com)');
+  check(/(^|\.)amazon\.com$/.test(payReadDescriptor.service) && payReadClass && payReadClass.sensitive === true && payReadDescriptor.sideEffectClass === 'read',
+    'read descriptor (list_orders) is a SENSITIVE amazon origin (' + payReadDescriptor.service + ') + sideEffectClass read (the emitted read op)');
 
   // Route the REAL payment descriptors through the LIVE gate.
   if (typeof Store._reset === 'function') Store._reset();
-  await Store.setOriginMode(DOORDASH_ORIGIN, 'auto');     // Auto, mutating flag false
+  await Store.setOriginMode(AMAZON_ORIGIN, 'auto');     // Auto, mutating flag false
 
   // The READ op (list_orders, sideEffectClass read from the loaded JSON) -> allow.
-  // Route through the read descriptor's OWN sensitive origin (the real plugin emits it on
-  // the apex doordash.com; auto-mode that origin too so the read evaluates under Auto).
+  // Route through the read descriptor's OWN sensitive origin under Auto.
   const PAY_READ_ORIGIN = 'https://' + payReadDescriptor.service;
   await Store.setOriginMode(PAY_READ_ORIGIN, 'auto');     // Auto, mutating flag false
   const payReadGate = await Gate.evaluate({
@@ -246,35 +255,35 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
     entry: { tier: 'T3', descriptor: { sideEffectClass: payReadDescriptor.sideEffectClass } }
   });
   check(payReadGate && payReadGate.decision === 'allow',
-    'the REAL doordash.list_orders (read) on ' + payReadDescriptor.service + ' (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
+    'the REAL amazon.list_orders (read) on ' + payReadDescriptor.service + ' (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
 
   // The payment WRITE op WITHOUT the per-origin mutating flag -> re-gated. The
   // descriptor's REAL sideEffectClass ('write', read from the loaded JSON) triggers
   // the re-gate even with NO method -- NO money moves under Auto.
   const payWriteNoFlag = await Gate.evaluate({
-    origin: DOORDASH_ORIGIN,
+    origin: AMAZON_ORIGIN,
     slug: payWriteDescriptor.slug,
     entry: { tier: 'T3', descriptor: { sideEffectClass: payWriteDescriptor.sideEffectClass } }
   });
   check(payWriteNoFlag && payWriteNoFlag.decision !== 'allow',
-    'the REAL doordash.place_order (payment write) on www.doordash.com (no flag) -> NOT allow (posture B re-gates the SHIPPED sensitive payment write -- no order placed under Auto)');
+    'the REAL amazon.place_order (payment write) on www.amazon.com (no flag) -> NOT allow (posture B re-gates the SHIPPED sensitive payment write -- no order placed under Auto)');
   // INV-03 dual-field byte-equality: the typed reason on code AND errorCode AND error.
   check(payWriteNoFlag && payWriteNoFlag.error && payWriteNoFlag.error.code === MUTATING_REQUIRED,
-    'shipped doordash payment write -> error.code === RECIPE_CONSENT_MUTATING_REQUIRED (byte-exact)');
+    'shipped amazon payment write -> error.code === RECIPE_CONSENT_MUTATING_REQUIRED (byte-exact)');
   check(payWriteNoFlag && payWriteNoFlag.error && payWriteNoFlag.error.errorCode === MUTATING_REQUIRED,
-    'shipped doordash payment write -> error.errorCode === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+    'shipped amazon payment write -> error.errorCode === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
   check(payWriteNoFlag && payWriteNoFlag.error && payWriteNoFlag.error.error === MUTATING_REQUIRED,
-    'shipped doordash payment write -> error.error === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+    'shipped amazon payment write -> error.error === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
 
   // The per-origin mutating flag ELEVATES the shipped sensitive payment write to allow.
-  await Store.setOriginMutating(DOORDASH_ORIGIN, true);
+  await Store.setOriginMutating(AMAZON_ORIGIN, true);
   const payWriteElevated = await Gate.evaluate({
-    origin: DOORDASH_ORIGIN,
+    origin: AMAZON_ORIGIN,
     slug: payWriteDescriptor.slug,
     entry: { tier: 'T3', descriptor: { sideEffectClass: payWriteDescriptor.sideEffectClass } }
   });
   check(payWriteElevated && payWriteElevated.decision === 'allow',
-    'the REAL doordash.place_order WITH the per-origin mutating flag -> allow (the flag elevates the SHIPPED sensitive payment write -- the headline money-no-movement-under-Auto mitigation, proven on a shipped payment descriptor)');
+    'the REAL amazon.place_order WITH the per-origin mutating flag -> allow (the flag elevates the SHIPPED sensitive payment write -- the headline money-no-movement-under-Auto mitigation, proven on a shipped payment descriptor)');
 
   console.log('\nsensitive-write-import-gate: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);

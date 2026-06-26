@@ -143,8 +143,12 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   check(typeof gate.sensitivityHeuristic === 'function',
     '(g) verify-classification-gate.mjs exports sensitivityHeuristic (the backstop under test)');
   const DESCRIPTORS_DIR = path.join(REPO_ROOT, 'catalog', 'descriptors');
+  // 39.5-REVIEW HI-02: the REAL chatgpt slice has NO send_message op (conversation-management
+  // only -- the old chatgpt.send_message was a stale ORPHAN, pruned). Use a real chatgpt WRITE
+  // (rename_conversation); the heuristic trips social/messaging on the chatgpt HOST token
+  // regardless of op, so the backstop assertion is unchanged. claude.send_message is real.
   const socialWriteDescriptors = [
-    'opentabs__chatgpt__send_message.json',
+    'opentabs__chatgpt__rename_conversation.json',
     'opentabs__claude__send_message.json',
     'opentabs__bsky__create_post.json',
     'opentabs__mastodon__create_status.json',
@@ -167,7 +171,7 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   // never a bare `post`/`feed`/`dm`. Proven directly over the real reddit read shapes.
   const redditReadHay = [
     ['reddit.com', 'reddit.get_post', 'Get a single Reddit post by its ID, including its body and top-level comments.'],
-    ['reddit.com', 'reddit.list_subreddit_posts', 'List posts in a subreddit, sorted hot/new/top/rising.'],
+    ['reddit.com', 'reddit.list_posts', 'List posts in a subreddit, sorted hot/new/top/rising.'],
   ];
   for (const [host, slug, desc] of redditReadHay) {
     const verdict = gate.sensitivityHeuristic(host, slug, desc);

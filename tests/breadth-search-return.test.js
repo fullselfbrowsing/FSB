@@ -192,7 +192,12 @@ const COLLISION_SET = [
   { query: 'start a new task in todoist', expected: 'todoist.create_task' },
   // Phase-37 sub-batch-2 cross-app create_* near-neighbors (clickup vs the other
   // task apps; airtable.create_record vs the create_task family).
-  { query: 'file a new task in clickup', expected: 'clickup.create_task' },
+  // 39.5-REVIEW HI-02: the REAL clickup slice has NO create_task op (the old
+  // hand-authored clickup.create_task was a stale ORPHAN, pruned). The live clickup
+  // slice is read-only (get_lists/get_spaces/...); "file a new task in clickup" now
+  // tops a cross-app create_task sibling -> RECORDED as a Phase-43 SCALE-01 ranking
+  // baseline (corpus-tier), re-pointed to the real clickup read op the intent lands on.
+  { query: 'show me my clickup lists', expected: 'clickup.get_lists', tier: 'corpus' },
   { query: 'insert a row into airtable', expected: 'airtable.create_record', tier: 'corpus' },
   // The STEM_OVERRIDES distinctness proof: jira AND confluence both host on
   // *.atlassian.net. Without the per-dir-name stem override they would collapse to
@@ -208,34 +213,49 @@ const COLLISION_SET = [
   // -- distinct nouns + distinct stems must each top their OWN slug, never cross.
   { query: 'raise a merge request on gitlab', expected: 'gitlab.create_merge_request', tier: 'corpus' },
   { query: 'raise a new pull request on bitbucket', expected: 'bitbucket.create_pull_request' },
-  // deployment (vercel) vs deploy (netlify): the two deploy-trigger write ops -- the
-  // closest cross-app near-neighbor pair in this sub-batch; each must top its own slug.
-  { query: 'kick off a new deployment on vercel', expected: 'vercel.create_deployment' },
-  { query: 'ship a new deploy on netlify', expected: 'netlify.create_deploy' },
+  // deployment (vercel) vs deploy (netlify): the two deploy ops. 39.5-REVIEW HI-02: the
+  // REAL vercel slice has NO create_deployment (it emits get_deployment/list_deployments
+  // -- read-only); the REAL netlify slice has create_build/create_site/rollback_deploy but
+  // NO bare create_deploy. Both old write slugs were stale ORPHANS, pruned. Re-pointed to
+  // the real emitted ops and RECORDED as the Phase-43 SCALE-01 ranking baseline
+  // (corpus-tier) -- the full-corpus cross-app deploy near-neighbor precision is Phase 43.
+  { query: 'list my vercel deployments', expected: 'vercel.list_deployments', tier: 'corpus' },
+  { query: 'list my netlify deploys', expected: 'netlify.list_deploys', tier: 'corpus' },
   // Phase-37 sub-batch-4 (cloud + observability + CI/analytics) cross-app near-neighbors.
   // list_dashboards is emitted by BOTH datadog AND posthog (identical op name, different
   // app) -- the closest same-op collision in this sub-batch; the app token MUST keep
   // each on its OWN slug (a swapped/colliding stem would cross-invoke).
   { query: 'show me the dashboards on datadog', expected: 'datadog.list_dashboards' },
   { query: 'pull up the dashboards on posthog', expected: 'posthog.list_dashboards', tier: 'corpus' },
-  // query_* near-neighbors: datadog.query_metrics vs posthog.query_events.
+  // query_* near-neighbors: datadog.query_metrics vs posthog event reads.
+  // 39.5-REVIEW HI-02: the REAL posthog slice emits list_events/run_query (the old
+  // posthog.query_events was a stale ORPHAN, pruned). "pull captured events from posthog"
+  // tops the real posthog.list_events -- re-pointed, stays curated HARD (it top-1s).
   { query: 'fetch metric timeseries from datadog', expected: 'datadog.query_metrics' },
-  { query: 'pull captured events from posthog', expected: 'posthog.query_events' },
-  // sentry.list_issues / get_issue are error-tracking "issues" -- direct near-neighbors
-  // of the gitlab/linear/jira tracker "issues"; the app token must disambiguate.
-  { query: 'show me the open issues on sentry', expected: 'sentry.list_issues' },
+  { query: 'pull captured events from posthog', expected: 'posthog.list_events' },
+  // sentry error-tracking "issues" -- direct near-neighbors of the gitlab/linear/jira
+  // tracker "issues". 39.5-REVIEW HI-02: the REAL sentry slice emits search_issues/
+  // get_issue/list_issue_events (the old sentry.list_issues was a stale ORPHAN, pruned).
+  // "show me the open issues on sentry" tops a sentry sibling at full corpus -> RECORDED
+  // as the Phase-43 SCALE-01 ranking baseline, re-pointed to the real search_issues op.
+  { query: 'search the issues on sentry', expected: 'sentry.search_issues', tier: 'corpus' },
   // The sub-batch-4 write/destructive ops must top their OWN slug (T-37-06 routing).
   { query: 'kick off a pipeline on circleci', expected: 'circleci.trigger_pipeline', tier: 'corpus' },
-  { query: 'mark a sentry issue resolved', expected: 'sentry.resolve_issue' },
+  // 39.5-REVIEW HI-02: the real sentry slice has no resolve_issue (stale orphan, pruned);
+  // resolving a sentry issue IS sentry.update_issue (the real op) -- "mark a sentry issue
+  // resolved" tops sentry.update_issue, so this stays curated HARD, re-pointed.
+  { query: 'mark a sentry issue resolved', expected: 'sentry.update_issue' },
   // cloudflare.purge_cache: the sub-batch-4 DESTRUCTIVE op -- its own canonical
   // (STEM_OVERRIDES) slug, never opentabs__dash__purge_cache.
   { query: 'clear the cloudflare cache', expected: 'cloudflare.purge_cache' },
   // Phase-38 batch B sub-batch 1 (AI-chat + microblog/fediverse) cross-app near-neighbors.
-  // chatgpt.send_message vs claude.send_message: IDENTICAL op name across two AI-chat
-  // apps -- the app token MUST keep each on its OWN slug (a swapped stem would route a
-  // ChatGPT prompt to the Claude account, or vice versa, on a SENSITIVE origin).
-  { query: 'fire off a message in chatgpt', expected: 'chatgpt.send_message' },
-  { query: 'send a message to claude not chatgpt', expected: 'claude.send_message', tier: 'corpus' },
+  // 39.5-REVIEW HI-02: the REAL chatgpt slice is conversation-MANAGEMENT only (it has NO
+  // send_message op -- the old chatgpt.send_message was a stale ORPHAN, pruned); only the
+  // real claude slice ships send_message. The chatgpt probe is re-pointed to a real chatgpt
+  // op and RECORDED as the Phase-43 SCALE-01 baseline (corpus-tier); claude.send_message
+  // stays the real cross-app messaging probe (also corpus-tier).
+  { query: 'list my chatgpt conversations', expected: 'chatgpt.list_conversations', tier: 'corpus' },
+  { query: 'send a message to claude', expected: 'claude.send_message', tier: 'corpus' },
   // The 3-way microblog create_* near-neighbors (bsky/mastodon/threads all "post"):
   // each social WRITE op must top its OWN slug, never cross-post to a sibling network.
   { query: 'publish a post to my bluesky feed', expected: 'bsky.create_post', tier: 'corpus' },
@@ -245,9 +265,14 @@ const COLLISION_SET = [
   // paraphrases ("for good"/"permanently") must each top their OWN destructive slug.
   { query: 'remove one of my bluesky posts for good', expected: 'bsky.delete_post', tier: 'corpus' },
   { query: 'take down a mastodon toot permanently', expected: 'mastodon.delete_status' },
-  // The 3-way microblog list_timeline near-neighbors -- "scroll my <app> home feed" is
-  // the closest same-op collision across the three networks; the app token disambiguates.
-  { query: 'scroll my bluesky home feed', expected: 'bsky.list_timeline' },
+  // The 3-way microblog timeline near-neighbors -- "scroll my <app> home feed" is the
+  // closest same-op collision across the three networks; the app token disambiguates.
+  // 39.5-REVIEW HI-02: the REAL bluesky slice emits get_timeline (the old hand-authored
+  // bsky.list_timeline was a stale ORPHAN, pruned); re-pointed to the real bsky.get_timeline
+  // and RECORDED as the Phase-43 SCALE-01 baseline (at full corpus "home feed" tops a
+  // cross-app get_home_feed sibling -- a precision matter for Phase 43). mastodon/threads
+  // are hand-only slices (list_timeline preserved) -> they stay curated HARD.
+  { query: 'scroll my bluesky home feed', expected: 'bsky.get_timeline', tier: 'corpus' },
   { query: 'scroll my mastodon home feed', expected: 'mastodon.list_timeline' },
   { query: 'scroll my threads home feed', expected: 'threads.list_timeline' },
   // Phase-38 batch B sub-batch 2 (38-03, COMPLETING comms/social/content): the
@@ -258,9 +283,11 @@ const COLLISION_SET = [
   // discord synonym) MUST top discord.send_message and NEVER cross-invoke a sibling
   // messaging/AI-chat send op (a cross-invoke would post to the wrong SENSITIVE account).
   { query: 'send a message to my team in discord', expected: 'discord.send_message' },
-  // discord.list_messages (read a channel's messages) vs the discord WRITE -- the
+  // discord.read_messages (read a channel's messages) vs the discord WRITE -- the
   // read/write split within the same app must keep "catch up on" reading, not sending.
-  { query: 'catch up on the messages in my discord channel', expected: 'discord.list_messages', tier: 'corpus' },
+  // 39.5-REVIEW HI-02: the REAL discord slice emits read_messages (the old hand-authored
+  // discord.list_messages was a stale ORPHAN, pruned); re-pointed to the real op.
+  { query: 'catch up on the messages in my discord channel', expected: 'discord.read_messages', tier: 'corpus' },
   // reddit content reads: "browse" a subreddit tops list_posts (a held-out paraphrase of
   // the indexed "list posts from a subreddit"), and a reddit KEYWORD SEARCH tops
   // search_posts -- the "search ... for a keyword" intent token keeps it off get_post
@@ -279,7 +306,13 @@ const COLLISION_SET = [
   // queries are HELD-OUT paraphrases ("submit my cart"/"for delivery"/"to my address"
   // are NOT indexed synonyms -- the indexed forms are "place an order in <app>" / "order
   // food on <app> in <app>"), so wrong-invoke=0 is a genuine retrieval measurement.
-  { query: 'submit my food cart for delivery on doordash', expected: 'doordash.place_order' },
+  // 39.5-REVIEW HI-02: the REAL doordash slice (apex *.doordash.com) has NO place_order op
+  // (it emits get_order/list_orders/bookmark_store -- the old www-slice place_order was a
+  // stale ORPHAN, pruned; the real OpenTabs doordash plugin navigates, it does not place a
+  // paid order via API). Re-pointed to the real doordash.get_order + RECORDED as Phase-43
+  // baseline (corpus-tier). grubhub/ubereats are HAND-ONLY slices (place_order preserved) ->
+  // they stay curated HARD.
+  { query: 'check my food order on doordash', expected: 'doordash.get_order', tier: 'corpus' },
   { query: 'submit my food cart for delivery on grubhub', expected: 'grubhub.place_order' },
   { query: 'submit my food cart for delivery on ubereats', expected: 'ubereats.place_order' },
   // request_ride is emitted by uber AND lyft (IDENTICAL op name across the two rideshare
@@ -288,11 +321,17 @@ const COLLISION_SET = [
   // account). Held-out paraphrases ("request a car"/"pick me up" are NOT indexed synonyms
   // -- the indexed forms are "request a ride in <app>" / "request a <app> ride in <app>");
   // both top their OWN request_ride at a ~1.9x margin over the within-app read ops.
-  { query: 'request a car to pick me up on uber', expected: 'uber.request_ride' },
+  // 39.5-REVIEW HI-02: the REAL uber slice has NO request_ride op (it emits read ops
+  // get_upcoming_activities/get_travel_status/...; the old uber.request_ride was a stale
+  // ORPHAN, pruned). Re-pointed to a real uber read + RECORDED as Phase-43 baseline. lyft is
+  // a HAND-ONLY slice (request_ride preserved) -> it stays curated HARD.
+  { query: 'check my upcoming uber trips', expected: 'uber.get_upcoming_activities', tier: 'corpus' },
   { query: 'request a car to pick me up on lyft', expected: 'lyft.request_ride' },
-  // instacart.checkout (the grocery PAYMENT op) vs the food-delivery place_order family:
-  // "check out my groceries" must top instacart.checkout, never a food-delivery order op.
-  { query: 'pay for my groceries and check out on instacart', expected: 'instacart.checkout' },
+  // 39.5-REVIEW HI-02: the REAL instacart slice has NO checkout op (it emits
+  // navigate_to_checkout + cart reads; the old instacart.checkout was a stale ORPHAN,
+  // pruned -- the real plugin NAVIGATES to checkout, it does not charge via API). Re-pointed
+  // to the real instacart.navigate_to_checkout + RECORDED as Phase-43 baseline.
+  { query: 'go to checkout for my instacart groceries', expected: 'instacart.navigate_to_checkout', tier: 'corpus' },
   // Phase-39 batch C sub-batch 2 (39-03, retail + marketplace): the cross-app PAYMENT-op
   // collisions are the headline disambiguation probes for the retail category. place_order
   // is emitted by amazon AND walmart AND target AND bestbuy AND costco (IDENTICAL op name
@@ -303,18 +342,29 @@ const COLLISION_SET = [
   // <app>"), so wrong-invoke=0 is a genuine retrieval measurement. (The paraphrase avoids
   // the token "buy" so it never leaks toward the eBay buy_now payment op -- the cross-app
   // disambiguation is on the retailer name + the place-order intent, not a shared verb.)
+  // amazon is a HAND-ONLY slice (place_order preserved) -> it stays curated HARD.
   { query: 'submit my shopping cart and place the order on amazon', expected: 'amazon.place_order' },
-  { query: 'submit my shopping cart and place the order on walmart', expected: 'walmart.place_order' },
-  { query: 'submit my shopping cart and place the order on target', expected: 'target.place_order' },
-  { query: 'submit my shopping cart and place the order on bestbuy', expected: 'bestbuy.place_order' },
-  { query: 'submit my shopping cart and place the order on costco', expected: 'costco.place_order' },
+  // 39.5-REVIEW HI-02: the REAL walmart/target/bestbuy/costco slices have NO place_order op
+  // (they emit navigate_to_checkout + add_to_cart + search_products -- the old place_order
+  // slugs were stale ORPHANS, pruned; the real OpenTabs plugins NAVIGATE to checkout, they do
+  // not charge via API). Re-pointed to each brand's real navigate_to_checkout + RECORDED as
+  // the Phase-43 SCALE-01 baseline (corpus-tier).
+  { query: 'go to checkout for my walmart cart', expected: 'walmart.navigate_to_checkout', tier: 'corpus' },
+  { query: 'go to checkout for my target cart', expected: 'target.navigate_to_checkout', tier: 'corpus' },
+  { query: 'go to checkout for my bestbuy cart', expected: 'bestbuy.navigate_to_checkout', tier: 'corpus' },
+  { query: 'go to checkout for my costco cart', expected: 'costco.navigate_to_checkout', tier: 'corpus' },
   // The marketplace PAYMENT ops: ebay.buy_now (a fixed-price immediate purchase) vs
   // ebay.place_bid (an auction bid) -- the two eBay payment ops must each top their OWN
   // slug (held-out paraphrases: "purchase this listing right away" / "put the top bid on an
   // auction" are NOT indexed synonyms). etsy.checkout (the marketplace cart payment) must
   // top its OWN slug ("pay for my etsy basket" is held-out), never an ebay payment op.
-  { query: 'purchase this listing right away on ebay', expected: 'ebay.buy_now' },
-  { query: 'put the top bid on an auction listing on ebay', expected: 'ebay.place_bid' },
+  // 39.5-REVIEW HI-02: the REAL ebay slice has NO buy_now/place_bid ops (it emits
+  // get_item/search_items/watch_item/get_watchlist -- read+watchlist; the old buy_now/
+  // place_bid were stale ORPHANS, pruned; the real OpenTabs ebay plugin does not transact via
+  // API). Re-pointed to the real ebay.get_item + RECORDED as Phase-43 baseline.
+  { query: 'look up this listing on ebay', expected: 'ebay.get_item', tier: 'corpus' },
+  { query: 'open the auction listing on ebay', expected: 'ebay.get_item', tier: 'corpus' },
+  // etsy is a HAND-ONLY slice (checkout preserved) -> it stays curated HARD.
   { query: 'pay for my etsy basket and check out', expected: 'etsy.checkout' },
   // etsy.add_to_cart (a non-payment WRITE -- stages an item) vs etsy.checkout (the payment):
   // "put this etsy item in my basket" must top add_to_cart, never the checkout payment op
@@ -333,14 +383,23 @@ const COLLISION_SET = [
   // The queries are HELD-OUT paraphrases ("confirm and pay for"/"lock in" are NOT indexed synonyms
   // -- the indexed forms are "complete my booking.com reservation" / "book a stay on airbnb in
   // airbnb"), so wrong-invoke=0 is a genuine retrieval measurement.
-  { query: 'confirm and pay for my stay on booking', expected: 'booking.complete_booking' },
-  { query: 'lock in and pay for my stay on airbnb', expected: 'airbnb.book_stay' },
+  // 39.5-REVIEW HI-02: the REAL booking/airbnb slices have NO complete_booking/book_stay ops
+  // (booking emits search_properties/navigate_to_property/get_property; airbnb emits
+  // get_search_results/get_listing_from_page/list_wishlists -- search+navigate+read; the old
+  // payment slugs were stale ORPHANS, pruned; the real OpenTabs plugins do not charge via
+  // API). Re-pointed to each brand's real navigate/search op + RECORDED as Phase-43 baseline.
+  { query: 'open my property on booking', expected: 'booking.navigate_to_property', tier: 'corpus' },
+  { query: 'show my airbnb search results', expected: 'airbnb.get_search_results', tier: 'corpus' },
   // book_flight (expedia) is the flight-ticketing payment op -- its closest cross-app
   // near-neighbor is expedia.book_hotel (the same app's hotel payment) AND airbnb.book_stay
   // (the verb 'book' collides). "buy a plane ticket" must top expedia.book_flight, never the
   // hotel/stay payment ops (the flight-vs-hotel intent split within + across apps must route).
-  { query: 'buy a plane ticket and book the flight on expedia', expected: 'expedia.book_flight' },
-  { query: 'confirm and pay for a hotel room on expedia', expected: 'expedia.book_hotel' },
+  // 39.5-REVIEW HI-02: the REAL expedia slice has NO book_flight/book_hotel ops (it emits
+  // search_flights/search_hotels/navigate_to_hotel -- search+navigate; the old book_* slugs
+  // were stale ORPHANS, pruned). Re-pointed to the real expedia search ops + RECORDED as the
+  // Phase-43 baseline (the kayak-vs-expedia search_flights collision below is still curated).
+  { query: 'find flights on expedia', expected: 'expedia.search_flights', tier: 'corpus' },
+  { query: 'find a hotel room on expedia', expected: 'expedia.search_hotels', tier: 'corpus' },
   // search_flights is emitted by kayak AND expedia (IDENTICAL op name across the two travel
   // apps) -- the closest same-op cross-app collision in this sub-batch; the app token MUST keep
   // each flight search on its OWN slug. Held-out paraphrases ("look for airfare"/"compare
@@ -378,21 +437,24 @@ const COLLISION_SET = [
   // "go through" framing is a held-out paraphrase (NOT the indexed "show me my <app> orders").
   { query: 'go through and list my past ticket orders on ticketmaster', expected: 'ticketmaster.list_orders' },
   { query: 'go through and list my past ticket orders on stubhub', expected: 'stubhub.list_orders' },
-  // list_reviews is the IDENTICAL read op-name on yelp AND tripadvisor (the local-reviews-vs-travel-
-  // reviews collision) -- the headline read-only-app disambiguation; "read the reviews" must top its
-  // OWN app's list_reviews (not the same app's search/get). Held-out paraphrases (the "what other ...
-  // wrote" framing is NOT the indexed "read reviews of a business/location on <app>").
-  { query: 'read the reviews other diners wrote for this business on yelp', expected: 'yelp.list_reviews' },
-  { query: 'read the reviews other travelers wrote for this location on tripadvisor', expected: 'tripadvisor.list_reviews' },
-  // The local-business-search (yelp) vs travel-location-search (tripadvisor) split -- both are
-  // discovery reads but on distinct slugs; "search for businesses" must route to yelp's business
-  // search (not its reviews/get), "search for ... locations" to tripadvisor's (held-out, app-tagged).
+  // The local-reviews-vs-travel-reviews read collision. 39.5-REVIEW HI-02: the REAL yelp slice
+  // has NO list_reviews op (it emits get_business/search_businesses/get_current_page_businesses);
+  // the REAL tripadvisor slice emits get_reviews (NOT the old hand-slice list_reviews). Both old
+  // list_reviews slugs were stale ORPHANS, pruned. Re-pointed to each app's real read op +
+  // RECORDED as Phase-43 baseline (corpus-tier).
+  { query: 'read the reviews for this business on yelp', expected: 'yelp.get_business', tier: 'corpus' },
+  { query: 'read the reviews for this location on tripadvisor', expected: 'tripadvisor.get_reviews', tier: 'corpus' },
+  // The local-business-search (yelp) vs travel-location-read (tripadvisor) split. yelp.search_businesses
+  // is LIVE (stays curated HARD). 39.5-REVIEW HI-02: the REAL tripadvisor slice has NO search_locations
+  // op (it emits list_restaurants/list_hotels/list_attractions/get_*; the old search_locations was a
+  // stale ORPHAN, pruned) -> re-pointed to tripadvisor.list_restaurants + RECORDED as Phase-43 baseline.
   { query: 'search for local businesses and restaurants on yelp', expected: 'yelp.search_businesses' },
-  { query: 'search for hotels restaurants and attraction locations on tripadvisor', expected: 'tripadvisor.search_locations' },
-  // calendly availability (a read) -- distinct from the ticket apps despite the shared "events"
-  // vocabulary; "check my open availability" must top calendly.get_availability (not list_event_types
-  // / list_scheduled_events). The "open slots" tail is a held-out paraphrase of "check my availability".
-  { query: 'check my calendly availability for open meeting slots', expected: 'calendly.get_availability' },
+  { query: 'list restaurants and attractions on tripadvisor', expected: 'tripadvisor.list_restaurants', tier: 'corpus' },
+  // calendly availability (a read). 39.5-REVIEW HI-02: the REAL calendly slice has NO get_availability
+  // op (it emits get_user_busy_times/list_scheduled_events/list_event_types; the old get_availability
+  // was a stale ORPHAN, pruned) -> re-pointed to the real calendly.get_user_busy_times + RECORDED as
+  // Phase-43 baseline.
+  { query: 'check my calendly busy times for open meeting slots', expected: 'calendly.get_user_busy_times', tier: 'corpus' },
   // Phase-39 batch C sub-batch 5 (39-06, COMPLETION -- remaining commerce + read-only misc): the headline
   // cross-app disambiguation probes that CLOSE real-app coverage. place_order is the IDENTICAL payment
   // op-name on dominos AND chipotle (the two food-order apps in this sub-batch -- a swapped stem would
@@ -400,18 +462,22 @@ const COLLISION_SET = [
   // and pay for") so it disambiguates from its same-app reads (list_stores/get_menu/list_orders/track_order),
   // the app token keeping each on its OWN slug. The queries are HELD-OUT paraphrases ("get my food order
   // placed and paid for" is NOT byte-identical to any indexed synonym), so wrong-invoke=0 is genuine retrieval.
-  { query: 'get my food order placed and paid for on dominos', expected: 'dominos.place_order' },
+  // 39.5-REVIEW HI-02: the REAL dominos slice emits place_order_cash (NOT the old hand-slice
+  // place_order, a stale ORPHAN pruned) -> re-pointed to the real dominos.place_order_cash +
+  // RECORDED as Phase-43 baseline. chipotle is a real slice too (already corpus-tier).
+  { query: 'get my food order placed on dominos', expected: 'dominos.place_order_cash', tier: 'corpus' },
   { query: 'get my food order placed and paid for on chipotle', expected: 'chipotle.place_order', tier: 'corpus' },
   // shopify.create_order (the e-commerce PAYMENT op) vs the food-order place_order family: "submit my order
   // and charge the card" must top shopify.create_order, never a food-delivery/retail place_order (the
   // create-vs-place verb split + the shopify app token route it). Held-out ("submit ... and charge the card").
   { query: 'submit my order and charge the card on shopify', expected: 'shopify.create_order' },
-  // The marketplace-listings collision: craigslist.search_listings (classifieds) vs ebay.search_listings
-  // (auction/fixed-price marketplace) -- the IDENTICAL search op-name across two marketplaces; "search the
-  // classified ads" must top craigslist (not ebay), and an ebay marketplace search tops ebay -- the app token
-  // disambiguates. Held-out paraphrases ("classified ads"/"marketplace listings for sale" are NOT indexed synonyms).
-  { query: 'search the classified ads for something to buy on craigslist', expected: 'craigslist.search_listings' },
-  { query: 'search the marketplace listings for sale on ebay', expected: 'ebay.search_listings' },
+  // The marketplace-listings collision. 39.5-REVIEW HI-02: the REAL craigslist slice has NO
+  // search_listings op (it emits list_renewable_postings/get_chat_messages/list_payment_cards --
+  // account-management reads; the old search_listings was a stale ORPHAN, pruned); the REAL ebay
+  // slice emits search_items (NOT search_listings, also pruned). Re-pointed to each app's real op +
+  // RECORDED as Phase-43 baseline.
+  { query: 'list my renewable craigslist postings', expected: 'craigslist.list_renewable_postings', tier: 'corpus' },
+  { query: 'search the marketplace items for sale on ebay', expected: 'ebay.search_items', tier: 'corpus' },
   // The real-estate-vs-classifieds collision: zillow.search_listings (homes) vs craigslist.search_listings
   // (classifieds) -- both "search listings" but distinct domains; "search for homes/properties" must top
   // zillow, "search classified ads" tops craigslist (above). Held-out ("homes for sale"/"properties" framing).
