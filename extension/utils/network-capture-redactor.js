@@ -99,12 +99,19 @@
     /^(sk|pk|rk)_(live|test)_[a-z0-9]{8,}$/i,   // stripe secret/publishable/restricted
     /^xox[bcpars]-[a-z0-9-]{8,}$/i,             // slack tokens
     /^gh[opsur]_[a-z0-9]{20,}$/i,               // github PAT / oauth / server / refresh / user
-    /^eyj[a-z0-9_-]+\.[a-z0-9_-]+/i             // JWT (eyJ... '.' ...) -- header.payload
+    /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/i       // JWT (eyJ... '.' ...) -- real eyJ casing; /i + helper-local lowercasing keep this correct for ANY caller
   ];
 
-  function _nameLooksTokenShaped(lowerName) {
+  // Self-contained contract (WR-02): lowercase the input HERE so the helper is
+  // correct regardless of whether the caller pre-lowercased the name. The patterns
+  // above are all /i, but writing the JWT literal as real 'eyJ' + lowercasing here
+  // means a future caller passing a raw (mixed-case) name still matches every row --
+  // no silent false-negative on the JWT shape. (The sole current caller passes an
+  // already-lowercased name; toLowerCase() is idempotent, so its behavior is unchanged.)
+  function _nameLooksTokenShaped(name) {
+    var s = String(name).toLowerCase();
     for (var i = 0; i < HEADER_NAME_TOKEN_SHAPES.length; i++) {
-      if (HEADER_NAME_TOKEN_SHAPES[i].test(lowerName)) { return true; }
+      if (HEADER_NAME_TOKEN_SHAPES[i].test(s)) { return true; }
     }
     return false;
   }
