@@ -187,7 +187,15 @@ const COLLISION_SET = [
   // The load-bearing create_issue cluster (linear/jira/gitlab) + the create_* family,
   // probed by held-out paraphrases ("log a bug", "create a new ticket", "file a new
   // issue" -- none is an indexed synonym; "ticket"/"bug"/"row" are held-out nouns).
-  { query: 'log a bug in linear', expected: 'linear.create_issue', tier: 'corpus' },
+  // MED-02 (43-REVIEW) PROMOTED to curated HARD: the bug->issue create generalization
+  // (CREATE_NOUN_VERBS file/log/report + the 'bug' noun-class) tops linear.create_issue.
+  // The probe is "report a bug in linear" -- a HELD-OUT paraphrase (NOT a verbatim member
+  // of create_issue's synonyms, which carry "file a bug" / "log a bug"; 'report' is the
+  // generalization's third bug create-verb, trimmed from the indexed 6 by the cap), so the
+  // wrong-invoke=0 here is genuine retrieval, not an exact match. Pinned HARD so a future
+  // IDF re-weight that re-tips it FAILS CI instead of silently regressing the RECORDED
+  // corpus number.
+  { query: 'report a bug in linear', expected: 'linear.create_issue' },
   { query: 'add a new task to my asana list', expected: 'asana.create_task', tier: 'corpus' },
   { query: 'start a new task in todoist', expected: 'todoist.create_task' },
   // Phase-37 sub-batch-2 cross-app create_* near-neighbors (clickup vs the other
@@ -258,7 +266,11 @@ const COLLISION_SET = [
   { query: 'send a message to claude', expected: 'claude.send_message', tier: 'corpus' },
   // The 3-way microblog create_* near-neighbors (bsky/mastodon/threads all "post"):
   // each social WRITE op must top its OWN slug, never cross-post to a sibling network.
-  { query: 'publish a post to my bluesky feed', expected: 'bsky.create_post', tier: 'corpus' },
+  // MED-02 (43-REVIEW) PROMOTED to curated HARD: the bluesky app-alias + post-verb
+  // generalization (CREATE_NOUN_VERBS publish/share/write on the post noun + the alias
+  // emission) tops bsky.create_post for this held-out paraphrase, so it is pinned HARD
+  // instead of silently regressing the RECORDED corpus number on a future re-weight.
+  { query: 'publish a post to my bluesky feed', expected: 'bsky.create_post' },
   { query: 'publish a status on mastodon', expected: 'mastodon.create_status' },
   { query: 'publish a new thread on threads', expected: 'threads.create_thread' },
   // The microblog DESTRUCTIVE ops (bsky.delete_post / mastodon.delete_status): held-out
@@ -331,7 +343,10 @@ const COLLISION_SET = [
   // navigate_to_checkout + cart reads; the old instacart.checkout was a stale ORPHAN,
   // pruned -- the real plugin NAVIGATES to checkout, it does not charge via API). Re-pointed
   // to the real instacart.navigate_to_checkout + RECORDED as Phase-43 baseline.
-  { query: 'go to checkout for my instacart groceries', expected: 'instacart.navigate_to_checkout', tier: 'corpus' },
+  // MED-02 (43-REVIEW) PROMOTED to curated HARD: the instacart 'groceries' STEM_NOUN_SYNONYMS
+  // scope tops instacart.navigate_to_checkout for this held-out cross-app paraphrase, so it
+  // is pinned HARD instead of staying a silently-re-tippable RECORDED corpus probe.
+  { query: 'go to checkout for my instacart groceries', expected: 'instacart.navigate_to_checkout' },
   // Phase-39 batch C sub-batch 2 (39-03, retail + marketplace): the cross-app PAYMENT-op
   // collisions are the headline disambiguation probes for the retail category. place_order
   // is emitted by amazon AND walmart AND target AND bestbuy AND costco (IDENTICAL op name

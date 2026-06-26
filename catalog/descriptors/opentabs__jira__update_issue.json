@@ -7,7 +7,7 @@
     "change the details of issue in jira",
     "modify an issue in jira",
     "update a ticket in jira",
-    "update a bug in jira"
+    "update issue in jira"
   ],
   "description": "Update fields on an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
   "actionVerb": "update",

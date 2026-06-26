@@ -6,8 +6,8 @@
     "add an issue in linear",
     "make a new issue in linear",
     "open a new issue in linear",
-    "file an issue in linear",
-    "create a ticket in linear"
+    "file a bug in linear",
+    "log a bug in linear"
   ],
   "description": "Create a new issue in Linear. Requires a team ID and title at minimum.",
   "actionVerb": "create",

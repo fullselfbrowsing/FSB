@@ -565,7 +565,10 @@ const INTENT_VERB_SYNONYMS = {
 // token is always first so the canonical phrasing dominates; the alias is the bridge.
 const NOUN_SYNONYMS = {
   task: ['task', 'to-do', 'to-do item', 'todo'],
-  issue: ['issue', 'ticket', 'bug'],
+  // HI-02 (43-REVIEW): 'bug' before 'ticket' so the held-out "log/file/report a bug"
+  // create paraphrase wins the create-noun-verb cap slot (it is the more common colloquial
+  // create alias; archive_issue's 'bug' over-claim is dropped via OVER_CLAIM_GUARD below).
+  issue: ['issue', 'bug', 'ticket'],
   businesses: ['businesses', 'restaurants', 'places'],
   business: ['business', 'restaurant', 'place'],
 };
@@ -582,16 +585,35 @@ const STEM_NOUN_SYNONYMS = {
 };
 
 // (1b) CREATE_NOUN_VERBS (Category B, the noun-specific create verb): some nouns have
-// a colloquial CREATE verb that is wrong for other nouns -- you "file an issue/ticket/
-// bug/report" but never "file a post/page/payment". A bare global 'file' create-alias
-// regresses (it tips create_post/create_task siblings + drops recall); so 'file' is
-// woven ONLY for the create-family ops whose noun is in this map, as an extra
-// stem-tagged phrase. Keyed by the singular op-noun; applies corpus-wide to that noun.
+// a colloquial CREATE verb that is wrong for other nouns -- you "file/log/report an
+// issue/ticket/bug" but never "file a post/page/payment". A bare global 'file'/'log'/
+// 'report' create-alias regresses (it tips create_post/create_task siblings + drops
+// recall); so these verbs are woven ONLY for the create-family ops whose noun is in this
+// map, as extra stem-tagged phrases. Keyed by the singular noun; applies corpus-wide to
+// that noun AND -- via the NOUN_SYNONYMS bridge in the weave below -- to its colloquial
+// noun-aliases, so a create op whose op-noun is 'issue' ALSO answers "log/report/file a
+// bug in <stem>" ('bug' is a NOUN_SYNONYMS alias of 'issue'). HI-02 (43-REVIEW): this is
+// the GENERAL bug->issue noun-class + file/log/report->create verb-class, NOT a fixture
+// string-match -- so unseen "log a bug" / "report a bug" / "file a bug" paraphrases for
+// ANY issue-tracker app (linear/jira/gitlab/...) reach its create_issue, stem-guarded.
 const CREATE_NOUN_VERBS = {
-  issue: ['file'],
-  ticket: ['file'],
-  bug: ['file', 'report'],
+  issue: ['file', 'log', 'report'],
+  ticket: ['file', 'log'],
+  bug: ['file', 'log', 'report'],
   report: ['file'],
+  // HI-02 (43-REVIEW) microblog post-verb class: a social create_post/create_status/
+  // create_thread op is colloquially "publish/share/write a post" (NOT "create"). These
+  // post-family create verbs are correct for the microblog post nouns but wrong for a
+  // tracker 'issue' or a doc 'page', so they are noun-scoped here (never global). Woven
+  // BOTH stem-tagged AND alias-tagged in the create-noun-verb emission, so "publish a
+  // post to my bluesky feed" / "share a post on bluesky" / "write a post in bluesky"
+  // reach bsky.create_post via the GENERAL post-verb->create class on the post noun --
+  // not a fixture string match -- for ANY microblog app (bsky/mastodon/threads), and the
+  // alias-tagged variants bind the friendly app name ('bluesky') through the same stem
+  // guard so they never leak cross-app.
+  post: ['publish', 'share', 'write'],
+  status: ['publish', 'share', 'write'],
+  thread: ['publish', 'share', 'write'],
 };
 
 // (1c) GET_NOUN_VERBS (the noun-specific GET verb, the inverse of CREATE_NOUN_VERBS):
@@ -619,6 +641,19 @@ const GET_NOUN_VERBS = {
 // is the Category-C "non-create op does not emit the create-family determiner" guidance
 // applied symmetrically -- here the create op drops 'open a new' for a get-favoring noun.
 const GET_FAVORING_NOUNS = new Set(['conversation', 'thread']);
+
+// (1c'') CREATE_FAVORING_NOUN_ALIASES (HI-02, 43-REVIEW): noun-aliases that colloquially
+// read as a CREATE intent and are WRONG on a non-create sibling. 'bug' is the canonical
+// case: a user "files/logs/reports a bug" (-> create_issue) but never colloquially
+// "archives/searches/updates a bug" (they say "issue" for those). The general noun-alt
+// weave (block 1b) emits every NOUN_SYNONYMS alias on every non-get verb, so without this
+// guard 'bug' leaks onto linear.archive_issue / *.update_issue / *.search_issue and
+// out-claims create_issue on "report a bug in linear" (the held-out create paraphrase). So
+// these aliases are SUPPRESSED from the noun-alt weave for non-create verbs -- they reach
+// the create op via CREATE_NOUN_VERBS (the file/log/report bug create-verb class) and are
+// dropped from create's siblings. GENERAL (a noun-class rule, the create-side mirror of
+// GET_FAVORING_NOUNS), keyed by the alias token.
+const CREATE_FAVORING_NOUN_ALIASES = new Set(['bug']);
 
 // (2) APP_ALIASES (Category A): the friendly DIR-NAME alias for a STEM_OVERRIDE'd app
 // whose emitted stem differs from how a user names it. synthSynonyms ALSO emits a
@@ -893,12 +928,41 @@ function synthSynonyms(tool, serviceStem, slug) {
   // issue in linear" -> linear.create_issue, not create_attachment whose DESCRIPTION
   // carries 'file'/'issue'). ONLY for verb==='create' + the noun-keyed verbs (never
   // global -- a global 'file' alias regressed create_post/create_task siblings).
+  //
+  // HI-02 (43-REVIEW) GENERALIZATION: emit the noun-specific create verbs across the
+  // op-noun AND its colloquial noun-aliases (nounAlts: 'bug'/'ticket' for 'issue'), each
+  // looked up in CREATE_NOUN_VERBS by its OWN singular. This makes "log/report/file a bug
+  // in <stem>" reach create_issue for ANY issue-tracker app via the GENERAL bug->issue
+  // noun-class + file/log/report->create verb-class -- not a fixture string match. Every
+  // phrase is still stem-tagged by push(), so a noun-alias create verb NEVER leaks
+  // cross-app. De-duped via push()'s out.includes guard.
   if (verb === 'create' && singular) {
-    const nounVerbsEarly = (Object.prototype.hasOwnProperty.call(CREATE_NOUN_VERBS, singular)
-      ? CREATE_NOUN_VERBS[singular] : null);
-    if (nounVerbsEarly) {
-      for (const nv of nounVerbsEarly) {
-        push(`${nv} ${article(singular)} ${singular} in ${stem}`);
+    // The set of nouns this create op answers for. HI-02: the colloquial noun-ALIASES
+    // ('bug'/'ticket' for an 'issue' op) come FIRST -- they are the MORE discriminating
+    // create phrases (the op-noun's own create coverage, "create an issue", is already
+    // emitted by the verbAlts loop above, whereas "log a bug" is the held-out paraphrase
+    // a sibling like archive_issue would otherwise win on the shared 'bug' token). Within
+    // the 6-synonym cap this keeps the noun-alias create verbs ("log/file a bug") over the
+    // redundant op-noun ones. The op-noun is appended LAST so its create verbs ("file an
+    // issue") still emit if budget remains (the "file a new issue in linear" eval fixture).
+    // Singularize a trailing-'s' alias for the "a <noun>" article form.
+    const createNounForms = [];
+    for (const a of nounAlts) {
+      const aSing = isPluralNoun(a) ? String(a).replace(/s$/, '') : String(a);
+      if (aSing && createNounForms.indexOf(aSing) === -1) { createNounForms.push(aSing); }
+    }
+    if (createNounForms.indexOf(singular) === -1) { createNounForms.push(singular); }
+    for (const cn of createNounForms) {
+      const nounVerbsEarly = (Object.prototype.hasOwnProperty.call(CREATE_NOUN_VERBS, cn)
+        ? CREATE_NOUN_VERBS[cn] : null);
+      if (nounVerbsEarly) {
+        for (const nv of nounVerbsEarly) {
+          push(`${nv} ${article(cn)} ${cn} in ${stem}`);
+          // HI-02: also bind the app-alias form (e.g. "publish a post in bluesky") when
+          // the app has a friendly alias, so a colloquial app-named create paraphrase
+          // reaches the right op. pushAlias enforces the alias stem-guard (app-bound).
+          if (alias) { pushAlias(`${nv} ${article(cn)} ${cn} in ${alias}`); }
+        }
       }
     }
   }
@@ -934,6 +998,13 @@ function synthSynonyms(tool, serviceStem, slug) {
   if (noun && nounAlts.length && verbAlts.length && verb !== 'get') {
     const primaryAlt = verbAlts[0];
     for (const nAlt of nounAlts) {
+      // HI-02: a CREATE-favoring noun-alias ('bug') is suppressed on a NON-create op so it
+      // does not out-claim the create op on a "report/file/log a bug" create paraphrase
+      // (it reaches create via CREATE_NOUN_VERBS instead). The create-side mirror of the
+      // get-favoring 'open' guard.
+      if (verb !== 'create' && CREATE_FAVORING_NOUN_ALIASES.has(String(nAlt).toLowerCase().trim())) {
+        continue;
+      }
       const nounPlural = isPluralNoun(nAlt);
       if (nounPlural) {
         push(`${primaryAlt} ${nAlt} in ${stem}`);

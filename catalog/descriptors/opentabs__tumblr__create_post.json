@@ -6,7 +6,8 @@
     "add a post in tumblr",
     "make a new post in tumblr",
     "open a new post in tumblr",
-    "create post in tumblr"
+    "publish a post in tumblr",
+    "share a post in tumblr"
   ],
   "description": "Create a new text post on a Tumblr blog using NPF format. Defaults to published state.",
   "actionVerb": "create",

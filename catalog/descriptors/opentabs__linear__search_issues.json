@@ -4,7 +4,6 @@
   "intentSynonyms": [
     "search issues in linear",
     "search a ticket in linear",
-    "search a bug in linear",
     "search and filter issues in linear"
   ],
   "description": "Search and filter Linear issues. Supports text search, filtering by team, assignee, state, label, project, and more. Returns paginated results.",

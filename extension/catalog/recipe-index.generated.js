@@ -7403,8 +7403,8 @@
         "add a post in bsky",
         "make a new post in bsky",
         "open a new post in bsky",
-        "create post in bsky",
-        "create a post in bluesky"
+        "publish a post in bsky",
+        "publish a post in bluesky"
       ],
       "description": "Create a new Bluesky post. Supports plain text. For replies, provide the parent and root post URIs and CIDs.",
       "actionVerb": "create",
@@ -22886,8 +22886,9 @@
         "create a thread in discord",
         "add a thread in discord",
         "make a new thread in discord",
-        "create thread in discord",
-        "create a new thread in discord"
+        "publish a thread in discord",
+        "share a thread in discord",
+        "write a thread in discord"
       ],
       "description": "Create a new thread from a message, or a standalone thread in a channel. Threads are temporary sub-channels for focused conversation.",
       "actionVerb": "create",
@@ -35002,8 +35003,8 @@
         "add an issue in gitlab",
         "make a new issue in gitlab",
         "open a new issue in gitlab",
-        "file an issue in gitlab",
-        "create a ticket in gitlab"
+        "file a bug in gitlab",
+        "log a bug in gitlab"
       ],
       "description": "Create a new issue in a project.",
       "actionVerb": "create",
@@ -35664,7 +35665,7 @@
         "view my issues in gitlab",
         "see all my issues in gitlab",
         "list a ticket in gitlab",
-        "list a bug in gitlab"
+        "list issues for a project in gitlab"
       ],
       "description": "List issues for a project. By default returns opened issues sorted by creation date. Can filter by state, labels, assignee, milestone, and more.",
       "actionVerb": "list",
@@ -36313,7 +36314,7 @@
         "change the details of issue in gitlab",
         "modify an issue in gitlab",
         "update a ticket in gitlab",
-        "update a bug in gitlab"
+        "update issue in gitlab"
       ],
       "description": "Update an existing issue. Only specified fields are changed.",
       "actionVerb": "update",
@@ -41263,7 +41264,6 @@
       "intentSynonyms": [
         "assign an issue in jira",
         "assign a ticket in jira",
-        "assign a bug in jira",
         "assign issue in jira",
         "assign or unassign an issue in jira"
       ],
@@ -41308,8 +41308,8 @@
         "add an issue in jira",
         "make a new issue in jira",
         "open a new issue in jira",
-        "file an issue in jira",
-        "create a ticket in jira"
+        "file a bug in jira",
+        "log a bug in jira"
       ],
       "description": "Create a new Jira issue in a project. Requires a project key, summary, and issue type.",
       "actionVerb": "create",
@@ -41381,7 +41381,7 @@
         "trash an issue in jira",
         "permanently delete an issue in jira",
         "delete a ticket in jira",
-        "delete a bug in jira"
+        "delete issue in jira"
       ],
       "description": "Delete a Jira issue. Optionally delete all subtasks as well.",
       "actionVerb": "delete",
@@ -41573,7 +41573,6 @@
       "intentSynonyms": [
         "link issues in jira",
         "link a ticket in jira",
-        "link a bug in jira",
         "link two issues together in jira"
       ],
       "description": "Create a link between two Jira issues. Common link types: \"Blocks\", \"is blocked by\", \"relates to\", \"duplicates\".",
@@ -41877,7 +41876,6 @@
       "intentSynonyms": [
         "search issues in jira",
         "search a ticket in jira",
-        "search a bug in jira",
         "search issues using jql in jira"
       ],
       "description": "Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.",
@@ -41965,7 +41963,6 @@
       "intentSynonyms": [
         "transition an issue in jira",
         "transition a ticket in jira",
-        "transition a bug in jira",
         "transition issue in jira",
         "change an issue's status in jira"
       ],
@@ -42012,7 +42009,7 @@
         "change the details of issue in jira",
         "modify an issue in jira",
         "update a ticket in jira",
-        "update a bug in jira"
+        "update issue in jira"
       ],
       "description": "Update fields on an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -43476,7 +43473,6 @@
       "intentSynonyms": [
         "archive an issue in linear",
         "archive a ticket in linear",
-        "archive a bug in linear",
         "archive issue in linear"
       ],
       "description": "Archive a Linear issue. Archived issues are hidden from default views but can be restored.",
@@ -43800,8 +43796,8 @@
         "add an issue in linear",
         "make a new issue in linear",
         "open a new issue in linear",
-        "file an issue in linear",
-        "create a ticket in linear"
+        "file a bug in linear",
+        "log a bug in linear"
       ],
       "description": "Create a new issue in Linear. Requires a team ID and title at minimum.",
       "actionVerb": "create",
@@ -44241,7 +44237,7 @@
         "trash an issue in linear",
         "permanently delete an issue in linear",
         "delete a ticket in linear",
-        "delete a bug in linear"
+        "delete issue in linear"
       ],
       "description": "Move a Linear issue to the trash. Trashed issues can be restored within 30 days.",
       "actionVerb": "delete",
@@ -45634,7 +45630,6 @@
       "intentSynonyms": [
         "search issues in linear",
         "search a ticket in linear",
-        "search a bug in linear",
         "search and filter issues in linear"
       ],
       "description": "Search and filter Linear issues. Supports text search, filtering by team, assignee, state, label, project, and more. Returns paginated results.",
@@ -45911,7 +45906,7 @@
         "change the details of issue in linear",
         "modify an issue in linear",
         "update a ticket in linear",
-        "update a bug in linear"
+        "update issue in linear"
       ],
       "description": "Update an existing Linear issue. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -47405,8 +47400,8 @@
         "add a status in mastodon",
         "make a new status in mastodon",
         "open a new status in mastodon",
-        "create status in mastodon",
-        "post a status to mastodon in mastodon"
+        "publish a status in mastodon",
+        "share a status in mastodon"
       ],
       "description": "Publish a new status (toot) to Mastodon. Posts the text to your account at the chosen visibility; this is visible to your audience. Optionally reply to an existing status.",
       "actionVerb": "create",
@@ -72881,7 +72876,6 @@
       "intentSynonyms": [
         "search issues in sentry",
         "search a ticket in sentry",
-        "search a bug in sentry",
         "search and list issues with optional filters in sentry"
       ],
       "description": "Search and list issues for a Sentry organization. Supports Sentry search syntax in the query parameter (e.g., \"is:unresolved\", \"assigned:me\", \"level:error\", \"first-seen:-24h\"). Filter by project IDs, environment, and time range. Results are paginated with a cursor.",
@@ -72954,7 +72948,7 @@
         "change the details of issue in sentry",
         "modify an issue in sentry",
         "update a ticket in sentry",
-        "update a bug in sentry"
+        "update issue in sentry"
       ],
       "description": "Update an issue's attributes. Supports changing status (resolve, unresolve, ignore), assigning to a user or team, bookmarking, and marking as seen. Only specified fields are modified.",
       "actionVerb": "update",
@@ -86808,8 +86802,9 @@
         "create a thread in threads",
         "add a thread in threads",
         "make a new thread in threads",
-        "create thread in threads",
-        "post a new thread in threads"
+        "publish a thread in threads",
+        "share a thread in threads",
+        "write a thread in threads"
       ],
       "description": "Post a new thread to Threads. Publishes the text to your account; this is publicly visible. Optionally reply to an existing thread.",
       "actionVerb": "create",
@@ -90183,7 +90178,8 @@
         "add a post in tumblr",
         "make a new post in tumblr",
         "open a new post in tumblr",
-        "create post in tumblr"
+        "publish a post in tumblr",
+        "share a post in tumblr"
       ],
       "description": "Create a new text post on a Tumblr blog using NPF format. Defaults to published state.",
       "actionVerb": "create",
@@ -101635,7 +101631,7 @@
         "make a new ticket in zendesk",
         "open a new ticket in zendesk",
         "file a ticket in zendesk",
-        "create ticket in zendesk"
+        "log a ticket in zendesk"
       ],
       "description": "Create a new support ticket in Zendesk. Requires a subject and initial comment body. Optionally set priority, type, tags, assignee, group, and requester. Returns the newly created ticket with its assigned ID.",
       "actionVerb": "create",

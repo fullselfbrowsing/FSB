@@ -5,8 +5,9 @@
     "create a thread in discord",
     "add a thread in discord",
     "make a new thread in discord",
-    "create thread in discord",
-    "create a new thread in discord"
+    "publish a thread in discord",
+    "share a thread in discord",
+    "write a thread in discord"
   ],
   "description": "Create a new thread from a message, or a standalone thread in a channel. Threads are temporary sub-channels for focused conversation.",
   "actionVerb": "create",

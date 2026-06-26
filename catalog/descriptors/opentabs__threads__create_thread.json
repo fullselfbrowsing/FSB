@@ -5,8 +5,9 @@
     "create a thread in threads",
     "add a thread in threads",
     "make a new thread in threads",
-    "create thread in threads",
-    "post a new thread in threads"
+    "publish a thread in threads",
+    "share a thread in threads",
+    "write a thread in threads"
   ],
   "description": "Post a new thread to Threads. Publishes the text to your account; this is publicly visible. Optionally reply to an existing thread.",
   "actionVerb": "create",

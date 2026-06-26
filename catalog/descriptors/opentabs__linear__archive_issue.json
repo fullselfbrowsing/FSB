@@ -4,7 +4,6 @@
   "intentSynonyms": [
     "archive an issue in linear",
     "archive a ticket in linear",
-    "archive a bug in linear",
     "archive issue in linear"
   ],
   "description": "Archive a Linear issue. Archived issues are hidden from default views but can be restored.",

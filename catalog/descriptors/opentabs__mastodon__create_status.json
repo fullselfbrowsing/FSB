@@ -6,8 +6,8 @@
     "add a status in mastodon",
     "make a new status in mastodon",
     "open a new status in mastodon",
-    "create status in mastodon",
-    "post a status to mastodon in mastodon"
+    "publish a status in mastodon",
+    "share a status in mastodon"
   ],
   "description": "Publish a new status (toot) to Mastodon. Posts the text to your account at the chosen visibility; this is visible to your audience. Optionally reply to an existing status.",
   "actionVerb": "create",

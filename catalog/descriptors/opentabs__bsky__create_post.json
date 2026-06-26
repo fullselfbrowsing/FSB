@@ -6,8 +6,8 @@
     "add a post in bsky",
     "make a new post in bsky",
     "open a new post in bsky",
-    "create post in bsky",
-    "create a post in bluesky"
+    "publish a post in bsky",
+    "publish a post in bluesky"
   ],
   "description": "Create a new Bluesky post. Supports plain text. For replies, provide the parent and root post URIs and CIDs.",
   "actionVerb": "create",
