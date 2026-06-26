@@ -205,7 +205,9 @@ function installChromeStorageStub() {
     'https://open.spotify.com',          // exact
     'https://www.twitch.tv',             // via https://*.twitch.tv (suffix)
     'https://store.steampowered.com',    // exact
-    'https://music.youtube.com',         // exact -- NOT *.youtube.com (would catch youtube proper)
+    'https://music.youtube.com',         // exact (the YouTube Music ToS-hostile media origin)
+    'https://youtube.com',               // exact (Phase 39.5-03: the bare apex, media/ToS axis)
+    'https://www.youtube.com',           // exact (Phase 39.5-03: www; NOT *.youtube.com)
     'https://www.tinder.com',            // via https://*.tinder.com (suffix)
     'https://www.onlyfans.com'           // via https://*.onlyfans.com (suffix)
   ];
@@ -251,8 +253,18 @@ function installChromeStorageStub() {
   // forms must NOT collapse to whole-domain wildcards.
   check(Denylist.classify('https://api.stripe.com').sensitive === false,
     "exact-host: classify('https://api.stripe.com').sensitive === false (dashboard.stripe.com did NOT over-broaden to *.stripe.com)");
-  check(Denylist.classify('https://www.youtube.com').denied === false,
-    "exact-host: classify('https://www.youtube.com').denied === false (music.youtube.com did NOT over-broaden to *.youtube.com)");
+  // Phase 39.5-03: youtube.com + www.youtube.com are now EXPLICITLY denied (the bare
+  // apex the real youtube plugin emits, media/ToS axis). They are added as EXACT-host
+  // entries (NOT '*.youtube.com'), so the anti-over-broadening discipline still holds:
+  // an UNRELATED youtube subdomain that is NOT a denylist entry (e.g. studio.youtube.com)
+  // stays non-denied -- the denied set is the exact youtube.com / www.youtube.com /
+  // music.youtube.com hosts, not a whole-domain wildcard.
+  check(Denylist.classify('https://www.youtube.com').denied === true,
+    "exact-host: classify('https://www.youtube.com').denied === true (Phase 39.5-03: the youtube app origin is explicitly denied)");
+  check(Denylist.classify('https://youtube.com').denied === true,
+    "exact-host: classify('https://youtube.com').denied === true (Phase 39.5-03: the bare apex is explicitly denied)");
+  check(Denylist.classify('https://studio.youtube.com').denied === false,
+    "exact-host: classify('https://studio.youtube.com').denied === false (the youtube entries are EXACT-host, NOT *.youtube.com -- an unrelated subdomain is not over-broadened)");
   check(Denylist.classify('https://digital.fidelity.com').denied === true,
     "exact-host: classify('https://digital.fidelity.com').denied === true (fidelity is exact digital.fidelity.com only)");
 
