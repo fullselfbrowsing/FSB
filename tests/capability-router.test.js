@@ -299,13 +299,18 @@ const GITHUB_RECIPE = {
   delete globalThis.FsbCapabilityFetch;
 
   // -----------------------------------------------------------------------
-  // HEAL-03 re-learn trigger WIRING (D-10): the post-fallback runDiscovery re-learn
-  // trigger is reachable on the rot path. Spy FsbDiscoverySession.runDiscovery and
-  // assert it is CALLABLE/wired when a recipe rots. NOTE: the exact trigger point is
-  // Plan 03's (router or autopilot door); the CI assertion is "the trigger is
-  // reachable/wired", NOT "a real fallback completed" (the live re-learn-after-real-
-  // fallback is UAT per D-10/A5). RED until Plan 03 wires the trigger.
+  // HEAL-03 re-learn trigger WIRING (D-10) + SCALE-02 (Phase 43): the post-fallback
+  // runDiscovery re-learn is reachable on the rot path AND now routes THROUGH the
+  // per-origin coalescing/back-off scheduler (FsbRelearnScheduler.scheduleRelearn), not
+  // a direct fire-and-forget. Spy FsbDiscoverySession.runDiscovery; because the router
+  // schedules the re-learn (it arms the coalescing window via the scheduler's real
+  // setTimer rather than calling runDiscovery synchronously), drive the scheduler's
+  // deterministic flush(origin) seam after the invoke and assert the re-learn fired
+  // EXACTLY ONCE -- proving the trigger is wired AND coalesced. The live
+  // re-learn-after-real-fallback is UAT per D-10/A5.
   // -----------------------------------------------------------------------
+  const SCHEDULER = require(path.join(REPO_ROOT, 'extension', 'utils', 'relearn-scheduler.js'));
+  if (typeof SCHEDULER._reset === 'function') { SCHEDULER._reset(); }
   const runDiscoveryCalls = [];
   const priorDiscovery = globalThis.FsbDiscoverySession;
   globalThis.FsbDiscoverySession = {
@@ -318,10 +323,18 @@ const GITHUB_RECIPE = {
   };
   installCatalog({ 'github.notifications': { tier: 'T1b', recipe: GITHUB_RECIPE } });
   await ROUTER.invoke('github.notifications', {}, { origin: 'https://github.com', tabId: 11 });
-  check(typeof globalThis.FsbDiscoverySession.runDiscovery === 'function' && runDiscoveryCalls.length >= 1,
-    'HEAL-03: the post-fallback runDiscovery re-learn trigger is WIRED on the rot path (FsbDiscoverySession.runDiscovery is reachable -- the live re-learn is UAT, D-10)');
+  // The router scheduled the re-learn through FsbRelearnScheduler (it did NOT call
+  // runDiscovery synchronously). Flush the coalescing window deterministically.
+  check(runDiscoveryCalls.length === 0,
+    'HEAL-03 + SCALE-02: the re-learn is SCHEDULED (coalesced), not fired synchronously -- runDiscovery has not run before the window flushes (got ' + runDiscoveryCalls.length + ')');
+  await (typeof SCHEDULER.flush === 'function' ? SCHEDULER.flush('https://github.com') : Promise.resolve());
+  check(typeof globalThis.FsbDiscoverySession.runDiscovery === 'function' && runDiscoveryCalls.length === 1,
+    'HEAL-03 + SCALE-02: the post-fallback runDiscovery re-learn is WIRED THROUGH the scheduler on the rot path (flushing the coalescing window fires runDiscovery exactly once -- the live re-learn is UAT, D-10)');
+  check(runDiscoveryCalls.length === 1 && runDiscoveryCalls[0].origin === 'https://github.com',
+    'HEAL-03 + SCALE-02: the scheduled re-learn is bound to the broken origin (runDiscovery called with origin https://github.com)');
   clearCatalog();
   delete globalThis.FsbCapabilityFetch;
+  if (typeof SCHEDULER._reset === 'function') { SCHEDULER._reset(); }
   if (priorDiscovery === undefined) { delete globalThis.FsbDiscoverySession; } else { globalThis.FsbDiscoverySession = priorDiscovery; }
 
   // -----------------------------------------------------------------------

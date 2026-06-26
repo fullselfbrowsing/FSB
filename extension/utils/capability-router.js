@@ -175,26 +175,62 @@
     return (typeof FsbDiscoverySession !== 'undefined' && FsbDiscoverySession) ? FsbDiscoverySession : null;
   }
 
-  // ---- HEAL-03: best-effort quarantine + opportunistic re-learn (D-09/D-10) ----
+  // ---- SCALE-02 (Phase 43): the per-origin re-learn COALESCING + back-off scheduler --
+  //      Reached the SAME typeof-guarded way as the other self-heal collaborators so a
+  //      harness that injects no scheduler DEGRADES to the legacy fire-and-forget
+  //      re-learn (the pre-SCALE-02 behavior is preserved byte-for-byte when the module
+  //      is absent). SW path: FsbRelearnScheduler is published on the global by
+  //      relearn-scheduler.js (importScripts'd before this module in background.js). Node
+  //      path: the global is unset under the router unit harness, so fall back to a
+  //      guarded STATIC require of the sibling module (mirrors _rotDetector()'s split) --
+  //      the require is a static module load, NOT a run-string-as-code construct, so the
+  //      recipe-path guard stays GREEN; it runs ONLY under Node (the SW scope has no
+  //      require, so this branch is inert there). NEVER throws.
+  function _relearnScheduler() {
+    if (typeof FsbRelearnScheduler !== 'undefined' && FsbRelearnScheduler) {
+      return FsbRelearnScheduler;
+    }
+    if (typeof require === 'function') {
+      try { return require('./relearn-scheduler.js'); } catch (_e) { return null; }
+    }
+    return null;
+  }
+
+  // ---- HEAL-03 + SCALE-02: quarantine + recurrence + COALESCED consent-gated re-learn -
   //
-  // Called ONLY on a classifyRecipeBroken broken:true verdict (a real rot). BOTH
-  // calls are FIRE-AND-FORGET -- they never block, never await into the invoke
-  // return path, and a rejection is swallowed (a failed quarantine / re-learn must
-  // not poison the typed RECIPE_DOM_FALLBACK_PENDING the model acts on).
+  // Called ONLY on a classifyRecipeBroken broken:true verdict (a real rot). Every call
+  // is FIRE-AND-FORGET -- it never blocks, never awaits into the invoke return path, and
+  // a rejection is swallowed (a failed quarantine / re-learn must not poison the typed
+  // RECIPE_DOM_FALLBACK_PENDING the model acts on).
   //
   //   - QUARANTINE: a T2 learned slug demotes via FsbLearnedRecipeStore.quarantine
   //     (persisted flag-not-delete, D-09); a bundled (T0/T1b/T1a) slug demotes via
   //     the catalog's session-only quarantineBundled (D-12). The recipe is DEMOTED,
   //     never deleted -- resolve() then falls through to the DOM fallback (D-11).
-  //   - RE-LEARN: runDiscovery(origin, { tabId }) is the existing consent-gated
-  //     discovery (D-10). It self-enforces the Phase-30 consent gate INSIDE
-  //     startSession before any capture, so a default-OFF / denied / sensitive
-  //     origin re-learns NOTHING. The CI assertion is that the trigger is WIRED
-  //     (reachable on the rot path); the real re-learn-after-fallback is UAT.
+  //   - RECURRENCE (SCALE-02): record the broken verdict against (origin, slug) via the
+  //     learned store's recordRot so the recurrence counter accumulates IN PRODUCTION
+  //     (systemic-vs-transient classification + the degraded surfacing getOriginHealth
+  //     reads it both go inert without this call). Broken-only by contract -- a typed
+  //     RECIPE_* security passthrough classifies broken:false and never reaches here.
+  //   - RE-LEARN (SCALE-02 thundering-herd prevention): runDiscovery(origin, { tabId })
+  //     is the existing consent-gated discovery (D-10). It self-enforces the Phase-30
+  //     consent gate INSIDE startSession before any capture, so a default-OFF / denied /
+  //     sensitive origin re-learns NOTHING. At 119-app scale, one vendor changing
+  //     site-wide rots N recipes on one origin -> N broken verdicts -> N fire-and-forget
+  //     runDiscovery calls (N concurrent CDP attaches). We now route the re-learn THROUGH
+  //     FsbRelearnScheduler.scheduleRelearn(origin, boundRunDiscovery, opts): the N calls
+  //     for one origin within the coalescing window COLLAPSE to ONE consent-gated
+  //     re-learn, with exponential back-off on repeated failure. The scheduler ONLY
+  //     INVOKES the supplied fn -- it never re-implements capture/consent -- so the gate
+  //     still runs inside runDiscovery exactly as before; this is purely a debounce LAYER
+  //     on the existing consent-gated re-learn. When the scheduler module is ABSENT (a
+  //     harness that injects none), we DEGRADE to the legacy direct fire-and-forget so
+  //     the pre-SCALE-02 behavior is preserved byte-for-byte.
   function _quarantineAndRelearn(slug, tierLabel, origin, tabId) {
     var store = _learnedStore();
     var catalog = _catalog();
     var discovery = _discoverySession();
+    var scheduler = _relearnScheduler();
 
     try {
       if (tierLabel === 'T2') {
@@ -207,10 +243,32 @@
       }
     } catch (_qe) { /* best-effort; quarantine must not poison the fallback return */ }
 
+    // SCALE-02 recurrence: increment the (origin, slug) recurrence counter on the broken
+    // verdict so systemic-vs-transient + the degraded surfacing accumulate in production.
+    try {
+      if (store && typeof store.recordRot === 'function'
+          && typeof origin === 'string' && origin
+          && typeof slug === 'string' && slug) {
+        store.recordRot(origin, slug);
+      }
+    } catch (_re) { /* best-effort; recurrence accounting must never poison the fallback */ }
+
     try {
       if (discovery && typeof discovery.runDiscovery === 'function') {
-        var dp = discovery.runDiscovery(origin, { tabId: tabId });
-        if (dp && typeof dp.catch === 'function') { dp.catch(function() { /* best-effort */ }); }
+        // The consent-gated re-learn, bound to the origin. The scheduler (and the legacy
+        // fallback) INVOKE this -- the Phase-30 gate runs INSIDE runDiscovery either way.
+        var boundRunDiscovery = function(_originArg) {
+          return discovery.runDiscovery(origin, { tabId: tabId });
+        };
+        if (scheduler && typeof scheduler.scheduleRelearn === 'function') {
+          // COALESCED + back-off: N broken verdicts on one origin within the window
+          // collapse to ONE consent-gated re-learn (no thundering-herd of CDP attaches).
+          scheduler.scheduleRelearn(origin, boundRunDiscovery);
+        } else {
+          // DEGRADE (scheduler absent): the legacy direct fire-and-forget re-learn.
+          var dp = boundRunDiscovery(origin);
+          if (dp && typeof dp.catch === 'function') { dp.catch(function() { /* best-effort */ }); }
+        }
       }
     } catch (_de) { /* best-effort; re-learn is opportunistic, never blocking */ }
   }
