@@ -192,7 +192,13 @@ Plans:
   1. The search index and catalog stay within budget at ~2,523 descriptors (searchable-text indexed; params schema-on-hit / out-of-band; sharded by service / split into `descriptor-index.generated.js` if the single IIFE parse is too costly), proven by the extended SURF-06 eval harness with size/load-time assertions (serialized index < ~1-2 MB; `loadJSON` + first search < ~50-100 ms on SW wake) and wrong-invoke=0 at full scale.
   2. Recipe-rot self-heal is hardened for 119-app scale: per-origin re-learn coalescing / back-off (no thundering-herd of CDP attaches when one vendor changes site-wide), recurrence-based systemic-vs-transient classification, and an app-level degraded/needs-re-port surfacing.
   3. The typed fallback reason stays byte-equal across all 7 providers (INV-03), per-app MIT provenance/attribution is complete, and full `npm test` exits 0 — the milestone gate; INV-01..04 + Walls 1/2 guards all green.
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 43-01-PLAN.md — Wave-0 self-heal test scaffolds (RED-first) + npm-test registration + SCALE-01 scale-gate confirm
+- [ ] 43-02-PLAN.md — SCALE-01 precision re-tune: importer synonym data-map enrichment, re-import, flip full-corpus wrong-invoke to a HARD assertion
+- [ ] 43-03-PLAN.md — SCALE-02 self-heal impl: per-origin coalescing/back-off scheduler + recurrence counter + degraded accessor (turns 43-01 RED tests green)
+- [ ] 43-04-PLAN.md — THE MILESTONE GATE: full npm test EXIT 0 + INV-03/provenance/scale/precision/self-heal sign-off + carried-forward NON-blocking UAT debt
 
 ## Progress
 
@@ -210,7 +216,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 40. Depth 1 — Top READ Hand-Ports | 5/5 | Complete   | 2026-06-26 |
 | 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 5/5 | Complete   | 2026-06-26 |
 | 42. Discovery Seeding + Tail Learn | 5/5 | Complete   | 2026-06-26 |
-| 43. Catalog-Scale + Milestone Gate | 0/TBD | Not started | - |
+| 43. Catalog-Scale + Milestone Gate | 0/4 | Planned | - |
 
 ## Completed Milestones
 
