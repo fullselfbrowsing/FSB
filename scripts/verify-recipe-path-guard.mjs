@@ -134,6 +134,12 @@ const RECIPE_PATH_ALLOWLIST = [
   'catalog/handlers/github.js',
   'catalog/handlers/slack.js',
   'catalog/handlers/notion.js',
+  // Phase 40 (DEPTH-01): the GitLab READ head (5 same-origin gitlab.com/api/v4 reads).
+  // A credential-bearing T1a handler under catalog/handlers/ -- listed so Check 1 greps
+  // it for eval/new Function/import() and the handler-dir disk-drift check (which
+  // enumerates catalog/handlers/*.js FROM DISK and fails CLOSED on any unlisted handler)
+  // stays green. gitlab.js is eval-free (GET-only same-origin reads; no token scrape).
+  'catalog/handlers/gitlab.js',
   // Phase 30 (SIGN-01, D-05): the JCS + Ed25519 verify module reached from
   // interpretRecipe. NAMED capability-* so Check 4's disk glob AUTO-covers it
   // (Pitfall 5). Registered AHEAD of its creation (Plan 03 writes it), the
