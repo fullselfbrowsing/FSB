@@ -239,11 +239,16 @@
 
   // A top-level GitLab error envelope carries a string `message` (e.g.
   // { message: "401 Unauthorized" } / { message: "404 Project Not Found" }) or a
-  // string `error` (e.g. { error: "invalid_token" }) -- neither of which a real
-  // project/issue resource body has. Used to reject an error envelope that happens
-  // to also carry an id/iid field (IN-02: the get_* heuristic was looser than its
-  // "id-bearing OBJECT" intent). Conservative: keyed only on the two documented
-  // GitLab error markers, so a legitimate resource body is never excluded.
+  // string `error` (e.g. { error: "invalid_token" }) -- neither of which the
+  // currently-ported project/issue/MR resource bodies carry. Used to reject an error
+  // envelope that happens to also carry an id/iid field (IN-02: the get_* heuristic
+  // was looser than its "id-bearing OBJECT" intent). Conservative: keyed only on the
+  // two documented GitLab error markers, so none of the 5 currently-ported read shapes
+  // is excluded. NOTE (IN-03): this is a value-shape assumption, NOT universal -- a
+  // future get_* whose legitimate 200 body has a top-level string `message` (e.g. a
+  // commit object's `message`) WOULD be classified an error envelope and fall back to
+  // DOM (a false-negative read, the safe direction). If such a read is added, scope
+  // this to require the ABSENCE of the resource's id/iid AND the error marker.
   function looksLikeGitlabError(data) {
     return !!data && typeof data === 'object'
       && (typeof data.message === 'string' || typeof data.error === 'string');
