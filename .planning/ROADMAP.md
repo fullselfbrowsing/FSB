@@ -132,7 +132,7 @@
 - [x] 39.5-01-PLAN.md — Fetch the pinned-SHA tarball + vendor the 117 real plugin slices (augment-preserving: 13 hand-only + grafana preserved) + PIN/provenance + the Wave-0 augment guard test [wave 1]
 - [x] 39.5-02-PLAN.md — Extend STEM_OVERRIDES (~40, collision-free) + the no-duplicate-stem CI gate + the target.apply_promo_code carve + the grafana/sqlpad skip [wave 2]
 - [x] 39.5-03-PLAN.md — Re-screen: classify linkedin (sensitive) + youtube (denied) + the conservative commerce reconciliation + the full-corpus classifyGate test [wave 3]
-- [ ] 39.5-04-PLAN.md — Run the full import (~2,374 descriptors, augment) + regenerate the catalog + pass the full-scale gates (classifyGate / crosscheck+payment-op / no-dead-entry / no-dup-stem) + update the coverage test [wave 4]
+- [x] 39.5-04-PLAN.md — Run the full import (~2,374 descriptors, augment) + regenerate the catalog + pass the full-scale gates (classifyGate / crosscheck+payment-op / no-dead-entry / no-dup-stem) + update the coverage test [wave 4]
 - [ ] 39.5-05-PLAN.md — Full-corpus SCALE assert (index <~2MB, cold-start <~100ms) + coverage close (realAppCount ~130) + full `npm test` green [wave 5]
 
 ### Phase 40: Depth 1 — Top READ Hand-Ports
