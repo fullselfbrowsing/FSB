@@ -130,6 +130,13 @@ function harvestHintsFromText(text) {
 
   // (2) fetch / doFetch / api( first-arg path or url literal:
   //     fetch('https://.../x'), doFetch('/y', ...), api('/z', { method })
+  // IN-03 (accepted residual): this idiom set is broad -- an unrelated `.call('/x')`
+  // or a test helper `request('/x')` can be captured as a hint. Left UNCHANGED on
+  // purpose: it is METADATA-only (a spurious hint only over-biases recognition, never
+  // executes), the `normalizePath` '/'-prefix guard already drops non-paths, the hint
+  // counts are sane (~255), and tightening would perturb the now byte-reproducible
+  // seed corpus while risking the loss of legitimate api()/request() transport hints
+  // the vendored *-api.ts files actually use. No security impact.
   const fetchRe = /\b(?:fetch|doFetch|api|request|call)\s*\(\s*(['"`])([^'"`$]*)\1/g;
   while ((m = fetchRe.exec(text)) !== null) {
     const p = normalizePath(m[2]);
