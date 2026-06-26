@@ -475,10 +475,158 @@
     });
   }
 
+  // ===========================================================================
+  // SCALE-02 (Phase 43 plan 03) -- ADDITIVE recurrence counter + degraded accessor.
+  // PURELY ADDITIVE: the envelope/cap/LRU/quarantine/getLearnedSync/promote contract
+  // above is byte-unchanged. The recurrence counter layers ON TOP of the UNCHANGED
+  // capability-rot-detector classifyRecipeBroken verdict (it consumes the verdict, never
+  // edits the taxonomy). getOriginHealth reads the SAME synchronous _syncMirror
+  // getLearnedSync uses. Both are bounded + null-proto, mirroring the store discipline.
+  // ===========================================================================
+
+  // The recurrence threshold (D-16-style constant): repeated rot on ONE (origin,slug)
+  // reaching this count classifies SYSTEMIC (the site changed -> escalate); below it is
+  // TRANSIENT (a one-off blip -> retry).
+  var RECURRENCE_SYSTEMIC_THRESHOLD = 3;
+  // The recurrence store is BOUNDED (never unbounded): cap the tracked origins, evicting
+  // the least-recently-touched past the cap. Reuses the PER_ORIGIN_CAP discipline value.
+  var RECURRENCE_CAP = PER_ORIGIN_CAP;
+
+  // In-memory bounded per-(origin,slug) recurrence map. Null-proto at BOTH levels (the
+  // _syncMirror ME-03 discipline) so a __proto__ origin/slug survives as own data. Each
+  // leaf is { count, touchedAt } (touchedAt drives LRU eviction past RECURRENCE_CAP).
+  // In-memory (like _syncMirror): a fresh SW start re-accumulates -- the conservative
+  // direction (a restart does not carry a stale systemic verdict).
+  var _recurrence = null;
+
+  function _recurrenceMap() {
+    if (!_recurrence) { _recurrence = Object.create(null); }
+    return _recurrence;
+  }
+
+  // LRU eviction past RECURRENCE_CAP: drop the origin with the oldest touchedAt.
+  function _evictRecurrenceIfOverCap(exceptOrigin) {
+    var map = _recurrenceMap();
+    var keys = Object.keys(map);
+    if (keys.length <= RECURRENCE_CAP) { return; }
+    var oldestKey = null;
+    var oldestAt = Infinity;
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] === exceptOrigin) { continue; }
+      var per = map[keys[i]];
+      var at = (per && typeof per._touchedAt === 'number') ? per._touchedAt : 0;
+      if (at < oldestAt) { oldestAt = at; oldestKey = keys[i]; }
+    }
+    if (oldestKey !== null) { delete map[oldestKey]; }
+  }
+
+  // ---- recordRot(origin, slug) -- the broken-only recurrence increment -------
+  // Increments the per-(origin,slug) recurrence count. The DOCUMENTED broken-only entry:
+  // the caller invokes it ONLY for a broken:true classifyRecipeBroken verdict (a typed
+  // RECIPE_* security passthrough is broken:false and MUST NOT be counted -- T-32-PASS).
+  // String-typed guards: a no-op on non-string args (never throws).
+  function recordRot(origin, slug) {
+    if (typeof origin !== 'string' || !origin || typeof slug !== 'string' || !slug) { return; }
+    var map = _recurrenceMap();
+    if (!map[origin] || typeof map[origin] !== 'object') { map[origin] = Object.create(null); }
+    var per = map[origin];
+    var leaf = per[slug];
+    if (!leaf || typeof leaf !== 'object') { leaf = { count: 0 }; per[slug] = leaf; }
+    leaf.count = (typeof leaf.count === 'number' ? leaf.count : 0) + 1;
+    per._touchedAt = Date.now();
+    _evictRecurrenceIfOverCap(origin);
+  }
+
+  // ---- recordOk(origin, slug) -- reset-on-success ---------------------------
+  // A NON-broken (ok) outcome RESETS the (origin,slug) recurrence count -- a recovered op
+  // stops trending systemic. No-op on non-string args / an unseen pair.
+  function recordOk(origin, slug) {
+    if (typeof origin !== 'string' || typeof slug !== 'string') { return; }
+    var map = _recurrence;
+    if (!map || !Object.prototype.hasOwnProperty.call(map, origin)) { return; }
+    var per = map[origin];
+    if (per && Object.prototype.hasOwnProperty.call(per, slug)) {
+      delete per[slug];
+    }
+  }
+
+  // ---- dispositionFor(origin, slug) -- transient vs systemic ----------------
+  // Returns 'systemic' when the (origin,slug) recurrence count >= the threshold, else
+  // 'transient' (including an unseen pair / count 0). Never throws.
+  function dispositionFor(origin, slug) {
+    try {
+      if (typeof origin !== 'string' || typeof slug !== 'string') { return 'transient'; }
+      var map = _recurrence;
+      if (!map || !Object.prototype.hasOwnProperty.call(map, origin)) { return 'transient'; }
+      var per = map[origin];
+      if (!per || !Object.prototype.hasOwnProperty.call(per, slug)) { return 'transient'; }
+      var leaf = per[slug];
+      var count = (leaf && typeof leaf.count === 'number') ? leaf.count : 0;
+      return count >= RECURRENCE_SYSTEMIC_THRESHOLD ? 'systemic' : 'transient';
+    } catch (_e) {
+      return 'transient';
+    }
+  }
+
+  // ---- recurrenceTrackedCount() -- the bound assertion accessor -------------
+  function recurrenceTrackedCount() {
+    return _recurrence ? Object.keys(_recurrence).length : 0;
+  }
+
+  // ---- getOriginHealth(origin) -- the ADDITIVE degraded/needs-re-port accessor --
+  // Reads the SYNCHRONOUS _syncMirror (the SAME source getLearnedSync uses): an origin
+  // with AT LEAST ONE live, non-quarantined learned recipe is healthy
+  // ({ degraded:false, status:'ok', origin }); an origin whose learned recipes are ALL
+  // quarantined (or whose recurrence crossed systemic for a learned slug) is degraded
+  // ({ degraded:true, status:'needs-re-port', origin }). An unknown / un-hydrated origin
+  // returns a defined healthy default (degraded:false) -- absence is not failure. Never
+  // throws (a malformed mirror degrades to the healthy default). The degraded state is
+  // VISIBLE (retrievable + truthful) so a user/agent SEES "this app needs re-learning"
+  // instead of a silent miss.
+  function getOriginHealth(origin) {
+    var healthy = { degraded: false, status: 'ok', origin: (typeof origin === 'string' ? origin : '') };
+    try {
+      if (typeof origin !== 'string' || !origin) { return healthy; }
+      var map = _syncMirror;
+      if (!map || typeof map !== 'object'
+        || !Object.prototype.hasOwnProperty.call(map, origin)) {
+        return healthy; // un-hydrated / unknown origin -> defined healthy default
+      }
+      var perOrigin = map[origin];
+      if (!perOrigin || typeof perOrigin !== 'object') { return healthy; }
+      var slugs = Object.keys(perOrigin);
+      if (!slugs.length) { return healthy; } // no learned recipes -> healthy default
+      var anyLive = false;
+      var allQuarantined = true;
+      for (var i = 0; i < slugs.length; i++) {
+        var entry = perOrigin[slugs[i]];
+        if (!entry || typeof entry !== 'object') { continue; }
+        if (entry.quarantined === true) { continue; }
+        // a live (non-quarantined) recipe whose recurrence has NOT crossed systemic
+        // counts as healthy; a live recipe trending systemic is itself degraded surface.
+        allQuarantined = false;
+        if (dispositionFor(origin, slugs[i]) !== 'systemic') {
+          anyLive = true;
+        }
+      }
+      if (anyLive) { return healthy; }
+      // ALL learned recipes are quarantined (or the only live ones crossed systemic) ->
+      // the origin is degraded / needs re-port (VISIBLE, not a silent failure).
+      if (allQuarantined || !anyLive) {
+        return { degraded: true, status: 'needs-re-port', origin: origin };
+      }
+      return healthy;
+    } catch (_e) {
+      return healthy;
+    }
+  }
+
   // ---- _reset() -- test hook ------------------------------------------------
-  // Clears the persisted envelope so a test starts empty. Best-effort.
+  // Clears the persisted envelope so a test starts empty. Best-effort. ALSO clears the
+  // additive in-memory recurrence map (SCALE-02) so a fresh test starts empty.
   function _reset() {
     _syncMirror = null;   // drop the in-memory mirror so a fresh test starts empty
+    _recurrence = null;   // SCALE-02: drop the recurrence map too
     if (!_hasLocalStorage()) {
       return Promise.resolve();
     }
@@ -509,6 +657,14 @@
     hydrateSyncCache: hydrateSyncCache, // Plan 06: SW-startup mirror hydration
     promote: promote,
     quarantine: quarantine,
+    // SCALE-02 (Phase 43 plan 03): ADDITIVE recurrence counter + degraded accessor.
+    RECURRENCE_SYSTEMIC_THRESHOLD: RECURRENCE_SYSTEMIC_THRESHOLD,
+    RECURRENCE_CAP: RECURRENCE_CAP,
+    recordRot: recordRot,               // broken-only recurrence increment
+    recordOk: recordOk,                 // reset-on-success
+    dispositionFor: dispositionFor,     // 'transient' | 'systemic'
+    recurrenceTrackedCount: recurrenceTrackedCount,
+    getOriginHealth: getOriginHealth,   // degraded / needs-re-port surfacing
     _reset: _reset
   };
 
