@@ -764,9 +764,15 @@ function isColloquialGuarded(slug) {
 // "list <noun> in <stem>" form survives.
 const COLLOQUIAL_LIST_ALTS = ['show me my', 'view my', 'see all my'];
 
-// A guarded phrase carries a cross-claiming token as a WHOLE WORD (so 'status' does
-// not trip on 'statuses' incorrectly is acceptable -- we want the exact cross-claim
-// token). Returns true when the phrase should be DROPPED for the given slug.
+// A guarded phrase carries a cross-claiming token as a WHOLE WORD: the `\b<tok>\b`
+// word-boundary regex matches 'status' in "status update" (the intended cross-claim) but
+// NOT 'status' inside "statuses" (e.g. "view all issue statuses" stays, so a sentry
+// issue-status read is not wrongly dropped). The whole-word property is LOAD-BEARING for
+// correctness -- a substring `.includes(tok)` would wrongly drop 'page' phrases like
+// "pages"/"paged" and shift rankings. LO-02 (43-REVIEW): pinned by a whole-word unit
+// assertion in tests/import-extraction.test.js (isOverClaim is exported below), so the
+// boundary semantics are a guarded contract, not just a comment. Returns true when the
+// phrase should be DROPPED for the given slug.
 function isOverClaim(slug, phrase) {
   const guarded = OVER_CLAIM_GUARD[slug];
   if (!guarded || !guarded.length) { return false; }
@@ -777,6 +783,10 @@ function isOverClaim(slug, phrase) {
   }
   return false;
 }
+// LO-02 (43-REVIEW): export isOverClaim + OVER_CLAIM_GUARD so the whole-word boundary is
+// unit-pinned (a future "simplify to .includes(tok)" would over-drop + red the test).
+// Additive export only -- no logic change to the importer CORE.
+export { isOverClaim, OVER_CLAIM_GUARD };
 
 function isPluralNoun(noun) {
   const n = String(noun || '').trim().toLowerCase();

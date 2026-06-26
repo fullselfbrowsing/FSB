@@ -84,6 +84,27 @@ async function main() {
   check(!!modeSchema && modeSchema.default === 'hi', 'default value emitted');
   check(Array.isArray(defParams.required) && defParams.required.includes('mode'), 'defaulted key STAYS in required');
 
+  // ---- 5. LO-02 (43-REVIEW): isOverClaim is WHOLE-WORD, not substring -------
+  // The over-claim guard's `\b<tok>\b` boundary is load-bearing for correctness: a
+  // guarded token must drop only a WHOLE-WORD cross-claim, never a substring (a future
+  // "simplify to .includes(tok)" would over-drop "statuses"/"pages" phrasings + shift
+  // rankings with no other safety net, since the corpus-tier is RECORDED). Pin it.
+  check(typeof importer.isOverClaim === 'function', 'importer exports isOverClaim (LO-02)');
+  check(importer.OVER_CLAIM_GUARD && Array.isArray(importer.OVER_CLAIM_GUARD['sentry.update_issue'])
+    && importer.OVER_CLAIM_GUARD['sentry.update_issue'].includes('status'),
+    'OVER_CLAIM_GUARD[sentry.update_issue] guards the "status" token (the fixture for the whole-word pin)');
+  // The guarded 'status' token MATCHES a whole-word cross-claim ("status update" -> dropped).
+  check(importer.isOverClaim('sentry.update_issue', 'tweet a status update') === true,
+    'isOverClaim: a WHOLE-WORD guarded token ("status" in "tweet a status update") IS dropped (the intended cross-claim suppression)');
+  // The guarded 'status' token does NOT match inside "statuses" ("view all issue statuses"
+  // stays -- a sentry issue-status read is NOT wrongly dropped). THIS is the whole-word
+  // contract a substring guard would break.
+  check(importer.isOverClaim('sentry.update_issue', 'view all issue statuses') === false,
+    'isOverClaim: a SUBSTRING-only match ("status" inside "statuses" in "view all issue statuses") is NOT dropped -- whole-word, not substring (a .includes(tok) refactor would FAIL this)');
+  // An unguarded slug never drops anything.
+  check(importer.isOverClaim('linear.create_issue', 'tweet a status update') === false,
+    'isOverClaim: a slug with no OVER_CLAIM_GUARD entry drops nothing (the guard is per-slug)');
+
   // ---- report ---------------------------------------------------------------
   if (failed > 0) {
     console.error('import-extraction.test: FAIL (' + failed + ' failure(s), ' + passed + ' passed)');
