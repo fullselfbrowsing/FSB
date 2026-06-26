@@ -30,7 +30,7 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 ### DEPTH -- Depth: Hand-Ported Handlers (~15-30 apps)
 
 - [x] **DEPTH-01**: The read-heads-first hand-port contract is established and the top verified-origin READ heads are ported as T1a handlers via the `github.js` contract (own first-party origin, executeBoundSpec-only, scraped tokens never logged), each UPGRADING its existing opentabs breadth descriptor dom→T1a. Phase 40 delivered **10 READ heads across 3 apps on verified same-origin internal APIs** — gitlab×5 (`gitlab.com/api/v4`, NEW module), slack×3 (`app.slack.com`, extend), notion×2 (`www.notion.so`, extend) — within the SC1 8–12 band. The originally-illustrated apps whose REAL first-party API turned out to be a **separate origin / per-org subdomain** (linear→`client-api.linear.app`, datadog→`*.datadoghq.com`, jira→`*.atlassian.net`, vercel/sentry/etc.) are DEFERRED to Phase 41 (DEPTH-02 owns the per-app CORS / first-party-origin verification gate that precedes any separate-API-origin Pattern-D port). The remaining READ heads ride alongside the writes in Phase 41's "remaining hand-ports."
-- [ ] **DEPTH-02**: Hand-ported WRITE ops fail closed and, on sensitive origins, honor the DENY-04 mutating opt-in; a per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port (linear is documented-safe; supabase / cloud-consoles must be verified or demoted to T2/T3).
+- [x] **DEPTH-02**: Hand-ported WRITE ops fail closed and, on sensitive origins, honor the DENY-04 mutating opt-in; a per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port (linear is documented-safe; supabase / cloud-consoles must be verified or demoted to T2/T3).
 
 ### DSEED -- Discovery Seeding for the Tail
 
@@ -84,7 +84,7 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 | BRDTH-02 | Phase 37 | Complete |
 | BRDTH-03 | Phase 37 | Complete |
 | DEPTH-01 | Phase 40 | Complete |
-| DEPTH-02 | Phase 41 | Pending |
+| DEPTH-02 | Phase 41 | Complete |
 | DSEED-01 | Phase 42 | Pending |
 | DSEED-02 | Phase 42 | Pending |
 | SCALE-01 | Phase 43 | Pending |

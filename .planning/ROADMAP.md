@@ -40,7 +40,7 @@
 - [ ] **Phase 38: Breadth B — Comms / Social / Content (sensitivity-screened)** - Extend the breadth import to comms/social/content apps, each included only after Phase 35 covers its origin (denylist-coverage assertion per batch); ToS-hostile apps routed DOM-only/denied.
 - [ ] **Phase 39: Breadth C — Commerce / Travel / Misc (most-sensitive)** - Extend the breadth import to commerce/travel/misc apps; payment-bearing flows fail-closed (T3 DOM) or denied; completes descriptor coverage of all real OpenTabs apps.
 - [ ] **Phase 40: Depth 1 — Top READ Hand-Ports** - Hand-port the highest-value READ heads (~8-12) as T1a/T1b handlers via the `github.js` contract (own first-party origin, `executeBoundSpec`-only, tokens never logged) so the hot subset upgrades from descriptor-T3 to the API fast path.
-- [ ] **Phase 41: Depth 2 — Remaining Hand-Ports + Guarded Writes** - Hand-port the remaining heads incl. WRITE ops that fail-closed to DOM fallback until live-captured; a per-app CORS / first-party-origin gate precedes any separate-API-origin (Pattern-D) port; sensitive-origin writes honor the DENY-04 mutating opt-in.
+- [x] **Phase 41: Depth 2 — Remaining Hand-Ports + Guarded Writes** - Hand-port the remaining heads incl. WRITE ops that fail-closed to DOM fallback until live-captured; a per-app CORS / first-party-origin gate precedes any separate-API-origin (Pattern-D) port; sensitive-origin writes honor the DENY-04 mutating opt-in. ✓ Complete (2026-06-26): 7 guarded writes (gitlab/notion/slack) fail-closed; the CORS-gate ships in validate:extension; SC2 proven on slack.send_message; Pattern-D demoted-to-T3-DOM (41-DEFERRAL.md); HEAD_HANDLER_MODULES=4 ≤30; full npm test EXIT 0.
 - [ ] **Phase 42: Discovery Seeding + Tail Learn** - Seed all non-hand-ported origins (+ endpoint hints harvested from OpenTabs `*-api.ts`) so the tail is learned on first authenticated visit (consent-gated, promote-after-replay); the structural redactor verified against the full 119-app auth-field universe.
 - [ ] **Phase 43: Catalog-Scale + Milestone Gate** - Prove the search index + catalog stay within budget at ~2,523 descriptors; harden recipe-rot self-heal for 119-app scale; 7-provider parity byte-equal; full `npm test` EXIT 0 (the milestone gate).
 
@@ -162,11 +162,11 @@ Plans:
   4. The head cap holds, INV-03 typed reasons stay byte-stable across all 7 providers, and the depth tests stay green.
 **Plans**: 5 plans (4 waves)
 Plans:
-- [ ] 41-01-PLAN.md — Wave 0: the fail-closed guarded-write harness + the CORS / first-party-origin verification gate (negative-control + wired into validate:extension) + the INV-03 byte-equality extension + the dom->T1a write-slug upgrade assertions [wave 1]
-- [ ] 41-02-PLAN.md — gitlab guarded WRITES (create_issue/create_merge_request/create_note) on same-origin gitlab.com, fail-closed [ASSUMED-ENDPOINT] + the live-UAT manifest [wave 2]
-- [ ] 41-03-PLAN.md — notion guarded WRITES (create_page/update_page/create_database_item) on same-origin www.notion.so, fail-closed [ASSUMED-ENDPOINT] [wave 2]
-- [ ] 41-04-PLAN.md — slack.send_message guarded WRITE (distinct from the executable chat.postMessage) + the SC2 sensitive-origin mutating-opt-in proof through the live roster + UAT consolidation [wave 3]
-- [ ] 41-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension (incl the CORS-gate) + INV-01/02/03 + head-cap green + Wall-2 origin-pin UNCHANGED + the Pattern-D deferral recorded [wave 4]
+- [x] 41-01-PLAN.md — Wave 0: the fail-closed guarded-write harness + the CORS / first-party-origin verification gate (negative-control + wired into validate:extension) + the INV-03 byte-equality extension + the dom->T1a write-slug upgrade assertions [wave 1]
+- [x] 41-02-PLAN.md — gitlab guarded WRITES (create_issue/create_merge_request/create_note) on same-origin gitlab.com, fail-closed [ASSUMED-ENDPOINT] + the live-UAT manifest [wave 2]
+- [x] 41-03-PLAN.md — notion guarded WRITES (create_page/update_page/create_database_item) on same-origin www.notion.so, fail-closed [ASSUMED-ENDPOINT] [wave 2]
+- [x] 41-04-PLAN.md — slack.send_message guarded WRITE (distinct from the executable chat.postMessage) + the SC2 sensitive-origin mutating-opt-in proof through the live roster + UAT consolidation [wave 3]
+- [x] 41-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension (incl the CORS-gate) + INV-01/02/03 + head-cap green + Wall-2 origin-pin UNCHANGED + the Pattern-D deferral recorded [wave 4]
 
 ### Phase 42: Discovery Seeding + Tail Learn
 **Goal**: Make the non-hand-ported tail invocable predictably by seeding all its origins (+ endpoint hints harvested from OpenTabs `*-api.ts`) so the existing Phase-31 network-capture path learns each origin on the first authenticated visit (consent-gated, promote-after-replay), and prove the capture-time structural redactor leaks no auth substring across the full 119-app field universe.
@@ -202,7 +202,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 39. Breadth C — Commerce / Travel / Misc | 7/7 | Complete    | 2026-06-25 |
 | 39.5 Full OpenTabs Source Import (real ~117-plugin / ~2,306-op) [INSERTED] | 5/5 | Complete    | 2026-06-26 |
 | 40. Depth 1 — Top READ Hand-Ports | 5/5 | Complete   | 2026-06-26 |
-| 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 0/TBD | Not started | - |
+| 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 5/5 | Complete   | 2026-06-26 |
 | 42. Discovery Seeding + Tail Learn | 0/TBD | Not started | - |
 | 43. Catalog-Scale + Milestone Gate | 0/TBD | Not started | - |
 
