@@ -111,6 +111,31 @@
     }
   }
 
+  // ---- Phase 42 (DSEED-01): typeof-guarded discovery-seed accessor -----------
+  //      Parallel to _getLearned()/_getDescriptor(). Reads the loaded discovery
+  //      seeds via FsbNetworkCapture.getSeedForOrigin(origin) so a SEEDED origin's
+  //      would-be-T3 descriptor can resolve T2 (learn-pending) instead. Guarded so
+  //      the catalog loads STANDALONE in the Node suite (capture/seeds absent ->
+  //      null -> the origin is treated as UNSEEDED, the pre-Phase-42 behavior).
+  //      This is a resolve-time LOOKUP only: it adds a branch, never a descriptor
+  //      re-stamp or a REGISTRY/djb2 data-shape change (INV-01).
+  function _captureModule() {
+    return (typeof FsbNetworkCapture !== 'undefined' && FsbNetworkCapture)
+      ? FsbNetworkCapture
+      : ((typeof globalThis !== 'undefined' && globalThis.FsbNetworkCapture) ? globalThis.FsbNetworkCapture : null);
+  }
+
+  function _seedForOrigin(origin) {
+    var cap = _captureModule();
+    if (!cap || typeof cap.getSeedForOrigin !== 'function') { return null; }
+    try {
+      var seed = cap.getSeedForOrigin(origin);
+      return (seed && typeof seed === 'object') ? seed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ---- HEAL-03 / D-09 / D-12: session-only bundled-recipe quarantine ---------
   //
   // A null-prototype map used as a Set of bundled slugs the router has demoted
@@ -352,10 +377,24 @@
     if (!entry) {
       var desc = _getDescriptor(slug);
       if (desc) {
-        return {
-          tier: (desc.backing === 'learn') ? 'T2' : 'T3',
-          descriptor: desc
-        };
+        // The existing backing:'learn' -> T2 leg is UNCHANGED.
+        if (desc.backing === 'learn') {
+          return { tier: 'T2', descriptor: desc };
+        }
+        // Phase 42 (DSEED-01, SC2): the seed->T2 upgrade. A would-be-T3 descriptor
+        // (backing 'dom' / absent) whose ORIGIN is seeded resolves T2 (learn-pending)
+        // instead, so the router takes its RECIPE_LEARN_PENDING leg (the affordance,
+        // Plan 04) -- pointing the user at the consent-gated live capture that learns
+        // the real T2. NO `recipe` field is set: we NEVER fabricate a credentialed
+        // call from a seed (a hint is recognition metadata, not an executor). An
+        // UNSEEDED origin stays T3-DOM. This is a resolve-time lookup (a branch), not
+        // a descriptor re-stamp or a data-shape change (INV-01). It is reached ONLY in
+        // the no-entry, no-learned descriptor-only fallback, so the LEARN-04
+        // learned-first check above still makes a learned T2 OUTRANK on the next visit.
+        if (_seedForOrigin(origin)) {
+          return { tier: 'T2', descriptor: desc };
+        }
+        return { tier: 'T3', descriptor: desc };
       }
       return null;   // genuinely-unknown slug ONLY (not in REGISTRY, not in descriptors) -> RECIPE_NOT_FOUND (correct)
     }
