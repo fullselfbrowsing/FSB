@@ -117,29 +117,32 @@ if (wrongs.length) {
 
 check(recall >= 0.9, `recall@5 ${recall.toFixed(3)} >= 0.9 (SURF-06 / D-13 -- HARD, holds over the full-corpus seed)`);
 
-// ---- FULL-CORPUS wrong-invoke: the Phase-43 SCALE-01 baseline (DEF-39.5-04-A) -------
-// PHASE BOUNDARY (NOT a silent weakening -- a TRACKED, DOCUMENTED deferral):
+// ---- FULL-CORPUS wrong-invoke: SCALE-01 HARD bar (DEF-39.5-04-A CLOSED, Phase 43) -------
+// CLOSED (Phase 43 SCALE-01, the precision re-tune deliverable -- no longer a deferral):
 // The seed fixture set (catalog/descriptors/_fixtures/seed-descriptors.json) is kept in
 // LOCKSTEP with the full ~2,383-op emitted corpus (feedSeedDescriptors, Plan 39.5-04), so
-// this paraphrase eval now runs over the COMPLETE catalog, not a tiny seed. At full scale
-// the corpus has MANY more cross-app near-neighbor ranking ties (e.g. "write an email" ->
-// outlook.send_message vs email.send; "tweet a status" -> sentry.update_issue vs
-// twitter.post-tweet; "find restaurants on yelp" -> chipotle.find_restaurants), so the
-// top-1 is not always the expected op even though recall@5 stays >= 0.99 (the right op IS
-// in the top 5). wrong-invoke == 0 over the FULL-CORPUS paraphrase set is the AUTHORITATIVE
-// SCALE-01 eval-harness re-tune deliverable owned by **Phase 43 (Catalog-Scale + Milestone
-// Gate, SCALE-01)**: rich intentSynonyms (>=3-4/op) + owned-origin ranking bias + the
-// full-scale eval-harness re-run (see STATE.md Top Risk "Search precision + SW cold-start at
-// ~2,523 docs" -> Phase 43, and .planning/phases/.../deferred-items.md DEF-39.5-04-A). It is
-// NOT a per-task auto-fix. We RECORD the measured full-corpus wrong-invoke here as the Phase-43
-// baseline target (the number 43's harness re-tune must drive to 0) and assert recall@5 >= 0.9
-// HARD. The CURATED cross-app collision proofs (the breadth-contract MED-01/MED-03 surface)
-// stay HARD wrong-invoke=0 in tests/breadth-search-return.test.js -- they are NOT weakened.
-// The structural/security gates (classifyGate, crosscheck incl payment-op + commerce backstop,
-// no-dead-entry, no-duplicate-stem, recipe-path-guard) stay HARD-green and are NOT touched.
-console.log(`  PHASE-43 BASELINE (DEF-39.5-04-A): full-corpus wrong-invoke=${wrongRate.toFixed(3)} over ${FIXTURES.length} fixtures -- the SCALE-01 eval-harness re-tune target (drive to 0 in Phase 43); recall@5=${recall.toFixed(3)} is the HARD gate here`);
-check(wrongRate >= 0,
-  `full-corpus wrong-invoke ${wrongRate.toFixed(3)} RECORDED as the Phase-43 SCALE-01 baseline (DEF-39.5-04-A) -- recall@5 is the HARD gate at this phase; wrong-invoke=0 is Phase 43's eval-harness re-tune deliverable, the curated collision proofs stay hard wrong-invoke=0 in breadth-search-return`);
+// this paraphrase eval runs over the COMPLETE catalog, not a tiny seed. At full scale the
+// corpus has many cross-app + intra-app near-neighbor ranking ties (e.g. "write an email" ->
+// outlook.send_message vs email.send; "tweet a status update" -> sentry.update_issue vs
+// twitter.post-tweet; "open a chatgpt conversation" get-vs-archive-vs-create). Phase 43
+// drove the full-corpus wrong-invoke from the recorded 0.079 (15/190) to ZERO via ROBUST,
+// GENERAL metadata-source synonym enrichment in the importer (NOT fixture overfitting): a
+// NOUN_SYNONYMS map (to-do/groceries/restaurants), a STEM_NOUN_SYNONYMS scope (instacart
+// groceries without a bestbuy regression), noun-scoped create/get verbs ('file an issue',
+// 'open a conversation'->get), app-alias emission (bluesky), an OVER_CLAIM_GUARD (trim a
+// competitor's cross-domain token), and a COLLOQUIAL_GUARD (suppress a list op's colloquial
+// alts that cross-claim the curated calendar head) -- then RE-IMPORT through the frozen
+// machinery. The WHOLE eval + the WHOLE breadth collision set were re-verified for the
+// IDF-shift regression (a bestbuy 'catalog' displacement was caught + fixed at the metadata
+// source). This assertion is now HARD: full-corpus wrong-invoke === 0 (it would FAIL if a
+// future change re-introduced a wrong-invoke). recall@5 >= 0.9 stays HARD. The CURATED
+// cross-app collision proofs (the breadth-contract MED-01/MED-03 surface) stay HARD
+// wrong-invoke=0 in tests/breadth-search-return.test.js. The structural/security gates
+// (classifyGate, crosscheck incl payment-op + commerce backstop, no-dead-entry,
+// no-duplicate-stem, recipe-path-guard) stay HARD-green and are NOT touched.
+console.log(`  SCALE-01 (DEF-39.5-04-A CLOSED): full-corpus wrong-invoke=${wrongRate.toFixed(3)} over ${FIXTURES.length} fixtures -- driven to 0 by robust metadata enrichment (HARD); recall@5=${recall.toFixed(3)} is the HARD gate here`);
+check(wrongRate === 0,
+  `SCALE-01 (DEF-39.5-04-A, HARD): full-corpus wrong-invoke ${wrongRate.toFixed(3)} === 0 over the ${FIXTURES.length}-fixture paraphrase set -- the re-tune deliverable landed (robust intentSynonym/noun-alias/app-alias/over-claim enrichment, NOT fixture overfit); recall@5 stays HARD >= 0.9; the curated collision proofs stay HARD=0 in breadth-search-return`);
 
 // ---- CGEN-04: serialized-index-size + SW cold-start budget (at full-corpus scale) ----
 // Phase 36 Plan 04 added the MEASUREMENT MACHINERY before breadth landed; Phase 39.5-04's
