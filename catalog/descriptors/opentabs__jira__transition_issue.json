@@ -3,6 +3,8 @@
   "service": "atlassian.net",
   "intentSynonyms": [
     "transition an issue in jira",
+    "transition a ticket in jira",
+    "transition a bug in jira",
     "transition issue in jira",
     "change an issue's status in jira"
   ],

@@ -7,7 +7,7 @@
     "make a new repository in dockerhub",
     "open a new repository in dockerhub",
     "create repository in dockerhub",
-    "create a new docker hub repository in dockerhub"
+    "create a repository in docker hub"
   ],
   "description": "Create a new Docker Hub repository in a namespace. The repository is created as a public image repository by default.",
   "actionVerb": "create",

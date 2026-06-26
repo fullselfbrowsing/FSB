@@ -7,7 +7,7 @@
     "view my shared with me in msword",
     "see all my shared with me in msword",
     "list shared with me in msword",
-    "list files shared with me in msword"
+    "list a shared with me in microsoft word"
   ],
   "description": "List files and folders shared with the current user.",
   "actionVerb": "list",

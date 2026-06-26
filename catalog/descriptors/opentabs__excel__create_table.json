@@ -7,7 +7,7 @@
     "make a new table in excel",
     "open a new table in excel",
     "create table in excel",
-    "create a table from a data range in excel"
+    "create a table in excel online"
   ],
   "description": "Create a new table from a data range. The range should contain the data (and optionally a header row). Set has_headers=true if the first row contains column headers.",
   "actionVerb": "create",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "mark a notifications seen in bsky",
     "mark notifications seen in bsky",
+    "mark a notifications seen in bluesky",
     "mark notifications as seen in bsky"
   ],
   "description": "Mark all notifications as seen up to the current timestamp.",

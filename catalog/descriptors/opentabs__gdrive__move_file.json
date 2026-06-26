@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "move a file in gdrive",
     "move file in gdrive",
+    "move a file in google drive",
     "move a file to a different folder in gdrive"
   ],
   "description": "Move a file or folder to a different parent folder. Specify the current parent to remove and the new parent to add. Use \"root\" for My Drive root.",

@@ -6,8 +6,8 @@
     "look up a thread in threads",
     "fetch a single thread in threads",
     "view one specific thread in threads",
-    "get thread in threads",
-    "open a thread on threads in threads"
+    "open a thread in threads",
+    "get thread in threads"
   ],
   "description": "Get a single Threads post and its replies by thread ID.",
   "actionVerb": "get",

@@ -6,6 +6,7 @@
     "show me my worksheets in excel",
     "view my worksheets in excel",
     "see all my worksheets in excel",
+    "list worksheets in excel online",
     "list all worksheets in the workbook in excel"
   ],
   "description": "List all worksheets in the currently open Excel workbook. Returns worksheet names, IDs, positions, and visibility status.",

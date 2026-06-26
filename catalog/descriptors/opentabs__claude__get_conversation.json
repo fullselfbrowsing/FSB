@@ -6,8 +6,8 @@
     "look up a conversation in claude",
     "fetch a single conversation in claude",
     "view one specific conversation in claude",
-    "get conversation in claude",
-    "get a conversation with messages in claude"
+    "open a conversation in claude",
+    "get conversation in claude"
   ],
   "description": "Get a conversation by UUID including its full message history. Returns conversation metadata and all messages with their text content, sender, and ordering.",
   "actionVerb": "get",

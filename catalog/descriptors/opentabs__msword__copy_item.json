@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "copy an item in msword",
     "copy item in msword",
+    "copy an item in microsoft word",
     "copy a file or folder in msword"
   ],
   "description": "Copy a file or folder. The copy operation is asynchronous — returns success immediately. The new copy appears in the destination folder shortly after.",

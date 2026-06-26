@@ -3,10 +3,8 @@
   "service": "cloud.temporal.io",
   "intentSynonyms": [
     "list schedules in temporal",
-    "show me my schedules in temporal",
-    "view my schedules in temporal",
-    "see all my schedules in temporal",
-    "list all schedules in the namespace in temporal"
+    "list all schedules in the namespace in temporal",
+    "list all schedules in a namespace in temporal"
   ],
   "description": "List all schedules in a namespace. Shows schedule IDs, workflow types, intervals/crons, recent action counts, and next scheduled times.",
   "actionVerb": "list",

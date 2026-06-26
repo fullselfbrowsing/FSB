@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "empty a trash in gdrive",
     "empty trash in gdrive",
+    "empty a trash in google drive",
     "permanently delete all trashed files in gdrive"
   ],
   "description": "Permanently delete all files in the trash. This action cannot be undone. All trashed files will be permanently removed.",

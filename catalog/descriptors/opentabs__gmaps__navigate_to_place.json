@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "navigate a to place in gmaps",
     "navigate to place in gmaps",
+    "navigate a to place in google maps",
     "open a place on the map in gmaps"
   ],
   "description": "Navigate Google Maps to a specific place by name or address. Opens the place detail view showing information like hours, reviews, and photos.",

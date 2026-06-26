@@ -3,8 +3,8 @@
   "service": "bsky.app",
   "intentSynonyms": [
     "search posts in bsky",
-    "search posts by keyword in bsky",
-    "search for posts matching a query in bsky"
+    "search posts in bluesky",
+    "search posts by keyword in bsky"
   ],
   "description": "Search for posts matching a query. Supports filtering by author, mentions, language, URL, domain, and tags. Results can be sorted by latest or top.",
   "actionVerb": "search",

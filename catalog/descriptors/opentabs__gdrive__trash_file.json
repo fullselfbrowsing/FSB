@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "trash a file in gdrive",
     "trash file in gdrive",
+    "trash a file in google drive",
     "move a file to the trash in gdrive"
   ],
   "description": "Move a file or folder to the trash. Trashed files can be restored with restore_file or permanently deleted with empty_trash. Files in the trash are automatically deleted after 30 days.",

@@ -6,6 +6,7 @@
     "show me my functions in gcloud",
     "view my functions in gcloud",
     "see all my functions in gcloud",
+    "list functions in google cloud",
     "list cloud functions in gcloud"
   ],
   "description": "List Cloud Functions in the project across all locations.",

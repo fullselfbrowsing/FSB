@@ -6,7 +6,8 @@
     "remove a playlist in ytmusic",
     "trash a playlist in ytmusic",
     "permanently delete a playlist in ytmusic",
-    "delete playlist in ytmusic"
+    "delete playlist in ytmusic",
+    "delete a playlist in youtube music"
   ],
   "description": "Delete a playlist from YouTube Music",
   "actionVerb": "delete",

@@ -6,6 +6,7 @@
     "show me my sql instances in gcloud",
     "view my sql instances in gcloud",
     "see all my sql instances in gcloud",
+    "list sql instances in google cloud",
     "list cloud sql instances in gcloud"
   ],
   "description": "List Cloud SQL database instances in the project.",

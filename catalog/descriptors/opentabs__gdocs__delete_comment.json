@@ -7,7 +7,7 @@
     "trash a comment in gdocs",
     "permanently delete a comment in gdocs",
     "delete comment in gdocs",
-    "delete a comment thread in gdocs"
+    "delete a comment in google docs"
   ],
   "description": "Permanently delete a comment thread from a Google Doc. Only the comment author or the document owner can delete comments. This action cannot be undone.",
   "actionVerb": "delete",

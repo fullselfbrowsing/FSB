@@ -6,8 +6,8 @@
     "add an issue in jira",
     "make a new issue in jira",
     "open a new issue in jira",
-    "create issue in jira",
-    "create a new jira issue in jira"
+    "file an issue in jira",
+    "create a ticket in jira"
   ],
   "description": "Create a new Jira issue in a project. Requires a project key, summary, and issue type.",
   "actionVerb": "create",

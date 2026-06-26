@@ -6,7 +6,8 @@
     "show me my issues in gitlab",
     "view my issues in gitlab",
     "see all my issues in gitlab",
-    "list issues for a project in gitlab"
+    "list a ticket in gitlab",
+    "list a bug in gitlab"
   ],
   "description": "List issues for a project. By default returns opened issues sorted by creation date. Can filter by state, labels, assignee, milestone, and more.",
   "actionVerb": "list",

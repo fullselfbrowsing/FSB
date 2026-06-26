@@ -6,6 +6,7 @@
     "show me my buckets in gcloud",
     "view my buckets in gcloud",
     "see all my buckets in gcloud",
+    "list buckets in google cloud",
     "list cloud storage buckets in gcloud"
   ],
   "description": "List Cloud Storage buckets in the project.",

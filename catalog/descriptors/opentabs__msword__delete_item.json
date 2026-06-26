@@ -7,7 +7,7 @@
     "trash an item in msword",
     "permanently delete an item in msword",
     "delete item in msword",
-    "delete a file or folder in msword"
+    "delete an item in microsoft word"
   ],
   "description": "Permanently delete a file or folder. This action cannot be undone.",
   "actionVerb": "delete",

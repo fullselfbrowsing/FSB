@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "unmute an actor in bsky",
     "unmute actor in bsky",
+    "unmute an actor in bluesky",
     "unmute a user in bsky"
   ],
   "description": "Unmute a user.",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "trash a document in gdocs",
     "trash document in gdocs",
+    "trash a document in google docs",
     "move a document to the trash in gdocs"
   ],
   "description": "Move a Google Doc to the Drive trash. The document can still be restored later with restore_document.",

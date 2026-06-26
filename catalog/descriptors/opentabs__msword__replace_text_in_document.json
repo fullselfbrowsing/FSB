@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "replace a text in document in msword",
     "replace text in document in msword",
+    "replace a text in document in microsoft word",
     "find and replace text in a word document in msword"
   ],
   "description": "Find and replace text in an existing Word document (.docx). This is the recommended way to edit documents because it preserves all formatting (bold, italic, headings, styles). Replaces all occurrences of the search text with the replacement text within existing paragraph runs. The search is case-sensitive and matches exact strings.",

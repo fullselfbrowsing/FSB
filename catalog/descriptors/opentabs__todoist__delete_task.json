@@ -6,8 +6,8 @@
     "remove a task in todoist",
     "trash a task in todoist",
     "permanently delete a task in todoist",
-    "delete task in todoist",
-    "delete a task permanently in todoist"
+    "delete a to-do in todoist",
+    "delete a to-do item in todoist"
   ],
   "description": "Permanently delete a Todoist task by its ID. This action cannot be undone.",
   "actionVerb": "delete",

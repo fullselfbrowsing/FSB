@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "start an instance in gcloud",
     "start instance in gcloud",
+    "start an instance in google cloud",
     "start a stopped vm instance in gcloud"
   ],
   "description": "Start a stopped Compute Engine VM instance. The instance must be in TERMINATED or STOPPED state.",

@@ -6,8 +6,8 @@
     "remove a task in asana",
     "trash a task in asana",
     "permanently delete a task in asana",
-    "delete task in asana",
-    "delete a task permanently in asana"
+    "delete a to-do in asana",
+    "delete a to-do item in asana"
   ],
   "description": "Permanently delete a task by its GID. This action cannot be undone.",
   "actionVerb": "delete",

@@ -6,6 +6,7 @@
     "show me my tags in dockerhub",
     "view my tags in dockerhub",
     "see all my tags in dockerhub",
+    "list tags in docker hub",
     "list repository tags in dockerhub"
   ],
   "description": "List tags for a Docker Hub repository. Returns tag names, digests, sizes, platform support, and last update times. Use namespace \"library\" for official images (e.g., library/nginx).",

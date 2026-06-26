@@ -4,7 +4,7 @@
   "intentSynonyms": [
     "mute a conversation in bsky",
     "mute conversation in bsky",
-    "mute a conversation to stop receiving notifications from it in bsky"
+    "mute a conversation in bluesky"
   ],
   "description": "Mute a conversation to stop receiving notifications from it.",
   "actionVerb": "mute",

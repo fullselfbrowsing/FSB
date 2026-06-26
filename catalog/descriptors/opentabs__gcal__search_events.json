@@ -3,8 +3,8 @@
   "service": "calendar.google.com",
   "intentSynonyms": [
     "search events in gcal",
-    "search events across all calendars in gcal",
-    "search for events across all writable calendars by text query in gcal"
+    "search events in google calendar",
+    "search events across all calendars in gcal"
   ],
   "description": "Search for events across all writable calendars by text query. Searches event summary, description, location, and attendee names. Returns matching events from all calendars the user has write access to.",
   "actionVerb": "search",

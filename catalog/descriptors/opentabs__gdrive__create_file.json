@@ -7,7 +7,7 @@
     "make a new file in gdrive",
     "open a new file in gdrive",
     "create file in gdrive",
-    "create a new file in google drive in gdrive"
+    "create a file in google drive"
   ],
   "description": "Create a new empty file in Google Drive. For Google Workspace types, use: \"application/vnd.google-apps.document\" (Docs), \"application/vnd.google-apps.spreadsheet\" (Sheets), \"application/vnd.google-apps.presentation\" (Slides). For regular files, use standard MIME types like \"text/plain\". Specify parent_id to create inside a folder, otherwise it goes to My Drive root.",
   "actionVerb": "create",

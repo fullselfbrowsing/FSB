@@ -6,6 +6,7 @@
     "show me my repositories in dockerhub",
     "view my repositories in dockerhub",
     "see all my repositories in dockerhub",
+    "list repositories in docker hub",
     "list repositories in a namespace in dockerhub"
   ],
   "description": "List Docker Hub repositories in a namespace (user or organization). Defaults to the current user. Supports filtering by name and sorting.",

@@ -6,6 +6,7 @@
     "show me my log entries in gcloud",
     "view my log entries in gcloud",
     "see all my log entries in gcloud",
+    "list log entries in google cloud",
     "list cloud logging entries in gcloud"
   ],
   "description": "List log entries from Cloud Logging. Supports advanced log filters (e.g., 'severity>=ERROR', 'resource.type=\"gce_instance\"').",

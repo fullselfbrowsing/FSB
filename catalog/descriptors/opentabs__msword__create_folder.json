@@ -6,7 +6,8 @@
     "add a folder in msword",
     "make a new folder in msword",
     "open a new folder in msword",
-    "create folder in msword"
+    "create folder in msword",
+    "create a folder in microsoft word"
   ],
   "description": "Create a new folder. Specify parent_id for nested folders, omit for root.",
   "actionVerb": "create",

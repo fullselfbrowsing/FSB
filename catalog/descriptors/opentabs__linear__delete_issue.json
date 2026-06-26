@@ -6,8 +6,8 @@
     "remove an issue in linear",
     "trash an issue in linear",
     "permanently delete an issue in linear",
-    "delete issue in linear",
-    "move an issue to the trash in linear"
+    "delete a ticket in linear",
+    "delete a bug in linear"
   ],
   "description": "Move a Linear issue to the trash. Trashed issues can be restored within 30 days.",
   "actionVerb": "delete",

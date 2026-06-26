@@ -6,6 +6,7 @@
     "show me my files in gdrive",
     "view my files in gdrive",
     "see all my files in gdrive",
+    "list files in google drive",
     "list files and folders in a drive folder in gdrive"
   ],
   "description": "List files and folders in Google Drive. By default lists items in the root \"My Drive\" folder. Use parent_id to list children of a specific folder. Supports ordering by name, modifiedTime, or createdTime. Trashed files are excluded by default.",

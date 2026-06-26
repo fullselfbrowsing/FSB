@@ -6,7 +6,8 @@
     "remove a repository in dockerhub",
     "trash a repository in dockerhub",
     "permanently delete a repository in dockerhub",
-    "delete repository in dockerhub"
+    "delete repository in dockerhub",
+    "delete a repository in docker hub"
   ],
   "description": "Permanently delete a Docker Hub repository. This action cannot be undone. All tags and images in the repository will be deleted.",
   "actionVerb": "delete",

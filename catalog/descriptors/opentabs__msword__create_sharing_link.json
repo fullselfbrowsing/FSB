@@ -7,7 +7,7 @@
     "make a new sharing link in msword",
     "open a new sharing link in msword",
     "create sharing link in msword",
-    "create a sharing link for a file or folder in msword"
+    "create a sharing link in microsoft word"
   ],
   "description": "Create a sharing link for a file or folder. Returns a URL that can be shared with others.",
   "actionVerb": "create",

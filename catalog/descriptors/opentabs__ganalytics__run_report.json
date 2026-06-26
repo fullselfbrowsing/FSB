@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "run a report in ganalytics",
     "run report in ganalytics",
+    "run a report in google analytics",
     "run a ga4 analytics report in ganalytics"
   ],
   "description": "Run a GA4 analytics report with specified dimensions, metrics, and date ranges. This is the primary reporting tool — supports all 374+ dimensions and 86+ metrics. Use get_metadata to discover available fields, and check_compatibility to verify combinations work together. Common dimensions: \"country\", \"city\", \"pagePath\", \"sessionSource\", \"deviceCategory\", \"browser\". Common metrics: \"activeUsers\", \"sessions\", \"screenPageViews\", \"bounceRate\", \"averageSessionDuration\", \"conversions\". Date formats: \"YYYY-MM-DD\", \"today\", \"yesterday\", \"NdaysAgo\" (e.g., \"7daysAgo\"). Returns up to 10000 rows per request; use offset for pagination.",

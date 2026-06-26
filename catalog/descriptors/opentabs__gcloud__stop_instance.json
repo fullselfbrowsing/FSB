@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "stop an instance in gcloud",
     "stop instance in gcloud",
+    "stop an instance in google cloud",
     "stop a running vm instance in gcloud"
   ],
   "description": "Stop a running Compute Engine VM instance. The instance must be in RUNNING state.",

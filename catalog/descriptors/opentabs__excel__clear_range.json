@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "clear a range in excel",
     "clear range in excel",
+    "clear a range in excel online",
     "clear cell contents or formatting in excel"
   ],
   "description": "Clear the contents, formatting, or both from a range of cells. Use apply_to to control what is cleared: \"All\" clears everything, \"Contents\" clears values and formulas only, \"Formats\" clears formatting only.",

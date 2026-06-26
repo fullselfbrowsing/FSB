@@ -7,7 +7,7 @@
     "change the details of file in gdrive",
     "modify a file in gdrive",
     "update file in gdrive",
-    "update file or folder metadata in gdrive"
+    "update a file in google drive"
   ],
   "description": "Update file or folder metadata — rename, change description, or toggle starred status. Only specified fields are changed; omitted fields remain unchanged.",
   "actionVerb": "update",

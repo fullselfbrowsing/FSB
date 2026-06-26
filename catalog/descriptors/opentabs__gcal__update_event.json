@@ -7,7 +7,7 @@
     "change the details of event in gcal",
     "modify an event in gcal",
     "update event in gcal",
-    "update an existing event in gcal"
+    "update an event in google calendar"
   ],
   "description": "Update an existing event. Only the fields you provide will be changed; omitted fields remain unchanged. Uses PATCH semantics.",
   "actionVerb": "update",

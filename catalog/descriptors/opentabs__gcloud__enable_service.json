@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "enable a service in gcloud",
     "enable service in gcloud",
+    "enable a service in google cloud",
     "enable a gcp api service in gcloud"
   ],
   "description": "Enable a GCP API service in the project. The service name is the API identifier (e.g., \"compute.googleapis.com\").",

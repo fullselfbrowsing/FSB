@@ -7,7 +7,7 @@
     "change the details of repository in dockerhub",
     "modify a repository in dockerhub",
     "update repository in dockerhub",
-    "update repository description or visibility in dockerhub"
+    "update a repository in docker hub"
   ],
   "description": "Update a Docker Hub repository. Only specified fields are changed; omitted fields remain unchanged.",
   "actionVerb": "update",

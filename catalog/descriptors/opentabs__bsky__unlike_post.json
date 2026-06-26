@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "unlike a post in bsky",
     "unlike post in bsky",
+    "unlike a post in bluesky",
     "remove a like from a post in bsky"
   ],
   "description": "Remove a like from a post. Requires the AT URI of the like record (returned by like_post).",

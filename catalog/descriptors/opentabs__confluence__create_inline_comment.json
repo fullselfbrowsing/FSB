@@ -6,8 +6,7 @@
     "add an inline comment in confluence",
     "make a new inline comment in confluence",
     "open a new inline comment in confluence",
-    "create inline comment in confluence",
-    "create an inline comment on page text in confluence"
+    "create inline comment in confluence"
   ],
   "description": "Create an inline comment on specific text in a Confluence page. The comment is anchored to the selected text and appears as a margin note. Provide the exact text to anchor to, the total number of matches of that text on the page, and which match (0-based index) to anchor to.",
   "actionVerb": "create",

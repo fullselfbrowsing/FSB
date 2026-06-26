@@ -6,8 +6,8 @@
     "look up a conversation in telegram",
     "fetch a single conversation in telegram",
     "view one specific conversation in telegram",
-    "get conversation in telegram",
-    "get details about a conversation in telegram"
+    "open a conversation in telegram",
+    "get conversation in telegram"
   ],
   "description": "Get detailed information about a specific conversation (dialog), including unread count, top message, and peer info.",
   "actionVerb": "get",

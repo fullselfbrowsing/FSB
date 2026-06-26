@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "copy a file in gdrive",
     "copy file in gdrive",
+    "copy a file in google drive",
     "create a copy of a file in gdrive"
   ],
   "description": "Create a copy of a file. Optionally specify a new name and parent folder for the copy. Folders cannot be copied.",

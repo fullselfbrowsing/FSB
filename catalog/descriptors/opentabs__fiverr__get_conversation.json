@@ -6,8 +6,8 @@
     "look up a conversation in fiverr",
     "fetch a single conversation in fiverr",
     "view one specific conversation in fiverr",
-    "get conversation in fiverr",
-    "read a conversation thread in fiverr"
+    "open a conversation in fiverr",
+    "get conversation in fiverr"
   ],
   "description": "Read the full message thread of a Fiverr conversation with a specific user. Returns messages (oldest first) with sender, recipient, text, timestamp, and attachment count, plus the unread count and whether the oldest page has been reached. Pass the other participant’s username, as returned by `list_conversations`.",
   "actionVerb": "get",

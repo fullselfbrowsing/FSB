@@ -7,7 +7,7 @@
     "restore a completed a comment in gdocs",
     "mark not done a comment in gdocs",
     "reopen comment in gdocs",
-    "reopen a resolved comment thread in gdocs"
+    "reopen a comment in google docs"
   ],
   "description": "Reopen a previously resolved comment thread. In the Drive API, reopening is done by creating a reply with action \"reopen\".",
   "actionVerb": "reopen",

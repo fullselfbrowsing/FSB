@@ -6,6 +6,7 @@
     "show me my event instances in gcal",
     "view my event instances in gcal",
     "see all my event instances in gcal",
+    "list event instances in google calendar",
     "list instances of a recurring event in gcal"
   ],
   "description": "List individual instances of a recurring event. Use timeMin/timeMax to scope the range of instances returned.",

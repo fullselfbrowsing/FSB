@@ -3,8 +3,9 @@
   "service": "instacart.com",
   "intentSynonyms": [
     "search products in instacart",
-    "search for grocery products in instacart",
-    "search for products across all available retailers near the delivery address in instacart"
+    "search groceries in instacart",
+    "search grocery items in instacart",
+    "search for grocery products in instacart"
   ],
   "description": "Search for products across all available retailers near the delivery address. Returns suggested items with thumbnails. Use get_location_context first if you need the zone ID. The search uses the user's current delivery location automatically.",
   "actionVerb": "search",

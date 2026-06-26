@@ -5,7 +5,8 @@
     "list recent documents in msword",
     "show me my recent documents in msword",
     "view my recent documents in msword",
-    "see all my recent documents in msword"
+    "see all my recent documents in msword",
+    "list recent documents in microsoft word"
   ],
   "description": "List recently accessed documents from OneDrive.",
   "actionVerb": "list",

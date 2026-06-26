@@ -3,8 +3,8 @@
   "service": "hub.docker.com",
   "intentSynonyms": [
     "search repositories in dockerhub",
-    "search repositories by keyword in dockerhub",
-    "search docker hub repositories by keyword in dockerhub"
+    "search repositories in docker hub",
+    "search repositories by keyword in dockerhub"
   ],
   "description": "Search Docker Hub repositories by keyword. Returns matching repositories with pull counts, star counts, and official/automated status.",
   "actionVerb": "search",

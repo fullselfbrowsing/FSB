@@ -3,8 +3,9 @@
   "service": "atlassian.net",
   "intentSynonyms": [
     "link issues in jira",
-    "link two issues together in jira",
-    "create a link between two jira issues in jira"
+    "link a ticket in jira",
+    "link a bug in jira",
+    "link two issues together in jira"
   ],
   "description": "Create a link between two Jira issues. Common link types: \"Blocks\", \"is blocked by\", \"relates to\", \"duplicates\".",
   "actionVerb": "link",

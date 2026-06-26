@@ -6,8 +6,8 @@
     "edit an issue in linear",
     "change the details of issue in linear",
     "modify an issue in linear",
-    "update issue in linear",
-    "update an existing issue in linear"
+    "update a ticket in linear",
+    "update a bug in linear"
   ],
   "description": "Update an existing Linear issue. Only specified fields are changed; omitted fields remain unchanged.",
   "actionVerb": "update",

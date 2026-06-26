@@ -7,7 +7,7 @@
     "make a new calendar in gcal",
     "open a new calendar in gcal",
     "create calendar in gcal",
-    "create a new secondary calendar in gcal"
+    "create a calendar in google calendar"
   ],
   "description": "Create a new secondary calendar. The authenticated user becomes the owner of the new calendar.",
   "actionVerb": "create",

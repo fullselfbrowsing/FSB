@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "share a location in gmaps",
     "share location in gmaps",
+    "share a location in google maps",
     "get a shareable maps link in gmaps"
   ],
   "description": "Get a shareable Google Maps URL for the current map view or a specific location. The URL can be shared with others to show the same location on Google Maps.",

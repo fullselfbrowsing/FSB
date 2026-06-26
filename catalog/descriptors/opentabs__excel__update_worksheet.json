@@ -7,7 +7,7 @@
     "change the details of worksheet in excel",
     "modify a worksheet in excel",
     "update worksheet in excel",
-    "update worksheet name, position, or visibility in excel"
+    "update a worksheet in excel online"
   ],
   "description": "Update worksheet properties such as name, position, or visibility. Only specified fields are changed; omitted fields remain unchanged.",
   "actionVerb": "update",

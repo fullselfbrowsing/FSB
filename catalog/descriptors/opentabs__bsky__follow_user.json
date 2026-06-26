@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "follow an user in bsky",
     "follow user in bsky",
+    "follow an user in bluesky",
     "follow a user in bsky"
   ],
   "description": "Follow a user. Requires the target user's DID. Returns the follow record URI (needed for unfollowing).",

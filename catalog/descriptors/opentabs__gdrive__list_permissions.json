@@ -6,6 +6,7 @@
     "show me my permissions in gdrive",
     "view my permissions in gdrive",
     "see all my permissions in gdrive",
+    "list permissions in google drive",
     "list sharing permissions on a file in gdrive"
   ],
   "description": "List all sharing permissions on a file or folder. Returns who has access and their role (owner, writer, commenter, reader).",

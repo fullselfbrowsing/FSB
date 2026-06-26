@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "move an event in gcal",
     "move event in gcal",
+    "move an event in google calendar",
     "move an event to another calendar in gcal"
   ],
   "description": "Move an event to another calendar. This changes the event organizer. Only default events can be moved — birthday, focusTime, fromGmail, outOfOffice, and workingLocation events cannot be moved.",

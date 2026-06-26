@@ -6,7 +6,8 @@
     "remove a message in bsky",
     "trash a message in bsky",
     "permanently delete a message in bsky",
-    "delete message in bsky"
+    "delete message in bsky",
+    "delete a message in bluesky"
   ],
   "description": "Delete a message for yourself in a conversation.",
   "actionVerb": "delete",

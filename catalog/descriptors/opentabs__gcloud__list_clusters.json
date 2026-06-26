@@ -6,6 +6,7 @@
     "show me my clusters in gcloud",
     "view my clusters in gcloud",
     "see all my clusters in gcloud",
+    "list clusters in google cloud",
     "list gke clusters in gcloud"
   ],
   "description": "List Google Kubernetes Engine (GKE) clusters in the project across all locations.",

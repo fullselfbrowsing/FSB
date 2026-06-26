@@ -6,7 +6,8 @@
     "mark done a task in todoist",
     "check off a task in todoist",
     "finish a task in todoist",
-    "close task in todoist"
+    "complete a to-do in todoist",
+    "complete a to-do item in todoist"
   ],
   "description": "Close (complete) a Todoist task by its ID. The task is marked as done.",
   "actionVerb": "close",

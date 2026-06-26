@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "calculate a workbook in excel",
     "calculate workbook in excel",
+    "calculate a workbook in excel online",
     "recalculate all formulas in excel"
   ],
   "description": "Recalculate all formulas in the workbook. Use calculation_type \"Recalculate\" for normal recalculation, \"Full\" to force recalculation of all formulas, or \"FullRebuild\" to rebuild the dependency chain and recalculate.",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "copy a document in gdocs",
     "copy document in gdocs",
+    "copy a document in google docs",
     "copy a google doc in gdocs"
   ],
   "description": "Create a copy of an existing Google Doc. You can optionally rename the new copy, move it into a folder, and set a Drive description.",

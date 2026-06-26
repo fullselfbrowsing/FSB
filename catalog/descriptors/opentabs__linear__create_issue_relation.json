@@ -6,8 +6,7 @@
     "add an issue relation in linear",
     "make a new issue relation in linear",
     "open a new issue relation in linear",
-    "create issue relation in linear",
-    "create a relation between two issues in linear"
+    "create issue relation in linear"
   ],
   "description": "Create a relation between two Linear issues (blocks, is blocked by, relates to, or duplicate of).",
   "actionVerb": "create",

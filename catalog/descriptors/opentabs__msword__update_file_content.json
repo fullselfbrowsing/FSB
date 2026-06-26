@@ -7,7 +7,7 @@
     "change the details of file content in msword",
     "modify a file content in msword",
     "update file content in msword",
-    "update a file's content in msword"
+    "update a file content in microsoft word"
   ],
   "description": "Update the content of an existing file by its ID.",
   "actionVerb": "update",

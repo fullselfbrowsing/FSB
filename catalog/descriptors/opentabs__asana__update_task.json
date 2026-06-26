@@ -6,8 +6,8 @@
     "edit a task in asana",
     "change the details of task in asana",
     "modify a task in asana",
-    "update task in asana",
-    "update an existing task in asana"
+    "update a to-do in asana",
+    "update a to-do item in asana"
   ],
   "description": "Update an existing task — change name, completion status, assignee, dates, or notes.",
   "actionVerb": "update",

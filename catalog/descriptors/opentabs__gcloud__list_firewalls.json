@@ -6,6 +6,7 @@
     "show me my firewalls in gcloud",
     "view my firewalls in gcloud",
     "see all my firewalls in gcloud",
+    "list firewalls in google cloud",
     "list firewall rules in gcloud"
   ],
   "description": "List firewall rules in the project.",

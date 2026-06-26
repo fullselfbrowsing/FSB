@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "restore a document in gdocs",
     "restore document in gdocs",
+    "restore a document in google docs",
     "restore a trashed document in gdocs"
   ],
   "description": "Restore a Google Doc from the Drive trash back to its previous location.",

@@ -4,8 +4,7 @@
   "intentSynonyms": [
     "unmute a conversation in bsky",
     "unmute conversation in bsky",
-    "unmute conversation in the bsky app",
-    "use bsky to unmute a conversation"
+    "unmute a conversation in bluesky"
   ],
   "description": "Unmute a conversation.",
   "actionVerb": "unmute",

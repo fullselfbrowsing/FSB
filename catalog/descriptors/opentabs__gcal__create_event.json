@@ -7,7 +7,7 @@
     "make a new event in gcal",
     "open a new event in gcal",
     "create event in gcal",
-    "create a new calendar event in gcal"
+    "create an event in google calendar"
   ],
   "description": "Create a new calendar event. For timed events, provide start_datetime and end_datetime in ISO 8601 format with timezone offset (e.g., \"2024-01-15T10:00:00-08:00\"). For all-day events, provide start_date and end_date in YYYY-MM-DD format (end_date is exclusive). At least one of (start_datetime or start_date) must be provided.",
   "actionVerb": "create",

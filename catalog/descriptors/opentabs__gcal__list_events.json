@@ -6,6 +6,7 @@
     "show me my events in gcal",
     "view my events in gcal",
     "see all my events in gcal",
+    "list events in google calendar",
     "list events on a calendar in gcal"
   ],
   "description": "List events on a calendar. Returns upcoming events by default. Use timeMin/timeMax to specify a date range. Use q to search event text. Results are ordered by start time when singleEvents is true.",

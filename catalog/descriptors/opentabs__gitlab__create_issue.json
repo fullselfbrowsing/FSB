@@ -6,8 +6,8 @@
     "add an issue in gitlab",
     "make a new issue in gitlab",
     "open a new issue in gitlab",
-    "create issue in gitlab",
-    "create a new issue in gitlab"
+    "file an issue in gitlab",
+    "create a ticket in gitlab"
   ],
   "description": "Create a new issue in a project.",
   "actionVerb": "create",

@@ -2,12 +2,8 @@
   "slug": "outlook.get_schedule",
   "service": "outlook.cloud.microsoft",
   "intentSynonyms": [
-    "get a schedule in outlook",
-    "look up a schedule in outlook",
-    "fetch a single schedule in outlook",
-    "view one specific schedule in outlook",
-    "get schedule in outlook",
-    "view others' availability in outlook"
+    "view others' availability in outlook",
+    "look up free/busy availability for one or more people in the organization over a time window in outlook"
   ],
   "description": "Look up free/busy availability for one or more people in the organization over a time window. Returns each person's busy/tentative/out-of-office blocks (with subjects and locations where the requester is permitted to see them) and their working hours. Use this to view other people's calendars and find open meeting times.",
   "actionVerb": "get",

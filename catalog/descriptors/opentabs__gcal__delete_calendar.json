@@ -7,7 +7,7 @@
     "trash a calendar in gcal",
     "permanently delete a calendar in gcal",
     "delete calendar in gcal",
-    "delete a secondary calendar in gcal"
+    "delete a calendar in google calendar"
   ],
   "description": "Delete a secondary calendar. Use calendars.clear for clearing all events on primary calendars. The primary calendar cannot be deleted.",
   "actionVerb": "delete",

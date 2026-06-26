@@ -7,7 +7,7 @@
     "trash a range in excel",
     "permanently delete a range in excel",
     "delete range in excel",
-    "delete cells and shift remaining data in excel"
+    "delete a range in excel online"
   ],
   "description": "Delete cells at a range address, shifting remaining cells up or to the left. Use shift=\"Up\" to pull cells up or shift=\"Left\" to pull cells left.",
   "actionVerb": "delete",

@@ -3,8 +3,8 @@
   "service": "word.cloud.microsoft",
   "intentSynonyms": [
     "search files in msword",
-    "search files and folders in msword",
-    "search for files and folders by name in onedrive in msword"
+    "search files in microsoft word",
+    "search files and folders in msword"
   ],
   "description": "Search for files and folders by name in OneDrive.",
   "actionVerb": "search",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "mark a conversation read in bsky",
     "mark conversation read in bsky",
+    "mark a conversation read in bluesky",
     "mark a conversation as read in bsky"
   ],
   "description": "Mark a conversation as read.",

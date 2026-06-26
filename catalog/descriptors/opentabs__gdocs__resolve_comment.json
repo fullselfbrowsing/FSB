@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "resolve a comment in gdocs",
     "resolve comment in gdocs",
+    "resolve a comment in google docs",
     "resolve a comment thread in gdocs"
   ],
   "description": "Mark a comment thread as resolved (done). In the Drive API, resolving is done by creating a reply with action \"resolve\".",

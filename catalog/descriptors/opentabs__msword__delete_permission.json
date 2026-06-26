@@ -7,7 +7,7 @@
     "trash a permission in msword",
     "permanently delete a permission in msword",
     "delete permission in msword",
-    "remove a sharing permission in msword"
+    "delete a permission in microsoft word"
   ],
   "description": "Remove a sharing permission from a file or folder.",
   "actionVerb": "delete",

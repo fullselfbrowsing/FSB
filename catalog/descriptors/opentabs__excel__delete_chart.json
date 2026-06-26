@@ -6,7 +6,8 @@
     "remove a chart in excel",
     "trash a chart in excel",
     "permanently delete a chart in excel",
-    "delete chart in excel"
+    "delete chart in excel",
+    "delete a chart in excel online"
   ],
   "description": "Delete a chart from a worksheet by its name.",
   "actionVerb": "delete",

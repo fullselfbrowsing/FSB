@@ -6,6 +6,7 @@
     "show me my disks in gcloud",
     "view my disks in gcloud",
     "see all my disks in gcloud",
+    "list disks in google cloud",
     "list persistent disks in gcloud"
   ],
   "description": "List Compute Engine persistent disks. If no zone is specified, lists across all zones.",

@@ -6,6 +6,7 @@
     "show me my iam roles in gcloud",
     "view my iam roles in gcloud",
     "see all my iam roles in gcloud",
+    "list iam roles in google cloud",
     "list custom iam roles in gcloud"
   ],
   "description": "List custom IAM roles defined in the project. Use \"roles\" as a prefix to list predefined roles.",

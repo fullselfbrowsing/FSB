@@ -7,7 +7,7 @@
     "trash a permission in gdrive",
     "permanently delete a permission in gdrive",
     "delete permission in gdrive",
-    "remove sharing access from a file in gdrive"
+    "delete a permission in google drive"
   ],
   "description": "Remove a sharing permission from a file or folder. Use list_permissions to find permission IDs.",
   "actionVerb": "delete",

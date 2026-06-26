@@ -6,8 +6,8 @@
     "edit an issue in sentry",
     "change the details of issue in sentry",
     "modify an issue in sentry",
-    "update issue in sentry",
-    "update issue status, assignee, or other attributes in sentry"
+    "update a ticket in sentry",
+    "update a bug in sentry"
   ],
   "description": "Update an issue's attributes. Supports changing status (resolve, unresolve, ignore), assigning to a user or team, bookmarking, and marking as seen. Only specified fields are modified.",
   "actionVerb": "update",

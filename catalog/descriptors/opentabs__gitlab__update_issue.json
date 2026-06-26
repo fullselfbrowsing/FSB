@@ -6,7 +6,8 @@
     "edit an issue in gitlab",
     "change the details of issue in gitlab",
     "modify an issue in gitlab",
-    "update issue in gitlab"
+    "update a ticket in gitlab",
+    "update a bug in gitlab"
   ],
   "description": "Update an existing issue. Only specified fields are changed.",
   "actionVerb": "update",

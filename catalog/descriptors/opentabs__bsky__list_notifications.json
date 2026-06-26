@@ -5,7 +5,8 @@
     "list notifications in bsky",
     "show me my notifications in bsky",
     "view my notifications in bsky",
-    "see all my notifications in bsky"
+    "see all my notifications in bsky",
+    "list notifications in bluesky"
   ],
   "description": "List the authenticated user's notifications including likes, reposts, follows, mentions, replies, and quotes. Supports cursor-based pagination.",
   "actionVerb": "list",

@@ -6,6 +6,7 @@
     "show me my organizations in dockerhub",
     "view my organizations in dockerhub",
     "see all my organizations in dockerhub",
+    "list organizations in docker hub",
     "list your docker hub organizations in dockerhub"
   ],
   "description": "List Docker Hub organizations the current user belongs to. Returns organization names, locations, and join dates.",

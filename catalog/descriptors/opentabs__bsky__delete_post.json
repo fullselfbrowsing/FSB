@@ -6,7 +6,8 @@
     "remove a post in bsky",
     "trash a post in bsky",
     "permanently delete a post in bsky",
-    "delete post in bsky"
+    "delete post in bsky",
+    "delete a post in bluesky"
   ],
   "description": "Delete a post by its AT URI. Only the post author can delete their own posts. The rkey is extracted from the URI.",
   "actionVerb": "delete",

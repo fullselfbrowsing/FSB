@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "search an users typeahead in bsky",
     "search users typeahead in bsky",
+    "search an users typeahead in bluesky",
     "typeahead search for users in bsky"
   ],
   "description": "Typeahead search for users. Returns a quick list of matching users for autocomplete. Faster than full search but returns fewer results.",

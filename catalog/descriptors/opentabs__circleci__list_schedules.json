@@ -3,10 +3,8 @@
   "service": "app.circleci.com",
   "intentSynonyms": [
     "list schedules in circleci",
-    "show me my schedules in circleci",
-    "view my schedules in circleci",
-    "see all my schedules in circleci",
-    "list scheduled triggers in circleci"
+    "list scheduled triggers in circleci",
+    "list scheduled pipeline triggers for a project in circleci"
   ],
   "description": "List scheduled pipeline triggers for a project.",
   "actionVerb": "list",

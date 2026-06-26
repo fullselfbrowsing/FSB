@@ -3,9 +3,8 @@
   "service": "bsky.app",
   "intentSynonyms": [
     "unrepost in bsky",
-    "remove a repost in bsky",
-    "unrepost in the bsky app",
-    "use bsky to unrepost"
+    "unrepost in bluesky",
+    "remove a repost in bsky"
   ],
   "description": "Remove a repost. Requires the AT URI of the repost record (returned by repost).",
   "actionVerb": "unrepost",

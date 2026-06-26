@@ -4,8 +4,7 @@
   "intentSynonyms": [
     "mute a thread in bsky",
     "mute thread in bsky",
-    "mute thread in the bsky app",
-    "use bsky to mute a thread"
+    "mute a thread in bluesky"
   ],
   "description": "Mute a thread. Notifications from this thread will be suppressed.",
   "actionVerb": "mute",

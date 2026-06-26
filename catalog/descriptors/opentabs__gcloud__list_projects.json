@@ -6,6 +6,7 @@
     "show me my projects in gcloud",
     "view my projects in gcloud",
     "see all my projects in gcloud",
+    "list projects in google cloud",
     "list accessible gcp projects in gcloud"
   ],
   "description": "List all GCP projects accessible to the current user. Returns project IDs, names, and lifecycle states.",

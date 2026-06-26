@@ -6,6 +6,7 @@
     "show me my conversations in bsky",
     "view my conversations in bsky",
     "see all my conversations in bsky",
+    "list conversations in bluesky",
     "list dm conversations in bsky"
   ],
   "description": "List the authenticated user's direct message conversations. Returns conversations sorted by most recent activity.",

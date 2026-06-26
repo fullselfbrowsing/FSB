@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "navigate a to location in gmaps",
     "navigate to location in gmaps",
+    "navigate a to location in google maps",
     "pan the map to specific coordinates in gmaps"
   ],
   "description": "Navigate the Google Maps view to specific coordinates with a given zoom level. The map pans and zooms to the specified location.",

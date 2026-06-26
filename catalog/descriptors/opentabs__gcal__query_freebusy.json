@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "query a freebusy in gcal",
     "query freebusy in gcal",
+    "query a freebusy in google calendar",
     "query free/busy information for calendars in gcal"
   ],
   "description": "Query free/busy information for one or more calendars within a time range. Returns time slots where events are scheduled. Useful for finding available meeting times.",

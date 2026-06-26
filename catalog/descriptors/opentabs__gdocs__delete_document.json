@@ -6,7 +6,8 @@
     "remove a document in gdocs",
     "trash a document in gdocs",
     "permanently delete a document in gdocs",
-    "delete document in gdocs"
+    "delete document in gdocs",
+    "delete a document in google docs"
   ],
   "description": "Permanently delete a Google Doc from Drive. This skips the trash and cannot be undone through the Google Docs plugin.",
   "actionVerb": "delete",

@@ -3,8 +3,9 @@
   "service": "sentry.io",
   "intentSynonyms": [
     "search issues in sentry",
-    "search and list issues with optional filters in sentry",
-    "search and list issues for a sentry organization in sentry"
+    "search a ticket in sentry",
+    "search a bug in sentry",
+    "search and list issues with optional filters in sentry"
   ],
   "description": "Search and list issues for a Sentry organization. Supports Sentry search syntax in the query parameter (e.g., \"is:unresolved\", \"assigned:me\", \"level:error\", \"first-seen:-24h\"). Filter by project IDs, environment, and time range. Results are paginated with a cursor.",
   "actionVerb": "search",

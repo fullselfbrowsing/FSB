@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "mute an actor in bsky",
     "mute actor in bsky",
+    "mute an actor in bluesky",
     "mute a user in bsky"
   ],
   "description": "Mute a user. Their posts will no longer appear in your feed.",

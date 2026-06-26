@@ -6,6 +6,7 @@
     "show me my accounts in ganalytics",
     "view my accounts in ganalytics",
     "see all my accounts in ganalytics",
+    "list accounts in google analytics",
     "list all ga accounts and properties in ganalytics"
   ],
   "description": "List all Google Analytics accounts and GA4 properties accessible to the current user. Returns accounts with their properties nested inside.",

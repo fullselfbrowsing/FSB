@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "check a compatibility in ganalytics",
     "check compatibility in ganalytics",
+    "check a compatibility in google analytics",
     "check dimension/metric compatibility in ganalytics"
   ],
   "description": "Check which dimensions and metrics are compatible with each other for a given GA4 property. Not all dimension-metric combinations work together in a report. Use this before run_report to validate your query will succeed. Returns all available dimensions and metrics with a \"compatible\" flag indicating whether they can be used together in the same report.",

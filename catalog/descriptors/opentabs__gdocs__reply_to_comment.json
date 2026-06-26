@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "reply a to comment in gdocs",
     "reply to comment in gdocs",
+    "reply a to comment in google docs",
     "reply to a comment thread in gdocs"
   ],
   "description": "Add a reply to an existing comment thread on a Google Doc.",

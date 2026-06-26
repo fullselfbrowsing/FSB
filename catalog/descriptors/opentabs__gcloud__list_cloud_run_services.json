@@ -5,7 +5,8 @@
     "list cloud run services in gcloud",
     "show me my cloud run services in gcloud",
     "view my cloud run services in gcloud",
-    "see all my cloud run services in gcloud"
+    "see all my cloud run services in gcloud",
+    "list cloud run services in google cloud"
   ],
   "description": "List Cloud Run services in the project across all locations.",
   "actionVerb": "list",

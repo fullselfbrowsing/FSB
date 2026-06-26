@@ -6,8 +6,8 @@
     "look up a conversation in chatgpt",
     "fetch a single conversation in chatgpt",
     "view one specific conversation in chatgpt",
-    "get conversation in chatgpt",
-    "get a conversation with messages in chatgpt"
+    "open a conversation in chatgpt",
+    "get conversation in chatgpt"
   ],
   "description": "Get a ChatGPT conversation with its full message history. Messages are returned in chronological order following the active branch of the conversation tree.",
   "actionVerb": "get",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "restore a file in gdrive",
     "restore file in gdrive",
+    "restore a file in google drive",
     "restore a file from the trash in gdrive"
   ],
   "description": "Restore a file or folder from the trash back to its original location.",

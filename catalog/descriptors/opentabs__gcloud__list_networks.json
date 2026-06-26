@@ -6,6 +6,7 @@
     "show me my networks in gcloud",
     "view my networks in gcloud",
     "see all my networks in gcloud",
+    "list networks in google cloud",
     "list vpc networks in gcloud"
   ],
   "description": "List VPC networks in the project.",

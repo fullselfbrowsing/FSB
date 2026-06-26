@@ -3,8 +3,8 @@
   "service": "bsky.app",
   "intentSynonyms": [
     "search users in bsky",
-    "search for users in bsky",
-    "search for users by keyword in bsky"
+    "search users in bluesky",
+    "search for users in bsky"
   ],
   "description": "Search for users by keyword. Returns paginated results matching the query against handles and display names.",
   "actionVerb": "search",

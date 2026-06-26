@@ -7,7 +7,7 @@
     "view my children in msword",
     "see all my children in msword",
     "list children in msword",
-    "list files and folders in msword"
+    "list a children in microsoft word"
   ],
   "description": "List files and folders in a directory. Use item_id to specify the folder, or omit for root.",
   "actionVerb": "list",

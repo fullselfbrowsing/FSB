@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "set a travel mode in gmaps",
     "set travel mode in gmaps",
+    "set a travel mode in google maps",
     "switch driving/transit/walking/biking in gmaps"
   ],
   "description": "Change the travel mode for the current directions view. Only works when viewing directions (URL contains /dir/). Switches between driving, transit, walking, and bicycling modes.",

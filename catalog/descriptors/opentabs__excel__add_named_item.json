@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "add a named item in excel",
     "add named item in excel",
+    "add a named item in excel online",
     "create a named range or constant in excel"
   ],
   "description": "Add a named range or named value to the workbook. For a range, provide a reference like \"Sheet1!A1:C10\". For a value or formula, provide the value directly.",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "navigate a to search in gmaps",
     "navigate to search in gmaps",
+    "navigate a to search in google maps",
     "open search results on the map in gmaps"
   ],
   "description": "Open Google Maps search results for a query at a specific location. The map shows search results pinned on the map with a list panel. Optionally provide coordinates to search near a specific location.",

@@ -7,7 +7,7 @@
     "trash a worksheet in excel",
     "permanently delete a worksheet in excel",
     "delete worksheet in excel",
-    "delete a worksheet by name in excel"
+    "delete a worksheet in excel online"
   ],
   "description": "Delete a worksheet from the currently open Excel workbook by name. The workbook must have at least two worksheets — you cannot delete the last one.",
   "actionVerb": "delete",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "disable a service in gcloud",
     "disable service in gcloud",
+    "disable a service in google cloud",
     "disable a gcp api service in gcloud"
   ],
   "description": "Disable a GCP API service in the project. WARNING: This may break resources that depend on this service.",

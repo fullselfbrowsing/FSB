@@ -7,7 +7,7 @@
     "make a new folder in gdrive",
     "open a new folder in gdrive",
     "create folder in gdrive",
-    "create a new folder in gdrive"
+    "create a folder in google drive"
   ],
   "description": "Create a new folder in Google Drive. Specify parent_id to create a nested folder, otherwise it goes to My Drive root.",
   "actionVerb": "create",

@@ -5,7 +5,8 @@
     "list billing accounts in gcloud",
     "show me my billing accounts in gcloud",
     "view my billing accounts in gcloud",
-    "see all my billing accounts in gcloud"
+    "see all my billing accounts in gcloud",
+    "list billing accounts in google cloud"
   ],
   "description": "List billing accounts accessible to the current user.",
   "actionVerb": "list",

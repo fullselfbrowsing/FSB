@@ -7,7 +7,7 @@
     "change the details of calendar in gcal",
     "modify a calendar in gcal",
     "update calendar in gcal",
-    "update calendar metadata in gcal"
+    "update a calendar in google calendar"
   ],
   "description": "Update metadata for a calendar. Only the fields you provide will be changed. Uses PATCH semantics.",
   "actionVerb": "update",

@@ -6,8 +6,7 @@
     "add an attachment in linear",
     "make a new attachment in linear",
     "open a new attachment in linear",
-    "create attachment in linear",
-    "link a url to an issue in linear"
+    "create attachment in linear"
   ],
   "description": "Link a URL (PR, document, design file, etc.) to a Linear issue as an attachment.",
   "actionVerb": "create",

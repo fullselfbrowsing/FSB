@@ -4,8 +4,7 @@
   "intentSynonyms": [
     "unmute a thread in bsky",
     "unmute thread in bsky",
-    "unmute thread in the bsky app",
-    "use bsky to unmute a thread"
+    "unmute a thread in bluesky"
   ],
   "description": "Unmute a thread.",
   "actionVerb": "unmute",

@@ -3,8 +3,10 @@
   "service": "app.asana.com",
   "intentSynonyms": [
     "search tasks in asana",
-    "search tasks in a workspace in asana",
-    "search for tasks in a workspace in asana"
+    "search a to-do in asana",
+    "search a to-do item in asana",
+    "search a todo in asana",
+    "search tasks in a workspace in asana"
   ],
   "description": "Search for tasks in a workspace. Supports filtering by text, assignee, completion status, due dates, and projects.",
   "actionVerb": "search",

@@ -6,6 +6,7 @@
     "show me my objects in gcloud",
     "view my objects in gcloud",
     "see all my objects in gcloud",
+    "list objects in google cloud",
     "list objects in a storage bucket in gcloud"
   ],
   "description": "List objects in a Cloud Storage bucket. Supports prefix filtering for directory-like browsing.",

@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "unfollow an user in bsky",
     "unfollow user in bsky",
+    "unfollow an user in bluesky",
     "unfollow a user in bsky"
   ],
   "description": "Unfollow a user. Requires the AT URI of the follow record (returned by follow_user or found in the viewer relationship).",

@@ -5,8 +5,7 @@
     "send a message in outlook",
     "post a message in outlook",
     "write a new message in outlook",
-    "send message in outlook",
-    "send an email in outlook"
+    "send message in outlook"
   ],
   "description": "Send a new email message. Supports plain text or HTML body, CC/BCC, and importance level.",
   "actionVerb": "send",

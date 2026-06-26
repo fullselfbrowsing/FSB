@@ -6,8 +6,8 @@
     "add a task in asana",
     "make a new task in asana",
     "open a new task in asana",
-    "create task in asana",
-    "create a new task in asana"
+    "create a to-do in asana",
+    "create a to-do item in asana"
   ],
   "description": "Create a new task in a workspace. Optionally assign to a project, user, or parent task.",
   "actionVerb": "create",

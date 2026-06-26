@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "upload a file in msword",
     "upload file in msword",
+    "upload a file in microsoft word",
     "upload a text file to onedrive in msword"
   ],
   "description": "Upload a text file to OneDrive. Creates a new file or overwrites existing. Specify the full path relative to drive root (e.g., \"Documents/report.txt\").",

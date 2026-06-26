@@ -6,6 +6,7 @@
     "show me my instances in gcloud",
     "view my instances in gcloud",
     "see all my instances in gcloud",
+    "list instances in google cloud",
     "list compute engine vm instances in gcloud"
   ],
   "description": "List Compute Engine VM instances in a zone. If no zone is specified, lists instances across all zones using aggregated list.",

@@ -3,8 +3,9 @@
   "service": "www.yelp.com",
   "intentSynonyms": [
     "search businesses in yelp",
-    "search for businesses by keyword and location in yelp",
-    "search for businesses on yelp by keyword and location in yelp"
+    "search restaurants in yelp",
+    "search places in yelp",
+    "search for businesses by keyword and location in yelp"
   ],
   "description": "Search for businesses on Yelp by keyword and location. Returns up to 10 results per page with business name, rating, review count, price range, categories, phone, and address. Use the start parameter to paginate through results.",
   "actionVerb": "search",

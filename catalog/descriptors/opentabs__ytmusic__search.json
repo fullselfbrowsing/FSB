@@ -3,9 +3,8 @@
   "service": "music.youtube.com",
   "intentSynonyms": [
     "search in ytmusic",
-    "search youtube music for songs, albums, artists, playlists, or videos in ytmusic",
-    "search in the ytmusic app",
-    "use ytmusic to search"
+    "search in youtube music",
+    "search youtube music for songs, albums, artists, playlists, or videos in ytmusic"
   ],
   "description": "Search YouTube Music for songs, albums, artists, playlists, or videos",
   "actionVerb": "search",

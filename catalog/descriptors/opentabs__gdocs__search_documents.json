@@ -3,8 +3,8 @@
   "service": "docs.google.com",
   "intentSynonyms": [
     "search documents in gdocs",
-    "search google docs by title or content in gdocs",
-    "search google docs by title and full-text content using the authenticated drive search index in gdocs"
+    "search documents in google docs",
+    "search google docs by title or content in gdocs"
   ],
   "description": "Search Google Docs by title and full-text content using the authenticated Drive search index. Trashed documents are excluded by default.",
   "actionVerb": "search",

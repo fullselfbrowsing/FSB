@@ -3,8 +3,8 @@
   "service": "www.google.com",
   "intentSynonyms": [
     "search places in gmaps",
-    "search for places near a location in gmaps",
-    "search for places on google maps by text query near a location in gmaps"
+    "search places in google maps",
+    "search for places near a location in gmaps"
   ],
   "description": "Search for places on Google Maps by text query near a location. Returns place names and IDs. Use get_current_view first to get coordinates for the search area, or provide explicit coordinates.",
   "actionVerb": "search",

@@ -6,8 +6,8 @@
     "look up a conversation in bsky",
     "fetch a single conversation in bsky",
     "view one specific conversation in bsky",
-    "get conversation in bsky",
-    "get conversation details in bsky"
+    "open a conversation in bsky",
+    "get conversation in bsky"
   ],
   "description": "Get details about a specific conversation by its ID.",
   "actionVerb": "get",

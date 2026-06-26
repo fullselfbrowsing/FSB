@@ -7,7 +7,7 @@
     "make a new document in msword",
     "open a new document in msword",
     "create document in msword",
-    "create a new word document with text in msword"
+    "create a document in microsoft word"
   ],
   "description": "Create a new Word document (.docx) with the given text content. Each string in the paragraphs array becomes a separate paragraph in the document. The file is created at the specified path in OneDrive.",
   "actionVerb": "create",

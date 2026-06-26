@@ -7,7 +7,7 @@
     "trash a reply in gdocs",
     "permanently delete a reply in gdocs",
     "delete reply in gdocs",
-    "delete a reply from a comment thread in gdocs"
+    "delete a reply in google docs"
   ],
   "description": "Permanently delete a reply from a comment thread on a Google Doc. Only the reply author or the document owner can delete replies. This action cannot be undone.",
   "actionVerb": "delete",

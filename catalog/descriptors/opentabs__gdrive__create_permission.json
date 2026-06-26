@@ -7,7 +7,7 @@
     "make a new permission in gdrive",
     "open a new permission in gdrive",
     "create permission in gdrive",
-    "share a file with someone in gdrive"
+    "create a permission in google drive"
   ],
   "description": "Share a file or folder with a user, group, domain, or make it public. For user/group sharing, provide an email address. For domain sharing, provide a domain name. Use type \"anyone\" to make the file accessible via link.",
   "actionVerb": "create",

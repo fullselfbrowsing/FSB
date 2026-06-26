@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "toggle a layer in gmaps",
     "toggle layer in gmaps",
+    "toggle a layer in google maps",
     "toggle traffic/transit/biking/terrain layer in gmaps"
   ],
   "description": "Toggle a map layer on Google Maps by navigating to the appropriate URL with the layer parameter. Supports traffic, transit, bicycling, and terrain layers.",

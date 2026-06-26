@@ -6,6 +6,7 @@
     "show me my tables in excel",
     "view my tables in excel",
     "see all my tables in excel",
+    "list tables in excel online",
     "list all tables in the workbook in excel"
   ],
   "description": "List all tables in the currently open Excel workbook. Returns table names, IDs, and display settings. Optionally filter by worksheet name to list only tables in a specific sheet.",

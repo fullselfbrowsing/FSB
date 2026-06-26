@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "search a catalog in dockerhub",
     "search catalog in dockerhub",
+    "search a catalog in docker hub",
     "search docker hub catalog (images, models, extensions) in dockerhub"
   ],
   "description": "Search the Docker Hub catalog for images, extensions, and models. Returns rich metadata including categories, source type (official, verified publisher, community), and content types. This is the newer, more comprehensive search API.",

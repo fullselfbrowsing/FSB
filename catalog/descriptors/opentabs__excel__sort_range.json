@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "sort a range in excel",
     "sort range in excel",
+    "sort a range in excel online",
     "sort data in a range by columns in excel"
   ],
   "description": "Sort data in a range by one or more columns. Each sort field specifies a zero-based column index and sort direction. Multiple fields create multi-level sorts (primary, secondary, etc.).",

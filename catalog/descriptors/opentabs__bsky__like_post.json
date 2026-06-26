@@ -4,8 +4,7 @@
   "intentSynonyms": [
     "like a post in bsky",
     "like post in bsky",
-    "like post in the bsky app",
-    "use bsky to like a post"
+    "like a post in bluesky"
   ],
   "description": "Like a post. Requires the post's AT URI and CID. Returns the URI of the like record (needed for unliking).",
   "actionVerb": "like",

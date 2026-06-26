@@ -6,6 +6,7 @@
     "show me my enabled services in gcloud",
     "view my enabled services in gcloud",
     "see all my enabled services in gcloud",
+    "list enabled services in google cloud",
     "list enabled api services in gcloud"
   ],
   "description": "List GCP API services enabled in the project. Each service represents an API that has been activated.",

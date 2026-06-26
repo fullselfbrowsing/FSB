@@ -3,8 +3,8 @@
   "service": "drive.google.com",
   "intentSynonyms": [
     "search files in gdrive",
-    "search files by name or content in gdrive",
-    "search for files and folders in google drive by name or full-text content in gdrive"
+    "search files in google drive",
+    "search files by name or content in gdrive"
   ],
   "description": "Search for files and folders in Google Drive by name or full-text content. The query searches file names and document content. Use mime_type to filter by type (e.g., \"application/vnd.google-apps.folder\" for folders, \"application/vnd.google-apps.document\" for Docs, \"application/vnd.google-apps.spreadsheet\" for Sheets). Trashed files are excluded by default.",
   "actionVerb": "search",

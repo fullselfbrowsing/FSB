@@ -3,8 +3,8 @@
   "service": "www.google.com",
   "intentSynonyms": [
     "navigate to directions in gmaps",
-    "open directions between two points in gmaps",
-    "open google maps directions between an origin and destination in gmaps"
+    "navigate to directions in google maps",
+    "open directions between two points in gmaps"
   ],
   "description": "Open Google Maps directions between an origin and destination. Shows the route on the map with step-by-step navigation instructions, distance, and estimated travel time. Supports driving, transit, walking, and bicycling modes.",
   "actionVerb": "navigate",

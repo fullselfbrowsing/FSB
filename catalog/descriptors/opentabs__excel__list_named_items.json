@@ -6,6 +6,7 @@
     "show me my named items in excel",
     "view my named items in excel",
     "see all my named items in excel",
+    "list named items in excel online",
     "list named ranges and constants in excel"
   ],
   "description": "List all named items (named ranges, constants) in the workbook. Named items are user-defined names that refer to ranges, values, or formulas.",

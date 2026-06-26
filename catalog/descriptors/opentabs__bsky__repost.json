@@ -3,9 +3,8 @@
   "service": "bsky.app",
   "intentSynonyms": [
     "repost in bsky",
-    "repost a post in bsky",
-    "repost in the bsky app",
-    "use bsky to repost"
+    "repost in bluesky",
+    "repost a post in bsky"
   ],
   "description": "Repost a post. Requires the post's AT URI and CID. Returns the URI of the repost record (needed for unreposting).",
   "actionVerb": "repost",

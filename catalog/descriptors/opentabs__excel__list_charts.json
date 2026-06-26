@@ -6,6 +6,7 @@
     "show me my charts in excel",
     "view my charts in excel",
     "see all my charts in excel",
+    "list charts in excel online",
     "list all charts in a worksheet in excel"
   ],
   "description": "List all charts in a worksheet. Returns chart names, IDs, dimensions, and positions.",

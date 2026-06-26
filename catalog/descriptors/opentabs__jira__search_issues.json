@@ -3,8 +3,9 @@
   "service": "atlassian.net",
   "intentSynonyms": [
     "search issues in jira",
-    "search issues using jql in jira",
-    "search for jira issues using jql (jira query language) in jira"
+    "search a ticket in jira",
+    "search a bug in jira",
+    "search issues using jql in jira"
   ],
   "description": "Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.",
   "actionVerb": "search",

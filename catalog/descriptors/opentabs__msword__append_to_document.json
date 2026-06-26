@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "append a to document in msword",
     "append to document in msword",
+    "append a to document in microsoft word",
     "append paragraphs to a word document in msword"
   ],
   "description": "Append paragraphs to the end of an existing Word document (.docx). Downloads the document, adds the new paragraphs after all existing content, and re-uploads. Existing content is preserved.",

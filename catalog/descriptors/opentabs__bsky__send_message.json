@@ -6,6 +6,7 @@
     "post a message in bsky",
     "write a new message in bsky",
     "send message in bsky",
+    "send a message in bluesky",
     "send a dm in bsky"
   ],
   "description": "Send a direct message in a conversation.",

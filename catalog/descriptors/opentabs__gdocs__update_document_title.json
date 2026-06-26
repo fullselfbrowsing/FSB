@@ -7,7 +7,7 @@
     "change the details of document title in gdocs",
     "modify a document title in gdocs",
     "update document title in gdocs",
-    "rename a google doc in gdocs"
+    "update a document title in google docs"
   ],
   "description": "Rename a Google Doc in Drive without changing its content.",
   "actionVerb": "update",

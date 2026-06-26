@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "add a table column in excel",
     "add table column in excel",
+    "add a table column in excel online",
     "add a column to a table in excel"
   ],
   "description": "Add a new column to a table. Provide values as a 2D array where the first value is the header name and subsequent values are the data for each existing row. Optionally specify an insertion index.",

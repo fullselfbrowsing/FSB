@@ -7,7 +7,7 @@
     "change the details of range in excel",
     "modify a range in excel",
     "update range in excel",
-    "write values or formulas to a range in excel"
+    "update a range in excel online"
   ],
   "description": "Write values, formulas, or number formats to a specific range in a worksheet. The values must be a 2D array matching the range dimensions. Use null within the array to skip a cell. Pass formulas starting with \"=\" (e.g., \"=SUM(A1:A10)\"). Use \"\" (empty string) to clear a cell.",
   "actionVerb": "update",

@@ -7,7 +7,7 @@
     "trash a table row in excel",
     "permanently delete a table row in excel",
     "delete table row in excel",
-    "delete a row from a table by index in excel"
+    "delete a table row in excel online"
   ],
   "description": "Delete a specific row from a table by its zero-based index. The row is permanently removed and subsequent rows shift up.",
   "actionVerb": "delete",

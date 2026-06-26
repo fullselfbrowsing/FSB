@@ -4,6 +4,7 @@
   "intentSynonyms": [
     "search a nearby in gmaps",
     "search nearby in gmaps",
+    "search a nearby in google maps",
     "search by category near coordinates in gmaps"
   ],
   "description": "Open a Google Maps search for a category of places near specific coordinates. Navigates the browser to show results on the map. Common categories: restaurants, hotels, gas stations, coffee, pharmacies, ATMs, grocery stores, parking, hospitals, banks.",

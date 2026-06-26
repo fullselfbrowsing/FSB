@@ -6,6 +6,7 @@
     "show me my recent documents in gdocs",
     "view my recent documents in gdocs",
     "see all my recent documents in gdocs",
+    "list recent documents in google docs",
     "list recently viewed google docs in gdocs"
   ],
   "description": "List recently viewed Google Docs from Drive, ordered by most recently viewed and then most recently modified.",

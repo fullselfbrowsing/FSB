@@ -6,7 +6,8 @@
     "remove a table in excel",
     "trash a table in excel",
     "permanently delete a table in excel",
-    "delete table in excel"
+    "delete table in excel",
+    "delete a table in excel online"
   ],
   "description": "Delete a table by name or ID. This removes the table object but keeps the data in the cells. Use convert_table_to_range instead if you want to explicitly convert first.",
   "actionVerb": "delete",

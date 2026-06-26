@@ -7,7 +7,7 @@
     "make a new comment in gdocs",
     "open a new comment in gdocs",
     "create comment in gdocs",
-    "add a comment to a document in gdocs"
+    "create a comment in google docs"
   ],
   "description": "Add a new comment to a Google Doc. Optionally anchor the comment to specific quoted text in the document. If quoted_text is provided, the comment appears as a margin note next to that text.",
   "actionVerb": "create",
