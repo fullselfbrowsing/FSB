@@ -70,6 +70,19 @@ The authoritative full-corpus scale/test gate → 43. NO change to the router ti
     (~2–3 heads, reuse `buildRpcSpec`). No new module.
   - This PRIMARY set = **~9–11 READ heads across 3 apps, ALL on verified/already-proven same-origin
     internal APIs** → hits SC1's 8–12 without any unverified origin.
+  - **EXECUTE-TIME SUBSTITUTION (planner-verified against the vendored ground truth; plan-checker
+    APPROVED):** linear was MOVED to Phase 41 and **gitlab substituted as the NEW module**. The real
+    `vendor/opentabs-snapshot/plugins/linear/src/linear-api.ts:18` hardcodes
+    `https://client-api.linear.app/graphql` — a SEPARATE subdomain reached only via cross-origin CORS,
+    which the Wall-2 origin-pin (`spec.origin !== tabOrigin` → `RECIPE_ORIGIN_MISMATCH`) correctly
+    rejects → linear is a Pattern-D port, the exact CORS-gate class Phase 41 OWNS. The roadmap's
+    "documented-safe" label did NOT match the source; first-party-origin-ONLY (the non-negotiable
+    constraint) wins over the illustrative app name (app selection is Claude's discretion). **gitlab**
+    (`https://gitlab.com/api/v4` — a PATH on the gitlab.com origin, NOT an `api.gitlab.com` subdomain;
+    verified genuinely same-origin in `gitlab/src/gitlab-api.ts:13`) is the NEW module: `list_projects`,
+    `get_project`, `list_issues`, `get_issue`, `list_merge_requests` (5 reads, GitHub-GET template).
+    slack + notion extends stay PRIMARY (vendored source confirms genuinely same-origin). Final set =
+    **10 READ heads, 4 head modules (github/slack/notion/gitlab)**.
 - **SECONDARY (include ONLY if the planner/executor can justify a single first-party same-origin
   internal API from the vendored source + known web behavior; else defer to 41):** vercel
   (`vercel.com`), gitlab (`gitlab.com`), sentry (`sentry.io`), asana (`app.asana.com`) — single-origin
