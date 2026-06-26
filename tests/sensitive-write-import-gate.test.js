@@ -285,6 +285,71 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
   check(payWriteElevated && payWriteElevated.decision === 'allow',
     'the REAL amazon.place_order WITH the per-origin mutating flag -> allow (the flag elevates the SHIPPED sensitive payment write -- the headline money-no-movement-under-Auto mitigation, proven on a shipped payment descriptor)');
 
+  // ===========================================================================
+  // Phase 41 (DEPTH-02) SC2: a hand-ported T1a WRITE on the SENSITIVE app.slack.com
+  // origin honors the DENY-04 per-origin mutating opt-in -- through the LIVE roster.
+  // ---------------------------------------------------------------------------
+  // The discord + amazon blocks above route a T3-DOM descriptor (entry.tier:'T3')
+  // through the gate. THIS block proves the SC2 nuance: a hand-ported T1a HEAD entry
+  // (entry.tier:'T1a') on a sensitive origin is gated IDENTICALLY -- because the consent
+  // gate runs BEFORE tier dispatch (capability-router.js:720 before :743), the gate
+  // sees the sideEffectClass + sensitivity and re-gates the write regardless of tier.
+  // The vehicle is the SHIPPED slack.send_message descriptor (write/dom, service
+  // slack.com) -- app.slack.com is sensitive via 'https://*.slack.com' in the COMMITTED
+  // roster (already loaded above as Denylist) -- so NO new risky social/payment write
+  // head is shipped just to prove the gate. The handler itself then fail-closes on the
+  // [ASSUMED] body (a DISTINCT concern, proven in guarded-write-failclosed.test.js); this
+  // block proves only the CONSENT posture.
+  console.log('\n--- DEPTH-02 (Phase 41): SC2 -- T1a slack.send_message write on the SENSITIVE app.slack.com origin honors the mutating opt-in (LIVE roster) ---');
+
+  const SLACK_ORIGIN = 'https://app.slack.com';
+  const slackClass = Denylist.classify(SLACK_ORIGIN);
+  check(slackClass && slackClass.sensitive === true && slackClass.denied === false,
+    'classify(https://app.slack.com) -> { sensitive:true, denied:false } in the LIVE roster (https://*.slack.com governs slack) -- the write-gating precondition');
+
+  if (typeof Store._reset === 'function') Store._reset();
+  await Store.setOriginMode(SLACK_ORIGIN, 'auto');     // Auto, mutating flag false
+
+  // A READ entry on app.slack.com under Auto -> allow (reads stay open everywhere; the
+  // re-gate is write-only). slack.list_channels is a real read slug (sideEffectClass read).
+  const slackReadGate = await Gate.evaluate({
+    origin: SLACK_ORIGIN,
+    slug: 'slack.list_channels',
+    entry: { tier: 'T1a', descriptor: { sideEffectClass: 'read' } }
+  });
+  check(slackReadGate && slackReadGate.decision === 'allow',
+    'the T1a slack.list_channels (read) on app.slack.com (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
+
+  // The T1a WRITE (slack.send_message, sideEffectClass write) WITHOUT the per-origin
+  // mutating flag -> re-gated. entry.tier:'T1a' is the SC2 nuance (the discord/amazon
+  // blocks used tier:'T3'): the gate gates a hand-ported T1a write identically because it
+  // runs BEFORE tier dispatch.
+  const slackWriteNoFlag = await Gate.evaluate({
+    origin: SLACK_ORIGIN,
+    slug: 'slack.send_message',
+    entry: { tier: 'T1a', descriptor: { sideEffectClass: 'write' } }
+  });
+  check(slackWriteNoFlag && slackWriteNoFlag.decision !== 'allow',
+    'the T1a slack.send_message (write) on app.slack.com (no flag) -> NOT allow (posture B re-gates the sensitive-origin T1a write identically to a DOM write)');
+  // INV-03 dual-field byte-equality: the typed reason on code AND errorCode AND error.
+  check(slackWriteNoFlag && slackWriteNoFlag.error && slackWriteNoFlag.error.code === MUTATING_REQUIRED,
+    'sensitive T1a slack write -> error.code === RECIPE_CONSENT_MUTATING_REQUIRED (byte-exact)');
+  check(slackWriteNoFlag && slackWriteNoFlag.error && slackWriteNoFlag.error.errorCode === MUTATING_REQUIRED,
+    'sensitive T1a slack write -> error.errorCode === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+  check(slackWriteNoFlag && slackWriteNoFlag.error && slackWriteNoFlag.error.error === MUTATING_REQUIRED,
+    'sensitive T1a slack write -> error.error === RECIPE_CONSENT_MUTATING_REQUIRED (dual-field, INV-03)');
+
+  // The per-origin mutating flag ELEVATES the sensitive T1a write back to allow (the gate
+  // allows; the handler then fail-closes on the [ASSUMED] body -- a distinct concern).
+  await Store.setOriginMutating(SLACK_ORIGIN, true);
+  const slackWriteElevated = await Gate.evaluate({
+    origin: SLACK_ORIGIN,
+    slug: 'slack.send_message',
+    entry: { tier: 'T1a', descriptor: { sideEffectClass: 'write' } }
+  });
+  check(slackWriteElevated && slackWriteElevated.decision === 'allow',
+    'the T1a slack.send_message WITH the per-origin mutating flag -> allow (the flag elevates the sensitive T1a write; the handler then fail-closes on [ASSUMED] -- SC2 proven, gate-allow and handler-fail-close are distinct concerns)');
+
   console.log('\nsensitive-write-import-gate: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);
 })().catch((err) => {

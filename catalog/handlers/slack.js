@@ -38,6 +38,18 @@
    * 29-HUMAN-UAT.md). The xoxc-in-body + xoxd-cookie split itself IS web-search-
    * verified; the exact endpoint shape is not.
    *
+   * GUARDED WRITE (Phase 41, DEPTH-02): slack.send_message was APPENDED as a fail-closed
+   * write head -- it is the BREADTH write slug (UPGRADES opentabs__slack__send_message
+   * dom->T1a) and is DISTINCT from the live-proven executable slack.chat.postMessage (a
+   * 29-03 hand slug with no opentabs descriptor -- no collision). The new write ships
+   * FAIL-CLOSED (the github.issues.create pattern): handle() returns the dual-field
+   * RECIPE_DOM_FALLBACK_PENDING and NEVER calls callSlackMethod or ctx.executeBoundSpec
+   * -- NO mutation fires, NO xoxc is scraped. It is fail-closed EVEN THOUGH
+   * chat.postMessage is the executable exception; the breadth write body is
+   * [ASSUMED-ENDPOINT] until 41-HUMAN-UAT.md confirms it. app.slack.com is SENSITIVE
+   * (https://*.slack.com), so the T1a write is mutating-gated by the posture-B consent
+   * re-gate before tier dispatch (the SC2 proof, sensitive-write-import-gate.test.js).
+   *
    * Module shell: the dual-export IIFE mirror of capability-interpreter.js:372-385 --
    * the service worker reads global.FsbHandlerSlack after importScripts and the module
    * self-registers its slugs into FsbCapabilityCatalog at load; Node tests require()
@@ -89,6 +101,22 @@
     properties: {
       channel: { type: 'string', minLength: 1 },
       text: { type: 'string', minLength: 1 }
+    },
+    required: ['channel', 'text'],
+    additionalProperties: false
+  };
+  // ---- Phase 41 (DEPTH-02) GUARDED-WRITE params schema ----------------------
+  // Props mirrored EXACTLY from the opentabs__slack__send_message.json descriptor
+  // (channel + text required, thread_ts optional). additionalProperties:false -- the
+  // AI cannot smuggle extra fields into a credentialed same-origin write. This scaffolds
+  // the params a single live-capture flips to executable; the slack.send_message handler
+  // below is fail-closed today (it NEVER calls callSlackMethod or ctx.executeBoundSpec).
+  var SEND_MESSAGE_PARAMS = {
+    type: 'object',
+    properties: {
+      channel: { type: 'string', minLength: 1 },
+      text: { type: 'string', minLength: 1 },
+      thread_ts: { type: 'string' }
     },
     required: ['channel', 'text'],
     additionalProperties: false
@@ -318,6 +346,46 @@
           channel: a.channel,
           text: a.text
         }, ctx);
+      }
+    },
+
+    // ======================================================================
+    // Phase 41 (DEPTH-02) -- the slack.send_message GUARDED WRITE (FAIL-CLOSED).
+    // ----------------------------------------------------------------------
+    // slack.send_message is the BREADTH write slug (it UPGRADES
+    // opentabs__slack__send_message.json -- service slack.com, write/dom -- dom->T1a)
+    // and is DISTINCT from the live-proven EXECUTABLE slack.chat.postMessage above (a
+    // 29-03 hand slug with NO opentabs descriptor). The two do NOT collide: distinct
+    // slugs, the upgrade harness asserts send_message resolves T1a byte-exact while
+    // chat.postMessage still resolves its executable head.
+    //
+    // The NEW write ships FAIL-CLOSED, the github.issues.create pattern (github.js:
+    // 111-123): handle() returns the dual-field RECIPE_DOM_FALLBACK_PENDING (reason
+    // unverified-slack-send-message-mutation, fellBackToDom:true) and NEVER calls
+    // callSlackMethod or ctx.executeBoundSpec -- so NO mutation fires (and NO xoxc is
+    // scraped: it fails closed before any probe). It is fail-closed EVEN THOUGH
+    // chat.postMessage is the live-proven executable exception -- the new breadth write
+    // body is [ASSUMED-ENDPOINT] until 41-HUMAN-UAT.md confirms it.
+    //
+    // SC2: app.slack.com is SENSITIVE (service-denylist.json: https://*.slack.com), so a
+    // T1a write here is mutating-gated by the DENY-04 posture-B consent re-gate BEFORE
+    // tier dispatch -- proven end-to-end through the live roster in
+    // tests/sensitive-write-import-gate.test.js. The gate-allow and the handler-fail-close
+    // are DISTINCT concerns (the gate proves consent posture; the handler proves
+    // no-mutation-without-capture).
+
+    // ---- slack.send_message (write -- fail-closed) -------------------------
+    'slack.send_message': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'write',
+      params: SEND_MESSAGE_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'slack.send_message',
+          reason: 'unverified-slack-send-message-mutation',
+          fellBackToDom: true
+        });
       }
     }
   };
