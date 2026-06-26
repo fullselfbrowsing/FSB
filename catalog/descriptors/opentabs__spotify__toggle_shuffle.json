@@ -1,0 +1,41 @@
+{
+  "slug": "spotify.toggle_shuffle",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "toggle a shuffle in spotify",
+    "toggle shuffle in spotify",
+    "enable or disable shuffle mode in spotify"
+  ],
+  "description": "Enable or disable shuffle mode for the current playback. When enabled, tracks play in random order.",
+  "actionVerb": "toggle",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "boolean",
+        "description": "Whether to enable (true) or disable (false) shuffle mode"
+      },
+      "device_id": {
+        "description": "Device ID to target. If omitted, targets the active device.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "state"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/toggle-shuffle.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "toggle"
+    }
+  }
+}

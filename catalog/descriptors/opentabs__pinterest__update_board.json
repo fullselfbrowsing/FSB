@@ -1,0 +1,55 @@
+{
+  "slug": "pinterest.update_board",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "update a board in pinterest",
+    "edit a board in pinterest",
+    "change the details of board in pinterest",
+    "modify a board in pinterest",
+    "update board in pinterest"
+  ],
+  "description": "Update a board name, description, or privacy setting. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "string",
+        "description": "Board ID to update"
+      },
+      "name": {
+        "description": "New board name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New board description",
+        "type": "string"
+      },
+      "privacy": {
+        "description": "New privacy setting",
+        "type": "string",
+        "enum": [
+          "public",
+          "secret"
+        ]
+      }
+    },
+    "required": [
+      "board_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/update-board.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

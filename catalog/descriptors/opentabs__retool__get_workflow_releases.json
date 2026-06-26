@@ -1,0 +1,39 @@
+{
+  "slug": "retool.get_workflow_releases",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get workflow releases in retool",
+    "look up workflow releases in retool",
+    "fetch a single workflow releases in retool",
+    "view one specific workflow releases in retool",
+    "get workflow release history in retool"
+  ],
+  "description": "Get the release/deployment history for a workflow. Returns an array of releases with version, deployer, and timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow ID"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-workflow-releases.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

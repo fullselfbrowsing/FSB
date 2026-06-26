@@ -1,0 +1,40 @@
+{
+  "slug": "mongodb.delete_ip_access_entry",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "delete an ip access entry in mongodb",
+    "remove an ip access entry in mongodb",
+    "trash an ip access entry in mongodb",
+    "permanently delete an ip access entry in mongodb",
+    "delete ip access entry in mongodb",
+    "remove an ip from the access list in mongodb"
+  ],
+  "description": "Remove an IP address or CIDR block from the access list for the current MongoDB Atlas project.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ip_address": {
+        "type": "string",
+        "description": "IP address or CIDR block to remove (e.g., \"192.168.1.0/24\")"
+      }
+    },
+    "required": [
+      "ip_address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/delete-ip-access-entry.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "bitbucket.create_branch",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "create a branch in bitbucket",
+    "add a branch in bitbucket",
+    "make a new branch in bitbucket",
+    "open a new branch in bitbucket",
+    "create branch in bitbucket",
+    "create a new branch in bitbucket"
+  ],
+  "description": "Create a new branch in a Bitbucket repository from a commit hash or existing branch name.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "name": {
+        "type": "string",
+        "description": "New branch name"
+      },
+      "target_hash": {
+        "type": "string",
+        "description": "Commit hash to branch from, or branch name"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "name",
+      "target_hash"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/create-branch.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

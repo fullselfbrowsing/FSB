@@ -1,0 +1,41 @@
+{
+  "slug": "ebay.get_seller_profile",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "get a seller profile in ebay",
+    "look up a seller profile in ebay",
+    "fetch a single seller profile in ebay",
+    "view one specific seller profile in ebay",
+    "get seller profile in ebay",
+    "get an ebay seller's public profile in ebay"
+  ],
+  "description": "Get a seller's public profile information by their eBay username. Returns positive feedback percentage, items sold, follower count, and store name if available.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "seller_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "eBay seller username"
+      }
+    },
+    "required": [
+      "seller_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/get-seller-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

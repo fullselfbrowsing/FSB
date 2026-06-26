@@ -1,0 +1,44 @@
+{
+  "slug": "notebooklm.delete_notebook",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "delete a notebook in notebooklm",
+    "remove a notebook in notebooklm",
+    "trash a notebook in notebooklm",
+    "permanently delete a notebook in notebooklm",
+    "delete notebook in notebooklm",
+    "delete notebooks in notebooklm"
+  ],
+  "description": "Delete one or more notebooks by their IDs. This permanently removes the notebook, all sources, notes, and chat history.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of notebook UUIDs to delete"
+      }
+    },
+    "required": [
+      "notebook_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/delete-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

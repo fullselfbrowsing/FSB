@@ -1,0 +1,49 @@
+{
+  "slug": "ytmusic.search",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "search in ytmusic",
+    "search youtube music for songs, albums, artists, playlists, or videos in ytmusic",
+    "search in the ytmusic app",
+    "use ytmusic to search"
+  ],
+  "description": "Search YouTube Music for songs, albums, artists, playlists, or videos",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "filter": {
+        "description": "Filter results by content type. Defaults to songs if omitted",
+        "type": "string",
+        "enum": [
+          "songs",
+          "albums",
+          "artists",
+          "playlists",
+          "videos"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

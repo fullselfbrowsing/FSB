@@ -1,0 +1,37 @@
+{
+  "slug": "pinterest.unfollow_user",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "unfollow an user in pinterest",
+    "unfollow user in pinterest",
+    "unfollow a pinterest user in pinterest"
+  ],
+  "description": "Unfollow a Pinterest user by their user ID.",
+  "actionVerb": "unfollow",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID to unfollow"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/unfollow-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "unfollow"
+    }
+  }
+}

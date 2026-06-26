@@ -1,0 +1,44 @@
+{
+  "slug": "chipotle.get_recent_orders",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get recent orders in chipotle",
+    "look up recent orders in chipotle",
+    "fetch a single recent orders in chipotle",
+    "view one specific recent orders in chipotle",
+    "get recent order history with meal details in chipotle"
+  ],
+  "description": "Get the authenticated user's recent Chipotle orders with meal details, reorder availability, and order dates. Optionally filter by restaurant ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "description": "Filter by restaurant ID",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "total_records": {
+        "description": "Maximum number of orders to return (default 5)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-recent-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

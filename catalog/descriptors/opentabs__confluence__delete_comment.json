@@ -1,0 +1,41 @@
+{
+  "slug": "confluence.delete_comment",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "delete a comment in confluence",
+    "remove a comment in confluence",
+    "trash a comment in confluence",
+    "permanently delete a comment in confluence",
+    "delete comment in confluence",
+    "delete a comment from a page in confluence"
+  ],
+  "description": "Delete a footer comment from a Confluence page. The comment is permanently removed.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment ID to delete"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/delete-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

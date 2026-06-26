@@ -1,0 +1,50 @@
+{
+  "slug": "netflix.rate_title",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "rate a title in netflix",
+    "rate title in netflix",
+    "rate a movie or show in netflix"
+  ],
+  "description": "Rate a Netflix movie or TV show using the thumbs rating system. Netflix uses three rating levels: thumbs up, thumbs way up (love it), and thumbs down. Pass \"THUMBS_UP\", \"THUMBS_WAY_UP\", \"THUMBS_DOWN\", or \"THUMBS_UNRATED\" to clear a rating.",
+  "actionVerb": "rate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID to rate"
+      },
+      "rating": {
+        "type": "string",
+        "enum": [
+          "THUMBS_UP",
+          "THUMBS_WAY_UP",
+          "THUMBS_DOWN",
+          "THUMBS_UNRATED"
+        ],
+        "description": "Rating: THUMBS_UP, THUMBS_WAY_UP, THUMBS_DOWN, or THUMBS_UNRATED to clear"
+      }
+    },
+    "required": [
+      "video_id",
+      "rating"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/rate-title.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "rate"
+    }
+  }
+}

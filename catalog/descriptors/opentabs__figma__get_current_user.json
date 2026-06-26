@@ -1,0 +1,32 @@
+{
+  "slug": "figma.get_current_user",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "get a current user in figma",
+    "look up a current user in figma",
+    "fetch a single current user in figma",
+    "view one specific current user in figma",
+    "get current user in figma",
+    "get the current user profile in figma"
+  ],
+  "description": "Get the profile of the currently authenticated Figma user",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

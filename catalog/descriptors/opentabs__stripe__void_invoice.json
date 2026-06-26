@@ -1,0 +1,37 @@
+{
+  "slug": "stripe.void_invoice",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "void an invoice in stripe",
+    "void invoice in stripe",
+    "void an open invoice in stripe"
+  ],
+  "description": "Void an open invoice. The invoice will be marked as void and no payment will be collected.",
+  "actionVerb": "void",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "invoice_id": {
+        "type": "string",
+        "description": "Invoice ID to void (e.g., in_xxx)"
+      }
+    },
+    "required": [
+      "invoice_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/void-invoice.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "void"
+    }
+  }
+}

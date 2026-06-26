@@ -1,0 +1,39 @@
+{
+  "slug": "netlify.list_members",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "list members in netlify",
+    "show me my members in netlify",
+    "view my members in netlify",
+    "see all my members in netlify",
+    "list account team members in netlify"
+  ],
+  "description": "List all members of a Netlify account (team). Returns each member with their name, email, role, pending status, and MFA status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_slug": {
+        "type": "string",
+        "description": "The account slug to list members for"
+      }
+    },
+    "required": [
+      "account_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/list-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

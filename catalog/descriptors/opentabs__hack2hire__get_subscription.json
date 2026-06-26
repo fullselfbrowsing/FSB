@@ -1,0 +1,32 @@
+{
+  "slug": "hack2hire.get_subscription",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get a subscription in hack2hire",
+    "look up a subscription in hack2hire",
+    "fetch a single subscription in hack2hire",
+    "view one specific subscription in hack2hire",
+    "get subscription in hack2hire",
+    "get the current subscription details in hack2hire"
+  ],
+  "description": "Get the authenticated user's subscription details — status (ACTIVE, CANCELED, EXPIRED, PENDING, TRIALING), payment method, plan duration code, current billing period start/end, and price.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-subscription.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

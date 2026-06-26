@@ -1,0 +1,39 @@
+{
+  "slug": "ytmusic.delete_playlist",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "delete a playlist in ytmusic",
+    "remove a playlist in ytmusic",
+    "trash a playlist in ytmusic",
+    "permanently delete a playlist in ytmusic",
+    "delete playlist in ytmusic"
+  ],
+  "description": "Delete a playlist from YouTube Music",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "ID of the playlist to delete"
+      }
+    },
+    "required": [
+      "playlist_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/delete-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

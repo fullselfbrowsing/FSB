@@ -1,0 +1,39 @@
+{
+  "slug": "minimax.delete_expert",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "delete an expert in minimax",
+    "remove an expert in minimax",
+    "trash an expert in minimax",
+    "permanently delete an expert in minimax",
+    "delete expert in minimax"
+  ],
+  "description": "Permanently delete an AI expert/agent by ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "number",
+        "description": "Expert ID to delete"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/delete-expert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

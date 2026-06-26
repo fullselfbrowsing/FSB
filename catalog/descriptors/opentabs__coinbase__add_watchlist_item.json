@@ -1,0 +1,42 @@
+{
+  "slug": "coinbase.add_watchlist_item",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "add a watchlist item in coinbase",
+    "add watchlist item in coinbase",
+    "add an asset to a watchlist in coinbase"
+  ],
+  "description": "Add an asset to a watchlist by providing the watchlist UUID and the asset UUID. Use list_watchlists to find watchlist UUIDs and get_asset_by_symbol/slug to find asset UUIDs.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "watchlist_uuid": {
+        "type": "string",
+        "description": "Watchlist UUID (from list_watchlists)"
+      },
+      "asset_uuid": {
+        "type": "string",
+        "description": "Asset UUID to add"
+      }
+    },
+    "required": [
+      "watchlist_uuid",
+      "asset_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/add-watchlist-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

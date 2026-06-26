@@ -1,0 +1,31 @@
+{
+  "slug": "robinhood.list_crypto_holdings",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "list crypto holdings in robinhood",
+    "show me my crypto holdings in robinhood",
+    "view my crypto holdings in robinhood",
+    "see all my crypto holdings in robinhood",
+    "list current crypto holdings in robinhood"
+  ],
+  "description": "List all cryptocurrency holdings with nonzero quantity including currency code, total quantity, cost basis, and available quantity for trading.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/list-crypto-holdings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

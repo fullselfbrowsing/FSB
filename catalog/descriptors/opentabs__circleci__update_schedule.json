@@ -1,0 +1,132 @@
+{
+  "slug": "circleci.update_schedule",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "update a schedule in circleci",
+    "edit a schedule in circleci",
+    "change the details of schedule in circleci",
+    "modify a schedule in circleci",
+    "update schedule in circleci",
+    "update a scheduled trigger in circleci"
+  ],
+  "description": "Update a scheduled pipeline trigger. Only provided fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "schedule_id": {
+        "type": "string",
+        "description": "Schedule UUID"
+      },
+      "name": {
+        "description": "Schedule name",
+        "type": "string"
+      },
+      "description": {
+        "description": "Schedule description",
+        "type": "string"
+      },
+      "attribution_actor": {
+        "description": "Who the pipeline runs as (\"current\" for your user, \"system\" for system)",
+        "type": "string",
+        "enum": [
+          "current",
+          "system"
+        ]
+      },
+      "timetable": {
+        "description": "Schedule timetable",
+        "type": "object",
+        "properties": {
+          "per_hour": {
+            "description": "Triggers per hour (1-60)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "hours_of_day": {
+            "description": "Hours of day to run (0-23)",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            }
+          },
+          "days_of_week": {
+            "description": "Days of week",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MON",
+                "TUE",
+                "WED",
+                "THU",
+                "FRI",
+                "SAT",
+                "SUN"
+              ]
+            }
+          },
+          "days_of_month": {
+            "description": "Days of month (1-31)",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31
+            }
+          },
+          "months": {
+            "description": "Months of year",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "JAN",
+                "FEB",
+                "MAR",
+                "APR",
+                "MAY",
+                "JUN",
+                "JUL",
+                "AUG",
+                "SEP",
+                "OCT",
+                "NOV",
+                "DEC"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "parameters": {
+        "description": "Pipeline parameters",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "schedule_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/update-schedule.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "pandaexpress.get_product_modifiers",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get product modifiers in pandaexpress",
+    "look up product modifiers in pandaexpress",
+    "fetch a single product modifiers in pandaexpress",
+    "view one specific product modifiers in pandaexpress",
+    "get customization options for a menu item in pandaexpress"
+  ],
+  "description": "Get available modifier options for a menu product. Most products (bowls, plates, combos) require modifier selections (side, entree, drink choices). Use the returned option IDs when calling add_product_to_basket.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Product ID from get_restaurant_menu"
+      }
+    },
+    "required": [
+      "product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-product-modifiers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "gcloud.list_disks",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list disks in gcloud",
+    "show me my disks in gcloud",
+    "view my disks in gcloud",
+    "see all my disks in gcloud",
+    "list persistent disks in gcloud"
+  ],
+  "description": "List Compute Engine persistent disks. If no zone is specified, lists across all zones.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "zone": {
+        "description": "Zone (e.g., \"us-central1-a\"). If omitted, lists across all zones.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Max results (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-disks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "tumblr.add_filtered_tag",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "add a filtered tag in tumblr",
+    "add filtered tag in tumblr",
+    "filter a tag from your dashboard in tumblr"
+  ],
+  "description": "Add a tag to the filter list. Posts with this tag will be hidden from your dashboard.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tag": {
+        "type": "string",
+        "description": "Tag to filter (without # prefix)"
+      }
+    },
+    "required": [
+      "tag"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/add-filtered-tag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

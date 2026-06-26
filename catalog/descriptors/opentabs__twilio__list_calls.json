@@ -1,0 +1,59 @@
+{
+  "slug": "twilio.list_calls",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list calls in twilio",
+    "show me my calls in twilio",
+    "view my calls in twilio",
+    "see all my calls in twilio"
+  ],
+  "description": "List voice calls. Supports filtering by recipient, sender, and call status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of calls to return per page (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "to": {
+        "description": "Filter by called phone number (E.164 format)",
+        "type": "string"
+      },
+      "from": {
+        "description": "Filter by caller phone number (E.164 format)",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by call status",
+        "type": "string",
+        "enum": [
+          "queued",
+          "ringing",
+          "in-progress",
+          "completed",
+          "busy",
+          "no-answer",
+          "canceled",
+          "failed"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-calls.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

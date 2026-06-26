@@ -1,0 +1,45 @@
+{
+  "slug": "retool.create_resource_folder",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "create a resource folder in retool",
+    "add a resource folder in retool",
+    "make a new resource folder in retool",
+    "open a new resource folder in retool",
+    "create resource folder in retool",
+    "create a new resource folder in retool"
+  ],
+  "description": "Create a new folder for organizing resources (data sources). Requires a parent resource folder ID.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new resource folder"
+      },
+      "parent_resource_folder_id": {
+        "type": "number",
+        "description": "Parent resource folder ID"
+      }
+    },
+    "required": [
+      "name",
+      "parent_resource_folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/create-resource-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

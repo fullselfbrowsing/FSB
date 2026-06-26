@@ -1,0 +1,44 @@
+{
+  "slug": "linear.update_comment",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "update a comment in linear",
+    "edit a comment in linear",
+    "change the details of comment in linear",
+    "modify a comment in linear",
+    "update comment in linear"
+  ],
+  "description": "Update an existing comment on a Linear issue.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "description": "Comment UUID to update"
+      },
+      "body": {
+        "type": "string",
+        "description": "New comment body in markdown"
+      }
+    },
+    "required": [
+      "comment_id",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/update-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

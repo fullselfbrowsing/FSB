@@ -1,0 +1,31 @@
+{
+  "slug": "starbucks.get_payment_methods",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get payment methods in starbucks",
+    "look up payment methods in starbucks",
+    "fetch a single payment methods in starbucks",
+    "view one specific payment methods in starbucks",
+    "list all payment methods in wallet in starbucks"
+  ],
+  "description": "Get all payment methods in the user's Starbucks wallet including credit/debit cards, Apple Pay, Google Pay, and PayPal.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-payment-methods.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "robinhood.create_watchlist",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "create a watchlist in robinhood",
+    "add a watchlist in robinhood",
+    "make a new watchlist in robinhood",
+    "open a new watchlist in robinhood",
+    "create watchlist in robinhood",
+    "create a new custom watchlist in robinhood"
+  ],
+  "description": "Create a new custom watchlist with the specified display name.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Display name for the new list"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/create-watchlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

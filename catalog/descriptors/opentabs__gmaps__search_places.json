@@ -1,0 +1,57 @@
+{
+  "slug": "gmaps.search_places",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "search places in gmaps",
+    "search for places near a location in gmaps",
+    "search for places on google maps by text query near a location in gmaps"
+  ],
+  "description": "Search for places on Google Maps by text query near a location. Returns place names and IDs. Use get_current_view first to get coordinates for the search area, or provide explicit coordinates.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (e.g., \"coffee shops\", \"restaurants Italian\", \"gas station\")"
+      },
+      "lat": {
+        "description": "Latitude for search center. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "lng": {
+        "description": "Longitude for search center. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "radius": {
+        "description": "Search radius in meters (default 5000)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "max_results": {
+        "description": "Maximum number of results to return (default 10, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/search-places.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

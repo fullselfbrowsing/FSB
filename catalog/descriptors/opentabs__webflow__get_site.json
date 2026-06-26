@@ -1,0 +1,40 @@
+{
+  "slug": "webflow.get_site",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "get a site in webflow",
+    "look up a site in webflow",
+    "fetch a single site in webflow",
+    "view one specific site in webflow",
+    "get site in webflow",
+    "get site details in webflow"
+  ],
+  "description": "Get detailed information about a specific Webflow site by its short name. Returns site metadata, publish status, timezone, SSL, and asset information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_short_name": {
+        "type": "string",
+        "description": "Site short name / URL slug (e.g., \"my-site-abc123\")"
+      }
+    },
+    "required": [
+      "site_short_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/get-site.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "instagram.get_stories_tray",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get a stories tray in instagram",
+    "look up a stories tray in instagram",
+    "fetch a single stories tray in instagram",
+    "view one specific stories tray in instagram",
+    "get stories tray in instagram",
+    "get stories from followed users in instagram"
+  ],
+  "description": "Get the stories tray showing which followed users currently have active stories. Use get_user_stories with a user ID to view the actual story items.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-stories-tray.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

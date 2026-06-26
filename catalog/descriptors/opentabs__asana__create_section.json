@@ -1,0 +1,47 @@
+{
+  "slug": "asana.create_section",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "create a section in asana",
+    "add a section in asana",
+    "make a new section in asana",
+    "open a new section in asana",
+    "create section in asana",
+    "create a new section in a project in asana"
+  ],
+  "description": "Create a new section in a project. Sections organize tasks into groups.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project GID to create the section in"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Section name"
+      }
+    },
+    "required": [
+      "project_gid",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/create-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

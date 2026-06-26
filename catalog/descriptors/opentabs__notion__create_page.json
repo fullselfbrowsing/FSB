@@ -1,0 +1,53 @@
+{
+  "slug": "notion.create_page",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "create a page in notion",
+    "add a page in notion",
+    "make a new page in notion",
+    "open a new page in notion",
+    "create page in notion",
+    "create a new page in notion"
+  ],
+  "description": "Create a new page in the Notion workspace. The page is created at the top level of the workspace by default, or as a child of an existing page.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page title"
+      },
+      "parent_page_id": {
+        "description": "Parent page ID to create as a child page. If omitted, creates at the workspace top level.",
+        "type": "string"
+      },
+      "icon": {
+        "description": "Page icon (emoji character, e.g., \"📝\")",
+        "type": "string"
+      },
+      "content": {
+        "description": "Initial text content to add to the page body",
+        "type": "string"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/create-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

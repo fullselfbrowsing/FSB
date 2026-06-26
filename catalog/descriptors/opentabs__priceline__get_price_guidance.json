@@ -1,0 +1,63 @@
+{
+  "slug": "priceline.get_price_guidance",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get a price guidance in priceline",
+    "look up a price guidance in priceline",
+    "fetch a single price guidance in priceline",
+    "view one specific price guidance in priceline",
+    "get price guidance in priceline",
+    "get hotel price trends for a city in priceline"
+  ],
+  "description": "Get hotel price trends for a city over a date range. Shows min, max, and average prices by star rating and product type for each date. Useful for finding the cheapest travel dates. Date format is YYYYMMDD.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "city_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Priceline city ID (numeric, from search_locations)"
+      },
+      "start_date": {
+        "type": "string",
+        "description": "Start of date range in YYYYMMDD format"
+      },
+      "end_date": {
+        "type": "string",
+        "description": "End of date range in YYYYMMDD format"
+      },
+      "star_rating": {
+        "description": "Filter by star rating (default returns all star ratings)",
+        "type": "string",
+        "enum": [
+          "All_Star",
+          "Star_2",
+          "Star_3",
+          "Star_4",
+          "Star_5"
+        ]
+      }
+    },
+    "required": [
+      "city_id",
+      "start_date",
+      "end_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-price-guidance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "tinder.unmatch",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "unmatch in tinder",
+    "remove a match in tinder",
+    "unmatch a person, removing them from your matches list in tinder"
+  ],
+  "description": "Unmatch a person, removing them from your matches list. This action cannot be undone.",
+  "actionVerb": "unmatch",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "match_id": {
+        "type": "string",
+        "description": "Match ID to unmatch"
+      }
+    },
+    "required": [
+      "match_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/unmatch.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "unmatch"
+    }
+  }
+}

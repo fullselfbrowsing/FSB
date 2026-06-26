@@ -1,0 +1,39 @@
+{
+  "slug": "bestbuy.get_purchase_details",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get purchase details in bestbuy",
+    "look up purchase details in bestbuy",
+    "fetch a single purchase details in bestbuy",
+    "view one specific purchase details in bestbuy",
+    "get in-store purchase receipt in bestbuy"
+  ],
+  "description": "Get detailed receipt information for an in-store purchase by its purchase key. The purchase key is in the format \"STORENUM RECEIPTNUMBER DATE\" (e.g., \"1423 005 6042 020124\"). Returns the full receipt text including itemized purchases, taxes, totals, and store information. Use list_purchases to find purchase keys for in-store orders.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "purchase_key": {
+        "type": "string",
+        "description": "In-store purchase key (e.g., \"1423 005 6042 020124\"). Found as the order ID for \"STORE PURCHASE\" type orders from list_purchases."
+      }
+    },
+    "required": [
+      "purchase_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-purchase-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

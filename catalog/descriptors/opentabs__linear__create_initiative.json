@@ -1,0 +1,61 @@
+{
+  "slug": "linear.create_initiative",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create an initiative in linear",
+    "add an initiative in linear",
+    "make a new initiative in linear",
+    "open a new initiative in linear",
+    "create initiative in linear",
+    "create a new initiative in linear"
+  ],
+  "description": "Create a new initiative in Linear.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Initiative name"
+      },
+      "description": {
+        "description": "Initiative description in markdown",
+        "type": "string"
+      },
+      "status": {
+        "description": "Initiative status",
+        "type": "string",
+        "enum": [
+          "Planned",
+          "Active",
+          "Completed"
+        ]
+      },
+      "color": {
+        "description": "Color hex code (e.g. #FF0000)",
+        "type": "string"
+      },
+      "owner_id": {
+        "description": "Owner user UUID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-initiative.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

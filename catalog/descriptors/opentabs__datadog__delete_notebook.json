@@ -1,0 +1,42 @@
+{
+  "slug": "datadog.delete_notebook",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "delete a notebook in datadog",
+    "remove a notebook in datadog",
+    "trash a notebook in datadog",
+    "permanently delete a notebook in datadog",
+    "delete notebook in datadog",
+    "delete a notebook by id in datadog"
+  ],
+  "description": "Permanently delete a Datadog notebook. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Notebook ID to delete"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/delete-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apidelete",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "chipotle.get_reward_categories",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get reward categories in chipotle",
+    "look up reward categories in chipotle",
+    "fetch a single reward categories in chipotle",
+    "view one specific reward categories in chipotle",
+    "get reward store offer categories in chipotle"
+  ],
+  "description": "Get reward category types from the Chipotle Rewards store. Each category groups related reward offers with a title, description, and image.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-reward-categories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

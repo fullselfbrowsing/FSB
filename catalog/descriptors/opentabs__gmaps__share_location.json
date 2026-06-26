@@ -1,0 +1,44 @@
+{
+  "slug": "gmaps.share_location",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "share a location in gmaps",
+    "share location in gmaps",
+    "get a shareable maps link in gmaps"
+  ],
+  "description": "Get a shareable Google Maps URL for the current map view or a specific location. The URL can be shared with others to show the same location on Google Maps.",
+  "actionVerb": "share",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "lat": {
+        "description": "Latitude. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "lng": {
+        "description": "Longitude. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "zoom": {
+        "description": "Zoom level (1-21). Uses current zoom if omitted.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 21
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/share-location.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "share"
+    }
+  }
+}

@@ -7,22 +7,21 @@
     "fetch a single conversation in claude",
     "view one specific conversation in claude",
     "get conversation in claude",
-    "open a claude conversation in claude"
+    "get a conversation with messages in claude"
   ],
-  "description": "Get the full message history of a single Claude conversation by its ID.",
+  "description": "Get a conversation by UUID including its full message history. Returns conversation metadata and all messages with their text content, sender, and ordering.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "conversation_id": {
+      "conversation_uuid": {
         "type": "string",
-        "minLength": 1,
-        "description": "Conversation ID to retrieve"
+        "description": "UUID of the conversation to retrieve"
       }
     },
     "required": [
-      "conversation_id"
+      "conversation_uuid"
     ],
     "additionalProperties": false
   },
@@ -33,8 +32,8 @@
     "sourcePath": "plugins/claude/src/tools/get-conversation.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

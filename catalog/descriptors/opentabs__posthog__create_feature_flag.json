@@ -1,0 +1,58 @@
+{
+  "slug": "posthog.create_feature_flag",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "create a feature flag in posthog",
+    "add a feature flag in posthog",
+    "make a new feature flag in posthog",
+    "open a new feature flag in posthog",
+    "create feature flag in posthog",
+    "create a new feature flag in posthog"
+  ],
+  "description": "Create a new boolean feature flag. The key must be unique within the project and is used in code to check the flag.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string",
+        "description": "Unique flag key (used in code)"
+      },
+      "name": {
+        "description": "Human-readable name",
+        "type": "string"
+      },
+      "active": {
+        "description": "Whether to activate immediately (default false)",
+        "type": "boolean"
+      },
+      "rollout_percentage": {
+        "description": "Percentage of users to roll out to (0-100)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "ensure_experience_continuity": {
+        "description": "Persist flag value per user",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/create-feature-flag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

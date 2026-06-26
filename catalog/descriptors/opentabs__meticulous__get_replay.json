@@ -1,0 +1,40 @@
+{
+  "slug": "meticulous.get_replay",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get a replay in meticulous",
+    "look up a replay in meticulous",
+    "fetch a single replay in meticulous",
+    "view one specific replay in meticulous",
+    "get replay in meticulous",
+    "get replay details in meticulous"
+  ],
+  "description": "Get detailed information about a specific replay including its status, accuracy, and associated session.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "replay_id": {
+        "type": "string",
+        "description": "Replay ID"
+      }
+    },
+    "required": [
+      "replay_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-replay.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

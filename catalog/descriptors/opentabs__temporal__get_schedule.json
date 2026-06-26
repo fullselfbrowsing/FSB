@@ -1,0 +1,44 @@
+{
+  "slug": "temporal.get_schedule",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "get a schedule in temporal",
+    "look up a schedule in temporal",
+    "fetch a single schedule in temporal",
+    "view one specific schedule in temporal",
+    "get schedule in temporal",
+    "get schedule details and recent actions in temporal"
+  ],
+  "description": "Get detailed information about a specific schedule including its spec (interval/cron), action configuration, policies, pause state, and recent execution history.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      },
+      "schedule_id": {
+        "type": "string",
+        "description": "Schedule ID"
+      }
+    },
+    "required": [
+      "schedule_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/get-schedule.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

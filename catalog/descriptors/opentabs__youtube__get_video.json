@@ -1,0 +1,40 @@
+{
+  "slug": "youtube.get_video",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get a video in youtube",
+    "look up a video in youtube",
+    "fetch a single video in youtube",
+    "view one specific video in youtube",
+    "get video in youtube",
+    "get video details by id in youtube"
+  ],
+  "description": "Get detailed information about a YouTube video including title, description, view count, duration, channel info, keywords, and publish date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID (e.g., \"dQw4w9WgXcQ\")"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-video.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

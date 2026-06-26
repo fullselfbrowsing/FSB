@@ -1,0 +1,67 @@
+{
+  "slug": "bitbucket.merge_pull_request",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "merge a pull request in bitbucket",
+    "merge pull request in bitbucket",
+    "merge pull request in the bitbucket app",
+    "use bitbucket to merge a pull request"
+  ],
+  "description": "Merge a pull request. Supports merge commit, squash, and fast-forward strategies.",
+  "actionVerb": "merge",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "pull_request_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Pull request ID"
+      },
+      "merge_strategy": {
+        "description": "Merge strategy (default merge_commit)",
+        "type": "string",
+        "enum": [
+          "merge_commit",
+          "squash",
+          "fast_forward"
+        ]
+      },
+      "close_source_branch": {
+        "description": "Whether to delete the source branch after merge",
+        "type": "boolean"
+      },
+      "message": {
+        "description": "Merge commit message",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "pull_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/merge-pull-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "merge"
+    }
+  }
+}

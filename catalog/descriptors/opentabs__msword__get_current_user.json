@@ -1,0 +1,32 @@
+{
+  "slug": "msword.get_current_user",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "get a current user in msword",
+    "look up a current user in msword",
+    "fetch a single current user in msword",
+    "view one specific current user in msword",
+    "get current user in msword",
+    "get the current user profile in msword"
+  ],
+  "description": "Get the profile of the currently authenticated Microsoft 365 user including name and email.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

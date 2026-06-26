@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.get_recording",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get a recording in twilio",
+    "look up a recording in twilio",
+    "fetch a single recording in twilio",
+    "view one specific recording in twilio",
+    "get recording in twilio"
+  ],
+  "description": "Get a specific call recording by its SID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Recording SID (e.g., RExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-recording.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

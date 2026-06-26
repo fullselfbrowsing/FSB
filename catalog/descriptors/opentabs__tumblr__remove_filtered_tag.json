@@ -1,0 +1,37 @@
+{
+  "slug": "tumblr.remove_filtered_tag",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "remove a filtered tag in tumblr",
+    "remove filtered tag in tumblr",
+    "unfilter a tag in tumblr"
+  ],
+  "description": "Remove a tag from the filter list. Posts with this tag will appear on your dashboard again.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tag": {
+        "type": "string",
+        "description": "Tag to remove from filter list"
+      }
+    },
+    "required": [
+      "tag"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/remove-filtered-tag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "remove"
+    }
+  }
+}

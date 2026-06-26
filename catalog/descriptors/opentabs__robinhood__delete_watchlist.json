@@ -1,0 +1,40 @@
+{
+  "slug": "robinhood.delete_watchlist",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "delete a watchlist in robinhood",
+    "remove a watchlist in robinhood",
+    "trash a watchlist in robinhood",
+    "permanently delete a watchlist in robinhood",
+    "delete watchlist in robinhood",
+    "delete a custom watchlist in robinhood"
+  ],
+  "description": "Permanently delete a custom watchlist by its ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "description": "Watchlist UUID to delete (from list_watchlists)"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/delete-watchlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

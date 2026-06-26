@@ -1,0 +1,39 @@
+{
+  "slug": "linear.list_issue_relations",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list issue relations in linear",
+    "show me my issue relations in linear",
+    "view my issue relations in linear",
+    "see all my issue relations in linear",
+    "list issue dependencies and relations in linear"
+  ],
+  "description": "List relations (blocks, is blocked by, relates to, duplicate of) for a Linear issue.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID or human-readable identifier (e.g. \"ENG-123\")"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-issue-relations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

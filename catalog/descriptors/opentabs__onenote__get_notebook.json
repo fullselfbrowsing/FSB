@@ -1,0 +1,41 @@
+{
+  "slug": "onenote.get_notebook",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "get a notebook in onenote",
+    "look up a notebook in onenote",
+    "fetch a single notebook in onenote",
+    "view one specific notebook in onenote",
+    "get notebook in onenote",
+    "get a notebook by id in onenote"
+  ],
+  "description": "Get detailed information about a specific OneNote notebook by its ID. Returns notebook metadata including name, creation date, sharing status, and web URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Notebook ID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/get-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

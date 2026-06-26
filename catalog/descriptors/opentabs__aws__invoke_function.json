@@ -1,0 +1,51 @@
+{
+  "slug": "aws.invoke_function",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "invoke a function in aws",
+    "invoke function in aws",
+    "invoke a lambda function with a json payload in aws"
+  ],
+  "description": "Invoke a Lambda function synchronously with a JSON payload. Returns the function response payload. For async (fire-and-forget), set invocation_type to \"Event\".",
+  "actionVerb": "invoke",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "function_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Function name or ARN"
+      },
+      "payload": {
+        "description": "JSON payload to pass to the function (default: empty object)",
+        "type": "string"
+      },
+      "invocation_type": {
+        "description": "RequestResponse (sync, default), Event (async), or DryRun (validate only)",
+        "type": "string",
+        "enum": [
+          "RequestResponse",
+          "Event",
+          "DryRun"
+        ]
+      }
+    },
+    "required": [
+      "function_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/invoke-function.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "invoke"
+    }
+  }
+}

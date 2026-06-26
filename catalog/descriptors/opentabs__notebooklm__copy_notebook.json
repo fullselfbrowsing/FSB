@@ -1,0 +1,37 @@
+{
+  "slug": "notebooklm.copy_notebook",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "copy a notebook in notebooklm",
+    "copy notebook in notebooklm",
+    "create a copy of an existing notebook, including all sources, notes, and artifacts in notebooklm"
+  ],
+  "description": "Create a copy of an existing notebook, including all sources, notes, and artifacts.",
+  "actionVerb": "copy",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID to copy"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/copy-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "copy"
+    }
+  }
+}

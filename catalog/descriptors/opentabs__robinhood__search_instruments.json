@@ -1,0 +1,37 @@
+{
+  "slug": "robinhood.search_instruments",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "search instruments in robinhood",
+    "search instruments by name or ticker in robinhood",
+    "search for stocks and other instruments by company name or ticker symbol in robinhood"
+  ],
+  "description": "Search for stocks and other instruments by company name or ticker symbol. Returns matching instruments with UUID, symbol, name, type, and tradeability.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (company name or ticker symbol)"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/search-instruments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

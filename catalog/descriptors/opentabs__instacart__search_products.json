@@ -1,36 +1,29 @@
 {
   "slug": "instacart.search_products",
-  "service": "www.instacart.com",
+  "service": "instacart.com",
   "intentSynonyms": [
     "search products in instacart",
-    "search for groceries on instacart in instacart",
-    "search the products available in a single instacart store by a query term in instacart"
+    "search for grocery products in instacart",
+    "search for products across all available retailers near the delivery address in instacart"
   ],
-  "description": "Search the products available in a single Instacart store by a query term.",
+  "description": "Search for products across all available retailers near the delivery address. Returns suggested items with thumbnails. Use get_location_context first if you need the zone ID. The search uses the user's current delivery location automatically.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "store_id": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The store to search within"
-      },
       "query": {
         "type": "string",
-        "minLength": 1,
-        "description": "The product search term"
+        "description": "Search query (e.g. \"milk\", \"organic eggs\", \"chicken breast\")"
       },
       "limit": {
-        "description": "Maximum number of products to return",
+        "description": "Max results (default 10)",
         "type": "integer",
         "minimum": 1,
-        "maximum": 50
+        "maximum": 20
       }
     },
     "required": [
-      "store_id",
       "query"
     ],
     "additionalProperties": false
@@ -42,8 +35,8 @@
     "sourcePath": "plugins/instacart/src/tools/search-products.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

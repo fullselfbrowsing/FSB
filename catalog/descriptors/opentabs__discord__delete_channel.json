@@ -1,0 +1,41 @@
+{
+  "slug": "discord.delete_channel",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "delete a channel in discord",
+    "remove a channel in discord",
+    "trash a channel in discord",
+    "permanently delete a channel in discord",
+    "delete channel in discord",
+    "delete a channel permanently in discord"
+  ],
+  "description": "Delete a Discord channel. This action is permanent and cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to delete"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/delete-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

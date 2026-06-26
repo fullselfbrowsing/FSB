@@ -1,0 +1,47 @@
+{
+  "slug": "jira.link_issues",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "link issues in jira",
+    "link two issues together in jira",
+    "create a link between two jira issues in jira"
+  ],
+  "description": "Create a link between two Jira issues. Common link types: \"Blocks\", \"is blocked by\", \"relates to\", \"duplicates\".",
+  "actionVerb": "link",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "Link type name (e.g. \"Blocks\", \"is blocked by\", \"relates to\", \"duplicates\")"
+      },
+      "inward_issue": {
+        "type": "string",
+        "description": "Inward issue key (e.g. \"KAN-1\")"
+      },
+      "outward_issue": {
+        "type": "string",
+        "description": "Outward issue key (e.g. \"KAN-2\")"
+      }
+    },
+    "required": [
+      "type",
+      "inward_issue",
+      "outward_issue"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/link-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "link"
+    }
+  }
+}

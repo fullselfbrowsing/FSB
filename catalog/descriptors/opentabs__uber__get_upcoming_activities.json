@@ -1,0 +1,31 @@
+{
+  "slug": "uber.get_upcoming_activities",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "get upcoming activities in uber",
+    "look up upcoming activities in uber",
+    "fetch a single upcoming activities in uber",
+    "view one specific upcoming activities in uber",
+    "get upcoming trips or reservations in uber"
+  ],
+  "description": "Get the user's upcoming Uber trip or reservation. Returns the active or scheduled trip details, or null if no upcoming trip exists.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/get-upcoming-activities.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

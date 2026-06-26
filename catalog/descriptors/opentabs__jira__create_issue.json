@@ -7,9 +7,9 @@
     "make a new issue in jira",
     "open a new issue in jira",
     "create issue in jira",
-    "create a new issue in jira"
+    "create a new jira issue in jira"
   ],
-  "description": "Create a new issue in a Jira project. Requires a project key, a summary, and an issue type at minimum. Optionally set description, assignee, priority, and labels.",
+  "description": "Create a new Jira issue in a project. Requires a project key, summary, and issue type.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -17,29 +17,26 @@
     "properties": {
       "project_key": {
         "type": "string",
-        "minLength": 1,
-        "description": "Project key to create the issue in (e.g. ENG)"
+        "description": "Project key to create the issue in (e.g. \"KAN\")"
       },
       "summary": {
         "type": "string",
-        "minLength": 1,
         "description": "Issue summary/title"
       },
       "issue_type": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Issue type name (e.g. Task, Bug, Story)"
-      },
-      "description": {
-        "description": "Issue description in markdown",
+        "description": "Issue type name (e.g. \"Task\", \"Story\", \"Bug\", \"Epic\"). Defaults to \"Task\"",
         "type": "string"
       },
-      "assignee_account_id": {
-        "description": "Account ID of the user to assign",
+      "description": {
+        "description": "Issue description in plain text",
         "type": "string"
       },
       "priority": {
-        "description": "Priority name (e.g. High, Medium, Low)",
+        "description": "Priority name (e.g. \"Highest\", \"High\", \"Medium\", \"Low\", \"Lowest\")",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "Assignee account ID (use search_users to find IDs)",
         "type": "string"
       },
       "labels": {
@@ -48,12 +45,15 @@
         "items": {
           "type": "string"
         }
+      },
+      "parent_key": {
+        "description": "Parent issue key for creating a subtask or child issue (e.g. \"KAN-1\")",
+        "type": "string"
       }
     },
     "required": [
       "project_key",
-      "summary",
-      "issue_type"
+      "summary"
     ],
     "additionalProperties": false
   },

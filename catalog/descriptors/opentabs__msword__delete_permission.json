@@ -1,0 +1,45 @@
+{
+  "slug": "msword.delete_permission",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a permission in msword",
+    "remove a permission in msword",
+    "trash a permission in msword",
+    "permanently delete a permission in msword",
+    "delete permission in msword",
+    "remove a sharing permission in msword"
+  ],
+  "description": "Remove a sharing permission from a file or folder.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      },
+      "permission_id": {
+        "type": "string",
+        "description": "Permission ID to remove"
+      }
+    },
+    "required": [
+      "item_id",
+      "permission_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/delete-permission.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

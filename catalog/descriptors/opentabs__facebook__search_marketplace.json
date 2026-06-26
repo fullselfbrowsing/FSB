@@ -1,0 +1,37 @@
+{
+  "slug": "facebook.search_marketplace",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "search a marketplace in facebook",
+    "search marketplace in facebook",
+    "search marketplace listings in facebook"
+  ],
+  "description": "Search Facebook Marketplace for items. Fetches the marketplace search page and extracts listing data from the server-rendered response. Returns listings with title, price, seller, location, and image.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search keywords (e.g., 'laptop', 'couch')"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/search-marketplace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

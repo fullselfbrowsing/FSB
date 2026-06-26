@@ -1,0 +1,44 @@
+{
+  "slug": "gcal.get_event",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "get an event in gcal",
+    "look up an event in gcal",
+    "fetch a single event in gcal",
+    "view one specific event in gcal",
+    "get event in gcal",
+    "get a specific event by id in gcal"
+  ],
+  "description": "Get detailed information about a specific event by its ID. Returns the full event resource including attendees, reminders, and conference data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "description": "Calendar ID (default \"primary\")",
+        "type": "string"
+      },
+      "event_id": {
+        "type": "string",
+        "description": "Event ID to retrieve"
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/get-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

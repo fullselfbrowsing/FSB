@@ -1,28 +1,31 @@
 {
   "slug": "costco.get_product",
-  "service": "www.costco.com",
+  "service": "costco.com",
   "intentSynonyms": [
     "get a product in costco",
     "look up a product in costco",
     "fetch a single product in costco",
     "view one specific product in costco",
     "get product in costco",
-    "look up a single costco product in costco"
+    "get product details by item number in costco"
   ],
-  "description": "Get the full detail (title, price, availability, and description) of a single Costco product by its item number.",
+  "description": "Get detailed information about a Costco product by its item number. Returns pricing, description, rating, availability, and more.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "product_id": {
+      "item_number": {
         "type": "string",
-        "minLength": 1,
-        "description": "The Costco item number / product ID to fetch"
+        "description": "Costco item number (e.g., \"4000369340\")"
+      },
+      "warehouse_number": {
+        "description": "Warehouse number for pricing (defaults to nearest warehouse)",
+        "type": "string"
       }
     },
     "required": [
-      "product_id"
+      "item_number"
     ],
     "additionalProperties": false
   },
@@ -33,8 +36,8 @@
     "sourcePath": "plugins/costco/src/tools/get-product.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

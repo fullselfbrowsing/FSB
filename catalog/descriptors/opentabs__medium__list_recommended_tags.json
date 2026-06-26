@@ -1,0 +1,38 @@
+{
+  "slug": "medium.list_recommended_tags",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "list recommended tags in medium",
+    "show me my recommended tags in medium",
+    "view my recommended tags in medium",
+    "see all my recommended tags in medium",
+    "get recommended tags in medium"
+  ],
+  "description": "Get personalized recommended tags/topics. Returns popular and trending tags tailored to the user.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum tags to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/list-recommended-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

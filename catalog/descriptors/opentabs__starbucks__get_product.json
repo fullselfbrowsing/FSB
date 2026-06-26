@@ -1,0 +1,52 @@
+{
+  "slug": "starbucks.get_product",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get a product in starbucks",
+    "look up a product in starbucks",
+    "fetch a single product in starbucks",
+    "view one specific product in starbucks",
+    "get product in starbucks",
+    "get product details by number and form in starbucks"
+  ],
+  "description": "Get details for a specific menu product at a store, including name, description, image, Star cost, and product type. Requires product number and form (e.g., \"iced\" or \"hot\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_number": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Product number (from get_store_menu results)"
+      },
+      "form": {
+        "type": "string",
+        "description": "Product form (e.g., \"iced\", \"hot\")"
+      },
+      "store_number": {
+        "type": "string",
+        "description": "Store number for availability and pricing"
+      }
+    },
+    "required": [
+      "product_number",
+      "form",
+      "store_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

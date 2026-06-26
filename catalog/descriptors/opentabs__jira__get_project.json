@@ -1,0 +1,40 @@
+{
+  "slug": "jira.get_project",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get a project in jira",
+    "look up a project in jira",
+    "fetch a single project in jira",
+    "view one specific project in jira",
+    "get project in jira",
+    "get details of a project in jira"
+  ],
+  "description": "Get detailed information about a Jira project by its key or ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_key": {
+        "type": "string",
+        "description": "Project key (e.g. \"KAN\") or project ID"
+      }
+    },
+    "required": [
+      "project_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

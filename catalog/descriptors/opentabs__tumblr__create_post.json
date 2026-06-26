@@ -1,0 +1,58 @@
+{
+  "slug": "tumblr.create_post",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "create a post in tumblr",
+    "add a post in tumblr",
+    "make a new post in tumblr",
+    "open a new post in tumblr",
+    "create post in tumblr"
+  ],
+  "description": "Create a new text post on a Tumblr blog using NPF format. Defaults to published state.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name to post to"
+      },
+      "content": {
+        "type": "string",
+        "description": "Text content for the post"
+      },
+      "tags": {
+        "description": "Comma-separated tags (e.g., \"art, photography, nature\")",
+        "type": "string"
+      },
+      "state": {
+        "description": "Post state (default \"published\")",
+        "type": "string",
+        "enum": [
+          "published",
+          "draft",
+          "queue",
+          "private"
+        ]
+      }
+    },
+    "required": [
+      "blog_name",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/create-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

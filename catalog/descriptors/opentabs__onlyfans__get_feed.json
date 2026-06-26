@@ -1,0 +1,43 @@
+{
+  "slug": "onlyfans.get_feed",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "get a feed in onlyfans",
+    "look up a feed in onlyfans",
+    "fetch a single feed in onlyfans",
+    "view one specific feed in onlyfans",
+    "get feed in onlyfans",
+    "get your content feed in onlyfans"
+  ],
+  "description": "Get the main content feed with posts from subscribed creators. Returns posts in reverse chronological order with pagination support.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of posts to return (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination marker from a previous response (tail_marker)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/get-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

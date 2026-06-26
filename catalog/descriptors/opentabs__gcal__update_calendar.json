@@ -1,0 +1,56 @@
+{
+  "slug": "gcal.update_calendar",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "update a calendar in gcal",
+    "edit a calendar in gcal",
+    "change the details of calendar in gcal",
+    "modify a calendar in gcal",
+    "update calendar in gcal",
+    "update calendar metadata in gcal"
+  ],
+  "description": "Update metadata for a calendar. Only the fields you provide will be changed. Uses PATCH semantics.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "type": "string",
+        "description": "Calendar ID to update"
+      },
+      "summary": {
+        "description": "New calendar title",
+        "type": "string"
+      },
+      "description": {
+        "description": "New calendar description",
+        "type": "string"
+      },
+      "location": {
+        "description": "New geographic location",
+        "type": "string"
+      },
+      "time_zone": {
+        "description": "New IANA time zone",
+        "type": "string"
+      }
+    },
+    "required": [
+      "calendar_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/update-calendar.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

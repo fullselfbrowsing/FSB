@@ -1,0 +1,31 @@
+{
+  "slug": "starbucks.get_rewards",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get rewards in starbucks",
+    "look up rewards in starbucks",
+    "fetch a single rewards in starbucks",
+    "view one specific rewards in starbucks",
+    "get stars balance and available reward tiers in starbucks"
+  ],
+  "description": "Get the user's Starbucks Rewards program status including current Stars balance, reward tiers and what each tier unlocks. Each tier shows the Stars cost and whether the user can currently redeem it.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-rewards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

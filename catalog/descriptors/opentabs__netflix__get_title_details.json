@@ -1,0 +1,41 @@
+{
+  "slug": "netflix.get_title_details",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "get title details in netflix",
+    "look up title details in netflix",
+    "fetch a single title details in netflix",
+    "view one specific title details in netflix",
+    "get full details including advisories and badges in netflix"
+  ],
+  "description": "Get comprehensive details about a Netflix title including content advisory, quality badges, and user rating. More detailed than get_title — use this when you need content advisories or playback badges.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/get-title-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

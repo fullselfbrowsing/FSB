@@ -1,0 +1,44 @@
+{
+  "slug": "dockerhub.delete_repository",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "delete a repository in dockerhub",
+    "remove a repository in dockerhub",
+    "trash a repository in dockerhub",
+    "permanently delete a repository in dockerhub",
+    "delete repository in dockerhub"
+  ],
+  "description": "Permanently delete a Docker Hub repository. This action cannot be undone. All tags and images in the repository will be deleted.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Namespace (user or organization)"
+      },
+      "repository": {
+        "type": "string",
+        "description": "Repository name"
+      }
+    },
+    "required": [
+      "namespace",
+      "repository"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/delete-repository.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

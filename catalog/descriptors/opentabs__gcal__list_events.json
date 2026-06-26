@@ -1,0 +1,74 @@
+{
+  "slug": "gcal.list_events",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "list events in gcal",
+    "show me my events in gcal",
+    "view my events in gcal",
+    "see all my events in gcal",
+    "list events on a calendar in gcal"
+  ],
+  "description": "List events on a calendar. Returns upcoming events by default. Use timeMin/timeMax to specify a date range. Use q to search event text. Results are ordered by start time when singleEvents is true.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "description": "Calendar ID (default \"primary\")",
+        "type": "string"
+      },
+      "time_min": {
+        "description": "Lower bound (inclusive) for event start time as ISO 8601 timestamp",
+        "type": "string"
+      },
+      "time_max": {
+        "description": "Upper bound (exclusive) for event start time as ISO 8601 timestamp",
+        "type": "string"
+      },
+      "q": {
+        "description": "Free text search terms to find events matching these terms in summary, description, location, attendee name, etc.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Maximum number of events to return (default 25, max 2500)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2500
+      },
+      "page_token": {
+        "description": "Token for fetching the next page of results",
+        "type": "string"
+      },
+      "single_events": {
+        "description": "Whether to expand recurring events into instances (default true)",
+        "type": "boolean"
+      },
+      "order_by": {
+        "description": "Sort order: startTime (requires singleEvents=true) or updated (default startTime)",
+        "type": "string",
+        "enum": [
+          "startTime",
+          "updated"
+        ]
+      },
+      "show_deleted": {
+        "description": "Whether to include deleted events (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/list-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

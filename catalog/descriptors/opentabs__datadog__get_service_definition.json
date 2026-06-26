@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_service_definition",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a service definition in datadog",
+    "look up a service definition in datadog",
+    "fetch a single service definition in datadog",
+    "view one specific service definition in datadog",
+    "get service definition in datadog",
+    "get service definition by name in datadog"
+  ],
+  "description": "Get the full service catalog definition for a specific service, including team, contacts, links, and tags.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_name": {
+        "type": "string",
+        "description": "Service name (e.g., \"web-store\", \"billing-api\")"
+      }
+    },
+    "required": [
+      "service_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-service-definition.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

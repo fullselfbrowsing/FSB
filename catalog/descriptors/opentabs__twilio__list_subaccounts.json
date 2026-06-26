@@ -1,0 +1,38 @@
+{
+  "slug": "twilio.list_subaccounts",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list subaccounts in twilio",
+    "show me my subaccounts in twilio",
+    "view my subaccounts in twilio",
+    "see all my subaccounts in twilio",
+    "list twilio subaccounts in twilio"
+  ],
+  "description": "List all subaccounts under the current Twilio account. Returns account SIDs, names, and statuses.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of accounts to return per page (default 50, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-subaccounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

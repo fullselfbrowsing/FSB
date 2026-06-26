@@ -1,0 +1,47 @@
+{
+  "slug": "retool.clone_app",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "clone an app in retool",
+    "clone app in retool",
+    "clone an existing app in retool"
+  ],
+  "description": "Clone an existing Retool app (page) to create a copy with a new name. The clone is placed in the specified folder.",
+  "actionVerb": "clone",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "UUID of the page to clone (use list_apps to find UUIDs)"
+      },
+      "new_name": {
+        "type": "string",
+        "description": "Name for the cloned app"
+      },
+      "folder_id": {
+        "type": "number",
+        "description": "Folder ID to place the clone in"
+      }
+    },
+    "required": [
+      "page_uuid",
+      "new_name",
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/clone-app.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "clone"
+    }
+  }
+}

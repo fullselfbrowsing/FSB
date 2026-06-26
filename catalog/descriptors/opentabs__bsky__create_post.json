@@ -7,9 +7,9 @@
     "make a new post in bsky",
     "open a new post in bsky",
     "create post in bsky",
-    "post to bluesky in bsky"
+    "create a new post in bsky"
   ],
-  "description": "Post a new entry to your Bluesky feed. Publishes the text to your account; this is publicly visible. Optionally reply to an existing post.",
+  "description": "Create a new Bluesky post. Supports plain text. For replies, provide the parent and root post URIs and CIDs.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -17,20 +17,24 @@
     "properties": {
       "text": {
         "type": "string",
-        "minLength": 1,
         "maxLength": 300,
-        "description": "The text content of the post (max 300 graphemes)"
+        "description": "The text content of the post (max 300 characters)"
       },
       "reply_to_uri": {
-        "description": "AT-URI of the post to reply to (omit to start a new post)",
+        "description": "AT URI of the parent post to reply to",
         "type": "string"
       },
-      "langs": {
-        "description": "BCP-47 language tags for the post",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
+      "reply_to_cid": {
+        "description": "CID of the parent post to reply to",
+        "type": "string"
+      },
+      "root_uri": {
+        "description": "AT URI of the root post in the thread (defaults to reply_to_uri for direct replies)",
+        "type": "string"
+      },
+      "root_cid": {
+        "description": "CID of the root post in the thread (defaults to reply_to_cid for direct replies)",
+        "type": "string"
       }
     },
     "required": [

@@ -1,0 +1,56 @@
+{
+  "slug": "ytmusic.create_playlist",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "create a playlist in ytmusic",
+    "add a playlist in ytmusic",
+    "make a new playlist in ytmusic",
+    "open a new playlist in ytmusic",
+    "create playlist in ytmusic",
+    "create a new playlist in ytmusic"
+  ],
+  "description": "Create a new playlist on YouTube Music",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Name for the new playlist"
+      },
+      "privacy": {
+        "description": "Privacy status for the playlist. Defaults to PRIVATE",
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "PUBLIC",
+          "UNLISTED"
+        ]
+      },
+      "video_ids": {
+        "description": "Video IDs to add to the playlist on creation",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/create-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "youtube.get_channel",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get a channel in youtube",
+    "look up a channel in youtube",
+    "fetch a single channel in youtube",
+    "view one specific channel in youtube",
+    "get channel in youtube",
+    "get channel details by id in youtube"
+  ],
+  "description": "Get detailed information about a YouTube channel including name, description, subscriber count, video count, and banner/avatar images.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel_id": {
+        "type": "string",
+        "description": "YouTube channel ID (starts with \"UC\")"
+      }
+    },
+    "required": [
+      "channel_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

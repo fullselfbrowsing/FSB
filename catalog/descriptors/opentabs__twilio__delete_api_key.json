@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.delete_api_key",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "delete an api key in twilio",
+    "remove an api key in twilio",
+    "trash an api key in twilio",
+    "permanently delete an api key in twilio",
+    "delete api key in twilio"
+  ],
+  "description": "Delete an API key by its SID. This action is permanent and cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "API Key SID to delete (e.g., SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/delete-api-key.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

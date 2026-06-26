@@ -1,0 +1,31 @@
+{
+  "slug": "notion.list_users",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "list users in notion",
+    "show me my users in notion",
+    "view my users in notion",
+    "see all my users in notion",
+    "list workspace members in notion"
+  ],
+  "description": "List all users (members) in the current Notion workspace",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/list-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

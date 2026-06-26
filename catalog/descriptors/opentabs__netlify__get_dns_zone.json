@@ -1,0 +1,40 @@
+{
+  "slug": "netlify.get_dns_zone",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "get a dns zone in netlify",
+    "look up a dns zone in netlify",
+    "fetch a single dns zone in netlify",
+    "view one specific dns zone in netlify",
+    "get dns zone in netlify",
+    "get dns zone details by id in netlify"
+  ],
+  "description": "Get detailed information about a specific DNS zone by its ID. Returns the zone name, record count, associated site, and timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "The DNS zone ID to retrieve"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/get-dns-zone.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

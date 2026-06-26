@@ -1,0 +1,42 @@
+{
+  "slug": "gcloud.list_projects",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list projects in gcloud",
+    "show me my projects in gcloud",
+    "view my projects in gcloud",
+    "see all my projects in gcloud",
+    "list accessible gcp projects in gcloud"
+  ],
+  "description": "List all GCP projects accessible to the current user. Returns project IDs, names, and lifecycle states.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Max results per page (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_token": {
+        "description": "Page token from a previous response for pagination",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

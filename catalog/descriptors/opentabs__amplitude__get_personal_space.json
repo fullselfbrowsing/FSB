@@ -1,0 +1,32 @@
+{
+  "slug": "amplitude.get_personal_space",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "get a personal space in amplitude",
+    "look up a personal space in amplitude",
+    "fetch a single personal space in amplitude",
+    "view one specific personal space in amplitude",
+    "get personal space in amplitude",
+    "get the user's personal workspace in amplitude"
+  ],
+  "description": "Get the current user's personal space with its contents, permissions, and folder structure.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/get-personal-space.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

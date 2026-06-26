@@ -1,0 +1,34 @@
+{
+  "slug": "spotify.skip_to_next",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "skip a to next in spotify",
+    "skip to next in spotify",
+    "skip to next track in spotify"
+  ],
+  "description": "Skip to the next track in the playback queue.",
+  "actionVerb": "skip",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "device_id": {
+        "description": "Device ID to skip on",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/skip-to-next.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "skip"
+    }
+  }
+}

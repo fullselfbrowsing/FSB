@@ -1,0 +1,49 @@
+{
+  "slug": "airtable.get_field_choices",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "get field choices in airtable",
+    "look up field choices in airtable",
+    "fetch a single field choices in airtable",
+    "view one specific field choices in airtable",
+    "get select/multi-select field choices in airtable"
+  ],
+  "description": "Get the available choices for a single-select or multi-select field. Returns choice IDs, names, and colors. Use the choice ID (sel prefix) when setting cell values for select fields.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "description": "Base ID (app prefix)"
+      },
+      "table_id": {
+        "type": "string",
+        "description": "Table ID (tbl prefix)"
+      },
+      "field_id": {
+        "type": "string",
+        "description": "Field/column ID (fld prefix) — must be a select or multiSelect type"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id",
+      "field_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/get-field-choices.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

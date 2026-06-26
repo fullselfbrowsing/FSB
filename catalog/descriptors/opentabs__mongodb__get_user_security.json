@@ -1,0 +1,32 @@
+{
+  "slug": "mongodb.get_user_security",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "get an user security in mongodb",
+    "look up an user security in mongodb",
+    "fetch a single user security in mongodb",
+    "view one specific user security in mongodb",
+    "get user security in mongodb",
+    "get project security settings in mongodb"
+  ],
+  "description": "Get the authentication security settings for the current MongoDB Atlas project including LDAP authentication, LDAP authorization, and custom X.509 certificate authority status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/get-user-security.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

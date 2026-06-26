@@ -1,0 +1,40 @@
+{
+  "slug": "linear.delete_issue",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "delete an issue in linear",
+    "remove an issue in linear",
+    "trash an issue in linear",
+    "permanently delete an issue in linear",
+    "delete issue in linear",
+    "move an issue to the trash in linear"
+  ],
+  "description": "Move a Linear issue to the trash. Trashed issues can be restored within 30 days.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID to delete"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/delete-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

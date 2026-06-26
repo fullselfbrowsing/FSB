@@ -7,9 +7,9 @@
     "fetch a single site in netlify",
     "view one specific site in netlify",
     "get site in netlify",
-    "get a site by id in netlify"
+    "get site details by id in netlify"
   ],
-  "description": "Get detailed information about a specific Netlify site by its site ID.",
+  "description": "Get detailed information about a specific Netlify site by its ID. Returns name, URLs, custom domain, framework, repo settings, SSL, and build configuration.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,8 +17,7 @@
     "properties": {
       "site_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Site ID to retrieve"
+        "description": "The site ID to retrieve"
       }
     },
     "required": [

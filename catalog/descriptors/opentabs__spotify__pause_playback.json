@@ -1,0 +1,34 @@
+{
+  "slug": "spotify.pause_playback",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "pause a playback in spotify",
+    "pause playback in spotify",
+    "pause the current playback on the user’s active device in spotify"
+  ],
+  "description": "Pause the current playback on the user’s active device.",
+  "actionVerb": "pause",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "device_id": {
+        "description": "Device ID to pause playback on",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/pause-playback.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "pause"
+    }
+  }
+}

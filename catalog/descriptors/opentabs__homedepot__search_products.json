@@ -1,0 +1,41 @@
+{
+  "slug": "homedepot.search_products",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "search products in homedepot",
+    "search home depot products by keyword in homedepot",
+    "search for products on the home depot by keyword in homedepot"
+  ],
+  "description": "Search for products on The Home Depot by keyword. Returns up to 24 matching products with price, rating, and availability. Results are from the user's local store.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "description": "Search keyword (e.g., \"cordless drill\", \"ceiling fan\")"
+      },
+      "store_id": {
+        "description": "Store ID for local pricing and availability",
+        "type": "string"
+      }
+    },
+    "required": [
+      "keyword"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

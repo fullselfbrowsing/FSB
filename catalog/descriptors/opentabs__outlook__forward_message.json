@@ -1,0 +1,49 @@
+{
+  "slug": "outlook.forward_message",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "forward a message in outlook",
+    "forward message in outlook",
+    "forward an email in outlook"
+  ],
+  "description": "Forward an email message to one or more recipients with an optional comment.",
+  "actionVerb": "forward",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID to forward"
+      },
+      "to": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Recipient email addresses"
+      },
+      "comment": {
+        "description": "Optional comment to include above the forwarded message",
+        "type": "string"
+      }
+    },
+    "required": [
+      "message_id",
+      "to"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/forward-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "forward"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "posthog.get_survey",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "get a survey in posthog",
+    "look up a survey in posthog",
+    "fetch a single survey in posthog",
+    "view one specific survey in posthog",
+    "get survey in posthog",
+    "get survey details in posthog"
+  ],
+  "description": "Get detailed information about a specific survey including its type, dates, and archive status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "survey_id": {
+        "type": "string",
+        "description": "Survey UUID"
+      }
+    },
+    "required": [
+      "survey_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-survey.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

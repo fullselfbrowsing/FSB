@@ -1,0 +1,41 @@
+{
+  "slug": "telegram.set_typing",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "set a typing in telegram",
+    "set typing in telegram",
+    "show typing indicator in a chat in telegram"
+  ],
+  "description": "Send a typing indicator to a conversation. The indicator automatically disappears after a few seconds or when a message is sent.",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation"
+      },
+      "action": {
+        "description": "Typing action type: \"typing\" (default), \"cancel\", \"recordAudio\", \"uploadPhoto\", \"uploadDocument\"",
+        "type": "string"
+      }
+    },
+    "required": [
+      "peer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/set-typing.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "set"
+    }
+  }
+}

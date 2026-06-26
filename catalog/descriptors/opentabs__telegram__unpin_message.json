@@ -1,0 +1,44 @@
+{
+  "slug": "telegram.unpin_message",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "unpin a message in telegram",
+    "unpin message in telegram",
+    "unpin a message in a chat in telegram"
+  ],
+  "description": "Unpin a previously pinned message in a conversation.",
+  "actionVerb": "unpin",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation"
+      },
+      "message_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "ID of the message to unpin"
+      }
+    },
+    "required": [
+      "peer_id",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/unpin-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "unpin"
+    }
+  }
+}

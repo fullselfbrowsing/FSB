@@ -1,0 +1,42 @@
+{
+  "slug": "powerpoint.rename_item",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "rename an item in powerpoint",
+    "rename item in powerpoint",
+    "rename a file or folder in powerpoint"
+  ],
+  "description": "Rename a file or folder in OneDrive by its item ID. Returns the updated item details.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file or folder"
+      },
+      "name": {
+        "type": "string",
+        "description": "New name including file extension (e.g., \"My Presentation.pptx\")"
+      }
+    },
+    "required": [
+      "item_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/rename-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "rename"
+    }
+  }
+}

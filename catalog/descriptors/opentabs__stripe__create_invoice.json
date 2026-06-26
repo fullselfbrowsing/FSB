@@ -1,0 +1,68 @@
+{
+  "slug": "stripe.create_invoice",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "create an invoice in stripe",
+    "add an invoice in stripe",
+    "make a new invoice in stripe",
+    "open a new invoice in stripe",
+    "create invoice in stripe",
+    "create a draft invoice in stripe"
+  ],
+  "description": "Create a new draft invoice for a customer. After creation, add invoice items and then finalize it.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "customer": {
+        "type": "string",
+        "description": "Customer ID to invoice"
+      },
+      "description": {
+        "description": "Invoice description",
+        "type": "string"
+      },
+      "collection_method": {
+        "description": "How to collect payment (default charge_automatically)",
+        "type": "string",
+        "enum": [
+          "charge_automatically",
+          "send_invoice"
+        ]
+      },
+      "days_until_due": {
+        "description": "Number of days until invoice is due (for send_invoice collection)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "metadata": {
+        "description": "Arbitrary key-value metadata",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "customer"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/create-invoice.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "slug": "leetcode.get_user_calendar",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get an user calendar in leetcode",
+    "look up an user calendar in leetcode",
+    "fetch a single user calendar in leetcode",
+    "view one specific user calendar in leetcode",
+    "get user calendar in leetcode",
+    "get submission calendar and streaks in leetcode"
+  ],
+  "description": "Get a user submission calendar (heatmap data), current streak, total active days, and active years. Optionally filter by year.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      },
+      "year": {
+        "description": "Filter by year (e.g., 2025). Omit for all years.",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-user-calendar.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

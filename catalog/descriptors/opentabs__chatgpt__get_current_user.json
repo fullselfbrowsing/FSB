@@ -1,0 +1,32 @@
+{
+  "slug": "chatgpt.get_current_user",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get a current user in chatgpt",
+    "look up a current user in chatgpt",
+    "fetch a single current user in chatgpt",
+    "view one specific current user in chatgpt",
+    "get current user in chatgpt",
+    "get your chatgpt profile in chatgpt"
+  ],
+  "description": "Get the authenticated ChatGPT user profile including email, name, and account creation date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

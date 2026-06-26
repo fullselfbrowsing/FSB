@@ -1,0 +1,36 @@
+{
+  "slug": "chipotle.get_promotions",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get promotions in chipotle",
+    "look up promotions in chipotle",
+    "fetch a single promotions in chipotle",
+    "view one specific promotions in chipotle",
+    "get available promotions and coupon codes in chipotle"
+  ],
+  "description": "Get available promotions and coupon codes for the authenticated Chipotle customer. Optionally filter by country code.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "country_code": {
+        "description": "Country code filter (default \"US\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-promotions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

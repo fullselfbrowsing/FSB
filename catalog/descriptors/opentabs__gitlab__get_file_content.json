@@ -1,0 +1,51 @@
+{
+  "slug": "gitlab.get_file_content",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "get a file content in gitlab",
+    "look up a file content in gitlab",
+    "fetch a single file content in gitlab",
+    "view one specific file content in gitlab",
+    "get file content in gitlab",
+    "read a file from a repository in gitlab"
+  ],
+  "description": "Read a file from a repository. Returns the decoded content as text. Use the ref parameter to read from a specific branch or commit.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "file_path": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File path relative to repository root (e.g., \"src/index.ts\")"
+      },
+      "ref": {
+        "description": "Branch name, tag, or commit SHA (defaults to the default branch)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project",
+      "file_path"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/get-file-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

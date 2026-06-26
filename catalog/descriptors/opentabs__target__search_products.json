@@ -1,45 +1,36 @@
 {
   "slug": "target.search_products",
-  "service": "www.target.com",
+  "service": "target.com",
   "intentSynonyms": [
     "search products in target",
     "search for products on target in target",
-    "search the target catalog by keyword in target"
+    "search the target product catalog by keyword in target"
   ],
-  "description": "Search the Target catalog by keyword. Optionally filter by department/category and sort the results.",
+  "description": "Search the Target product catalog by keyword. Returns product name, price, brand, rating, and image. Results are personalized to the user's preferred store for pricing and availability.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "query": {
+      "keyword": {
         "type": "string",
-        "minLength": 1,
-        "description": "Search keywords (product name, brand, or description)"
+        "description": "Search keyword (e.g., \"airpods\", \"paper towels\")"
       },
-      "category": {
-        "description": "Department or category to filter by",
-        "type": "string"
-      },
-      "sort": {
-        "description": "Result ordering",
-        "type": "string",
-        "enum": [
-          "relevance",
-          "price_low_to_high",
-          "price_high_to_low",
-          "best_seller"
-        ]
-      },
-      "limit": {
-        "description": "Maximum number of products to return",
+      "count": {
+        "description": "Number of results (default 10, max 24)",
         "type": "integer",
         "minimum": 1,
-        "maximum": 50
+        "maximum": 24
+      },
+      "offset": {
+        "description": "Result offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
       }
     },
     "required": [
-      "query"
+      "keyword"
     ],
     "additionalProperties": false
   },
@@ -50,8 +41,8 @@
     "sourcePath": "plugins/target/src/tools/search-products.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

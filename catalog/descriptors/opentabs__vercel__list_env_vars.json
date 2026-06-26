@@ -1,0 +1,52 @@
+{
+  "slug": "vercel.list_env_vars",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "list env vars in vercel",
+    "show me my env vars in vercel",
+    "view my env vars in vercel",
+    "see all my env vars in vercel",
+    "list project environment variables in vercel"
+  ],
+  "description": "List environment variables for a Vercel project. Shows variable names, targets (production/preview/development), and types. Values of encrypted/secret variables may be masked.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "description": "Project name or ID"
+      },
+      "target": {
+        "description": "Filter by deployment target",
+        "type": "string",
+        "enum": [
+          "production",
+          "preview",
+          "development"
+        ]
+      },
+      "git_branch": {
+        "description": "Filter by Git branch name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/list-env-vars.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

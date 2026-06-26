@@ -1,0 +1,40 @@
+{
+  "slug": "msword.get_item",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "get an item in msword",
+    "look up an item in msword",
+    "fetch a single item in msword",
+    "view one specific item in msword",
+    "get item in msword",
+    "get file or folder details in msword"
+  ],
+  "description": "Get metadata for a file or folder by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/get-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.unmute_thread",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "unmute a thread in bsky",
+    "unmute thread in bsky",
+    "unmute thread in the bsky app",
+    "use bsky to unmute a thread"
+  ],
+  "description": "Unmute a thread.",
+  "actionVerb": "unmute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "root": {
+        "type": "string",
+        "description": "AT URI of the root post of the thread to unmute"
+      }
+    },
+    "required": [
+      "root"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/unmute-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unmute"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_grids",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list grids in retool",
+    "show me my grids in retool",
+    "view my grids in retool",
+    "see all my grids in retool",
+    "list retool database tables in retool"
+  ],
+  "description": "List all Retool Database tables (grids). Retool Database is a built-in PostgreSQL database for storing app data.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-grids.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

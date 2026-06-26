@@ -1,0 +1,37 @@
+{
+  "slug": "booking.search_destinations",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "search destinations in booking",
+    "search for travel destinations in booking",
+    "search for destinations on booking in booking"
+  ],
+  "description": "Search for destinations on Booking.com by text query. Returns matching cities, regions, countries, landmarks, and hotels with their destination IDs. Use the returned dest_id and dest_type for more precise property searches.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Destination search text (e.g., \"Paris\", \"Tokyo\", \"Hilton London\")"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/search-destinations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

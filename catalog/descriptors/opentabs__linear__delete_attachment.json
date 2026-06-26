@@ -1,0 +1,39 @@
+{
+  "slug": "linear.delete_attachment",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "delete an attachment in linear",
+    "remove an attachment in linear",
+    "trash an attachment in linear",
+    "permanently delete an attachment in linear",
+    "delete attachment in linear"
+  ],
+  "description": "Delete an attachment from a Linear issue.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "attachment_id": {
+        "type": "string",
+        "description": "Attachment UUID to delete"
+      }
+    },
+    "required": [
+      "attachment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/delete-attachment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

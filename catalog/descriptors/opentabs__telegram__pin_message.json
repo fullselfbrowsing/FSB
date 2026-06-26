@@ -1,0 +1,48 @@
+{
+  "slug": "telegram.pin_message",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "pin a message in telegram",
+    "pin message in telegram",
+    "pin a message in a chat in telegram"
+  ],
+  "description": "Pin a message in a conversation. Pinned messages are highlighted and easily accessible. Set silent=true to pin without sending a notification to chat members.",
+  "actionVerb": "pin",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation"
+      },
+      "message_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "ID of the message to pin"
+      },
+      "silent": {
+        "description": "Pin without sending a notification (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "peer_id",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/pin-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "pin"
+    }
+  }
+}

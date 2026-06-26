@@ -1,0 +1,54 @@
+{
+  "slug": "discord.edit_channel",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "edit a channel in discord",
+    "edit channel in discord",
+    "edit a channel's name, topic, or settings in discord"
+  ],
+  "description": "Edit a Discord channel. Update name, topic, NSFW flag, or move to a different category.",
+  "actionVerb": "edit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to edit"
+      },
+      "name": {
+        "description": "New channel name (lowercase, hyphens, max 100 chars)",
+        "type": "string"
+      },
+      "topic": {
+        "description": "New channel topic (max 1024 chars for text channels)",
+        "type": "string"
+      },
+      "nsfw": {
+        "description": "Whether the channel is NSFW",
+        "type": "boolean"
+      },
+      "parent_id": {
+        "description": "Parent category ID to move the channel under",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/edit-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PATCH",
+      "opNameVerb": "edit"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "cloudflare.list_kv_namespaces",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list kv namespaces in cloudflare",
+    "show me my kv namespaces in cloudflare",
+    "view my kv namespaces in cloudflare",
+    "see all my kv namespaces in cloudflare"
+  ],
+  "description": "List all Workers KV namespaces in the account. Returns namespace IDs and titles.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-kv-namespaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

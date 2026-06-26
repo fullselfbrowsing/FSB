@@ -1,0 +1,40 @@
+{
+  "slug": "medium.get_post",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "get a post in medium",
+    "look up a post in medium",
+    "fetch a single post in medium",
+    "view one specific post in medium",
+    "get post in medium",
+    "get a post by id in medium"
+  ],
+  "description": "Get detailed information about a Medium post by its ID. Returns title, author, clap count, tags, and more.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "string",
+        "description": "Medium post ID (e.g., \"978090b95f93\")"
+      }
+    },
+    "required": [
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/get-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "slug": "gitlab.list_pipeline_jobs",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list pipeline jobs in gitlab",
+    "show me my pipeline jobs in gitlab",
+    "view my pipeline jobs in gitlab",
+    "see all my pipeline jobs in gitlab",
+    "list jobs for a pipeline in gitlab"
+  ],
+  "description": "List jobs for a specific pipeline.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "pipeline_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Pipeline ID"
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project",
+      "pipeline_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-pipeline-jobs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

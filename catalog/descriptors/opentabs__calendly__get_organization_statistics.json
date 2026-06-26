@@ -1,0 +1,31 @@
+{
+  "slug": "calendly.get_organization_statistics",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get organization statistics in calendly",
+    "look up organization statistics in calendly",
+    "fetch a single organization statistics in calendly",
+    "view one specific organization statistics in calendly",
+    "get organization seat statistics in calendly"
+  ],
+  "description": "Get seat usage statistics for the current Calendly organization including available seats, active users, pending invitations, and occupancy ratio.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-organization-statistics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

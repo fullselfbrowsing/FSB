@@ -1,0 +1,39 @@
+{
+  "slug": "webflow.get_workspace_permissions",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "get workspace permissions in webflow",
+    "look up workspace permissions in webflow",
+    "fetch a single workspace permissions in webflow",
+    "view one specific workspace permissions in webflow",
+    "get your workspace permissions in webflow"
+  ],
+  "description": "Get the current user permissions for a Webflow workspace. Returns which actions the user can perform on workspace resources like sites, billing, members, and integrations.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug"
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/get-workspace-permissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

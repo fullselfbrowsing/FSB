@@ -1,0 +1,40 @@
+{
+  "slug": "powerpoint.delete_item",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "delete an item in powerpoint",
+    "remove an item in powerpoint",
+    "trash an item in powerpoint",
+    "permanently delete an item in powerpoint",
+    "delete item in powerpoint",
+    "delete a file or folder in powerpoint"
+  ],
+  "description": "Permanently delete a file or folder from OneDrive by its item ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file or folder to delete"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/delete-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

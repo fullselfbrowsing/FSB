@@ -1,0 +1,37 @@
+{
+  "slug": "twitch.search_channels",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "search channels in twitch",
+    "search for twitch channels in twitch",
+    "search for twitch channels by keyword in twitch"
+  ],
+  "description": "Search for Twitch channels by keyword. Returns matching channels with their live status, follower count, and current stream info if live.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/search-channels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

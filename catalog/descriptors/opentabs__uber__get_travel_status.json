@@ -1,0 +1,41 @@
+{
+  "slug": "uber.get_travel_status",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "get a travel status in uber",
+    "look up a travel status in uber",
+    "fetch a single travel status in uber",
+    "view one specific travel status in uber",
+    "get travel status in uber",
+    "check if user has an active ride in uber"
+  ],
+  "description": "Check whether the user is currently traveling (i.e., has an active Uber ride in progress).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "latitude": {
+        "description": "Current latitude (default 0)",
+        "type": "number"
+      },
+      "longitude": {
+        "description": "Current longitude (default 0)",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/get-travel-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

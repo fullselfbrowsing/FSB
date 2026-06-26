@@ -1,0 +1,31 @@
+{
+  "slug": "chatgpt.get_custom_instructions",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get custom instructions in chatgpt",
+    "look up custom instructions in chatgpt",
+    "fetch a single custom instructions in chatgpt",
+    "view one specific custom instructions in chatgpt",
+    "get your custom instructions in chatgpt"
+  ],
+  "description": "Get the current ChatGPT custom instructions (system messages). These include \"What would you like ChatGPT to know about you?\" and \"How would you like ChatGPT to respond?\".",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-custom-instructions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

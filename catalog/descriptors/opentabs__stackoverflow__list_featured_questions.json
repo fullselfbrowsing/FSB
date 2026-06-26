@@ -1,0 +1,65 @@
+{
+  "slug": "stackoverflow.list_featured_questions",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "list featured questions in stackoverflow",
+    "show me my featured questions in stackoverflow",
+    "view my featured questions in stackoverflow",
+    "see all my featured questions in stackoverflow",
+    "list questions with active bounties in stackoverflow"
+  ],
+  "description": "List Stack Overflow questions that currently have an active bounty. These are questions where users have offered reputation as a reward for a good answer.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tagged": {
+        "description": "Semicolon-delimited tags to filter by (e.g., \"javascript;react\")",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort order (default: activity)",
+        "type": "string",
+        "enum": [
+          "activity",
+          "creation",
+          "votes"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/list-featured-questions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

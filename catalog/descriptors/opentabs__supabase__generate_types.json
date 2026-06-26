@@ -1,0 +1,38 @@
+{
+  "slug": "supabase.generate_types",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "generate types in supabase",
+    "generate typescript types from the db schema in supabase",
+    "generate typescript type definitions from a supabase project database schema in supabase"
+  ],
+  "description": "Generate TypeScript type definitions from a Supabase project database schema. Returns the full TypeScript types for all tables, views, and functions.",
+  "actionVerb": "generate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/generate-types.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "generate"
+    }
+  }
+}

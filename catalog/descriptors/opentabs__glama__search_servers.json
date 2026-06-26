@@ -1,0 +1,47 @@
+{
+  "slug": "glama.search_servers",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "search servers in glama",
+    "search for mcp servers in the glama directory in glama",
+    "search for mcp servers in the glama directory by keyword in glama"
+  ],
+  "description": "Search for MCP servers in the Glama directory by keyword. Returns matching servers with metadata (stars, tools, language, license) and directory-wide statistics.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Search query to find MCP servers"
+      },
+      "sort": {
+        "description": "Sort order for results",
+        "type": "string",
+        "enum": [
+          "search-relevance:desc",
+          "popularity:desc",
+          "recently-added:desc",
+          "name:asc"
+        ]
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/search-servers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

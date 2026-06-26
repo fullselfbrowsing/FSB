@@ -1,0 +1,39 @@
+{
+  "slug": "lucid.delete_folder",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "delete a folder in lucid",
+    "remove a folder in lucid",
+    "trash a folder in lucid",
+    "permanently delete a folder in lucid",
+    "delete folder in lucid"
+  ],
+  "description": "Permanently delete a folder entry. Documents inside the folder are not deleted — they are moved to the root level.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "entry_id": {
+        "type": "string",
+        "description": "Folder entry ID to delete"
+      }
+    },
+    "required": [
+      "entry_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/delete-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

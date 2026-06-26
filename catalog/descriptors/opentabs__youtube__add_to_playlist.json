@@ -1,0 +1,42 @@
+{
+  "slug": "youtube.add_to_playlist",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "add a to playlist in youtube",
+    "add to playlist in youtube",
+    "add a video to a playlist in youtube"
+  ],
+  "description": "Add a video to a playlist. Use \"WL\" as the playlist_id to add to Watch Later.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "Playlist ID to add the video to (use \"WL\" for Watch Later)"
+      },
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID to add"
+      }
+    },
+    "required": [
+      "playlist_id",
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/add-to-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "add"
+    }
+  }
+}

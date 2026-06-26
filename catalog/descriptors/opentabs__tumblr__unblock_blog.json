@@ -1,0 +1,42 @@
+{
+  "slug": "tumblr.unblock_blog",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "unblock a blog in tumblr",
+    "unblock blog in tumblr",
+    "unblock a previously blocked tumblr blog in tumblr"
+  ],
+  "description": "Unblock a previously blocked Tumblr blog.",
+  "actionVerb": "unblock",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Your blog name or identifier"
+      },
+      "blocked_blog": {
+        "type": "string",
+        "description": "Blog name to unblock"
+      }
+    },
+    "required": [
+      "blog_name",
+      "blocked_blog"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/unblock-blog.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "unblock"
+    }
+  }
+}

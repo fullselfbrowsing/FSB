@@ -1,0 +1,40 @@
+{
+  "slug": "linkedin.get_user_profile",
+  "service": "linkedin.com",
+  "intentSynonyms": [
+    "get an user profile in linkedin",
+    "look up an user profile in linkedin",
+    "fetch a single user profile in linkedin",
+    "view one specific user profile in linkedin",
+    "get user profile in linkedin",
+    "get a user's linkedin profile in linkedin"
+  ],
+  "description": "Get a LinkedIn user profile by their public identifier (the slug from their profile URL, e.g., \"williamhgates\" for linkedin.com/in/williamhgates). Returns name, headline, location, and profile picture.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "public_identifier": {
+        "type": "string",
+        "description": "Public profile identifier — the slug from the LinkedIn profile URL (e.g., \"williamhgates\")"
+      }
+    },
+    "required": [
+      "public_identifier"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linkedin/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

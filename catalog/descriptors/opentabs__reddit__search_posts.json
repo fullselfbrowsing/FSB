@@ -1,12 +1,12 @@
 {
   "slug": "reddit.search_posts",
-  "service": "reddit.com",
+  "service": "www.reddit.com",
   "intentSynonyms": [
     "search posts in reddit",
-    "search reddit for posts in reddit",
-    "search reddit posts by a query string, optionally restricted to a single subreddit in reddit"
+    "search reddit posts in reddit",
+    "search for posts across reddit or within a specific subreddit in reddit"
   ],
-  "description": "Search Reddit posts by a query string, optionally restricted to a single subreddit.",
+  "description": "Search for posts across Reddit or within a specific subreddit. Supports sorting and time filtering.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
@@ -15,14 +15,14 @@
       "query": {
         "type": "string",
         "minLength": 1,
-        "description": "The search query text"
+        "description": "Search query string"
       },
       "subreddit": {
-        "description": "Restrict the search to this subreddit (omit to search all of Reddit)",
+        "description": "Restrict search to this subreddit (without r/ prefix)",
         "type": "string"
       },
       "sort": {
-        "description": "Sort order for the results",
+        "description": "Sort order (default \"relevance\")",
         "type": "string",
         "enum": [
           "relevance",
@@ -32,11 +32,31 @@
           "comments"
         ]
       },
+      "t": {
+        "description": "Time period filter (default \"all\")",
+        "type": "string",
+        "enum": [
+          "hour",
+          "day",
+          "week",
+          "month",
+          "year",
+          "all"
+        ]
+      },
       "limit": {
-        "description": "Maximum number of results to return (1-100)",
+        "description": "Number of results (default 25, max 100)",
         "type": "integer",
         "minimum": 1,
         "maximum": 100
+      },
+      "after": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      },
+      "include_body": {
+        "description": "Whether to include post body text (selftext) and external URL. Defaults to false — titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
+        "type": "boolean"
       }
     },
     "required": [
@@ -51,8 +71,8 @@
     "sourcePath": "plugins/reddit/src/tools/search-posts.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

@@ -1,0 +1,40 @@
+{
+  "slug": "meticulous.get_session",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get a session in meticulous",
+    "look up a session in meticulous",
+    "fetch a single session in meticulous",
+    "view one specific session in meticulous",
+    "get session in meticulous",
+    "get session details in meticulous"
+  ],
+  "description": "Get detailed information about a specific recorded user session.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "session_id": {
+        "type": "string",
+        "description": "Session ID"
+      }
+    },
+    "required": [
+      "session_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-session.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

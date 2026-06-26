@@ -1,0 +1,56 @@
+{
+  "slug": "discord.read_messages",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "read messages in discord",
+    "read recent messages from a channel in discord",
+    "read recent messages from a discord channel with optional pagination in discord"
+  ],
+  "description": "Read recent messages from a Discord channel with optional pagination",
+  "actionVerb": "read",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to read messages from"
+      },
+      "limit": {
+        "description": "Number of messages to return (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "before": {
+        "description": "Get messages before this message ID (for pagination)",
+        "type": "string"
+      },
+      "after": {
+        "description": "Get messages after this message ID",
+        "type": "string"
+      },
+      "around": {
+        "description": "Get messages around this message ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/read-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "read"
+    }
+  }
+}

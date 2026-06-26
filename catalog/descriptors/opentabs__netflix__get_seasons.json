@@ -1,0 +1,41 @@
+{
+  "slug": "netflix.get_seasons",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "get seasons in netflix",
+    "look up seasons in netflix",
+    "fetch a single seasons in netflix",
+    "view one specific seasons in netflix",
+    "get seasons and episodes for a show in netflix"
+  ],
+  "description": "Get the season and episode list for a Netflix TV show. Returns all seasons with their episodes, including episode titles, runtimes, and watch progress. Only works for TV shows (not movies).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID of the TV show"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/get-seasons.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

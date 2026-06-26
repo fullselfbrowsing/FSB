@@ -1,0 +1,31 @@
+{
+  "slug": "mongodb.list_database_users",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "list database users in mongodb",
+    "show me my database users in mongodb",
+    "view my database users in mongodb",
+    "see all my database users in mongodb",
+    "list database users in the project in mongodb"
+  ],
+  "description": "List all database users in the current MongoDB Atlas project with their roles, scopes, and authentication type.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/list-database-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

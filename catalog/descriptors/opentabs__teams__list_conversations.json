@@ -1,0 +1,38 @@
+{
+  "slug": "teams.list_conversations",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "list conversations in teams",
+    "show me my conversations in teams",
+    "view my conversations in teams",
+    "see all my conversations in teams",
+    "list recent chats in teams"
+  ],
+  "description": "List recent chat conversations. Returns chats sorted by last activity. Use the conversation ID from results with read_messages to read messages.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of conversations to return (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

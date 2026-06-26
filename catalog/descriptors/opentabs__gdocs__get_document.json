@@ -1,0 +1,41 @@
+{
+  "slug": "gdocs.get_document",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "get a document in gdocs",
+    "look up a document in gdocs",
+    "fetch a single document in gdocs",
+    "view one specific document in gdocs",
+    "get document in gdocs",
+    "get document metadata and tabs in gdocs"
+  ],
+  "description": "Get metadata, revision info, and tab details for a Google Doc by ID. If document_id is omitted, the tool reads the document currently open in the editor.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "tab_id": {
+        "description": "Optional tab ID to mark as the selected tab in the response. Defaults to the current or first tab.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/get-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "slug": "instacart.navigate_to_checkout",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "navigate a to checkout in instacart",
+    "navigate to checkout in instacart",
+    "open cart for checkout in instacart"
+  ],
+  "description": "Open the Instacart cart panel so the user can review items, select delivery time, and proceed to checkout. Call this after adding items to the cart. The user completes payment manually in the browser.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/navigate-to-checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

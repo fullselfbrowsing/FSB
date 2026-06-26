@@ -1,0 +1,52 @@
+{
+  "slug": "powerpoint.update_slide_text",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "update a slide text in powerpoint",
+    "edit a slide text in powerpoint",
+    "change the details of slide text in powerpoint",
+    "modify a slide text in powerpoint",
+    "update slide text in powerpoint",
+    "modify text on a slide in powerpoint"
+  ],
+  "description": "Update the text content of a specific slide. Downloads the PPTX, modifies the slide XML, and re-uploads. Use newline characters to separate lines within a text box.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the PowerPoint file"
+      },
+      "slide_number": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Slide number (1-indexed)"
+      },
+      "text": {
+        "type": "string",
+        "description": "New text content for the slide (use \\n for line breaks)"
+      }
+    },
+    "required": [
+      "item_id",
+      "slide_number",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/update-slide-text.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

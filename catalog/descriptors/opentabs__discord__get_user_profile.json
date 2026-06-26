@@ -1,0 +1,41 @@
+{
+  "slug": "discord.get_user_profile",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "get an user profile in discord",
+    "look up an user profile in discord",
+    "fetch a single user profile in discord",
+    "view one specific user profile in discord",
+    "get user profile in discord",
+    "get a user's profile information in discord"
+  ],
+  "description": "Get a Discord user's profile by their user ID. Use \"@me\" for the authenticated user.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID to look up, or \"@me\" for the authenticated user"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

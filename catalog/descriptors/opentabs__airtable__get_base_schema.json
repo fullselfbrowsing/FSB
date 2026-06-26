@@ -1,0 +1,40 @@
+{
+  "slug": "airtable.get_base_schema",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "get a base schema in airtable",
+    "look up a base schema in airtable",
+    "fetch a single base schema in airtable",
+    "view one specific base schema in airtable",
+    "get base schema in airtable",
+    "get all tables, fields, and views in a base in airtable"
+  ],
+  "description": "Get the full schema of an Airtable base including all tables, fields (columns), and views. Use this to understand the structure before reading or writing records.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "description": "Base ID (app prefix, e.g., \"appCJ2w2lRQp9Vxm0\")"
+      }
+    },
+    "required": [
+      "base_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/get-base-schema.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

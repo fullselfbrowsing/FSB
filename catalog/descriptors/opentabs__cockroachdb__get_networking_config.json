@@ -1,0 +1,40 @@
+{
+  "slug": "cockroachdb.get_networking_config",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "get a networking config in cockroachdb",
+    "look up a networking config in cockroachdb",
+    "fetch a single networking config in cockroachdb",
+    "view one specific networking config in cockroachdb",
+    "get networking config in cockroachdb",
+    "get cluster networking configuration in cockroachdb"
+  ],
+  "description": "Get the networking configuration for a cluster including IP allowlist entries and private endpoint settings.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      }
+    },
+    "required": [
+      "cluster_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/get-networking-config.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

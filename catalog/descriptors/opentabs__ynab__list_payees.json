@@ -1,0 +1,31 @@
+{
+  "slug": "ynab.list_payees",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "list payees in ynab",
+    "show me my payees in ynab",
+    "view my payees in ynab",
+    "see all my payees in ynab",
+    "list all payees in ynab"
+  ],
+  "description": "List all payees in the active YNAB plan. Payees represent merchants, employers, or transfer targets. Excludes deleted payees.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/list-payees.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

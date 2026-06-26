@@ -1,0 +1,31 @@
+{
+  "slug": "chipotle.get_rewards",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get rewards in chipotle",
+    "look up rewards in chipotle",
+    "fetch a single rewards in chipotle",
+    "view one specific rewards in chipotle",
+    "get available rewards and point costs in chipotle"
+  ],
+  "description": "Get available rewards from the Chipotle Rewards store. Returns redeemable offers with point costs, descriptions, and images.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-rewards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

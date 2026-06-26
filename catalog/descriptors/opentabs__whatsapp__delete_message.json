@@ -1,0 +1,51 @@
+{
+  "slug": "whatsapp.delete_message",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "delete a message in whatsapp",
+    "remove a message in whatsapp",
+    "trash a message in whatsapp",
+    "permanently delete a message in whatsapp",
+    "delete message in whatsapp",
+    "delete messages locally in whatsapp"
+  ],
+  "description": "Delete messages from a WhatsApp chat. Messages are deleted locally only (they remain visible to other participants). Use revoke_message to unsend messages for everyone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID containing the messages"
+      },
+      "message_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Message IDs to delete"
+      }
+    },
+    "required": [
+      "chat_id",
+      "message_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/delete-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

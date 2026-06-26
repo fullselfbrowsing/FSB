@@ -1,0 +1,106 @@
+{
+  "slug": "zillow.search_recently_sold",
+  "service": "zillow.com",
+  "intentSynonyms": [
+    "search a recently sold in zillow",
+    "search recently sold in zillow",
+    "search recently sold properties in zillow"
+  ],
+  "description": "Search for recently sold properties on Zillow. Useful for market research and comp analysis. Requires either a region_id (from search_locations) or map_bounds. Returns sale prices, dates, and property details.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "region_id": {
+        "description": "Zillow region ID (from search_locations). Required if map_bounds is not provided.",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "region_type": {
+        "description": "Region type: \"city\", \"county\", \"zipcode\", \"neighborhood\" (default \"city\")",
+        "type": "string"
+      },
+      "map_bounds": {
+        "description": "Map bounding box. Required if region_id is not provided.",
+        "type": "object",
+        "properties": {
+          "west": {
+            "type": "number",
+            "description": "Western longitude"
+          },
+          "east": {
+            "type": "number",
+            "description": "Eastern longitude"
+          },
+          "south": {
+            "type": "number",
+            "description": "Southern latitude"
+          },
+          "north": {
+            "type": "number",
+            "description": "Northern latitude"
+          }
+        },
+        "required": [
+          "west",
+          "east",
+          "south",
+          "north"
+        ],
+        "additionalProperties": false
+      },
+      "min_price": {
+        "description": "Minimum sale price in dollars",
+        "type": "number"
+      },
+      "max_price": {
+        "description": "Maximum sale price in dollars",
+        "type": "number"
+      },
+      "min_beds": {
+        "description": "Minimum bedrooms",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "min_baths": {
+        "description": "Minimum bathrooms",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "sort": {
+        "description": "Sort order (default \"globalrelevanceex\"). \"days\"=Most recent, \"pricea\"=Price low-high, \"priced\"=Price high-low",
+        "type": "string",
+        "enum": [
+          "globalrelevanceex",
+          "days",
+          "pricea",
+          "priced",
+          "size"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/search-recently-sold.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "shortcut.list_story_comments",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "list story comments in shortcut",
+    "show me my story comments in shortcut",
+    "view my story comments in shortcut",
+    "see all my story comments in shortcut",
+    "list comments on a story in shortcut"
+  ],
+  "description": "List all comments on a story, ordered by creation date.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "story_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Story numeric ID"
+      }
+    },
+    "required": [
+      "story_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/list-story-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "retool.get_workflow_run_count",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get a workflow run count in retool",
+    "look up a workflow run count in retool",
+    "fetch a single workflow run count in retool",
+    "view one specific workflow run count in retool",
+    "get workflow run count in retool",
+    "get total run counts per workflow in retool"
+  ],
+  "description": "Get the total execution count for every workflow. Returns a map of workflow ID to run count. Useful for identifying active vs dormant workflows and monitoring workflow health.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-workflow-run-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

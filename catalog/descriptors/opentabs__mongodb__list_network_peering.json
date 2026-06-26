@@ -1,0 +1,32 @@
+{
+  "slug": "mongodb.list_network_peering",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "list a network peering in mongodb",
+    "show me my network peering in mongodb",
+    "view my network peering in mongodb",
+    "see all my network peering in mongodb",
+    "list network peering in mongodb",
+    "list network peering connections in mongodb"
+  ],
+  "description": "List all network peering connections for the current MongoDB Atlas project including provider, status, VPC ID, and CIDR block.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/list-network-peering.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

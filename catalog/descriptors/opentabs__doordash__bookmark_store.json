@@ -1,0 +1,37 @@
+{
+  "slug": "doordash.bookmark_store",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "bookmark a store in doordash",
+    "bookmark store in doordash",
+    "save a store as a favorite in doordash"
+  ],
+  "description": "Save a store to your bookmarked/favorite stores list on DoorDash.",
+  "actionVerb": "bookmark",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "type": "string",
+        "description": "Store ID to bookmark"
+      }
+    },
+    "required": [
+      "store_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/bookmark-store.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "bookmark"
+    }
+  }
+}

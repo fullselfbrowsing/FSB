@@ -1,0 +1,44 @@
+{
+  "slug": "cloudflare.delete_dns_record",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "delete a dns record in cloudflare",
+    "remove a dns record in cloudflare",
+    "trash a dns record in cloudflare",
+    "permanently delete a dns record in cloudflare",
+    "delete dns record in cloudflare"
+  ],
+  "description": "Delete a DNS record from a zone. This action is irreversible.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      },
+      "record_id": {
+        "type": "string",
+        "description": "DNS record ID to delete"
+      }
+    },
+    "required": [
+      "zone_id",
+      "record_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/delete-dns-record.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

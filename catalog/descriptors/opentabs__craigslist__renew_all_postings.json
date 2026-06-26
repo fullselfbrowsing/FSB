@@ -1,0 +1,29 @@
+{
+  "slug": "craigslist.renew_all_postings",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "renew all postings in craigslist",
+    "bulk renew all eligible postings in craigslist",
+    "renew all eligible postings in bulk in craigslist"
+  ],
+  "description": "Renew all eligible postings in bulk. Check list_renewable_postings first to see which postings are eligible. This action renews all renewable postings at once.",
+  "actionVerb": "renew",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/renew-all-postings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "renew"
+    }
+  }
+}

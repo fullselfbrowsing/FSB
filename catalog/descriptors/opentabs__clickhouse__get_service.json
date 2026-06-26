@@ -1,0 +1,40 @@
+{
+  "slug": "clickhouse.get_service",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "get a service in clickhouse",
+    "look up a service in clickhouse",
+    "fetch a single service in clickhouse",
+    "view one specific service in clickhouse",
+    "get service in clickhouse",
+    "get service details in clickhouse"
+  ],
+  "description": "Get detailed information about a specific ClickHouse Cloud service including state, endpoints, scaling, and IP access list.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_id": {
+        "type": "string",
+        "description": "Service UUID"
+      }
+    },
+    "required": [
+      "service_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/get-service.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

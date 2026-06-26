@@ -1,0 +1,31 @@
+{
+  "slug": "azure.list_tenants",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list tenants in azure",
+    "show me my tenants in azure",
+    "view my tenants in azure",
+    "see all my tenants in azure",
+    "list all azure ad tenants in azure"
+  ],
+  "description": "List all Azure Active Directory tenants accessible to the current user. Returns tenant ID, display name, default domain, and category.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-tenants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

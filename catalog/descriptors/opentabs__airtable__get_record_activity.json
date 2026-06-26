@@ -1,0 +1,50 @@
+{
+  "slug": "airtable.get_record_activity",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "get a record activity in airtable",
+    "look up a record activity in airtable",
+    "fetch a single record activity in airtable",
+    "view one specific record activity in airtable",
+    "get record activity in airtable",
+    "get activity history and comments for a record in airtable"
+  ],
+  "description": "Get the activity history and comments for a record. Returns a chronological list of changes (cell updates, record creation, comments, etc.) with user attribution.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "description": "Base ID (app prefix)"
+      },
+      "table_id": {
+        "type": "string",
+        "description": "Table ID (tbl prefix)"
+      },
+      "record_id": {
+        "type": "string",
+        "description": "Record ID (rec prefix)"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id",
+      "record_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/get-record-activity.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

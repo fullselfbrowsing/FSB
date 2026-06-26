@@ -1,0 +1,45 @@
+{
+  "slug": "twilio.list_alerts",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list alerts in twilio",
+    "show me my alerts in twilio",
+    "view my alerts in twilio",
+    "see all my alerts in twilio"
+  ],
+  "description": "List account alerts from the Twilio Monitor. Optionally filter by log level.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of alerts to return per page (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "log_level": {
+        "description": "Filter by log level (warning or error)",
+        "type": "string",
+        "enum": [
+          "warning",
+          "error"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-alerts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

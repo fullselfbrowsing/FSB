@@ -1,0 +1,45 @@
+{
+  "slug": "whatsapp.mute_chat",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "mute a chat in whatsapp",
+    "mute chat in whatsapp",
+    "mute or unmute a chat in whatsapp"
+  ],
+  "description": "Mute or unmute a WhatsApp chat. Muted chats do not send notifications. Provide a duration in hours, or 0 to unmute.",
+  "actionVerb": "mute",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID"
+      },
+      "duration_hours": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Mute duration in hours. Use 0 to unmute. Common values: 8 (8 hours), 168 (1 week), 8760 (1 year)"
+      }
+    },
+    "required": [
+      "chat_id",
+      "duration_hours"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/mute-chat.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "mute"
+    }
+  }
+}

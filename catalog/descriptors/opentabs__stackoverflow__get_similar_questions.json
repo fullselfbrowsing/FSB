@@ -1,0 +1,77 @@
+{
+  "slug": "stackoverflow.get_similar_questions",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get similar questions in stackoverflow",
+    "look up similar questions in stackoverflow",
+    "fetch a single similar questions in stackoverflow",
+    "view one specific similar questions in stackoverflow",
+    "find similar questions by title in stackoverflow"
+  ],
+  "description": "Find Stack Overflow questions similar to a given title. Uses title-based similarity matching to find potential duplicates or related content. Useful before asking a new question to check for existing answers.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Title text to find similar questions for"
+      },
+      "tagged": {
+        "description": "Semicolon-delimited tags to filter by (e.g., \"javascript;react\")",
+        "type": "string"
+      },
+      "nottagged": {
+        "description": "Semicolon-delimited tags to exclude",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort order (default: relevance)",
+        "type": "string",
+        "enum": [
+          "activity",
+          "creation",
+          "votes",
+          "relevance"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-similar-questions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

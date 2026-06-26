@@ -1,0 +1,50 @@
+{
+  "slug": "todoist.create_section",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "create a section in todoist",
+    "add a section in todoist",
+    "make a new section in todoist",
+    "open a new section in todoist",
+    "create section in todoist"
+  ],
+  "description": "Create a new section in a Todoist project. Sections help organize tasks within a project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the section to create"
+      },
+      "project_id": {
+        "type": "string",
+        "description": "Project ID to create the section in"
+      },
+      "order": {
+        "description": "Position of the section among other sections in the project",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "name",
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/create-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "lucid.search_documents",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "search documents in lucid",
+    "search documents by keyword in lucid",
+    "search across all lucid documents by title or content in lucid"
+  ],
+  "description": "Search across all Lucid documents by title or content. Returns rich document metadata including creator, starred status, and project membership. Use count to limit results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "count": {
+        "description": "Maximum number of results to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "product": {
+        "description": "Filter by product type",
+        "type": "string",
+        "enum": [
+          "chart",
+          "press",
+          "spark"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/search-documents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

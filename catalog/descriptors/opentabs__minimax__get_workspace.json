@@ -1,0 +1,32 @@
+{
+  "slug": "minimax.get_workspace",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get a workspace in minimax",
+    "look up a workspace in minimax",
+    "fetch a single workspace in minimax",
+    "view one specific workspace in minimax",
+    "get workspace in minimax",
+    "get workspace details in minimax"
+  ],
+  "description": "Get details about the current MiniMax Agent workspace including name, ID, and member count.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-workspace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

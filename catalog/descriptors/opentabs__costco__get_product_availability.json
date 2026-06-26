@@ -1,0 +1,43 @@
+{
+  "slug": "costco.get_product_availability",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "get a product availability in costco",
+    "look up a product availability in costco",
+    "fetch a single product availability in costco",
+    "view one specific product availability in costco",
+    "get product availability in costco",
+    "check product inventory and availability in costco"
+  ],
+  "description": "Check inventory availability for one or more Costco products. Returns online shipping availability, warehouse availability, pickup availability, and third-party delivery status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_numbers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of item numbers to check (max 30)"
+      }
+    },
+    "required": [
+      "item_numbers"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/get-product-availability.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

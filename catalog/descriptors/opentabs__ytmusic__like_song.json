@@ -1,0 +1,37 @@
+{
+  "slug": "ytmusic.like_song",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "like a song in ytmusic",
+    "like song in ytmusic",
+    "like a song on youtube music in ytmusic"
+  ],
+  "description": "Like a song on YouTube Music",
+  "actionVerb": "like",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID of the song to like"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/like-song.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "like"
+    }
+  }
+}

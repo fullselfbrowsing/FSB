@@ -1,0 +1,51 @@
+{
+  "slug": "facebook.react_to_post",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "react a to post in facebook",
+    "react to post in facebook",
+    "react to a facebook post in facebook"
+  ],
+  "description": "Add or remove a reaction on a Facebook post. Requires the feedback_id from get_user_posts. Set reaction to \"NONE\" to remove an existing reaction. Available reactions: LIKE, LOVE, HAHA, WOW, SAD, ANGRY.",
+  "actionVerb": "react",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "feedback_id": {
+        "type": "string",
+        "description": "Feedback ID of the post (from get_user_posts)"
+      },
+      "reaction": {
+        "type": "string",
+        "enum": [
+          "LIKE",
+          "LOVE",
+          "HAHA",
+          "WOW",
+          "SAD",
+          "ANGRY",
+          "NONE"
+        ],
+        "description": "Reaction type: LIKE, LOVE, HAHA, WOW, SAD, ANGRY, or NONE to remove"
+      }
+    },
+    "required": [
+      "feedback_id",
+      "reaction"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/react-to-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "react"
+    }
+  }
+}

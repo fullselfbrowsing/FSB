@@ -1,0 +1,31 @@
+{
+  "slug": "instacart.list_addresses",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "list addresses in instacart",
+    "show me my addresses in instacart",
+    "view my addresses in instacart",
+    "see all my addresses in instacart",
+    "list saved delivery addresses in instacart"
+  ],
+  "description": "List all saved delivery addresses on the Instacart account. Returns street address, city, state, postal code, coordinates, and delivery instructions.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/list-addresses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "excel.calculate_workbook",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "calculate a workbook in excel",
+    "calculate workbook in excel",
+    "recalculate all formulas in excel"
+  ],
+  "description": "Recalculate all formulas in the workbook. Use calculation_type \"Recalculate\" for normal recalculation, \"Full\" to force recalculation of all formulas, or \"FullRebuild\" to rebuild the dependency chain and recalculate.",
+  "actionVerb": "calculate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calculation_type": {
+        "description": "Calculation type (default \"Recalculate\")",
+        "type": "string",
+        "enum": [
+          "Recalculate",
+          "Full",
+          "FullRebuild"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/calculate-workbook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "calculate"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "slug": "outlook.get_schedule",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "get a schedule in outlook",
+    "look up a schedule in outlook",
+    "fetch a single schedule in outlook",
+    "view one specific schedule in outlook",
+    "get schedule in outlook",
+    "view others' availability in outlook"
+  ],
+  "description": "Look up free/busy availability for one or more people in the organization over a time window. Returns each person's busy/tentative/out-of-office blocks (with subjects and locations where the requester is permitted to see them) and their working hours. Use this to view other people's calendars and find open meeting times.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "schedules": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Email addresses of the people (or rooms) to look up"
+      },
+      "start": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|))$",
+        "description": "Window start as ISO 8601 without an offset (e.g. \"2026-06-02T08:00:00\"); the zone is set by time_zone."
+      },
+      "end": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|))$",
+        "description": "Window end as ISO 8601 without an offset (e.g. \"2026-06-02T18:00:00\"); the zone is set by time_zone."
+      },
+      "time_zone": {
+        "description": "Time zone for the window and returned times (e.g. \"Eastern Standard Time\"). Defaults to UTC.",
+        "type": "string"
+      },
+      "interval_minutes": {
+        "description": "Granularity of the availability view in minutes (default 30)",
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 1440
+      }
+    },
+    "required": [
+      "schedules",
+      "start",
+      "end"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/get-schedule.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

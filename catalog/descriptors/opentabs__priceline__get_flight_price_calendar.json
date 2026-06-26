@@ -1,0 +1,83 @@
+{
+  "slug": "priceline.get_flight_price_calendar",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get a flight price calendar in priceline",
+    "look up a flight price calendar in priceline",
+    "fetch a single flight price calendar in priceline",
+    "view one specific flight price calendar in priceline",
+    "get flight price calendar in priceline",
+    "flight fare forecast for a date range in priceline"
+  ],
+  "description": "Get Priceline's fare forecast for a route over a date range. Returns the cheapest available fare for each date (or date combination for round-trips), along with departure/arrival times and stop counts. Pass a single `trips` entry for one-way, or two entries (outbound + return) for round-trip. Each trip can be a single date (`depart_date`) or a date window (`depart_date_from`/`depart_date_to`). Useful for finding the cheapest date to fly before booking.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "trips": {
+        "minItems": 1,
+        "maxItems": 6,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "description": "Origin airport/city code (e.g., JFK, NYC)"
+            },
+            "destination": {
+              "type": "string",
+              "description": "Destination airport/city code (e.g., LAX, LON)"
+            },
+            "depart_date": {
+              "description": "Single departure date in YYYY-MM-DD format. Provide either this or depart_date_range, not both.",
+              "type": "string"
+            },
+            "depart_date_from": {
+              "description": "Start of departure date window in YYYY-MM-DD format. Pair with depart_date_to for range searches.",
+              "type": "string"
+            },
+            "depart_date_to": {
+              "description": "End of departure date window in YYYY-MM-DD format. Pair with depart_date_from for range searches.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "origin",
+            "destination"
+          ],
+          "additionalProperties": false,
+          "description": "A single flight slice (leg). For one-way pass one slice; for round-trip pass two (outbound + return)."
+        },
+        "description": "Flight slices — 1 for one-way, 2 for round-trip, up to 6 for multi-city"
+      },
+      "cabin_class": {
+        "description": "Cabin class filter (default ECO)",
+        "type": "string",
+        "enum": [
+          "ECO",
+          "PREMIUM",
+          "BUS",
+          "FIRST"
+        ]
+      }
+    },
+    "required": [
+      "trips"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-flight-price-calendar.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

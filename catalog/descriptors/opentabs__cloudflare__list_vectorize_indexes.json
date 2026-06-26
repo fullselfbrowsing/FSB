@@ -1,0 +1,30 @@
+{
+  "slug": "cloudflare.list_vectorize_indexes",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list vectorize indexes in cloudflare",
+    "show me my vectorize indexes in cloudflare",
+    "view my vectorize indexes in cloudflare",
+    "see all my vectorize indexes in cloudflare"
+  ],
+  "description": "List Vectorize vector database indexes in the account. Vectorize stores vector embeddings for semantic search and RAG applications.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-vectorize-indexes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

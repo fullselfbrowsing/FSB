@@ -1,0 +1,40 @@
+{
+  "slug": "retool.get_app",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get an app in retool",
+    "look up an app in retool",
+    "fetch a single app in retool",
+    "view one specific app in retool",
+    "get app in retool",
+    "get app details by uuid in retool"
+  ],
+  "description": "Get a Retool application by UUID. Returns the page save record including serialized app state, change history, and metadata. For a human-readable lookup by path, use lookup_app instead.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID (from list_apps results)"
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-app.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

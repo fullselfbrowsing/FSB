@@ -1,0 +1,53 @@
+{
+  "slug": "doordash.update_profile",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "update a profile in doordash",
+    "edit a profile in doordash",
+    "change the details of profile in doordash",
+    "modify a profile in doordash",
+    "update profile in doordash",
+    "update your doordash profile in doordash"
+  ],
+  "description": "Update the authenticated DoorDash user profile. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "first_name": {
+        "description": "New first name",
+        "type": "string"
+      },
+      "last_name": {
+        "description": "New last name",
+        "type": "string"
+      },
+      "email": {
+        "description": "New email address",
+        "type": "string"
+      },
+      "phone_number": {
+        "description": "New phone number in E.164 format (e.g., +18005551234)",
+        "type": "string"
+      },
+      "default_country": {
+        "description": "New default country",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/update-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

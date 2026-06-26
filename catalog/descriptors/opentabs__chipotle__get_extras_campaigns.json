@@ -1,0 +1,31 @@
+{
+  "slug": "chipotle.get_extras_campaigns",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get extras campaigns in chipotle",
+    "look up extras campaigns in chipotle",
+    "fetch a single extras campaigns in chipotle",
+    "view one specific extras campaigns in chipotle",
+    "get extras bonus reward campaigns in chipotle"
+  ],
+  "description": "Get Chipotle Extras campaigns — bonus reward opportunities and promotional challenges from the loyalty program.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-extras-campaigns.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

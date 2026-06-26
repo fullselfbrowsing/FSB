@@ -1,0 +1,42 @@
+{
+  "slug": "snowflake.list_dashboards",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "list dashboards in snowflake",
+    "show me my dashboards in snowflake",
+    "view my dashboards in snowflake",
+    "see all my dashboards in snowflake",
+    "list snowflake dashboards in snowflake"
+  ],
+  "description": "List Snowflake dashboards, sorted by most recently modified. Supports pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum dashboards to return (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/list-dashboards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

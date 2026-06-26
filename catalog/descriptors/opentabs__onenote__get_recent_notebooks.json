@@ -1,0 +1,36 @@
+{
+  "slug": "onenote.get_recent_notebooks",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "get recent notebooks in onenote",
+    "look up recent notebooks in onenote",
+    "fetch a single recent notebooks in onenote",
+    "view one specific recent notebooks in onenote",
+    "get recently accessed notebooks in onenote"
+  ],
+  "description": "Get recently accessed OneNote notebooks. Returns notebooks sorted by last access time, including notebooks from personal OneDrive and OneDrive for Business.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "include_personal": {
+        "description": "Include personal (consumer) notebooks in addition to business notebooks (default true)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/get-recent-notebooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

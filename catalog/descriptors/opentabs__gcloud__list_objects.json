@@ -1,0 +1,57 @@
+{
+  "slug": "gcloud.list_objects",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list objects in gcloud",
+    "show me my objects in gcloud",
+    "view my objects in gcloud",
+    "see all my objects in gcloud",
+    "list objects in a storage bucket in gcloud"
+  ],
+  "description": "List objects in a Cloud Storage bucket. Supports prefix filtering for directory-like browsing.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "bucket_name": {
+        "type": "string",
+        "description": "Bucket name"
+      },
+      "prefix": {
+        "description": "Object name prefix for filtering (e.g., \"logs/2024/\")",
+        "type": "string"
+      },
+      "delimiter": {
+        "description": "Delimiter for directory-like listing (typically \"/\")",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Max results (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "bucket_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-objects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

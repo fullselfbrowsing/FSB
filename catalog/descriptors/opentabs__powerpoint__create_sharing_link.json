@@ -1,0 +1,58 @@
+{
+  "slug": "powerpoint.create_sharing_link",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "create a sharing link in powerpoint",
+    "add a sharing link in powerpoint",
+    "make a new sharing link in powerpoint",
+    "open a new sharing link in powerpoint",
+    "create sharing link in powerpoint",
+    "create a sharing link for a file in powerpoint"
+  ],
+  "description": "Create a sharing link for a file or folder. Supports view-only and edit links with anonymous or organization scope.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file or folder"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "view",
+          "edit",
+          "embed"
+        ],
+        "description": "Link type — view (read-only), edit (read-write), or embed"
+      },
+      "scope": {
+        "description": "Link scope — anonymous (anyone) or organization (org members only). Default: anonymous",
+        "type": "string",
+        "enum": [
+          "anonymous",
+          "organization"
+        ]
+      }
+    },
+    "required": [
+      "item_id",
+      "type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/create-sharing-link.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

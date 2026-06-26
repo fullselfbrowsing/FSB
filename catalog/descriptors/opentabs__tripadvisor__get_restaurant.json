@@ -1,0 +1,40 @@
+{
+  "slug": "tripadvisor.get_restaurant",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get a restaurant in tripadvisor",
+    "look up a restaurant in tripadvisor",
+    "fetch a single restaurant in tripadvisor",
+    "view one specific restaurant in tripadvisor",
+    "get restaurant in tripadvisor",
+    "get restaurant details in tripadvisor"
+  ],
+  "description": "Get detailed information about a TripAdvisor restaurant including ratings, subratings, cuisine, address, hours, AI review summary, and price range. Provide the restaurant URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-...\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Restaurant page URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-Brenda_s_French_Soul_Food-San_Francisco_California.html\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-restaurant.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

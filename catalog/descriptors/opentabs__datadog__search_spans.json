@@ -1,0 +1,59 @@
+{
+  "slug": "datadog.search_spans",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search spans in datadog",
+    "search apm spans with datadog query syntax in datadog",
+    "search apm spans/traces using datadog query syntax in datadog"
+  ],
+  "description": "Search APM spans/traces using Datadog query syntax. Filter by service, resource, operation, status, duration, and tags (e.g., \"service:web-store\", \"@http.status_code:500\", \"@duration:>5000000\").",
+  "actionVerb": "search",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Span search query (e.g., \"service:my-app status:error\", \"@duration:>1000000\")"
+      },
+      "from": {
+        "description": "Start time (default now-1h)",
+        "type": "string"
+      },
+      "to": {
+        "description": "End time (default now)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum spans (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "sort": {
+        "description": "Sort order (default -timestamp)",
+        "type": "string",
+        "enum": [
+          "timestamp",
+          "-timestamp"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-spans.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "search"
+    }
+  }
+}

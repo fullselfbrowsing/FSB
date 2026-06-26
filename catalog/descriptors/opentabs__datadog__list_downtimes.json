@@ -1,0 +1,48 @@
+{
+  "slug": "datadog.list_downtimes",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list downtimes in datadog",
+    "show me my downtimes in datadog",
+    "view my downtimes in datadog",
+    "see all my downtimes in datadog",
+    "list maintenance windows in datadog"
+  ],
+  "description": "List scheduled downtimes (maintenance windows) in the Datadog organization.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "current_only": {
+        "description": "If true, return only active downtimes",
+        "type": "boolean"
+      },
+      "page_limit": {
+        "description": "Results per page (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_offset": {
+        "description": "Offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-downtimes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

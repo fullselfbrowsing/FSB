@@ -1,0 +1,39 @@
+{
+  "slug": "cloudflare.list_rulesets",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list rulesets in cloudflare",
+    "show me my rulesets in cloudflare",
+    "view my rulesets in cloudflare",
+    "see all my rulesets in cloudflare",
+    "list zone rulesets in cloudflare"
+  ],
+  "description": "List all rulesets for a zone. Rulesets contain WAF, rate limiting, redirect, and transform rules organized by phase (e.g., http_request_firewall_managed, ddos_l7, http_request_sanitize).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-rulesets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

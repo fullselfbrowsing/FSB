@@ -1,0 +1,44 @@
+{
+  "slug": "x.remove_list_member",
+  "service": "x.com",
+  "intentSynonyms": [
+    "remove a list member in x",
+    "remove list member in x",
+    "remove a user from a list in x"
+  ],
+  "description": "Remove a user from a list.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID"
+      },
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID to remove"
+      }
+    },
+    "required": [
+      "list_id",
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/remove-list-member.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

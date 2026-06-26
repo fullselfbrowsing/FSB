@@ -1,0 +1,39 @@
+{
+  "slug": "pinterest.delete_board",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "delete a board in pinterest",
+    "remove a board in pinterest",
+    "trash a board in pinterest",
+    "permanently delete a board in pinterest",
+    "delete board in pinterest"
+  ],
+  "description": "Delete a board and all its pins. Only works for boards you own. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "string",
+        "description": "Board ID to delete"
+      }
+    },
+    "required": [
+      "board_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/delete-board.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

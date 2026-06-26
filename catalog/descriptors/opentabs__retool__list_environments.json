@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_environments",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list environments in retool",
+    "show me my environments in retool",
+    "view my environments in retool",
+    "see all my environments in retool",
+    "list all deployment environments in retool"
+  ],
+  "description": "List all deployment environments in the Retool organization. Environments define separate configurations for resources (e.g., production, staging).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-environments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

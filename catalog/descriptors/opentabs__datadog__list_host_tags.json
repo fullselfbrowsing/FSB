@@ -1,0 +1,39 @@
+{
+  "slug": "datadog.list_host_tags",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list host tags in datadog",
+    "show me my host tags in datadog",
+    "view my host tags in datadog",
+    "see all my host tags in datadog",
+    "list tags for a host in datadog"
+  ],
+  "description": "List all tags for a specific host, organized by source (e.g., datadog-agent, cloud provider).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "host_name": {
+        "type": "string",
+        "description": "Host name to get tags for"
+      }
+    },
+    "required": [
+      "host_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-host-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

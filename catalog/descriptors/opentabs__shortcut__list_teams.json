@@ -1,0 +1,31 @@
+{
+  "slug": "shortcut.list_teams",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "list teams in shortcut",
+    "show me my teams in shortcut",
+    "view my teams in shortcut",
+    "see all my teams in shortcut",
+    "list all teams in shortcut"
+  ],
+  "description": "List all teams (groups) in the workspace. Teams organize members and are associated with workflows.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/list-teams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "hack2hire.list_comment_replies",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "list comment replies in hack2hire",
+    "show me my comment replies in hack2hire",
+    "view my comment replies in hack2hire",
+    "see all my comment replies in hack2hire",
+    "list replies to a comment in hack2hire"
+  ],
+  "description": "List replies to a Hack2Hire comment. Each reply has the same shape as a top-level comment (body, vote scores, author, etc.).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "commentId": {
+        "type": "string",
+        "description": "Parent comment ID — get this from list_question_comments."
+      },
+      "page": {
+        "description": "Page number (default 1).",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "perPage": {
+        "description": "Results per page (default 10, max 50).",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "commentId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/list-comment-replies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

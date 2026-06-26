@@ -1,0 +1,53 @@
+{
+  "slug": "whatsapp.star_message",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "star a message in whatsapp",
+    "star message in whatsapp",
+    "star or unstar messages in whatsapp"
+  ],
+  "description": "Star or unstar messages in a WhatsApp chat. Starred messages can be accessed later via the starred messages list.",
+  "actionVerb": "star",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID containing the messages"
+      },
+      "message_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Message IDs to star or unstar"
+      },
+      "star": {
+        "type": "boolean",
+        "description": "True to star, false to unstar"
+      }
+    },
+    "required": [
+      "chat_id",
+      "message_ids",
+      "star"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/star-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "star"
+    }
+  }
+}

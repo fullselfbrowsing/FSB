@@ -1,0 +1,37 @@
+{
+  "slug": "gcloud.get_iam_policy",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "get an iam policy in gcloud",
+    "look up an iam policy in gcloud",
+    "fetch a single iam policy in gcloud",
+    "view one specific iam policy in gcloud",
+    "get iam policy in gcloud",
+    "get the project iam policy in gcloud"
+  ],
+  "description": "Get the IAM access control policy for the project. Returns all role bindings (who has which role).",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/get-iam-policy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

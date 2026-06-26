@@ -1,0 +1,37 @@
+{
+  "slug": "pinterest.get_home_feed",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get a home feed in pinterest",
+    "look up a home feed in pinterest",
+    "fetch a single home feed in pinterest",
+    "view one specific home feed in pinterest",
+    "get home feed in pinterest",
+    "get the personalized home feed in pinterest"
+  ],
+  "description": "Get the personalized home feed of pins for the authenticated user. Returns recommended pins based on interests and activity. Supports pagination via bookmark cursor.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-home-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

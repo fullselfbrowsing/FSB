@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_host_info",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a host info in datadog",
+    "look up a host info in datadog",
+    "fetch a single host info in datadog",
+    "view one specific host info in datadog",
+    "get host info in datadog",
+    "get host details by name in datadog"
+  ],
+  "description": "Get detailed information about a specific host by hostname.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "hostname": {
+        "type": "string",
+        "description": "Hostname to look up"
+      }
+    },
+    "required": [
+      "hostname"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-host-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "slug": "minimax.list_workspace_members",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list workspace members in minimax",
+    "show me my workspace members in minimax",
+    "view my workspace members in minimax",
+    "see all my workspace members in minimax"
+  ],
+  "description": "List all members of the current MiniMax Agent workspace including their roles and contact information.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-workspace-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

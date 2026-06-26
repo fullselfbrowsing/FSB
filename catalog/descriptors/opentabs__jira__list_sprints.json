@@ -1,0 +1,51 @@
+{
+  "slug": "jira.list_sprints",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list sprints in jira",
+    "show me my sprints in jira",
+    "view my sprints in jira",
+    "see all my sprints in jira",
+    "list sprints for a board in jira"
+  ],
+  "description": "List sprints for a Jira board. Returns sprint name, state, and dates.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "number",
+        "description": "Board ID to list sprints for (use list_boards to find IDs)"
+      },
+      "state": {
+        "description": "Filter by sprint state: active, future, closed",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Maximum number of sprints to return (default 50)",
+        "type": "number"
+      },
+      "start_at": {
+        "description": "Index of the first result to return for pagination",
+        "type": "number"
+      }
+    },
+    "required": [
+      "board_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/list-sprints.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

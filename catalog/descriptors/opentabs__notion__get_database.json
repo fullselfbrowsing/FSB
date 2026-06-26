@@ -1,0 +1,41 @@
+{
+  "slug": "notion.get_database",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "get a database in notion",
+    "look up a database in notion",
+    "fetch a single database in notion",
+    "view one specific database in notion",
+    "get database in notion",
+    "get a database schema in notion"
+  ],
+  "description": "Get a Notion database (collection) schema including its properties/columns and their types. Use this to understand the structure before querying.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "database_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Database (collection) ID. You can find this from a collection_view or collection_view_page block."
+      }
+    },
+    "required": [
+      "database_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/get-database.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

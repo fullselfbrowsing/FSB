@@ -1,0 +1,39 @@
+{
+  "slug": "webflow.list_folders",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "list folders in webflow",
+    "show me my folders in webflow",
+    "view my folders in webflow",
+    "see all my folders in webflow",
+    "list workspace folders in webflow"
+  ],
+  "description": "List all folders in a Webflow workspace. Folders are used to organize sites into groups.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug"
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/list-folders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

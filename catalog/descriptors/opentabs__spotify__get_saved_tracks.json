@@ -1,0 +1,44 @@
+{
+  "slug": "spotify.get_saved_tracks",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get saved tracks in spotify",
+    "look up saved tracks in spotify",
+    "fetch a single saved tracks in spotify",
+    "view one specific saved tracks in spotify",
+    "get saved tracks from library in spotify"
+  ],
+  "description": "Get tracks saved in the current user's library. Returns saved tracks with the date they were added.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of tracks to return (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Index of the first track to return (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-saved-tracks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

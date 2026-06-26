@@ -1,0 +1,36 @@
+{
+  "slug": "lucid.list_folder_entries",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "list folder entries in lucid",
+    "show me my folder entries in lucid",
+    "view my folder entries in lucid",
+    "see all my folder entries in lucid",
+    "list folders and document entries in lucid"
+  ],
+  "description": "List folder entries for the current user. Includes both folders and document entries. Optionally filter by parent folder to list children of a specific folder.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "parent_id": {
+        "description": "Parent folder entry ID to list children of. Omit for root-level entries.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/list-folder-entries.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

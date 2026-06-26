@@ -1,0 +1,41 @@
+{
+  "slug": "onenote.get_section_group",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "get a section group in onenote",
+    "look up a section group in onenote",
+    "fetch a single section group in onenote",
+    "view one specific section group in onenote",
+    "get section group in onenote",
+    "get a section group by id in onenote"
+  ],
+  "description": "Get detailed information about a specific OneNote section group by its ID. Section groups are folders that organize sections within a notebook.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "section_group_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Section group ID"
+      }
+    },
+    "required": [
+      "section_group_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/get-section-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

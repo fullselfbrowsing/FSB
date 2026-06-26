@@ -1,0 +1,47 @@
+{
+  "slug": "shortcut.search_epics",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "search epics in shortcut",
+    "search epics by text in shortcut",
+    "search for epics by text query in shortcut"
+  ],
+  "description": "Search for epics by text query. Returns matching epics with pagination.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "page_size": {
+        "description": "Results per page (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      },
+      "next": {
+        "description": "Cursor token for next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/search-epics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

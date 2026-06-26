@@ -6,16 +6,16 @@
     "show me my zones in cloudflare",
     "view my zones in cloudflare",
     "see all my zones in cloudflare",
-    "list zones in the account in cloudflare"
+    "list all domains/zones in cloudflare"
   ],
-  "description": "List the zones (domains) in your Cloudflare account. Optionally filter by name or status.",
+  "description": "List all zones (domains) in the Cloudflare account. Returns domain names, status, plan, nameservers, and configuration. Supports filtering by name and status, with pagination.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
       "name": {
-        "description": "Filter zones by exact domain name",
+        "description": "Filter by domain name (supports partial match)",
         "type": "string"
       },
       "status": {
@@ -25,22 +25,20 @@
           "active",
           "pending",
           "initializing",
-          "moved",
-          "deleted",
-          "deactivated"
+          "moved"
         ]
       },
       "page": {
-        "description": "Page number for pagination (1-indexed)",
+        "description": "Page number (default 1)",
         "type": "integer",
-        "minimum": -9007199254740991,
+        "minimum": 1,
         "maximum": 9007199254740991
       },
       "per_page": {
-        "description": "Results per page (max 50)",
+        "description": "Results per page (default 20, max 50)",
         "type": "integer",
-        "minimum": -9007199254740991,
-        "maximum": 9007199254740991
+        "minimum": 5,
+        "maximum": 50
       }
     },
     "additionalProperties": false
@@ -52,8 +50,8 @@
     "sourcePath": "plugins/cloudflare/src/tools/list-zones.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

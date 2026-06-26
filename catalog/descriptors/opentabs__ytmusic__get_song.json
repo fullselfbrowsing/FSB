@@ -1,0 +1,40 @@
+{
+  "slug": "ytmusic.get_song",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "get a song in ytmusic",
+    "look up a song in ytmusic",
+    "fetch a single song in ytmusic",
+    "view one specific song in ytmusic",
+    "get song in ytmusic",
+    "get detailed information about a song in ytmusic"
+  ],
+  "description": "Get detailed information about a song by its video ID",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID of the song"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/get-song.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

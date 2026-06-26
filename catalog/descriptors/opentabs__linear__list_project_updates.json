@@ -1,0 +1,47 @@
+{
+  "slug": "linear.list_project_updates",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list project updates in linear",
+    "show me my project updates in linear",
+    "view my project updates in linear",
+    "see all my project updates in linear",
+    "list project status updates in linear"
+  ],
+  "description": "List status updates (health reports) for a Linear project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project UUID to list updates for"
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-project-updates.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "ganalytics.get_metadata",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "get a metadata in ganalytics",
+    "look up a metadata in ganalytics",
+    "fetch a single metadata in ganalytics",
+    "view one specific metadata in ganalytics",
+    "get metadata in ganalytics",
+    "list available dimensions and metrics in ganalytics"
+  ],
+  "description": "List all available dimensions and metrics for a GA4 property. Use this to discover which fields can be used in run_report. Optionally filter by category to narrow results. Use property_id \"0\" for universal metadata (not property-specific).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "string",
+        "description": "GA4 property ID (numeric string). Use \"0\" for universal metadata."
+      },
+      "category": {
+        "description": "Filter by category (e.g., \"User\", \"Session\", \"Traffic source\", \"Event\", \"Ecommerce\"). Case-sensitive.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "property_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/get-metadata.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

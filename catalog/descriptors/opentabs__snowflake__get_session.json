@@ -1,0 +1,32 @@
+{
+  "slug": "snowflake.get_session",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "get a session in snowflake",
+    "look up a session in snowflake",
+    "fetch a single session in snowflake",
+    "view one specific session in snowflake",
+    "get session in snowflake",
+    "get current session context in snowflake"
+  ],
+  "description": "Get the current Snowflake session context including user email, active role, organization, and build version.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/get-session.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

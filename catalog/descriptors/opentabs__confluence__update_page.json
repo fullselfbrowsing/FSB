@@ -9,7 +9,7 @@
     "update page in confluence",
     "update an existing page in confluence"
   ],
-  "description": "Update an existing Confluence page. Confluence requires the new version number; only specified fields are changed.",
+  "description": "Update an existing Confluence page. Requires the current version number (get it from get_page). The body uses Confluence storage format (HTML).",
   "actionVerb": "update",
   "sideEffectClass": "write",
   "params": {
@@ -20,31 +20,34 @@
         "minLength": 1,
         "description": "Page ID to update"
       },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New page title"
+      },
+      "body": {
+        "type": "string",
+        "description": "New page body in storage format (HTML)"
+      },
       "version_number": {
         "type": "integer",
         "minimum": 1,
         "maximum": 9007199254740991,
-        "description": "New version number (the current version + 1)"
+        "description": "Current version number of the page — the update increments this by 1"
       },
-      "title": {
-        "description": "New page title",
-        "type": "string"
-      },
-      "body": {
-        "description": "New page body content in storage (HTML) format",
+      "version_message": {
+        "description": "Optional message describing the changes",
         "type": "string"
       },
       "status": {
-        "description": "Page status: \"current\" or \"draft\"",
-        "type": "string",
-        "enum": [
-          "current",
-          "draft"
-        ]
+        "description": "Page status: \"current\" (default) or \"draft\"",
+        "type": "string"
       }
     },
     "required": [
       "page_id",
+      "title",
+      "body",
       "version_number"
     ],
     "additionalProperties": false
@@ -56,7 +59,7 @@
     "sourcePath": "plugins/confluence/src/tools/update-page.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": null,
       "httpMethod": "PUT",
       "opNameVerb": "update"
     }

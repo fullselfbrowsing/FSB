@@ -1,0 +1,30 @@
+{
+  "slug": "zendesk.list_views",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "list views in zendesk",
+    "show me my views in zendesk",
+    "view my views in zendesk",
+    "see all my views in zendesk"
+  ],
+  "description": "List all shared and personal views in the Zendesk account.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/list-views.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

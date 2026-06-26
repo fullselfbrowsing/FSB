@@ -7,33 +7,21 @@
     "fetch a single issue in jira",
     "view one specific issue in jira",
     "get issue in jira",
-    "get an issue by id or key in jira"
+    "get details of an issue in jira"
   ],
-  "description": "Get detailed information about a specific Jira issue by its ID or key.",
+  "description": "Get detailed information about a specific Jira issue by its key (e.g. KAN-1) or ID.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "issue_id_or_key": {
+      "issue_key": {
         "type": "string",
-        "minLength": 1,
-        "description": "Issue ID or key to retrieve (e.g. ENG-123)"
-      },
-      "fields": {
-        "description": "Issue field names to include in the response",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "expand": {
-        "description": "Comma-separated list of fields to expand (e.g. changelog)",
-        "type": "string"
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
       }
     },
     "required": [
-      "issue_id_or_key"
+      "issue_key"
     ],
     "additionalProperties": false
   },

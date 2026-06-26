@@ -1,0 +1,32 @@
+{
+  "slug": "ytmusic.get_library",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "get a library in ytmusic",
+    "look up a library in ytmusic",
+    "fetch a single library in ytmusic",
+    "view one specific library in ytmusic",
+    "get library in ytmusic",
+    "get the user's music library overview in ytmusic"
+  ],
+  "description": "Get the user's YouTube Music library overview with playlists",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/get-library.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

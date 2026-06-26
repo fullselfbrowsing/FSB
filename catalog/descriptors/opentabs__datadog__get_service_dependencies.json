@@ -1,0 +1,43 @@
+{
+  "slug": "datadog.get_service_dependencies",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get service dependencies in datadog",
+    "look up service dependencies in datadog",
+    "fetch a single service dependencies in datadog",
+    "view one specific service dependencies in datadog",
+    "get service dependency map in datadog"
+  ],
+  "description": "Get upstream and downstream service dependencies for an APM service. Returns services that call this service and services this service calls.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_name": {
+        "type": "string",
+        "description": "Service name to get dependencies for"
+      },
+      "env": {
+        "description": "Environment (e.g., \"production\", \"staging\"). Defaults to \"production\".",
+        "type": "string"
+      }
+    },
+    "required": [
+      "service_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-service-dependencies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

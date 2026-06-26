@@ -1,0 +1,31 @@
+{
+  "slug": "datadog.get_host_totals",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get host totals in datadog",
+    "look up host totals in datadog",
+    "fetch a single host totals in datadog",
+    "view one specific host totals in datadog",
+    "get total active/up host counts in datadog"
+  ],
+  "description": "Get the total number of active and up hosts in the organization.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-host-totals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

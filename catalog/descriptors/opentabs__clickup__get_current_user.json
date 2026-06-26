@@ -1,0 +1,32 @@
+{
+  "slug": "clickup.get_current_user",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get a current user in clickup",
+    "look up a current user in clickup",
+    "fetch a single current user in clickup",
+    "view one specific current user in clickup",
+    "get current user in clickup",
+    "get the authenticated user profile in clickup"
+  ],
+  "description": "Get the profile of the currently authenticated ClickUp user including name, email, timezone, and avatar.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

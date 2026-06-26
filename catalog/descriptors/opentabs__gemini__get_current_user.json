@@ -1,0 +1,32 @@
+{
+  "slug": "gemini.get_current_user",
+  "service": "gemini.google.com",
+  "intentSynonyms": [
+    "get a current user in gemini",
+    "look up a current user in gemini",
+    "fetch a single current user in gemini",
+    "view one specific current user in gemini",
+    "get current user in gemini",
+    "get the current gemini user profile in gemini"
+  ],
+  "description": "Get the authenticated Google Gemini user profile including email and user ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gemini/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

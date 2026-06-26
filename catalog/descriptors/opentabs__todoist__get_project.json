@@ -1,0 +1,40 @@
+{
+  "slug": "todoist.get_project",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "get a project in todoist",
+    "look up a project in todoist",
+    "fetch a single project in todoist",
+    "view one specific project in todoist",
+    "get project in todoist",
+    "get a project by id in todoist"
+  ],
+  "description": "Get detailed information about a specific Todoist project by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "The ID of the project to retrieve"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

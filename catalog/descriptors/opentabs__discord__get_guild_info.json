@@ -1,0 +1,41 @@
+{
+  "slug": "discord.get_guild_info",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "get a guild info in discord",
+    "look up a guild info in discord",
+    "fetch a single guild info in discord",
+    "view one specific guild info in discord",
+    "get guild info in discord",
+    "get detailed info about a server in discord"
+  ],
+  "description": "Get detailed information about a Discord guild (server) including description, member count, features, and boost status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guild_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Guild (server) ID to get information for"
+      }
+    },
+    "required": [
+      "guild_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/get-guild-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

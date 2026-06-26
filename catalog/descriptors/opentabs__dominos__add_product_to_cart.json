@@ -1,0 +1,43 @@
+{
+  "slug": "dominos.add_product_to_cart",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "add a product to cart in dominos",
+    "add product to cart in dominos",
+    "add a menu item to your cart in dominos"
+  ],
+  "description": "Quick-add a product to the cart by its product code. Get product codes from get_category_products. Optionally specify a quantity (defaults to 1). The user must have selected a store on the Domino's website first.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_code": {
+        "type": "string",
+        "description": "Product code/SKU from the menu (e.g., \"S_PIZSC\")"
+      },
+      "quantity": {
+        "description": "Quantity to add (default 1)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "product_code"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/add-product-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

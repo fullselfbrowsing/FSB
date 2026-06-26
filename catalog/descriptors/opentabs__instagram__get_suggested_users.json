@@ -1,0 +1,31 @@
+{
+  "slug": "instagram.get_suggested_users",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get suggested users in instagram",
+    "look up suggested users in instagram",
+    "fetch a single suggested users in instagram",
+    "view one specific suggested users in instagram",
+    "get follow suggestions in instagram"
+  ],
+  "description": "Get personalized follow suggestions based on your network. Returns suggested users with social context explaining why they are recommended.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-suggested-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

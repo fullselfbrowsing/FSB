@@ -1,0 +1,32 @@
+{
+  "slug": "bestbuy.get_cart",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get a cart in bestbuy",
+    "look up a cart in bestbuy",
+    "fetch a single cart in bestbuy",
+    "view one specific cart in bestbuy",
+    "get cart in bestbuy",
+    "view current cart contents and total in bestbuy"
+  ],
+  "description": "View the current Best Buy shopping cart contents including items, quantities, prices, and the cart total.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

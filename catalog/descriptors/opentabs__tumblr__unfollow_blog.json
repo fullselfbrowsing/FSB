@@ -1,0 +1,37 @@
+{
+  "slug": "tumblr.unfollow_blog",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "unfollow a blog in tumblr",
+    "unfollow blog in tumblr",
+    "unfollow a tumblr blog by url in tumblr"
+  ],
+  "description": "Unfollow a Tumblr blog by URL.",
+  "actionVerb": "unfollow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Blog URL to unfollow (e.g., \"staff.tumblr.com\" or \"https://staff.tumblr.com\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/unfollow-blog.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unfollow"
+    }
+  }
+}

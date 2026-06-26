@@ -1,0 +1,43 @@
+{
+  "slug": "sentry.list_comments",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list comments in sentry",
+    "show me my comments in sentry",
+    "view my comments in sentry",
+    "see all my comments in sentry",
+    "list comments on an issue in sentry"
+  ],
+  "description": "List comments (notes) on a Sentry issue. Returns the activity feed filtered to user-posted comments. Use create_comment to add a new comment.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "The issue ID to list comments for"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

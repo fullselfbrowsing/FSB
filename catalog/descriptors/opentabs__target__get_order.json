@@ -1,0 +1,40 @@
+{
+  "slug": "target.get_order",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get an order in target",
+    "look up an order in target",
+    "fetch a single order in target",
+    "view one specific order in target",
+    "get order in target",
+    "get details for a specific order in target"
+  ],
+  "description": "Get details for a specific Target order by order number. Returns order items, fulfillment status, and total. Use list_orders to find order numbers.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "order_number": {
+        "type": "string",
+        "description": "Order number (e.g., \"912003308575842\")"
+      }
+    },
+    "required": [
+      "order_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.get_apply",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get an apply in terraform",
+    "look up an apply in terraform",
+    "fetch a single apply in terraform",
+    "view one specific apply in terraform",
+    "get apply in terraform",
+    "get apply details in terraform"
+  ],
+  "description": "Get details about an apply including resource changes and status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "apply_id": {
+        "type": "string",
+        "description": "Apply ID (e.g., \"apply-...\")"
+      }
+    },
+    "required": [
+      "apply_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-apply.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

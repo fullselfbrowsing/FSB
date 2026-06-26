@@ -1,0 +1,32 @@
+{
+  "slug": "ganalytics.get_active_property",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "get an active property in ganalytics",
+    "look up an active property in ganalytics",
+    "fetch a single active property in ganalytics",
+    "view one specific active property in ganalytics",
+    "get active property in ganalytics",
+    "get the currently selected ga4 property in ganalytics"
+  ],
+  "description": "Get the GA4 property ID currently selected in the Google Analytics UI. The property ID is extracted from the URL hash. Returns empty if no property is selected (e.g., on the account admin page). Use this property ID with run_report and other Data API tools.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/get-active-property.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "minimax.vote_expert",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "vote an expert in minimax",
+    "vote expert in minimax",
+    "vote on an expert in minimax"
+  ],
+  "description": "Upvote or remove a vote from an AI expert/agent.",
+  "actionVerb": "vote",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "number",
+        "description": "Expert ID"
+      },
+      "vote_status": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Vote status (1=upvote, 0=remove vote)"
+      }
+    },
+    "required": [
+      "id",
+      "vote_status"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/vote-expert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "vote"
+    }
+  }
+}

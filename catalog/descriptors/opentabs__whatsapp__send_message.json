@@ -1,0 +1,46 @@
+{
+  "slug": "whatsapp.send_message",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "send a message in whatsapp",
+    "post a message in whatsapp",
+    "write a new message in whatsapp",
+    "send message in whatsapp",
+    "send a text message in whatsapp"
+  ],
+  "description": "Send a text message to a WhatsApp chat. Supports plain text and basic formatting (*bold*, _italic_, ~strikethrough~, ```code```).",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID to send the message to"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message text content"
+      }
+    },
+    "required": [
+      "chat_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "send"
+    }
+  }
+}

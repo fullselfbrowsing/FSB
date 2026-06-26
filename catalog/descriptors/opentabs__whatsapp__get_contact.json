@@ -1,0 +1,41 @@
+{
+  "slug": "whatsapp.get_contact",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "get a contact in whatsapp",
+    "look up a contact in whatsapp",
+    "fetch a single contact in whatsapp",
+    "view one specific contact in whatsapp",
+    "get contact in whatsapp",
+    "get a single contact by id in whatsapp"
+  ],
+  "description": "Get details for a specific WhatsApp contact by their ID. Use list_contacts to find contact IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "contact_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Contact ID (e.g., \"15551234567@c.us\")"
+      }
+    },
+    "required": [
+      "contact_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/get-contact.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

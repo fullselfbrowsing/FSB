@@ -1,0 +1,54 @@
+{
+  "slug": "slack.read_thread",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "read a thread in slack",
+    "read thread in slack",
+    "read replies in a thread in slack"
+  ],
+  "description": "Read replies in a Slack thread. Returns all messages including the parent message, with optional pagination.",
+  "actionVerb": "read",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID containing the thread (e.g., C01234567)"
+      },
+      "ts": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Timestamp of the parent message (thread_ts)"
+      },
+      "limit": {
+        "description": "Maximum number of replies to return (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel",
+      "ts"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/read-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "read"
+    }
+  }
+}

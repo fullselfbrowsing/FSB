@@ -1,0 +1,41 @@
+{
+  "slug": "pandaexpress.get_restaurant",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get a restaurant in pandaexpress",
+    "look up a restaurant in pandaexpress",
+    "fetch a single restaurant in pandaexpress",
+    "view one specific restaurant in pandaexpress",
+    "get restaurant in pandaexpress",
+    "get restaurant details by slug or ref in pandaexpress"
+  ],
+  "description": "Get detailed information about a specific Panda Express restaurant by its URL slug or external reference number.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "description": "Restaurant URL slug (e.g., \"fillmore-geary-px\")",
+        "type": "string"
+      },
+      "ext_ref": {
+        "description": "External reference number (e.g., \"4226\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-restaurant.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

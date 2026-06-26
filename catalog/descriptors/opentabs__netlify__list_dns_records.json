@@ -1,0 +1,39 @@
+{
+  "slug": "netlify.list_dns_records",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "list dns records in netlify",
+    "show me my dns records in netlify",
+    "view my dns records in netlify",
+    "see all my dns records in netlify",
+    "list dns records in a zone in netlify"
+  ],
+  "description": "List all DNS records in a Netlify DNS zone. Returns record hostname, type (A, AAAA, CNAME, MX, TXT, NS, etc.), value, TTL, and priority.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "The DNS zone ID to list records for"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/list-dns-records.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

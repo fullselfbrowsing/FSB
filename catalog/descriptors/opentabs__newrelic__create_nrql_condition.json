@@ -1,0 +1,92 @@
+{
+  "slug": "newrelic.create_nrql_condition",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "create a nrql condition in newrelic",
+    "add a nrql condition in newrelic",
+    "make a new nrql condition in newrelic",
+    "open a new nrql condition in newrelic",
+    "create nrql condition in newrelic",
+    "create a nrql alert condition in newrelic"
+  ],
+  "description": "Create a NRQL-based static alert condition. The condition evaluates the NRQL query and triggers when the result crosses the critical threshold.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID"
+      },
+      "policy_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Alert policy ID to attach the condition to"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Condition name"
+      },
+      "nrql_query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "NRQL query (e.g., \"SELECT count(*) FROM Transaction WHERE error IS true\")"
+      },
+      "critical_threshold": {
+        "type": "number",
+        "description": "Critical threshold value"
+      },
+      "threshold_operator": {
+        "description": "Threshold operator (default ABOVE)",
+        "type": "string",
+        "enum": [
+          "ABOVE",
+          "BELOW",
+          "EQUALS"
+        ]
+      },
+      "threshold_duration": {
+        "description": "Duration in seconds the threshold must be violated (default 300)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "threshold_occurrences": {
+        "description": "How many evaluation windows must violate (default ALL)",
+        "type": "string",
+        "enum": [
+          "ALL",
+          "AT_LEAST_ONCE"
+        ]
+      },
+      "enabled": {
+        "description": "Whether the condition is enabled (default true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "account_id",
+      "policy_id",
+      "name",
+      "nrql_query",
+      "critical_threshold"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/create-nrql-condition.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

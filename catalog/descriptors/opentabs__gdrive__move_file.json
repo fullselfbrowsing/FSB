@@ -1,0 +1,47 @@
+{
+  "slug": "gdrive.move_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "move a file in gdrive",
+    "move file in gdrive",
+    "move a file to a different folder in gdrive"
+  ],
+  "description": "Move a file or folder to a different parent folder. Specify the current parent to remove and the new parent to add. Use \"root\" for My Drive root.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID to move"
+      },
+      "from_parent_id": {
+        "type": "string",
+        "description": "Current parent folder ID to remove. Use \"root\" for My Drive root."
+      },
+      "to_parent_id": {
+        "type": "string",
+        "description": "New parent folder ID. Use \"root\" for My Drive root."
+      }
+    },
+    "required": [
+      "file_id",
+      "from_parent_id",
+      "to_parent_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/move-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "move"
+    }
+  }
+}

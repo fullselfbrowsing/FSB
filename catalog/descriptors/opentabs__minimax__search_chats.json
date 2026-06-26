@@ -1,0 +1,37 @@
+{
+  "slug": "minimax.search_chats",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "search chats in minimax",
+    "search chats by keyword in minimax",
+    "search for chat conversations by name in minimax"
+  ],
+  "description": "Search for chat conversations by name.",
+  "actionVerb": "search",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "description": "Search keyword"
+      }
+    },
+    "required": [
+      "keyword"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/search-chats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "search"
+    }
+  }
+}

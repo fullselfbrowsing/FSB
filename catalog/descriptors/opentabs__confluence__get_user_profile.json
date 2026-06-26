@@ -1,0 +1,37 @@
+{
+  "slug": "confluence.get_user_profile",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get an user profile in confluence",
+    "look up an user profile in confluence",
+    "fetch a single user profile in confluence",
+    "view one specific user profile in confluence",
+    "get user profile in confluence",
+    "get a user profile in confluence"
+  ],
+  "description": "Get a Confluence user profile by account ID. If no account ID is provided, returns the current user profile.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "description": "Atlassian account ID — omit to get the current user profile",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

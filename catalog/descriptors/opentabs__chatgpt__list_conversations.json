@@ -6,25 +6,33 @@
     "show me my conversations in chatgpt",
     "view my conversations in chatgpt",
     "see all my conversations in chatgpt",
-    "show me my chatgpt conversations in chatgpt"
+    "list your chatgpt conversations in chatgpt"
   ],
-  "description": "List your recent ChatGPT conversations. Optionally page through with an offset and limit.",
+  "description": "List ChatGPT conversations sorted by last updated. Supports pagination with offset and limit.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
       "offset": {
-        "description": "Number of conversations to skip",
+        "description": "Pagination offset (default 0)",
         "type": "integer",
         "minimum": 0,
         "maximum": 9007199254740991
       },
       "limit": {
-        "description": "Maximum number of conversations to return",
+        "description": "Number of conversations to return (default 28, max 100)",
         "type": "integer",
         "minimum": 1,
         "maximum": 100
+      },
+      "order": {
+        "description": "Sort order (default \"updated\")",
+        "type": "string",
+        "enum": [
+          "updated",
+          "created"
+        ]
       }
     },
     "additionalProperties": false

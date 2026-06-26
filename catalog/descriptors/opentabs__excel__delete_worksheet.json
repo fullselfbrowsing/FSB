@@ -1,0 +1,40 @@
+{
+  "slug": "excel.delete_worksheet",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a worksheet in excel",
+    "remove a worksheet in excel",
+    "trash a worksheet in excel",
+    "permanently delete a worksheet in excel",
+    "delete worksheet in excel",
+    "delete a worksheet by name in excel"
+  ],
+  "description": "Delete a worksheet from the currently open Excel workbook by name. The workbook must have at least two worksheets — you cannot delete the last one.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the worksheet to delete"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/delete-worksheet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "outlook.delete_event",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "delete an event in outlook",
+    "remove an event in outlook",
+    "trash an event in outlook",
+    "permanently delete an event in outlook",
+    "delete event in outlook",
+    "delete or cancel an event in outlook"
+  ],
+  "description": "Delete or cancel a calendar event. For a meeting you organize, provide a cancellation_message to send a cancellation notice to all attendees. Without a cancellation_message the event is simply removed from your calendar.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to delete or cancel"
+      },
+      "cancellation_message": {
+        "description": "When set and you are the organizer, sends this cancellation note to attendees instead of a silent delete.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/delete-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

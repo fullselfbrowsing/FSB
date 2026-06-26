@@ -1,0 +1,40 @@
+{
+  "slug": "stripe.get_subscription",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "get a subscription in stripe",
+    "look up a subscription in stripe",
+    "fetch a single subscription in stripe",
+    "view one specific subscription in stripe",
+    "get subscription in stripe",
+    "get a subscription by id in stripe"
+  ],
+  "description": "Get detailed information about a specific subscription by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (e.g., sub_xxx)"
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/get-subscription.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

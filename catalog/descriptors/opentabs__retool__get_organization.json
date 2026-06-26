@@ -1,0 +1,32 @@
+{
+  "slug": "retool.get_organization",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get an organization in retool",
+    "look up an organization in retool",
+    "fetch a single organization in retool",
+    "view one specific organization in retool",
+    "get organization in retool",
+    "get the current organization details in retool"
+  ],
+  "description": "Get detailed information about the current Retool organization, including name, subdomain, plan, and settings.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

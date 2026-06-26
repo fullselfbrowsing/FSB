@@ -1,0 +1,40 @@
+{
+  "slug": "telegram.get_user",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "get an user in telegram",
+    "look up an user in telegram",
+    "fetch a single user in telegram",
+    "view one specific user in telegram",
+    "get user in telegram",
+    "get a user profile by id in telegram"
+  ],
+  "description": "Get basic profile information for a Telegram user by their numeric user ID. Returns name, username, phone, bot status, and online status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "number",
+        "description": "Telegram user ID"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "airbnb.get_listing_from_page",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get a listing from page in airbnb",
+    "look up a listing from page in airbnb",
+    "fetch a single listing from page in airbnb",
+    "view one specific listing from page in airbnb",
+    "get listing from page in airbnb",
+    "extract listing details from the current page in airbnb"
+  ],
+  "description": "Extract listing details from the current Airbnb listing page. Navigate to a listing page first, then call this tool to read the listing data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-listing-from-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

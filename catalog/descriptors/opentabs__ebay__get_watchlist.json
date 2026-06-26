@@ -1,0 +1,32 @@
+{
+  "slug": "ebay.get_watchlist",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "get a watchlist in ebay",
+    "look up a watchlist in ebay",
+    "fetch a single watchlist in ebay",
+    "view one specific watchlist in ebay",
+    "get watchlist in ebay",
+    "get your ebay watchlist items in ebay"
+  ],
+  "description": "Get the authenticated user's eBay watchlist. Returns items being watched with their current price, title, and time remaining. Parses the My eBay watchlist HTML page.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/get-watchlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

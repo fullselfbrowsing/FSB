@@ -1,0 +1,39 @@
+{
+  "slug": "steam.unignore_app",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "unignore an app in steam",
+    "unignore app in steam",
+    "show an app in recommendations again in steam"
+  ],
+  "description": "Remove an app from the ignored list so it appears in recommendations and discovery queues again.",
+  "actionVerb": "unignore",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "appid": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Steam app ID to unignore"
+      }
+    },
+    "required": [
+      "appid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/unignore-app.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "unignore"
+    }
+  }
+}

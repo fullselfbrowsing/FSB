@@ -1,0 +1,31 @@
+{
+  "slug": "pandaexpress.get_recent_orders",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get recent orders in pandaexpress",
+    "look up recent orders in pandaexpress",
+    "fetch a single recent orders in pandaexpress",
+    "view one specific recent orders in pandaexpress",
+    "view your recent panda express orders in pandaexpress"
+  ],
+  "description": "Get the authenticated user's recent order history. Returns orders with restaurant info, totals, and status. Requires the user to be logged in.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-recent-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

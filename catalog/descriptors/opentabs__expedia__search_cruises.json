@@ -1,0 +1,38 @@
+{
+  "slug": "expedia.search_cruises",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "search cruises in expedia",
+    "navigate to cruise search results in expedia",
+    "navigate to the expedia cruise search page for the given destination in expedia"
+  ],
+  "description": "Navigate to the Expedia cruise search page for the given destination. Returns the search URL.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "destination": {
+        "description": "Cruise destination (e.g. \"Caribbean\", \"Alaska\", \"Mediterranean\")",
+        "type": "string"
+      },
+      "departure_month": {
+        "description": "Departure month in YYYY-MM format (e.g. \"2026-06\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-cruises.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

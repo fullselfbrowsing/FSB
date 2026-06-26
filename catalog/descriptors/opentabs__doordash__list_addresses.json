@@ -1,0 +1,31 @@
+{
+  "slug": "doordash.list_addresses",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "list addresses in doordash",
+    "show me my addresses in doordash",
+    "view my addresses in doordash",
+    "see all my addresses in doordash",
+    "list your saved delivery addresses in doordash"
+  ],
+  "description": "List all saved delivery addresses on the DoorDash account. Returns street, city, state, ZIP, coordinates, and delivery instructions for each address.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/list-addresses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "gmaps.get_place_details",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "get place details in gmaps",
+    "look up place details in gmaps",
+    "fetch a single place details in gmaps",
+    "view one specific place details in gmaps",
+    "get place info by name or address in gmaps"
+  ],
+  "description": "Get details about a place on Google Maps by name or address. Fetches the place page and extracts available information including name, coordinates, and place ID. For complete details (hours, phone, reviews), use navigate_to_place to open the place in the browser.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Place name or address (e.g., \"Statue of Liberty\", \"1600 Pennsylvania Ave NW, Washington, DC\")"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/get-place-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "cockroachdb.get_user_profile",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "get an user profile in cockroachdb",
+    "look up an user profile in cockroachdb",
+    "fetch a single user profile in cockroachdb",
+    "view one specific user profile in cockroachdb",
+    "get user profile in cockroachdb",
+    "get current user profile in cockroachdb"
+  ],
+  "description": "Get the profile and preferences of the currently authenticated CockroachDB Cloud user.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

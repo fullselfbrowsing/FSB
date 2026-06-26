@@ -1,0 +1,44 @@
+{
+  "slug": "target.list_favorites",
+  "service": "target.com",
+  "intentSynonyms": [
+    "list favorites in target",
+    "show me my favorites in target",
+    "view my favorites in target",
+    "see all my favorites in target",
+    "list saved/favorited products in target"
+  ],
+  "description": "List the user's favorited/saved Target products with name, price, brand, and rating. Supports pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "count": {
+        "description": "Items per page (default 10, max 24)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 24
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/list-favorites.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

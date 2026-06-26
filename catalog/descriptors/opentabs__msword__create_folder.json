@@ -1,0 +1,44 @@
+{
+  "slug": "msword.create_folder",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "create a folder in msword",
+    "add a folder in msword",
+    "make a new folder in msword",
+    "open a new folder in msword",
+    "create folder in msword"
+  ],
+  "description": "Create a new folder. Specify parent_id for nested folders, omit for root.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Folder name"
+      },
+      "parent_id": {
+        "description": "Parent folder ID — omit for drive root",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/create-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

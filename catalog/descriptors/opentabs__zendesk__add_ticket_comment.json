@@ -1,0 +1,48 @@
+{
+  "slug": "zendesk.add_ticket_comment",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "add a ticket comment in zendesk",
+    "add ticket comment in zendesk",
+    "add a comment to a ticket in zendesk"
+  ],
+  "description": "Add a comment to an existing support ticket. Comments can be public (visible to the requester) or private (internal notes for agents only). Returns the updated ticket with the new comment.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "The ID of the ticket to add a comment to"
+      },
+      "body": {
+        "type": "string",
+        "description": "The comment text body"
+      },
+      "public": {
+        "description": "Whether the comment is public (visible to requester) or private (internal note). Default is true.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "ticket_id",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/add-ticket-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "add"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "azure.list_subscriptions",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list subscriptions in azure",
+    "show me my subscriptions in azure",
+    "view my subscriptions in azure",
+    "see all my subscriptions in azure",
+    "list all azure subscriptions in azure"
+  ],
+  "description": "List all Azure subscriptions accessible to the current user. Returns subscription ID, display name, state, and tenant ID.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-subscriptions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

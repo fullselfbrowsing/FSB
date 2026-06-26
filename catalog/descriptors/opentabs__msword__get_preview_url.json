@@ -1,0 +1,40 @@
+{
+  "slug": "msword.get_preview_url",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "get a preview url in msword",
+    "look up a preview url in msword",
+    "fetch a single preview url in msword",
+    "view one specific preview url in msword",
+    "get preview url in msword",
+    "get a document preview url in msword"
+  ],
+  "description": "Get an embeddable preview URL for a document. Useful for generating view-only links.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/get-preview-url.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

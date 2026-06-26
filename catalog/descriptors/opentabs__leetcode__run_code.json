@@ -1,0 +1,57 @@
+{
+  "slug": "leetcode.run_code",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "run a code in leetcode",
+    "run code in leetcode",
+    "run code against test cases in leetcode"
+  ],
+  "description": "Run code against test cases for a LeetCode problem without submitting. Returns the output, expected output, runtime, memory, and whether the answer is correct. Use this to test solutions before submitting.",
+  "actionVerb": "run",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "titleSlug": {
+        "type": "string",
+        "description": "Problem URL slug (e.g., \"two-sum\")"
+      },
+      "questionId": {
+        "type": "string",
+        "description": "Question ID (numeric string, e.g., \"1\")"
+      },
+      "lang": {
+        "type": "string",
+        "description": "Language slug (e.g., \"python3\", \"java\", \"cpp\", \"javascript\", \"typescript\")"
+      },
+      "typedCode": {
+        "type": "string",
+        "description": "Source code to run"
+      },
+      "dataInput": {
+        "type": "string",
+        "description": "Test case input (newline-separated for multiple inputs, e.g., \"[2,7,11,15]\\n9\")"
+      }
+    },
+    "required": [
+      "titleSlug",
+      "questionId",
+      "lang",
+      "typedCode",
+      "dataInput"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/run-code.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "run"
+    }
+  }
+}

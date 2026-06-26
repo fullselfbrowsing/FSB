@@ -1,0 +1,55 @@
+{
+  "slug": "uber.search_locations",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "search locations in uber",
+    "search for addresses and places in uber",
+    "search for pickup or dropoff locations by text query and coordinates in uber"
+  ],
+  "description": "Search for pickup or dropoff locations by text query and coordinates. Returns matching addresses, landmarks, airports, and restaurants. Use the returned place ID with other Uber tools.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search text (e.g., \"SFO\", \"Golden Gate Bridge\", \"123 Main St\")"
+      },
+      "latitude": {
+        "type": "number",
+        "description": "Latitude for the search center (e.g., 37.7749 for San Francisco)"
+      },
+      "longitude": {
+        "type": "number",
+        "description": "Longitude for the search center (e.g., -122.4194 for San Francisco)"
+      },
+      "type": {
+        "description": "Search type — PICKUP or DROPOFF. Default PICKUP.",
+        "type": "string",
+        "enum": [
+          "PICKUP",
+          "DROPOFF"
+        ]
+      }
+    },
+    "required": [
+      "query",
+      "latitude",
+      "longitude"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/search-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

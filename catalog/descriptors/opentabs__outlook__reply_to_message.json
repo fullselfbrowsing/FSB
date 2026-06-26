@@ -1,0 +1,54 @@
+{
+  "slug": "outlook.reply_to_message",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "reply a to message in outlook",
+    "reply to message in outlook",
+    "reply to an email in outlook"
+  ],
+  "description": "Reply to an email message. Set reply_all to true to reply to all recipients.",
+  "actionVerb": "reply",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID to reply to"
+      },
+      "body": {
+        "type": "string",
+        "description": "Reply body content"
+      },
+      "body_type": {
+        "description": "Body content type (default: text)",
+        "type": "string",
+        "enum": [
+          "text",
+          "html"
+        ]
+      },
+      "reply_all": {
+        "description": "Reply to all recipients (default: false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "message_id",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/reply-to-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "reply"
+    }
+  }
+}

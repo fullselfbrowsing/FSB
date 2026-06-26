@@ -1,0 +1,53 @@
+{
+  "slug": "retool.create_folder",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "create a folder in retool",
+    "add a folder in retool",
+    "make a new folder in retool",
+    "open a new folder in retool",
+    "create folder in retool",
+    "create a new app or workflow folder in retool"
+  ],
+  "description": "Create a new folder for organizing apps or workflows. Specify the parent folder ID and folder type.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new folder"
+      },
+      "parent_folder_id": {
+        "type": "number",
+        "description": "Parent folder ID (use list_apps to find folder IDs)"
+      },
+      "folder_type": {
+        "description": "Folder type (default \"app\")",
+        "type": "string",
+        "enum": [
+          "app",
+          "workflow"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "parent_folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/create-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

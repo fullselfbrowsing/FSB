@@ -1,0 +1,29 @@
+{
+  "slug": "costco.navigate_to_cart",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "navigate a to cart in costco",
+    "navigate to cart in costco",
+    "open the shopping cart page in costco"
+  ],
+  "description": "Navigate the browser to the Costco shopping cart page where the user can view and manage cart items.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/navigate-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

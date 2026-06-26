@@ -1,0 +1,32 @@
+{
+  "slug": "amplitude.get_report_quota",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "get a report quota in amplitude",
+    "look up a report quota in amplitude",
+    "fetch a single report quota in amplitude",
+    "view one specific report quota in amplitude",
+    "get report quota in amplitude",
+    "get report quota usage and limits in amplitude"
+  ],
+  "description": "Get the current report quota usage and limits for the organization. Shows how many charts, dashboards, and spaces exist relative to plan limits.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/get-report-quota.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

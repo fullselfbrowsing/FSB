@@ -1,0 +1,46 @@
+{
+  "slug": "stripe.list_events",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list events in stripe",
+    "show me my events in stripe",
+    "view my events in stripe",
+    "see all my events in stripe",
+    "list recent events in stripe"
+  ],
+  "description": "List events in your Stripe account. Events represent changes to Stripe objects (up to 30 days). Optionally filter by event type.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Event ID cursor for pagination",
+        "type": "string"
+      },
+      "type": {
+        "description": "Filter by event type (e.g., customer.created, payment_intent.succeeded)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

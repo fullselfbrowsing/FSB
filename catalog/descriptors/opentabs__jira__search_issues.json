@@ -3,10 +3,10 @@
   "service": "atlassian.net",
   "intentSynonyms": [
     "search issues in jira",
-    "search issues with jql in jira",
-    "search for jira issues using a jql (jira query language) query string in jira"
+    "search issues using jql in jira",
+    "search for jira issues using jql (jira query language) in jira"
   ],
-  "description": "Search for Jira issues using a JQL (Jira Query Language) query string.",
+  "description": "Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
@@ -14,27 +14,15 @@
     "properties": {
       "jql": {
         "type": "string",
-        "minLength": 1,
-        "description": "JQL query string (e.g. project = ENG AND status = \"In Progress\")"
+        "description": "JQL query string (e.g. \"project = KAN AND status = 'In Progress'\")"
       },
       "max_results": {
-        "description": "Maximum number of issues to return",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 100
+        "description": "Maximum number of results to return (default 20, max 100)",
+        "type": "number"
       },
       "start_at": {
-        "description": "Index of the first issue to return (pagination)",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 9007199254740991
-      },
-      "fields": {
-        "description": "Issue field names to include in the response",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
+        "description": "Index of the first result to return for pagination",
+        "type": "number"
       }
     },
     "required": [

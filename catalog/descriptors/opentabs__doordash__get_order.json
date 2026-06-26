@@ -1,0 +1,40 @@
+{
+  "slug": "doordash.get_order",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "get an order in doordash",
+    "look up an order in doordash",
+    "fetch a single order in doordash",
+    "view one specific order in doordash",
+    "get order in doordash",
+    "get details of a specific order in doordash"
+  ],
+  "description": "Get a specific DoorDash order by its ID. Searches through order history to find the matching order. Returns full details including items, store, payment, and delivery info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "description": "Order ID to look up"
+      }
+    },
+    "required": [
+      "order_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/get-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

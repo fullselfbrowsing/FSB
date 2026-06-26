@@ -1,0 +1,31 @@
+{
+  "slug": "carta.get_witness_signatures",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get witness signatures in carta",
+    "look up witness signatures in carta",
+    "fetch a single witness signatures in carta",
+    "view one specific witness signatures in carta",
+    "get witness signature requests in carta"
+  ],
+  "description": "Get pending witness signature requests for option agreements in the portfolio.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-witness-signatures.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

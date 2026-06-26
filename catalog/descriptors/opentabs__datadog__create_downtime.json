@@ -1,0 +1,59 @@
+{
+  "slug": "datadog.create_downtime",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "create a downtime in datadog",
+    "add a downtime in datadog",
+    "make a new downtime in datadog",
+    "open a new downtime in datadog",
+    "create downtime in datadog",
+    "schedule a new downtime in datadog"
+  ],
+  "description": "Create a scheduled downtime (maintenance window) in Datadog.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "description": "Scope for the downtime (e.g., \"host:myhost\", \"env:prod\")"
+      },
+      "start": {
+        "description": "Start time as POSIX epoch seconds. Omit for immediate.",
+        "type": "number"
+      },
+      "end": {
+        "description": "End time as POSIX epoch seconds. Omit for indefinite.",
+        "type": "number"
+      },
+      "message": {
+        "description": "Message to include with the downtime notification",
+        "type": "string"
+      },
+      "monitor_tags": {
+        "description": "Monitor tags to scope the downtime to specific monitors",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "scope"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/create-downtime.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "notion.query_database",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "query a database in notion",
+    "query database in notion",
+    "query rows from a database in notion"
+  ],
+  "description": "Query rows from a Notion database with optional search. Returns items with their property values.",
+  "actionVerb": "query",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "database_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Database (collection) ID to query"
+      },
+      "view_id": {
+        "description": "Collection view ID. If omitted, uses the first available view.",
+        "type": "string"
+      },
+      "query": {
+        "description": "Search query to filter results",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of results (default 50, max 100)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "database_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/query-database.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "query"
+    }
+  }
+}

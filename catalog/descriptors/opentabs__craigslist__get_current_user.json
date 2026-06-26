@@ -1,0 +1,32 @@
+{
+  "slug": "craigslist.get_current_user",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "get a current user in craigslist",
+    "look up a current user in craigslist",
+    "fetch a single current user in craigslist",
+    "view one specific current user in craigslist",
+    "get current user in craigslist",
+    "get the current user profile in craigslist"
+  ],
+  "description": "Get the currently authenticated Craigslist user profile including email, user ID, and default area.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "whatsapp.mark_chat_read",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "mark a chat read in whatsapp",
+    "mark chat read in whatsapp",
+    "mark a chat as read or unread in whatsapp"
+  ],
+  "description": "Mark a WhatsApp chat as read or unread. Marking as read clears the unread badge; marking as unread highlights the chat.",
+  "actionVerb": "mark",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID"
+      },
+      "read": {
+        "type": "boolean",
+        "description": "True to mark as read, false to mark as unread"
+      }
+    },
+    "required": [
+      "chat_id",
+      "read"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/mark-chat-read.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "mark"
+    }
+  }
+}

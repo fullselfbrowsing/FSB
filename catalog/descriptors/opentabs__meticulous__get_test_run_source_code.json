@@ -1,0 +1,45 @@
+{
+  "slug": "meticulous.get_test_run_source_code",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get a test run source code in meticulous",
+    "look up a test run source code in meticulous",
+    "fetch a single test run source code in meticulous",
+    "view one specific test run source code in meticulous",
+    "get test run source code in meticulous",
+    "get source code for a test run commit in meticulous"
+  ],
+  "description": "Get the source code of a file at the commit of a specific test run.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "path": {
+        "type": "string",
+        "description": "File path relative to repository root"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "path"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-test-run-source-code.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

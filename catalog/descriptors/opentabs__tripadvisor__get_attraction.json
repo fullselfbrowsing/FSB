@@ -1,0 +1,40 @@
+{
+  "slug": "tripadvisor.get_attraction",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get an attraction in tripadvisor",
+    "look up an attraction in tripadvisor",
+    "fetch a single attraction in tripadvisor",
+    "view one specific attraction in tripadvisor",
+    "get attraction in tripadvisor",
+    "get attraction details in tripadvisor"
+  ],
+  "description": "Get detailed information about a TripAdvisor attraction or thing to do including ratings, address, and AI review summary. Provide the attraction URL path.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Attraction page URL path (e.g., \"/Attraction_Review-g60713-d104675-Reviews-Alcatraz_Island-...\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-attraction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

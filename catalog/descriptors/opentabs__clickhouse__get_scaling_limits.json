@@ -1,0 +1,39 @@
+{
+  "slug": "clickhouse.get_scaling_limits",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "get scaling limits in clickhouse",
+    "look up scaling limits in clickhouse",
+    "fetch a single scaling limits in clickhouse",
+    "view one specific scaling limits in clickhouse",
+    "get region scaling limits in clickhouse"
+  ],
+  "description": "Get the minimum and maximum memory and replica scaling limits for a cloud region. Useful for understanding what scaling options are available before adjusting service resources.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "region": {
+        "type": "string",
+        "description": "Cloud region ID (e.g., \"gcp-us-east1\", \"aws-us-east-1\")"
+      }
+    },
+    "required": [
+      "region"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/get-scaling-limits.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

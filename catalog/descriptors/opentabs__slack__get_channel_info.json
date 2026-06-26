@@ -1,0 +1,41 @@
+{
+  "slug": "slack.get_channel_info",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "get a channel info in slack",
+    "look up a channel info in slack",
+    "fetch a single channel info in slack",
+    "view one specific channel info in slack",
+    "get channel info in slack",
+    "get detailed information about a channel in slack"
+  ],
+  "description": "Get detailed information about a Slack channel including topic, purpose, and member count",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to get info for (e.g., C01234567)"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/get-channel-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

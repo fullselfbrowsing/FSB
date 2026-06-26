@@ -1,0 +1,52 @@
+{
+  "slug": "onlyfans.get_list_users",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "get list users in onlyfans",
+    "look up list users in onlyfans",
+    "fetch a single list users in onlyfans",
+    "view one specific list users in onlyfans",
+    "get users in a list in onlyfans"
+  ],
+  "description": "Get users in a specific list. Works with both system lists (fans, following) and custom lists.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID (from list_user_lists)"
+      },
+      "limit": {
+        "description": "Number of users to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/get-list-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

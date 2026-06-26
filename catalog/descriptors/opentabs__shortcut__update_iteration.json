@@ -1,0 +1,73 @@
+{
+  "slug": "shortcut.update_iteration",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "update an iteration in shortcut",
+    "edit an iteration in shortcut",
+    "change the details of iteration in shortcut",
+    "modify an iteration in shortcut",
+    "update iteration in shortcut"
+  ],
+  "description": "Update an existing iteration. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "iteration_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Iteration numeric ID"
+      },
+      "name": {
+        "description": "New iteration name",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "New start date in YYYY-MM-DD",
+        "type": "string"
+      },
+      "end_date": {
+        "description": "New end date in YYYY-MM-DD",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "label_ids": {
+        "description": "Replace all labels with these IDs",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "group_ids": {
+        "description": "Replace all teams with these UUIDs",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "iteration_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/update-iteration.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

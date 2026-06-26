@@ -1,0 +1,40 @@
+{
+  "slug": "robinhood.get_watchlist",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get a watchlist in robinhood",
+    "look up a watchlist in robinhood",
+    "fetch a single watchlist in robinhood",
+    "view one specific watchlist in robinhood",
+    "get watchlist in robinhood",
+    "get watchlist details and items in robinhood"
+  ],
+  "description": "Get a specific watchlist by its ID including display name, item count, and all items with their instrument IDs. Use list_watchlists to find available list IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "description": "Watchlist UUID from list_watchlists"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-watchlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

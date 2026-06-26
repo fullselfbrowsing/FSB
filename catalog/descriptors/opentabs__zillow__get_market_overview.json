@@ -1,0 +1,46 @@
+{
+  "slug": "zillow.get_market_overview",
+  "service": "zillow.com",
+  "intentSynonyms": [
+    "get a market overview in zillow",
+    "look up a market overview in zillow",
+    "fetch a single market overview in zillow",
+    "view one specific market overview in zillow",
+    "get market overview in zillow",
+    "get market listing counts for an area in zillow"
+  ],
+  "description": "Get a market overview for a location showing total listings counts across categories: for sale, for rent, and recently sold. Useful for understanding market activity in a specific area.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "region_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Zillow region ID (from search_locations)"
+      },
+      "region_type": {
+        "description": "Region type: \"city\", \"county\", \"zipcode\", \"neighborhood\" (default \"city\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "region_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/get-market-overview.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

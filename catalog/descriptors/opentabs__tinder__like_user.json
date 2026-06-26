@@ -1,0 +1,45 @@
+{
+  "slug": "tinder.like_user",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "like an user in tinder",
+    "like user in tinder",
+    "like a user in tinder"
+  ],
+  "description": "Like (swipe right on) a user. Returns whether the like resulted in a match. Pass the content_hash and s_number from get_recommendations for best results.",
+  "actionVerb": "like",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID to like"
+      },
+      "content_hash": {
+        "type": "string",
+        "description": "Content hash from get_recommendations"
+      },
+      "s_number": {
+        "type": "number",
+        "description": "S number from get_recommendations"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/like-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "like"
+    }
+  }
+}

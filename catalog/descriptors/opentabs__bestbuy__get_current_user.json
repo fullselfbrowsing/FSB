@@ -1,0 +1,32 @@
+{
+  "slug": "bestbuy.get_current_user",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get a current user in bestbuy",
+    "look up a current user in bestbuy",
+    "fetch a single current user in bestbuy",
+    "view one specific current user in bestbuy",
+    "get current user in bestbuy",
+    "get the authenticated user profile in bestbuy"
+  ],
+  "description": "Get the profile of the currently authenticated Best Buy user. Returns name, email, phone number, and My Best Buy rewards loyalty information (member ID, tier name, and tier code).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

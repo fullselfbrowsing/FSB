@@ -1,0 +1,46 @@
+{
+  "slug": "stripe.list_payment_intents",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list payment intents in stripe",
+    "show me my payment intents in stripe",
+    "view my payment intents in stripe",
+    "see all my payment intents in stripe",
+    "list payment intents with pagination in stripe"
+  ],
+  "description": "List payment intents in your Stripe account. Returns payment intents sorted by creation date (newest first).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "PaymentIntent ID cursor for pagination",
+        "type": "string"
+      },
+      "customer": {
+        "description": "Filter by customer ID",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-payment-intents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

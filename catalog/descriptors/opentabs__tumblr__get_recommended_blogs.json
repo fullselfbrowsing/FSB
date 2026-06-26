@@ -1,0 +1,38 @@
+{
+  "slug": "tumblr.get_recommended_blogs",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get recommended blogs in tumblr",
+    "look up recommended blogs in tumblr",
+    "fetch a single recommended blogs in tumblr",
+    "view one specific recommended blogs in tumblr",
+    "discover recommended blogs in tumblr"
+  ],
+  "description": "Get recommended Tumblr blogs to follow.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of blogs to return (1-20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-recommended-blogs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

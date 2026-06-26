@@ -1,0 +1,93 @@
+{
+  "slug": "ynab.create_transaction",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "create a transaction in ynab",
+    "add a transaction in ynab",
+    "make a new transaction in ynab",
+    "open a new transaction in ynab",
+    "create transaction in ynab",
+    "create a new transaction in ynab"
+  ],
+  "description": "Create a new transaction in the active YNAB plan. Amount is in currency units (e.g. -42.50 for a $42.50 expense, 1500 for $1500 income). Negative amounts are outflows (expenses), positive amounts are inflows (income).",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Account ID to create the transaction in"
+      },
+      "date": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Transaction date in YYYY-MM-DD format"
+      },
+      "amount": {
+        "type": "number",
+        "description": "Amount in currency units (negative for expenses, positive for income). E.g. -42.50 for a $42.50 expense."
+      },
+      "payee_name": {
+        "description": "Payee name (creates new payee if not found)",
+        "type": "string"
+      },
+      "payee_id": {
+        "description": "Existing payee ID (takes precedence over payee_name)",
+        "type": "string"
+      },
+      "category_id": {
+        "description": "Category ID to assign",
+        "type": "string"
+      },
+      "memo": {
+        "description": "Transaction memo",
+        "type": "string"
+      },
+      "cleared": {
+        "description": "Cleared status (default uncleared)",
+        "type": "string",
+        "enum": [
+          "cleared",
+          "uncleared",
+          "reconciled"
+        ]
+      },
+      "approved": {
+        "description": "Whether the transaction is approved (default true)",
+        "type": "boolean"
+      },
+      "flag_color": {
+        "description": "Flag color",
+        "type": "string",
+        "enum": [
+          "red",
+          "orange",
+          "yellow",
+          "green",
+          "blue",
+          "purple"
+        ]
+      }
+    },
+    "required": [
+      "account_id",
+      "date",
+      "amount"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/create-transaction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

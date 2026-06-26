@@ -1,0 +1,44 @@
+{
+  "slug": "bsky.get_user_profiles",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get user profiles in bsky",
+    "look up user profiles in bsky",
+    "fetch a single user profiles in bsky",
+    "view one specific user profiles in bsky",
+    "get multiple user profiles in bsky"
+  ],
+  "description": "Get multiple user profiles in a single request. Accepts up to 25 DIDs or handles.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "actors": {
+        "minItems": 1,
+        "maxItems": 25,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "DIDs or handles of the users to look up (max 25)"
+      }
+    },
+    "required": [
+      "actors"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-user-profiles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

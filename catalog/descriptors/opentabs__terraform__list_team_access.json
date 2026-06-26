@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.list_team_access",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "list a team access in terraform",
+    "show me my team access in terraform",
+    "view my team access in terraform",
+    "see all my team access in terraform",
+    "list team access in terraform",
+    "list team access for a workspace in terraform"
+  ],
+  "description": "List team access permissions for a workspace. Shows which teams have access and their permission levels.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/list-team-access.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "netlify.rollback_deploy",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "rollback a deploy in netlify",
+    "rollback deploy in netlify",
+    "rollback site to previous deploy in netlify"
+  ],
+  "description": "Rollback a site to its previously published deploy. This is a quick way to revert the site without specifying a deploy ID.",
+  "actionVerb": "rollback",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to rollback"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/rollback-deploy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "rollback"
+    }
+  }
+}

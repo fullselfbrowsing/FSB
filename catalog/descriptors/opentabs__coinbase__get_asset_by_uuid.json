@@ -1,0 +1,44 @@
+{
+  "slug": "coinbase.get_asset_by_uuid",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "get an asset by uuid in coinbase",
+    "look up an asset by uuid in coinbase",
+    "fetch a single asset by uuid in coinbase",
+    "view one specific asset by uuid in coinbase",
+    "get asset by uuid in coinbase",
+    "get asset details by uuid in coinbase"
+  ],
+  "description": "Get detailed information about a cryptocurrency asset by its Coinbase UUID. Returns market data, price, categories, and supported networks.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uuid": {
+        "type": "string",
+        "description": "Asset UUID (e.g. \"5b71fc48-3dd3-540c-809b-f8c94d0e68b5\" for Bitcoin)"
+      },
+      "quote_currency": {
+        "description": "Quote currency for price (default \"USD\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/get-asset-by-uuid.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

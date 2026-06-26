@@ -1,0 +1,32 @@
+{
+  "slug": "costco.get_current_user",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "get a current user in costco",
+    "look up a current user in costco",
+    "fetch a single current user in costco",
+    "view one specific current user in costco",
+    "get current user in costco",
+    "get logged-in member profile in costco"
+  ],
+  "description": "Get the currently logged-in Costco member profile including name, email, member number, and membership tier.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

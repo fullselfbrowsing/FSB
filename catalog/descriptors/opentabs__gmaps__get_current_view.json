@@ -1,0 +1,32 @@
+{
+  "slug": "gmaps.get_current_view",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "get a current view in gmaps",
+    "look up a current view in gmaps",
+    "fetch a single current view in gmaps",
+    "view one specific current view in gmaps",
+    "get current view in gmaps",
+    "get current map center, zoom, and query in gmaps"
+  ],
+  "description": "Get the current Google Maps view including center coordinates, zoom level, active search query, and the current URL. Use this to understand what the user is currently looking at.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/get-current-view.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

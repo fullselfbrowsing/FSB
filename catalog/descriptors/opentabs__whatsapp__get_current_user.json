@@ -1,0 +1,32 @@
+{
+  "slug": "whatsapp.get_current_user",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "get a current user in whatsapp",
+    "look up a current user in whatsapp",
+    "fetch a single current user in whatsapp",
+    "view one specific current user in whatsapp",
+    "get current user in whatsapp",
+    "get the current whatsapp user profile in whatsapp"
+  ],
+  "description": "Get the currently logged-in WhatsApp user profile including phone number ID, display name, and platform.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

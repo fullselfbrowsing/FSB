@@ -1,0 +1,42 @@
+{
+  "slug": "tinder.list_matches",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "list matches in tinder",
+    "show me my matches in tinder",
+    "view my matches in tinder",
+    "see all my matches in tinder",
+    "list your matches in tinder"
+  ],
+  "description": "List your Tinder matches. Returns matched profiles with message counts and activity dates. Use the page_token from a previous response to paginate.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of matches to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/list-matches.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

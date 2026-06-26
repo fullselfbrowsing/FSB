@@ -1,0 +1,73 @@
+{
+  "slug": "linear.batch_update_issues",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "batch update issues in linear",
+    "update multiple issues at once in linear",
+    "apply the same update to multiple issues at once in linear"
+  ],
+  "description": "Apply the same update to multiple issues at once. All specified fields are applied to every issue in the batch. Maximum 25 issues per call.",
+  "actionVerb": "batch",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_ids": {
+        "minItems": 1,
+        "maxItems": 25,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of issue UUIDs to update (1–25)"
+      },
+      "state_id": {
+        "description": "New workflow state UUID",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "New assignee UUID",
+        "type": "string"
+      },
+      "priority": {
+        "description": "New priority (0=none, 1=urgent, 2=high, 3=medium, 4=low)",
+        "type": "number"
+      },
+      "project_id": {
+        "description": "Move to this project UUID",
+        "type": "string"
+      },
+      "cycle_id": {
+        "description": "Assign to this cycle UUID",
+        "type": "string"
+      },
+      "label_ids": {
+        "description": "Replace labels with these label UUIDs",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "due_date": {
+        "description": "New due date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/batch-update-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "batch"
+    }
+  }
+}

@@ -9,54 +9,66 @@
     "create issue in linear",
     "create a new issue in linear"
   ],
-  "description": "Create a new issue in Linear. Requires a team and a title at minimum. Optionally set description, assignee, priority, labels, project, and estimate.",
+  "description": "Create a new issue in Linear. Requires a team ID and title at minimum.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
-      "teamId": {
+      "team_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Team ID to create the issue in"
+        "description": "Team UUID to create the issue in (use list_teams to find team IDs)"
       },
       "title": {
         "type": "string",
-        "minLength": 1,
         "description": "Issue title"
       },
       "description": {
         "description": "Issue description in markdown",
         "type": "string"
       },
-      "assigneeId": {
-        "description": "User ID to assign the issue to",
+      "priority": {
+        "description": "Priority level (0=none, 1=urgent, 2=high, 3=medium, 4=low)",
+        "type": "number"
+      },
+      "assignee_id": {
+        "description": "UUID of the user to assign (use list_users to find user IDs)",
         "type": "string"
       },
-      "priority": {
-        "description": "Priority from 0 (none) to 4 (urgent)",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 4
+      "state_id": {
+        "description": "Workflow state UUID (use list_workflow_states to find state IDs)",
+        "type": "string"
       },
-      "labelIds": {
-        "description": "List of label IDs to apply",
+      "label_ids": {
+        "description": "Array of label UUIDs to apply (use list_labels to find label IDs)",
         "type": "array",
         "items": {
           "type": "string"
         }
       },
-      "projectId": {
-        "description": "Project ID to associate the issue with",
+      "project_id": {
+        "description": "Project UUID to add the issue to (use list_projects to find IDs)",
+        "type": "string"
+      },
+      "cycle_id": {
+        "description": "Cycle UUID to add the issue to (use list_cycles to find IDs)",
+        "type": "string"
+      },
+      "due_date": {
+        "description": "Due date in YYYY-MM-DD format",
         "type": "string"
       },
       "estimate": {
-        "description": "Estimate points for the issue",
+        "description": "Estimate points",
         "type": "number"
+      },
+      "parent_id": {
+        "description": "Parent issue UUID for creating a sub-issue",
+        "type": "string"
       }
     },
     "required": [
-      "teamId",
+      "team_id",
       "title"
     ],
     "additionalProperties": false

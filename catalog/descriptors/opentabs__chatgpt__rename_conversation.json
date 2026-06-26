@@ -1,0 +1,42 @@
+{
+  "slug": "chatgpt.rename_conversation",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "rename a conversation in chatgpt",
+    "rename conversation in chatgpt",
+    "rename a chatgpt conversation by setting a new title in chatgpt"
+  ],
+  "description": "Rename a ChatGPT conversation by setting a new title.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "description": "Conversation ID (UUID)"
+      },
+      "title": {
+        "type": "string",
+        "description": "New title for the conversation"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/rename-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "rename"
+    }
+  }
+}

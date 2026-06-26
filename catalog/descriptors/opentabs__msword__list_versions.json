@@ -1,0 +1,39 @@
+{
+  "slug": "msword.list_versions",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "list versions in msword",
+    "show me my versions in msword",
+    "view my versions in msword",
+    "see all my versions in msword",
+    "list file version history in msword"
+  ],
+  "description": "List version history of a file.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/list-versions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "instagram.get_following",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get a following in instagram",
+    "look up a following in instagram",
+    "fetch a single following in instagram",
+    "view one specific following in instagram",
+    "get following in instagram",
+    "list who a user follows in instagram"
+  ],
+  "description": "List accounts that a user follows. Requires the user numeric ID. Supports cursor pagination via max_id.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User numeric ID (pk)"
+      },
+      "count": {
+        "description": "Number of results to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "max_id": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-following.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

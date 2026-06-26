@@ -1,0 +1,40 @@
+{
+  "slug": "target.get_store",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get a store in target",
+    "look up a store in target",
+    "fetch a single store in target",
+    "view one specific store in target",
+    "get store in target",
+    "get details for a target store in target"
+  ],
+  "description": "Get detailed information about a specific Target store by its store ID. Returns name, address, phone, and status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "type": "string",
+        "description": "Store ID (e.g., \"1426\")"
+      }
+    },
+    "required": [
+      "store_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-store.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

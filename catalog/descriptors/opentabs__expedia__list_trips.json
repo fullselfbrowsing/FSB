@@ -1,33 +1,26 @@
 {
   "slug": "expedia.list_trips",
-  "service": "www.expedia.com",
+  "service": "expedia.com",
   "intentSynonyms": [
     "list trips in expedia",
     "show me my trips in expedia",
     "view my trips in expedia",
     "see all my trips in expedia",
-    "show me my expedia trips in expedia"
+    "list booked or planned trips in expedia"
   ],
-  "description": "List your Expedia trips (booked flights and hotels). Optionally filter by status (upcoming, completed, cancelled).",
+  "description": "List the user's trips on Expedia. Reads trip data from the currently loaded trips page. If not on the trips page, navigates to it first. Filter by trip type: \"BOOKED\" for confirmed bookings, \"PLANNED\" for saved/planned trips.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "status": {
-        "description": "Filter trips by status",
+      "trip_type": {
+        "description": "Trip type filter (default \"BOOKED\")",
         "type": "string",
         "enum": [
-          "upcoming",
-          "completed",
-          "cancelled"
+          "BOOKED",
+          "PLANNED"
         ]
-      },
-      "limit": {
-        "description": "Maximum number of trips to return",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 50
       }
     },
     "additionalProperties": false
@@ -39,8 +32,8 @@
     "sourcePath": "plugins/expedia/src/tools/list-trips.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

@@ -1,0 +1,42 @@
+{
+  "slug": "pandaexpress.apply_coupon",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "apply a coupon in pandaexpress",
+    "apply coupon in pandaexpress",
+    "apply a coupon code to your order in pandaexpress"
+  ],
+  "description": "Apply a coupon or promo code to an existing basket. Returns the updated basket with discount applied.",
+  "actionVerb": "apply",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID)"
+      },
+      "coupon_code": {
+        "type": "string",
+        "description": "Coupon or promo code to apply"
+      }
+    },
+    "required": [
+      "basket_id",
+      "coupon_code"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/apply-coupon.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "apply"
+    }
+  }
+}

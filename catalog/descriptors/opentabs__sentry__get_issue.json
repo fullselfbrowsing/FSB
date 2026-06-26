@@ -7,9 +7,9 @@
     "fetch a single issue in sentry",
     "view one specific issue in sentry",
     "get issue in sentry",
-    "get an issue by id in sentry"
+    "get details for a specific issue in sentry"
   ],
-  "description": "Get detailed information about a single Sentry error issue by its issue ID.",
+  "description": "Get detailed information about a specific Sentry issue by its ID. Returns title, status, priority, event count, user count, assigned user, and more.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,8 +17,7 @@
     "properties": {
       "issue_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Sentry issue ID"
+        "description": "The issue ID to retrieve"
       }
     },
     "required": [
@@ -33,8 +32,8 @@
     "sourcePath": "plugins/sentry/src/tools/get-issue.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

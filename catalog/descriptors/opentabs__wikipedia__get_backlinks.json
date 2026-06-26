@@ -1,0 +1,45 @@
+{
+  "slug": "wikipedia.get_backlinks",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get backlinks in wikipedia",
+    "look up backlinks in wikipedia",
+    "fetch a single backlinks in wikipedia",
+    "view one specific backlinks in wikipedia",
+    "find pages that link to an article in wikipedia"
+  ],
+  "description": "Get the pages that link to a specific Wikipedia article (also known as \"What links here\"). Useful for understanding how widely referenced an article is.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\")"
+      },
+      "limit": {
+        "description": "Maximum number of backlinks to return (default 50, max 500)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-backlinks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

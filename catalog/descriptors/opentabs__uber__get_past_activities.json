@@ -1,0 +1,36 @@
+{
+  "slug": "uber.get_past_activities",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "get past activities in uber",
+    "look up past activities in uber",
+    "fetch a single past activities in uber",
+    "view one specific past activities in uber",
+    "get recent trip and order history in uber"
+  ],
+  "description": "Get the user's recent Uber trip and order history. Returns past rides with destination, date, cost, and a rebook URL. Set show_only_trip to true to exclude non-ride activities (e.g., Uber Eats orders).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "show_only_trip": {
+        "description": "Only show trips (exclude Uber Eats, etc.). Default false.",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/get-past-activities.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -9,7 +9,7 @@
     "get pipeline in circleci",
     "get a pipeline by id in circleci"
   ],
-  "description": "Get detailed information about a single CircleCI pipeline by its pipeline ID.",
+  "description": "Get a single pipeline by its UUID. Returns pipeline details including state, trigger info, and VCS data.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,8 +17,7 @@
     "properties": {
       "pipeline_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "CircleCI pipeline ID (UUID)"
+        "description": "Pipeline UUID"
       }
     },
     "required": [

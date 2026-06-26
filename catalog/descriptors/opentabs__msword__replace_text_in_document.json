@@ -1,0 +1,48 @@
+{
+  "slug": "msword.replace_text_in_document",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "replace a text in document in msword",
+    "replace text in document in msword",
+    "find and replace text in a word document in msword"
+  ],
+  "description": "Find and replace text in an existing Word document (.docx). This is the recommended way to edit documents because it preserves all formatting (bold, italic, headings, styles). Replaces all occurrences of the search text with the replacement text within existing paragraph runs. The search is case-sensitive and matches exact strings.",
+  "actionVerb": "replace",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID of the .docx document"
+      },
+      "find": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Text to search for (case-sensitive, exact match)"
+      },
+      "replace": {
+        "type": "string",
+        "description": "Replacement text (use empty string to delete matches)"
+      }
+    },
+    "required": [
+      "item_id",
+      "find",
+      "replace"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/replace-text-in-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "replace"
+    }
+  }
+}

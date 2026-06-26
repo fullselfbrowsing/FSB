@@ -1,0 +1,80 @@
+{
+  "slug": "sentry.update_issue",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "update an issue in sentry",
+    "edit an issue in sentry",
+    "change the details of issue in sentry",
+    "modify an issue in sentry",
+    "update issue in sentry",
+    "update issue status, assignee, or other attributes in sentry"
+  ],
+  "description": "Update an issue's attributes. Supports changing status (resolve, unresolve, ignore), assigning to a user or team, bookmarking, and marking as seen. Only specified fields are modified.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "The issue ID to update"
+      },
+      "status": {
+        "description": "New status for the issue",
+        "type": "string",
+        "enum": [
+          "resolved",
+          "resolvedInNextRelease",
+          "unresolved",
+          "ignored"
+        ]
+      },
+      "assigned_to": {
+        "description": "Username or team slug to assign to. Pass empty string to unassign",
+        "type": "string"
+      },
+      "has_seen": {
+        "description": "Mark as seen or unseen for the current user",
+        "type": "boolean"
+      },
+      "is_bookmarked": {
+        "description": "Bookmark or unbookmark the issue",
+        "type": "boolean"
+      },
+      "is_public": {
+        "description": "Make the issue public or private",
+        "type": "boolean"
+      },
+      "is_subscribed": {
+        "description": "Subscribe or unsubscribe from notifications",
+        "type": "boolean"
+      },
+      "priority": {
+        "description": "Set issue priority level",
+        "type": "string",
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ]
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/update-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

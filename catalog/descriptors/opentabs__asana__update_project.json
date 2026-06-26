@@ -1,0 +1,69 @@
+{
+  "slug": "asana.update_project",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "update a project in asana",
+    "edit a project in asana",
+    "change the details of project in asana",
+    "modify a project in asana",
+    "update project in asana",
+    "update an existing project in asana"
+  ],
+  "description": "Update an existing project. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project GID to update"
+      },
+      "name": {
+        "description": "New project name",
+        "type": "string"
+      },
+      "notes": {
+        "description": "New plain-text project description",
+        "type": "string"
+      },
+      "color": {
+        "description": "New project color name (e.g. \"light-green\", \"dark-blue\")",
+        "type": "string"
+      },
+      "archived": {
+        "description": "Whether the project is archived",
+        "type": "boolean"
+      },
+      "due_on": {
+        "description": "New due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "start_on": {
+        "description": "New start date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "public": {
+        "description": "Whether the project is public to the workspace",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/update-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

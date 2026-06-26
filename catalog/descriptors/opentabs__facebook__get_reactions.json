@@ -1,0 +1,39 @@
+{
+  "slug": "facebook.get_reactions",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "get reactions in facebook",
+    "look up reactions in facebook",
+    "fetch a single reactions in facebook",
+    "view one specific reactions in facebook",
+    "get reaction counts on a post in facebook"
+  ],
+  "description": "Get the reaction summary (counts per reaction type) for a Facebook post. Requires the feedback_id from get_user_posts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "feedback_id": {
+        "type": "string",
+        "description": "Feedback ID of the post (from get_user_posts)"
+      }
+    },
+    "required": [
+      "feedback_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/get-reactions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

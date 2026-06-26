@@ -1,0 +1,48 @@
+{
+  "slug": "temporal.get_workflow",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "get a workflow in temporal",
+    "look up a workflow in temporal",
+    "fetch a single workflow in temporal",
+    "view one specific workflow in temporal",
+    "get workflow in temporal",
+    "get workflow execution details in temporal"
+  ],
+  "description": "Get detailed information about a specific workflow execution including configuration, status, history length, search attributes, and memo fields. Useful for debugging workflow state.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      },
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow ID"
+      },
+      "run_id": {
+        "description": "Run ID (optional — uses latest run if omitted)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/get-workflow.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

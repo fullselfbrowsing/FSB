@@ -1,0 +1,46 @@
+{
+  "slug": "retool.force_editor_save",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "force an editor save in retool",
+    "force editor save in retool",
+    "force-save the open retool editor state in retool"
+  ],
+  "description": "Trigger Retool's own editor save pipeline for the currently targeted editor tab. Use this after a Toolscript import or backend app-state update has been loaded in the editor and you need Retool to reconcile editor-only/server-side state without making a manual dummy edit. Requires targeting an open editor tab for the requested page UUID with tabId.",
+  "actionVerb": "force",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "UUID of the app currently open in the targeted Retool editor tab"
+      },
+      "trigger": {
+        "description": "Retool save trigger label to use for the editor save. Defaults to manual.",
+        "type": "string",
+        "enum": [
+          "manual",
+          "imported",
+          "forced"
+        ]
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/force-editor-save.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "force"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "medium.get_notification_count",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "get a notification count in medium",
+    "look up a notification count in medium",
+    "fetch a single notification count in medium",
+    "view one specific notification count in medium",
+    "get notification count in medium",
+    "get unread notification count in medium"
+  ],
+  "description": "Get the number of unread notifications for the current Medium user.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/get-notification-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

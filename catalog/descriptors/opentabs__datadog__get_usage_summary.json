@@ -1,0 +1,48 @@
+{
+  "slug": "datadog.get_usage_summary",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get an usage summary in datadog",
+    "look up an usage summary in datadog",
+    "fetch a single usage summary in datadog",
+    "view one specific usage summary in datadog",
+    "get usage summary in datadog",
+    "get org usage summary in datadog"
+  ],
+  "description": "Get usage summary for the Datadog organization over a time range.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "start_month": {
+        "type": "string",
+        "description": "Start month in ISO format (e.g., \"2024-01-01T00:00:00+00:00\")"
+      },
+      "end_month": {
+        "description": "End month in ISO format. Defaults to current month.",
+        "type": "string"
+      },
+      "include_org_details": {
+        "description": "Include child org details (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "start_month"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-usage-summary.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

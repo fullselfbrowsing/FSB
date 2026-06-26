@@ -1,0 +1,41 @@
+{
+  "slug": "tripadvisor.get_restaurant_awards",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get restaurant awards in tripadvisor",
+    "look up restaurant awards in tripadvisor",
+    "fetch a single restaurant awards in tripadvisor",
+    "view one specific restaurant awards in tripadvisor",
+    "get michelin and other awards in tripadvisor"
+  ],
+  "description": "Get MICHELIN Guide awards and other accolades for a restaurant. Returns award details including stars, Bib Gourmand status, and MICHELIN review text. Requires the restaurant location ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "location_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Restaurant location ID (from search or listing)"
+      }
+    },
+    "required": [
+      "location_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-restaurant-awards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

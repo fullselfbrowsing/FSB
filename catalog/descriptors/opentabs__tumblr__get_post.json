@@ -1,0 +1,44 @@
+{
+  "slug": "tumblr.get_post",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get a post in tumblr",
+    "look up a post in tumblr",
+    "fetch a single post in tumblr",
+    "view one specific post in tumblr",
+    "get post in tumblr"
+  ],
+  "description": "Get detailed information about a specific Tumblr post by blog name and post ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or URL (e.g. \"staff\" or \"staff.tumblr.com\")"
+      },
+      "post_id": {
+        "type": "string",
+        "description": "Post ID"
+      }
+    },
+    "required": [
+      "blog_name",
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

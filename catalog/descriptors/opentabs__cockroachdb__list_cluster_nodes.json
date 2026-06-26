@@ -1,0 +1,39 @@
+{
+  "slug": "cockroachdb.list_cluster_nodes",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "list cluster nodes in cockroachdb",
+    "show me my cluster nodes in cockroachdb",
+    "view my cluster nodes in cockroachdb",
+    "see all my cluster nodes in cockroachdb",
+    "list nodes in a cluster in cockroachdb"
+  ],
+  "description": "List all nodes in a CockroachDB cluster with their status, region, and liveness information.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      }
+    },
+    "required": [
+      "cluster_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/list-cluster-nodes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

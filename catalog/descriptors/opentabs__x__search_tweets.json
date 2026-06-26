@@ -1,0 +1,56 @@
+{
+  "slug": "x.search_tweets",
+  "service": "x.com",
+  "intentSynonyms": [
+    "search tweets in x",
+    "search tweets by query with x search operators in x",
+    "search for tweets matching a query in x"
+  ],
+  "description": "Search for tweets matching a query. Supports standard X/Twitter search operators: exact phrases (\"hello world\"), OR (cats OR dogs), negation (-spam), from/to a user (from:username), mentions (@username), hashtags (#topic), min engagement (min_faves:100, min_retweets:10), filters (filter:links, filter:media, -filter:replies), language (lang:en), date range (since:2024-01-01 until:2024-12-31). Results can be sorted by relevance (\"Top\") or chronologically (\"Latest\").",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query — supports X search operators (from:, #, OR, \"\", -, etc.)"
+      },
+      "product": {
+        "description": "Sort order: \"Top\" for relevance (default), \"Latest\" for chronological",
+        "type": "string",
+        "enum": [
+          "Top",
+          "Latest"
+        ]
+      },
+      "count": {
+        "description": "Number of tweets to return (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/search-tweets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

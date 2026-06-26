@@ -1,0 +1,40 @@
+{
+  "slug": "wikipedia.get_article",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get an article in wikipedia",
+    "look up an article in wikipedia",
+    "fetch a single article in wikipedia",
+    "view one specific article in wikipedia",
+    "get article in wikipedia",
+    "get article summary and metadata in wikipedia"
+  ],
+  "description": "Get a Wikipedia article summary including the introduction extract, description, thumbnail, protection status, and URL. Use get_article_sections for the full table of contents, or get_section_content to read a specific section.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\", \"Albert Einstein\")"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-article.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

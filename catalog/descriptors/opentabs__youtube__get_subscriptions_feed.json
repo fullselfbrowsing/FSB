@@ -1,0 +1,32 @@
+{
+  "slug": "youtube.get_subscriptions_feed",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get a subscriptions feed in youtube",
+    "look up a subscriptions feed in youtube",
+    "fetch a single subscriptions feed in youtube",
+    "view one specific subscriptions feed in youtube",
+    "get subscriptions feed in youtube",
+    "get latest videos from subscriptions in youtube"
+  ],
+  "description": "Get recent videos from subscribed channels. Returns the latest uploads from channels the user is subscribed to.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-subscriptions-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

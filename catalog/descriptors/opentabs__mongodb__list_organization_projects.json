@@ -1,0 +1,31 @@
+{
+  "slug": "mongodb.list_organization_projects",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "list organization projects in mongodb",
+    "show me my organization projects in mongodb",
+    "view my organization projects in mongodb",
+    "see all my organization projects in mongodb",
+    "list projects in the organization in mongodb"
+  ],
+  "description": "List all projects (groups) in the current MongoDB Atlas organization with cluster, user, and alert counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/list-organization-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

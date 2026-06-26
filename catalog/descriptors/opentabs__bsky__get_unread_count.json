@@ -1,0 +1,32 @@
+{
+  "slug": "bsky.get_unread_count",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get an unread count in bsky",
+    "look up an unread count in bsky",
+    "fetch a single unread count in bsky",
+    "view one specific unread count in bsky",
+    "get unread count in bsky",
+    "get unread notification count in bsky"
+  ],
+  "description": "Get the count of unread notifications.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-unread-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

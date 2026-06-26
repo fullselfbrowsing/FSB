@@ -1,0 +1,69 @@
+{
+  "slug": "retool.create_resource",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "create a resource in retool",
+    "add a resource in retool",
+    "make a new resource in retool",
+    "open a new resource in retool",
+    "create resource in retool",
+    "create a new data source resource in retool"
+  ],
+  "description": "Create a new resource (data source) in Retool. Resources are connections to external services like REST APIs, databases (PostgreSQL, MySQL), GraphQL endpoints, and more. Once created, queries in apps can reference the resource by name.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "display_name": {
+        "type": "string",
+        "description": "Human-readable name for the resource"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "restapi",
+          "postgresql",
+          "mysql",
+          "graphql",
+          "mongodb",
+          "redis",
+          "snowflake",
+          "s3",
+          "googlesheets"
+        ],
+        "description": "Resource type"
+      },
+      "options": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Configuration options (varies by type). For restapi: { baseURL, headers, authentication }. For postgresql: { host, port, databaseName, databaseUsername, databasePassword, ssl }."
+      },
+      "folder_id": {
+        "description": "Resource folder ID (default: root folder)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "display_name",
+      "type",
+      "options"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/create-resource.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "vercel.list_domains",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "list domains in vercel",
+    "show me my domains in vercel",
+    "view my domains in vercel",
+    "see all my domains in vercel",
+    "list project domains in vercel"
+  ],
+  "description": "List all domains configured for a Vercel project. Shows DNS configuration status and redirects.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "description": "Project name or ID"
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/list-domains.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

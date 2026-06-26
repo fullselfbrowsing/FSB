@@ -1,0 +1,31 @@
+{
+  "slug": "craigslist.list_payment_cards",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "list payment cards in craigslist",
+    "show me my payment cards in craigslist",
+    "view my payment cards in craigslist",
+    "see all my payment cards in craigslist",
+    "list saved payment cards in craigslist"
+  ],
+  "description": "List all saved payment cards on the Craigslist account. Returns card type, last four digits, expiration, billing address, and default status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/list-payment-cards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

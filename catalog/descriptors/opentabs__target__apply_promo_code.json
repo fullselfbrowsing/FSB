@@ -1,0 +1,37 @@
+{
+  "slug": "target.apply_promo_code",
+  "service": "target.com",
+  "intentSynonyms": [
+    "apply a promo code in target",
+    "apply promo code in target",
+    "apply a promo code to the cart in target"
+  ],
+  "description": "Apply a promotion code or coupon to the Target shopping cart.",
+  "actionVerb": "apply",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "promo_code": {
+        "type": "string",
+        "description": "Promotion code or coupon code"
+      }
+    },
+    "required": [
+      "promo_code"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/apply-promo-code.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "apply"
+    }
+  }
+}

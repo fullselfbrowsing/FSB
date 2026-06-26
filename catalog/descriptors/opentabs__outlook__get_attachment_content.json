@@ -1,0 +1,44 @@
+{
+  "slug": "outlook.get_attachment_content",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "get an attachment content in outlook",
+    "look up an attachment content in outlook",
+    "fetch a single attachment content in outlook",
+    "view one specific attachment content in outlook",
+    "get attachment content in outlook"
+  ],
+  "description": "Download and read the content of an email attachment. For text-based files (plain text, CSV, HTML, JSON, XML), returns decoded text. For binary files (PDF, images, Office documents), returns base64-encoded content.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID"
+      },
+      "attachment_id": {
+        "type": "string",
+        "description": "The attachment ID (from list_attachments)"
+      }
+    },
+    "required": [
+      "message_id",
+      "attachment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/get-attachment-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

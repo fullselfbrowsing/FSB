@@ -1,0 +1,32 @@
+{
+  "slug": "expedia.get_current_user",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "get a current user in expedia",
+    "look up a current user in expedia",
+    "fetch a single current user in expedia",
+    "view one specific current user in expedia",
+    "get current user in expedia",
+    "get the signed-in user profile in expedia"
+  ],
+  "description": "Get the authenticated Expedia user profile including name, loyalty tier, currency, and locale. Requires the user to be signed in.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

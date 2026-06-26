@@ -1,0 +1,70 @@
+{
+  "slug": "starbucks.price_order",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "price an order in starbucks",
+    "price order in starbucks",
+    "calculate order price without placing it in starbucks"
+  ],
+  "description": "Get pricing for a cart of items at a specific store. This does NOT place an order — it only calculates the total price. Provide items with their SKUs (from get_product) and the store number. Returns itemized pricing and the order total.",
+  "actionVerb": "price",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_number": {
+        "type": "string",
+        "description": "Store number to price the order at"
+      },
+      "items": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sku": {
+              "type": "string",
+              "description": "SKU of the product size (from get_product size data, e.g., \"11186315\")"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "Quantity of this item"
+            },
+            "child_skus": {
+              "description": "Optional array of customization SKUs (syrups, milk, etc. from get_product options)",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "sku",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Cart items with SKUs and quantities"
+      }
+    },
+    "required": [
+      "store_number",
+      "items"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/price-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "price"
+    }
+  }
+}

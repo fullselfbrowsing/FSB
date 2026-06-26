@@ -1,0 +1,37 @@
+{
+  "slug": "medium.follow_user",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "follow an user in medium",
+    "follow user in medium",
+    "follow a user in medium"
+  ],
+  "description": "Follow a Medium user by their user ID.",
+  "actionVerb": "follow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "Medium user ID to follow"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/follow-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "follow"
+    }
+  }
+}

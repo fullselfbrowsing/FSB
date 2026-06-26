@@ -1,0 +1,47 @@
+{
+  "slug": "linear.list_sub_issues",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list sub issues in linear",
+    "show me my sub issues in linear",
+    "view my sub issues in linear",
+    "see all my sub issues in linear",
+    "list sub-issues of an issue in linear"
+  ],
+  "description": "List child/sub-issues of a parent Linear issue.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Parent issue UUID to list sub-issues for"
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-sub-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

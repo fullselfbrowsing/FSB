@@ -1,0 +1,92 @@
+{
+  "slug": "hack2hire.list_questions",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "list questions in hack2hire",
+    "show me my questions in hack2hire",
+    "view my questions in hack2hire",
+    "see all my questions in hack2hire",
+    "search and filter interview questions in hack2hire"
+  ],
+  "description": "Search and filter Hack2Hire interview questions. Combine filters to narrow results: `companyTags` (uppercase, e.g. \"PINTEREST\") returns questions reportedly asked at that company; `type` (ALGORITHM, SD, ML_SD, BLOG) selects the question category; `algorithmTags` filters by topic (e.g. ARRAY, GREEDY, HASH_TABLE, HEAP, TRIE); `stages` filters by interview stage (SCREENING, OA, ONSITE, PHONE); `difficulty` is 1 (Easy), 2 (Medium), or 3 (Hard); `selectedCollectionKey` selects a curated list (e.g. \"hack2hire-50-picks\", \"engineering-problem-picks\"). Returns a paginated list with summary fields including the company frequency map, tags, difficulty, and locked/free status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "companyTags": {
+        "description": "Filter by company key in uppercase (e.g. \"PINTEREST\", \"AMAZON\"). Use list_companies to discover keys.",
+        "type": "string"
+      },
+      "type": {
+        "description": "Filter by question type — ALGORITHM (coding), SD (system design), ML_SD (ML system design), or BLOG.",
+        "type": "string",
+        "enum": [
+          "ALGORITHM",
+          "SD",
+          "ML_SD",
+          "BLOG"
+        ]
+      },
+      "algorithmTags": {
+        "description": "Filter by algorithm/topic tag (e.g. \"ARRAY\", \"GREEDY\", \"HASH_TABLE\", \"HEAP\", \"TRIE\", \"BACKTRACKING\", \"BREADTH_FIRST_SEARCH\", \"UNION_FIND\", \"SORTING\", \"CONCURRENCY\").",
+        "type": "string"
+      },
+      "stages": {
+        "description": "Filter by interview stage where the question is reported.",
+        "type": "string",
+        "enum": [
+          "SCREENING",
+          "OA",
+          "ONSITE",
+          "PHONE"
+        ]
+      },
+      "difficulty": {
+        "description": "Filter by difficulty — 1 (Easy), 2 (Medium), or 3 (Hard).",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 3
+      },
+      "selectedCollectionKey": {
+        "description": "Filter by curated collection key (e.g. \"hack2hire-50-picks\", \"engineering-problem-picks\", \"object-oriented-problem-picks\", \"system-simulation-problem-picks\", \"classic-ml-system-design-picks\", \"new-ml-system-design-picks\", \"ai-system-design-picks\", \"classic-system-design-picks\", \"customer-facing-system-design-picks\", \"infra-system-design-picks\", \"new-system-design-topic-picks\").",
+        "type": "string"
+      },
+      "sortBy": {
+        "description": "Sort order. \"isLocked\" (default) lists free questions first, then locked.",
+        "type": "string",
+        "enum": [
+          "isLocked",
+          "frequency",
+          "difficulty",
+          "createdDate"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1).",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "perPage": {
+        "description": "Results per page (default 10, max 100).",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/list-questions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

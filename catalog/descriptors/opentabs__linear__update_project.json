@@ -1,0 +1,59 @@
+{
+  "slug": "linear.update_project",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "update a project in linear",
+    "edit a project in linear",
+    "change the details of project in linear",
+    "modify a project in linear",
+    "update project in linear"
+  ],
+  "description": "Update an existing Linear project. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project UUID to update"
+      },
+      "name": {
+        "description": "New project name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New project description",
+        "type": "string"
+      },
+      "state": {
+        "description": "New project state (planned, started, paused, completed, canceled)",
+        "type": "string"
+      },
+      "target_date": {
+        "description": "New target completion date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "New start date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/update-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

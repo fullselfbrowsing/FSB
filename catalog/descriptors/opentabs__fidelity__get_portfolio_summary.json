@@ -1,0 +1,32 @@
+{
+  "slug": "fidelity.get_portfolio_summary",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get a portfolio summary in fidelity",
+    "look up a portfolio summary in fidelity",
+    "fetch a single portfolio summary in fidelity",
+    "view one specific portfolio summary in fidelity",
+    "get portfolio summary in fidelity",
+    "view total portfolio balance and daily gain/loss in fidelity"
+  ],
+  "description": "Get the total portfolio balance, today's gain/loss, and high-level account status. Returns aggregate balances across all Fidelity accounts including brokerage, retirement, and workplace plans.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-portfolio-summary.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

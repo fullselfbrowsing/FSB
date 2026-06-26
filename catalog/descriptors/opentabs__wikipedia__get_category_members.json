@@ -1,0 +1,54 @@
+{
+  "slug": "wikipedia.get_category_members",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get category members in wikipedia",
+    "look up category members in wikipedia",
+    "fetch a single category members in wikipedia",
+    "view one specific category members in wikipedia",
+    "list pages in a category in wikipedia"
+  ],
+  "description": "Get the pages that belong to a specific Wikipedia category. Returns article titles. The category name should include the \"Category:\" prefix (e.g., \"Category:Programming languages\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category": {
+        "type": "string",
+        "description": "Category name with prefix (e.g., \"Category:Programming languages\")"
+      },
+      "limit": {
+        "description": "Maximum number of pages to return (default 50, max 500)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      },
+      "type": {
+        "description": "Type of category members to return (default: \"page\"). \"subcat\" for subcategories, \"file\" for files",
+        "type": "string",
+        "enum": [
+          "page",
+          "subcat",
+          "file"
+        ]
+      }
+    },
+    "required": [
+      "category"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-category-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

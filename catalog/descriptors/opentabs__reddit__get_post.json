@@ -1,15 +1,15 @@
 {
   "slug": "reddit.get_post",
-  "service": "reddit.com",
+  "service": "www.reddit.com",
   "intentSynonyms": [
     "get a post in reddit",
     "look up a post in reddit",
     "fetch a single post in reddit",
     "view one specific post in reddit",
     "get post in reddit",
-    "read a single reddit post and its comments in reddit"
+    "get a post and its comments in reddit"
   ],
-  "description": "Get a single Reddit post by its ID, including its body and top-level comments.",
+  "description": "Get a Reddit post and its comments by subreddit and post ID. Returns the post details and a flattened comment tree.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -18,18 +18,36 @@
       "subreddit": {
         "type": "string",
         "minLength": 1,
-        "description": "The subreddit the post lives in (without the r/ prefix)"
+        "description": "Subreddit name without r/ prefix"
       },
       "post_id": {
         "type": "string",
         "minLength": 1,
-        "description": "The base-36 post ID to fetch"
+        "description": "Post ID without t3_ prefix (e.g., \"1ki00n1\")"
       },
       "comment_limit": {
-        "description": "Maximum number of comments to include",
+        "description": "Max number of top-level comments (default 50)",
         "type": "integer",
         "minimum": 0,
         "maximum": 500
+      },
+      "comment_depth": {
+        "description": "Max comment nesting depth (default 3)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "sort": {
+        "description": "Comment sort order (default \"confidence\")",
+        "type": "string",
+        "enum": [
+          "confidence",
+          "top",
+          "new",
+          "controversial",
+          "old",
+          "qa"
+        ]
       }
     },
     "required": [
@@ -45,8 +63,8 @@
     "sourcePath": "plugins/reddit/src/tools/get-post.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

@@ -7,27 +7,27 @@
     "trash a message in discord",
     "permanently delete a message in discord",
     "delete message in discord",
-    "delete a discord message permanently in discord"
+    "delete a message from a channel in discord"
   ],
-  "description": "Permanently delete a message from a Discord channel by its ID. This action cannot be undone.",
+  "description": "Delete a message from a channel",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {
     "type": "object",
     "properties": {
-      "channel_id": {
+      "channel": {
         "type": "string",
         "minLength": 1,
-        "description": "The channel ID the message lives in"
+        "description": "Channel ID where the message is located"
       },
       "message_id": {
         "type": "string",
         "minLength": 1,
-        "description": "The message ID to delete"
+        "description": "ID of the message to delete"
       }
     },
     "required": [
-      "channel_id",
+      "channel",
       "message_id"
     ],
     "additionalProperties": false
@@ -39,7 +39,7 @@
     "sourcePath": "plugins/discord/src/tools/delete-message.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "apivoid",
+      "transportHelper": null,
       "httpMethod": "DELETE",
       "opNameVerb": "delete"
     }

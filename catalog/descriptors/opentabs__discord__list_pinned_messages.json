@@ -1,0 +1,40 @@
+{
+  "slug": "discord.list_pinned_messages",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "list pinned messages in discord",
+    "show me my pinned messages in discord",
+    "view my pinned messages in discord",
+    "see all my pinned messages in discord",
+    "list pinned messages in a channel in discord"
+  ],
+  "description": "List all pinned messages in a Discord channel. Returns messages in reverse chronological order.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to list pinned messages for"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/list-pinned-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "twilio.list_phone_numbers",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list phone numbers in twilio",
+    "show me my phone numbers in twilio",
+    "view my phone numbers in twilio",
+    "see all my phone numbers in twilio",
+    "list incoming phone numbers in twilio"
+  ],
+  "description": "List incoming phone numbers on the account with their capabilities, voice/SMS URLs, and status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of phone numbers to return per page (default 50, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-phone-numbers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

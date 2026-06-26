@@ -1,0 +1,32 @@
+{
+  "slug": "msword.get_drive",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "get a drive in msword",
+    "look up a drive in msword",
+    "fetch a single drive in msword",
+    "view one specific drive in msword",
+    "get drive in msword",
+    "get onedrive details in msword"
+  ],
+  "description": "Get the current user's OneDrive information including storage quota and drive type.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/get-drive.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

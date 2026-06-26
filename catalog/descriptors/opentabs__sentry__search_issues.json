@@ -1,0 +1,69 @@
+{
+  "slug": "sentry.search_issues",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "search issues in sentry",
+    "search and list issues with optional filters in sentry",
+    "search and list issues for a sentry organization in sentry"
+  ],
+  "description": "Search and list issues for a Sentry organization. Supports Sentry search syntax in the query parameter (e.g., \"is:unresolved\", \"assigned:me\", \"level:error\", \"first-seen:-24h\"). Filter by project IDs, environment, and time range. Results are paginated with a cursor.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Search query using Sentry search syntax (e.g., \"is:unresolved\", \"assigned:me\", \"level:error\"). Defaults to \"is:unresolved\"",
+        "type": "string"
+      },
+      "project": {
+        "description": "Array of project IDs to filter by. Omit to search all projects",
+        "type": "array",
+        "items": {
+          "type": "number",
+          "description": "Project ID"
+        }
+      },
+      "environment": {
+        "description": "Environment names to filter by (e.g., [\"production\", \"staging\"])",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "description": "Environment name"
+        }
+      },
+      "sort": {
+        "description": "Sort order: \"date\" (last seen), \"new\" (first seen), \"freq\" (events), \"user\" (users), \"trends\"",
+        "type": "string",
+        "enum": [
+          "date",
+          "new",
+          "freq",
+          "user",
+          "trends"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of issues to return (default 25, max 100)",
+        "type": "number"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/search-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "steam.search_store",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "search a store in steam",
+    "search store in steam",
+    "search for games and apps on the steam store in steam"
+  ],
+  "description": "Search the Steam store for games, DLC, software, and other apps by keyword. Returns matching items with name, type, price, and thumbnail image. Prices are in cents (e.g., 5999 = $59.99).",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "term": {
+        "type": "string",
+        "description": "Search query (e.g., \"elden ring\", \"indie roguelike\")"
+      },
+      "count": {
+        "description": "Max results to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      }
+    },
+    "required": [
+      "term"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/search-store.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

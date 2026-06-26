@@ -1,0 +1,31 @@
+{
+  "slug": "airbnb.get_search_results",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get search results in airbnb",
+    "look up search results in airbnb",
+    "fetch a single search results in airbnb",
+    "view one specific search results in airbnb",
+    "extract search results from the current page in airbnb"
+  ],
+  "description": "Extract search results from the current Airbnb search page. Navigate to a search page first, then call this tool to read the results.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-search-results.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

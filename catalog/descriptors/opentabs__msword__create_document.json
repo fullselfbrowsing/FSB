@@ -1,0 +1,50 @@
+{
+  "slug": "msword.create_document",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "create a document in msword",
+    "add a document in msword",
+    "make a new document in msword",
+    "open a new document in msword",
+    "create document in msword",
+    "create a new word document with text in msword"
+  ],
+  "description": "Create a new Word document (.docx) with the given text content. Each string in the paragraphs array becomes a separate paragraph in the document. The file is created at the specified path in OneDrive.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File path relative to drive root, must end with .docx (e.g., \"Documents/report.docx\")"
+      },
+      "paragraphs": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of text paragraphs for the document content"
+      }
+    },
+    "required": [
+      "path",
+      "paragraphs"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/create-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "create"
+    }
+  }
+}

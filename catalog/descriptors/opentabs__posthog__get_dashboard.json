@@ -1,0 +1,42 @@
+{
+  "slug": "posthog.get_dashboard",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "get a dashboard in posthog",
+    "look up a dashboard in posthog",
+    "fetch a single dashboard in posthog",
+    "view one specific dashboard in posthog",
+    "get dashboard in posthog",
+    "get dashboard details in posthog"
+  ],
+  "description": "Get detailed information about a specific dashboard including its tiles and sharing status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "dashboard_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Dashboard ID"
+      }
+    },
+    "required": [
+      "dashboard_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

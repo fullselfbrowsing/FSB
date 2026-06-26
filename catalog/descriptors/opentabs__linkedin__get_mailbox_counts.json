@@ -1,0 +1,31 @@
+{
+  "slug": "linkedin.get_mailbox_counts",
+  "service": "linkedin.com",
+  "intentSynonyms": [
+    "get mailbox counts in linkedin",
+    "look up mailbox counts in linkedin",
+    "fetch a single mailbox counts in linkedin",
+    "view one specific mailbox counts in linkedin",
+    "get unread message counts in linkedin"
+  ],
+  "description": "Get unread message counts per mailbox category (Inbox, Secondary Inbox, Message Requests, Archive, Spam).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linkedin/src/tools/get-mailbox-counts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

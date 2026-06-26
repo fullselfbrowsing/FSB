@@ -1,0 +1,49 @@
+{
+  "slug": "gcloud.get_function",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "get a function in gcloud",
+    "look up a function in gcloud",
+    "fetch a single function in gcloud",
+    "view one specific function in gcloud",
+    "get function in gcloud",
+    "get a cloud function in gcloud"
+  ],
+  "description": "Get detailed information about a specific Cloud Function.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "description": "Location (e.g., \"us-central1\")"
+      },
+      "function_name": {
+        "type": "string",
+        "description": "Function name"
+      },
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "location",
+      "function_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/get-function.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

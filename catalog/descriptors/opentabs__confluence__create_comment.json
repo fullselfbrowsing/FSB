@@ -1,0 +1,51 @@
+{
+  "slug": "confluence.create_comment",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "create a comment in confluence",
+    "add a comment in confluence",
+    "make a new comment in confluence",
+    "open a new comment in confluence",
+    "create comment in confluence",
+    "add a footer comment or reply to a comment in confluence"
+  ],
+  "description": "Add a footer comment to a Confluence page, or reply to an existing comment. To create a new top-level comment, provide page_id. To reply to an existing footer comment, provide parent_comment_id instead. The comment body uses storage format (HTML).",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "description": "Page ID to comment on — required for new top-level comments, omit when replying",
+        "type": "string",
+        "minLength": 1
+      },
+      "parent_comment_id": {
+        "description": "Parent footer comment ID to reply to — omit for new top-level comments",
+        "type": "string",
+        "minLength": 1
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment body in storage format (HTML) — e.g., \"<p>Great work!</p>\""
+      }
+    },
+    "required": [
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

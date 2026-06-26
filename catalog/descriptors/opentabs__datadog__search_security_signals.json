@@ -1,0 +1,57 @@
+{
+  "slug": "datadog.search_security_signals",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search security signals in datadog",
+    "search security signals in datadog security monitoring in datadog",
+    "search security signal in the datadog app",
+    "use datadog to search a security signal"
+  ],
+  "description": "Search security signals in Datadog Security Monitoring.",
+  "actionVerb": "search",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Search query for security signals (e.g., \"status:high\", \"rule.name:*brute*\")",
+        "type": "string"
+      },
+      "from": {
+        "description": "Start time — ISO 8601 or relative (e.g., \"now-1h\"). Default: now-1h",
+        "type": "string"
+      },
+      "to": {
+        "description": "End time — ISO 8601 or relative (e.g., \"now\"). Default: now",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum signals to return (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "sort": {
+        "description": "Sort order (default -timestamp)",
+        "type": "string",
+        "enum": [
+          "timestamp",
+          "-timestamp"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-security-signals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "search"
+    }
+  }
+}

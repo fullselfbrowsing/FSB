@@ -1,0 +1,41 @@
+{
+  "slug": "craigslist.get_chat_messages",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "get chat messages in craigslist",
+    "look up chat messages in craigslist",
+    "fetch a single chat messages in craigslist",
+    "view one specific chat messages in craigslist",
+    "get messages in a chat conversation in craigslist"
+  ],
+  "description": "Get messages for a specific chat conversation by conversation ID. Returns all messages in the conversation.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Conversation ID to retrieve messages for"
+      }
+    },
+    "required": [
+      "conversation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/get-chat-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "gcal.list_calendars",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "list calendars in gcal",
+    "show me my calendars in gcal",
+    "view my calendars in gcal",
+    "see all my calendars in gcal",
+    "list all calendars the user has access to in gcal"
+  ],
+  "description": "List all calendars on the user's calendar list. Returns primary and secondary calendars, subscribed calendars, and holiday calendars with their display settings.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "show_hidden": {
+        "description": "Whether to include hidden calendars (default false)",
+        "type": "boolean"
+      },
+      "show_deleted": {
+        "description": "Whether to include deleted calendars (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/list-calendars.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

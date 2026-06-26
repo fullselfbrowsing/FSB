@@ -1,0 +1,38 @@
+{
+  "slug": "whatsapp.clear_chat",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "clear a chat in whatsapp",
+    "clear chat in whatsapp",
+    "clear all messages from a chat in whatsapp"
+  ],
+  "description": "Clear all messages from a WhatsApp chat. The chat remains in the list but all messages are removed locally.",
+  "actionVerb": "clear",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID to clear"
+      }
+    },
+    "required": [
+      "chat_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/clear-chat.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "clear"
+    }
+  }
+}

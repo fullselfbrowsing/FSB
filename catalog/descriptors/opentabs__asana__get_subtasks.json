@@ -1,0 +1,50 @@
+{
+  "slug": "asana.get_subtasks",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get subtasks in asana",
+    "look up subtasks in asana",
+    "fetch a single subtasks in asana",
+    "view one specific subtasks in asana",
+    "list subtasks of a task in asana"
+  ],
+  "description": "List subtasks of a parent task. Supports pagination with limit and offset.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Parent task GID to list subtasks for"
+      },
+      "limit": {
+        "description": "Maximum number of subtasks to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-subtasks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

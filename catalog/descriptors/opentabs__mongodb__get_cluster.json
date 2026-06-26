@@ -1,0 +1,40 @@
+{
+  "slug": "mongodb.get_cluster",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "get a cluster in mongodb",
+    "look up a cluster in mongodb",
+    "fetch a single cluster in mongodb",
+    "view one specific cluster in mongodb",
+    "get cluster in mongodb",
+    "get cluster details by name in mongodb"
+  ],
+  "description": "Get detailed information about a specific MongoDB Atlas cluster by name, including state, version, provider, connection string, and disk size.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_name": {
+        "type": "string",
+        "description": "Cluster name to retrieve"
+      }
+    },
+    "required": [
+      "cluster_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/get-cluster.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

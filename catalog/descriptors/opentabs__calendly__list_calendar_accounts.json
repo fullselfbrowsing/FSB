@@ -1,0 +1,31 @@
+{
+  "slug": "calendly.list_calendar_accounts",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "list calendar accounts in calendly",
+    "show me my calendar accounts in calendly",
+    "view my calendar accounts in calendly",
+    "see all my calendar accounts in calendly",
+    "list connected calendar accounts in calendly"
+  ],
+  "description": "List all connected calendar accounts (Google Calendar, Outlook, etc.) with their conflict checking and push settings.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/list-calendar-accounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

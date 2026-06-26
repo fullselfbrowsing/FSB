@@ -1,0 +1,52 @@
+{
+  "slug": "linear.update_milestone",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "update a milestone in linear",
+    "edit a milestone in linear",
+    "change the details of milestone in linear",
+    "modify a milestone in linear",
+    "update milestone in linear",
+    "update a project milestone in linear"
+  ],
+  "description": "Update an existing milestone in a Linear project. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "milestone_id": {
+        "type": "string",
+        "description": "Milestone UUID to update"
+      },
+      "name": {
+        "description": "New milestone name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New milestone description",
+        "type": "string"
+      },
+      "target_date": {
+        "description": "New target date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "milestone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/update-milestone.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

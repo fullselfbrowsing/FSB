@@ -1,0 +1,46 @@
+{
+  "slug": "dominos.search_address",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "search an address in dominos",
+    "search address in dominos",
+    "autocomplete an address for store search in dominos"
+  ],
+  "description": "Autocomplete an address string to get place IDs. Use the returned place_id with find_stores_by_address to locate nearby stores. The service_method determines whether to search for delivery or carryout stores.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Address text to autocomplete"
+      },
+      "service_method": {
+        "type": "string",
+        "enum": [
+          "DELIVERY",
+          "CARRYOUT"
+        ],
+        "description": "Service method: DELIVERY or CARRYOUT"
+      }
+    },
+    "required": [
+      "address",
+      "service_method"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/search-address.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

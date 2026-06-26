@@ -1,0 +1,44 @@
+{
+  "slug": "discord.pin_message",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "pin a message in discord",
+    "pin message in discord",
+    "pin a message in a channel in discord"
+  ],
+  "description": "Pin a message in a channel. Requires Manage Messages permission.",
+  "actionVerb": "pin",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message ID to pin"
+      }
+    },
+    "required": [
+      "channel",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/pin-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "pin"
+    }
+  }
+}

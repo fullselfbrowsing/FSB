@@ -1,0 +1,62 @@
+{
+  "slug": "netlify.create_dns_record",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create a dns record in netlify",
+    "add a dns record in netlify",
+    "make a new dns record in netlify",
+    "open a new dns record in netlify",
+    "create dns record in netlify"
+  ],
+  "description": "Create a new DNS record in a Netlify DNS zone. Supports A, AAAA, CNAME, MX, TXT, NS, and other record types. Specify hostname, type, value, and optionally TTL and priority.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "The DNS zone ID to create the record in"
+      },
+      "hostname": {
+        "type": "string",
+        "description": "Fully qualified hostname for the record"
+      },
+      "type": {
+        "type": "string",
+        "description": "Record type (e.g. A, AAAA, CNAME, MX, TXT, NS)"
+      },
+      "value": {
+        "type": "string",
+        "description": "Record value (IP address, hostname, or text content)"
+      },
+      "ttl": {
+        "description": "Time to live in seconds",
+        "type": "number"
+      },
+      "priority": {
+        "description": "Record priority (required for MX and SRV records)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "zone_id",
+      "hostname",
+      "type",
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-dns-record.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

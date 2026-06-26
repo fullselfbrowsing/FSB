@@ -1,0 +1,40 @@
+{
+  "slug": "telegram.get_user_profile",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "get an user profile in telegram",
+    "look up an user profile in telegram",
+    "fetch a single user profile in telegram",
+    "view one specific user profile in telegram",
+    "get user profile in telegram",
+    "get detailed user profile with bio in telegram"
+  ],
+  "description": "Get full profile information for a Telegram user, including bio (about text) and common groups count. Requires the user ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "number",
+        "description": "Telegram user ID"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "youtube.search_videos",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "search videos in youtube",
+    "search youtube for videos in youtube",
+    "search youtube for videos matching a query in youtube"
+  ],
+  "description": "Search YouTube for videos matching a query. Returns a list of videos with titles, channels, view counts, and thumbnails. Use the video_id from results with get_video for full details.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/search-videos.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

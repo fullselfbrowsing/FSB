@@ -1,0 +1,48 @@
+{
+  "slug": "gmaps.navigate_to_location",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "navigate a to location in gmaps",
+    "navigate to location in gmaps",
+    "pan the map to specific coordinates in gmaps"
+  ],
+  "description": "Navigate the Google Maps view to specific coordinates with a given zoom level. The map pans and zooms to the specified location.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "lat": {
+        "type": "number",
+        "description": "Latitude to navigate to"
+      },
+      "lng": {
+        "type": "number",
+        "description": "Longitude to navigate to"
+      },
+      "zoom": {
+        "description": "Zoom level (1-21, default 15). Higher values show more detail.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 21
+      }
+    },
+    "required": [
+      "lat",
+      "lng"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/navigate-to-location.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

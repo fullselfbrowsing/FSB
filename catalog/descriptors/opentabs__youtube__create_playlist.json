@@ -1,0 +1,49 @@
+{
+  "slug": "youtube.create_playlist",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "create a playlist in youtube",
+    "add a playlist in youtube",
+    "make a new playlist in youtube",
+    "open a new playlist in youtube",
+    "create playlist in youtube",
+    "create a new playlist in youtube"
+  ],
+  "description": "Create a new YouTube playlist. Returns the playlist ID of the newly created playlist.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Playlist title"
+      },
+      "privacy": {
+        "description": "Privacy status (default PRIVATE)",
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "PUBLIC",
+          "UNLISTED"
+        ]
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/create-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "create"
+    }
+  }
+}

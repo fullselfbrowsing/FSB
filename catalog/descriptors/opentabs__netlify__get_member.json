@@ -1,0 +1,45 @@
+{
+  "slug": "netlify.get_member",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "get a member in netlify",
+    "look up a member in netlify",
+    "fetch a single member in netlify",
+    "view one specific member in netlify",
+    "get member in netlify",
+    "get member details by id in netlify"
+  ],
+  "description": "Get detailed information about a specific team member in a Netlify account by their member ID. Returns name, email, role, pending status, and MFA status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_slug": {
+        "type": "string",
+        "description": "The account slug the member belongs to"
+      },
+      "member_id": {
+        "type": "string",
+        "description": "The member ID to retrieve"
+      }
+    },
+    "required": [
+      "account_slug",
+      "member_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/get-member.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

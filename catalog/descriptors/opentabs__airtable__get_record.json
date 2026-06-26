@@ -7,9 +7,9 @@
     "fetch a single record in airtable",
     "view one specific record in airtable",
     "get record in airtable",
-    "get a record by id in airtable"
+    "get a single record by id in airtable"
   ],
-  "description": "Get a single record from an Airtable table by its record ID.",
+  "description": "Get a single record (row) by its ID. Returns all cell values for the record.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,23 +17,20 @@
     "properties": {
       "base_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Base ID containing the table"
+        "description": "Base ID (app prefix)"
       },
-      "table_id_or_name": {
+      "table_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Table ID or name containing the record"
+        "description": "Table ID (tbl prefix)"
       },
       "record_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Record ID to retrieve"
+        "description": "Record ID (rec prefix)"
       }
     },
     "required": [
       "base_id",
-      "table_id_or_name",
+      "table_id",
       "record_id"
     ],
     "additionalProperties": false
@@ -45,7 +42,7 @@
     "sourcePath": "plugins/airtable/src/tools/get-record.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": "apiget",
       "httpMethod": "GET",
       "opNameVerb": "get"
     }

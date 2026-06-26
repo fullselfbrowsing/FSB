@@ -1,0 +1,41 @@
+{
+  "slug": "datadog.get_monitor_groups",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get monitor groups in datadog",
+    "look up monitor groups in datadog",
+    "fetch a single monitor groups in datadog",
+    "view one specific monitor groups in datadog",
+    "get group statuses for a multi-alert monitor in datadog"
+  ],
+  "description": "Get the status of individual groups for a multi-alert monitor. Useful for seeing which specific hosts, services, or tag combinations are alerting.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "monitor_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Monitor ID"
+      }
+    },
+    "required": [
+      "monitor_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-monitor-groups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

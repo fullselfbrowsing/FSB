@@ -1,0 +1,86 @@
+{
+  "slug": "shortcut.update_epic",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "update an epic in shortcut",
+    "edit an epic in shortcut",
+    "change the details of epic in shortcut",
+    "modify an epic in shortcut",
+    "update epic in shortcut"
+  ],
+  "description": "Update an existing epic. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "epic_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Epic numeric ID"
+      },
+      "name": {
+        "description": "New epic name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description in Markdown",
+        "type": "string"
+      },
+      "epic_state_id": {
+        "description": "New epic state ID",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "deadline": {
+        "description": "Deadline in ISO 8601, or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "owner_ids": {
+        "description": "Replace all owners with these member UUIDs",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "label_ids": {
+        "description": "Replace all labels with these IDs",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "archived": {
+        "description": "Whether to archive the epic",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "epic_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/update-epic.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

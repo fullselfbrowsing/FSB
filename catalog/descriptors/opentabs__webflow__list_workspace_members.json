@@ -1,0 +1,38 @@
+{
+  "slug": "webflow.list_workspace_members",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "list workspace members in webflow",
+    "show me my workspace members in webflow",
+    "view my workspace members in webflow",
+    "see all my workspace members in webflow"
+  ],
+  "description": "List all members and pending invites for a Webflow workspace. Returns member details including name, email, role, and 2FA status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug"
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/list-workspace-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

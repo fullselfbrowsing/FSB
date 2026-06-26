@@ -1,0 +1,32 @@
+{
+  "slug": "asana.get_current_user",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get a current user in asana",
+    "look up a current user in asana",
+    "fetch a single current user in asana",
+    "view one specific current user in asana",
+    "get current user in asana",
+    "get the current user profile in asana"
+  ],
+  "description": "Get the profile of the currently authenticated Asana user, including their workspaces.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

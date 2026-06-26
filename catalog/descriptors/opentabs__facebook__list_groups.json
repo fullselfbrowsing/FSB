@@ -1,0 +1,31 @@
+{
+  "slug": "facebook.list_groups",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "list groups in facebook",
+    "show me my groups in facebook",
+    "view my groups in facebook",
+    "see all my groups in facebook",
+    "list your joined groups in facebook"
+  ],
+  "description": "List Facebook groups the current user has joined. Returns group name, member count, privacy setting, and URL.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/list-groups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

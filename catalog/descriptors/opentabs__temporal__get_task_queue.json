@@ -1,0 +1,44 @@
+{
+  "slug": "temporal.get_task_queue",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "get a task queue in temporal",
+    "look up a task queue in temporal",
+    "fetch a single task queue in temporal",
+    "view one specific task queue in temporal",
+    "get task queue in temporal",
+    "get task queue pollers and worker info in temporal"
+  ],
+  "description": "Get information about a task queue including active pollers (workers), their identities, last access times, build IDs, and rate limits. Useful for debugging worker connectivity issues.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      },
+      "task_queue": {
+        "type": "string",
+        "description": "Task queue name"
+      }
+    },
+    "required": [
+      "task_queue"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/get-task-queue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

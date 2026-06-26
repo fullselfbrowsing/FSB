@@ -1,0 +1,32 @@
+{
+  "slug": "starbucks.get_current_user",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get a current user in starbucks",
+    "look up a current user in starbucks",
+    "fetch a single current user in starbucks",
+    "view one specific current user in starbucks",
+    "get current user in starbucks",
+    "get current user profile and rewards info in starbucks"
+  ],
+  "description": "Get the authenticated Starbucks user profile including name, email, Stars balance, loyalty program status, and birthday.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

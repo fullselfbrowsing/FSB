@@ -1,0 +1,31 @@
+{
+  "slug": "gcal.list_settings",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "list settings in gcal",
+    "show me my settings in gcal",
+    "view my settings in gcal",
+    "see all my settings in gcal",
+    "list all user calendar settings in gcal"
+  ],
+  "description": "List all user settings for the authenticated user. Returns settings like timezone, locale, date format, week start day, etc.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/list-settings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

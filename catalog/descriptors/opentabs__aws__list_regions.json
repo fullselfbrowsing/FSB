@@ -1,0 +1,31 @@
+{
+  "slug": "aws.list_regions",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list regions in aws",
+    "show me my regions in aws",
+    "view my regions in aws",
+    "see all my regions in aws",
+    "list all available aws regions in aws"
+  ],
+  "description": "List all available AWS regions with their geographic locations and opt-in status. Also returns the current console region. Reads from page metadata — does not make an AWS API call.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-regions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

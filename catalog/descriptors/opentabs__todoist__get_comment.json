@@ -1,0 +1,40 @@
+{
+  "slug": "todoist.get_comment",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "get a comment in todoist",
+    "look up a comment in todoist",
+    "fetch a single comment in todoist",
+    "view one specific comment in todoist",
+    "get comment in todoist",
+    "get a comment by id in todoist"
+  ],
+  "description": "Get a specific comment by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "description": "The ID of the comment to retrieve"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/get-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

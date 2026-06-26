@@ -9,7 +9,7 @@
     "get page in confluence",
     "get a page by id in confluence"
   ],
-  "description": "Get detailed information about a specific Confluence page by its ID, optionally including the body.",
+  "description": "Get a Confluence page by its ID, including title, metadata, and optionally the page body content in storage format (HTML)",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -20,14 +20,9 @@
         "minLength": 1,
         "description": "Page ID to retrieve"
       },
-      "body_format": {
-        "description": "Body content format to return",
-        "type": "string",
-        "enum": [
-          "storage",
-          "atlas_doc_format",
-          "view"
-        ]
+      "include_body": {
+        "description": "Whether to include the page body content (default false — set to true to read page content)",
+        "type": "boolean"
       }
     },
     "required": [
@@ -42,8 +37,8 @@
     "sourcePath": "plugins/confluence/src/tools/get-page.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

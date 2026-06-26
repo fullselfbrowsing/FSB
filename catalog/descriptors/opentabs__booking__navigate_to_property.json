@@ -1,0 +1,50 @@
+{
+  "slug": "booking.navigate_to_property",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "navigate a to property in booking",
+    "navigate to property in booking",
+    "open a property page in the browser in booking"
+  ],
+  "description": "Navigate the browser to a specific property page on Booking.com. The user can then view photos, reviews, room options, and book directly. Provide check-in/check-out dates for pricing.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_name": {
+        "type": "string",
+        "description": "Property page name slug (e.g., \"paris-j-39-adore-amp-spa\")"
+      },
+      "country_code": {
+        "type": "string",
+        "description": "Two-letter country code (e.g., \"fr\", \"us\")"
+      },
+      "checkin": {
+        "description": "Check-in date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "checkout": {
+        "description": "Check-out date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_name",
+      "country_code"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/navigate-to-property.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

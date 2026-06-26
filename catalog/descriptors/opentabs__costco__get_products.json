@@ -1,0 +1,46 @@
+{
+  "slug": "costco.get_products",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "get products in costco",
+    "look up products in costco",
+    "fetch a single products in costco",
+    "view one specific products in costco",
+    "get multiple products by item numbers in costco"
+  ],
+  "description": "Get details for multiple Costco products by their item numbers in a single request. Returns pricing, description, rating, and more for each product.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_numbers": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of Costco item numbers (max 25)"
+      },
+      "warehouse_number": {
+        "description": "Warehouse number for pricing (defaults to nearest warehouse)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "item_numbers"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/get-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

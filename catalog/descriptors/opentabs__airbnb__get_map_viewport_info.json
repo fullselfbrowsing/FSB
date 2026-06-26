@@ -1,0 +1,60 @@
+{
+  "slug": "airbnb.get_map_viewport_info",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get a map viewport info in airbnb",
+    "look up a map viewport info in airbnb",
+    "fetch a single map viewport info in airbnb",
+    "view one specific map viewport info in airbnb",
+    "get map viewport info in airbnb",
+    "get location name for a map viewport in airbnb"
+  ],
+  "description": "Get the localized location name for a map bounding box and zoom level.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "southwest_lat": {
+        "type": "number",
+        "description": "Southwest corner latitude"
+      },
+      "southwest_lng": {
+        "type": "number",
+        "description": "Southwest corner longitude"
+      },
+      "northeast_lat": {
+        "type": "number",
+        "description": "Northeast corner latitude"
+      },
+      "northeast_lng": {
+        "type": "number",
+        "description": "Northeast corner longitude"
+      },
+      "zoom_level": {
+        "type": "number",
+        "description": "Map zoom level"
+      }
+    },
+    "required": [
+      "southwest_lat",
+      "southwest_lng",
+      "northeast_lat",
+      "northeast_lng",
+      "zoom_level"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-map-viewport-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

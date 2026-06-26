@@ -1,0 +1,31 @@
+{
+  "slug": "booking.list_trips",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "list trips in booking",
+    "show me my trips in booking",
+    "view my trips in booking",
+    "see all my trips in booking",
+    "list user trips and bookings in booking"
+  ],
+  "description": "List the current user's trips and bookings on Booking.com. Returns upcoming and past bookings with property details, dates, and status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/list-trips.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

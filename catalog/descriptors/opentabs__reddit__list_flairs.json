@@ -1,0 +1,40 @@
+{
+  "slug": "reddit.list_flairs",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "list flairs in reddit",
+    "show me my flairs in reddit",
+    "view my flairs in reddit",
+    "see all my flairs in reddit",
+    "list post flairs for a subreddit in reddit"
+  ],
+  "description": "List available post flairs for a subreddit. Use the returned flair ID with submit_post to satisfy subreddits that require flair.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Subreddit name without r/ prefix (e.g., \"ClaudeAI\")"
+      }
+    },
+    "required": [
+      "subreddit"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/list-flairs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

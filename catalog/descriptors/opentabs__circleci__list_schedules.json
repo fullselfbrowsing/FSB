@@ -1,0 +1,43 @@
+{
+  "slug": "circleci.list_schedules",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "list schedules in circleci",
+    "show me my schedules in circleci",
+    "view my schedules in circleci",
+    "see all my schedules in circleci",
+    "list scheduled triggers in circleci"
+  ],
+  "description": "List scheduled pipeline triggers for a project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/list-schedules.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

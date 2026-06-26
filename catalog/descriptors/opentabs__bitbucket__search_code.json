@@ -1,0 +1,54 @@
+{
+  "slug": "bitbucket.search_code",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "search a code in bitbucket",
+    "search code in bitbucket",
+    "search code in a workspace in bitbucket"
+  ],
+  "description": "Search for code across all repositories in a Bitbucket workspace. Returns matching file paths and content snippets.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "search_query": {
+        "type": "string",
+        "description": "Search query string"
+      },
+      "page": {
+        "description": "Page number for pagination (default 1)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "pagelen": {
+        "description": "Number of results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "workspace",
+      "search_query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/search-code.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

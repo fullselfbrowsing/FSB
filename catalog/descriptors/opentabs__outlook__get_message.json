@@ -1,0 +1,40 @@
+{
+  "slug": "outlook.get_message",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "get a message in outlook",
+    "look up a message in outlook",
+    "fetch a single message in outlook",
+    "view one specific message in outlook",
+    "get message in outlook",
+    "get full email content in outlook"
+  ],
+  "description": "Get the full content of an email message by ID, including body, all recipients, and metadata. Use list_messages or search_messages to find message IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID"
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/get-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

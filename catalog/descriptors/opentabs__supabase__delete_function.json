@@ -1,0 +1,47 @@
+{
+  "slug": "supabase.delete_function",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "delete a function in supabase",
+    "remove a function in supabase",
+    "trash a function in supabase",
+    "permanently delete a function in supabase",
+    "delete function in supabase",
+    "delete an edge function in supabase"
+  ],
+  "description": "Delete an Edge Function from a Supabase project.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      },
+      "function_slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Function slug to delete"
+      }
+    },
+    "required": [
+      "ref",
+      "function_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/delete-function.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

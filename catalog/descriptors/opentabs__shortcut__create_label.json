@@ -1,0 +1,48 @@
+{
+  "slug": "shortcut.create_label",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "create a label in shortcut",
+    "add a label in shortcut",
+    "make a new label in shortcut",
+    "open a new label in shortcut",
+    "create label in shortcut",
+    "create a new label in shortcut"
+  ],
+  "description": "Create a new label in the workspace.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Label name"
+      },
+      "color": {
+        "description": "Hex color code (e.g., \"#ff0000\")",
+        "type": "string"
+      },
+      "description": {
+        "description": "Label description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/create-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "slug": "bitbucket.update_pull_request",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "update a pull request in bitbucket",
+    "edit a pull request in bitbucket",
+    "change the details of pull request in bitbucket",
+    "modify a pull request in bitbucket",
+    "update pull request in bitbucket"
+  ],
+  "description": "Update an existing pull request. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "pull_request_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Pull request ID"
+      },
+      "title": {
+        "description": "New pull request title",
+        "type": "string"
+      },
+      "description": {
+        "description": "New pull request description in Markdown",
+        "type": "string"
+      },
+      "destination_branch": {
+        "description": "New destination branch name",
+        "type": "string"
+      },
+      "close_source_branch": {
+        "description": "Whether to delete the source branch after merge",
+        "type": "boolean"
+      },
+      "reviewers": {
+        "description": "Array of reviewer UUIDs — replaces the existing reviewer list",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "pull_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/update-pull-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

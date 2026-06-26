@@ -1,0 +1,37 @@
+{
+  "slug": "gemini.get_conversation",
+  "service": "gemini.google.com",
+  "intentSynonyms": [
+    "get a conversation in gemini",
+    "look up a conversation in gemini",
+    "fetch a single conversation in gemini",
+    "view one specific conversation in gemini",
+    "get conversation in gemini",
+    "get messages from the current conversation in gemini"
+  ],
+  "description": "Get the messages of the currently active Gemini conversation. Returns the conversation ID and all visible message turns (prompt/response pairs). If a conversation_id is provided and it does not match the current URL, the browser navigates to that conversation first. Note: only messages visible on screen are returned — very long conversations may be truncated.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "description": "Conversation ID to load. If omitted, reads the current conversation.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gemini/src/tools/get-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "slug": "todoist.update_label",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "update a label in todoist",
+    "edit a label in todoist",
+    "change the details of label in todoist",
+    "modify a label in todoist",
+    "update label in todoist"
+  ],
+  "description": "Update an existing label. Only the fields provided will be changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "label_id": {
+        "type": "string",
+        "description": "The ID of the label to update"
+      },
+      "name": {
+        "description": "New name for the label",
+        "type": "string"
+      },
+      "color": {
+        "description": "New color name (e.g. \"berry_red\", \"blue\", \"green\")",
+        "type": "string"
+      },
+      "order": {
+        "description": "New position among labels",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "is_favorite": {
+        "description": "Whether to mark the label as a favorite",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "label_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/update-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

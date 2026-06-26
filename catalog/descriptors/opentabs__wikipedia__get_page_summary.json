@@ -1,0 +1,40 @@
+{
+  "slug": "wikipedia.get_page_summary",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get a page summary in wikipedia",
+    "look up a page summary in wikipedia",
+    "fetch a single page summary in wikipedia",
+    "view one specific page summary in wikipedia",
+    "get page summary in wikipedia",
+    "get a quick article summary in wikipedia"
+  ],
+  "description": "Get a concise summary of a Wikipedia article using the Wikimedia REST API. Returns a clean extract, description, thumbnail, original image, and desktop/mobile URLs. Lighter than get_article.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\", \"Albert Einstein\")"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-page-summary.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

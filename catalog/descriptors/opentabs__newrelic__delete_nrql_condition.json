@@ -1,0 +1,48 @@
+{
+  "slug": "newrelic.delete_nrql_condition",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "delete a nrql condition in newrelic",
+    "remove a nrql condition in newrelic",
+    "trash a nrql condition in newrelic",
+    "permanently delete a nrql condition in newrelic",
+    "delete nrql condition in newrelic",
+    "delete a nrql alert condition in newrelic"
+  ],
+  "description": "Permanently delete a NRQL alert condition. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID"
+      },
+      "condition_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Condition ID to delete"
+      }
+    },
+    "required": [
+      "account_id",
+      "condition_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/delete-nrql-condition.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

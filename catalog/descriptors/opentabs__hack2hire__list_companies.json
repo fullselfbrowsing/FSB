@@ -1,0 +1,31 @@
+{
+  "slug": "hack2hire.list_companies",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "list companies in hack2hire",
+    "show me my companies in hack2hire",
+    "view my companies in hack2hire",
+    "see all my companies in hack2hire",
+    "list all tracked companies in hack2hire"
+  ],
+  "description": "List every company that Hack2Hire tracks interview questions for, with the canonical URL key (e.g. \"amazon\", \"pinterest\"), display name, country, and a priority value used to rank companies in the UI. Use the `key` field to look up questions in `list_questions` (uppercased) or `get_company_question_stats`.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/list-companies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

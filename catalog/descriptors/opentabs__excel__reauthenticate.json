@@ -1,0 +1,29 @@
+{
+  "slug": "excel.reauthenticate",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "reauthenticate in excel",
+    "force a fresh microsoft graph token by clearing stale msal state and reloading the tab in excel",
+    "clear cached msal state and reload the sharepoint/onedrive tab to force a fresh microsoft graph token in excel"
+  ],
+  "description": "Clear cached MSAL state and reload the SharePoint/OneDrive tab to force a fresh Microsoft Graph token. Use this when another Excel tool returns an authentication error pointing at this tool. After invoking, wait ~5 seconds for the tab to finish reloading, then retry the original operation.",
+  "actionVerb": "reauthenticate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/reauthenticate.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "reauthenticate"
+    }
+  }
+}

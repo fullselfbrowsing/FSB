@@ -1,0 +1,43 @@
+{
+  "slug": "robinhood.get_market_hours",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get market hours in robinhood",
+    "look up market hours in robinhood",
+    "fetch a single market hours in robinhood",
+    "view one specific market hours in robinhood",
+    "get market hours for a date in robinhood"
+  ],
+  "description": "Get market trading hours for a specific date including open/close times and extended hours windows.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "market": {
+        "description": "Market MIC code (default XNYS for NYSE)",
+        "type": "string"
+      },
+      "date": {
+        "type": "string",
+        "description": "Date to check in YYYY-MM-DD format"
+      }
+    },
+    "required": [
+      "date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-market-hours.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

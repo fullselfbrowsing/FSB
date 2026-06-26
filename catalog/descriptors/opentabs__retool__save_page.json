@@ -1,0 +1,50 @@
+{
+  "slug": "retool.save_page",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "save a page in retool",
+    "save page in retool",
+    "save app state to a retool page in retool"
+  ],
+  "description": "Save (update) a Retool app by pushing its full app state JSON. This is the core tool for programmatically building and modifying Retool apps. The appState must be a valid Transit-encoded JSON string (the same format returned by get_app). Use get_app_state to get the current state, modify it, then use this tool to save changes.",
+  "actionVerb": "save",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID (from list_apps or create_app)"
+      },
+      "app_state": {
+        "type": "string",
+        "description": "Transit-encoded app state JSON string (same format as returned by get_app_state)"
+      },
+      "commit_message": {
+        "description": "Optional commit message describing the change (shown in edit history)",
+        "type": "string"
+      },
+      "branch_name": {
+        "description": "Optional source-control branch name to save into. Defaults to the branch in the targeted editor URL, if present.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_uuid",
+      "app_state"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/save-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "save"
+    }
+  }
+}

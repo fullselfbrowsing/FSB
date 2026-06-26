@@ -6,21 +6,21 @@
     "show me my issues in gitlab",
     "view my issues in gitlab",
     "see all my issues in gitlab",
-    "list issues in a project in gitlab"
+    "list issues for a project in gitlab"
   ],
-  "description": "List issues in a GitLab project. Optionally filter by state, labels, assignee, or milestone.",
+  "description": "List issues for a project. By default returns opened issues sorted by creation date. Can filter by state, labels, assignee, milestone, and more.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "project_id": {
+      "project": {
         "type": "string",
         "minLength": 1,
-        "description": "Project ID or URL-encoded path (group/project)"
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
       },
       "state": {
-        "description": "Filter by issue state",
+        "description": "Issue state filter (default: opened)",
         "type": "string",
         "enum": [
           "opened",
@@ -29,29 +29,52 @@
         ]
       },
       "labels": {
-        "description": "Filter by label names",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
+        "description": "Comma-separated list of label names to filter by",
+        "type": "string"
       },
       "assignee_username": {
         "description": "Filter by assignee username",
         "type": "string"
       },
       "milestone": {
-        "description": "Filter by milestone title",
+        "description": "Milestone title to filter by, or \"None\" / \"Any\"",
         "type": "string"
       },
-      "page": {
-        "description": "Page number for pagination (1-indexed)",
+      "search": {
+        "description": "Search in title and description",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "Sort field (default: created_at)",
+        "type": "string",
+        "enum": [
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
         "type": "integer",
-        "minimum": -9007199254740991,
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
         "maximum": 9007199254740991
       }
     },
     "required": [
-      "project_id"
+      "project"
     ],
     "additionalProperties": false
   },

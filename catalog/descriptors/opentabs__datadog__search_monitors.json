@@ -1,0 +1,49 @@
+{
+  "slug": "datadog.search_monitors",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search monitors in datadog",
+    "search monitors by name, status, tags, or type in datadog",
+    "search for monitors by query string in datadog"
+  ],
+  "description": "Search for monitors by query string. Supports searching by name, status, tags, and other attributes. Use Datadog monitor search syntax (e.g., \"status:Alert\", \"tag:env:prod\", \"type:metric\").",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Monitor search query (e.g., \"status:Alert\", \"tag:env:prod\", \"my-service\")"
+      },
+      "per_page": {
+        "description": "Results per page (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-monitors.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

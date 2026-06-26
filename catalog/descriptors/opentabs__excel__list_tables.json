@@ -1,0 +1,36 @@
+{
+  "slug": "excel.list_tables",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "list tables in excel",
+    "show me my tables in excel",
+    "view my tables in excel",
+    "see all my tables in excel",
+    "list all tables in the workbook in excel"
+  ],
+  "description": "List all tables in the currently open Excel workbook. Returns table names, IDs, and display settings. Optionally filter by worksheet name to list only tables in a specific sheet.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "description": "Worksheet name to filter tables by. Omit to list tables from all sheets.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/list-tables.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

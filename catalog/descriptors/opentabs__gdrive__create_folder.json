@@ -1,0 +1,48 @@
+{
+  "slug": "gdrive.create_folder",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "create a folder in gdrive",
+    "add a folder in gdrive",
+    "make a new folder in gdrive",
+    "open a new folder in gdrive",
+    "create folder in gdrive",
+    "create a new folder in gdrive"
+  ],
+  "description": "Create a new folder in Google Drive. Specify parent_id to create a nested folder, otherwise it goes to My Drive root.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Folder name"
+      },
+      "parent_id": {
+        "description": "Parent folder ID. Defaults to My Drive root.",
+        "type": "string"
+      },
+      "description": {
+        "description": "Folder description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/create-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

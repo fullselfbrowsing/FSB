@@ -1,0 +1,32 @@
+{
+  "slug": "netflix.get_current_user",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "get a current user in netflix",
+    "look up a current user in netflix",
+    "fetch a single current user in netflix",
+    "view one specific current user in netflix",
+    "get current user in netflix",
+    "get current netflix user info in netflix"
+  ],
+  "description": "Get the currently logged-in Netflix user profile information including account name, membership status, country, maturity level, and playback permissions.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

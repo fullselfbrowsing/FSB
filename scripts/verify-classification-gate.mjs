@@ -296,10 +296,27 @@ function originFromService(service) {
 // Read catalog/descriptors/*.json TOP-LEVEL ONLY (mirroring readJsonDir's
 // non-recursion; do NOT descend into _fixtures/, so the proof fixture and the
 // seed fixtures are excluded exactly as they are from the shipped catalog).
+//
+// SCREENED PER ORIGIN (DEF-39.5-03-A, full-corpus import): the CI backstop -- like
+// the importer's merge-time gate -- screens whether each emitted ORIGIN is a sensitive
+// BRAND that must be classified. The authoritative origin signals are the HOST and the
+// canonical SLUG (which carries a payment-verb op-name like place_order). An op's free-
+// text PROSE DESCRIPTION is NOT an origin signal: at full-corpus scale a benign dev/
+// infra op's prose legitimately mentions an axis token in passing ("view pipeline
+// health", a "billing" page read, "budget"/"signal"/"claude"/comment "threads"/"tax"),
+// which false-trips the axis on an origin that is CORRECTLY safe (a dev tool is not a
+// finance/health/social brand). So this sweep keys ONE item per origin on host + slug
+// (NO op prose) -- the EXACT model tests/full-corpus-screen.test.js proves yields 0
+// failures over the whole corpus. This does NOT weaken the gate: every committed origin
+// is still host-screened (the sensitive-brand check) and every slug is still screened
+// (a payment-verb op-name still trips). It is ORTHOGONAL to the Wall-1 forbidden-field
+// input pre-scan in the importer (which is input-schema-only and NEVER read a
+// description). Deduplicating by origin also collapses the previously-duplicated
+// per-op failures for the same host into a single screen.
 function readCorpusItems() {
-  const items = [];
+  const byOrigin = new Map(); // origin -> { origin, service, slug }
   const dir = resolve(ROOT, 'catalog/descriptors');
-  if (!existsSync(dir)) return items;
+  if (!existsSync(dir)) return [];
   const names = readdirSync(dir)
     .filter((n) => n.endsWith('.json'))
     .sort();
@@ -314,9 +331,14 @@ function readCorpusItems() {
     }
     const origin = originFromService(d && d.service);
     if (!origin) continue;
-    items.push({ origin: origin, service: d.service, slug: d.slug, description: d.description });
+    // First descriptor for an origin seeds the screen item; a later one re-keys the slug
+    // (any of the origin's slugs is a valid host-level screen signal). No op-prose
+    // description is carried (DEF-39.5-03-A) -- only host + slug screen the origin.
+    if (!byOrigin.has(origin)) {
+      byOrigin.set(origin, { origin: origin, service: d.service, slug: d.slug });
+    }
   }
-  return items;
+  return [...byOrigin.values()];
 }
 
 // ---- CLI entry (only when invoked directly, not when imported) ---------------

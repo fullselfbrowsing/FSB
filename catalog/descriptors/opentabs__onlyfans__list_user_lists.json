@@ -1,0 +1,31 @@
+{
+  "slug": "onlyfans.list_user_lists",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "list user lists in onlyfans",
+    "show me my user lists in onlyfans",
+    "view my user lists in onlyfans",
+    "see all my user lists in onlyfans",
+    "get your user lists in onlyfans"
+  ],
+  "description": "Get all user-created lists (e.g. Fans, Following, custom lists). Lists organize subscribed users into groups.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/list-user-lists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

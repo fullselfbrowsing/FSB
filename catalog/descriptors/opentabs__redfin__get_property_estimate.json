@@ -1,0 +1,42 @@
+{
+  "slug": "redfin.get_property_estimate",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "get a property estimate in redfin",
+    "look up a property estimate in redfin",
+    "fetch a single property estimate in redfin",
+    "view one specific property estimate in redfin",
+    "get property estimate in redfin",
+    "get redfin estimate and comparable homes in redfin"
+  ],
+  "description": "Get the Redfin Estimate (automated home valuation) for a property, along with comparable properties used to determine the estimate. The Redfin Estimate is a proprietary AVM that predicts current market value.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Redfin property ID"
+      }
+    },
+    "required": [
+      "property_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/get-property-estimate.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

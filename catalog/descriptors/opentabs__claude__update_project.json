@@ -1,0 +1,47 @@
+{
+  "slug": "claude.update_project",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "update a project in claude",
+    "edit a project in claude",
+    "change the details of project in claude",
+    "modify a project in claude",
+    "update project in claude"
+  ],
+  "description": "Update a project name or description. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_uuid": {
+        "type": "string",
+        "description": "Project UUID to update"
+      },
+      "name": {
+        "description": "New project name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New project description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/update-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

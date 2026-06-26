@@ -1,0 +1,42 @@
+{
+  "slug": "tumblr.unlike_post",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "unlike a post in tumblr",
+    "unlike post in tumblr",
+    "remove a like from a tumblr post in tumblr"
+  ],
+  "description": "Remove a like from a Tumblr post. Requires the post ID and reblog key.",
+  "actionVerb": "unlike",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "string",
+        "description": "Post ID"
+      },
+      "reblog_key": {
+        "type": "string",
+        "description": "Reblog key for the post (from post data)"
+      }
+    },
+    "required": [
+      "post_id",
+      "reblog_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/unlike-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unlike"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "msword.get_document_text",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "get a document text in msword",
+    "look up a document text in msword",
+    "fetch a single document text in msword",
+    "view one specific document text in msword",
+    "get document text in msword",
+    "extract text from a word document in msword"
+  ],
+  "description": "Extract plain text content from a Word document (.docx). Downloads the binary file, decompresses the OOXML archive, and extracts text from all paragraphs. Returns paragraphs as an array of strings.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID of the .docx document (from list_children or search_files)"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/get-document-text.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

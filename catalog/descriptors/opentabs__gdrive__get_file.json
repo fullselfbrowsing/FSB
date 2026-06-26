@@ -1,0 +1,40 @@
+{
+  "slug": "gdrive.get_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "get a file in gdrive",
+    "look up a file in gdrive",
+    "fetch a single file in gdrive",
+    "view one specific file in gdrive",
+    "get file in gdrive",
+    "get file or folder details by id in gdrive"
+  ],
+  "description": "Get detailed information about a specific file or folder by its ID. Returns metadata including name, MIME type, size, owner, sharing status, and a web view link.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/get-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

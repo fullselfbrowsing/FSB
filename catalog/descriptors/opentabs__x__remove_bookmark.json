@@ -1,0 +1,38 @@
+{
+  "slug": "x.remove_bookmark",
+  "service": "x.com",
+  "intentSynonyms": [
+    "remove a bookmark in x",
+    "remove bookmark in x",
+    "remove a tweet from your bookmarks in x"
+  ],
+  "description": "Remove a tweet from your bookmarks.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID to remove from bookmarks"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/remove-bookmark.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

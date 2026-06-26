@@ -1,0 +1,39 @@
+{
+  "slug": "circleci.get_flaky_tests",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get flaky tests in circleci",
+    "look up flaky tests in circleci",
+    "fetch a single flaky tests in circleci",
+    "view one specific flaky tests in circleci",
+    "get flaky tests in a project in circleci"
+  ],
+  "description": "Get flaky tests detected in a project. Returns test names, how many times they flaked, and which workflows/jobs they ran in.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-flaky-tests.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

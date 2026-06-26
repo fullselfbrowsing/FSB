@@ -1,33 +1,28 @@
 {
   "slug": "instacart.list_orders",
-  "service": "www.instacart.com",
+  "service": "instacart.com",
   "intentSynonyms": [
     "list orders in instacart",
     "show me my orders in instacart",
     "view my orders in instacart",
     "see all my orders in instacart",
-    "show me my instacart order history in instacart"
+    "list recent orders in instacart"
   ],
-  "description": "List your recent Instacart orders. Optionally filter by status (active, completed, cancelled).",
+  "description": "List recent Instacart orders with status, retailer, total, and item count. Supports cursor-based pagination. Returns orders sorted by most recent first.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "status": {
-        "description": "Filter orders by status",
-        "type": "string",
-        "enum": [
-          "active",
-          "completed",
-          "cancelled"
-        ]
-      },
-      "limit": {
-        "description": "Maximum number of orders to return",
+      "first": {
+        "description": "Number of orders to return (default 10)",
         "type": "integer",
         "minimum": 1,
         "maximum": 50
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
       }
     },
     "additionalProperties": false
@@ -39,8 +34,8 @@
     "sourcePath": "plugins/instacart/src/tools/list-orders.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

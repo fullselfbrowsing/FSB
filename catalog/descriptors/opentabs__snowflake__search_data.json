@@ -1,0 +1,37 @@
+{
+  "slug": "snowflake.search_data",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "search a data in snowflake",
+    "search data in snowflake",
+    "search databases by name pattern in snowflake"
+  ],
+  "description": "Search for Snowflake databases by name pattern (case-insensitive LIKE match). Use '%' as wildcard. For example, 'billing' matches databases containing 'billing' in their name.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Database name pattern to search (case-insensitive, e.g., 'billing' or '%prod%')"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/search-data.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

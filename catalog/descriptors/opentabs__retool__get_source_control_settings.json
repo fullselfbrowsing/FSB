@@ -1,0 +1,31 @@
+{
+  "slug": "retool.get_source_control_settings",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get source control settings in retool",
+    "look up source control settings in retool",
+    "fetch a single source control settings in retool",
+    "view one specific source control settings in retool",
+    "get source control configuration in retool"
+  ],
+  "description": "Get the source control configuration for the Retool organization, including auto branch naming, PR templates, and branch cleanup settings.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-source-control-settings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

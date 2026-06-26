@@ -1,0 +1,49 @@
+{
+  "slug": "bitbucket.delete_branch",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "delete a branch in bitbucket",
+    "remove a branch in bitbucket",
+    "trash a branch in bitbucket",
+    "permanently delete a branch in bitbucket",
+    "delete branch in bitbucket"
+  ],
+  "description": "Delete a branch from a Bitbucket repository. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "name": {
+        "type": "string",
+        "description": "Branch name to delete"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/delete-branch.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "redfin.search_locations",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "search locations in redfin",
+    "search cities, zips, and neighborhoods in redfin",
+    "search for locations on redfin by name in redfin"
+  ],
+  "description": "Search for locations on Redfin by name. Returns matching cities, counties, neighborhoods, ZIP codes, and addresses. Use the returned location IDs and types with search_properties.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Location search text (e.g., \"San Francisco\", \"94105\", \"Mission District\")"
+      },
+      "count": {
+        "description": "Maximum number of results (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/search-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "discord.list_roles",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "list roles in discord",
+    "show me my roles in discord",
+    "view my roles in discord",
+    "see all my roles in discord",
+    "list roles in a server in discord"
+  ],
+  "description": "List all roles in a Discord guild (server). Returns roles sorted by position.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guild_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Guild (server) ID to list roles for"
+      }
+    },
+    "required": [
+      "guild_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/list-roles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

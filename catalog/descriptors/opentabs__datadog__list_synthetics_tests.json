@@ -1,0 +1,44 @@
+{
+  "slug": "datadog.list_synthetics_tests",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list synthetics tests in datadog",
+    "show me my synthetics tests in datadog",
+    "view my synthetics tests in datadog",
+    "see all my synthetics tests in datadog",
+    "list synthetic monitoring tests in datadog"
+  ],
+  "description": "List synthetic monitoring tests (API, browser, mobile). Supports filtering by page size.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Results per page (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_number": {
+        "description": "Page number (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-synthetics-tests.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

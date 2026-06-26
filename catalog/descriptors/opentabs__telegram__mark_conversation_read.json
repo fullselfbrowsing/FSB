@@ -1,0 +1,43 @@
+{
+  "slug": "telegram.mark_conversation_read",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "mark a conversation read in telegram",
+    "mark conversation read in telegram",
+    "mark messages as read in telegram"
+  ],
+  "description": "Mark all messages in a conversation as read up to the specified message ID. This clears the unread count for the conversation.",
+  "actionVerb": "mark",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation to mark as read"
+      },
+      "max_id": {
+        "description": "Mark messages up to this ID as read (default: mark all as read)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "peer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/mark-conversation-read.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "mark"
+    }
+  }
+}

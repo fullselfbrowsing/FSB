@@ -1,0 +1,42 @@
+{
+  "slug": "outlook.move_message",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "move a message in outlook",
+    "move message in outlook",
+    "move email to folder in outlook"
+  ],
+  "description": "Move an email message to a different folder. Use well-known names (Inbox, Archive, DeletedItems, Drafts, JunkEmail, SentItems) or folder IDs from list_folders.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID to move"
+      },
+      "destination_folder_id": {
+        "type": "string",
+        "description": "Destination folder ID or well-known name"
+      }
+    },
+    "required": [
+      "message_id",
+      "destination_folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/move-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "move"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "slug": "bitbucket.get_file_content",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "get a file content in bitbucket",
+    "look up a file content in bitbucket",
+    "fetch a single file content in bitbucket",
+    "view one specific file content in bitbucket",
+    "get file content in bitbucket",
+    "read a file from a repository in bitbucket"
+  ],
+  "description": "Read the raw content of a file from a Bitbucket repository at a given branch, tag, or commit.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "path": {
+        "type": "string",
+        "description": "File path relative to repository root"
+      },
+      "ref": {
+        "description": "Branch name, tag, or commit SHA — defaults to the repository default branch",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "path"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/get-file-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

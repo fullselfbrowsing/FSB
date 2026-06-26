@@ -1,0 +1,40 @@
+{
+  "slug": "circleci.delete_schedule",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "delete a schedule in circleci",
+    "remove a schedule in circleci",
+    "trash a schedule in circleci",
+    "permanently delete a schedule in circleci",
+    "delete schedule in circleci",
+    "delete a scheduled trigger in circleci"
+  ],
+  "description": "Delete a scheduled pipeline trigger. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "schedule_id": {
+        "type": "string",
+        "description": "Schedule UUID"
+      }
+    },
+    "required": [
+      "schedule_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/delete-schedule.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

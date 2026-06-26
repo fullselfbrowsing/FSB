@@ -1,0 +1,40 @@
+{
+  "slug": "supabase.list_functions",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "list functions in supabase",
+    "show me my functions in supabase",
+    "view my functions in supabase",
+    "see all my functions in supabase",
+    "list all edge functions for a project in supabase"
+  ],
+  "description": "List all Edge Functions deployed to a Supabase project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/list-functions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

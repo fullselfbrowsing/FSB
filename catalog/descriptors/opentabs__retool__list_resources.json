@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_resources",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list resources in retool",
+    "show me my resources in retool",
+    "view my resources in retool",
+    "see all my resources in retool",
+    "list all configured data resources in retool"
+  ],
+  "description": "List all configured resources (data sources) in the Retool organization. Resources include databases, APIs, AI providers, and other integrations.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-resources.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

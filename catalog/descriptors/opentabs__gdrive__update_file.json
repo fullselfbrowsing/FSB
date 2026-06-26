@@ -1,0 +1,52 @@
+{
+  "slug": "gdrive.update_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "update a file in gdrive",
+    "edit a file in gdrive",
+    "change the details of file in gdrive",
+    "modify a file in gdrive",
+    "update file in gdrive",
+    "update file or folder metadata in gdrive"
+  ],
+  "description": "Update file or folder metadata — rename, change description, or toggle starred status. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      },
+      "name": {
+        "description": "New file name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "starred": {
+        "description": "Whether the file is starred",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/update-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "slug": "excel.update_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "update a range in excel",
+    "edit a range in excel",
+    "change the details of range in excel",
+    "modify a range in excel",
+    "update range in excel",
+    "write values or formulas to a range in excel"
+  ],
+  "description": "Write values, formulas, or number formats to a specific range in a worksheet. The values must be a 2D array matching the range dimensions. Use null within the array to skip a cell. Pass formulas starting with \"=\" (e.g., \"=SUM(A1:A10)\"). Use \"\" (empty string) to clear a cell.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Range address in A1 notation (e.g., \"A1:C3\")"
+      },
+      "values": {
+        "description": "2D array of values to write. Dimensions must match the range.",
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "formulas": {
+        "description": "2D array of formulas to write. Each formula starts with \"=\".",
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "number_format": {
+        "description": "2D array of number format codes (e.g., \"0.00\", \"m/d/yyyy\")",
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required": [
+      "worksheet",
+      "address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/update-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

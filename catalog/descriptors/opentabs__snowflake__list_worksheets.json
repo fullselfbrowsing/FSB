@@ -1,0 +1,42 @@
+{
+  "slug": "snowflake.list_worksheets",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "list worksheets in snowflake",
+    "show me my worksheets in snowflake",
+    "view my worksheets in snowflake",
+    "see all my worksheets in snowflake",
+    "list saved worksheets in snowflake"
+  ],
+  "description": "List saved Snowflake worksheets, sorted by most recently modified. Supports pagination via cursor. Worksheets are the SQL editor tabs in the Snowflake web UI.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum worksheets to return (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/list-worksheets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

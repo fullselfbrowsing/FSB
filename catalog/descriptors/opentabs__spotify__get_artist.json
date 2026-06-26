@@ -1,0 +1,40 @@
+{
+  "slug": "spotify.get_artist",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get an artist in spotify",
+    "look up an artist in spotify",
+    "fetch a single artist in spotify",
+    "view one specific artist in spotify",
+    "get artist in spotify",
+    "get artist details and top tracks in spotify"
+  ],
+  "description": "Get detailed information about a Spotify artist including name, biography, followers, monthly listeners, and top tracks. Provide the artist's Spotify URI (e.g., spotify:artist:0OdUWJ0sBjDrqHygGUXeCF).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "description": "Spotify artist URI (e.g., \"spotify:artist:0OdUWJ0sBjDrqHygGUXeCF\")"
+      }
+    },
+    "required": [
+      "uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-artist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "notebooklm.add_source_url",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "add a source url in notebooklm",
+    "add source url in notebooklm",
+    "add a website source in notebooklm"
+  ],
+  "description": "Add a website URL as a source to a notebook. NotebookLM will fetch and index the page content.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "url": {
+        "type": "string",
+        "description": "Website URL to add as a source"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/add-source-url.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

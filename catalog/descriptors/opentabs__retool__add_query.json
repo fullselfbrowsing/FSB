@@ -1,0 +1,74 @@
+{
+  "slug": "retool.add_query",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "add a query in retool",
+    "add query in retool",
+    "add a data query to an app in retool"
+  ],
+  "description": "Add a data query to a Retool app. The query connects to an existing resource (database, REST API, gRPC service) and can be referenced by widgets via {{ queryName.data }}. For SQL queries, provide the SQL string. For REST queries, provide httpMethod and query (URL path).",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID"
+      },
+      "query_id": {
+        "type": "string",
+        "description": "Unique query ID (e.g., \"getUsers\", \"listPaymentPlans\")"
+      },
+      "resource_name": {
+        "type": "string",
+        "description": "Resource display name (e.g., \"Billing Lifecycle (readonly / replica)\") or internal UUID name"
+      },
+      "query_type": {
+        "type": "string",
+        "enum": [
+          "sql",
+          "RESTQuery",
+          "grpc"
+        ],
+        "description": "Query type: sql for databases, RESTQuery for REST APIs, grpc for gRPC services"
+      },
+      "query_string": {
+        "type": "string",
+        "description": "The query: SQL statement, REST URL path, or gRPC method name"
+      },
+      "run_on_page_load": {
+        "description": "Whether to run when the page loads (default: false)",
+        "type": "boolean"
+      },
+      "additional_properties": {
+        "description": "Extra query template properties (e.g., { httpMethod: \"GET\", body: \"...\" } for REST)",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "page_uuid",
+      "query_id",
+      "resource_name",
+      "query_type",
+      "query_string"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/add-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

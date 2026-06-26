@@ -1,0 +1,41 @@
+{
+  "slug": "clickup.get_folder",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get a folder in clickup",
+    "look up a folder in clickup",
+    "fetch a single folder in clickup",
+    "view one specific folder in clickup",
+    "get folder in clickup",
+    "get folder details by id in clickup"
+  ],
+  "description": "Get detailed information about a specific ClickUp folder by its ID. Returns folder name, order, archive status, and parent space.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Folder ID"
+      }
+    },
+    "required": [
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

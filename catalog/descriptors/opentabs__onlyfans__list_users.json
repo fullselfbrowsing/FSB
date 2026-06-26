@@ -1,0 +1,46 @@
+{
+  "slug": "onlyfans.list_users",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "list users in onlyfans",
+    "show me my users in onlyfans",
+    "view my users in onlyfans",
+    "see all my users in onlyfans",
+    "look up multiple users by id in onlyfans"
+  ],
+  "description": "Bulk-resolve users by their numeric IDs. Returns profile data for up to 25 users at once. Use the a[] parameter for \"author\" view or r[] for \"referenced\" view.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_ids": {
+        "minItems": 1,
+        "maxItems": 25,
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "description": "Array of numeric user IDs to resolve (max 25)"
+      }
+    },
+    "required": [
+      "user_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/list-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

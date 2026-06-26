@@ -1,0 +1,44 @@
+{
+  "slug": "onlyfans.list_chats",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "list chats in onlyfans",
+    "show me my chats in onlyfans",
+    "view my chats in onlyfans",
+    "see all my chats in onlyfans",
+    "list your chat conversations in onlyfans"
+  ],
+  "description": "List chat conversations. Returns conversations sorted by most recent activity with unread counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of chats to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/list-chats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

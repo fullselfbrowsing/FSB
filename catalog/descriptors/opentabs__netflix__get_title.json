@@ -1,0 +1,42 @@
+{
+  "slug": "netflix.get_title",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "get a title in netflix",
+    "look up a title in netflix",
+    "fetch a single title in netflix",
+    "view one specific title in netflix",
+    "get title in netflix",
+    "get details for a movie or show in netflix"
+  ],
+  "description": "Get detailed information about a Netflix movie or TV show by its video ID. Returns title metadata including synopsis, rating, watch status, and whether it is in My List. Use search_titles to find video IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/get-title.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

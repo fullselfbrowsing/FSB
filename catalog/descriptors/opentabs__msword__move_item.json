@@ -1,0 +1,42 @@
+{
+  "slug": "msword.move_item",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "move an item in msword",
+    "move item in msword",
+    "move a file or folder in msword"
+  ],
+  "description": "Move a file or folder to a new parent folder.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "ID of the file or folder to move"
+      },
+      "destination_id": {
+        "type": "string",
+        "description": "ID of the destination folder"
+      }
+    },
+    "required": [
+      "item_id",
+      "destination_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/move-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "move"
+    }
+  }
+}

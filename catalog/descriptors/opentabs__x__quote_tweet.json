@@ -1,0 +1,45 @@
+{
+  "slug": "x.quote_tweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "quote a tweet in x",
+    "quote tweet in x",
+    "post a quote tweet in x"
+  ],
+  "description": "Post a quote tweet — a top-level post that embeds and comments on another tweet. Unlike a reply (which lives inside the original thread) or a plain retweet (which adds no commentary), a quote tweet appears on your own profile with your text plus the referenced tweet.",
+  "actionVerb": "quote",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "quoted_tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ID of the tweet to quote"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 280,
+        "description": "Commentary text (max 280 characters)"
+      }
+    },
+    "required": [
+      "quoted_tweet_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/quote-tweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "quote"
+    }
+  }
+}

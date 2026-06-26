@@ -1,0 +1,39 @@
+{
+  "slug": "steam.add_to_wishlist",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "add a to wishlist in steam",
+    "add to wishlist in steam",
+    "add a game to your steam wishlist in steam"
+  ],
+  "description": "Add a game to the current user's Steam wishlist by app ID. Returns the updated wishlist count. Fails if the app is already wishlisted or does not exist.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "appid": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Steam app ID to add to wishlist"
+      }
+    },
+    "required": [
+      "appid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/add-to-wishlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

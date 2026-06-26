@@ -1,0 +1,37 @@
+{
+  "slug": "instagram.like_post",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "like a post in instagram",
+    "like post in instagram",
+    "like an instagram post by its media id in instagram"
+  ],
+  "description": "Like an Instagram post by its media ID.",
+  "actionVerb": "like",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "media_id": {
+        "type": "string",
+        "description": "Media numeric pk"
+      }
+    },
+    "required": [
+      "media_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/like-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "like"
+    }
+  }
+}

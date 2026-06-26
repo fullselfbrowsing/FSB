@@ -1,0 +1,42 @@
+{
+  "slug": "netflix.list_top_10",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "list a top 10 in netflix",
+    "show me my top 10 in netflix",
+    "view my top 10 in netflix",
+    "see all my top 10 in netflix",
+    "list top 10 in netflix",
+    "get netflix top 10 titles in netflix"
+  ],
+  "description": "Get the Netflix Top 10 list for the user's region. Returns the most-watched titles currently ranking on Netflix. Optionally filter by \"tv\" or \"movie\".",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "description": "Filter by content type: \"all\" (default), \"tv\", or \"movie\"",
+        "type": "string",
+        "enum": [
+          "all",
+          "tv",
+          "movie"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/list-top-10.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "hackernews.submit_comment",
+  "service": "news.ycombinator.com",
+  "intentSynonyms": [
+    "submit a comment in hackernews",
+    "submit comment in hackernews",
+    "post a comment or reply on hacker news in hackernews"
+  ],
+  "description": "Submit a comment on a Hacker News story or reply to an existing comment. Requires being logged in. The parent_id can be a story ID (to post a top-level comment) or a comment ID (to reply to that comment).",
+  "actionVerb": "submit",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "parent_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "ID of the story or comment to reply to"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment text (supports HN formatting: blank line for paragraphs, * for italics, indented code blocks)"
+      }
+    },
+    "required": [
+      "parent_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hackernews/src/tools/submit-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "submit"
+    }
+  }
+}

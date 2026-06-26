@@ -1,0 +1,44 @@
+{
+  "slug": "slack.unpin_message",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "unpin a message in slack",
+    "unpin message in slack",
+    "unpin a message from a channel in slack"
+  ],
+  "description": "Unpin a message from a Slack channel",
+  "actionVerb": "unpin",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is pinned (e.g., C01234567)"
+      },
+      "ts": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Timestamp of the message to unpin — serves as the unique message ID (e.g., 1234567890.123456)"
+      }
+    },
+    "required": [
+      "channel",
+      "ts"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/unpin-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "unpin"
+    }
+  }
+}

@@ -1,43 +1,60 @@
 {
   "slug": "expedia.search_hotels",
-  "service": "www.expedia.com",
+  "service": "expedia.com",
   "intentSynonyms": [
     "search hotels in expedia",
-    "search hotels on expedia in expedia",
-    "search expedia for hotels in a destination for a set of dates and number of guests in expedia"
+    "search for hotels by destination and dates in expedia",
+    "search for hotels in a destination in expedia"
   ],
-  "description": "Search Expedia for hotels in a destination for a set of dates and number of guests. Returns matching hotels with nightly prices.",
+  "description": "Search for hotels in a destination. Requires a region ID from search_locations. Returns hotel names and pricing. Results are sorted by \"RECOMMENDED\" by default.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "destination": {
+      "region_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "City, region, or hotel name to search"
+        "description": "Gaia region ID from search_locations (e.g. \"178293\" for New York)"
       },
-      "check_in": {
+      "check_in_date": {
         "type": "string",
-        "minLength": 1,
-        "description": "Check-in date (YYYY-MM-DD)"
+        "description": "Check-in date in YYYY-MM-DD format"
       },
-      "check_out": {
+      "check_out_date": {
         "type": "string",
-        "minLength": 1,
-        "description": "Check-out date (YYYY-MM-DD)"
+        "description": "Check-out date in YYYY-MM-DD format"
       },
-      "guests": {
-        "description": "Number of guests",
+      "adults": {
+        "description": "Number of adults (default 2)",
         "type": "integer",
         "minimum": 1,
-        "maximum": 9007199254740991
+        "maximum": 14
+      },
+      "children_ages": {
+        "description": "Ages of children (empty array if none)",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 17
+        }
+      },
+      "sort": {
+        "description": "Sort order (default \"RECOMMENDED\")",
+        "type": "string",
+        "enum": [
+          "RECOMMENDED",
+          "PRICE_LOW_TO_HIGH",
+          "PRICE_HIGH_TO_LOW",
+          "DISTANCE",
+          "REVIEW"
+        ]
       }
     },
     "required": [
-      "destination",
-      "check_in",
-      "check_out"
+      "region_id",
+      "check_in_date",
+      "check_out_date"
     ],
     "additionalProperties": false
   },
@@ -48,8 +65,8 @@
     "sourcePath": "plugins/expedia/src/tools/search-hotels.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": "graphql",
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

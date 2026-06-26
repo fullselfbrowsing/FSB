@@ -1,0 +1,44 @@
+{
+  "slug": "coinbase.get_asset_by_symbol",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "get an asset by symbol in coinbase",
+    "look up an asset by symbol in coinbase",
+    "fetch a single asset by symbol in coinbase",
+    "view one specific asset by symbol in coinbase",
+    "get asset by symbol in coinbase",
+    "get asset details by ticker symbol in coinbase"
+  ],
+  "description": "Get detailed information about a cryptocurrency asset by its ticker symbol (e.g. \"BTC\", \"ETH\", \"SOL\"). Returns market data and current price.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Ticker symbol (e.g. \"BTC\", \"ETH\", \"SOL\", \"DOGE\")"
+      },
+      "quote_currency": {
+        "description": "Quote currency for price (default \"USD\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "symbol"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/get-asset-by-symbol.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "slug": "newrelic.create_dashboard",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "create a dashboard in newrelic",
+    "add a dashboard in newrelic",
+    "make a new dashboard in newrelic",
+    "open a new dashboard in newrelic",
+    "create dashboard in newrelic",
+    "create a new dashboard in newrelic"
+  ],
+  "description": "Create a new dashboard with pages and widgets. Each page must have at least one widget. Widget types include markdown, billboard, table, line, bar, pie, and area charts powered by NRQL queries.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID to create the dashboard in"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dashboard name"
+      },
+      "permissions": {
+        "description": "Permission level (default PRIVATE)",
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "PUBLIC_READ_ONLY",
+          "PUBLIC_READ_WRITE"
+        ]
+      },
+      "pages": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Page name"
+            },
+            "widgets": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Widget title"
+                  },
+                  "nrql_query": {
+                    "description": "NRQL query for data-driven widgets (e.g., \"SELECT count(*) FROM Transaction SINCE 1 hour ago\")",
+                    "type": "string"
+                  },
+                  "markdown": {
+                    "description": "Markdown text for markdown widgets",
+                    "type": "string"
+                  },
+                  "visualization": {
+                    "description": "Visualization type (default viz.line for NRQL, viz.markdown for markdown)",
+                    "type": "string",
+                    "enum": [
+                      "viz.billboard",
+                      "viz.line",
+                      "viz.table",
+                      "viz.bar",
+                      "viz.pie",
+                      "viz.area",
+                      "viz.markdown"
+                    ]
+                  },
+                  "row": {
+                    "description": "Row position (default 1)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "column": {
+                    "description": "Column position (default 1)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "width": {
+                    "description": "Width in columns 1-12 (default 4)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "height": {
+                    "description": "Height in rows (default 3)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Widgets for this page"
+            }
+          },
+          "required": [
+            "name",
+            "widgets"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Dashboard pages"
+      }
+    },
+    "required": [
+      "account_id",
+      "name",
+      "pages"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/create-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

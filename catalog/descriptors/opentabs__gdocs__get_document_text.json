@@ -1,0 +1,37 @@
+{
+  "slug": "gdocs.get_document_text",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "get a document text in gdocs",
+    "look up a document text in gdocs",
+    "fetch a single document text in gdocs",
+    "view one specific document text in gdocs",
+    "get document text in gdocs",
+    "read the plain text of a document in gdocs"
+  ],
+  "description": "Get the plain-text content of a Google Doc. Fetches the latest saved document content from the server, including edits by other collaborators. Returns the full document text as paragraphs joined by newlines.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/get-document-text.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

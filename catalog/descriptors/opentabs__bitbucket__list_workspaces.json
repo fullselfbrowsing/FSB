@@ -1,0 +1,43 @@
+{
+  "slug": "bitbucket.list_workspaces",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "list workspaces in bitbucket",
+    "show me my workspaces in bitbucket",
+    "view my workspaces in bitbucket",
+    "see all my workspaces in bitbucket"
+  ],
+  "description": "List all Bitbucket workspaces the authenticated user has access to. Supports pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (default 1)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "pagelen": {
+        "description": "Number of results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/list-workspaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

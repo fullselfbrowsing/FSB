@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_apps",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list apps in retool",
+    "show me my apps in retool",
+    "view my apps in retool",
+    "see all my apps in retool",
+    "list all retool apps and folders in retool"
+  ],
+  "description": "List all apps (pages) and folders in the Retool organization. Returns both apps and their folder structure. Apps include web apps, mobile apps, modules, and forms.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-apps.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "costco.delete_list",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "delete a list in costco",
+    "remove a list in costco",
+    "trash a list in costco",
+    "permanently delete a list in costco",
+    "delete list in costco",
+    "delete a shopping list in costco"
+  ],
+  "description": "Delete a shopping list from the Costco account. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "description": "Shopping list ID to delete (from get_lists)"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/delete-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

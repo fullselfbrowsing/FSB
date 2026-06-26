@@ -1,0 +1,31 @@
+{
+  "slug": "lucid.get_user_permissions",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "get user permissions in lucid",
+    "look up user permissions in lucid",
+    "fetch a single user permissions in lucid",
+    "view one specific user permissions in lucid",
+    "get your account permissions in lucid"
+  ],
+  "description": "Get the list of permissions granted to the current user in their Lucid account. Permissions control access to features like admin, templates, integrations, and document management.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/get-user-permissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "slug": "netlify.update_env_var",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "update an env var in netlify",
+    "edit an env var in netlify",
+    "change the details of env var in netlify",
+    "modify an env var in netlify",
+    "update env var in netlify",
+    "update an environment variable in netlify"
+  ],
+  "description": "Replace an existing environment variable for a Netlify account. Replaces all values for the variable. Optionally scope to a specific site.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "The account ID the variable belongs to"
+      },
+      "key": {
+        "type": "string",
+        "description": "The environment variable key name to update"
+      },
+      "site_id": {
+        "description": "Optional site ID to scope to a specific site",
+        "type": "string"
+      },
+      "scopes": {
+        "description": "Scopes where the variable is available (e.g. [\"builds\", \"functions\", \"runtime\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "values": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "The variable value"
+            },
+            "context": {
+              "type": "string",
+              "description": "Deploy context (e.g. \"all\", \"production\", \"deploy-preview\", \"branch-deploy\", \"dev\")"
+            },
+            "context_parameter": {
+              "description": "Branch name when context is branch-specific",
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "context"
+          ],
+          "additionalProperties": false
+        },
+        "description": "New context-specific values for this variable"
+      },
+      "is_secret": {
+        "description": "Whether the variable value should be masked",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "account_id",
+      "key",
+      "values"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/update-env-var.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

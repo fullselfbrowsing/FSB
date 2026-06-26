@@ -1,0 +1,50 @@
+{
+  "slug": "telegram.create_group",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "create a group in telegram",
+    "add a group in telegram",
+    "make a new group in telegram",
+    "open a new group in telegram",
+    "create group in telegram",
+    "create a new group chat in telegram"
+  ],
+  "description": "Create a new group chat with a title and a list of user IDs to invite. Returns the chat ID of the newly created group.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Title for the new group chat"
+      },
+      "user_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "description": "Array of user IDs to invite to the group"
+      }
+    },
+    "required": [
+      "title",
+      "user_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/create-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

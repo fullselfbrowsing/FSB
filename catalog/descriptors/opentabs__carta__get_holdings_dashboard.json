@@ -1,0 +1,42 @@
+{
+  "slug": "carta.get_holdings_dashboard",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get a holdings dashboard in carta",
+    "look up a holdings dashboard in carta",
+    "fetch a single holdings dashboard in carta",
+    "view one specific holdings dashboard in carta",
+    "get holdings dashboard in carta",
+    "get holdings summary for a company in carta"
+  ],
+  "description": "Get a summary dashboard for holdings in a specific company, including cost basis, ownership percentage, and how long shares have been held.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-holdings-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

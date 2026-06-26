@@ -1,0 +1,65 @@
+{
+  "slug": "bitbucket.create_repository",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "create a repository in bitbucket",
+    "add a repository in bitbucket",
+    "make a new repository in bitbucket",
+    "open a new repository in bitbucket",
+    "create repository in bitbucket",
+    "create a new repository in bitbucket"
+  ],
+  "description": "Create a new repository in a Bitbucket workspace.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug (URL-friendly name)"
+      },
+      "scm": {
+        "description": "Source control type (default \"git\")",
+        "type": "string"
+      },
+      "is_private": {
+        "description": "Whether the repository is private (default true)",
+        "type": "boolean"
+      },
+      "description": {
+        "description": "Repository description",
+        "type": "string"
+      },
+      "has_issues": {
+        "description": "Whether to enable the issue tracker",
+        "type": "boolean"
+      },
+      "has_wiki": {
+        "description": "Whether to enable the wiki",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/create-repository.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

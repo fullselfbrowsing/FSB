@@ -1,0 +1,65 @@
+{
+  "slug": "stackoverflow.list_tags",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "list tags in stackoverflow",
+    "show me my tags in stackoverflow",
+    "view my tags in stackoverflow",
+    "see all my tags in stackoverflow",
+    "list tags by popularity or name in stackoverflow"
+  ],
+  "description": "List Stack Overflow tags sorted by popularity or name. Tags categorize questions by topic. Use this to discover popular technologies and topics.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "inname": {
+        "description": "Filter tags containing this string (e.g., \"java\")",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort order (default: popular)",
+        "type": "string",
+        "enum": [
+          "popular",
+          "activity",
+          "name"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/list-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

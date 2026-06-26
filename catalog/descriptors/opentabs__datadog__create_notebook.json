@@ -1,0 +1,72 @@
+{
+  "slug": "datadog.create_notebook",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "create a notebook in datadog",
+    "add a notebook in datadog",
+    "make a new notebook in datadog",
+    "open a new notebook in datadog",
+    "create notebook in datadog",
+    "create a new notebook in datadog"
+  ],
+  "description": "Create a new Datadog notebook with markdown and metric cells.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Notebook title"
+      },
+      "cells": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "timeseries",
+                "log_stream"
+              ],
+              "description": "Cell type"
+            },
+            "content": {
+              "type": "string",
+              "description": "Cell content (markdown text or metric query)"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Notebook cells"
+      },
+      "time_span": {
+        "description": "Relative time span (e.g., \"1h\", \"4h\", \"1d\"). Default: \"1h\"",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "cells"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/create-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

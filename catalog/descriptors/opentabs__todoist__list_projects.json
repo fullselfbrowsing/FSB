@@ -1,0 +1,31 @@
+{
+  "slug": "todoist.list_projects",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "list projects in todoist",
+    "show me my projects in todoist",
+    "view my projects in todoist",
+    "see all my projects in todoist",
+    "list all projects in todoist"
+  ],
+  "description": "List all projects in the Todoist workspace. Returns every project including inbox, personal, and shared projects with their metadata.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

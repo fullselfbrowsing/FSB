@@ -1,0 +1,40 @@
+{
+  "slug": "hack2hire.get_question",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get a question in hack2hire",
+    "look up a question in hack2hire",
+    "fetch a single question in hack2hire",
+    "view one specific question in hack2hire",
+    "get question in hack2hire",
+    "get full detail of one question in hack2hire"
+  ],
+  "description": "Get the full detail of a single Hack2Hire interview question by its post ID, including the markdown content preview, company frequencies, algorithm tags, interview stages, difficulty, and the IDs of any associated coding questions (use those IDs with list_question_comments). For paid (locked) questions the contentPreview field returns a teaser only — full content requires a Hack2Hire premium subscription.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "postId": {
+        "type": "string",
+        "description": "Post ID — get this from list_questions."
+      }
+    },
+    "required": [
+      "postId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-question.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "carta.get_company_profile",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get a company profile in carta",
+    "look up a company profile in carta",
+    "fetch a single company profile in carta",
+    "view one specific company profile in carta",
+    "get company profile in carta",
+    "get company profile details in carta"
+  ],
+  "description": "Get detailed profile for a company including legal name, incorporation date, address, CEO, website, and description.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-company-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

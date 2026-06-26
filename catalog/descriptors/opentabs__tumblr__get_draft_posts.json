@@ -1,0 +1,43 @@
+{
+  "slug": "tumblr.get_draft_posts",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get draft posts in tumblr",
+    "look up draft posts in tumblr",
+    "fetch a single draft posts in tumblr",
+    "view one specific draft posts in tumblr",
+    "list draft posts in tumblr"
+  ],
+  "description": "List draft posts for a Tumblr blog. Use before_id for pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or URL"
+      },
+      "before_id": {
+        "description": "Post ID cursor for pagination — returns drafts before this ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "blog_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-draft-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

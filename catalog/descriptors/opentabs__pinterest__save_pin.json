@@ -1,0 +1,46 @@
+{
+  "slug": "pinterest.save_pin",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "save a pin in pinterest",
+    "save pin in pinterest",
+    "save an existing pin to a board in pinterest"
+  ],
+  "description": "Save (repin) an existing pin to one of your boards. This creates a copy of the pin on your board. Optionally specify a board section.",
+  "actionVerb": "save",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pin_id": {
+        "type": "string",
+        "description": "Pin ID to save"
+      },
+      "board_id": {
+        "type": "string",
+        "description": "Board ID to save the pin to"
+      },
+      "section_id": {
+        "description": "Board section ID to save the pin to",
+        "type": "string"
+      }
+    },
+    "required": [
+      "pin_id",
+      "board_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/save-pin.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "save"
+    }
+  }
+}

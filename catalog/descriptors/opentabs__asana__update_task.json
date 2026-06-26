@@ -6,9 +6,10 @@
     "edit a task in asana",
     "change the details of task in asana",
     "modify a task in asana",
-    "update task in asana"
+    "update task in asana",
+    "update an existing task in asana"
   ],
-  "description": "Update an existing Asana task. Provide the task GID and any fields to change.",
+  "description": "Update an existing task — change name, completion status, assignee, dates, or notes.",
   "actionVerb": "update",
   "sideEffectClass": "write",
   "params": {
@@ -23,20 +24,28 @@
         "description": "New task name",
         "type": "string"
       },
-      "notes": {
-        "description": "New task notes/description",
-        "type": "string"
-      },
-      "assignee": {
-        "description": "User ID to reassign the task to",
-        "type": "string"
-      },
       "completed": {
-        "description": "Mark the task completed or not",
+        "description": "Whether the task is completed",
         "type": "boolean"
       },
+      "assignee": {
+        "description": "New assignee user GID",
+        "type": "string"
+      },
       "due_on": {
-        "description": "New due date in YYYY-MM-DD format",
+        "description": "Due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "due_at": {
+        "description": "Due datetime in ISO 8601 format",
+        "type": "string"
+      },
+      "start_on": {
+        "description": "Start date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "notes": {
+        "description": "Plain-text task description",
         "type": "string"
       }
     },

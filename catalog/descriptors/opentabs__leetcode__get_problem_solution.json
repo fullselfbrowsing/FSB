@@ -1,0 +1,40 @@
+{
+  "slug": "leetcode.get_problem_solution",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get a problem solution in leetcode",
+    "look up a problem solution in leetcode",
+    "fetch a single problem solution in leetcode",
+    "view one specific problem solution in leetcode",
+    "get problem solution in leetcode",
+    "get the official solution article in leetcode"
+  ],
+  "description": "Get the official editorial/solution article for a problem. Returns the solution content in HTML format. Not all problems have official solutions.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "titleSlug": {
+        "type": "string",
+        "description": "Problem URL slug (e.g., \"two-sum\")"
+      }
+    },
+    "required": [
+      "titleSlug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-problem-solution.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

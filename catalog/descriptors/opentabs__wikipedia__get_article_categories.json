@@ -1,0 +1,45 @@
+{
+  "slug": "wikipedia.get_article_categories",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get article categories in wikipedia",
+    "look up article categories in wikipedia",
+    "fetch a single article categories in wikipedia",
+    "view one specific article categories in wikipedia",
+    "list categories an article belongs to in wikipedia"
+  ],
+  "description": "Get the categories that a Wikipedia article belongs to. Returns category titles. Supports pagination via continue token.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\")"
+      },
+      "limit": {
+        "description": "Maximum number of categories to return (default 50, max 500)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-article-categories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

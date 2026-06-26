@@ -1,0 +1,103 @@
+{
+  "slug": "gitlab.list_merge_requests",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list merge requests in gitlab",
+    "show me my merge requests in gitlab",
+    "view my merge requests in gitlab",
+    "see all my merge requests in gitlab",
+    "list merge requests for a project in gitlab"
+  ],
+  "description": "List merge requests for a project. By default returns opened MRs sorted by creation date. Can filter by state, labels, author, assignee, and more.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "state": {
+        "description": "MR state filter (default: opened)",
+        "type": "string",
+        "enum": [
+          "opened",
+          "closed",
+          "merged",
+          "locked",
+          "all"
+        ]
+      },
+      "labels": {
+        "description": "Comma-separated list of label names to filter by",
+        "type": "string"
+      },
+      "author_username": {
+        "description": "Filter by author username",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "Filter by assignee user ID",
+        "type": "number"
+      },
+      "source_branch": {
+        "description": "Filter by source branch",
+        "type": "string"
+      },
+      "target_branch": {
+        "description": "Filter by target branch",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search in title and description",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "Sort field (default: created_at)",
+        "type": "string",
+        "enum": [
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-merge-requests.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

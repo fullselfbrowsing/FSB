@@ -1,0 +1,47 @@
+{
+  "slug": "pinterest.search_pins",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "search pins in pinterest",
+    "search for pins by keyword in pinterest",
+    "search for pins on pinterest by keyword query in pinterest"
+  ],
+  "description": "Search for pins on Pinterest by keyword query. Returns matching pins with images, descriptions, and links. Supports pagination via bookmark cursor.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Number of results per page (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/search-pins.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

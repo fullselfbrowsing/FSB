@@ -1,0 +1,41 @@
+{
+  "slug": "terraform.discard_run",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "discard a run in terraform",
+    "discard run in terraform",
+    "discard a planned run in terraform"
+  ],
+  "description": "Discard a run that is waiting for confirmation. The plan will not be applied.",
+  "actionVerb": "discard",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "run_id": {
+        "type": "string",
+        "description": "Run ID (e.g., \"run-...\")"
+      },
+      "comment": {
+        "description": "Comment explaining the discard",
+        "type": "string"
+      }
+    },
+    "required": [
+      "run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/discard-run.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "discard"
+    }
+  }
+}

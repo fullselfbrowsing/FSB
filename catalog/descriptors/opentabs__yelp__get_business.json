@@ -7,22 +7,21 @@
     "fetch a single business in yelp",
     "view one specific business in yelp",
     "get business in yelp",
-    "look up a business on yelp in yelp"
+    "get business details by alias in yelp"
   ],
-  "description": "Get the full details, hours, photos, rating, and contact info of a single Yelp business by its ID.",
+  "description": "Get details about a specific Yelp business by its URL alias (e.g., \"a-slice-of-new-york-san-jose\"). Returns the business ID, name, and canonical URL. Use search_businesses to find business aliases.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "business_id": {
+      "alias": {
         "type": "string",
-        "minLength": 1,
-        "description": "The Yelp business ID to fetch"
+        "description": "Business URL alias (e.g., \"a-slice-of-new-york-san-jose\"). Found in business URLs: yelp.com/biz/{alias}"
       }
     },
     "required": [
-      "business_id"
+      "alias"
     ],
     "additionalProperties": false
   },
@@ -33,8 +32,8 @@
     "sourcePath": "plugins/yelp/src/tools/get-business.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

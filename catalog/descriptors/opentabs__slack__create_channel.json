@@ -1,0 +1,53 @@
+{
+  "slug": "slack.create_channel",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "create a channel in slack",
+    "add a channel in slack",
+    "make a new channel in slack",
+    "open a new channel in slack",
+    "create channel in slack",
+    "create a new channel in slack"
+  ],
+  "description": "Create a new public or private Slack channel",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "description": "Name for the new channel — must be lowercase, no spaces, max 80 chars (e.g., \"project-updates\")"
+      },
+      "is_private": {
+        "description": "Whether to create a private channel (default false — creates public channel)",
+        "type": "boolean"
+      },
+      "topic": {
+        "description": "Initial topic for the channel (max 250 chars)",
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 250
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/create-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

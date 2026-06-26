@@ -9,35 +9,34 @@
     "update issue in jira",
     "update an existing issue in jira"
   ],
-  "description": "Update an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
+  "description": "Update fields on an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
   "actionVerb": "update",
   "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
-      "issue_id_or_key": {
+      "issue_key": {
         "type": "string",
-        "minLength": 1,
-        "description": "Issue ID or key to update (e.g. ENG-123)"
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
       },
       "summary": {
         "description": "New issue summary/title",
         "type": "string"
       },
       "description": {
-        "description": "New issue description in markdown",
-        "type": "string"
-      },
-      "assignee_account_id": {
-        "description": "Account ID of the new assignee",
+        "description": "New issue description in plain text",
         "type": "string"
       },
       "priority": {
-        "description": "New priority name (e.g. High, Medium, Low)",
+        "description": "New priority name (e.g. \"Highest\", \"High\", \"Medium\", \"Low\", \"Lowest\")",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "New assignee account ID (use search_users to find IDs). Pass empty string to unassign.",
         "type": "string"
       },
       "labels": {
-        "description": "New labels (replaces existing)",
+        "description": "Replace all labels with these values",
         "type": "array",
         "items": {
           "type": "string"
@@ -45,7 +44,7 @@
       }
     },
     "required": [
-      "issue_id_or_key"
+      "issue_key"
     ],
     "additionalProperties": false
   },

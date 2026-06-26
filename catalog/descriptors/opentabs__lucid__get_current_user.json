@@ -1,0 +1,32 @@
+{
+  "slug": "lucid.get_current_user",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "get a current user in lucid",
+    "look up a current user in lucid",
+    "fetch a single current user in lucid",
+    "view one specific current user in lucid",
+    "get current user in lucid",
+    "get your lucid profile in lucid"
+  ],
+  "description": "Get the profile of the currently authenticated Lucid user, including name, email, and account status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

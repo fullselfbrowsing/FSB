@@ -1,0 +1,32 @@
+{
+  "slug": "stripe.get_account",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "get an account in stripe",
+    "look up an account in stripe",
+    "fetch a single account in stripe",
+    "view one specific account in stripe",
+    "get account in stripe",
+    "get current stripe account info in stripe"
+  ],
+  "description": "Get the current Stripe account information including business name, email, country, and default currency. Reads from the page bootstrap data for instant response.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/get-account.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

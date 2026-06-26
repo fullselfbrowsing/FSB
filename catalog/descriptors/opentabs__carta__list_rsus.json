@@ -1,0 +1,42 @@
+{
+  "slug": "carta.list_rsus",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "list a rsus in carta",
+    "show me my rsus in carta",
+    "view my rsus in carta",
+    "see all my rsus in carta",
+    "list rsus in carta",
+    "list rsu grants in carta"
+  ],
+  "description": "List all restricted stock unit (RSU) grants for a company in the portfolio. Shows grant labels, quantities, vesting status, settled shares, and settlement eligibility.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/list-rsus.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

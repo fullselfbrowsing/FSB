@@ -1,0 +1,43 @@
+{
+  "slug": "instagram.get_post_comments",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get post comments in instagram",
+    "look up post comments in instagram",
+    "fetch a single post comments in instagram",
+    "view one specific post comments in instagram",
+    "get comments on a post in instagram"
+  ],
+  "description": "Get comments on a post. Use the media ID (numeric pk portion). Supports cursor pagination via min_id.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "media_id": {
+        "type": "string",
+        "description": "Media numeric pk (e.g. \"3849123669892697076\")"
+      },
+      "min_id": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "media_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-post-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

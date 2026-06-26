@@ -1,0 +1,40 @@
+{
+  "slug": "sentry.list_monitors",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list monitors in sentry",
+    "show me my monitors in sentry",
+    "view my monitors in sentry",
+    "see all my monitors in sentry",
+    "list cron monitors in the organization in sentry"
+  ],
+  "description": "List cron monitors for the current Sentry organization. Monitors track scheduled jobs (crons) and alert when check-ins are missed or fail.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of monitors to return (default 25, max 100)",
+        "type": "number"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-monitors.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

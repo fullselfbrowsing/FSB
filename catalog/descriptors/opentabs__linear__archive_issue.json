@@ -1,0 +1,37 @@
+{
+  "slug": "linear.archive_issue",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "archive an issue in linear",
+    "archive issue in linear",
+    "archive a linear issue in linear"
+  ],
+  "description": "Archive a Linear issue. Archived issues are hidden from default views but can be restored.",
+  "actionVerb": "archive",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID to archive"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/archive-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "archive"
+    }
+  }
+}

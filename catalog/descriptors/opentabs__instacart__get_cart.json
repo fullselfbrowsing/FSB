@@ -1,0 +1,40 @@
+{
+  "slug": "instacart.get_cart",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "get a cart in instacart",
+    "look up a cart in instacart",
+    "fetch a single cart in instacart",
+    "view one specific cart in instacart",
+    "get cart in instacart",
+    "get cart details with items in instacart"
+  ],
+  "description": "Get full details of a shopping cart by its ID, including all items with item IDs and quantities. Use list_active_carts first to discover cart IDs. Use get_product with item IDs to get product names and images.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cart_id": {
+        "type": "string",
+        "description": "Cart ID (from list_active_carts)"
+      }
+    },
+    "required": [
+      "cart_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/get-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "aws.get_current_user",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "get a current user in aws",
+    "look up a current user in aws",
+    "fetch a single current user in aws",
+    "view one specific current user in aws",
+    "get current user in aws",
+    "get the authenticated aws user profile in aws"
+  ],
+  "description": "Get the currently authenticated AWS user profile including account ID, username, ARN, and current region. Reads from console session data and cookies — does not make an AWS API call.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

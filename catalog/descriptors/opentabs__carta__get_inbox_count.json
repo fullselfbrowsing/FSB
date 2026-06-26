@@ -1,0 +1,32 @@
+{
+  "slug": "carta.get_inbox_count",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get an inbox count in carta",
+    "look up an inbox count in carta",
+    "fetch a single inbox count in carta",
+    "view one specific inbox count in carta",
+    "get inbox count in carta",
+    "get unread inbox count in carta"
+  ],
+  "description": "Get the count of unread messages in the Carta communication center inbox.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-inbox-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

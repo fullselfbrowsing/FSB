@@ -1,0 +1,42 @@
+{
+  "slug": "slack.list_users",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "list users in slack",
+    "show me my users in slack",
+    "view my users in slack",
+    "see all my users in slack",
+    "list workspace users in slack"
+  ],
+  "description": "List users in the Slack workspace with optional pagination",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of users to return (default 100, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response for fetching the next page",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/list-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

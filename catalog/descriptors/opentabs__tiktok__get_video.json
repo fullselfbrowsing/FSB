@@ -1,0 +1,45 @@
+{
+  "slug": "tiktok.get_video",
+  "service": "tiktok.com",
+  "intentSynonyms": [
+    "get a video in tiktok",
+    "look up a video in tiktok",
+    "fetch a single video in tiktok",
+    "view one specific video in tiktok",
+    "get video in tiktok",
+    "get video details by id in tiktok"
+  ],
+  "description": "Get detailed information about a TikTok video by its ID. Returns video description, author info, play/like/comment/share counts, music details, and cover image. Requires the author username and video ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Author username without @ prefix (e.g., \"charlidamelio\")"
+      },
+      "video_id": {
+        "type": "string",
+        "description": "Video ID (numeric string)"
+      }
+    },
+    "required": [
+      "username",
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tiktok/src/tools/get-video.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

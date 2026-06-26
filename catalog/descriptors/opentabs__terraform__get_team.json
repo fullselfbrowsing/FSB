@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.get_team",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get a team in terraform",
+    "look up a team in terraform",
+    "fetch a single team in terraform",
+    "view one specific team in terraform",
+    "get team in terraform",
+    "get team details in terraform"
+  ],
+  "description": "Get detailed information about a team including member count and visibility.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "description": "Team ID (e.g., \"team-...\")"
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-team.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

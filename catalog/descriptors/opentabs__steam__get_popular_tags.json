@@ -1,0 +1,31 @@
+{
+  "slug": "steam.get_popular_tags",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "get popular tags in steam",
+    "look up popular tags in steam",
+    "fetch a single popular tags in steam",
+    "view one specific popular tags in steam",
+    "list popular steam store tags in steam"
+  ],
+  "description": "Get the most popular tags on Steam. Tags categorize games by genre, theme, and features (e.g., \"Indie\", \"Action\", \"Roguelike\"). Useful for discovering game categories.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/get-popular-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

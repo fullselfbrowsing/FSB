@@ -1,0 +1,47 @@
+{
+  "slug": "dominos.update_product_quantity",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "update a product quantity in dominos",
+    "edit a product quantity in dominos",
+    "change the details of product quantity in dominos",
+    "modify a product quantity in dominos",
+    "update product quantity in dominos",
+    "change quantity of a cart item in dominos"
+  ],
+  "description": "Change the quantity of a product already in the cart. Set quantity to 0 to remove it. Get the product_instance_id from get_cart (the \"id\" field of each product).",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_instance_id": {
+        "type": "string",
+        "description": "Product instance ID from get_cart (the \"id\" field of each cart product)"
+      },
+      "quantity": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "New quantity (0 to remove the item)"
+      }
+    },
+    "required": [
+      "product_instance_id",
+      "quantity"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/update-product-quantity.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

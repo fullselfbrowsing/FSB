@@ -1,0 +1,95 @@
+{
+  "slug": "netlify.create_env_vars",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create env vars in netlify",
+    "add env vars in netlify",
+    "make a new env vars in netlify",
+    "open a new env vars in netlify",
+    "create environment variables in netlify"
+  ],
+  "description": "Create one or more environment variables for a Netlify account. Each variable can have multiple context-specific values (e.g. different values for production vs deploy previews). Optionally scope to a specific site.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "The account ID to create variables in"
+      },
+      "site_id": {
+        "description": "Optional site ID to scope variables to a specific site",
+        "type": "string"
+      },
+      "variables": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Environment variable name"
+            },
+            "scopes": {
+              "description": "Scopes where the variable is available (e.g. [\"builds\", \"functions\", \"runtime\"])",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "description": "The variable value"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Deploy context (e.g. \"all\", \"production\", \"deploy-preview\", \"branch-deploy\", \"dev\")"
+                  }
+                },
+                "required": [
+                  "value",
+                  "context"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Context-specific values for this variable"
+            },
+            "is_secret": {
+              "description": "Whether the variable value should be masked",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "key",
+            "values"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Array of environment variables to create"
+      }
+    },
+    "required": [
+      "account_id",
+      "variables"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-env-vars.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

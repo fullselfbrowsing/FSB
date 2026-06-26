@@ -1,0 +1,66 @@
+{
+  "slug": "linear.search_issues",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "search issues in linear",
+    "search and filter issues in linear",
+    "search and filter linear issues in linear"
+  ],
+  "description": "Search and filter Linear issues. Supports text search, filtering by team, assignee, state, label, project, and more. Returns paginated results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Text search query to find issues by title or description",
+        "type": "string"
+      },
+      "team_key": {
+        "description": "Filter by team key (e.g. \"ENG\")",
+        "type": "string"
+      },
+      "assignee_name": {
+        "description": "Filter by assignee display name (partial match)",
+        "type": "string"
+      },
+      "state_name": {
+        "description": "Filter by workflow state name (e.g. \"In Progress\", \"Done\")",
+        "type": "string"
+      },
+      "label_name": {
+        "description": "Filter by label name",
+        "type": "string"
+      },
+      "project_name": {
+        "description": "Filter by project name",
+        "type": "string"
+      },
+      "priority": {
+        "description": "Filter by priority level (0=none, 1=urgent, 2=high, 3=medium, 4=low)",
+        "type": "number"
+      },
+      "limit": {
+        "description": "Maximum number of issues to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/search-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

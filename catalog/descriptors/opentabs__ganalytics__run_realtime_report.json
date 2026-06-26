@@ -1,0 +1,66 @@
+{
+  "slug": "ganalytics.run_realtime_report",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "run a realtime report in ganalytics",
+    "run realtime report in ganalytics",
+    "get realtime analytics data (last 30 minutes) in ganalytics"
+  ],
+  "description": "Run a realtime analytics report showing data from the last 30 minutes. Useful for monitoring live traffic, active users, current page views, and event activity. Common realtime dimensions: \"country\", \"city\", \"unifiedScreenName\", \"eventName\", \"platform\", \"deviceCategory\". Common realtime metrics: \"activeUsers\", \"eventCount\", \"screenPageViews\", \"conversions\". Not all standard dimensions/metrics are available in realtime — use get_metadata with the property ID to check availability.",
+  "actionVerb": "run",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "string",
+        "description": "GA4 property ID (numeric string)"
+      },
+      "dimensions": {
+        "description": "Realtime dimension API names (e.g., [\"country\", \"unifiedScreenName\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "metrics": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Realtime metric API names (e.g., [\"activeUsers\", \"eventCount\"]). At least 1 required."
+      },
+      "dimension_filter": {
+        "description": "JSON string of a dimension filter object for realtime data",
+        "type": "string"
+      },
+      "metric_filter": {
+        "description": "JSON string of a metric filter object for realtime data",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Max rows to return (default 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10000
+      }
+    },
+    "required": [
+      "property_id",
+      "metrics"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/run-realtime-report.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "run"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "twilio.send_message",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "send a message in twilio",
+    "post a message in twilio",
+    "write a new message in twilio",
+    "send message in twilio"
+  ],
+  "description": "Send an SMS or MMS message. Requires a Twilio phone number as the sender.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "string",
+        "description": "Recipient phone number in E.164 format (e.g., +15551234567)"
+      },
+      "from": {
+        "type": "string",
+        "description": "Sender Twilio phone number in E.164 format (e.g., +15559876543)"
+      },
+      "body": {
+        "type": "string",
+        "description": "Message text content"
+      },
+      "media_url": {
+        "description": "URL of media to include (for MMS)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "to",
+      "from",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

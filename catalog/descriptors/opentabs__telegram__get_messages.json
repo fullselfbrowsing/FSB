@@ -1,0 +1,51 @@
+{
+  "slug": "telegram.get_messages",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "get messages in telegram",
+    "look up messages in telegram",
+    "fetch a single messages in telegram",
+    "view one specific messages in telegram",
+    "get messages from a chat in telegram"
+  ],
+  "description": "Get message history for a conversation. Returns messages in reverse chronological order. Use offset_id to paginate (pass the oldest message ID from the previous page). Pass peer_id=0 or omit it to read Saved Messages.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation (user ID, chat ID, or channel ID). Use 0 for Saved Messages."
+      },
+      "limit": {
+        "description": "Number of messages to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset_id": {
+        "description": "Message ID to start from for pagination (returns messages before this ID)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "peer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/get-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

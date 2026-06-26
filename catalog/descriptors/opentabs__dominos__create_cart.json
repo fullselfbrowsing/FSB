@@ -1,0 +1,40 @@
+{
+  "slug": "dominos.create_cart",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "create a cart in dominos",
+    "add a cart in dominos",
+    "make a new cart in dominos",
+    "open a new cart in dominos",
+    "create cart in dominos",
+    "start a new carryout order at a store in dominos"
+  ],
+  "description": "Create a new shopping cart at a specific store for carryout. Sets up the browser so the Domino's website recognizes the cart. Call this before add_product_to_cart if no store has been selected yet.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "type": "string",
+        "description": "Store ID (e.g., \"8290\"). Use find_stores_by_address to find stores."
+      }
+    },
+    "required": [
+      "store_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/create-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

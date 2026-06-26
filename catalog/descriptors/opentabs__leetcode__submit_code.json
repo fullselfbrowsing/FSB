@@ -1,0 +1,52 @@
+{
+  "slug": "leetcode.submit_code",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "submit a code in leetcode",
+    "submit code in leetcode",
+    "submit a solution for judging in leetcode"
+  ],
+  "description": "Submit a solution for a LeetCode problem. Runs against all test cases and returns the verdict including status, runtime/memory percentiles, and any errors. Use run_code first to test your solution.",
+  "actionVerb": "submit",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "titleSlug": {
+        "type": "string",
+        "description": "Problem URL slug (e.g., \"two-sum\")"
+      },
+      "questionId": {
+        "type": "string",
+        "description": "Question ID (numeric string, e.g., \"1\")"
+      },
+      "lang": {
+        "type": "string",
+        "description": "Language slug (e.g., \"python3\", \"java\", \"cpp\", \"javascript\", \"typescript\")"
+      },
+      "typedCode": {
+        "type": "string",
+        "description": "Source code to submit"
+      }
+    },
+    "required": [
+      "titleSlug",
+      "questionId",
+      "lang",
+      "typedCode"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/submit-code.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "submit"
+    }
+  }
+}

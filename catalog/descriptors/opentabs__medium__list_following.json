@@ -1,0 +1,39 @@
+{
+  "slug": "medium.list_following",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "list a following in medium",
+    "show me my following in medium",
+    "view my following in medium",
+    "see all my following in medium",
+    "list following in medium",
+    "list users you follow in medium"
+  ],
+  "description": "List users that the current user is following on Medium.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum results to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/list-following.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

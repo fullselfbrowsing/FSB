@@ -1,0 +1,40 @@
+{
+  "slug": "ynab.delete_category",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "delete a category in ynab",
+    "remove a category in ynab",
+    "trash a category in ynab",
+    "permanently delete a category in ynab",
+    "delete category in ynab"
+  ],
+  "description": "Delete a category from the active YNAB plan. This is a soft delete (tombstone). Existing transactions assigned to this category remain in place but the category will no longer appear in budget views.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Category ID to delete"
+      }
+    },
+    "required": [
+      "category_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/delete-category.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

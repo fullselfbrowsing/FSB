@@ -1,0 +1,42 @@
+{
+  "slug": "stackoverflow.get_question",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get a question in stackoverflow",
+    "look up a question in stackoverflow",
+    "fetch a single question in stackoverflow",
+    "view one specific question in stackoverflow",
+    "get question in stackoverflow",
+    "get question details by id in stackoverflow"
+  ],
+  "description": "Get a specific Stack Overflow question by its ID. Returns the full question body, tags, score, answer count, and metadata. Use this to read the full content of a question.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "question_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Question ID"
+      }
+    },
+    "required": [
+      "question_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-question.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "craigslist.delete_payment_card",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "delete a payment card in craigslist",
+    "remove a payment card in craigslist",
+    "trash a payment card in craigslist",
+    "permanently delete a payment card in craigslist",
+    "delete payment card in craigslist",
+    "delete a saved payment card in craigslist"
+  ],
+  "description": "Delete a saved payment card from the Craigslist account. Requires the card ID from list_payment_cards.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "card_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Payment card ID to delete (from list_payment_cards)"
+      }
+    },
+    "required": [
+      "card_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/delete-payment-card.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

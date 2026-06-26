@@ -1,0 +1,40 @@
+{
+  "slug": "lucid.get_folder_entry",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "get a folder entry in lucid",
+    "look up a folder entry in lucid",
+    "fetch a single folder entry in lucid",
+    "view one specific folder entry in lucid",
+    "get folder entry in lucid",
+    "get folder entry details in lucid"
+  ],
+  "description": "Get details of a specific folder entry by its ID, including name, parent, associated document, and project status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "entry_id": {
+        "type": "string",
+        "description": "Folder entry ID"
+      }
+    },
+    "required": [
+      "entry_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/get-folder-entry.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "figma.list_team_projects",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "list team projects in figma",
+    "show me my team projects in figma",
+    "view my team projects in figma",
+    "see all my team projects in figma",
+    "list projects in a team in figma"
+  ],
+  "description": "List all projects in a Figma team. Projects are containers for files within a team.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Team ID to list projects for"
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/list-team-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

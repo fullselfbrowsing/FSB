@@ -1,0 +1,39 @@
+{
+  "slug": "retool.list_components",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list components in retool",
+    "show me my components in retool",
+    "view my components in retool",
+    "see all my components in retool",
+    "list all components in an app in retool"
+  ],
+  "description": "List all components (widgets, queries, frames) in a Retool app. Parses the Transit-encoded app state and returns a human-readable list with component IDs, types, positions, and key properties.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID"
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-components.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

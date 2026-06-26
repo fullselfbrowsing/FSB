@@ -1,0 +1,47 @@
+{
+  "slug": "datadog.mute_monitor",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "mute a monitor in datadog",
+    "mute monitor in datadog",
+    "mute a monitor to suppress alerts in datadog"
+  ],
+  "description": "Mute a monitor so it does not trigger alerts. Optionally specify a scope and end time.",
+  "actionVerb": "mute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "monitor_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Monitor ID to mute"
+      },
+      "scope": {
+        "description": "Scope to mute (e.g., \"host:myhost\"). Omit to mute all scopes.",
+        "type": "string"
+      },
+      "end": {
+        "description": "POSIX timestamp for when the mute should end. Omit for indefinite.",
+        "type": "number"
+      }
+    },
+    "required": [
+      "monitor_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/mute-monitor.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "mute"
+    }
+  }
+}

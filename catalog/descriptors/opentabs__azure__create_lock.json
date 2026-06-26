@@ -1,0 +1,63 @@
+{
+  "slug": "azure.create_lock",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "create a lock in azure",
+    "add a lock in azure",
+    "make a new lock in azure",
+    "open a new lock in azure",
+    "create lock in azure",
+    "create a management lock in azure"
+  ],
+  "description": "Create a management lock on a resource group to prevent accidental deletion or modification. CanNotDelete prevents deletion but allows modifications. ReadOnly prevents all changes.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      },
+      "lock_name": {
+        "type": "string",
+        "description": "Lock name"
+      },
+      "level": {
+        "type": "string",
+        "enum": [
+          "CanNotDelete",
+          "ReadOnly"
+        ],
+        "description": "Lock level — CanNotDelete or ReadOnly"
+      },
+      "notes": {
+        "description": "Notes about the lock",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name",
+      "lock_name",
+      "level"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/create-lock.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "create"
+    }
+  }
+}

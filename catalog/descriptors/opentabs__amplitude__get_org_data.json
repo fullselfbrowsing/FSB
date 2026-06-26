@@ -1,0 +1,32 @@
+{
+  "slug": "amplitude.get_org_data",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "get an org data in amplitude",
+    "look up an org data in amplitude",
+    "fetch a single org data in amplitude",
+    "view one specific org data in amplitude",
+    "get org data in amplitude",
+    "get org data with apps, user, and plan info in amplitude"
+  ],
+  "description": "Get organization overview including apps/projects, current user info, plan details, and usage status. This is the bootstrap data for the Amplitude organization.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/get-org-data.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "wikipedia.get_random_articles",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get random articles in wikipedia",
+    "look up random articles in wikipedia",
+    "fetch a single random articles in wikipedia",
+    "view one specific random articles in wikipedia",
+    "get random wikipedia articles in wikipedia"
+  ],
+  "description": "Get random Wikipedia articles. Returns article IDs and titles. Useful for discovering content or selecting a random topic.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of random articles to return (default 5, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-random-articles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "meticulous.accept_all_diffs",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "accept all diffs in meticulous",
+    "approve all diffs in a test run in meticulous",
+    "accept (approve) all visual differences in a test run in meticulous"
+  ],
+  "description": "Accept (approve) all visual differences in a test run. This marks all screenshot diffs as expected/approved for the associated pull request.",
+  "actionVerb": "accept",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pull_request_id": {
+        "type": "string",
+        "description": "Pull request ID (from test run's pullRequest.id field)"
+      },
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      }
+    },
+    "required": [
+      "pull_request_id",
+      "test_run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/accept-all-diffs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "accept"
+    }
+  }
+}

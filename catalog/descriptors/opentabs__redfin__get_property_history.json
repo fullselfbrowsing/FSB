@@ -1,0 +1,42 @@
+{
+  "slug": "redfin.get_property_history",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "get a property history in redfin",
+    "look up a property history in redfin",
+    "fetch a single property history in redfin",
+    "view one specific property history in redfin",
+    "get property history in redfin",
+    "get price and listing history in redfin"
+  ],
+  "description": "Get the price and listing history for a property, including past sales, listings, and price changes from public records and MLS data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Redfin property ID"
+      }
+    },
+    "required": [
+      "property_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/get-property-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

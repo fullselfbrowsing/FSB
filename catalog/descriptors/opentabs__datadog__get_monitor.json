@@ -1,6 +1,6 @@
 {
   "slug": "datadog.get_monitor",
-  "service": "app.datadoghq.com",
+  "service": "datadoghq.com",
   "intentSynonyms": [
     "get a monitor in datadog",
     "look up a monitor in datadog",
@@ -9,7 +9,7 @@
     "get monitor in datadog",
     "get a monitor by id in datadog"
   ],
-  "description": "Get detailed information about a single Datadog monitor by its monitor ID.",
+  "description": "Get detailed information about a specific Datadog monitor by its ID.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -19,7 +19,7 @@
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991,
-        "description": "Datadog monitor ID"
+        "description": "Monitor ID"
       }
     },
     "required": [
@@ -34,7 +34,7 @@
     "sourcePath": "plugins/datadog/src/tools/get-monitor.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": "apiget",
       "httpMethod": "GET",
       "opNameVerb": "get"
     }

@@ -1,0 +1,29 @@
+{
+  "slug": "snowflake.browse_data",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "browse a data in snowflake",
+    "browse data in snowflake",
+    "list accessible databases in snowflake"
+  ],
+  "description": "List all databases accessible to the current Snowflake user and role. Returns database names, owners, kinds (STANDARD or APPLICATION), and creation timestamps.",
+  "actionVerb": "browse",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/browse-data.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "browse"
+    }
+  }
+}

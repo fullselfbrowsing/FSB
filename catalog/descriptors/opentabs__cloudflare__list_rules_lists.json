@@ -1,0 +1,31 @@
+{
+  "slug": "cloudflare.list_rules_lists",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list rules lists in cloudflare",
+    "show me my rules lists in cloudflare",
+    "view my rules lists in cloudflare",
+    "see all my rules lists in cloudflare",
+    "list ip/rules lists in cloudflare"
+  ],
+  "description": "List account-level IP/CIDR lists used in firewall rules, WAF custom rules, and other security features. These lists define sets of IPs, ASNs, or hostnames that can be referenced by rules.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-rules-lists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

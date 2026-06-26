@@ -1,0 +1,39 @@
+{
+  "slug": "meticulous.get_session_events",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get session events in meticulous",
+    "look up session events in meticulous",
+    "fetch a single session events in meticulous",
+    "view one specific session events in meticulous",
+    "get user events in a session in meticulous"
+  ],
+  "description": "Get the user interaction events (clicks, inputs, navigations) recorded during a session.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "session_id": {
+        "type": "string",
+        "description": "Session ID"
+      }
+    },
+    "required": [
+      "session_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-session-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

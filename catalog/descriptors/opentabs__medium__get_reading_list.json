@@ -1,0 +1,39 @@
+{
+  "slug": "medium.get_reading_list",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "get a reading list in medium",
+    "look up a reading list in medium",
+    "fetch a single reading list in medium",
+    "view one specific reading list in medium",
+    "get reading list in medium",
+    "get your saved posts in medium"
+  ],
+  "description": "Get the current user's reading list (saved/bookmarked posts) on Medium.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum items to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/get-reading-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "vercel.get_project",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "get a project in vercel",
+    "look up a project in vercel",
+    "fetch a single project in vercel",
+    "view one specific project in vercel",
+    "get project in vercel",
+    "get project details in vercel"
+  ],
+  "description": "Get detailed information about a specific Vercel project by name or ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "description": "Project name or ID"
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "asana.get_user",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get an user in asana",
+    "look up an user in asana",
+    "fetch a single user in asana",
+    "view one specific user in asana",
+    "get user in asana",
+    "get a user by gid in asana"
+  ],
+  "description": "Get detailed information about a specific Asana user by their GID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User GID to retrieve"
+      }
+    },
+    "required": [
+      "user_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

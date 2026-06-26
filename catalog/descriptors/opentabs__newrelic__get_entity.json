@@ -1,0 +1,41 @@
+{
+  "slug": "newrelic.get_entity",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "get an entity in newrelic",
+    "look up an entity in newrelic",
+    "fetch a single entity in newrelic",
+    "view one specific entity in newrelic",
+    "get entity in newrelic",
+    "get entity details by guid in newrelic"
+  ],
+  "description": "Get detailed information about a specific monitored entity by its GUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Entity GUID"
+      }
+    },
+    "required": [
+      "guid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/get-entity.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "gdocs.search_documents",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "search documents in gdocs",
+    "search google docs by title or content in gdocs",
+    "search google docs by title and full-text content using the authenticated drive search index in gdocs"
+  ],
+  "description": "Search Google Docs by title and full-text content using the authenticated Drive search index. Trashed documents are excluded by default.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search text to match against document titles and indexed document content"
+      },
+      "page_size": {
+        "description": "Maximum number of documents to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_token": {
+        "description": "Page token from a previous search_documents call",
+        "type": "string"
+      },
+      "include_trashed": {
+        "description": "Include documents that are currently in the trash",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/search-documents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

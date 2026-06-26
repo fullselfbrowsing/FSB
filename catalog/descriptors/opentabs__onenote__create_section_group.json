@@ -1,0 +1,47 @@
+{
+  "slug": "onenote.create_section_group",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "create a section group in onenote",
+    "add a section group in onenote",
+    "make a new section group in onenote",
+    "open a new section group in onenote",
+    "create section group in onenote",
+    "create a section group in a notebook in onenote"
+  ],
+  "description": "Create a new section group in a OneNote notebook. Section groups act as folders to organize sections within a notebook.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Notebook ID to create the section group in"
+      },
+      "display_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name for the new section group"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "display_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/create-section-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

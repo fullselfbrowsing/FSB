@@ -1,0 +1,37 @@
+{
+  "slug": "bestbuy.add_to_cart",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "add a to cart in bestbuy",
+    "add to cart in bestbuy",
+    "add a product to the cart in bestbuy"
+  ],
+  "description": "Add a product to the Best Buy shopping cart by its SKU ID. Use search_products or get_product to find SKU IDs. Returns the updated cart item count and subtotal.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sku_id": {
+        "type": "string",
+        "description": "Best Buy SKU ID of the product to add (e.g., \"6612975\")"
+      }
+    },
+    "required": [
+      "sku_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/add-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

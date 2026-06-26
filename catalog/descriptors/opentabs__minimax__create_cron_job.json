@@ -1,0 +1,50 @@
+{
+  "slug": "minimax.create_cron_job",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "create a cron job in minimax",
+    "add a cron job in minimax",
+    "make a new cron job in minimax",
+    "open a new cron job in minimax",
+    "create cron job in minimax",
+    "create a scheduled job in minimax"
+  ],
+  "description": "Create a new scheduled (cron) job with a name, prompt, and cron expression defining when it runs.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the scheduled job"
+      },
+      "prompt": {
+        "type": "string",
+        "description": "Prompt to execute on each run"
+      },
+      "cron_expression": {
+        "type": "string",
+        "description": "Cron expression e.g. \"0 9 * * *\""
+      }
+    },
+    "required": [
+      "name",
+      "prompt",
+      "cron_expression"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/create-cron-job.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

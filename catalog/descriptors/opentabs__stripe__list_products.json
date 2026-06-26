@@ -1,0 +1,46 @@
+{
+  "slug": "stripe.list_products",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list products in stripe",
+    "show me my products in stripe",
+    "view my products in stripe",
+    "see all my products in stripe",
+    "list products with pagination in stripe"
+  ],
+  "description": "List products in your Stripe account. Returns products sorted by creation date (newest first). Use starting_after for cursor-based pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of products to return (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Product ID cursor — fetch products created after this ID",
+        "type": "string"
+      },
+      "active": {
+        "description": "Filter by active status",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

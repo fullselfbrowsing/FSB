@@ -1,0 +1,45 @@
+{
+  "slug": "circleci.delete_env_var",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "delete an env var in circleci",
+    "remove an env var in circleci",
+    "trash an env var in circleci",
+    "permanently delete an env var in circleci",
+    "delete env var in circleci",
+    "delete a project env var in circleci"
+  ],
+  "description": "Delete a project environment variable. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "name": {
+        "type": "string",
+        "description": "Variable name to delete"
+      }
+    },
+    "required": [
+      "project_slug",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/delete-env-var.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

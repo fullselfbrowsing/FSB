@@ -1,0 +1,97 @@
+{
+  "slug": "zendesk.update_ticket",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "update a ticket in zendesk",
+    "edit a ticket in zendesk",
+    "change the details of ticket in zendesk",
+    "modify a ticket in zendesk",
+    "update ticket in zendesk",
+    "update an existing ticket in zendesk"
+  ],
+  "description": "Update an existing support ticket. Change the subject, status, priority, type, tags, assignee, or group. Only specified fields are updated; omitted fields remain unchanged. Returns the updated ticket.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "The ID of the ticket to update"
+      },
+      "subject": {
+        "description": "New subject/title for the ticket",
+        "type": "string"
+      },
+      "status": {
+        "description": "New status for the ticket",
+        "type": "string",
+        "enum": [
+          "new",
+          "open",
+          "pending",
+          "hold",
+          "solved",
+          "closed"
+        ]
+      },
+      "priority": {
+        "description": "New priority level",
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ]
+      },
+      "type": {
+        "description": "New type for the ticket",
+        "type": "string",
+        "enum": [
+          "problem",
+          "incident",
+          "question",
+          "task"
+        ]
+      },
+      "tags": {
+        "description": "New tags (replaces existing tags)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "assignee_id": {
+        "description": "New assignee user ID",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "group_id": {
+        "description": "New group ID",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "ticket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/update-ticket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

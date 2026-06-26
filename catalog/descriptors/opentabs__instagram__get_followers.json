@@ -1,0 +1,49 @@
+{
+  "slug": "instagram.get_followers",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get followers in instagram",
+    "look up followers in instagram",
+    "fetch a single followers in instagram",
+    "view one specific followers in instagram",
+    "list a user's followers in instagram"
+  ],
+  "description": "List followers of a user. Requires the user numeric ID. Supports cursor pagination via max_id. Private accounts only show followers to the account owner.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User numeric ID (pk)"
+      },
+      "count": {
+        "description": "Number of followers to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "max_id": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-followers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

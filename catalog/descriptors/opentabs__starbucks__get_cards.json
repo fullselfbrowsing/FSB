@@ -1,0 +1,31 @@
+{
+  "slug": "starbucks.get_cards",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get cards in starbucks",
+    "look up cards in starbucks",
+    "fetch a single cards in starbucks",
+    "view one specific cards in starbucks",
+    "list all starbucks cards and balances in starbucks"
+  ],
+  "description": "Get all Starbucks gift/stored value cards on the account including balance, card number, and primary card status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-cards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

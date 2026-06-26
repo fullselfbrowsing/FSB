@@ -1,0 +1,45 @@
+{
+  "slug": "sentry.get_event",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "get an event in sentry",
+    "look up an event in sentry",
+    "fetch a single event in sentry",
+    "view one specific event in sentry",
+    "get event in sentry",
+    "get full details of a specific event in sentry"
+  ],
+  "description": "Get full details of a specific event including stack trace, breadcrumbs, tags, context, and more. Requires the project slug and event ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug the event belongs to"
+      },
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to retrieve"
+      }
+    },
+    "required": [
+      "project_slug",
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/get-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

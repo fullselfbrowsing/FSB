@@ -1,0 +1,39 @@
+{
+  "slug": "tripadvisor.check_saved",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "check a saved in tripadvisor",
+    "check saved in tripadvisor",
+    "check if a place is saved in tripadvisor"
+  ],
+  "description": "Check whether a location (restaurant, hotel, or attraction) is saved/bookmarked by the current user. Requires the location ID.",
+  "actionVerb": "check",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "location_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Location ID to check"
+      }
+    },
+    "required": [
+      "location_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/check-saved.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "check"
+    }
+  }
+}

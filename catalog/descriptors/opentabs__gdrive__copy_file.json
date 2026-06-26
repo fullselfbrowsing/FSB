@@ -1,0 +1,45 @@
+{
+  "slug": "gdrive.copy_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "copy a file in gdrive",
+    "copy file in gdrive",
+    "create a copy of a file in gdrive"
+  ],
+  "description": "Create a copy of a file. Optionally specify a new name and parent folder for the copy. Folders cannot be copied.",
+  "actionVerb": "copy",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File ID to copy"
+      },
+      "name": {
+        "description": "Name for the copy. Defaults to \"Copy of <original name>\".",
+        "type": "string"
+      },
+      "parent_id": {
+        "description": "Parent folder ID for the copy. Defaults to the same folder as the original.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/copy-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "copy"
+    }
+  }
+}

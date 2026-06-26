@@ -1,0 +1,50 @@
+{
+  "slug": "terraform.list_organization_members",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "list organization members in terraform",
+    "show me my organization members in terraform",
+    "view my organization members in terraform",
+    "see all my organization members in terraform"
+  ],
+  "description": "List members of an organization with their status and email.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "organization"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/list-organization-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

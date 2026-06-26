@@ -1,0 +1,32 @@
+{
+  "slug": "chatgpt.get_account_info",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get an account info in chatgpt",
+    "look up an account info in chatgpt",
+    "fetch a single account info in chatgpt",
+    "view one specific account info in chatgpt",
+    "get account info in chatgpt",
+    "get account subscription and features in chatgpt"
+  ],
+  "description": "Get ChatGPT account details including subscription plan, features, and entitlements.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-account-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

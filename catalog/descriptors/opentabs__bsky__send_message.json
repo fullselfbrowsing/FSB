@@ -1,0 +1,44 @@
+{
+  "slug": "bsky.send_message",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "send a message in bsky",
+    "post a message in bsky",
+    "write a new message in bsky",
+    "send message in bsky",
+    "send a dm in bsky"
+  ],
+  "description": "Send a direct message in a conversation.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "convo_id": {
+        "type": "string",
+        "description": "Conversation ID"
+      },
+      "text": {
+        "type": "string",
+        "description": "Message text content"
+      }
+    },
+    "required": [
+      "convo_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

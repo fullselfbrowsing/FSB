@@ -1,0 +1,63 @@
+{
+  "slug": "calendly.update_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "update an event type in calendly",
+    "edit an event type in calendly",
+    "change the details of event type in calendly",
+    "modify an event type in calendly",
+    "update event type in calendly"
+  ],
+  "description": "Update an existing event type. Only specified fields are changed; omitted fields remain unchanged. Returns the updated event type.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Event type numeric ID to update"
+      },
+      "name": {
+        "description": "New display name",
+        "type": "string"
+      },
+      "slug": {
+        "description": "New URL-safe slug",
+        "type": "string"
+      },
+      "duration": {
+        "description": "New duration in minutes",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "color": {
+        "description": "New display color hex code",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/update-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

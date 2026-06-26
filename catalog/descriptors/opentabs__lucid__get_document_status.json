@@ -1,0 +1,40 @@
+{
+  "slug": "lucid.get_document_status",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "get a document status in lucid",
+    "look up a document status in lucid",
+    "fetch a single document status in lucid",
+    "view one specific document status in lucid",
+    "get document status in lucid",
+    "get document workflow status in lucid"
+  ],
+  "description": "Get the workflow status of a Lucid document, including the status definition and action history length.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "type": "string",
+        "description": "Document UUID"
+      }
+    },
+    "required": [
+      "document_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/get-document-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

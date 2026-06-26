@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.unmute_conversation",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "unmute a conversation in bsky",
+    "unmute conversation in bsky",
+    "unmute conversation in the bsky app",
+    "use bsky to unmute a conversation"
+  ],
+  "description": "Unmute a conversation.",
+  "actionVerb": "unmute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "convo_id": {
+        "type": "string",
+        "description": "Conversation ID"
+      }
+    },
+    "required": [
+      "convo_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/unmute-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "unmute"
+    }
+  }
+}

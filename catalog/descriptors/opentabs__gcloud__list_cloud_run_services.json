@@ -1,0 +1,45 @@
+{
+  "slug": "gcloud.list_cloud_run_services",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list cloud run services in gcloud",
+    "show me my cloud run services in gcloud",
+    "view my cloud run services in gcloud",
+    "see all my cloud run services in gcloud"
+  ],
+  "description": "List Cloud Run services in the project across all locations.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Max results per page (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-cloud-run-services.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

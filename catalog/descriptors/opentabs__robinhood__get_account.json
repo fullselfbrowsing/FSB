@@ -1,0 +1,32 @@
+{
+  "slug": "robinhood.get_account",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get an account in robinhood",
+    "look up an account in robinhood",
+    "fetch a single account in robinhood",
+    "view one specific account in robinhood",
+    "get account in robinhood",
+    "get brokerage account details in robinhood"
+  ],
+  "description": "Get the Robinhood brokerage account details including account number, type, buying power, cash balance, and withdrawal availability.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-account.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -7,9 +7,9 @@
     "fetch a single zone in cloudflare",
     "view one specific zone in cloudflare",
     "get zone in cloudflare",
-    "get a zone by id in cloudflare"
+    "get zone details in cloudflare"
   ],
-  "description": "Get detailed information about a single Cloudflare zone (domain) by its zone ID.",
+  "description": "Get detailed information about a specific zone (domain) by its zone ID.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,8 +17,7 @@
     "properties": {
       "zone_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Cloudflare zone ID"
+        "description": "Zone ID (32-char hex string)"
       }
     },
     "required": [
@@ -33,8 +32,8 @@
     "sourcePath": "plugins/cloudflare/src/tools/get-zone.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

@@ -1,0 +1,40 @@
+{
+  "slug": "stripe.get_price",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "get a price in stripe",
+    "look up a price in stripe",
+    "fetch a single price in stripe",
+    "view one specific price in stripe",
+    "get price in stripe",
+    "get a price by id in stripe"
+  ],
+  "description": "Get detailed information about a specific price by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "price_id": {
+        "type": "string",
+        "description": "Price ID (e.g., price_xxx)"
+      }
+    },
+    "required": [
+      "price_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/get-price.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

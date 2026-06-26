@@ -1,0 +1,62 @@
+{
+  "slug": "temporal.get_workflow_history",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "get a workflow history in temporal",
+    "look up a workflow history in temporal",
+    "fetch a single workflow history in temporal",
+    "view one specific workflow history in temporal",
+    "get workflow history in temporal",
+    "get workflow event history for debugging in temporal"
+  ],
+  "description": "Get the event history for a workflow execution. Events include workflow started, activity scheduled/started/completed/failed, timer fired, signals received, and more. Essential for debugging workflow behavior and understanding failures.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      },
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow ID"
+      },
+      "run_id": {
+        "description": "Run ID (optional — uses latest run if omitted)",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Max events per page (default 100, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "next_page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      },
+      "wait_new_event": {
+        "description": "Long-poll for new events (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/get-workflow-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

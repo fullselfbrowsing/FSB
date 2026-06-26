@@ -1,0 +1,32 @@
+{
+  "slug": "mongodb.list_ip_access_list",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "list an ip access list in mongodb",
+    "show me my ip access list in mongodb",
+    "view my ip access list in mongodb",
+    "see all my ip access list in mongodb",
+    "list ip access list in mongodb",
+    "list ip access list entries in mongodb"
+  ],
+  "description": "List all IP access list entries (IP whitelist) for the current MongoDB Atlas project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/list-ip-access-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

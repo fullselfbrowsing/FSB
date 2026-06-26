@@ -1,0 +1,39 @@
+{
+  "slug": "tripadvisor.get_breadcrumbs",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get breadcrumbs in tripadvisor",
+    "look up breadcrumbs in tripadvisor",
+    "fetch a single breadcrumbs in tripadvisor",
+    "view one specific breadcrumbs in tripadvisor",
+    "get location hierarchy in tripadvisor"
+  ],
+  "description": "Get the location hierarchy (breadcrumbs) for any TripAdvisor page. Returns the trail from country → state → city → location. Useful for discovering parent geo URLs for listing pages.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Any TripAdvisor page URL path (restaurant, hotel, attraction, or city)"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-breadcrumbs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

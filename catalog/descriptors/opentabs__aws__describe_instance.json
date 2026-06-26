@@ -1,0 +1,38 @@
+{
+  "slug": "aws.describe_instance",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "describe an instance in aws",
+    "describe instance in aws",
+    "get details of a specific ec2 instance in aws"
+  ],
+  "description": "Get detailed information about a specific EC2 instance by ID. Returns instance type, state, IPs, VPC, tags, key pair, and availability zone.",
+  "actionVerb": "describe",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instance_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "EC2 instance ID (e.g., i-1234567890abcdef0)"
+      }
+    },
+    "required": [
+      "instance_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/describe-instance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "describe"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "onenote.create_notebook",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "create a notebook in onenote",
+    "add a notebook in onenote",
+    "make a new notebook in onenote",
+    "open a new notebook in onenote",
+    "create notebook in onenote",
+    "create a new notebook in onenote"
+  ],
+  "description": "Create a new OneNote notebook. The notebook name must be unique across the user's notebooks. Returns the created notebook with its ID and web URL.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "display_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name for the new notebook (must be unique)"
+      }
+    },
+    "required": [
+      "display_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/create-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

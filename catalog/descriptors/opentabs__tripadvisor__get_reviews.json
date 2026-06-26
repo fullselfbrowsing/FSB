@@ -1,0 +1,39 @@
+{
+  "slug": "tripadvisor.get_reviews",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get reviews in tripadvisor",
+    "look up reviews in tripadvisor",
+    "fetch a single reviews in tripadvisor",
+    "view one specific reviews in tripadvisor",
+    "get location reviews in tripadvisor"
+  ],
+  "description": "Get reviews for a TripAdvisor location (restaurant, hotel, or attraction). Returns the most recent reviews with ratings, text, and author info. Use offset in the URL path to paginate (e.g., \"-or15-\" for page 2).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Location review page URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-...\" or with offset \"/Restaurant_Review-g60713-d480544-Reviews-or15-...\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-reviews.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

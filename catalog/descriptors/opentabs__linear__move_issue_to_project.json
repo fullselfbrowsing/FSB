@@ -1,0 +1,42 @@
+{
+  "slug": "linear.move_issue_to_project",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "move an issue to project in linear",
+    "move issue to project in linear",
+    "move an issue between projects in linear"
+  ],
+  "description": "Move an issue to a different project. Use list_projects to find project IDs. Pass an empty string to remove from the current project.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID to move"
+      },
+      "project_id": {
+        "type": "string",
+        "description": "Target project UUID, or empty string to remove from project"
+      }
+    },
+    "required": [
+      "issue_id",
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/move-issue-to-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "move"
+    }
+  }
+}

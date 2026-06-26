@@ -1,0 +1,59 @@
+{
+  "slug": "shortcut.create_story_link",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "create a story link in shortcut",
+    "add a story link in shortcut",
+    "make a new story link in shortcut",
+    "open a new story link in shortcut",
+    "create story link in shortcut",
+    "link two stories together in shortcut"
+  ],
+  "description": "Create a relationship between two stories. Types: \"blocks\" (subject blocks object), \"duplicates\" (subject duplicates object), \"relates to\" (bidirectional).",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subject_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Subject story numeric ID"
+      },
+      "object_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Object story numeric ID"
+      },
+      "verb": {
+        "type": "string",
+        "enum": [
+          "blocks",
+          "duplicates",
+          "relates to"
+        ],
+        "description": "Relationship type"
+      }
+    },
+    "required": [
+      "subject_id",
+      "object_id",
+      "verb"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/create-story-link.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

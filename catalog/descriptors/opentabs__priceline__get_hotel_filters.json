@@ -1,0 +1,55 @@
+{
+  "slug": "priceline.get_hotel_filters",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get hotel filters in priceline",
+    "look up hotel filters in priceline",
+    "fetch a single hotel filters in priceline",
+    "view one specific hotel filters in priceline",
+    "get available hotel search filters in priceline"
+  ],
+  "description": "Get available dynamic filter options for a hotel search. Returns filter categories (amenities, price ranges, deal types, rate options, zones) with their selectable values. Use these filters to understand what refinements are available for a specific city and date combination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "city_id": {
+        "type": "string",
+        "description": "Priceline city ID"
+      },
+      "check_in": {
+        "type": "string",
+        "description": "Check-in date in YYYYMMDD format"
+      },
+      "check_out": {
+        "type": "string",
+        "description": "Check-out date in YYYYMMDD format"
+      },
+      "adults": {
+        "description": "Number of adults (default 2)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "city_id",
+      "check_in",
+      "check_out"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-hotel-filters.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

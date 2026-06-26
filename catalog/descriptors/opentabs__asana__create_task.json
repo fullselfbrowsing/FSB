@@ -9,7 +9,7 @@
     "create task in asana",
     "create a new task in asana"
   ],
-  "description": "Create a new task in Asana. Requires a name at minimum. Optionally set notes, assignee, projects, due date, and parent task.",
+  "description": "Create a new task in a workspace. Optionally assign to a project, user, or parent task.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -18,38 +18,48 @@
       "name": {
         "type": "string",
         "minLength": 1,
-        "description": "Task name/title"
+        "description": "Task name"
       },
-      "notes": {
-        "description": "Task notes/description",
-        "type": "string"
-      },
-      "assignee": {
-        "description": "User ID to assign the task to",
-        "type": "string"
+      "workspace": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace GID to create the task in"
       },
       "projects": {
-        "description": "List of project IDs to add the task to",
+        "description": "Project GIDs to add the task to",
         "type": "array",
         "items": {
           "type": "string"
         }
       },
-      "workspace": {
-        "description": "Workspace ID the task belongs to",
+      "assignee": {
+        "description": "Assignee user GID",
         "type": "string"
       },
       "due_on": {
         "description": "Due date in YYYY-MM-DD format",
         "type": "string"
       },
+      "due_at": {
+        "description": "Due datetime in ISO 8601 format",
+        "type": "string"
+      },
+      "start_on": {
+        "description": "Start date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "notes": {
+        "description": "Plain-text task description",
+        "type": "string"
+      },
       "parent": {
-        "description": "Parent task ID to create a subtask",
+        "description": "Parent task GID to create as a subtask",
         "type": "string"
       }
     },
     "required": [
-      "name"
+      "name",
+      "workspace"
     ],
     "additionalProperties": false
   },

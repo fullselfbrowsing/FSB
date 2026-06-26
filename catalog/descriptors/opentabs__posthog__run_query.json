@@ -1,0 +1,37 @@
+{
+  "slug": "posthog.run_query",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "run a query in posthog",
+    "run query in posthog",
+    "run a hogql analytics query in posthog"
+  ],
+  "description": "Execute a HogQL (SQL-like) query against PostHog event data. HogQL supports SELECT, aggregations (count, uniqExact, avg, sum, min, max), GROUP BY, ORDER BY, WHERE, and JOIN. Query the `events` table for raw events, `persons` for person data. Example: \"SELECT event, count() as total FROM events WHERE timestamp > now() - INTERVAL 7 DAY GROUP BY event ORDER BY total DESC LIMIT 20\".",
+  "actionVerb": "run",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "HogQL query string (SQL-like syntax over PostHog data)"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/run-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "run"
+    }
+  }
+}

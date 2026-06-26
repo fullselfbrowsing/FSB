@@ -7,9 +7,9 @@
     "fetch a single conversation in chatgpt",
     "view one specific conversation in chatgpt",
     "get conversation in chatgpt",
-    "open a chatgpt conversation in chatgpt"
+    "get a conversation with messages in chatgpt"
   ],
-  "description": "Get the full message history of a single ChatGPT conversation by its ID.",
+  "description": "Get a ChatGPT conversation with its full message history. Messages are returned in chronological order following the active branch of the conversation tree.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,8 +17,7 @@
     "properties": {
       "conversation_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Conversation ID to retrieve"
+        "description": "Conversation ID (UUID)"
       }
     },
     "required": [

@@ -1,0 +1,43 @@
+{
+  "slug": "bsky.search_users_typeahead",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "search an users typeahead in bsky",
+    "search users typeahead in bsky",
+    "typeahead search for users in bsky"
+  ],
+  "description": "Typeahead search for users. Returns a quick list of matching users for autocomplete. Faster than full search but returns fewer results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Search query"
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 8, max 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/search-users-typeahead.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

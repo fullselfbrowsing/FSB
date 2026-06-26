@@ -1,0 +1,36 @@
+{
+  "slug": "priceline.list_flight_price_watches",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "list flight price watches in priceline",
+    "show me my flight price watches in priceline",
+    "view my flight price watches in priceline",
+    "see all my flight price watches in priceline",
+    "list user's flight price alerts in priceline"
+  ],
+  "description": "List the authenticated user's active Priceline flight price watches. Returns watches the user has set up to track fare changes on specific routes. Each entry includes origin, destination, travel dates, cabin class, current price, and target price.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "include_inactive": {
+        "description": "Include inactive (paused or expired) watches in addition to active ones (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/list-flight-price-watches.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

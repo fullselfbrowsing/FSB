@@ -1,0 +1,40 @@
+{
+  "slug": "clickup.get_spaces",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get spaces in clickup",
+    "look up spaces in clickup",
+    "fetch a single spaces in clickup",
+    "view one specific spaces in clickup",
+    "list spaces in a workspace in clickup"
+  ],
+  "description": "List all spaces in a ClickUp workspace. Spaces are top-level containers for organizing work. Returns space name, color, privacy, and archive status. By default excludes archived spaces.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "description": "Workspace ID. Defaults to the current workspace.",
+        "type": "string"
+      },
+      "include_archived": {
+        "description": "Whether to include archived spaces (default: false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-spaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

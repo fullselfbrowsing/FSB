@@ -1,0 +1,45 @@
+{
+  "slug": "meticulous.list_sessions",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "list sessions in meticulous",
+    "show me my sessions in meticulous",
+    "view my sessions in meticulous",
+    "see all my sessions in meticulous",
+    "list sessions for a project in meticulous"
+  ],
+  "description": "List recorded user sessions for a project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project ID"
+      },
+      "count": {
+        "default": 50,
+        "description": "Number of sessions to return",
+        "type": "number"
+      }
+    },
+    "required": [
+      "project_id",
+      "count"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/list-sessions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

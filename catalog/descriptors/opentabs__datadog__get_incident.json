@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_incident",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get an incident in datadog",
+    "look up an incident in datadog",
+    "fetch a single incident in datadog",
+    "view one specific incident in datadog",
+    "get incident in datadog",
+    "get an incident by id in datadog"
+  ],
+  "description": "Get detailed information about a specific incident by ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "incident_id": {
+        "type": "string",
+        "description": "Incident ID"
+      }
+    },
+    "required": [
+      "incident_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-incident.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

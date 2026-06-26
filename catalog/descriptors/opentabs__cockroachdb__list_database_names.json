@@ -1,0 +1,39 @@
+{
+  "slug": "cockroachdb.list_database_names",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "list database names in cockroachdb",
+    "show me my database names in cockroachdb",
+    "view my database names in cockroachdb",
+    "see all my database names in cockroachdb",
+    "list database names in a cluster in cockroachdb"
+  ],
+  "description": "List all database names in a CockroachDB cluster.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      }
+    },
+    "required": [
+      "cluster_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/list-database-names.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "npm.get_package_readme",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get a package readme in npm",
+    "look up a package readme in npm",
+    "fetch a single package readme in npm",
+    "view one specific package readme in npm",
+    "get package readme in npm",
+    "get the readme of a package in npm"
+  ],
+  "description": "Get the README content of an npm package. Returns the full README as rendered on the package page.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Package name (e.g., \"express\")"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-package-readme.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

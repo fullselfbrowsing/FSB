@@ -148,19 +148,31 @@ export function crossCheck(descriptors) {
 }
 
 // ---- MED-02 (38-REVIEW): the "safe-because-read-only" INVARIANT --------------
-// Several social/content origins are deliberately classified SAFE (absent from
+// Several origins are deliberately classified SAFE (absent from
 // service-denylist.json sensitiveOrigins) ONLY because the vendored slice happens to
-// expose read ops alone -- reddit is the canonical case (get_post / list_subreddit_
-// posts / search_posts, all GET reads). That safety is coupled to the CONTENT of the
-// vendored snapshot, not enforced anywhere: a future re-vendor that adds a reddit
-// write op (submit_post / reply / vote / send_message) would emit it under
-// service:reddit.com, which classifies NOT sensitive (writes run under Auto with no
-// mutating re-gate) AND is NOT caught by the classification heuristic (reddit is in no
-// axis, and post/submit are not -- and deliberately must not be -- axis tokens). So a
-// reddit write would ship writable-under-Auto silently (threat parallel to MED-01 but
-// for the intentionally-safe origin).
+// expose read ops alone -- yelp/tripadvisor/zillow/grafana are the canonical cases
+// (search_*/get_*/list_* / query_metrics, all GET reads). That safety is coupled to the
+// CONTENT of the vendored snapshot, not enforced anywhere: a future re-vendor that adds
+// a write op (a yelp review POST, a zillow saved-search write, a grafana dashboard
+// create) would emit it under that service, which classifies NOT sensitive (writes run
+// under Auto with no mutating re-gate) AND is NOT caught by the classification heuristic
+// (these brands are in no axis, and their op names are deliberately not axis tokens). So
+// such a write would ship writable-under-Auto silently (threat parallel to MED-01 but
+// for an intentionally-safe origin).
 //
-// This gate turns the "reddit is read-only" assumption into a CHECKED INVARIANT: every
+// HISTORICAL NOTE (Phase 39.5-04 -- the full-source import): reddit + calendly USED to
+// live in this set (the hand-authored slices the earlier plans assumed were read-only).
+// The REAL vendored plugins expose WRITE ops (real reddit: edit_text/send_message/delete/
+// submit_comment/vote/...; real calendly: create_event_type/update_event_type/activate/
+// deactivate/clone_event_type/delete_event_type), so this very invariant FAILED THE BUILD
+// at full scale -- exactly its job. Per the gate's own prescription they were RE-CLASSIFIED
+// SENSITIVE in service-denylist.json ('https://*.reddit.com' apex-suffix + 'https://
+// calendly.com' exact-host) and REMOVED from this set (a brand cannot be both sensitive
+// and safe-because-read-only -- the disjointness with COMMERCE_SENSITIVE is asserted
+// below; the same one-set discipline applies to the denylist). Their writes now run
+// posture-B mutating-gated (the discord/linkedin posture).
+//
+// This gate turns the "X is read-only" assumption into a CHECKED INVARIANT: every
 // emitted descriptor whose `service` is in READ_ONLY_SAFE_SERVICES MUST be
 // sideEffectClass 'read'. A re-vendored write/destructive op for one of these services
 // FAILS THE BUILD, forcing an explicit re-classification decision (add the origin to
@@ -168,19 +180,19 @@ export function crossCheck(descriptors) {
 // writable-under-Auto. The set is intentionally SMALL + curated: an origin earns a
 // place here ONLY when it is left safe SPECIFICALLY because it is content-read-only.
 //
-// Phase 39-05 (BRDTH-02) extends the set with the genuinely-read-only local-services /
-// scheduling apps the events sub-batch imports -- www.yelp.com + www.tripadvisor.com
-// (local/travel reviews + listings: search_*/get_*/list_reviews, all GET reads) and
-// calendly.com (scheduling availability: list_event_types/get_availability/
-// list_scheduled_events, all GET reads). Each is left SAFE (absent from
-// sensitiveOrigins) SPECIFICALLY because its vendored ops are read-only -- so a FUTURE
-// re-vendor that adds a write op for one (a yelp/tripadvisor review POST, a calendly
-// booking, a partner hotel-booking) would emit it under that service, classify NOT
-// sensitive, and ship writable-under-Auto. Listing them here turns that into a CHECKED
-// invariant: any non-read op for these origins FAILS the build, forcing an explicit
-// re-classification (add the origin to sensitiveOrigins) rather than a silent
-// writable-under-Auto ship. The hosts are the EXACT services each app vendors,
-// lowercased (www.yelp.com / www.tripadvisor.com / calendly.com).
+// Phase 39-05 (BRDTH-02) extended the set with the genuinely-read-only local-services
+// apps the events sub-batch imports -- www.yelp.com + www.tripadvisor.com (local/travel
+// reviews + listings: search_*/get_*/list_reviews, all GET reads). Each is left SAFE
+// (absent from sensitiveOrigins) SPECIFICALLY because its vendored ops are read-only --
+// so a FUTURE re-vendor that adds a write op for one (a yelp/tripadvisor review POST)
+// would emit it under that service, classify NOT sensitive, and ship writable-under-Auto.
+// Listing them here turns that into a CHECKED invariant: any non-read op for these
+// origins FAILS the build, forcing an explicit re-classification (add the origin to
+// sensitiveOrigins) rather than a silent writable-under-Auto ship. The hosts are the
+// EXACT services each app vendors, lowercased (www.yelp.com / www.tripadvisor.com).
+// (calendly.com was originally added here too on the read-only-slice assumption; the
+// 39.5-04 full-source import proved the real plugin has writes, so it was moved to
+// sensitiveOrigins -- see the HISTORICAL NOTE above.)
 //
 // Phase 39-06 (BRDTH-02) extends the set with the genuinely-read-only misc apps the
 // completion sub-batch imports -- www.zillow.com (real-estate: search_listings/
@@ -196,9 +208,8 @@ export function crossCheck(descriptors) {
 // lowercased (www.zillow.com / grafana.com). Because every emitted op carries NO
 // payment verb, the payment-op guard never keys on zillow/grafana either.
 const READ_ONLY_SAFE_SERVICES = new Set([
-  'reddit.com', 'www.reddit.com',
-  'www.yelp.com', 'www.tripadvisor.com', 'calendly.com',
-  'www.zillow.com', 'grafana.com',
+  'www.yelp.com', 'www.tripadvisor.com',
+  'www.zillow.com', 'zillow.com', 'grafana.com',
 ]);
 
 /**
@@ -270,8 +281,12 @@ export function checkReadOnlySafeOrigins(descriptors) {
 // sensitive/denied for each here. The roster = the curated set (food-delivery/rideshare/
 // retail/marketplace/travel/ticketing) + the spike-named net-new (homedepot/priceline/
 // redfin/starbucks/pandaexpress) + fiverr (freelance marketplace) + coinbase (fintech).
-// zillow/grafana/calendly/yelp/tripadvisor/reddit are NOT here -- they are genuinely-non-
-// commerce reads in READ_ONLY_SAFE_SERVICES (the disjointness assertion enforces this).
+// zillow/grafana/yelp/tripadvisor are NOT here -- they are genuinely-non-commerce reads
+// in READ_ONLY_SAFE_SERVICES (the disjointness assertion enforces this). reddit/calendly
+// are NOT here either, but for a DIFFERENT reason: they are social/scheduling brands with
+// real WRITE ops (39.5-04), classified sensitive directly in service-denylist.json (NOT on
+// the commerce roster -- they carry no payment verb, so the payment-op guard never keys on
+// them; the denylist is their gate).
 const COMMERCE_SENSITIVE_SERVICES = new Set([
   // food-delivery / food-order
   'doordash.com', 'www.ubereats.com', 'www.grubhub.com', 'instacart.com',
@@ -380,7 +395,7 @@ export { COMMERCE_SENSITIVE_SERVICES };
 // payment op that is backing:'dom' on a sensitive/denied origin PASSES (DOM-only on
 // a gated origin = no money movement under Auto; e.g. reserve_table on opentable --
 // opentable is sensitive per Task 1, so reserve_table DOM-only-on-sensitive PASSES).
-// The read-only-safe apps (calendly/zillow/yelp/tripadvisor/grafana) emit ONLY read
+// The read-only-safe apps (zillow/yelp/tripadvisor/grafana) emit ONLY read
 // ops (search/list/get/query) -- none of those verbs/op-names is a payment verb/op,
 // so NONE of their ops is a payment op and the guard never keys on them.
 //
@@ -548,7 +563,7 @@ async function runCli() {
     'verify-catalog-crosscheck: PASS (' + checked.length +
     ' descriptors with signals; every declared sideEffectClass >= its derived ' +
     'fail-safe-high class -- no under-stated destructive/mutating op; every ' +
-    'read-only-safe origin (reddit) emits read-only ops, MED-02; no payment-bearing ' +
+    'read-only-safe origin (yelp/tripadvisor/zillow/grafana) emits read-only ops, MED-02; no payment-bearing ' +
     'op is safe-and-API-invocable -- the money-no-movement-under-Auto guard, Phase 39; ' +
     'and all ' + COMMERCE_SENSITIVE_SERVICES.size + ' COMMERCE_SENSITIVE brands classify ' +
     'sensitive AND are disjoint from READ_ONLY_SAFE -- the conservative-commerce build ' +

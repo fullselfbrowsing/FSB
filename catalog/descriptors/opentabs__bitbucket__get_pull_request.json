@@ -7,9 +7,9 @@
     "fetch a single pull request in bitbucket",
     "view one specific pull request in bitbucket",
     "get pull request in bitbucket",
-    "get a pull request by id in bitbucket"
+    "get pull request details in bitbucket"
   ],
-  "description": "Get detailed information about a specific Bitbucket pull request by its repository and ID.",
+  "description": "Get detailed information about a specific pull request.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,19 +17,17 @@
     "properties": {
       "workspace": {
         "type": "string",
-        "minLength": 1,
-        "description": "Workspace ID or slug that owns the repository"
+        "description": "Workspace slug or UUID"
       },
       "repo_slug": {
         "type": "string",
-        "minLength": 1,
         "description": "Repository slug"
       },
       "pull_request_id": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991,
-        "description": "Pull request ID within the repository"
+        "description": "Pull request ID"
       }
     },
     "required": [

@@ -1,0 +1,32 @@
+{
+  "slug": "dominos.get_cart",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get a cart in dominos",
+    "look up a cart in dominos",
+    "fetch a single cart in dominos",
+    "view one specific cart in dominos",
+    "get cart in dominos",
+    "view your current cart in dominos"
+  ],
+  "description": "View the current cart contents including all products, quantities, and the cart total.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "terraform.lock_workspace",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "lock a workspace in terraform",
+    "lock workspace in terraform",
+    "lock a workspace to prevent new runs in terraform"
+  ],
+  "description": "Lock a workspace to prevent new runs. Provide an optional reason.",
+  "actionVerb": "lock",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      },
+      "reason": {
+        "description": "Reason for locking",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/lock-workspace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "lock"
+    }
+  }
+}

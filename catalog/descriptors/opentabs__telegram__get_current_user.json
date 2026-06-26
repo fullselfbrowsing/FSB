@@ -1,0 +1,32 @@
+{
+  "slug": "telegram.get_current_user",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "get a current user in telegram",
+    "look up a current user in telegram",
+    "fetch a single current user in telegram",
+    "view one specific current user in telegram",
+    "get current user in telegram",
+    "get your telegram profile in telegram"
+  ],
+  "description": "Get the authenticated Telegram user profile including name, username, phone number, and online status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

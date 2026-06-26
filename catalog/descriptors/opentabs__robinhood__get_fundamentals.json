@@ -1,0 +1,39 @@
+{
+  "slug": "robinhood.get_fundamentals",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get fundamentals in robinhood",
+    "look up fundamentals in robinhood",
+    "fetch a single fundamentals in robinhood",
+    "view one specific fundamentals in robinhood",
+    "get fundamental financial data for a stock in robinhood"
+  ],
+  "description": "Get fundamental financial data for a stock including market cap, P/E ratio, dividend yield, 52-week range, volume, and company description.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Ticker symbol"
+      }
+    },
+    "required": [
+      "symbol"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-fundamentals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

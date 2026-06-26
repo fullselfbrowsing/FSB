@@ -1,0 +1,54 @@
+{
+  "slug": "pinterest.get_board_pins",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get board pins in pinterest",
+    "look up board pins in pinterest",
+    "fetch a single board pins in pinterest",
+    "view one specific board pins in pinterest",
+    "get pins from a board in pinterest"
+  ],
+  "description": "Get pins on a specific board. Requires the board ID and the board URL path (e.g., \"/username/board-name/\"). Supports pagination via bookmark cursor.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "string",
+        "description": "Board ID"
+      },
+      "board_url": {
+        "type": "string",
+        "description": "Board URL path (e.g., \"/username/board-name/\")"
+      },
+      "page_size": {
+        "description": "Number of pins per page (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "board_id",
+      "board_url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-board-pins.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

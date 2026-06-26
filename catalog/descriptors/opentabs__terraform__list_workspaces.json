@@ -1,0 +1,55 @@
+{
+  "slug": "terraform.list_workspaces",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "list workspaces in terraform",
+    "show me my workspaces in terraform",
+    "view my workspaces in terraform",
+    "see all my workspaces in terraform",
+    "list workspaces in an organization in terraform"
+  ],
+  "description": "List workspaces in an organization. Supports filtering by name search and pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "search": {
+        "description": "Search workspaces by name",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "organization"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/list-workspaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

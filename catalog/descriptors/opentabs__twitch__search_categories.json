@@ -1,0 +1,37 @@
+{
+  "slug": "twitch.search_categories",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "search categories in twitch",
+    "search for games and categories in twitch",
+    "search for games and categories on twitch by keyword in twitch"
+  ],
+  "description": "Search for games and categories on Twitch by keyword. Returns matching games with viewer counts and box art.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/search-categories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

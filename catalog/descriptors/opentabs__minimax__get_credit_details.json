@@ -1,0 +1,44 @@
+{
+  "slug": "minimax.get_credit_details",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get credit details in minimax",
+    "look up credit details in minimax",
+    "fetch a single credit details in minimax",
+    "view one specific credit details in minimax",
+    "list credit transaction history in minimax"
+  ],
+  "description": "List credit transaction records for the authenticated MiniMax Agent account. Shows credit earnings and spending history with pagination support.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Records per page (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-credit-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

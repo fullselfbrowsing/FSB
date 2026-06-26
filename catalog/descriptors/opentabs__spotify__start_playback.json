@@ -1,0 +1,57 @@
+{
+  "slug": "spotify.start_playback",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "start a playback in spotify",
+    "start playback in spotify",
+    "start or resume playback in spotify"
+  ],
+  "description": "Start or resume playback. Provide context_uri for an album, playlist, or artist, or uris for specific tracks.",
+  "actionVerb": "start",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "context_uri": {
+        "description": "Spotify URI of the context to play (album, playlist, or artist URI)",
+        "type": "string"
+      },
+      "uris": {
+        "description": "Array of Spotify track URIs to play",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "offset": {
+        "description": "Zero-based position of the track to start playback from within the context",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "position_ms": {
+        "description": "Position in milliseconds to seek to within the track",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "device_id": {
+        "description": "Device ID to start playback on",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/start-playback.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "start"
+    }
+  }
+}

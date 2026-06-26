@@ -1,0 +1,44 @@
+{
+  "slug": "fidelity.get_quotes",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get quotes in fidelity",
+    "look up quotes in fidelity",
+    "fetch a single quotes in fidelity",
+    "view one specific quotes in fidelity",
+    "get real-time stock quotes in fidelity"
+  ],
+  "description": "Get real-time stock/fund quotes for specified ticker symbols. Returns last price, daily change, and security type. Also includes current market status (open/closed/pre-market).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbols": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Ticker symbols to quote (e.g., [\"AAPL\", \"VOO\", \"QQQ\"])"
+      }
+    },
+    "required": [
+      "symbols"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-quotes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

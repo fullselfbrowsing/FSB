@@ -1,0 +1,45 @@
+{
+  "slug": "reddit.vote",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "vote in reddit",
+    "vote on a post or comment in reddit",
+    "upvote, downvote, or remove a vote on a post or comment in reddit"
+  ],
+  "description": "Upvote, downvote, or remove a vote on a post or comment",
+  "actionVerb": "vote",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Fullname of the thing to vote on (e.g., \"t3_abc123\" for post, \"t1_xyz\" for comment)"
+      },
+      "dir": {
+        "type": "integer",
+        "minimum": -1,
+        "maximum": 1,
+        "description": "Vote direction: 1 = upvote, -1 = downvote, 0 = remove vote"
+      }
+    },
+    "required": [
+      "id",
+      "dir"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/vote.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "vote"
+    }
+  }
+}

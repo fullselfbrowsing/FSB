@@ -1,0 +1,114 @@
+{
+  "slug": "gcal.update_event",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "update an event in gcal",
+    "edit an event in gcal",
+    "change the details of event in gcal",
+    "modify an event in gcal",
+    "update event in gcal",
+    "update an existing event in gcal"
+  ],
+  "description": "Update an existing event. Only the fields you provide will be changed; omitted fields remain unchanged. Uses PATCH semantics.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "description": "Calendar ID (default \"primary\")",
+        "type": "string"
+      },
+      "event_id": {
+        "type": "string",
+        "description": "Event ID to update"
+      },
+      "summary": {
+        "description": "New event title",
+        "type": "string"
+      },
+      "description": {
+        "description": "New event description",
+        "type": "string"
+      },
+      "location": {
+        "description": "New event location",
+        "type": "string"
+      },
+      "start_datetime": {
+        "description": "New start datetime in ISO 8601 format",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "New start date for all-day events in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "end_datetime": {
+        "description": "New end datetime in ISO 8601 format",
+        "type": "string"
+      },
+      "end_date": {
+        "description": "New end date (exclusive) for all-day events",
+        "type": "string"
+      },
+      "time_zone": {
+        "description": "IANA time zone for the event",
+        "type": "string"
+      },
+      "attendees": {
+        "description": "Replace all attendees with these email addresses",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "color_id": {
+        "description": "Color ID (1-11) for the event",
+        "type": "string"
+      },
+      "visibility": {
+        "description": "Event visibility",
+        "type": "string",
+        "enum": [
+          "default",
+          "public",
+          "private",
+          "confidential"
+        ]
+      },
+      "transparency": {
+        "description": "Whether the event blocks time",
+        "type": "string",
+        "enum": [
+          "opaque",
+          "transparent"
+        ]
+      },
+      "send_updates": {
+        "description": "Who to send notifications to (default \"none\")",
+        "type": "string",
+        "enum": [
+          "all",
+          "externalOnly",
+          "none"
+        ]
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/update-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

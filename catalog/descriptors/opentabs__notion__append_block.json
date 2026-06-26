@@ -1,0 +1,66 @@
+{
+  "slug": "notion.append_block",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "append a block in notion",
+    "append block in notion",
+    "append content to a page in notion"
+  ],
+  "description": "Append a content block (text, heading, list item, quote, code, etc.) to a page or block. Use this to add content to existing pages.",
+  "actionVerb": "append",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "parent_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page or block ID to append content to"
+      },
+      "type": {
+        "description": "Block type: text, header, sub_header, sub_sub_header, bulleted_list, numbered_list, to_do, toggle, quote, callout, divider, code (default: text)",
+        "type": "string",
+        "enum": [
+          "text",
+          "header",
+          "sub_header",
+          "sub_sub_header",
+          "bulleted_list",
+          "numbered_list",
+          "to_do",
+          "toggle",
+          "quote",
+          "callout",
+          "divider",
+          "code"
+        ]
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Text content of the block"
+      },
+      "after_id": {
+        "description": "Block ID to insert after. If omitted, appends at the end.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "parent_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/append-block.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "append"
+    }
+  }
+}

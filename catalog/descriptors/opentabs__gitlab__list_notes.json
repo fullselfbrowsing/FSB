@@ -1,0 +1,84 @@
+{
+  "slug": "gitlab.list_notes",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list notes in gitlab",
+    "show me my notes in gitlab",
+    "view my notes in gitlab",
+    "see all my notes in gitlab",
+    "list notes on an issue or merge request in gitlab"
+  ],
+  "description": "List notes (comments) on an issue or merge request. System notes (status changes, label updates) are included by default.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "noteable_type": {
+        "type": "string",
+        "enum": [
+          "issues",
+          "merge_requests"
+        ],
+        "description": "Type of the noteable: \"issues\" or \"merge_requests\""
+      },
+      "noteable_iid": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "IID of the issue or merge request"
+      },
+      "order_by": {
+        "description": "Sort field (default: created_at)",
+        "type": "string",
+        "enum": [
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project",
+      "noteable_type",
+      "noteable_iid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-notes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

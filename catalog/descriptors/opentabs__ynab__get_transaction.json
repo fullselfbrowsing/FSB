@@ -1,0 +1,41 @@
+{
+  "slug": "ynab.get_transaction",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "get a transaction in ynab",
+    "look up a transaction in ynab",
+    "fetch a single transaction in ynab",
+    "view one specific transaction in ynab",
+    "get transaction in ynab",
+    "get transaction details by id in ynab"
+  ],
+  "description": "Get details for a specific transaction by its ID. Returns full transaction data including any split subtransactions.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "transaction_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Transaction ID to retrieve"
+      }
+    },
+    "required": [
+      "transaction_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/get-transaction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

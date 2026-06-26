@@ -1,0 +1,45 @@
+{
+  "slug": "cockroachdb.delete_database_user",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "delete a database user in cockroachdb",
+    "remove a database user in cockroachdb",
+    "trash a database user in cockroachdb",
+    "permanently delete a database user in cockroachdb",
+    "delete database user in cockroachdb",
+    "delete a sql user from a cluster in cockroachdb"
+  ],
+  "description": "Delete a SQL database user from a CockroachDB cluster.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Username of the SQL user to delete"
+      }
+    },
+    "required": [
+      "cluster_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/delete-database-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

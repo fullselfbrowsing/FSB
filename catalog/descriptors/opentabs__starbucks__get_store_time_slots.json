@@ -1,0 +1,39 @@
+{
+  "slug": "starbucks.get_store_time_slots",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get store time slots in starbucks",
+    "look up store time slots in starbucks",
+    "fetch a single store time slots in starbucks",
+    "view one specific store time slots in starbucks",
+    "get available pickup time slots in starbucks"
+  ],
+  "description": "Get available pickup time slots for a specific Starbucks store. Use this to check when mobile orders can be picked up. Returns empty if the store does not support scheduled ordering or is closed.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_number": {
+        "type": "string",
+        "description": "Store number (e.g., \"53646-283069\")"
+      }
+    },
+    "required": [
+      "store_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-store-time-slots.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

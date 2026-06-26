@@ -1,0 +1,40 @@
+{
+  "slug": "asana.list_sections",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "list sections in asana",
+    "show me my sections in asana",
+    "view my sections in asana",
+    "see all my sections in asana",
+    "list sections in a project in asana"
+  ],
+  "description": "List all sections in a project. Sections are used to organize tasks into groups within a project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project GID to list sections from"
+      }
+    },
+    "required": [
+      "project_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/list-sections.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

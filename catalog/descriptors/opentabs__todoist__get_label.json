@@ -1,0 +1,40 @@
+{
+  "slug": "todoist.get_label",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "get a label in todoist",
+    "look up a label in todoist",
+    "fetch a single label in todoist",
+    "view one specific label in todoist",
+    "get label in todoist",
+    "get a label by id in todoist"
+  ],
+  "description": "Get a specific label by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "label_id": {
+        "type": "string",
+        "description": "The ID of the label to retrieve"
+      }
+    },
+    "required": [
+      "label_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/get-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

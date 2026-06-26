@@ -1,0 +1,43 @@
+{
+  "slug": "msword.rename_item",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "rename an item in msword",
+    "rename item in msword",
+    "rename a file or folder in msword"
+  ],
+  "description": "Rename a file or folder.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New name for the item"
+      }
+    },
+    "required": [
+      "item_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/rename-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "rename"
+    }
+  }
+}

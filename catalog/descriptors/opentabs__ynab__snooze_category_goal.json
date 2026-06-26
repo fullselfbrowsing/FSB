@@ -1,0 +1,48 @@
+{
+  "slug": "ynab.snooze_category_goal",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "snooze a category goal in ynab",
+    "snooze category goal in ynab",
+    "snooze a category goal for a month in ynab"
+  ],
+  "description": "Snooze a category goal for a specific month so it does not appear as needing funding for that month. Pass snooze=false to un-snooze.",
+  "actionVerb": "snooze",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Category ID whose goal to snooze"
+      },
+      "month": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
+        "description": "Month in YYYY-MM format (e.g. 2026-04)"
+      },
+      "snooze": {
+        "description": "true to snooze (default), false to un-snooze",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "category_id",
+      "month"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/snooze-category-goal.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "snooze"
+    }
+  }
+}

@@ -5,20 +5,17 @@
     "list deployments in vercel",
     "show me my deployments in vercel",
     "view my deployments in vercel",
-    "see all my deployments in vercel"
+    "see all my deployments in vercel",
+    "list vercel deployments in vercel"
   ],
-  "description": "List recent deployments for a Vercel project or team. Optionally filter by project, target, or state.",
+  "description": "List deployments for the current team/account, optionally filtered by project. Returns deployment URLs, states, Git metadata, and timestamps.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "project_id": {
-        "description": "Project ID or name to scope deployments to",
-        "type": "string"
-      },
-      "team_id": {
-        "description": "Team ID that owns the deployments",
+      "project": {
+        "description": "Filter by project name or ID",
         "type": "string"
       },
       "target": {
@@ -42,10 +39,12 @@
         ]
       },
       "limit": {
-        "description": "Maximum number of deployments to return",
-        "type": "integer",
-        "minimum": -9007199254740991,
-        "maximum": 9007199254740991
+        "description": "Maximum number of deployments to return (default 20, max 100)",
+        "type": "number"
+      },
+      "from": {
+        "description": "Pagination cursor — timestamp in ms to fetch deployments before",
+        "type": "string"
       }
     },
     "additionalProperties": false
@@ -57,8 +56,8 @@
     "sourcePath": "plugins/vercel/src/tools/list-deployments.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

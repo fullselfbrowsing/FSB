@@ -1,12 +1,12 @@
 {
   "slug": "walmart.search_products",
-  "service": "www.walmart.com",
+  "service": "walmart.com",
   "intentSynonyms": [
     "search products in walmart",
     "search for products on walmart in walmart",
-    "search the walmart catalog by keyword in walmart"
+    "search for products on walmart by keyword in walmart"
   ],
-  "description": "Search the Walmart catalog by keyword. Optionally filter by department/category and sort the results.",
+  "description": "Search for products on Walmart by keyword. Returns up to 40 products per page with prices, ratings, and availability. Supports pagination and sorting.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
@@ -14,28 +14,25 @@
     "properties": {
       "query": {
         "type": "string",
-        "minLength": 1,
-        "description": "Search keywords (product name, brand, or description)"
+        "description": "Search keywords"
       },
-      "category": {
-        "description": "Department or category to filter by",
-        "type": "string"
-      },
-      "sort": {
-        "description": "Result ordering",
-        "type": "string",
-        "enum": [
-          "relevance",
-          "price_low_to_high",
-          "price_high_to_low",
-          "best_seller"
-        ]
-      },
-      "limit": {
-        "description": "Maximum number of products to return",
+      "page": {
+        "description": "Page number (default 1)",
         "type": "integer",
         "minimum": 1,
-        "maximum": 50
+        "maximum": 9007199254740991
+      },
+      "sort": {
+        "description": "Sort order (default \"best_match\")",
+        "type": "string",
+        "enum": [
+          "best_match",
+          "price_low",
+          "price_high",
+          "best_seller",
+          "new",
+          "rating_high"
+        ]
       }
     },
     "required": [
@@ -50,8 +47,8 @@
     "sourcePath": "plugins/walmart/src/tools/search-products.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

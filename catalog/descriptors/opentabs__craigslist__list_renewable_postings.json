@@ -1,0 +1,31 @@
+{
+  "slug": "craigslist.list_renewable_postings",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "list renewable postings in craigslist",
+    "show me my renewable postings in craigslist",
+    "view my renewable postings in craigslist",
+    "see all my renewable postings in craigslist",
+    "list postings eligible for renewal in craigslist"
+  ],
+  "description": "List posting IDs that are eligible for renewal. Returns posting IDs and UUIDs that can be renewed using renew_all_postings.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/list-renewable-postings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

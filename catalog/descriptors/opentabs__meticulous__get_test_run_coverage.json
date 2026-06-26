@@ -1,0 +1,71 @@
+{
+  "slug": "meticulous.get_test_run_coverage",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get a test run coverage in meticulous",
+    "look up a test run coverage in meticulous",
+    "fetch a single test run coverage in meticulous",
+    "view one specific test run coverage in meticulous",
+    "get test run coverage in meticulous"
+  ],
+  "description": "Get screenshot coverage data for a test run. Shows which routes have diffs, which were compared without diffs, and which were not compared. Use category filter to limit output size (defaults to with_diffs only). Use route_filter to search for specific routes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "pr_mode": {
+        "default": true,
+        "description": "Whether to use PR mode for coverage calculation",
+        "type": "boolean"
+      },
+      "replay_id": {
+        "description": "Optional replay ID to scope coverage to",
+        "type": "string"
+      },
+      "category": {
+        "default": "with_diffs",
+        "description": "Coverage category to return (defaults to with_diffs to limit response size)",
+        "type": "string",
+        "enum": [
+          "with_diffs",
+          "without_diffs",
+          "not_compared",
+          "all"
+        ]
+      },
+      "route_filter": {
+        "description": "Filter routes by substring match on route URL or group",
+        "type": "string"
+      },
+      "limit": {
+        "default": 50,
+        "description": "Max routes to return per category",
+        "type": "number"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "pr_mode",
+      "category",
+      "limit"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-test-run-coverage.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

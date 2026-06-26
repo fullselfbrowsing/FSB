@@ -1,0 +1,39 @@
+{
+  "slug": "netflix.play_title",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "play a title in netflix",
+    "play title in netflix",
+    "start playing a title in netflix"
+  ],
+  "description": "Start playing a Netflix movie or TV show in the browser. Navigates directly to the Netflix player for the given video ID. For TV shows, pass the specific episode video ID to play that episode.",
+  "actionVerb": "play",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID to play (movie or episode)"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/play-title.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "play"
+    }
+  }
+}

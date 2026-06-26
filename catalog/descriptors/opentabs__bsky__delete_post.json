@@ -6,10 +6,9 @@
     "remove a post in bsky",
     "trash a post in bsky",
     "permanently delete a post in bsky",
-    "delete post in bsky",
-    "delete a bluesky post permanently in bsky"
+    "delete post in bsky"
   ],
-  "description": "Permanently delete one of your Bluesky posts by its AT-URI. This action cannot be undone.",
+  "description": "Delete a post by its AT URI. Only the post author can delete their own posts. The rkey is extracted from the URI.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {
@@ -17,8 +16,7 @@
     "properties": {
       "uri": {
         "type": "string",
-        "minLength": 1,
-        "description": "AT-URI of the post to delete"
+        "description": "AT URI of the post to delete"
       }
     },
     "required": [
@@ -33,8 +31,8 @@
     "sourcePath": "plugins/bluesky/src/tools/delete-post.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "apivoid",
-      "httpMethod": "DELETE",
+      "transportHelper": "api",
+      "httpMethod": "POST",
       "opNameVerb": "delete"
     }
   }

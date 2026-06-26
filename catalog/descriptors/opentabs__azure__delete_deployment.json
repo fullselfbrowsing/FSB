@@ -1,0 +1,49 @@
+{
+  "slug": "azure.delete_deployment",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "delete a deployment in azure",
+    "remove a deployment in azure",
+    "trash a deployment in azure",
+    "permanently delete a deployment in azure",
+    "delete deployment in azure"
+  ],
+  "description": "Delete a template deployment from a resource group. This removes the deployment history — it does not delete the deployed resources.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      },
+      "deployment_name": {
+        "type": "string",
+        "description": "Deployment name to delete"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name",
+      "deployment_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/delete-deployment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

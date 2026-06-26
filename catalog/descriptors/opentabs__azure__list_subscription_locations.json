@@ -1,0 +1,39 @@
+{
+  "slug": "azure.list_subscription_locations",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list subscription locations in azure",
+    "show me my subscription locations in azure",
+    "view my subscription locations in azure",
+    "see all my subscription locations in azure",
+    "list available locations for a subscription in azure"
+  ],
+  "description": "List all available locations/regions for a specific subscription. These are the regions where resources can be deployed within the subscription.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-subscription-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

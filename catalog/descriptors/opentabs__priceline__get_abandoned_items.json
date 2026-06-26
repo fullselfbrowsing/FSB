@@ -1,0 +1,31 @@
+{
+  "slug": "priceline.get_abandoned_items",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get abandoned items in priceline",
+    "look up abandoned items in priceline",
+    "fetch a single abandoned items in priceline",
+    "view one specific abandoned items in priceline",
+    "get your abandoned cart items in priceline"
+  ],
+  "description": "Get items the user previously viewed or added to cart but did not complete booking. Useful for resuming interrupted booking flows.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-abandoned-items.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

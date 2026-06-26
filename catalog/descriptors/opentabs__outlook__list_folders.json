@@ -1,0 +1,40 @@
+{
+  "slug": "outlook.list_folders",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "list folders in outlook",
+    "show me my folders in outlook",
+    "view my folders in outlook",
+    "see all my folders in outlook",
+    "list mail folders in outlook"
+  ],
+  "description": "List mail folders in the mailbox. Returns folder names, IDs, and unread/total counts. Use folder IDs with list_messages to read specific folders.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "parent_folder_id": {
+        "description": "Parent folder ID to list child folders. Omit for top-level folders.",
+        "type": "string"
+      },
+      "include_hidden": {
+        "description": "Include hidden folders (default: false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/list-folders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

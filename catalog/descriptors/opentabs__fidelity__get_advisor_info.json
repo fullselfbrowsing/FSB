@@ -1,0 +1,32 @@
+{
+  "slug": "fidelity.get_advisor_info",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get an advisor info in fidelity",
+    "look up an advisor info in fidelity",
+    "fetch a single advisor info in fidelity",
+    "view one specific advisor info in fidelity",
+    "get advisor info in fidelity",
+    "view your advisor assignment in fidelity"
+  ],
+  "description": "Get information about your assigned financial advisor and service model at Fidelity.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-advisor-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

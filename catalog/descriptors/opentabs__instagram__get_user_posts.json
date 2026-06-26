@@ -1,0 +1,49 @@
+{
+  "slug": "instagram.get_user_posts",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get user posts in instagram",
+    "look up user posts in instagram",
+    "fetch a single user posts in instagram",
+    "view one specific user posts in instagram",
+    "get posts from a user in instagram"
+  ],
+  "description": "Get recent posts by a user. Requires the user numeric ID (use get_user_profile to find it from a username). Supports cursor-based pagination via max_id.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User numeric ID (pk)"
+      },
+      "count": {
+        "description": "Number of posts to return (default 12, max 33)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 33
+      },
+      "max_id": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-user-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

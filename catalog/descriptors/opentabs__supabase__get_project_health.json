@@ -1,0 +1,41 @@
+{
+  "slug": "supabase.get_project_health",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get a project health in supabase",
+    "look up a project health in supabase",
+    "fetch a single project health in supabase",
+    "view one specific project health in supabase",
+    "get project health in supabase",
+    "check project service health in supabase"
+  ],
+  "description": "Get the health status of all services in a Supabase project (database, auth, realtime, storage, etc.).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-project-health.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "cockroachdb.get_resource_count",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "get a resource count in cockroachdb",
+    "look up a resource count in cockroachdb",
+    "fetch a single resource count in cockroachdb",
+    "view one specific resource count in cockroachdb",
+    "get resource count in cockroachdb",
+    "get cluster and folder counts in cockroachdb"
+  ],
+  "description": "Get a count of clusters and folders in the organization, broken down by serverless vs dedicated and authorized vs total.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/get-resource-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

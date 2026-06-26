@@ -1,0 +1,41 @@
+{
+  "slug": "redfin.get_property_details",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "get property details in redfin",
+    "look up property details in redfin",
+    "fetch a single property details in redfin",
+    "view one specific property details in redfin",
+    "get full details for a property in redfin"
+  ],
+  "description": "Get detailed information about a specific property by its Redfin property ID. Returns address, price, beds/baths, Redfin Estimate, status, and photo count. Use search_properties to find property IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Redfin property ID"
+      }
+    },
+    "required": [
+      "property_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/get-property-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

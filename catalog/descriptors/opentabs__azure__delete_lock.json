@@ -1,0 +1,50 @@
+{
+  "slug": "azure.delete_lock",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "delete a lock in azure",
+    "remove a lock in azure",
+    "trash a lock in azure",
+    "permanently delete a lock in azure",
+    "delete lock in azure",
+    "delete a management lock in azure"
+  ],
+  "description": "Delete a management lock from a resource group. This allows the previously locked operations to proceed.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      },
+      "lock_name": {
+        "type": "string",
+        "description": "Lock name to delete"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name",
+      "lock_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/delete-lock.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

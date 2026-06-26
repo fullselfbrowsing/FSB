@@ -1,0 +1,37 @@
+{
+  "slug": "terraform.unlock_workspace",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "unlock a workspace in terraform",
+    "unlock workspace in terraform",
+    "unlock a workspace to allow new runs in terraform"
+  ],
+  "description": "Unlock a workspace to allow new runs.",
+  "actionVerb": "unlock",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/unlock-workspace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unlock"
+    }
+  }
+}

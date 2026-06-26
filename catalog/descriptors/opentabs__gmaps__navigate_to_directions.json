@@ -1,0 +1,52 @@
+{
+  "slug": "gmaps.navigate_to_directions",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "navigate to directions in gmaps",
+    "open directions between two points in gmaps",
+    "open google maps directions between an origin and destination in gmaps"
+  ],
+  "description": "Open Google Maps directions between an origin and destination. Shows the route on the map with step-by-step navigation instructions, distance, and estimated travel time. Supports driving, transit, walking, and bicycling modes.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "origin": {
+        "type": "string",
+        "description": "Starting point — address, place name, or \"lat,lng\" coordinates (e.g., \"San Francisco\", \"37.7749,-122.4194\")"
+      },
+      "destination": {
+        "type": "string",
+        "description": "End point — address, place name, or \"lat,lng\" coordinates"
+      },
+      "travel_mode": {
+        "description": "Travel mode (default \"driving\")",
+        "type": "string",
+        "enum": [
+          "driving",
+          "transit",
+          "walking",
+          "bicycling"
+        ]
+      }
+    },
+    "required": [
+      "origin",
+      "destination"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/navigate-to-directions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

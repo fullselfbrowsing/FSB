@@ -6,9 +6,9 @@
     "show me my records in airtable",
     "view my records in airtable",
     "see all my records in airtable",
-    "list records in a table in airtable"
+    "list all records in a table in airtable"
   ],
-  "description": "List records from an Airtable table. Optionally filter, sort, and page through results.",
+  "description": "List all records (rows) in a table. Returns record IDs, creation times, and cell values keyed by field ID. Use get_base_schema first to learn the field IDs and their types.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -16,42 +16,16 @@
     "properties": {
       "base_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Base ID containing the table"
+        "description": "Base ID (app prefix)"
       },
-      "table_id_or_name": {
+      "table_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Table ID or name to list records from"
-      },
-      "view": {
-        "description": "View ID or name to use for filtering/sorting",
-        "type": "string"
-      },
-      "filter_by_formula": {
-        "description": "Airtable formula to filter records",
-        "type": "string"
-      },
-      "max_records": {
-        "description": "Maximum number of records to return",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 9007199254740991
-      },
-      "page_size": {
-        "description": "Number of records per page",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 100
-      },
-      "offset": {
-        "description": "Pagination offset token from a prior response",
-        "type": "string"
+        "description": "Table ID (tbl prefix)"
       }
     },
     "required": [
       "base_id",
-      "table_id_or_name"
+      "table_id"
     ],
     "additionalProperties": false
   },
@@ -62,7 +36,7 @@
     "sourcePath": "plugins/airtable/src/tools/list-records.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": "apiget",
       "httpMethod": "GET",
       "opNameVerb": "list"
     }

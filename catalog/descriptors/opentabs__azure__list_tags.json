@@ -1,0 +1,39 @@
+{
+  "slug": "azure.list_tags",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list tags in azure",
+    "show me my tags in azure",
+    "view my tags in azure",
+    "see all my tags in azure",
+    "list all tags in a subscription in azure"
+  ],
+  "description": "List all tag names and values used in a subscription. Shows how many resources use each tag name and value combination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "gdrive.create_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "create a file in gdrive",
+    "add a file in gdrive",
+    "make a new file in gdrive",
+    "open a new file in gdrive",
+    "create file in gdrive",
+    "create a new file in google drive in gdrive"
+  ],
+  "description": "Create a new empty file in Google Drive. For Google Workspace types, use: \"application/vnd.google-apps.document\" (Docs), \"application/vnd.google-apps.spreadsheet\" (Sheets), \"application/vnd.google-apps.presentation\" (Slides). For regular files, use standard MIME types like \"text/plain\". Specify parent_id to create inside a folder, otherwise it goes to My Drive root.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "File name"
+      },
+      "mime_type": {
+        "description": "MIME type. Defaults to \"application/vnd.google-apps.document\" (Google Doc). Use \"application/vnd.google-apps.spreadsheet\" for Sheets, \"application/vnd.google-apps.presentation\" for Slides, \"text/plain\" for text files.",
+        "type": "string"
+      },
+      "parent_id": {
+        "description": "Parent folder ID. Defaults to My Drive root.",
+        "type": "string"
+      },
+      "description": {
+        "description": "File description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/create-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

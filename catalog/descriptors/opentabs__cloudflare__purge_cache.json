@@ -4,9 +4,9 @@
   "intentSynonyms": [
     "purge a cache in cloudflare",
     "purge cache in cloudflare",
-    "purge the zone cache in cloudflare"
+    "purge zone cache in cloudflare"
   ],
-  "description": "Purge cached content for a Cloudflare zone. Purge everything, or selectively purge by URL, host, tag, or prefix. This evicts cache entries and cannot be undone.",
+  "description": "Purge cached content for a zone. Can purge everything, specific URLs, or by tags/prefixes/hosts. Use purge_everything=true to clear all cached files.",
   "actionVerb": "purge",
   "sideEffectClass": "destructive",
   "params": {
@@ -14,36 +14,35 @@
     "properties": {
       "zone_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Cloudflare zone ID whose cache to purge"
+        "description": "Zone ID (32-char hex string)"
       },
       "purge_everything": {
-        "description": "Purge the entire cache for the zone",
+        "description": "Purge all cached files (default false)",
         "type": "boolean"
       },
       "files": {
-        "description": "Specific URLs to purge from cache",
+        "description": "Array of URLs to purge (max 30)",
         "type": "array",
         "items": {
           "type": "string"
         }
       },
       "tags": {
-        "description": "Cache-Tags to purge",
+        "description": "Array of cache tags to purge (Enterprise only)",
         "type": "array",
         "items": {
           "type": "string"
         }
       },
       "hosts": {
-        "description": "Hostnames to purge",
+        "description": "Array of hostnames to purge (Enterprise only)",
         "type": "array",
         "items": {
           "type": "string"
         }
       },
       "prefixes": {
-        "description": "URL prefixes to purge",
+        "description": "Array of URL prefixes to purge (Enterprise only)",
         "type": "array",
         "items": {
           "type": "string"
@@ -62,7 +61,7 @@
     "sourcePath": "plugins/cloudflare/src/tools/purge-cache.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "apivoid",
+      "transportHelper": null,
       "httpMethod": "POST",
       "opNameVerb": "purge"
     }

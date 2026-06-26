@@ -6,27 +6,19 @@
     "show me my projects in sentry",
     "view my projects in sentry",
     "see all my projects in sentry",
-    "list projects in the organization in sentry"
+    "list all projects in the organization in sentry"
   ],
-  "description": "List the projects for a Sentry organization.",
+  "description": "List all projects for the current Sentry organization. Returns project name, slug, platform, and access status. Use the project slug for filtering issues or retrieving events.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "organization_slug": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Sentry organization slug"
-      },
       "cursor": {
-        "description": "Pagination cursor for the next page",
+        "description": "Pagination cursor from a previous response",
         "type": "string"
       }
     },
-    "required": [
-      "organization_slug"
-    ],
     "additionalProperties": false
   },
   "backing": "dom",
@@ -36,8 +28,8 @@
     "sourcePath": "plugins/sentry/src/tools/list-projects.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

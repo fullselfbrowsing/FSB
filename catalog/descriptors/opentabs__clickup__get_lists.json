@@ -1,0 +1,44 @@
+{
+  "slug": "clickup.get_lists",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get lists in clickup",
+    "look up lists in clickup",
+    "fetch a single lists in clickup",
+    "view one specific lists in clickup",
+    "list lists in a folder in clickup"
+  ],
+  "description": "List all lists in a ClickUp folder. Lists contain tasks and are the primary work containers. By default excludes archived lists.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Folder ID to list lists for"
+      },
+      "include_archived": {
+        "description": "Whether to include archived lists (default: false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-lists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

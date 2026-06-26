@@ -1,0 +1,41 @@
+{
+  "slug": "twitch.get_game",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get a game in twitch",
+    "look up a game in twitch",
+    "fetch a single game in twitch",
+    "view one specific game in twitch",
+    "get game in twitch",
+    "get game/category details in twitch"
+  ],
+  "description": "Get details about a specific game/category on Twitch by name or ID. Returns viewer count, broadcaster count, and box art URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Game name (e.g., \"Just Chatting\", \"Fortnite\")",
+        "type": "string"
+      },
+      "id": {
+        "description": "Game ID (alternative to name)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-game.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

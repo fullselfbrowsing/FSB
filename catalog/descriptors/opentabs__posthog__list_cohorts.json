@@ -1,0 +1,43 @@
+{
+  "slug": "posthog.list_cohorts",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "list cohorts in posthog",
+    "show me my cohorts in posthog",
+    "view my cohorts in posthog",
+    "see all my cohorts in posthog"
+  ],
+  "description": "List cohorts in the current PostHog project. Cohorts are groups of persons defined by shared properties or behaviors.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Results per page (default 100, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/list-cohorts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

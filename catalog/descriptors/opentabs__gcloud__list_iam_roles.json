@@ -1,0 +1,46 @@
+{
+  "slug": "gcloud.list_iam_roles",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list iam roles in gcloud",
+    "show me my iam roles in gcloud",
+    "view my iam roles in gcloud",
+    "see all my iam roles in gcloud",
+    "list custom iam roles in gcloud"
+  ],
+  "description": "List custom IAM roles defined in the project. Use \"roles\" as a prefix to list predefined roles.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Max results per page (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 300
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-iam-roles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

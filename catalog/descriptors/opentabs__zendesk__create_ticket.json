@@ -1,0 +1,90 @@
+{
+  "slug": "zendesk.create_ticket",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "create a ticket in zendesk",
+    "add a ticket in zendesk",
+    "make a new ticket in zendesk",
+    "open a new ticket in zendesk",
+    "create ticket in zendesk",
+    "create a new support ticket in zendesk"
+  ],
+  "description": "Create a new support ticket in Zendesk. Requires a subject and initial comment body. Optionally set priority, type, tags, assignee, group, and requester. Returns the newly created ticket with its assigned ID.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subject": {
+        "type": "string",
+        "description": "The subject/title of the ticket"
+      },
+      "body": {
+        "type": "string",
+        "description": "The initial comment body (ticket description)"
+      },
+      "priority": {
+        "description": "Priority level of the ticket",
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ]
+      },
+      "type": {
+        "description": "Type of the ticket",
+        "type": "string",
+        "enum": [
+          "problem",
+          "incident",
+          "question",
+          "task"
+        ]
+      },
+      "tags": {
+        "description": "Tags to apply to the ticket",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "assignee_id": {
+        "description": "User ID to assign the ticket to",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "group_id": {
+        "description": "Group ID to assign the ticket to",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "requester_id": {
+        "description": "User ID of the requester (ticket submitter)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "subject",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/create-ticket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

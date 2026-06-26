@@ -1,0 +1,32 @@
+{
+  "slug": "booking.get_genius_status",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "get a genius status in booking",
+    "look up a genius status in booking",
+    "fetch a single genius status in booking",
+    "view one specific genius status in booking",
+    "get genius status in booking",
+    "get genius loyalty program details in booking"
+  ],
+  "description": "Get the current user's Booking.com Genius loyalty program status including level, completed bookings, and active benefits.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/get-genius-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

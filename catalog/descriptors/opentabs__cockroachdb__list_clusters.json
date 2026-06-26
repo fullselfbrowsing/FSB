@@ -1,0 +1,31 @@
+{
+  "slug": "cockroachdb.list_clusters",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "list clusters in cockroachdb",
+    "show me my clusters in cockroachdb",
+    "view my clusters in cockroachdb",
+    "see all my clusters in cockroachdb",
+    "list all clusters in the organization in cockroachdb"
+  ],
+  "description": "List all CockroachDB clusters in the organization. Returns cluster name, state, version, cloud provider, regions, and connection endpoints.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/list-clusters.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

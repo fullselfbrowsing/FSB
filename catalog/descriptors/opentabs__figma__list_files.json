@@ -1,0 +1,40 @@
+{
+  "slug": "figma.list_files",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "list files in figma",
+    "show me my files in figma",
+    "view my files in figma",
+    "see all my files in figma",
+    "list files in a folder or project in figma"
+  ],
+  "description": "List files in a Figma folder or project. Use the folder_id from team roles or project info.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Folder/project ID to list files from"
+      }
+    },
+    "required": [
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/list-files.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

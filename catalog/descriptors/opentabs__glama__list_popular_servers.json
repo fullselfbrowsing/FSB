@@ -1,0 +1,41 @@
+{
+  "slug": "glama.list_popular_servers",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "list popular servers in glama",
+    "show me my popular servers in glama",
+    "view my popular servers in glama",
+    "see all my popular servers in glama",
+    "list popular mcp servers from the directory in glama"
+  ],
+  "description": "List popular or trending MCP servers from the Glama directory. Defaults to sorting by popularity. Returns server summaries and directory statistics.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sort": {
+        "description": "Sort order for the listing",
+        "type": "string",
+        "enum": [
+          "popularity:desc",
+          "recently-added:desc",
+          "name:asc"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/list-popular-servers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

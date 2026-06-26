@@ -1,0 +1,40 @@
+{
+  "slug": "pinterest.get_user_profile",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get an user profile in pinterest",
+    "look up an user profile in pinterest",
+    "fetch a single user profile in pinterest",
+    "view one specific user profile in pinterest",
+    "get user profile in pinterest",
+    "get a user profile by username in pinterest"
+  ],
+  "description": "Get a Pinterest user profile by username. Returns display name, follower/following counts, pin count, board count, and profile image.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Pinterest username (e.g., \"pinterest\")"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

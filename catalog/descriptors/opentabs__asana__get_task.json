@@ -7,9 +7,9 @@
     "fetch a single task in asana",
     "view one specific task in asana",
     "get task in asana",
-    "get a single task in asana"
+    "get details of a specific task in asana"
   ],
-  "description": "Get a single task from Asana by its GID.",
+  "description": "Get detailed information about a specific task by its GID.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -18,7 +18,11 @@
       "task_gid": {
         "type": "string",
         "minLength": 1,
-        "description": "Task GID to fetch"
+        "description": "Task GID to retrieve"
+      },
+      "opt_fields": {
+        "description": "Comma-separated list of fields to return (defaults to standard task fields)",
+        "type": "string"
       }
     },
     "required": [

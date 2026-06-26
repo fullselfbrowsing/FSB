@@ -1,0 +1,32 @@
+{
+  "slug": "zillow.get_current_user",
+  "service": "zillow.com",
+  "intentSynonyms": [
+    "get a current user in zillow",
+    "look up a current user in zillow",
+    "fetch a single current user in zillow",
+    "view one specific current user in zillow",
+    "get current user in zillow",
+    "get the current zillow user profile in zillow"
+  ],
+  "description": "Get the currently authenticated Zillow user profile including email, name, saved homes count, and agent status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

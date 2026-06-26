@@ -1,0 +1,45 @@
+{
+  "slug": "youtube.create_comment",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "create a comment in youtube",
+    "add a comment in youtube",
+    "make a new comment in youtube",
+    "open a new comment in youtube",
+    "create comment in youtube",
+    "post a comment on a video in youtube"
+  ],
+  "description": "Post a comment on a YouTube video. The comment is posted as the authenticated user.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID to comment on"
+      },
+      "text": {
+        "type": "string",
+        "description": "Comment text"
+      }
+    },
+    "required": [
+      "video_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "create"
+    }
+  }
+}

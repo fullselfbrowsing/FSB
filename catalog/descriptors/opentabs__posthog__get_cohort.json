@@ -1,0 +1,42 @@
+{
+  "slug": "posthog.get_cohort",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "get a cohort in posthog",
+    "look up a cohort in posthog",
+    "fetch a single cohort in posthog",
+    "view one specific cohort in posthog",
+    "get cohort in posthog",
+    "get cohort details in posthog"
+  ],
+  "description": "Get detailed information about a specific cohort including its person count and calculation status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cohort_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Cohort ID"
+      }
+    },
+    "required": [
+      "cohort_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-cohort.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

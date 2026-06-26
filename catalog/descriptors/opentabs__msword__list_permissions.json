@@ -1,0 +1,39 @@
+{
+  "slug": "msword.list_permissions",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "list permissions in msword",
+    "show me my permissions in msword",
+    "view my permissions in msword",
+    "see all my permissions in msword",
+    "list sharing permissions in msword"
+  ],
+  "description": "List sharing permissions on a file or folder.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/list-permissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

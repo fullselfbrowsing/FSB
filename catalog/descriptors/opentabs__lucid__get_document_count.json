@@ -1,0 +1,42 @@
+{
+  "slug": "lucid.get_document_count",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "get a document count in lucid",
+    "look up a document count in lucid",
+    "fetch a single document count in lucid",
+    "view one specific document count in lucid",
+    "get document count in lucid",
+    "count your documents in lucid"
+  ],
+  "description": "Get the total number of documents the current user has for a given product type.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product": {
+        "description": "Product type to count (default: chart)",
+        "type": "string",
+        "enum": [
+          "chart",
+          "press",
+          "spark"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/get-document-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

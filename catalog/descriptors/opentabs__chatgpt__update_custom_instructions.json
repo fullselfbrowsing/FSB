@@ -1,0 +1,48 @@
+{
+  "slug": "chatgpt.update_custom_instructions",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "update custom instructions in chatgpt",
+    "edit custom instructions in chatgpt",
+    "change the details of custom instructions in chatgpt",
+    "modify custom instructions in chatgpt",
+    "update your custom instructions in chatgpt"
+  ],
+  "description": "Update ChatGPT custom instructions. Set what ChatGPT should know about you and how it should respond. Pass empty strings to clear instructions.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "about_user": {
+        "type": "string",
+        "description": "What you want ChatGPT to know about you"
+      },
+      "about_model": {
+        "type": "string",
+        "description": "How you want ChatGPT to respond"
+      },
+      "enabled": {
+        "description": "Whether to enable custom instructions (default true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "about_user",
+      "about_model"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/update-custom-instructions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

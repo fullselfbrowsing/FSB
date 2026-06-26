@@ -1,0 +1,39 @@
+{
+  "slug": "cloudflare.list_ssl_certificates",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list ssl certificates in cloudflare",
+    "show me my ssl certificates in cloudflare",
+    "view my ssl certificates in cloudflare",
+    "see all my ssl certificates in cloudflare",
+    "list ssl certificate packs in cloudflare"
+  ],
+  "description": "List SSL/TLS certificate packs for a zone. Returns certificate type (universal, advanced, custom), status, hostnames covered, and validity dates.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-ssl-certificates.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

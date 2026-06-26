@@ -1,0 +1,52 @@
+{
+  "slug": "spotify.get_playlist",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get a playlist in spotify",
+    "look up a playlist in spotify",
+    "fetch a single playlist in spotify",
+    "view one specific playlist in spotify",
+    "get playlist in spotify",
+    "get playlist details with tracks in spotify"
+  ],
+  "description": "Get detailed information about a Spotify playlist including tracks, owner, and description. Provide the playlist Spotify URI (e.g., spotify:playlist:37i9dQZF1DXcBWIGoYBM5M). Tracks are included in the response.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "description": "Spotify playlist URI (e.g., \"spotify:playlist:37i9dQZF1DXcBWIGoYBM5M\")"
+      },
+      "offset": {
+        "description": "Track offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "limit": {
+        "description": "Maximum tracks to return (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

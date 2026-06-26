@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.delete_dashboard",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "delete a dashboard in datadog",
+    "remove a dashboard in datadog",
+    "trash a dashboard in datadog",
+    "permanently delete a dashboard in datadog",
+    "delete dashboard in datadog",
+    "delete a dashboard by id in datadog"
+  ],
+  "description": "Permanently delete a Datadog dashboard. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "dashboard_id": {
+        "type": "string",
+        "description": "Dashboard ID to delete (e.g., \"abc-def-ghi\")"
+      }
+    },
+    "required": [
+      "dashboard_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/delete-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apidelete",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

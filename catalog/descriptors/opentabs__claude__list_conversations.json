@@ -6,27 +6,14 @@
     "show me my conversations in claude",
     "view my conversations in claude",
     "see all my conversations in claude",
-    "show me my claude conversations in claude"
+    "list all conversations in claude"
   ],
-  "description": "List your recent Claude conversations. Optionally page through with an offset and limit.",
+  "description": "List all chat conversations in the current Claude organization. Returns conversation metadata including name, model, timestamps, and starred status.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
-    "properties": {
-      "offset": {
-        "description": "Number of conversations to skip",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 9007199254740991
-      },
-      "limit": {
-        "description": "Maximum number of conversations to return",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 100
-      }
-    },
+    "properties": {},
     "additionalProperties": false
   },
   "backing": "dom",
@@ -36,8 +23,8 @@
     "sourcePath": "plugins/claude/src/tools/list-conversations.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

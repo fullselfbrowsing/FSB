@@ -1,0 +1,37 @@
+{
+  "slug": "priceline.search_locations",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "search locations in priceline",
+    "search destinations by keyword in priceline",
+    "search for cities, hotels, airports, neighborhoods, and points of interest by keyword in priceline"
+  ],
+  "description": "Search for cities, hotels, airports, neighborhoods, and points of interest by keyword. Returns location IDs needed for hotel search. Use this to find a city ID before searching for hotels.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "description": "Search keyword (city name, hotel name, airport, POI)"
+      }
+    },
+    "required": [
+      "keyword"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/search-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

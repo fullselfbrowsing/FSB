@@ -1,0 +1,50 @@
+{
+  "slug": "temporal.list_workflows",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "list workflows in temporal",
+    "show me my workflows in temporal",
+    "view my workflows in temporal",
+    "see all my workflows in temporal",
+    "list workflow executions with optional filtering in temporal"
+  ],
+  "description": "List workflow executions in a namespace. Supports Temporal visibility query syntax for filtering (e.g., WorkflowType=\"MyWorkflow\", ExecutionStatus=\"Running\"). Defaults to the namespace in the current browser tab if not specified.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      },
+      "query": {
+        "description": "Temporal visibility query filter (e.g., WorkflowType=\"MyWorkflow\" AND ExecutionStatus=\"Running\")",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Results per page (default 100, max 200)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "next_page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/list-workflows.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

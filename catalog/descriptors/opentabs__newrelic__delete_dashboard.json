@@ -1,0 +1,40 @@
+{
+  "slug": "newrelic.delete_dashboard",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "delete a dashboard in newrelic",
+    "remove a dashboard in newrelic",
+    "trash a dashboard in newrelic",
+    "permanently delete a dashboard in newrelic",
+    "delete dashboard in newrelic"
+  ],
+  "description": "Permanently delete a dashboard by its GUID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dashboard entity GUID to delete"
+      }
+    },
+    "required": [
+      "guid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/delete-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

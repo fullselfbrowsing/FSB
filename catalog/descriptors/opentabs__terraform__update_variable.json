@@ -1,0 +1,60 @@
+{
+  "slug": "terraform.update_variable",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "update a variable in terraform",
+    "edit a variable in terraform",
+    "change the details of variable in terraform",
+    "modify a variable in terraform",
+    "update variable in terraform",
+    "update a workspace variable in terraform"
+  ],
+  "description": "Update a workspace variable. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "variable_id": {
+        "type": "string",
+        "description": "Variable ID (e.g., \"var-...\")"
+      },
+      "key": {
+        "description": "New variable key name",
+        "type": "string"
+      },
+      "value": {
+        "description": "New variable value",
+        "type": "string"
+      },
+      "description": {
+        "description": "New variable description",
+        "type": "string"
+      },
+      "hcl": {
+        "description": "Whether the value is HCL",
+        "type": "boolean"
+      },
+      "sensitive": {
+        "description": "Whether the variable is sensitive",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "variable_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/update-variable.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

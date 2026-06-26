@@ -1,0 +1,40 @@
+{
+  "slug": "excel.get_used_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "get an used range in excel",
+    "look up an used range in excel",
+    "fetch a single used range in excel",
+    "view one specific used range in excel",
+    "get used range in excel",
+    "get the used range of a worksheet in excel"
+  ],
+  "description": "Get the smallest range that encompasses all cells with data or formatting in a worksheet. Useful for discovering the extent of data in a sheet without knowing the exact range.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      }
+    },
+    "required": [
+      "worksheet"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/get-used-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

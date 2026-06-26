@@ -1,42 +1,34 @@
 {
   "slug": "datadog.list_monitors",
-  "service": "app.datadoghq.com",
+  "service": "datadoghq.com",
   "intentSynonyms": [
     "list monitors in datadog",
     "show me my monitors in datadog",
     "view my monitors in datadog",
     "see all my monitors in datadog",
-    "list monitors in the account in datadog"
+    "list datadog monitors with optional tag filters in datadog"
   ],
-  "description": "List the monitors in your Datadog account. Optionally filter by name, tags, or monitor tags.",
+  "description": "List monitors in the Datadog organization. Supports filtering by tags and pagination. Returns monitor details including name, type, query, state, and tags.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "name": {
-        "description": "Filter monitors by name substring",
+      "tags": {
+        "description": "Comma-separated tags to filter monitors (e.g., \"env:prod,team:backend\")",
         "type": "string"
       },
-      "tags": {
-        "description": "Filter by monitor scope tags",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "monitor_tags": {
-        "description": "Filter by monitor (management) tags",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
       "page": {
-        "description": "Page number for pagination (0-indexed)",
+        "description": "Page number for pagination (default 0)",
         "type": "integer",
-        "minimum": -9007199254740991,
+        "minimum": 0,
         "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Monitors per page (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
       }
     },
     "additionalProperties": false
@@ -48,7 +40,7 @@
     "sourcePath": "plugins/datadog/src/tools/list-monitors.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": "apiget",
       "httpMethod": "GET",
       "opNameVerb": "list"
     }

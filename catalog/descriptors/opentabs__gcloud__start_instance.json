@@ -1,0 +1,46 @@
+{
+  "slug": "gcloud.start_instance",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "start an instance in gcloud",
+    "start instance in gcloud",
+    "start a stopped vm instance in gcloud"
+  ],
+  "description": "Start a stopped Compute Engine VM instance. The instance must be in TERMINATED or STOPPED state.",
+  "actionVerb": "start",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone": {
+        "type": "string",
+        "description": "Zone (e.g., \"us-central1-a\")"
+      },
+      "instance_name": {
+        "type": "string",
+        "description": "Instance name"
+      },
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "zone",
+      "instance_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/start-instance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "start"
+    }
+  }
+}

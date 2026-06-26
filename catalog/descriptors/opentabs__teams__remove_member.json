@@ -1,0 +1,44 @@
+{
+  "slug": "teams.remove_member",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "remove a member in teams",
+    "remove member in teams",
+    "remove a user from a group chat in teams"
+  ],
+  "description": "Remove a user from a Teams group chat. Requires admin privileges in the chat.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation/thread ID"
+      },
+      "user": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User MRI to remove (e.g., \"8:live:username\")"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "user"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/remove-member.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "remove"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "netlify.get_deploy",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "get a deploy in netlify",
+    "look up a deploy in netlify",
+    "fetch a single deploy in netlify",
+    "view one specific deploy in netlify",
+    "get deploy in netlify",
+    "get deploy details by id in netlify"
+  ],
+  "description": "Get detailed information about a specific Netlify deploy by its ID. Returns state, URLs, branch, commit, context, framework, error message, and lock status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "deploy_id": {
+        "type": "string",
+        "description": "The deploy ID to retrieve"
+      }
+    },
+    "required": [
+      "deploy_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/get-deploy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

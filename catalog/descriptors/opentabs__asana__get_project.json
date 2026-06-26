@@ -1,0 +1,41 @@
+{
+  "slug": "asana.get_project",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get a project in asana",
+    "look up a project in asana",
+    "fetch a single project in asana",
+    "view one specific project in asana",
+    "get project in asana",
+    "get details of a specific project in asana"
+  ],
+  "description": "Get detailed information about a specific project by its GID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project GID to retrieve"
+      }
+    },
+    "required": [
+      "project_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

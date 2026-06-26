@@ -1,0 +1,50 @@
+{
+  "slug": "cockroachdb.create_database_user",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "create a database user in cockroachdb",
+    "add a database user in cockroachdb",
+    "make a new database user in cockroachdb",
+    "open a new database user in cockroachdb",
+    "create database user in cockroachdb",
+    "create a sql user in a cluster in cockroachdb"
+  ],
+  "description": "Create a new SQL database user in a CockroachDB cluster with the specified password.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      },
+      "name": {
+        "type": "string",
+        "description": "Username for the new SQL user"
+      },
+      "password": {
+        "type": "string",
+        "description": "Password for the new SQL user"
+      }
+    },
+    "required": [
+      "cluster_id",
+      "name",
+      "password"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/create-database-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "notion.update_page",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "update a page in notion",
+    "edit a page in notion",
+    "change the details of page in notion",
+    "modify a page in notion",
+    "update page in notion",
+    "update a page's title, icon, or cover in notion"
+  ],
+  "description": "Update a page title, icon, or cover image in Notion",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID (UUID) to update"
+      },
+      "title": {
+        "description": "New page title",
+        "type": "string"
+      },
+      "icon": {
+        "description": "New page icon (emoji character, e.g., \"📝\")",
+        "type": "string"
+      },
+      "cover": {
+        "description": "New page cover image path",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/update-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

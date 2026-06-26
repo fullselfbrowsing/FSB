@@ -1,0 +1,39 @@
+{
+  "slug": "linear.delete_comment",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "delete a comment in linear",
+    "remove a comment in linear",
+    "trash a comment in linear",
+    "permanently delete a comment in linear",
+    "delete comment in linear"
+  ],
+  "description": "Delete a comment from a Linear issue.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "description": "Comment UUID to delete"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/delete-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

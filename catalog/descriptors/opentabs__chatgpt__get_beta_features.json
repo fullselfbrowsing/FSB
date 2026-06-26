@@ -1,0 +1,31 @@
+{
+  "slug": "chatgpt.get_beta_features",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get beta features in chatgpt",
+    "look up beta features in chatgpt",
+    "fetch a single beta features in chatgpt",
+    "view one specific beta features in chatgpt",
+    "get beta feature flags in chatgpt"
+  ],
+  "description": "Get the status of all ChatGPT beta features and settings. Returns a map of feature names to their enabled/disabled status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-beta-features.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

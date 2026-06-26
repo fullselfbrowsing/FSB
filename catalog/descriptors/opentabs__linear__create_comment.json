@@ -7,27 +7,25 @@
     "make a new comment in linear",
     "open a new comment in linear",
     "create comment in linear",
-    "comment on an issue in linear"
+    "add a comment to an issue in linear"
   ],
-  "description": "Add a comment to a Linear issue. Requires the issue ID and the comment body.",
+  "description": "Add a comment to an existing Linear issue.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
-      "issueId": {
+      "issue_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Issue ID to comment on"
+        "description": "Issue UUID to comment on"
       },
       "body": {
         "type": "string",
-        "minLength": 1,
         "description": "Comment body in markdown"
       }
     },
     "required": [
-      "issueId",
+      "issue_id",
       "body"
     ],
     "additionalProperties": false

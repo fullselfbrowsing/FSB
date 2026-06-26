@@ -1,0 +1,39 @@
+{
+  "slug": "coinbase.get_asset_networks",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "get asset networks in coinbase",
+    "look up asset networks in coinbase",
+    "fetch a single asset networks in coinbase",
+    "view one specific asset networks in coinbase",
+    "get supported networks for an asset in coinbase"
+  ],
+  "description": "Get the blockchain networks that support a cryptocurrency asset, including network name, EVM chain ID, and token contract address. Useful for identifying which chains an asset can be sent/received on.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uuid": {
+        "type": "string",
+        "description": "Asset UUID"
+      }
+    },
+    "required": [
+      "uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/get-asset-networks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

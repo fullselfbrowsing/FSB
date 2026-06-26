@@ -1,0 +1,49 @@
+{
+  "slug": "tiktok.search_videos",
+  "service": "tiktok.com",
+  "intentSynonyms": [
+    "search videos in tiktok",
+    "search for videos by keyword in tiktok",
+    "search for tiktok videos by keyword in tiktok"
+  ],
+  "description": "Search for TikTok videos by keyword. Returns videos matching the query with engagement stats. Results include video description, author, play count, likes, comments, shares, and music info. Use offset and cursor for pagination.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text (e.g., \"funny cats\", \"cooking tips\")"
+      },
+      "count": {
+        "description": "Number of results to return (default 12, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "offset": {
+        "description": "Pagination offset from a previous response cursor (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tiktok/src/tools/search-videos.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

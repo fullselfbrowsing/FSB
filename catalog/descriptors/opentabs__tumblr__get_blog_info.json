@@ -1,0 +1,40 @@
+{
+  "slug": "tumblr.get_blog_info",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get a blog info in tumblr",
+    "look up a blog info in tumblr",
+    "fetch a single blog info in tumblr",
+    "view one specific blog info in tumblr",
+    "get blog info in tumblr",
+    "get blog details in tumblr"
+  ],
+  "description": "Get information about a Tumblr blog including title, description, post count, and avatar.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or identifier (e.g., \"staff\" or \"staff.tumblr.com\")"
+      }
+    },
+    "required": [
+      "blog_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-blog-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

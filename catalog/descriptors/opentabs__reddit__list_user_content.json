@@ -1,0 +1,92 @@
+{
+  "slug": "reddit.list_user_content",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "list an user content in reddit",
+    "show me my user content in reddit",
+    "view my user content in reddit",
+    "see all my user content in reddit",
+    "list user content in reddit",
+    "list a user's posts, comments, or saved items in reddit"
+  ],
+  "description": "Browse a user's posts, comments, or saved items. Use \"submitted\" for posts, \"comments\" for comments, \"saved\" for saved items (own profile only), \"upvoted\"/\"downvoted\" for voted items (own profile only), or \"overview\" for both posts and comments.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Reddit username (without u/ prefix)"
+      },
+      "where": {
+        "type": "string",
+        "enum": [
+          "overview",
+          "submitted",
+          "comments",
+          "saved",
+          "upvoted",
+          "downvoted",
+          "hidden",
+          "gilded"
+        ],
+        "description": "Content type to list"
+      },
+      "sort": {
+        "description": "Sort order (default \"new\")",
+        "type": "string",
+        "enum": [
+          "hot",
+          "new",
+          "top",
+          "controversial"
+        ]
+      },
+      "t": {
+        "description": "Time period for \"top\" and \"controversial\" sort",
+        "type": "string",
+        "enum": [
+          "hour",
+          "day",
+          "week",
+          "month",
+          "year",
+          "all"
+        ]
+      },
+      "limit": {
+        "description": "Number of results (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "after": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      },
+      "include_body": {
+        "description": "Whether to include post/comment body text (selftext/body). Defaults to false — titles, link_ids, and metadata only. Set true when you need to read item contents.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "username",
+      "where"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/list-user-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

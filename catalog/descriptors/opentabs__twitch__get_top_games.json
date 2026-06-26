@@ -1,0 +1,38 @@
+{
+  "slug": "twitch.get_top_games",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get top games in twitch",
+    "look up top games in twitch",
+    "fetch a single top games in twitch",
+    "view one specific top games in twitch",
+    "get top games and categories by viewer count in twitch"
+  ],
+  "description": "Get the top games/categories on Twitch sorted by viewer count. Returns game name, total viewers, number of broadcasters, and box art URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "first": {
+        "description": "Number of games to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-top-games.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

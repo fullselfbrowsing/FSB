@@ -1,0 +1,51 @@
+{
+  "slug": "tumblr.get_blocks",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get blocks in tumblr",
+    "look up blocks in tumblr",
+    "fetch a single blocks in tumblr",
+    "view one specific blocks in tumblr",
+    "list blocked blogs in tumblr"
+  ],
+  "description": "Get the list of blogs blocked by a Tumblr blog.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or identifier (e.g., \"staff\" or \"staff.tumblr.com\")"
+      },
+      "limit": {
+        "description": "Number of blocked blogs to return (1-20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "offset": {
+        "description": "Offset for pagination",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "blog_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-blocks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

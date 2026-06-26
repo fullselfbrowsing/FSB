@@ -1,0 +1,39 @@
+{
+  "slug": "leetcode.get_user_submit_stats",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get user submit stats in leetcode",
+    "look up user submit stats in leetcode",
+    "fetch a single user submit stats in leetcode",
+    "view one specific user submit stats in leetcode",
+    "get submission stats by difficulty in leetcode"
+  ],
+  "description": "Get detailed submission statistics for a user including total submissions, accepted count, and acceptance rate broken down by difficulty.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-user-submit-stats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

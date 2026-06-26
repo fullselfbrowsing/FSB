@@ -6,9 +6,9 @@
     "show me my channels in discord",
     "view my channels in discord",
     "see all my channels in discord",
-    "show me the channels in my discord server in discord"
+    "list channels in a server in discord"
   ],
-  "description": "List the text channels in a Discord server (guild) you are a member of.",
+  "description": "List all channels in a Discord guild (server)",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -17,7 +17,7 @@
       "guild_id": {
         "type": "string",
         "minLength": 1,
-        "description": "The Discord server (guild) ID to list channels for"
+        "description": "Guild (server) ID to list channels for"
       }
     },
     "required": [
@@ -32,8 +32,8 @@
     "sourcePath": "plugins/discord/src/tools/list-channels.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

@@ -7,22 +7,21 @@
     "fetch a single issue in linear",
     "view one specific issue in linear",
     "get issue in linear",
-    "get a single issue in linear"
+    "get details of a single issue in linear"
   ],
-  "description": "Get a single issue from Linear by its ID or identifier.",
+  "description": "Get detailed information about a single Linear issue by its UUID or human-readable identifier (e.g. ENG-123).",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "issueId": {
+      "issue_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Issue ID or identifier (e.g. ENG-123) to fetch"
+        "description": "Issue UUID or human-readable identifier (e.g. \"ENG-123\")"
       }
     },
     "required": [
-      "issueId"
+      "issue_id"
     ],
     "additionalProperties": false
   },

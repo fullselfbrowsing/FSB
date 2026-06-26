@@ -1,0 +1,44 @@
+{
+  "slug": "telegram.list_conversations",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "list conversations in telegram",
+    "show me my conversations in telegram",
+    "view my conversations in telegram",
+    "see all my conversations in telegram",
+    "list recent chats and conversations in telegram"
+  ],
+  "description": "List recent Telegram conversations (dialogs) sorted by most recent activity. Returns chats, groups, channels, and bots. Use folder_id 0 for the main chat list, 1 for archived chats.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of conversations to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "folder_id": {
+        "description": "Folder/filter ID — 0 for main list (default), 1 for archive",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

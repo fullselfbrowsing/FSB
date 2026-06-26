@@ -1,0 +1,31 @@
+{
+  "slug": "bestbuy.get_customer_plans",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get customer plans in bestbuy",
+    "look up customer plans in bestbuy",
+    "fetch a single customer plans in bestbuy",
+    "view one specific customer plans in bestbuy",
+    "get active plans and subscriptions in bestbuy"
+  ],
+  "description": "Get active plans and subscriptions for the current Best Buy account. Returns Geek Squad protection plans, Best Buy membership plans, and any other active service plans.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-customer-plans.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

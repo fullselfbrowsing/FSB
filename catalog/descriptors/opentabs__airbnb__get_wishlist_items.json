@@ -1,0 +1,44 @@
+{
+  "slug": "airbnb.get_wishlist_items",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get wishlist items in airbnb",
+    "look up wishlist items in airbnb",
+    "fetch a single wishlist items in airbnb",
+    "view one specific wishlist items in airbnb",
+    "get wishlists containing specific listings in airbnb"
+  ],
+  "description": "Get the wishlists that contain specific listings. Returns which wishlists each listing belongs to.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "listing_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Array of listing IDs to check"
+      }
+    },
+    "required": [
+      "listing_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-wishlist-items.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

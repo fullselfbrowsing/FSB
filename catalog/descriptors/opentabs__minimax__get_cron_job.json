@@ -1,0 +1,40 @@
+{
+  "slug": "minimax.get_cron_job",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get a cron job in minimax",
+    "look up a cron job in minimax",
+    "fetch a single cron job in minimax",
+    "view one specific cron job in minimax",
+    "get cron job in minimax",
+    "get scheduled job details in minimax"
+  ],
+  "description": "Get detailed information about a specific scheduled (cron) job by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Cron job ID"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-cron-job.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

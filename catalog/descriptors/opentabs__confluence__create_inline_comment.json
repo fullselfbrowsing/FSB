@@ -1,0 +1,67 @@
+{
+  "slug": "confluence.create_inline_comment",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "create an inline comment in confluence",
+    "add an inline comment in confluence",
+    "make a new inline comment in confluence",
+    "open a new inline comment in confluence",
+    "create inline comment in confluence",
+    "create an inline comment on page text in confluence"
+  ],
+  "description": "Create an inline comment on specific text in a Confluence page. The comment is anchored to the selected text and appears as a margin note. Provide the exact text to anchor to, the total number of matches of that text on the page, and which match (0-based index) to anchor to.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to create the inline comment on"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment body in storage format (HTML) — e.g., \"<p>This needs clarification</p>\""
+      },
+      "text_selection": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The exact text in the page to anchor the comment to"
+      },
+      "text_selection_match_count": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Total number of times the selected text appears on the page"
+      },
+      "text_selection_match_index": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Which occurrence of the text to anchor to (0-based index)"
+      }
+    },
+    "required": [
+      "page_id",
+      "body",
+      "text_selection",
+      "text_selection_match_count",
+      "text_selection_match_index"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/create-inline-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

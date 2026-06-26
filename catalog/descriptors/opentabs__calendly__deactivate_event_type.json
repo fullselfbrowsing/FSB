@@ -1,0 +1,39 @@
+{
+  "slug": "calendly.deactivate_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "deactivate an event type in calendly",
+    "deactivate event type in calendly",
+    "deactivate an event type so it is no longer available for booking in calendly"
+  ],
+  "description": "Deactivate an event type so it is no longer available for booking. The event type is preserved and can be reactivated later. Existing scheduled events are not affected.",
+  "actionVerb": "deactivate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Event type numeric ID to deactivate"
+      }
+    },
+    "required": [
+      "event_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/deactivate-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "deactivate"
+    }
+  }
+}

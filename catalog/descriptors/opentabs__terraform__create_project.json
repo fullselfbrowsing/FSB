@@ -1,0 +1,49 @@
+{
+  "slug": "terraform.create_project",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "create a project in terraform",
+    "add a project in terraform",
+    "make a new project in terraform",
+    "open a new project in terraform",
+    "create project in terraform",
+    "create a new project in terraform"
+  ],
+  "description": "Create a new project in an organization.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "name": {
+        "type": "string",
+        "description": "Project name"
+      },
+      "description": {
+        "description": "Project description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "organization",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/create-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

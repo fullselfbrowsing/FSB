@@ -1,0 +1,40 @@
+{
+  "slug": "msword.get_file_content",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "get a file content in msword",
+    "look up a file content in msword",
+    "fetch a single file content in msword",
+    "view one specific file content in msword",
+    "get file content in msword",
+    "read text content of a file in msword"
+  ],
+  "description": "Read text content of a file by its ID. Works with text-based files (.txt, .md, .csv, .html, .json, .xml, .yaml, .log, etc.). For Word documents (.docx), use get_document_text instead.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/get-file-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

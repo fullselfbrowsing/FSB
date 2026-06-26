@@ -1,0 +1,41 @@
+{
+  "slug": "fidelity.get_contribution_data",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get a contribution data in fidelity",
+    "look up a contribution data in fidelity",
+    "fetch a single contribution data in fidelity",
+    "view one specific contribution data in fidelity",
+    "get contribution data in fidelity",
+    "view ira/hsa contribution limits and ytd in fidelity"
+  ],
+  "description": "Get IRA and HSA contribution limits, year-to-date contributions, and catch-up eligibility for retirement accounts. Shows both current and prior year data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_number": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Account number for the retirement account"
+      }
+    },
+    "required": [
+      "account_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-contribution-data.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

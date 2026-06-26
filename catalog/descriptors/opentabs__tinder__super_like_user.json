@@ -1,0 +1,37 @@
+{
+  "slug": "tinder.super_like_user",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "super a like user in tinder",
+    "super like user in tinder",
+    "super like a user in tinder"
+  ],
+  "description": "Super Like a user (swipe up). Limited availability — check remaining super likes in get_metadata. Returns whether the super like resulted in a match.",
+  "actionVerb": "super",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID to super like"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/super-like-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "super"
+    }
+  }
+}

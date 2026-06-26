@@ -1,0 +1,41 @@
+{
+  "slug": "twilio.get_phone_number",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get a phone number in twilio",
+    "look up a phone number in twilio",
+    "fetch a single phone number in twilio",
+    "view one specific phone number in twilio",
+    "get phone number in twilio",
+    "get phone number details by sid in twilio"
+  ],
+  "description": "Get detailed information about a specific incoming phone number by its SID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Phone number SID (PNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-phone-number.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

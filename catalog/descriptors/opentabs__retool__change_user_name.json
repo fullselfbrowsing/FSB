@@ -1,0 +1,42 @@
+{
+  "slug": "retool.change_user_name",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "change an user name in retool",
+    "change user name in retool",
+    "change the current user name in retool"
+  ],
+  "description": "Update the first and last name of the currently authenticated user.",
+  "actionVerb": "change",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "first_name": {
+        "type": "string",
+        "description": "New first name"
+      },
+      "last_name": {
+        "type": "string",
+        "description": "New last name"
+      }
+    },
+    "required": [
+      "first_name",
+      "last_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/change-user-name.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "change"
+    }
+  }
+}

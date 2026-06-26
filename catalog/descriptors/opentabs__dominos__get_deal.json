@@ -1,0 +1,50 @@
+{
+  "slug": "dominos.get_deal",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get a deal in dominos",
+    "look up a deal in dominos",
+    "fetch a single deal in dominos",
+    "view one specific deal in dominos",
+    "get deal in dominos",
+    "get details for a specific deal/coupon in dominos"
+  ],
+  "description": "Get details for a specific deal or coupon by its code. Requires a store ID and cart ID to check deal availability.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "deal_code": {
+        "type": "string",
+        "description": "Deal/coupon code"
+      },
+      "store_id": {
+        "type": "string",
+        "description": "Store ID"
+      },
+      "cart_id": {
+        "type": "string",
+        "description": "Cart ID"
+      }
+    },
+    "required": [
+      "deal_code",
+      "store_id",
+      "cart_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-deal.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

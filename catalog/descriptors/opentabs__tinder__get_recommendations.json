@@ -1,0 +1,31 @@
+{
+  "slug": "tinder.get_recommendations",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "get recommendations in tinder",
+    "look up recommendations in tinder",
+    "fetch a single recommendations in tinder",
+    "view one specific recommendations in tinder",
+    "get profiles to swipe on in tinder"
+  ],
+  "description": "Get recommended profiles for swiping. Returns user profiles with photos, bio, distance. Use the returned content_hash and s_number when calling like_user or pass_user. Returns up to ~10 profiles per batch.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/get-recommendations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

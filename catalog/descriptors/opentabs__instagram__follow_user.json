@@ -1,0 +1,37 @@
+{
+  "slug": "instagram.follow_user",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "follow an user in instagram",
+    "follow user in instagram",
+    "follow a user in instagram"
+  ],
+  "description": "Follow an Instagram user. If the account is private, sends a follow request. Returns the updated friendship status.",
+  "actionVerb": "follow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User numeric ID (pk)"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/follow-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "follow"
+    }
+  }
+}

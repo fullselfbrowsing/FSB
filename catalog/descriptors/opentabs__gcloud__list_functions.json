@@ -1,0 +1,46 @@
+{
+  "slug": "gcloud.list_functions",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list functions in gcloud",
+    "show me my functions in gcloud",
+    "view my functions in gcloud",
+    "see all my functions in gcloud",
+    "list cloud functions in gcloud"
+  ],
+  "description": "List Cloud Functions in the project across all locations.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Max results per page (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-functions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

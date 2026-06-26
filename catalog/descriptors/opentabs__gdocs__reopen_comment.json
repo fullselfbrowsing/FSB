@@ -1,0 +1,44 @@
+{
+  "slug": "gdocs.reopen_comment",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "reopen a comment in gdocs",
+    "uncomplete a comment in gdocs",
+    "restore a completed a comment in gdocs",
+    "mark not done a comment in gdocs",
+    "reopen comment in gdocs",
+    "reopen a resolved comment thread in gdocs"
+  ],
+  "description": "Reopen a previously resolved comment thread. In the Drive API, reopening is done by creating a reply with action \"reopen\".",
+  "actionVerb": "reopen",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "comment_id": {
+        "type": "string",
+        "description": "Comment thread ID to reopen (from list_comments)"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/reopen-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "reopen"
+    }
+  }
+}

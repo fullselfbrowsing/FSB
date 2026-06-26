@@ -1,0 +1,39 @@
+{
+  "slug": "walmart.get_product_reviews",
+  "service": "walmart.com",
+  "intentSynonyms": [
+    "get product reviews in walmart",
+    "look up product reviews in walmart",
+    "fetch a single product reviews in walmart",
+    "view one specific product reviews in walmart",
+    "get product reviews by item id in walmart"
+  ],
+  "description": "Get customer reviews for a Walmart product. Returns review summary and individual reviews with ratings and text.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "us_item_id": {
+        "type": "string",
+        "description": "Walmart US item ID"
+      }
+    },
+    "required": [
+      "us_item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/walmart/src/tools/get-product-reviews.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

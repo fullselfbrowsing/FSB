@@ -1,0 +1,39 @@
+{
+  "slug": "gdrive.list_permissions",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "list permissions in gdrive",
+    "show me my permissions in gdrive",
+    "view my permissions in gdrive",
+    "see all my permissions in gdrive",
+    "list sharing permissions on a file in gdrive"
+  ],
+  "description": "List all sharing permissions on a file or folder. Returns who has access and their role (owner, writer, commenter, reader).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/list-permissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

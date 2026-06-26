@@ -1,0 +1,69 @@
+{
+  "slug": "stackoverflow.get_question_comments",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get question comments in stackoverflow",
+    "look up question comments in stackoverflow",
+    "fetch a single question comments in stackoverflow",
+    "view one specific question comments in stackoverflow",
+    "get comments on a question in stackoverflow"
+  ],
+  "description": "Get comments on a specific Stack Overflow question. Returns comment body, score, and author information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "question_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Question ID"
+      },
+      "sort": {
+        "description": "Sort order (default: creation)",
+        "type": "string",
+        "enum": [
+          "creation",
+          "votes"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "question_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-question-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

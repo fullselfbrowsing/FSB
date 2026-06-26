@@ -1,0 +1,41 @@
+{
+  "slug": "spotify.add_to_queue",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "add a to queue in spotify",
+    "add to queue in spotify",
+    "add a track or episode to the playback queue in spotify"
+  ],
+  "description": "Add a track or episode to the end of the playback queue. Requires the Spotify URI of the item (e.g., \"spotify:track:4iV5W9uYEdYUVa79Axb7Rh\").",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "description": "Spotify URI of the track or episode to add (e.g., \"spotify:track:4iV5W9uYEdYUVa79Axb7Rh\")"
+      },
+      "device_id": {
+        "description": "Device ID to target. If omitted, targets the active device.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/add-to-queue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

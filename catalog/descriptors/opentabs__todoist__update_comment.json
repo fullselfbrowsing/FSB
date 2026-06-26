@@ -1,0 +1,44 @@
+{
+  "slug": "todoist.update_comment",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "update a comment in todoist",
+    "edit a comment in todoist",
+    "change the details of comment in todoist",
+    "modify a comment in todoist",
+    "update comment in todoist"
+  ],
+  "description": "Update the content of an existing comment.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "description": "The ID of the comment to update"
+      },
+      "content": {
+        "type": "string",
+        "description": "New comment content in markdown"
+      }
+    },
+    "required": [
+      "comment_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/update-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

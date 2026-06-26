@@ -1,0 +1,44 @@
+{
+  "slug": "x.get_tweet_replies",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get tweet replies in x",
+    "look up tweet replies in x",
+    "fetch a single tweet replies in x",
+    "view one specific tweet replies in x",
+    "get replies to a tweet in x"
+  ],
+  "description": "Get the reply thread for a tweet. Returns the original tweet and its replies.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID to get replies for"
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-tweet-replies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "tiktok.get_for_you_feed",
+  "service": "tiktok.com",
+  "intentSynonyms": [
+    "get a for you feed in tiktok",
+    "look up a for you feed in tiktok",
+    "fetch a single for you feed in tiktok",
+    "view one specific for you feed in tiktok",
+    "get for you feed in tiktok",
+    "get personalized for you video feed in tiktok"
+  ],
+  "description": "Get the personalized \"For You\" feed of recommended TikTok videos. Returns trending and personalized video content based on the user's interests and activity.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of videos to return (default 10, max 30)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tiktok/src/tools/get-for-you-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

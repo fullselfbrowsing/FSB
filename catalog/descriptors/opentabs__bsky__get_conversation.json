@@ -1,0 +1,40 @@
+{
+  "slug": "bsky.get_conversation",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get a conversation in bsky",
+    "look up a conversation in bsky",
+    "fetch a single conversation in bsky",
+    "view one specific conversation in bsky",
+    "get conversation in bsky",
+    "get conversation details in bsky"
+  ],
+  "description": "Get details about a specific conversation by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "convo_id": {
+        "type": "string",
+        "description": "Conversation ID"
+      }
+    },
+    "required": [
+      "convo_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

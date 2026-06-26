@@ -1,0 +1,32 @@
+{
+  "slug": "stripe.get_balance",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "get a balance in stripe",
+    "look up a balance in stripe",
+    "fetch a single balance in stripe",
+    "view one specific balance in stripe",
+    "get balance in stripe",
+    "get account balance in stripe"
+  ],
+  "description": "Get the current balance of your Stripe account, broken down by currency. Shows available and pending balances.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/get-balance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

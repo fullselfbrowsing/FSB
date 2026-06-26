@@ -1,0 +1,52 @@
+{
+  "slug": "linear.create_label",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create a label in linear",
+    "add a label in linear",
+    "make a new label in linear",
+    "open a new label in linear",
+    "create label in linear",
+    "create a new label in linear"
+  ],
+  "description": "Create a new issue label in Linear.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Label name"
+      },
+      "color": {
+        "description": "Label color as hex code (e.g. \"#ff0000\")",
+        "type": "string"
+      },
+      "description": {
+        "description": "Label description",
+        "type": "string"
+      },
+      "team_id": {
+        "description": "Team UUID to scope the label to a specific team",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

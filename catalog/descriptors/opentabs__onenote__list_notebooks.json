@@ -1,0 +1,42 @@
+{
+  "slug": "onenote.list_notebooks",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "list notebooks in onenote",
+    "show me my notebooks in onenote",
+    "view my notebooks in onenote",
+    "see all my notebooks in onenote",
+    "list all onenote notebooks in onenote"
+  ],
+  "description": "List all OneNote notebooks for the current user. Returns notebook names, IDs, creation dates, and sharing status. Results are sorted by last modified date (newest first).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "order_by": {
+        "description": "OData $orderby expression (default \"lastModifiedDateTime desc\"). Examples: \"displayName\", \"createdDateTime desc\"",
+        "type": "string"
+      },
+      "top": {
+        "description": "Maximum number of notebooks to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/list-notebooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

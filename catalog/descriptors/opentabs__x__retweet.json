@@ -1,0 +1,38 @@
+{
+  "slug": "x.retweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "retweet in x",
+    "retweet a tweet in x",
+    "retweet (repost) a tweet in x"
+  ],
+  "description": "Retweet (repost) a tweet.",
+  "actionVerb": "retweet",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID to retweet"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/retweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "retweet"
+    }
+  }
+}

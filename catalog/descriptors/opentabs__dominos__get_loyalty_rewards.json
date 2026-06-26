@@ -1,0 +1,40 @@
+{
+  "slug": "dominos.get_loyalty_rewards",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get loyalty rewards in dominos",
+    "look up loyalty rewards in dominos",
+    "fetch a single loyalty rewards in dominos",
+    "view one specific loyalty rewards in dominos",
+    "check available loyalty rewards in dominos"
+  ],
+  "description": "Get the count of available loyalty rewards the customer can redeem. Optionally scoped to a specific store and cart.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_id": {
+        "description": "Store ID to check reward availability for",
+        "type": "string"
+      },
+      "cart_id": {
+        "description": "Cart ID to check reward availability for",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-loyalty-rewards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

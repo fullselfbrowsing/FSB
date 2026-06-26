@@ -1,0 +1,62 @@
+{
+  "slug": "minimax.add_mcp_server",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "add a mcp server in minimax",
+    "add mcp server in minimax",
+    "add an mcp server in minimax"
+  ],
+  "description": "Add a new MCP server to the MiniMax Agent workspace. Provide a name, URL or command, and optional environment variables or arguments.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Server name"
+      },
+      "url": {
+        "type": "string",
+        "description": "Server URL or command"
+      },
+      "env": {
+        "description": "Environment variables as key-value pairs",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "args": {
+        "description": "Arguments as key-value pairs",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "name",
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/add-mcp-server.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

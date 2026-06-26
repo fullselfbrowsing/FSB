@@ -1,0 +1,40 @@
+{
+  "slug": "ytmusic.get_album",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "get an album in ytmusic",
+    "look up an album in ytmusic",
+    "fetch a single album in ytmusic",
+    "view one specific album in ytmusic",
+    "get album in ytmusic",
+    "get album details and track listing in ytmusic"
+  ],
+  "description": "Get album details and track listing",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "browse_id": {
+        "type": "string",
+        "description": "Album browse ID (e.g., \"MPREb_...\")"
+      }
+    },
+    "required": [
+      "browse_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/get-album.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

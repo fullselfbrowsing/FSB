@@ -1,0 +1,40 @@
+{
+  "slug": "circleci.get_pipeline_config",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get a pipeline config in circleci",
+    "look up a pipeline config in circleci",
+    "fetch a single pipeline config in circleci",
+    "view one specific pipeline config in circleci",
+    "get pipeline config in circleci",
+    "get pipeline configuration in circleci"
+  ],
+  "description": "Get the compiled YAML configuration for a pipeline. Returns the source and compiled config.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pipeline_id": {
+        "type": "string",
+        "description": "Pipeline UUID"
+      }
+    },
+    "required": [
+      "pipeline_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-pipeline-config.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "dominos.get_product",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get a product in dominos",
+    "look up a product in dominos",
+    "fetch a single product in dominos",
+    "view one specific product in dominos",
+    "get product in dominos",
+    "get details for a specific menu item in dominos"
+  ],
+  "description": "Get detailed product builder information for a specific menu item. Returns name, description, available sizes, and quantity limits. Requires a store_id.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_code": {
+        "type": "string",
+        "description": "Product code/SKU (e.g., \"S_PIZSC\")"
+      },
+      "store_id": {
+        "type": "string",
+        "description": "Store ID for store-specific details"
+      }
+    },
+    "required": [
+      "product_code",
+      "store_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

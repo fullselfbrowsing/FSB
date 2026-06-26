@@ -1,0 +1,44 @@
+{
+  "slug": "discord.unpin_message",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "unpin a message in discord",
+    "unpin message in discord",
+    "unpin a message from a channel in discord"
+  ],
+  "description": "Unpin a message from a channel. Requires Manage Messages permission.",
+  "actionVerb": "unpin",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message ID to unpin"
+      }
+    },
+    "required": [
+      "channel",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/unpin-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "unpin"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "youtube.get_video_comments",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get video comments in youtube",
+    "look up video comments in youtube",
+    "fetch a single video comments in youtube",
+    "view one specific video comments in youtube",
+    "get comments on a video in youtube"
+  ],
+  "description": "Get comments on a YouTube video. Returns the top-level comments with author, text, likes, and reply count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-video-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

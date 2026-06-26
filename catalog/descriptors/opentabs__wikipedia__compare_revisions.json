@@ -1,0 +1,46 @@
+{
+  "slug": "wikipedia.compare_revisions",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "compare revisions in wikipedia",
+    "compare two article revisions in wikipedia",
+    "compare two revisions of a wikipedia article to see what changed in wikipedia"
+  ],
+  "description": "Compare two revisions of a Wikipedia article to see what changed. Returns a text diff showing additions and deletions. Provide two revision IDs from get_revisions.",
+  "actionVerb": "compare",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "from_rev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Source revision ID (older)"
+      },
+      "to_rev": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Target revision ID (newer)"
+      }
+    },
+    "required": [
+      "from_rev",
+      "to_rev"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/compare-revisions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "compare"
+    }
+  }
+}

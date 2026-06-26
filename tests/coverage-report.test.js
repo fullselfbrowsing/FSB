@@ -209,8 +209,16 @@ function parseManifestVendoredStems(md) {
   // services) must therefore exceed the count of vendored apps. Report the count.
   check(report.realAppCount >= vendoredStems.length,
     'realAppCount (' + report.realAppCount + ' distinct services) covers at least the manifest VENDORED+IMPORTED apps (' + vendoredStems.length + ') -- complete coverage, reported vs ~' + report.milestoneTarget);
-  check(report.realAppCount > 50,
-    'realAppCount (' + report.realAppCount + ') reflects the full real-app corpus (52 opentabs services + the 3 heads + the hand-authored recipe origin -- the complete vendored OpenTabs surface)');
+  // 39.5-04 (the full-source import): RAISED the floor from > 50 to >= 110 to reflect
+  // the FULL ~117-real-app corpus. The real import emits ~2,374 descriptors across the
+  // 117 real apps; reportCoverage yields realAppCount ~146 distinct services (the per-op
+  // apex/www host split the real plugins vendor produces MORE distinct service hosts than
+  // the 117 app count -- e.g. reddit.com + www.reddit.com, doordash.com + www.doordash.com).
+  // The floor is set with deliberate margin (>= 110, actual ~146) so the exact count is
+  // NOT brittle to a single app's host form, while still proving the full corpus landed
+  // (the old > 50 floor would silently pass a half-imported catalog).
+  check(report.realAppCount >= 110,
+    'realAppCount (' + report.realAppCount + ') reflects the FULL real-app corpus (>= 110 distinct services -- the ~117 real apps across their emitted apex/www hosts + the 3 heads + the hand-authored recipe origins; the 39.5-04 full-source import)');
 
   // (5) NO payment op is API-invocable (cross-confirm the payment-op guard) ------
   // Reuse the SAME dual-path payment detection the crosscheck gate ships (verbPrefix

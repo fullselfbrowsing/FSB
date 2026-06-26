@@ -1,0 +1,39 @@
+{
+  "slug": "leetcode.get_code_snippets",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get code snippets in leetcode",
+    "look up code snippets in leetcode",
+    "fetch a single code snippets in leetcode",
+    "view one specific code snippets in leetcode",
+    "get starter code for all languages in leetcode"
+  ],
+  "description": "Get starter code templates for all available languages for a given problem. Returns the function signature and boilerplate for each language.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "titleSlug": {
+        "type": "string",
+        "description": "Problem URL slug (e.g., \"two-sum\")"
+      }
+    },
+    "required": [
+      "titleSlug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-code-snippets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

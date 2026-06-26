@@ -1,0 +1,40 @@
+{
+  "slug": "figma.list_comments",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "list comments in figma",
+    "show me my comments in figma",
+    "view my comments in figma",
+    "see all my comments in figma",
+    "list comments on a file in figma"
+  ],
+  "description": "List all comments on a Figma file",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File key to list comments for"
+      }
+    },
+    "required": [
+      "file_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/list-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

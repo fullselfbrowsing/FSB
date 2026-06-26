@@ -1,0 +1,40 @@
+{
+  "slug": "stackoverflow.get_tag_info",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get a tag info in stackoverflow",
+    "look up a tag info in stackoverflow",
+    "fetch a single tag info in stackoverflow",
+    "view one specific tag info in stackoverflow",
+    "get tag info in stackoverflow",
+    "get tag details and wiki in stackoverflow"
+  ],
+  "description": "Get detailed information about a Stack Overflow tag, including its description and wiki. Tags are the primary way questions are categorized.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tag": {
+        "type": "string",
+        "description": "Tag name (e.g., \"javascript\", \"python\", \"react\")"
+      }
+    },
+    "required": [
+      "tag"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-tag-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

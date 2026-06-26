@@ -1,0 +1,49 @@
+{
+  "slug": "powerpoint.get_download_url",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get a download url in powerpoint",
+    "look up a download url in powerpoint",
+    "fetch a single download url in powerpoint",
+    "view one specific download url in powerpoint",
+    "get download url in powerpoint",
+    "get a download url for a file in powerpoint"
+  ],
+  "description": "Get a temporary download URL for a file. The URL is pre-authenticated and expires after a short time.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file"
+      },
+      "format": {
+        "description": "Convert to this format before downloading — pdf, jpg, or png. Omit for original format.",
+        "type": "string",
+        "enum": [
+          "pdf",
+          "jpg",
+          "png"
+        ]
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-download-url.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

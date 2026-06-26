@@ -1,0 +1,43 @@
+{
+  "slug": "jira.delete_issue",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "delete an issue in jira",
+    "remove an issue in jira",
+    "trash an issue in jira",
+    "permanently delete an issue in jira",
+    "delete issue in jira"
+  ],
+  "description": "Delete a Jira issue. Optionally delete all subtasks as well.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_key": {
+        "type": "string",
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
+      },
+      "delete_subtasks": {
+        "description": "Whether to also delete subtasks (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "issue_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/delete-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

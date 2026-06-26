@@ -1,0 +1,50 @@
+{
+  "slug": "asana.list_teams",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "list teams in asana",
+    "show me my teams in asana",
+    "view my teams in asana",
+    "see all my teams in asana",
+    "list teams in a workspace in asana"
+  ],
+  "description": "List all teams in a workspace.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace GID to list teams for"
+      },
+      "limit": {
+        "description": "Maximum number of teams to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspace_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/list-teams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

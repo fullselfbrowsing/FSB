@@ -1,0 +1,39 @@
+{
+  "slug": "netflix.remove_from_my_list",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "remove a from my list in netflix",
+    "remove from my list in netflix",
+    "remove a title from my list in netflix"
+  ],
+  "description": "Remove a movie or TV show from the current Netflix profile's \"My List\". Use list_my_list to see what is currently in the list.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID to remove"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/remove-from-my-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

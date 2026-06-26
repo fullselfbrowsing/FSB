@@ -1,0 +1,104 @@
+{
+  "slug": "datadog.aggregate_rum_events",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "aggregate rum events in datadog",
+    "aggregate rum event data with grouping in datadog",
+    "aggregate datadog rum events to compute counts, sums, averages, min, max, and cardinality, with optional grouping by fields or time intervals in datadog"
+  ],
+  "description": "Aggregate Datadog RUM events to compute counts, sums, averages, min, max, and cardinality, with optional grouping by fields or time intervals. Use this for aggregated analysis of RUM data such as session counts over time, error counts by page, or average loading times by browser.",
+  "actionVerb": "aggregate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query to filter RUM events (e.g., \"@type:error\", \"@type:view\")"
+      },
+      "compute": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "aggregation": {
+              "type": "string",
+              "enum": [
+                "count",
+                "avg",
+                "sum",
+                "min",
+                "max",
+                "cardinality"
+              ],
+              "description": "Aggregation function"
+            },
+            "field": {
+              "description": "Field to aggregate on",
+              "type": "string"
+            },
+            "type": {
+              "description": "Compute type (default: total)",
+              "type": "string",
+              "enum": [
+                "total",
+                "timeseries"
+              ]
+            }
+          },
+          "required": [
+            "aggregation"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Aggregation computations to perform"
+      },
+      "group_by": {
+        "description": "Grouping configuration",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "facet": {
+              "type": "string",
+              "description": "Field name to group by (e.g., \"@browser.name\", \"@geo.country\")"
+            },
+            "limit": {
+              "description": "Max number of groups",
+              "type": "number"
+            }
+          },
+          "required": [
+            "facet"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "from": {
+        "description": "Start time (default now-15m)",
+        "type": "string"
+      },
+      "to": {
+        "description": "End time (default now)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query",
+      "compute"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/aggregate-rum-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "aggregate"
+    }
+  }
+}

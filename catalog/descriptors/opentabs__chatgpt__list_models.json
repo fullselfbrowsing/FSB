@@ -1,0 +1,31 @@
+{
+  "slug": "chatgpt.list_models",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "list models in chatgpt",
+    "show me my models in chatgpt",
+    "view my models in chatgpt",
+    "see all my models in chatgpt",
+    "list available ai models in chatgpt"
+  ],
+  "description": "List available ChatGPT models with their capabilities, token limits, and enabled tools. Returns the default model slug.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/list-models.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

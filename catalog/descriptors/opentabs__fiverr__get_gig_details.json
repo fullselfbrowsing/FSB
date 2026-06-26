@@ -1,0 +1,40 @@
+{
+  "slug": "fiverr.get_gig_details",
+  "service": "fiverr.com",
+  "intentSynonyms": [
+    "get gig details in fiverr",
+    "look up gig details in fiverr",
+    "fetch a single gig details in fiverr",
+    "view one specific gig details in fiverr",
+    "get full details for a gig in fiverr"
+  ],
+  "description": "Get full details for a single Fiverr gig: title, description, category, packages (with prices, delivery times, revisions, and features), rating, orders in queue, seller summary, and recent reviews. Pass the gig path from a `search_gigs` result (e.g., \"/username/gig-slug\"). Reads the gig’s server-rendered page.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "gig_url": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Gig page path or full URL (e.g., \"/username/do-something-great\" or the absolute URL)"
+      }
+    },
+    "required": [
+      "gig_url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fiverr/src/tools/get-gig-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

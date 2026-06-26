@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_workflows",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list workflows in retool",
+    "show me my workflows in retool",
+    "view my workflows in retool",
+    "see all my workflows in retool",
+    "list all workflows and workflow folders in retool"
+  ],
+  "description": "List all workflows and workflow folders in the Retool organization. Workflows are automated processes that can be triggered by events, schedules, or webhooks.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-workflows.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

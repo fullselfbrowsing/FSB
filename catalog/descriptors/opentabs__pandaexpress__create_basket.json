@@ -1,0 +1,46 @@
+{
+  "slug": "pandaexpress.create_basket",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "create a basket in pandaexpress",
+    "add a basket in pandaexpress",
+    "make a new basket in pandaexpress",
+    "open a new basket in pandaexpress",
+    "create basket in pandaexpress",
+    "start a new order at a restaurant in pandaexpress"
+  ],
+  "description": "Create a new order basket (cart) at a specific Panda Express restaurant. The basket must be created before adding products. Use \"asap\" for timewanted to order immediately.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Restaurant ID to order from"
+      },
+      "time_wanted": {
+        "description": "Desired pickup/delivery time, or \"asap\" (default \"asap\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/create-basket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

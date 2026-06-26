@@ -1,0 +1,40 @@
+{
+  "slug": "figma.list_file_versions",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "list file versions in figma",
+    "show me my file versions in figma",
+    "view my file versions in figma",
+    "see all my file versions in figma",
+    "list file version history in figma"
+  ],
+  "description": "List version history of a Figma file. Returns version labels, timestamps, and authors.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File key to list versions for"
+      }
+    },
+    "required": [
+      "file_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/list-file-versions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

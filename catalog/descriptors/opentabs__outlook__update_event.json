@@ -1,0 +1,147 @@
+{
+  "slug": "outlook.update_event",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "update an event in outlook",
+    "edit an event in outlook",
+    "change the details of event in outlook",
+    "modify an event in outlook",
+    "update event in outlook",
+    "update a calendar event in outlook"
+  ],
+  "description": "Update properties of an existing calendar event. Only the fields you provide are changed. Updating the attendees of a meeting you organize sends updated invitations. To change start/end times, provide both start and end.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID to update"
+      },
+      "subject": {
+        "description": "New subject/title",
+        "type": "string"
+      },
+      "start": {
+        "description": "New start as ISO 8601 without an offset; the zone is set by time_zone. Provide together with end.",
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|))$"
+      },
+      "end": {
+        "description": "New end as ISO 8601 without an offset; the zone is set by time_zone. Provide together with start.",
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|))$"
+      },
+      "time_zone": {
+        "description": "Time zone for start/end (e.g. \"Eastern Standard Time\"). Defaults to UTC.",
+        "type": "string"
+      },
+      "body": {
+        "description": "New event body/description",
+        "type": "string"
+      },
+      "body_type": {
+        "description": "Body content type (default: text)",
+        "type": "string",
+        "enum": [
+          "text",
+          "html"
+        ]
+      },
+      "location": {
+        "description": "New location display name",
+        "type": "string"
+      },
+      "attendees": {
+        "description": "Replace the attendee list",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "description": "Attendee email address"
+            },
+            "name": {
+              "description": "Attendee display name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Attendance type (default: required)",
+              "type": "string",
+              "enum": [
+                "required",
+                "optional",
+                "resource"
+              ]
+            }
+          },
+          "required": [
+            "address"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "is_all_day": {
+        "description": "Mark as all-day. When true, start/end must be at midnight.",
+        "type": "boolean"
+      },
+      "is_online_meeting": {
+        "description": "Toggle an online (Teams) meeting",
+        "type": "boolean"
+      },
+      "importance": {
+        "description": "Importance level",
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high"
+        ]
+      },
+      "show_as": {
+        "description": "Free/busy status to show",
+        "type": "string",
+        "enum": [
+          "free",
+          "tentative",
+          "busy",
+          "oof",
+          "workingElsewhere"
+        ]
+      },
+      "reminder_minutes_before_start": {
+        "description": "Reminder lead time in minutes",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "categories": {
+        "description": "Set categories/labels",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/update-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

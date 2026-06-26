@@ -6,62 +6,65 @@
     "add a merge request in gitlab",
     "make a new merge request in gitlab",
     "open a new merge request in gitlab",
-    "create merge request in gitlab"
+    "create merge request in gitlab",
+    "create a new merge request in gitlab"
   ],
-  "description": "Open a new merge request in a GitLab project from a source branch into a target branch. Requires a project, source_branch, target_branch, and title.",
+  "description": "Create a new merge request in a project.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
-      "project_id": {
+      "project": {
         "type": "string",
         "minLength": 1,
-        "description": "Project ID or URL-encoded path (group/project)"
-      },
-      "source_branch": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Source branch name to merge from"
-      },
-      "target_branch": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Target branch name to merge into"
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
       },
       "title": {
         "type": "string",
         "minLength": 1,
         "description": "Merge request title"
       },
+      "source_branch": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Source branch name"
+      },
+      "target_branch": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Target branch name"
+      },
       "description": {
-        "description": "Merge request description in markdown",
+        "description": "MR description in Markdown",
         "type": "string"
       },
-      "assignee_ids": {
-        "description": "User IDs to assign as reviewers",
-        "type": "array",
-        "items": {
-          "type": "number"
-        }
-      },
       "labels": {
-        "description": "Label names to apply",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
+        "description": "Comma-separated list of label names",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "User ID to assign",
+        "type": "number"
+      },
+      "milestone_id": {
+        "description": "Milestone ID",
+        "type": "number"
       },
       "remove_source_branch": {
-        "description": "Delete the source branch on merge",
+        "description": "Delete source branch after merge",
+        "type": "boolean"
+      },
+      "squash": {
+        "description": "Squash commits when merging",
         "type": "boolean"
       }
     },
     "required": [
-      "project_id",
+      "project",
+      "title",
       "source_branch",
-      "target_branch",
-      "title"
+      "target_branch"
     ],
     "additionalProperties": false
   },

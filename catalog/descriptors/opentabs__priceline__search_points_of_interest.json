@@ -1,0 +1,44 @@
+{
+  "slug": "priceline.search_points_of_interest",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "search a points of interest in priceline",
+    "search points of interest in priceline",
+    "find top attractions in a city in priceline"
+  ],
+  "description": "Search for top points of interest in a city. Returns landmarks, attractions, and popular areas near hotels. Useful for finding hotels near specific attractions.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "city_id": {
+        "description": "Priceline city ID to search within",
+        "type": "string"
+      },
+      "city_name": {
+        "description": "City name to search by (alternative to city_id)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of results (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/search-points-of-interest.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

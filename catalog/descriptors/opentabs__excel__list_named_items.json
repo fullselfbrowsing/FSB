@@ -1,0 +1,31 @@
+{
+  "slug": "excel.list_named_items",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "list named items in excel",
+    "show me my named items in excel",
+    "view my named items in excel",
+    "see all my named items in excel",
+    "list named ranges and constants in excel"
+  ],
+  "description": "List all named items (named ranges, constants) in the workbook. Named items are user-defined names that refer to ranges, values, or formulas.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/list-named-items.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "cloudflare.graphql_query",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "graphql a query in cloudflare",
+    "graphql query in cloudflare",
+    "execute a graphql analytics query in cloudflare"
+  ],
+  "description": "Execute a GraphQL query against the Cloudflare Analytics API. Use this for analytics data, traffic stats, firewall events, DNS analytics, and other metrics not available via REST endpoints. Common query fields: httpRequests1dGroups (daily HTTP stats), firewallEventsAdaptiveGroups (WAF events), httpRequestsAdaptiveGroups (detailed traffic). Pass the zone tag as a filter. Example query: { viewer { zones(filter: { zoneTag: \"ZONE_ID\" }) { httpRequests1dGroups(limit: 7, filter: { date_geq: \"2026-03-01\" }) { dimensions { date } sum { requests pageViews } } } } }",
+  "actionVerb": "graphql",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "GraphQL query string"
+      },
+      "variables": {
+        "description": "GraphQL variables (optional)",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/graphql-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "graphql"
+    }
+  }
+}

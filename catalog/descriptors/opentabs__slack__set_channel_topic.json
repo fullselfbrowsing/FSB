@@ -1,0 +1,45 @@
+{
+  "slug": "slack.set_channel_topic",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "set a channel topic in slack",
+    "set channel topic in slack",
+    "set the topic of a channel in slack"
+  ],
+  "description": "Set the topic of a Slack channel",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to set the topic for (e.g., C01234567)"
+      },
+      "topic": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 250,
+        "description": "New topic text for the channel (max 250 chars)"
+      }
+    },
+    "required": [
+      "channel",
+      "topic"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/set-channel-topic.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "set"
+    }
+  }
+}

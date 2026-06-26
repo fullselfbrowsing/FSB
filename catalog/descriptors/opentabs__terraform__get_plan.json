@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.get_plan",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get a plan in terraform",
+    "look up a plan in terraform",
+    "fetch a single plan in terraform",
+    "view one specific plan in terraform",
+    "get plan in terraform",
+    "get plan details in terraform"
+  ],
+  "description": "Get details about a plan including resource changes and status. Use the plan ID from a run's relationships.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "plan_id": {
+        "type": "string",
+        "description": "Plan ID (e.g., \"plan-...\")"
+      }
+    },
+    "required": [
+      "plan_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-plan.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

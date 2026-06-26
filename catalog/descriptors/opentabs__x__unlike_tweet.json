@@ -1,0 +1,38 @@
+{
+  "slug": "x.unlike_tweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "unlike a tweet in x",
+    "unlike tweet in x",
+    "remove a like from a tweet in x"
+  ],
+  "description": "Remove a like from a tweet.",
+  "actionVerb": "unlike",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID to unlike"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/unlike-tweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "unlike"
+    }
+  }
+}

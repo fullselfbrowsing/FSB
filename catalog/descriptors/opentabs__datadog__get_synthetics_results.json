@@ -1,0 +1,39 @@
+{
+  "slug": "datadog.get_synthetics_results",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get synthetics results in datadog",
+    "look up synthetics results in datadog",
+    "fetch a single synthetics results in datadog",
+    "view one specific synthetics results in datadog",
+    "get recent synthetic test results in datadog"
+  ],
+  "description": "Get recent execution results for a synthetic test.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "public_id": {
+        "type": "string",
+        "description": "Synthetic test public ID"
+      }
+    },
+    "required": [
+      "public_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-synthetics-results.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

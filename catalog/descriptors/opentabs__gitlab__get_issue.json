@@ -7,28 +7,28 @@
     "fetch a single issue in gitlab",
     "view one specific issue in gitlab",
     "get issue in gitlab",
-    "get an issue by iid in gitlab"
+    "get issue details in gitlab"
   ],
-  "description": "Get detailed information about a specific GitLab issue by its project and internal IID.",
+  "description": "Get detailed information about a specific issue.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "project_id": {
+      "project": {
         "type": "string",
         "minLength": 1,
-        "description": "Project ID or URL-encoded path (group/project)"
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
       },
       "issue_iid": {
         "type": "integer",
-        "minimum": -9007199254740991,
+        "minimum": 1,
         "maximum": 9007199254740991,
-        "description": "Internal issue IID within the project"
+        "description": "Issue IID (project-scoped ID)"
       }
     },
     "required": [
-      "project_id",
+      "project",
       "issue_iid"
     ],
     "additionalProperties": false

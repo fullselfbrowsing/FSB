@@ -1,0 +1,31 @@
+{
+  "slug": "ganalytics.list_accounts",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "list accounts in ganalytics",
+    "show me my accounts in ganalytics",
+    "view my accounts in ganalytics",
+    "see all my accounts in ganalytics",
+    "list all ga accounts and properties in ganalytics"
+  ],
+  "description": "List all Google Analytics accounts and GA4 properties accessible to the current user. Returns accounts with their properties nested inside.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/list-accounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

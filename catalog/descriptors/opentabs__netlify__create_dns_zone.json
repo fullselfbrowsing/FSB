@@ -1,0 +1,49 @@
+{
+  "slug": "netlify.create_dns_zone",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create a dns zone in netlify",
+    "add a dns zone in netlify",
+    "make a new dns zone in netlify",
+    "open a new dns zone in netlify",
+    "create dns zone in netlify",
+    "create a new dns zone in netlify"
+  ],
+  "description": "Create a new DNS zone for a domain in a Netlify account. Optionally associate it with a specific site. The zone manages DNS records for the domain.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_slug": {
+        "type": "string",
+        "description": "The account slug to create the zone in"
+      },
+      "name": {
+        "type": "string",
+        "description": "The domain name for the zone (e.g. \"example.com\")"
+      },
+      "site_id": {
+        "description": "Optional site ID to associate the zone with",
+        "type": "string"
+      }
+    },
+    "required": [
+      "account_slug",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-dns-zone.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

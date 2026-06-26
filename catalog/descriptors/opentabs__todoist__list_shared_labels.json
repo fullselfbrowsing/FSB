@@ -1,0 +1,36 @@
+{
+  "slug": "todoist.list_shared_labels",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "list shared labels in todoist",
+    "show me my shared labels in todoist",
+    "view my shared labels in todoist",
+    "see all my shared labels in todoist",
+    "list shared label names in todoist"
+  ],
+  "description": "List all shared label names across collaborative projects.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "omit_personal": {
+        "description": "Whether to exclude personal labels from the results",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/list-shared-labels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

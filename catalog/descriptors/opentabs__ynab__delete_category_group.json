@@ -1,0 +1,41 @@
+{
+  "slug": "ynab.delete_category_group",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "delete a category group in ynab",
+    "remove a category group in ynab",
+    "trash a category group in ynab",
+    "permanently delete a category group in ynab",
+    "delete category group in ynab",
+    "delete a category group and its children in ynab"
+  ],
+  "description": "Delete a category group and all of its child categories from the active YNAB plan. This is a soft delete (tombstone). Internal/non-deletable groups (Credit Card Payments, Hidden Categories, Internal Master Category) cannot be deleted.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "group_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Category group ID to delete"
+      }
+    },
+    "required": [
+      "group_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/delete-category-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

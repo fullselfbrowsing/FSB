@@ -1,0 +1,32 @@
+{
+  "slug": "calendly.get_organization",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get an organization in calendly",
+    "look up an organization in calendly",
+    "fetch a single organization in calendly",
+    "view one specific organization in calendly",
+    "get organization in calendly",
+    "get the current organization details in calendly"
+  ],
+  "description": "Get details about the current Calendly organization including name, tier, trial status, and owner information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

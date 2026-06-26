@@ -1,0 +1,51 @@
+{
+  "slug": "ganalytics.check_compatibility",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "check a compatibility in ganalytics",
+    "check compatibility in ganalytics",
+    "check dimension/metric compatibility in ganalytics"
+  ],
+  "description": "Check which dimensions and metrics are compatible with each other for a given GA4 property. Not all dimension-metric combinations work together in a report. Use this before run_report to validate your query will succeed. Returns all available dimensions and metrics with a \"compatible\" flag indicating whether they can be used together in the same report.",
+  "actionVerb": "check",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "string",
+        "description": "GA4 property ID (numeric string)"
+      },
+      "dimensions": {
+        "description": "Dimensions already selected (checks what metrics are compatible with these)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "metrics": {
+        "description": "Metrics already selected (checks what dimensions are compatible with these)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "property_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/check-compatibility.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "check"
+    }
+  }
+}

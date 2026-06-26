@@ -1,0 +1,29 @@
+{
+  "slug": "target.navigate_to_checkout",
+  "service": "target.com",
+  "intentSynonyms": [
+    "navigate a to checkout in target",
+    "navigate to checkout in target",
+    "go to checkout to complete purchase in target"
+  ],
+  "description": "Navigate the browser to the Target checkout page so the user can review the order, select payment, and complete the purchase. Call this after adding items to the cart.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/navigate-to-checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

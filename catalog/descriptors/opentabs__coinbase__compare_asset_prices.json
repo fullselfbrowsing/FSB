@@ -1,0 +1,46 @@
+{
+  "slug": "coinbase.compare_asset_prices",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "compare asset prices in coinbase",
+    "compare prices of multiple assets in coinbase",
+    "get current prices for multiple assets in a single request in coinbase"
+  ],
+  "description": "Get current prices for multiple assets in a single request. Provide up to 10 asset UUIDs and receive all their latest prices at once. Useful for comparing prices across assets.",
+  "actionVerb": "compare",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uuids": {
+        "minItems": 1,
+        "maxItems": 10,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of asset UUIDs to compare (1-10)"
+      },
+      "quote_currency": {
+        "description": "Quote currency for prices (default \"USD\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "uuids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/compare-asset-prices.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "compare"
+    }
+  }
+}

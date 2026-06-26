@@ -9,7 +9,7 @@
     "create page in confluence",
     "create a new page in confluence"
   ],
-  "description": "Create a new page in a Confluence space. Requires a space_id and a title at minimum. Optionally set the body content and a parent page.",
+  "description": "Create a new Confluence page in a space. The body content uses Confluence storage format (HTML).",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -26,25 +26,22 @@
         "description": "Page title"
       },
       "body": {
-        "description": "Page body content in storage (HTML) format",
-        "type": "string"
+        "type": "string",
+        "description": "Page body in storage format (HTML) — e.g., \"<p>Hello world</p>\""
       },
       "parent_id": {
-        "description": "Parent page ID to nest this page under",
+        "description": "Parent page ID — omit to create at the space root",
         "type": "string"
       },
       "status": {
-        "description": "Page status: \"current\" or \"draft\"",
-        "type": "string",
-        "enum": [
-          "current",
-          "draft"
-        ]
+        "description": "Page status: \"current\" (published, default) or \"draft\"",
+        "type": "string"
       }
     },
     "required": [
       "space_id",
-      "title"
+      "title",
+      "body"
     ],
     "additionalProperties": false
   },
@@ -55,7 +52,7 @@
     "sourcePath": "plugins/confluence/src/tools/create-page.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": null,
       "httpMethod": "POST",
       "opNameVerb": "create"
     }

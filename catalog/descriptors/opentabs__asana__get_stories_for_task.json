@@ -1,0 +1,51 @@
+{
+  "slug": "asana.get_stories_for_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get a stories for task in asana",
+    "look up a stories for task in asana",
+    "fetch a single stories for task in asana",
+    "view one specific stories for task in asana",
+    "get stories for task in asana",
+    "list stories on a task in asana"
+  ],
+  "description": "List stories (comments and activity) on a task.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to retrieve stories for"
+      },
+      "limit": {
+        "description": "Maximum number of stories to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-stories-for-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

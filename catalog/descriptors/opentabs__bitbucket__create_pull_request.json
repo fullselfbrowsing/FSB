@@ -6,9 +6,10 @@
     "add a pull request in bitbucket",
     "make a new pull request in bitbucket",
     "open a new pull request in bitbucket",
-    "create pull request in bitbucket"
+    "create pull request in bitbucket",
+    "create a new pull request in bitbucket"
   ],
-  "description": "Open a new pull request in a Bitbucket repository from a source branch into a destination branch. Requires a workspace, repo_slug, source branch, destination branch, and title.",
+  "description": "Create a new pull request in a Bitbucket repository.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -16,51 +17,45 @@
     "properties": {
       "workspace": {
         "type": "string",
-        "minLength": 1,
-        "description": "Workspace ID or slug that owns the repository"
+        "description": "Workspace slug or UUID"
       },
       "repo_slug": {
         "type": "string",
-        "minLength": 1,
         "description": "Repository slug"
-      },
-      "source_branch": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Source branch name to merge from"
-      },
-      "destination_branch": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Destination branch name to merge into"
       },
       "title": {
         "type": "string",
-        "minLength": 1,
         "description": "Pull request title"
       },
-      "description": {
-        "description": "Pull request description in markdown",
+      "source_branch": {
+        "type": "string",
+        "description": "Source branch name"
+      },
+      "destination_branch": {
+        "description": "Destination branch name (defaults to the repository default branch)",
         "type": "string"
       },
+      "description": {
+        "description": "Pull request description in Markdown",
+        "type": "string"
+      },
+      "close_source_branch": {
+        "description": "Whether to delete the source branch after merge",
+        "type": "boolean"
+      },
       "reviewers": {
-        "description": "Reviewer account UUIDs",
+        "description": "Array of reviewer UUIDs to request reviews from",
         "type": "array",
         "items": {
           "type": "string"
         }
-      },
-      "close_source_branch": {
-        "description": "Delete the source branch on merge",
-        "type": "boolean"
       }
     },
     "required": [
       "workspace",
       "repo_slug",
-      "source_branch",
-      "destination_branch",
-      "title"
+      "title",
+      "source_branch"
     ],
     "additionalProperties": false
   },

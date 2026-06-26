@@ -1,0 +1,60 @@
+{
+  "slug": "terraform.create_run",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "create a run in terraform",
+    "add a run in terraform",
+    "make a new run in terraform",
+    "open a new run in terraform",
+    "create run in terraform",
+    "queue a new run in terraform"
+  ],
+  "description": "Queue a new plan/apply run for a workspace. Optionally set as destroy, plan-only, or refresh-only.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      },
+      "message": {
+        "description": "Run message describing the reason",
+        "type": "string"
+      },
+      "is_destroy": {
+        "description": "Whether this is a destroy run",
+        "type": "boolean"
+      },
+      "plan_only": {
+        "description": "Whether to only plan without applying",
+        "type": "boolean"
+      },
+      "refresh_only": {
+        "description": "Whether to only refresh state",
+        "type": "boolean"
+      },
+      "auto_apply": {
+        "description": "Override auto-apply setting",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/create-run.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

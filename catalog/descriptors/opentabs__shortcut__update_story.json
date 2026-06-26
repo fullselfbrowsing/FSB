@@ -1,0 +1,143 @@
+{
+  "slug": "shortcut.update_story",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "update a story in shortcut",
+    "edit a story in shortcut",
+    "change the details of story in shortcut",
+    "modify a story in shortcut",
+    "update story in shortcut"
+  ],
+  "description": "Update an existing story. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "story_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Story numeric ID"
+      },
+      "name": {
+        "description": "New story title",
+        "type": "string"
+      },
+      "story_type": {
+        "description": "New story type",
+        "type": "string",
+        "enum": [
+          "feature",
+          "bug",
+          "chore"
+        ]
+      },
+      "description": {
+        "description": "New description in Markdown",
+        "type": "string"
+      },
+      "workflow_state_id": {
+        "description": "New workflow state ID",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "epic_id": {
+        "description": "Epic ID to associate, or null to remove",
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "iteration_id": {
+        "description": "Iteration ID to associate, or null to remove",
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "group_id": {
+        "description": "Team UUID, or null to remove",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "owner_ids": {
+        "description": "Replace all owners with these member UUIDs",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "label_ids": {
+        "description": "Replace all labels with these IDs",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "estimate": {
+        "description": "Story point estimate, or null to clear",
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "deadline": {
+        "description": "Deadline in ISO 8601, or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "archived": {
+        "description": "Whether to archive the story",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "story_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/update-story.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

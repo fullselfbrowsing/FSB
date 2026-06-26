@@ -1,0 +1,54 @@
+{
+  "slug": "telegram.search_messages",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "search messages in telegram",
+    "search messages by keyword in telegram",
+    "search for messages by text query in telegram"
+  ],
+  "description": "Search for messages by text query. Search within a specific conversation by providing peer_id, or search globally across all chats by setting peer_id to 0.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query text"
+      },
+      "peer_id": {
+        "description": "Peer ID to search within (0 or omit for global search)",
+        "type": "number"
+      },
+      "limit": {
+        "description": "Maximum number of results (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset_id": {
+        "description": "Message ID to start from for pagination",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/search-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

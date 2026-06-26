@@ -1,0 +1,32 @@
+{
+  "slug": "steam.get_featured",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "get a featured in steam",
+    "look up a featured in steam",
+    "fetch a single featured in steam",
+    "view one specific featured in steam",
+    "get featured in steam",
+    "get featured games on the steam store in steam"
+  ],
+  "description": "Get currently featured games on the Steam store front page. Returns featured games for Windows, Mac, and Linux with pricing info. Prices are in cents.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/get-featured.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

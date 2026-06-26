@@ -1,0 +1,96 @@
+{
+  "slug": "redfin.search_properties",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "search properties in redfin",
+    "search properties by region with filters in redfin",
+    "search for properties on redfin in a given region in redfin"
+  ],
+  "description": "Search for properties on Redfin in a given region. Returns listings with price, beds, baths, sqft, and location. Use search_locations first to find region_id and region_type values. Status filter: 9=for sale, 32=off market, 130=sold. Common region types: 2=city, 5=county, 6=zip.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "region_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Region ID from search_locations (numeric part of the location id, e.g., 17151)"
+      },
+      "region_type": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Region type from search_locations (e.g., 2=city, 5=county, 6=zip)"
+      },
+      "num_homes": {
+        "description": "Maximum number of results (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "status": {
+        "description": "Listing status filter: 9=for sale (default), 32=off market, 130=recently sold",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "min_price": {
+        "description": "Minimum listing price in dollars",
+        "type": "number"
+      },
+      "max_price": {
+        "description": "Maximum listing price in dollars",
+        "type": "number"
+      },
+      "min_beds": {
+        "description": "Minimum bedrooms",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "max_beds": {
+        "description": "Maximum bedrooms",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "min_baths": {
+        "description": "Minimum bathrooms",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "min_sqft": {
+        "description": "Minimum square footage",
+        "type": "number"
+      },
+      "max_sqft": {
+        "description": "Maximum square footage",
+        "type": "number"
+      },
+      "property_type": {
+        "description": "Property type filter codes, comma-separated (e.g., \"1,2,3,4,5,6,7\" for all types)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "region_id",
+      "region_type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/search-properties.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

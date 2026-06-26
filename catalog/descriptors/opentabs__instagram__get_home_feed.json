@@ -1,0 +1,37 @@
+{
+  "slug": "instagram.get_home_feed",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get a home feed in instagram",
+    "look up a home feed in instagram",
+    "fetch a single home feed in instagram",
+    "view one specific home feed in instagram",
+    "get home feed in instagram",
+    "get the home timeline feed in instagram"
+  ],
+  "description": "Get the authenticated user's home feed (timeline). Returns posts from followed accounts and suggested content.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_id": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-home-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

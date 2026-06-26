@@ -1,0 +1,38 @@
+{
+  "slug": "whatsapp.list_contacts",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "list contacts in whatsapp",
+    "show me my contacts in whatsapp",
+    "view my contacts in whatsapp",
+    "see all my contacts in whatsapp",
+    "list all contacts in whatsapp"
+  ],
+  "description": "List all WhatsApp contacts. Returns saved contacts with their name, push name, and business status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of contacts to return (default 100, max 500)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/list-contacts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

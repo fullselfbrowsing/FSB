@@ -1,0 +1,44 @@
+{
+  "slug": "gemini.create_conversation",
+  "service": "gemini.google.com",
+  "intentSynonyms": [
+    "create a conversation in gemini",
+    "add a conversation in gemini",
+    "make a new conversation in gemini",
+    "open a new conversation in gemini",
+    "create conversation in gemini",
+    "start a new gemini conversation in gemini"
+  ],
+  "description": "Create a new Gemini conversation by sending an initial message. Returns the new conversation ID, response ID, and the AI response text. Use the returned conversation_id, response_id, and response_choice_id with send_message to continue the conversation.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Initial message text to start the conversation"
+      },
+      "model_id": {
+        "description": "Model ID to use (from list_models). Defaults to the active model.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gemini/src/tools/create-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

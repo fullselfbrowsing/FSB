@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_org_config",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get an org config in datadog",
+    "look up an org config in datadog",
+    "fetch a single org config in datadog",
+    "view one specific org config in datadog",
+    "get org config in datadog",
+    "get org configuration in datadog"
+  ],
+  "description": "Get a specific organization configuration value by name.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "config_name": {
+        "type": "string",
+        "description": "Configuration name to retrieve"
+      }
+    },
+    "required": [
+      "config_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-org-config.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

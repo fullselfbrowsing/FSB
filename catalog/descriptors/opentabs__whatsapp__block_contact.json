@@ -1,0 +1,38 @@
+{
+  "slug": "whatsapp.block_contact",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "block a contact in whatsapp",
+    "block contact in whatsapp",
+    "block a whatsapp contact in whatsapp"
+  ],
+  "description": "Block a WhatsApp contact. Blocked contacts cannot send you messages or see your profile information.",
+  "actionVerb": "block",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "contact_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Contact ID to block"
+      }
+    },
+    "required": [
+      "contact_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/block-contact.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "block"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "tripadvisor.get_hotel",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get a hotel in tripadvisor",
+    "look up a hotel in tripadvisor",
+    "fetch a single hotel in tripadvisor",
+    "view one specific hotel in tripadvisor",
+    "get hotel in tripadvisor",
+    "get hotel details in tripadvisor"
+  ],
+  "description": "Get detailed information about a TripAdvisor hotel including ratings, address, AI review summary, and price range. Provide the hotel URL path.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Hotel page URL path (e.g., \"/Hotel_Review-g60713-d224953-Reviews-Hotel_Nikko_San_Francisco-...\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-hotel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

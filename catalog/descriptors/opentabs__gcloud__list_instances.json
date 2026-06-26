@@ -1,0 +1,50 @@
+{
+  "slug": "gcloud.list_instances",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list instances in gcloud",
+    "show me my instances in gcloud",
+    "view my instances in gcloud",
+    "see all my instances in gcloud",
+    "list compute engine vm instances in gcloud"
+  ],
+  "description": "List Compute Engine VM instances in a zone. If no zone is specified, lists instances across all zones using aggregated list.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "zone": {
+        "description": "Zone (e.g., \"us-central1-a\"). If omitted, lists across all zones.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Max results (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-instances.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

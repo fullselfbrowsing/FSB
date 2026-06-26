@@ -1,0 +1,39 @@
+{
+  "slug": "tripadvisor.list_restaurants",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "list restaurants in tripadvisor",
+    "show me my restaurants in tripadvisor",
+    "view my restaurants in tripadvisor",
+    "see all my restaurants in tripadvisor",
+    "list restaurants in an area in tripadvisor"
+  ],
+  "description": "List restaurants in a city or area on TripAdvisor. Returns a page of restaurant listings with names, ratings, and URLs. Uses the geo-based restaurant listing page URL. Use offset URLs for pagination (e.g., \"-oa30-\" for page 2).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Restaurant listing page URL path (e.g., \"/Restaurants-g60713-San_Francisco_California.html\" or with offset \"/Restaurants-g60713-oa30-San_Francisco_California.html\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/list-restaurants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

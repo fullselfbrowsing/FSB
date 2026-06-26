@@ -1,0 +1,45 @@
+{
+  "slug": "lucid.list_documents",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "list documents in lucid",
+    "show me my documents in lucid",
+    "view my documents in lucid",
+    "see all my documents in lucid",
+    "list your documents in lucid"
+  ],
+  "description": "List documents for the current user. Filter by product type (chart for Lucidchart, press for Lucidspark, spark for Lucidscale). Optionally search by text query.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product": {
+        "description": "Product type to filter by (default: chart)",
+        "type": "string",
+        "enum": [
+          "chart",
+          "press",
+          "spark"
+        ]
+      },
+      "search": {
+        "description": "Search query to filter documents by title",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/list-documents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

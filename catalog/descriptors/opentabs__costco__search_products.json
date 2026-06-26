@@ -1,45 +1,24 @@
 {
   "slug": "costco.search_products",
-  "service": "www.costco.com",
+  "service": "costco.com",
   "intentSynonyms": [
     "search products in costco",
-    "search for products on costco in costco",
-    "search the costco warehouse catalog by keyword in costco"
+    "extract and enrich products from the current search page in costco",
+    "search for products on costco by reading the current search results page and enriching with full product details from the api in costco"
   ],
-  "description": "Search the Costco warehouse catalog by keyword. Optionally filter by category and sort the results.",
+  "description": "Search for products on Costco by reading the current search results page and enriching with full product details from the API. The browser must already be on a Costco search results page — call navigate_to_search first to navigate to the search page, wait for it to load, then call this tool to extract and enrich the results.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "query": {
-        "type": "string",
-        "minLength": 1,
-        "description": "Search keywords (product name, brand, or description)"
-      },
-      "category": {
-        "description": "Category to filter by",
-        "type": "string"
-      },
-      "sort": {
-        "description": "Result ordering",
-        "type": "string",
-        "enum": [
-          "relevance",
-          "price_low_to_high",
-          "price_high_to_low"
-        ]
-      },
-      "limit": {
-        "description": "Maximum number of products to return",
+      "max_results": {
+        "description": "Maximum number of results to return (default 10, max 24)",
         "type": "integer",
         "minimum": 1,
-        "maximum": 50
+        "maximum": 24
       }
     },
-    "required": [
-      "query"
-    ],
     "additionalProperties": false
   },
   "backing": "dom",
@@ -49,8 +28,8 @@
     "sourcePath": "plugins/costco/src/tools/search-products.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

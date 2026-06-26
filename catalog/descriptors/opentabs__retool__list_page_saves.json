@@ -1,0 +1,39 @@
+{
+  "slug": "retool.list_page_saves",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list page saves in retool",
+    "show me my page saves in retool",
+    "view my page saves in retool",
+    "see all my page saves in retool",
+    "list edit history for an app in retool"
+  ],
+  "description": "List the edit history (saved versions) for a Retool app. Shows who made each save and when. Useful for auditing changes and understanding who last modified an app.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID"
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-page-saves.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

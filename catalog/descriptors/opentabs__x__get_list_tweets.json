@@ -1,0 +1,50 @@
+{
+  "slug": "x.get_list_tweets",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get list tweets in x",
+    "look up list tweets in x",
+    "fetch a single list tweets in x",
+    "view one specific list tweets in x",
+    "get tweets from a list in x"
+  ],
+  "description": "Get tweets from a list's timeline.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID"
+      },
+      "count": {
+        "description": "Number of tweets (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-list-tweets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

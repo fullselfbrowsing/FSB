@@ -8,7 +8,7 @@
     "see all my dns records in cloudflare",
     "list dns records for a zone in cloudflare"
   ],
-  "description": "List the DNS records for a Cloudflare zone. Optionally filter by record type, name, or content.",
+  "description": "List DNS records for a zone. Returns record type, name, content, TTL, and proxy status. Supports filtering by type and name, with pagination.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -16,32 +16,39 @@
     "properties": {
       "zone_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Cloudflare zone ID the records belong to"
+        "description": "Zone ID (32-char hex string)"
       },
       "type": {
-        "description": "Filter by DNS record type",
+        "description": "Filter by record type",
         "type": "string",
         "enum": [
           "A",
           "AAAA",
           "CNAME",
-          "TXT",
           "MX",
+          "TXT",
           "NS",
           "SRV",
-          "CAA"
+          "CAA",
+          "PTR",
+          "SOA"
         ]
       },
       "name": {
-        "description": "Filter by record name (FQDN)",
+        "description": "Filter by record name (e.g., \"www.example.com\")",
         "type": "string"
       },
       "page": {
-        "description": "Page number for pagination (1-indexed)",
+        "description": "Page number (default 1)",
         "type": "integer",
-        "minimum": -9007199254740991,
+        "minimum": 1,
         "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Results per page (default 50, max 100)",
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 100
       }
     },
     "required": [
@@ -56,8 +63,8 @@
     "sourcePath": "plugins/cloudflare/src/tools/list-dns-records.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "list"
     }
   }

@@ -1,0 +1,44 @@
+{
+  "slug": "msword.search_files",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "search files in msword",
+    "search files and folders in msword",
+    "search for files and folders by name in onedrive in msword"
+  ],
+  "description": "Search for files and folders by name in OneDrive.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query text"
+      },
+      "top": {
+        "description": "Max results (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/search-files.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

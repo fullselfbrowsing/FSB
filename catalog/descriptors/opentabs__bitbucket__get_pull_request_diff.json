@@ -1,0 +1,51 @@
+{
+  "slug": "bitbucket.get_pull_request_diff",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "get a pull request diff in bitbucket",
+    "look up a pull request diff in bitbucket",
+    "fetch a single pull request diff in bitbucket",
+    "view one specific pull request diff in bitbucket",
+    "get pull request diff in bitbucket"
+  ],
+  "description": "Get the unified diff of all changed files in a pull request.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "pull_request_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Pull request ID"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "pull_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/get-pull-request-diff.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

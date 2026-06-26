@@ -1,0 +1,49 @@
+{
+  "slug": "newrelic.delete_entity_tags",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "delete entity tags in newrelic",
+    "remove entity tags in newrelic",
+    "trash entity tags in newrelic",
+    "permanently delete entity tags in newrelic",
+    "delete tags from an entity in newrelic"
+  ],
+  "description": "Delete tags from an entity by tag key. Removes all values for the specified keys.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Entity GUID"
+      },
+      "tag_keys": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Tag keys to delete"
+      }
+    },
+    "required": [
+      "guid",
+      "tag_keys"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/delete-entity-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

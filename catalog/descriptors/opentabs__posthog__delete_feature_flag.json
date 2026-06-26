@@ -1,0 +1,41 @@
+{
+  "slug": "posthog.delete_feature_flag",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "delete a feature flag in posthog",
+    "remove a feature flag in posthog",
+    "trash a feature flag in posthog",
+    "permanently delete a feature flag in posthog",
+    "delete feature flag in posthog"
+  ],
+  "description": "Delete a feature flag by marking it as deleted (soft delete).",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "flag_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Feature flag ID to delete"
+      }
+    },
+    "required": [
+      "flag_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/delete-feature-flag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

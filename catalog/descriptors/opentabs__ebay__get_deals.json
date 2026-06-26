@@ -1,0 +1,31 @@
+{
+  "slug": "ebay.get_deals",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "get deals in ebay",
+    "look up deals in ebay",
+    "fetch a single deals in ebay",
+    "view one specific deals in ebay",
+    "get current ebay daily deals in ebay"
+  ],
+  "description": "Get current eBay daily deals and featured promotions. Returns discounted items with their deal price and original price.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/get-deals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

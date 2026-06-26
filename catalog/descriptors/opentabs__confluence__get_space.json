@@ -1,0 +1,41 @@
+{
+  "slug": "confluence.get_space",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get a space in confluence",
+    "look up a space in confluence",
+    "fetch a single space in confluence",
+    "view one specific space in confluence",
+    "get space in confluence",
+    "get a space by id in confluence"
+  ],
+  "description": "Get detailed information about a specific Confluence space by its ID",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "space_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Space ID to retrieve"
+      }
+    },
+    "required": [
+      "space_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/get-space.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

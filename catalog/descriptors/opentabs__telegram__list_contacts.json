@@ -1,0 +1,31 @@
+{
+  "slug": "telegram.list_contacts",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "list contacts in telegram",
+    "show me my contacts in telegram",
+    "view my contacts in telegram",
+    "see all my contacts in telegram",
+    "list your telegram contacts in telegram"
+  ],
+  "description": "List all contacts in the Telegram address book. Returns contact details with user profiles.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/list-contacts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "gcloud.disable_service",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "disable a service in gcloud",
+    "disable service in gcloud",
+    "disable a gcp api service in gcloud"
+  ],
+  "description": "Disable a GCP API service in the project. WARNING: This may break resources that depend on this service.",
+  "actionVerb": "disable",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_name": {
+        "type": "string",
+        "description": "Service API name (e.g., \"compute.googleapis.com\")"
+      },
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "service_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/disable-service.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "disable"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "coinbase.remove_watchlist_item",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "remove a watchlist item in coinbase",
+    "remove watchlist item in coinbase",
+    "remove an asset from a watchlist in coinbase"
+  ],
+  "description": "Remove an asset from a watchlist. Use list_watchlists to find the watchlist item UUID for the asset you want to remove.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "watchlist_uuid": {
+        "type": "string",
+        "description": "Watchlist UUID (from list_watchlists)"
+      },
+      "item_uuid": {
+        "type": "string",
+        "description": "Watchlist item UUID to remove (from the items array in list_watchlists)"
+      }
+    },
+    "required": [
+      "watchlist_uuid",
+      "item_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/remove-watchlist-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

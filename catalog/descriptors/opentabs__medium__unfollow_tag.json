@@ -1,0 +1,37 @@
+{
+  "slug": "medium.unfollow_tag",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "unfollow a tag in medium",
+    "unfollow tag in medium",
+    "unfollow a medium tag/topic to stop seeing posts about it in your feed in medium"
+  ],
+  "description": "Unfollow a Medium tag/topic to stop seeing posts about it in your feed.",
+  "actionVerb": "unfollow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tag_slug": {
+        "type": "string",
+        "description": "Tag slug to unfollow (e.g., \"javascript\", \"data-science\")"
+      }
+    },
+    "required": [
+      "tag_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/unfollow-tag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "unfollow"
+    }
+  }
+}

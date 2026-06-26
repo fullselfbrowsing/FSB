@@ -1,0 +1,32 @@
+{
+  "slug": "ganalytics.get_current_user",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "get a current user in ganalytics",
+    "look up a current user in ganalytics",
+    "fetch a single current user in ganalytics",
+    "view one specific current user in ganalytics",
+    "get current user in ganalytics",
+    "get current user info in ganalytics"
+  ],
+  "description": "Get information about the currently authenticated Google Analytics user, including their obfuscated user ID and associated accounts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

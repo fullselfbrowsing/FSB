@@ -1,0 +1,32 @@
+{
+  "slug": "homedepot.get_store_context",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "get a store context in homedepot",
+    "look up a store context in homedepot",
+    "fetch a single store context in homedepot",
+    "view one specific store context in homedepot",
+    "get store context in homedepot",
+    "get current store and delivery info in homedepot"
+  ],
+  "description": "Get the user's currently selected Home Depot store and delivery information from the page context. Includes store ID, store name, delivery ZIP, and store ZIP.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/get-store-context.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

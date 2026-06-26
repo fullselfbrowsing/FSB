@@ -1,0 +1,49 @@
+{
+  "slug": "instagram.get_conversation_messages",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get conversation messages in instagram",
+    "look up conversation messages in instagram",
+    "fetch a single conversation messages in instagram",
+    "view one specific conversation messages in instagram",
+    "get messages in a dm conversation in instagram"
+  ],
+  "description": "Get messages in a direct message conversation. Returns messages in reverse chronological order. Supports cursor pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thread_id": {
+        "type": "string",
+        "description": "Conversation thread ID (from list_conversations)"
+      },
+      "limit": {
+        "description": "Number of messages to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "thread_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-conversation-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

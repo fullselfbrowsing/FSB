@@ -1,0 +1,39 @@
+{
+  "slug": "steam.remove_from_wishlist",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "remove a from wishlist in steam",
+    "remove from wishlist in steam",
+    "remove a game from your steam wishlist in steam"
+  ],
+  "description": "Remove a game from the current user's Steam wishlist by app ID. Returns the updated wishlist count.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "appid": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Steam app ID to remove from wishlist"
+      }
+    },
+    "required": [
+      "appid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/remove-from-wishlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

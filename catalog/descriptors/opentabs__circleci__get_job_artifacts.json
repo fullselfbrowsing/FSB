@@ -1,0 +1,46 @@
+{
+  "slug": "circleci.get_job_artifacts",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get job artifacts in circleci",
+    "look up job artifacts in circleci",
+    "fetch a single job artifacts in circleci",
+    "view one specific job artifacts in circleci",
+    "list job artifacts in circleci"
+  ],
+  "description": "List artifacts produced by a job. Returns file paths and download URLs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "job_number": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Job number within the project"
+      }
+    },
+    "required": [
+      "project_slug",
+      "job_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-job-artifacts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

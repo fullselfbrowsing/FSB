@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.get_application",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get an application in twilio",
+    "look up an application in twilio",
+    "fetch a single application in twilio",
+    "view one specific application in twilio",
+    "get application in twilio"
+  ],
+  "description": "Get a specific TwiML application by its SID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Application SID (e.g., APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-application.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

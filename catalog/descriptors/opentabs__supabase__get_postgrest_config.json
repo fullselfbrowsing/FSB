@@ -1,0 +1,41 @@
+{
+  "slug": "supabase.get_postgrest_config",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get a postgrest config in supabase",
+    "look up a postgrest config in supabase",
+    "fetch a single postgrest config in supabase",
+    "view one specific postgrest config in supabase",
+    "get postgrest config in supabase",
+    "get postgrest api configuration in supabase"
+  ],
+  "description": "Get the PostgREST (auto-generated REST API) configuration for a project. Includes default schema, max rows, and JWT secret role claim key.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-postgrest-config.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

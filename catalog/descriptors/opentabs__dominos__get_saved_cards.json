@@ -1,0 +1,31 @@
+{
+  "slug": "dominos.get_saved_cards",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get saved cards in dominos",
+    "look up saved cards in dominos",
+    "fetch a single saved cards in dominos",
+    "view one specific saved cards in dominos",
+    "list your saved payment cards in dominos"
+  ],
+  "description": "List saved payment cards on the customer account. Returns card type, last four digits, expiration, and whether the card is the default.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-saved-cards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

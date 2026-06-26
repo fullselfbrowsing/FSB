@@ -1,0 +1,31 @@
+{
+  "slug": "robinhood.list_watchlists",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "list watchlists in robinhood",
+    "show me my watchlists in robinhood",
+    "view my watchlists in robinhood",
+    "see all my watchlists in robinhood",
+    "list all watchlists in robinhood"
+  ],
+  "description": "List all watchlists (discovery lists) including default and custom lists with their display names, item counts, and emoji icons.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/list-watchlists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

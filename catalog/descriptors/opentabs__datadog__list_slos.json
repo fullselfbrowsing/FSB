@@ -1,0 +1,48 @@
+{
+  "slug": "datadog.list_slos",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list slos in datadog",
+    "show me my slos in datadog",
+    "view my slos in datadog",
+    "see all my slos in datadog",
+    "list datadog slos in datadog"
+  ],
+  "description": "List Service Level Objectives (SLOs) in the Datadog organization with optional tag filtering.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tags": {
+        "description": "Comma-separated tags to filter (e.g., \"env:prod,team:backend\")",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum results (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-slos.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

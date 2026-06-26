@@ -1,0 +1,40 @@
+{
+  "slug": "glama.get_chat_session",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "get a chat session in glama",
+    "look up a chat session in glama",
+    "fetch a single chat session in glama",
+    "view one specific chat session in glama",
+    "get chat session in glama",
+    "get details about a chat session in glama"
+  ],
+  "description": "Get details about a specific chat session including title, model, project, and reasoning effort.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uid": {
+        "type": "string",
+        "description": "Chat session UID"
+      }
+    },
+    "required": [
+      "uid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/get-chat-session.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

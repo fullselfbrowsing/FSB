@@ -1,0 +1,42 @@
+{
+  "slug": "zendesk.get_ticket",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "get a ticket in zendesk",
+    "look up a ticket in zendesk",
+    "fetch a single ticket in zendesk",
+    "view one specific ticket in zendesk",
+    "get ticket in zendesk",
+    "get a single ticket by id in zendesk"
+  ],
+  "description": "Get detailed information about a specific support ticket by its ID. Returns the full ticket object including subject, description, status, priority, assignee, requester, tags, and all timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "The ID of the ticket to retrieve"
+      }
+    },
+    "required": [
+      "ticket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/get-ticket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

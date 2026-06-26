@@ -1,0 +1,39 @@
+{
+  "slug": "carta.check_favourite",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "check a favourite in carta",
+    "check favourite in carta",
+    "check if company is favourited in carta"
+  ],
+  "description": "Check whether a company is marked as a favourite in the portfolio.",
+  "actionVerb": "check",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/check-favourite.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "check"
+    }
+  }
+}

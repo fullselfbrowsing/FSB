@@ -1,0 +1,39 @@
+{
+  "slug": "cockroachdb.list_database_users",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "list database users in cockroachdb",
+    "show me my database users in cockroachdb",
+    "view my database users in cockroachdb",
+    "see all my database users in cockroachdb",
+    "list sql users in a cluster in cockroachdb"
+  ],
+  "description": "List all SQL database users in a CockroachDB cluster. Shows username and whether the user is system-internal.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      }
+    },
+    "required": [
+      "cluster_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/list-database-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "tumblr.follow_blog",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "follow a blog in tumblr",
+    "follow blog in tumblr",
+    "follow a tumblr blog by url in tumblr"
+  ],
+  "description": "Follow a Tumblr blog by URL.",
+  "actionVerb": "follow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Blog URL to follow (e.g., \"staff.tumblr.com\" or \"https://staff.tumblr.com\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/follow-blog.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "follow"
+    }
+  }
+}

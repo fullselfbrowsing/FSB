@@ -1,0 +1,48 @@
+{
+  "slug": "ynab.list_transactions",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "list transactions in ynab",
+    "show me my transactions in ynab",
+    "view my transactions in ynab",
+    "see all my transactions in ynab",
+    "list budget transactions in ynab"
+  ],
+  "description": "List transactions in the active YNAB plan. Returns all transactions sorted by date (newest first). Optionally filter by account ID. Results include amount, payee, category, cleared status, and memo.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "description": "Filter by account ID. Omit to list all transactions.",
+        "type": "string"
+      },
+      "since_date": {
+        "description": "Only return transactions on or after this date (YYYY-MM-DD). Omit for all transactions.",
+        "type": "string"
+      },
+      "until_date": {
+        "description": "Only return transactions on or before this date (YYYY-MM-DD). Combine with since_date for a date range.",
+        "type": "string"
+      },
+      "payee_search": {
+        "description": "Case-insensitive substring match against payee_name, imported_payee, and original_imported_payee. Useful for finding all transactions for a merchant without knowing the exact payee ID.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/list-transactions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.delete_variable",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "delete a variable in terraform",
+    "remove a variable in terraform",
+    "trash a variable in terraform",
+    "permanently delete a variable in terraform",
+    "delete variable in terraform",
+    "delete a workspace variable in terraform"
+  ],
+  "description": "Delete a workspace variable.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "variable_id": {
+        "type": "string",
+        "description": "Variable ID (e.g., \"var-...\")"
+      }
+    },
+    "required": [
+      "variable_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/delete-variable.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

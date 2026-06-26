@@ -1,0 +1,41 @@
+{
+  "slug": "posthog.delete_dashboard",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "delete a dashboard in posthog",
+    "remove a dashboard in posthog",
+    "trash a dashboard in posthog",
+    "permanently delete a dashboard in posthog",
+    "delete dashboard in posthog"
+  ],
+  "description": "Delete a dashboard by marking it as deleted (soft delete). The dashboard can potentially be recovered.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "dashboard_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Dashboard ID to delete"
+      }
+    },
+    "required": [
+      "dashboard_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/delete-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

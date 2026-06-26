@@ -1,0 +1,46 @@
+{
+  "slug": "spotify.set_repeat_mode",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "set a repeat mode in spotify",
+    "set repeat mode in spotify",
+    "set repeat mode (off, context, or track) in spotify"
+  ],
+  "description": "Set the repeat mode for the current playback. Options are \"off\" (no repeat), \"context\" (repeat the current context such as album or playlist), and \"track\" (repeat the current track).",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "state": {
+        "type": "string",
+        "enum": [
+          "off",
+          "context",
+          "track"
+        ],
+        "description": "Repeat mode: \"off\", \"context\" (repeat album/playlist), or \"track\" (repeat current track)"
+      },
+      "device_id": {
+        "description": "Device ID to target. If omitted, targets the active device.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "state"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/set-repeat-mode.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "set"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "wikipedia.get_featured_content",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get a featured content in wikipedia",
+    "look up a featured content in wikipedia",
+    "fetch a single featured content in wikipedia",
+    "view one specific featured content in wikipedia",
+    "get featured content in wikipedia",
+    "get today's featured content in wikipedia"
+  ],
+  "description": "Get Wikipedia's featured content for a specific date: Today's Featured Article, most-read articles, and On This Day events. Uses the Wikimedia REST API.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "date": {
+        "description": "Date in YYYY/MM/DD format (e.g., \"2026/03/09\"). Defaults to today.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-featured-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

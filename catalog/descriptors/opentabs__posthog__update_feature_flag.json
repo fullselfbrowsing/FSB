@@ -1,0 +1,59 @@
+{
+  "slug": "posthog.update_feature_flag",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "update a feature flag in posthog",
+    "edit a feature flag in posthog",
+    "change the details of feature flag in posthog",
+    "modify a feature flag in posthog",
+    "update feature flag in posthog"
+  ],
+  "description": "Update an existing feature flag. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "flag_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Feature flag ID"
+      },
+      "name": {
+        "description": "New name",
+        "type": "string"
+      },
+      "active": {
+        "description": "Active status",
+        "type": "boolean"
+      },
+      "rollout_percentage": {
+        "description": "Rollout percentage",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "ensure_experience_continuity": {
+        "description": "Persist flag value per user",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "flag_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/update-feature-flag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

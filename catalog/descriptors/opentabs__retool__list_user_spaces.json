@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_user_spaces",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list user spaces in retool",
+    "show me my user spaces in retool",
+    "view my user spaces in retool",
+    "see all my user spaces in retool",
+    "list accessible user spaces in retool"
+  ],
+  "description": "List all spaces (workspaces) accessible to the current user. Spaces represent separate Retool organizations or child organizations.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-user-spaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

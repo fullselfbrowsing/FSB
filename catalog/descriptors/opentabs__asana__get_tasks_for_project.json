@@ -1,0 +1,51 @@
+{
+  "slug": "asana.get_tasks_for_project",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get a tasks for project in asana",
+    "look up a tasks for project in asana",
+    "fetch a single tasks for project in asana",
+    "view one specific tasks for project in asana",
+    "get tasks for project in asana",
+    "list tasks in a project in asana"
+  ],
+  "description": "List tasks in a project. Supports pagination with limit and offset.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project GID to list tasks for"
+      },
+      "limit": {
+        "description": "Maximum number of tasks to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-tasks-for-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

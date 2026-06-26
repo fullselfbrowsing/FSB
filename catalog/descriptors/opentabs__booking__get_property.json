@@ -1,36 +1,42 @@
 {
   "slug": "booking.get_property",
-  "service": "www.booking.com",
+  "service": "booking.com",
   "intentSynonyms": [
     "get a property in booking",
     "look up a property in booking",
     "fetch a single property in booking",
     "view one specific property in booking",
     "get property in booking",
-    "look up a booking property in booking"
+    "get property details by name and location in booking"
   ],
-  "description": "Get the full details, room options, and availability of a single Booking.com property by its ID.",
+  "description": "Get detailed information about a specific property on Booking.com by searching for it. Provide the property name and city to find it, along with check-in/check-out dates for pricing.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "property_id": {
+      "property_name": {
         "type": "string",
-        "minLength": 1,
-        "description": "The property ID to fetch"
+        "description": "Property name or partial name to search for"
       },
-      "check_in": {
-        "description": "Check-in date (YYYY-MM-DD) for live availability",
-        "type": "string"
+      "city": {
+        "type": "string",
+        "description": "City where the property is located"
       },
-      "check_out": {
-        "description": "Check-out date (YYYY-MM-DD) for live availability",
-        "type": "string"
+      "checkin": {
+        "type": "string",
+        "description": "Check-in date in YYYY-MM-DD format (for pricing)"
+      },
+      "checkout": {
+        "type": "string",
+        "description": "Check-out date in YYYY-MM-DD format (for pricing)"
       }
     },
     "required": [
-      "property_id"
+      "property_name",
+      "city",
+      "checkin",
+      "checkout"
     ],
     "additionalProperties": false
   },
@@ -41,8 +47,8 @@
     "sourcePath": "plugins/booking/src/tools/get-property.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

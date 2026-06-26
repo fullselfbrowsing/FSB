@@ -6,9 +6,9 @@
     "show me my deploys in netlify",
     "view my deploys in netlify",
     "see all my deploys in netlify",
-    "list deploys for a site in netlify"
+    "list site deploys in netlify"
   ],
-  "description": "List deploys for a Netlify site. Optionally filter by state (new, building, ready, error).",
+  "description": "List deploys for a Netlify site. Returns deploy state, branch, commit info, context, framework, and timestamps. Supports pagination.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -16,24 +16,15 @@
     "properties": {
       "site_id": {
         "type": "string",
-        "minLength": 1,
-        "description": "Site ID to list deploys for"
-      },
-      "state": {
-        "description": "Filter by deploy state",
-        "type": "string",
-        "enum": [
-          "new",
-          "building",
-          "ready",
-          "error"
-        ]
+        "description": "The site ID to list deploys for"
       },
       "page": {
-        "description": "Page number for pagination (1-indexed)",
-        "type": "integer",
-        "minimum": -9007199254740991,
-        "maximum": 9007199254740991
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "per_page": {
+        "description": "Number of deploys per page (default 20)",
+        "type": "number"
       }
     },
     "required": [

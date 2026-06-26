@@ -1,0 +1,76 @@
+{
+  "slug": "ebay.search_items",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "search items in ebay",
+    "search for items on ebay in ebay",
+    "search for items on ebay by keyword in ebay"
+  ],
+  "description": "Search for items on eBay by keyword. Returns listings with title, price, condition, and shipping info. Supports filtering by category, condition, and price range. Results are paginated.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search keywords (e.g., \"macbook pro\", \"vintage watch\")"
+      },
+      "category": {
+        "description": "Category ID to filter by (e.g., \"175672\" for Laptops)",
+        "type": "string"
+      },
+      "condition": {
+        "description": "Filter by item condition",
+        "type": "string",
+        "enum": [
+          "new",
+          "used",
+          "refurbished"
+        ]
+      },
+      "min_price": {
+        "description": "Minimum price in dollars",
+        "type": "number"
+      },
+      "max_price": {
+        "description": "Maximum price in dollars",
+        "type": "number"
+      },
+      "sort": {
+        "description": "Sort order (default: best_match)",
+        "type": "string",
+        "enum": [
+          "best_match",
+          "price_asc",
+          "price_desc",
+          "ending_soonest",
+          "newly_listed"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/search-items.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "coinbase.list_watchlists",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "list watchlists in coinbase",
+    "show me my watchlists in coinbase",
+    "view my watchlists in coinbase",
+    "see all my watchlists in coinbase",
+    "list all watchlists in coinbase"
+  ],
+  "description": "List all watchlists for the authenticated user. Each watchlist contains items (assets) the user is tracking. Items include their UUID and type but not full asset details — use get_asset_by_uuid for that.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/list-watchlists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

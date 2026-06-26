@@ -1,0 +1,73 @@
+{
+  "slug": "twilio.update_phone_number",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "update a phone number in twilio",
+    "edit a phone number in twilio",
+    "change the details of phone number in twilio",
+    "modify a phone number in twilio",
+    "update phone number in twilio",
+    "update phone number configuration in twilio"
+  ],
+  "description": "Update configuration for an incoming phone number. Change the friendly name, voice/SMS webhook URLs, HTTP methods, or status callback.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Phone number SID (PNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      },
+      "friendly_name": {
+        "description": "New friendly name for the phone number",
+        "type": "string"
+      },
+      "voice_url": {
+        "description": "URL for incoming voice calls",
+        "type": "string"
+      },
+      "voice_method": {
+        "description": "HTTP method for voice URL",
+        "type": "string",
+        "enum": [
+          "GET",
+          "POST"
+        ]
+      },
+      "sms_url": {
+        "description": "URL for incoming SMS messages",
+        "type": "string"
+      },
+      "sms_method": {
+        "description": "HTTP method for SMS URL",
+        "type": "string",
+        "enum": [
+          "GET",
+          "POST"
+        ]
+      },
+      "status_callback": {
+        "description": "Status callback URL",
+        "type": "string"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/update-phone-number.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "ynab.list_months",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "list months in ynab",
+    "show me my months in ynab",
+    "view my months in ynab",
+    "see all my months in ynab",
+    "list budget months with summaries in ynab"
+  ],
+  "description": "List all budget months in the active YNAB plan. Returns income, budgeted, activity, and Ready to Assign amounts for each month. Sorted from most recent to oldest.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/list-months.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

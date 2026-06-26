@@ -1,0 +1,70 @@
+{
+  "slug": "terraform.create_variable",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "create a variable in terraform",
+    "add a variable in terraform",
+    "make a new variable in terraform",
+    "open a new variable in terraform",
+    "create variable in terraform",
+    "create a workspace variable in terraform"
+  ],
+  "description": "Create a new variable in a workspace. Set category to \"terraform\" for Terraform variables or \"env\" for environment variables.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      },
+      "key": {
+        "type": "string",
+        "description": "Variable key name"
+      },
+      "value": {
+        "description": "Variable value",
+        "type": "string"
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "terraform",
+          "env"
+        ],
+        "description": "Variable category: \"terraform\" or \"env\""
+      },
+      "description": {
+        "description": "Variable description",
+        "type": "string"
+      },
+      "hcl": {
+        "description": "Whether the value is HCL (default false)",
+        "type": "boolean"
+      },
+      "sensitive": {
+        "description": "Whether the variable is sensitive (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "workspace_id",
+      "key",
+      "category"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/create-variable.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

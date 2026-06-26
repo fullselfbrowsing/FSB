@@ -1,0 +1,50 @@
+{
+  "slug": "confluence.list_page_attachments",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list page attachments in confluence",
+    "show me my page attachments in confluence",
+    "view my page attachments in confluence",
+    "see all my page attachments in confluence",
+    "list attachments on a page in confluence"
+  ],
+  "description": "List attachments on a Confluence page. Returns file names, sizes, and download URLs.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to list attachments for"
+      },
+      "limit": {
+        "description": "Maximum number of attachments to return (default 25, max 250)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/list-page-attachments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

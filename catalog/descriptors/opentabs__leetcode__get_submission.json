@@ -1,0 +1,42 @@
+{
+  "slug": "leetcode.get_submission",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get a submission in leetcode",
+    "look up a submission in leetcode",
+    "fetch a single submission in leetcode",
+    "view one specific submission in leetcode",
+    "get submission in leetcode",
+    "get submission details by id in leetcode"
+  ],
+  "description": "Get full details of a submission including source code, runtime/memory stats with percentiles, language, and any errors.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "submissionId": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Submission ID (numeric)"
+      }
+    },
+    "required": [
+      "submissionId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-submission.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

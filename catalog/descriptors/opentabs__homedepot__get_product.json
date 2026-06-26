@@ -1,0 +1,44 @@
+{
+  "slug": "homedepot.get_product",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "get a product in homedepot",
+    "look up a product in homedepot",
+    "fetch a single product in homedepot",
+    "view one specific product in homedepot",
+    "get product in homedepot",
+    "get product details by item id in homedepot"
+  ],
+  "description": "Get detailed information about a Home Depot product by its item ID. Returns description, pricing, availability, fulfillment options, and reviews.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Home Depot product item ID (e.g., \"312610058\")"
+      },
+      "store_id": {
+        "description": "Store ID for local pricing and fulfillment",
+        "type": "string"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

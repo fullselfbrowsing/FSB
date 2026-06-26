@@ -1,0 +1,42 @@
+{
+  "slug": "chipotle.get_restaurant",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get a restaurant in chipotle",
+    "look up a restaurant in chipotle",
+    "fetch a single restaurant in chipotle",
+    "view one specific restaurant in chipotle",
+    "get restaurant in chipotle",
+    "get restaurant details with hours and status in chipotle"
+  ],
+  "description": "Get detailed information about a specific Chipotle restaurant including address, hours, phone number, online ordering status, and Chipotlane availability.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Restaurant ID (from find_restaurants)"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-restaurant.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

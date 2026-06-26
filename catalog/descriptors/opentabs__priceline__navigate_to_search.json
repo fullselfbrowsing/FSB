@@ -1,0 +1,59 @@
+{
+  "slug": "priceline.navigate_to_search",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "navigate a to search in priceline",
+    "navigate to search in priceline",
+    "open hotel search results page in priceline"
+  ],
+  "description": "Navigate the browser to Priceline hotel search results for a given city and dates. This opens the search results page where the user can browse, filter, and select hotels.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "location_id": {
+        "type": "string",
+        "description": "Priceline city or location ID"
+      },
+      "check_in": {
+        "type": "string",
+        "description": "Check-in date in YYYYMMDD format"
+      },
+      "check_out": {
+        "type": "string",
+        "description": "Check-out date in YYYYMMDD format"
+      },
+      "adults": {
+        "description": "Number of adults (default 2)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "rooms": {
+        "description": "Number of rooms (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "location_id",
+      "check_in",
+      "check_out"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/navigate-to-search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

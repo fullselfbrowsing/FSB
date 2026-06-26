@@ -1,0 +1,49 @@
+{
+  "slug": "posthog.create_annotation",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "create an annotation in posthog",
+    "add an annotation in posthog",
+    "make a new annotation in posthog",
+    "open a new annotation in posthog",
+    "create annotation in posthog",
+    "create a new annotation in posthog"
+  ],
+  "description": "Create a new annotation to mark an important event on PostHog charts.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "Annotation text content"
+      },
+      "date_marker": {
+        "type": "string",
+        "description": "ISO 8601 timestamp the annotation marks"
+      },
+      "scope": {
+        "description": "Annotation scope: \"project\" (default), \"organization\", or \"dashboard_item\"",
+        "type": "string"
+      }
+    },
+    "required": [
+      "content",
+      "date_marker"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/create-annotation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

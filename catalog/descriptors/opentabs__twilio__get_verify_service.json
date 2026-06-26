@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.get_verify_service",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get a verify service in twilio",
+    "look up a verify service in twilio",
+    "fetch a single verify service in twilio",
+    "view one specific verify service in twilio",
+    "get verify service in twilio"
+  ],
+  "description": "Get a specific verification service by its SID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Verify Service SID (e.g., VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-verify-service.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

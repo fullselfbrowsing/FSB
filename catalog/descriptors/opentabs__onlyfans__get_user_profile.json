@@ -1,0 +1,41 @@
+{
+  "slug": "onlyfans.get_user_profile",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "get an user profile in onlyfans",
+    "look up an user profile in onlyfans",
+    "fetch a single user profile in onlyfans",
+    "view one specific user profile in onlyfans",
+    "get user profile in onlyfans",
+    "get a user profile by username in onlyfans"
+  ],
+  "description": "Get a user's public profile by their username. Returns profile details including post count, subscriber count, and subscription price.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Username (URL slug, without @)"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "chatgpt.get_prompt_library",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get a prompt library in chatgpt",
+    "look up a prompt library in chatgpt",
+    "fetch a single prompt library in chatgpt",
+    "view one specific prompt library in chatgpt",
+    "get prompt library in chatgpt",
+    "get prompt library templates in chatgpt"
+  ],
+  "description": "Get the ChatGPT prompt library — a collection of suggested prompt templates organized by category.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-prompt-library.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

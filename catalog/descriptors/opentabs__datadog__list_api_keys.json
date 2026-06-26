@@ -1,0 +1,30 @@
+{
+  "slug": "datadog.list_api_keys",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list api keys in datadog",
+    "show me my api keys in datadog",
+    "view my api keys in datadog",
+    "see all my api keys in datadog"
+  ],
+  "description": "List API keys in the Datadog organization.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-api-keys.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

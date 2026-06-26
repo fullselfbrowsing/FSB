@@ -1,0 +1,37 @@
+{
+  "slug": "notebooklm.create_notebook",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "create a notebook in notebooklm",
+    "add a notebook in notebooklm",
+    "make a new notebook in notebooklm",
+    "open a new notebook in notebooklm",
+    "create notebook in notebooklm",
+    "create a new notebook in notebooklm"
+  ],
+  "description": "Create a new empty notebook in NotebookLM. Returns the new notebook ID. Sources can be added after creation.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "description": "Notebook title (optional, defaults to untitled)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/create-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

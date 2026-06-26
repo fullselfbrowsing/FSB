@@ -1,0 +1,41 @@
+{
+  "slug": "steam.get_app_details",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "get app details in steam",
+    "look up app details in steam",
+    "fetch a single app details in steam",
+    "view one specific app details in steam",
+    "get detailed info about a steam app in steam"
+  ],
+  "description": "Get detailed information about a Steam app by its ID. Returns name, description, price, platforms, genres, categories, release date, metacritic score, and more. Prices are in cents.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "appid": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Steam app ID (e.g., 730 for Counter-Strike 2)"
+      }
+    },
+    "required": [
+      "appid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/get-app-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -6,25 +6,23 @@
     "add comment in jira",
     "add a comment to an issue in jira"
   ],
-  "description": "Add a comment to an existing Jira issue.",
+  "description": "Add a comment to a Jira issue.",
   "actionVerb": "add",
   "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
-      "issue_id_or_key": {
+      "issue_key": {
         "type": "string",
-        "minLength": 1,
-        "description": "Issue ID or key to comment on (e.g. ENG-123)"
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
       },
       "body": {
         "type": "string",
-        "minLength": 1,
-        "description": "Comment body text in markdown"
+        "description": "Comment text in plain text"
       }
     },
     "required": [
-      "issue_id_or_key",
+      "issue_key",
       "body"
     ],
     "additionalProperties": false

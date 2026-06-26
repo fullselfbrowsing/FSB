@@ -1,0 +1,45 @@
+{
+  "slug": "azure.get_policy_assignment",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "get a policy assignment in azure",
+    "look up a policy assignment in azure",
+    "fetch a single policy assignment in azure",
+    "view one specific policy assignment in azure",
+    "get policy assignment in azure",
+    "get policy assignment details in azure"
+  ],
+  "description": "Get detailed information about a specific Azure Policy assignment by name.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "policy_assignment_name": {
+        "type": "string",
+        "description": "Policy assignment name"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "policy_assignment_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/get-policy-assignment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

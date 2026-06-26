@@ -1,0 +1,44 @@
+{
+  "slug": "datadog.list_incidents",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list incidents in datadog",
+    "show me my incidents in datadog",
+    "view my incidents in datadog",
+    "see all my incidents in datadog",
+    "list datadog incidents in datadog"
+  ],
+  "description": "List incidents in the Datadog organization. Supports filtering by status and pagination. Note: Incident Management must be enabled.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Results per page (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_offset": {
+        "description": "Offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-incidents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

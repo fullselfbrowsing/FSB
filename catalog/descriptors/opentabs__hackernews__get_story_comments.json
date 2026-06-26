@@ -1,0 +1,47 @@
+{
+  "slug": "hackernews.get_story_comments",
+  "service": "news.ycombinator.com",
+  "intentSynonyms": [
+    "get story comments in hackernews",
+    "look up story comments in hackernews",
+    "fetch a single story comments in hackernews",
+    "view one specific story comments in hackernews",
+    "get comments for a story in hackernews"
+  ],
+  "description": "Get comments for a story by its ID. Returns all comments on the page with nesting depth (indent=0 for top-level, indent=1 for replies, etc.). Comments are in ranked display order. Use page for pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "story_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Story ID to get comments for"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "story_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hackernews/src/tools/get-story-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

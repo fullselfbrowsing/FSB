@@ -1,0 +1,40 @@
+{
+  "slug": "powerpoint.get_item",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get an item in powerpoint",
+    "look up an item in powerpoint",
+    "fetch a single item in powerpoint",
+    "view one specific item in powerpoint",
+    "get item in powerpoint",
+    "get details of a file or folder in powerpoint"
+  ],
+  "description": "Get detailed information about a file or folder by its item ID. Returns name, size, MIME type, creation/modification details, and web URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file or folder"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

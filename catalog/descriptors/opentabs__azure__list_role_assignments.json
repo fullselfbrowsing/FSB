@@ -1,0 +1,43 @@
+{
+  "slug": "azure.list_role_assignments",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list role assignments in azure",
+    "show me my role assignments in azure",
+    "view my role assignments in azure",
+    "see all my role assignments in azure",
+    "list rbac role assignments in azure"
+  ],
+  "description": "List all RBAC role assignments for a subscription. Shows which principals have which roles at which scopes. Use the filter to narrow by principal ID or role definition.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "filter": {
+        "description": "OData filter expression (e.g., \"principalId eq '...'\" or \"atScope()\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-role-assignments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "posthog.create_dashboard",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "create a dashboard in posthog",
+    "add a dashboard in posthog",
+    "make a new dashboard in posthog",
+    "open a new dashboard in posthog",
+    "create dashboard in posthog",
+    "create a new dashboard in posthog"
+  ],
+  "description": "Create a new dashboard in the current PostHog project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Dashboard name"
+      },
+      "description": {
+        "description": "Dashboard description",
+        "type": "string"
+      },
+      "pinned": {
+        "description": "Whether to pin the dashboard",
+        "type": "boolean"
+      },
+      "tags": {
+        "description": "Tags to attach",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/create-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

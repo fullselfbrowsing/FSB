@@ -1,0 +1,145 @@
+{
+  "slug": "gcal.create_event",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "create an event in gcal",
+    "add an event in gcal",
+    "make a new event in gcal",
+    "open a new event in gcal",
+    "create event in gcal",
+    "create a new calendar event in gcal"
+  ],
+  "description": "Create a new calendar event. For timed events, provide start_datetime and end_datetime in ISO 8601 format with timezone offset (e.g., \"2024-01-15T10:00:00-08:00\"). For all-day events, provide start_date and end_date in YYYY-MM-DD format (end_date is exclusive). At least one of (start_datetime or start_date) must be provided.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "description": "Calendar ID (default \"primary\")",
+        "type": "string"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Event title"
+      },
+      "description": {
+        "description": "Event description",
+        "type": "string"
+      },
+      "location": {
+        "description": "Event location",
+        "type": "string"
+      },
+      "start_datetime": {
+        "description": "Start datetime in ISO 8601 format with offset (e.g., \"2024-01-15T10:00:00-08:00\")",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "Start date for all-day events in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "end_datetime": {
+        "description": "End datetime in ISO 8601 format with offset",
+        "type": "string"
+      },
+      "end_date": {
+        "description": "End date (exclusive) for all-day events in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "time_zone": {
+        "description": "IANA time zone for the event (e.g., \"America/Los_Angeles\")",
+        "type": "string"
+      },
+      "attendees": {
+        "description": "List of attendee email addresses",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "recurrence": {
+        "description": "RRULE, EXRULE, RDATE, or EXDATE lines (e.g., [\"RRULE:FREQ=WEEKLY;COUNT=5\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "reminders": {
+        "description": "Custom reminder overrides",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "email",
+                "popup"
+              ],
+              "description": "Reminder method"
+            },
+            "minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Minutes before the event"
+            }
+          },
+          "required": [
+            "method",
+            "minutes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "color_id": {
+        "description": "Color ID (1-11) for the event",
+        "type": "string"
+      },
+      "visibility": {
+        "description": "Event visibility",
+        "type": "string",
+        "enum": [
+          "default",
+          "public",
+          "private",
+          "confidential"
+        ]
+      },
+      "transparency": {
+        "description": "Whether the event blocks time on the calendar",
+        "type": "string",
+        "enum": [
+          "opaque",
+          "transparent"
+        ]
+      },
+      "send_updates": {
+        "description": "Who to send notifications to (default \"none\")",
+        "type": "string",
+        "enum": [
+          "all",
+          "externalOnly",
+          "none"
+        ]
+      }
+    },
+    "required": [
+      "summary"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/create-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

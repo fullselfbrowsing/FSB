@@ -1,0 +1,68 @@
+{
+  "slug": "asana.search_tasks",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "search tasks in asana",
+    "search tasks in a workspace in asana",
+    "search for tasks in a workspace in asana"
+  ],
+  "description": "Search for tasks in a workspace. Supports filtering by text, assignee, completion status, due dates, and projects.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace GID to search in"
+      },
+      "text": {
+        "description": "Text to search for in task names and descriptions",
+        "type": "string"
+      },
+      "assignee_gid": {
+        "description": "Filter by assignee user GID",
+        "type": "string"
+      },
+      "completed": {
+        "description": "Filter by completion status",
+        "type": "boolean"
+      },
+      "due_on_before": {
+        "description": "Filter tasks due on or before this date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "due_on_after": {
+        "description": "Filter tasks due on or after this date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "projects_any": {
+        "description": "Comma-separated project GIDs to filter by (matches any)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "workspace_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/search-tasks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "todoist.archive_project",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "archive a project in todoist",
+    "archive project in todoist",
+    "archive a todoist project in todoist"
+  ],
+  "description": "Archive a Todoist project. Archived projects are hidden from the default view but can be restored later.",
+  "actionVerb": "archive",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "The ID of the project to archive"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/archive-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "archive"
+    }
+  }
+}

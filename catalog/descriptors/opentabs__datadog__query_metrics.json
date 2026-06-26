@@ -1,12 +1,12 @@
 {
   "slug": "datadog.query_metrics",
-  "service": "app.datadoghq.com",
+  "service": "datadoghq.com",
   "intentSynonyms": [
     "query metrics in datadog",
-    "query metric timeseries in datadog",
-    "query timeseries points for a datadog metric over a time window using a metric query string in datadog"
+    "query metric time-series data in datadog",
+    "query time-series metric data from datadog in datadog"
   ],
-  "description": "Query timeseries points for a Datadog metric over a time window using a metric query string.",
+  "description": "Query time-series metric data from Datadog. Use standard metric query syntax with aggregation, scope, and optional group-by (e.g., \"avg:system.cpu.user{env:prod} by {host}\").",
   "actionVerb": "query",
   "sideEffectClass": "read",
   "params": {
@@ -14,20 +14,15 @@
     "properties": {
       "query": {
         "type": "string",
-        "minLength": 1,
-        "description": "Datadog metric query (e.g. avg:system.cpu.user{*})"
+        "description": "Metric query (e.g., \"avg:system.cpu.user{*}\", \"sum:my.metric{env:prod} by {host}\")"
       },
       "from": {
-        "type": "integer",
-        "minimum": -9007199254740991,
-        "maximum": 9007199254740991,
-        "description": "Start of the window as a Unix timestamp (seconds)"
+        "type": "number",
+        "description": "Start time (POSIX epoch seconds)"
       },
       "to": {
-        "type": "integer",
-        "minimum": -9007199254740991,
-        "maximum": 9007199254740991,
-        "description": "End of the window as a Unix timestamp (seconds)"
+        "type": "number",
+        "description": "End time (POSIX epoch seconds)"
       }
     },
     "required": [
@@ -44,7 +39,7 @@
     "sourcePath": "plugins/datadog/src/tools/query-metrics.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
+      "transportHelper": "apiget",
       "httpMethod": "GET",
       "opNameVerb": "query"
     }

@@ -1,0 +1,31 @@
+{
+  "slug": "supabase.list_sql_snippets",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "list sql snippets in supabase",
+    "show me my sql snippets in supabase",
+    "view my sql snippets in supabase",
+    "see all my sql snippets in supabase",
+    "list saved sql snippets in supabase"
+  ],
+  "description": "List saved SQL snippets for the authenticated user.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/list-sql-snippets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

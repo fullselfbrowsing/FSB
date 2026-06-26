@@ -1,0 +1,48 @@
+{
+  "slug": "lucid.create_document",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "create a document in lucid",
+    "add a document in lucid",
+    "make a new document in lucid",
+    "open a new document in lucid",
+    "create document in lucid",
+    "create a new document in lucid"
+  ],
+  "description": "Create a new blank Lucid document. Specify a title and product type (chart for Lucidchart diagram, press for Lucidspark whiteboard). Returns the created document with its edit URL.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Document title"
+      },
+      "product": {
+        "description": "Product type: chart (Lucidchart) or press (Lucidspark). Default: chart",
+        "type": "string",
+        "enum": [
+          "chart",
+          "press"
+        ]
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/create-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "slug": "linear.create_project",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create a project in linear",
+    "add a project in linear",
+    "make a new project in linear",
+    "open a new project in linear",
+    "create project in linear",
+    "create a new project in linear"
+  ],
+  "description": "Create a new project in Linear.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Project name"
+      },
+      "description": {
+        "description": "Project description",
+        "type": "string"
+      },
+      "team_ids": {
+        "description": "Array of team UUIDs to associate with the project",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "state": {
+        "description": "Project state (planned, started, paused, completed, canceled)",
+        "type": "string"
+      },
+      "target_date": {
+        "description": "Target completion date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

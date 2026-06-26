@@ -1,0 +1,46 @@
+{
+  "slug": "stripe.list_customers",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list customers in stripe",
+    "show me my customers in stripe",
+    "view my customers in stripe",
+    "see all my customers in stripe",
+    "list customers with pagination in stripe"
+  ],
+  "description": "List customers in your Stripe account. Returns customers sorted by creation date (newest first). Use starting_after for cursor-based pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of customers to return (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Customer ID cursor — fetch customers created after this ID",
+        "type": "string"
+      },
+      "email": {
+        "description": "Filter by exact email address",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-customers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

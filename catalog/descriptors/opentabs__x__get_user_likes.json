@@ -1,0 +1,50 @@
+{
+  "slug": "x.get_user_likes",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get user likes in x",
+    "look up user likes in x",
+    "fetch a single user likes in x",
+    "view one specific user likes in x",
+    "get tweets liked by a user in x"
+  ],
+  "description": "Get tweets liked by a specific user. Requires the user's numeric ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID"
+      },
+      "count": {
+        "description": "Number of tweets (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-user-likes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "glama.list_server_categories",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "list server categories in glama",
+    "show me my server categories in glama",
+    "view my server categories in glama",
+    "see all my server categories in glama",
+    "list mcp server categories in glama"
+  ],
+  "description": "List all MCP server categories in the Glama directory. Returns category names, slugs, icons, and descriptions. Use the slug with list_servers_by_category to browse servers in a category.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/list-server-categories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

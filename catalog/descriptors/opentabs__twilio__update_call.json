@@ -1,0 +1,55 @@
+{
+  "slug": "twilio.update_call",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "update a call in twilio",
+    "edit a call in twilio",
+    "change the details of call in twilio",
+    "modify a call in twilio",
+    "update call in twilio"
+  ],
+  "description": "Modify an in-progress call. Use this to redirect a call to a new TwiML URL or to end a call by setting its status to \"completed\" or \"canceled\".",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Call SID to modify (e.g., CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      },
+      "url": {
+        "description": "New TwiML URL to redirect the call to",
+        "type": "string"
+      },
+      "method": {
+        "description": "HTTP method for the new TwiML URL (GET or POST)",
+        "type": "string"
+      },
+      "status": {
+        "description": "Set to \"completed\" or \"canceled\" to end the call",
+        "type": "string",
+        "enum": [
+          "completed",
+          "canceled"
+        ]
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/update-call.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

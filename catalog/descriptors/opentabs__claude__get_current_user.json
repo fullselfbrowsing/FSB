@@ -1,0 +1,32 @@
+{
+  "slug": "claude.get_current_user",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "get a current user in claude",
+    "look up a current user in claude",
+    "fetch a single current user in claude",
+    "view one specific current user in claude",
+    "get current user in claude",
+    "get the current user profile in claude"
+  ],
+  "description": "Get the profile of the currently authenticated Claude user including email, name, and verification status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

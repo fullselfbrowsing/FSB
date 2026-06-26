@@ -1,0 +1,39 @@
+{
+  "slug": "linear.list_workflow_states",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list workflow states in linear",
+    "show me my workflow states in linear",
+    "view my workflow states in linear",
+    "see all my workflow states in linear",
+    "list workflow states for a team in linear"
+  ],
+  "description": "List all workflow states for a team. Use this to find state IDs for filtering issues or updating issue state.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "description": "Team UUID to list workflow states for (use list_teams to find IDs)"
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-workflow-states.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

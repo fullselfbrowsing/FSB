@@ -4,9 +4,9 @@
   "intentSynonyms": [
     "trigger a pipeline in circleci",
     "trigger pipeline in circleci",
-    "start a new pipeline run on circleci in circleci"
+    "trigger a new pipeline in circleci"
   ],
-  "description": "Start and run a new CircleCI pipeline for a project on a given branch or tag -- kick off a fresh pipeline build. Optionally pass pipeline parameters.",
+  "description": "Trigger a new pipeline on a project. Specify a branch or tag to build.",
   "actionVerb": "trigger",
   "sideEffectClass": "write",
   "params": {
@@ -14,19 +14,18 @@
     "properties": {
       "project_slug": {
         "type": "string",
-        "minLength": 1,
-        "description": "Project slug (vcs-type/org-name/repo-name, e.g. gh/acme/app)"
+        "description": "Project slug e.g. \"gh/org/repo\""
       },
       "branch": {
-        "description": "Branch to run the pipeline on",
+        "description": "VCS branch to build",
         "type": "string"
       },
       "tag": {
-        "description": "Tag to run the pipeline on (mutually exclusive with branch)",
+        "description": "VCS tag to build",
         "type": "string"
       },
       "parameters": {
-        "description": "Pipeline parameters to pass",
+        "description": "Pipeline parameters as key-value pairs",
         "type": "object",
         "propertyNames": {
           "type": "string"

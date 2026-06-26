@@ -1,0 +1,39 @@
+{
+  "slug": "onlyfans.like_post",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "like a post in onlyfans",
+    "like post in onlyfans",
+    "like or unlike a post in onlyfans"
+  ],
+  "description": "Toggle the like/favorite status on a post. If the post is already liked, it will be unliked.",
+  "actionVerb": "like",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Post ID to like/unlike"
+      }
+    },
+    "required": [
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/like-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "like"
+    }
+  }
+}

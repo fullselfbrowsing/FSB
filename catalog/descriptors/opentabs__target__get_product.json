@@ -1,28 +1,27 @@
 {
   "slug": "target.get_product",
-  "service": "www.target.com",
+  "service": "target.com",
   "intentSynonyms": [
     "get a product in target",
     "look up a product in target",
     "fetch a single product in target",
     "view one specific product in target",
     "get product in target",
-    "look up a single target product in target"
+    "get product details by tcin in target"
   ],
-  "description": "Get the full detail (title, price, availability, and description) of a single Target product by its TCIN/product ID.",
+  "description": "Get detailed information about a Target product by its TCIN (Target item number). Returns title, description, price, brand, rating, reviews, bullet features, and image. Use search_products to find TCINs.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "product_id": {
+      "tcin": {
         "type": "string",
-        "minLength": 1,
-        "description": "The TCIN / product ID to fetch"
+        "description": "Target item number (TCIN) — e.g., \"85978618\""
       }
     },
     "required": [
-      "product_id"
+      "tcin"
     ],
     "additionalProperties": false
   },
@@ -33,8 +32,8 @@
     "sourcePath": "plugins/target/src/tools/get-product.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

@@ -1,0 +1,51 @@
+{
+  "slug": "minimax.list_cron_executions",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list cron executions in minimax",
+    "show me my cron executions in minimax",
+    "view my cron executions in minimax",
+    "see all my cron executions in minimax",
+    "list cron job executions in minimax"
+  ],
+  "description": "List execution history for a scheduled (cron) job with pagination. Returns individual execution records with status and timing.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "job_id": {
+        "type": "string",
+        "description": "Cron job ID"
+      },
+      "page_num": {
+        "description": "Page number (1-based)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Number of executions per page",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "job_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-cron-executions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

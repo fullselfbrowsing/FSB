@@ -222,21 +222,31 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
     'payment write descriptor sideEffectClass is write (the emitted class crosscheck verified -- drives the re-gate; a money-moving order placement)');
   check(payWriteDescriptor.backing === 'dom',
     'payment write descriptor backing is dom (BRDTH-03: DOM-only on a sensitive origin -- the payment-op CI guard PASSES -- AND its write is posture-B gated)');
-  check(payReadDescriptor.service === 'www.doordash.com' && payReadDescriptor.sideEffectClass === 'read',
-    'read descriptor (list_orders) is service www.doordash.com + sideEffectClass read (the emitted read op)');
+  // 39.5-04 full-source import: the REAL doordash plugin emits list_orders on the bare
+  // apex doordash.com (place_order stays on www.doordash.com). BOTH classify SENSITIVE
+  // (the '*.doordash.com' apex-suffix covers apex + www), so the read-runs-under-Auto
+  // proof holds either way. Assert the read op is a doordash origin that is SENSITIVE +
+  // read (host-agnostic so the apex/www split the real plugin uses is not brittle).
+  const payReadClass = Denylist.classify('https://' + payReadDescriptor.service);
+  check(/(^|\.)doordash\.com$/.test(payReadDescriptor.service) && payReadClass && payReadClass.sensitive === true && payReadDescriptor.sideEffectClass === 'read',
+    'read descriptor (list_orders) is a SENSITIVE doordash origin (' + payReadDescriptor.service + ') + sideEffectClass read (the emitted read op -- real plugin emits it on the apex doordash.com)');
 
   // Route the REAL payment descriptors through the LIVE gate.
   if (typeof Store._reset === 'function') Store._reset();
   await Store.setOriginMode(DOORDASH_ORIGIN, 'auto');     // Auto, mutating flag false
 
   // The READ op (list_orders, sideEffectClass read from the loaded JSON) -> allow.
+  // Route through the read descriptor's OWN sensitive origin (the real plugin emits it on
+  // the apex doordash.com; auto-mode that origin too so the read evaluates under Auto).
+  const PAY_READ_ORIGIN = 'https://' + payReadDescriptor.service;
+  await Store.setOriginMode(PAY_READ_ORIGIN, 'auto');     // Auto, mutating flag false
   const payReadGate = await Gate.evaluate({
-    origin: DOORDASH_ORIGIN,
+    origin: PAY_READ_ORIGIN,
     slug: payReadDescriptor.slug,
     entry: { tier: 'T3', descriptor: { sideEffectClass: payReadDescriptor.sideEffectClass } }
   });
   check(payReadGate && payReadGate.decision === 'allow',
-    'the REAL doordash.list_orders (read) on www.doordash.com (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
+    'the REAL doordash.list_orders (read) on ' + payReadDescriptor.service + ' (sensitive, Auto) -> allow (reads run under Auto; the re-gate is write-only)');
 
   // The payment WRITE op WITHOUT the per-origin mutating flag -> re-gated. The
   // descriptor's REAL sideEffectClass ('write', read from the loaded JSON) triggers

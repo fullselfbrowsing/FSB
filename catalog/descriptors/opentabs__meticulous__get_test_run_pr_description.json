@@ -1,0 +1,40 @@
+{
+  "slug": "meticulous.get_test_run_pr_description",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get a test run pr description in meticulous",
+    "look up a test run pr description in meticulous",
+    "fetch a single test run pr description in meticulous",
+    "view one specific test run pr description in meticulous",
+    "get test run pr description in meticulous",
+    "get pr description for a test run in meticulous"
+  ],
+  "description": "Get the pull request description associated with a test run.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      }
+    },
+    "required": [
+      "test_run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-test-run-pr-description.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

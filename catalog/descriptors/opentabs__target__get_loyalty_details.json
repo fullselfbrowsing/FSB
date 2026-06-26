@@ -1,0 +1,31 @@
+{
+  "slug": "target.get_loyalty_details",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get loyalty details in target",
+    "look up loyalty details in target",
+    "fetch a single loyalty details in target",
+    "view one specific loyalty details in target",
+    "get target circle loyalty balance and savings in target"
+  ],
+  "description": "Get Target Circle loyalty account details including earnings balance, lifetime savings, community votes, enrollment date, and bonus offer slots.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-loyalty-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

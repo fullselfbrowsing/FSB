@@ -1,0 +1,32 @@
+{
+  "slug": "gdrive.get_current_user",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "get a current user in gdrive",
+    "look up a current user in gdrive",
+    "fetch a single current user in gdrive",
+    "view one specific current user in gdrive",
+    "get current user in gdrive",
+    "get drive user profile and storage info in gdrive"
+  ],
+  "description": "Get the authenticated Google Drive user profile including display name, email, and storage quota. Uses the Drive v3 About endpoint.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

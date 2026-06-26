@@ -1,0 +1,31 @@
+{
+  "slug": "cockroachdb.list_invoices",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "list invoices in cockroachdb",
+    "show me my invoices in cockroachdb",
+    "view my invoices in cockroachdb",
+    "see all my invoices in cockroachdb",
+    "list organization invoices in cockroachdb"
+  ],
+  "description": "List all invoices for the organization. Returns invoice period, amounts due and paid.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/list-invoices.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

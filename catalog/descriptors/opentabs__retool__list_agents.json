@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_agents",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list agents in retool",
+    "show me my agents in retool",
+    "view my agents in retool",
+    "see all my agents in retool",
+    "list all retool ai agents in retool"
+  ],
+  "description": "List all AI agents in the Retool organization. Agents are AI-powered assistants built within Retool.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-agents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

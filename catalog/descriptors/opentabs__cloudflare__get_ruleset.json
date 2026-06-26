@@ -1,0 +1,45 @@
+{
+  "slug": "cloudflare.get_ruleset",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "get a ruleset in cloudflare",
+    "look up a ruleset in cloudflare",
+    "fetch a single ruleset in cloudflare",
+    "view one specific ruleset in cloudflare",
+    "get ruleset in cloudflare",
+    "get ruleset with rules in cloudflare"
+  ],
+  "description": "Get a specific ruleset with all its rules. Returns the full rule definitions including expressions, actions, and configuration. Use list_rulesets first to discover ruleset IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      },
+      "ruleset_id": {
+        "type": "string",
+        "description": "Ruleset ID"
+      }
+    },
+    "required": [
+      "zone_id",
+      "ruleset_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/get-ruleset.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

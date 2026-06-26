@@ -1,0 +1,51 @@
+{
+  "slug": "figma.create_file",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "create a file in figma",
+    "add a file in figma",
+    "make a new file in figma",
+    "open a new file in figma",
+    "create file in figma",
+    "create a new design file in figma"
+  ],
+  "description": "Create a new Figma design file in a specified folder",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name for the new file"
+      },
+      "folder_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Folder/project ID to create the file in"
+      },
+      "editor_type": {
+        "description": "Editor type: \"design\" (default), \"figjam\", or \"slides\"",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/create-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

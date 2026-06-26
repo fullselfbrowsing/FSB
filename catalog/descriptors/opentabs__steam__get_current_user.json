@@ -1,0 +1,32 @@
+{
+  "slug": "steam.get_current_user",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "get a current user in steam",
+    "look up a current user in steam",
+    "fetch a single current user in steam",
+    "view one specific current user in steam",
+    "get current user in steam",
+    "get current logged-in steam user info in steam"
+  ],
+  "description": "Get the currently logged-in Steam user identity. Returns the account ID and Steam64 ID. The Steam64 ID is the 17-digit identifier used in profile URLs and API calls.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

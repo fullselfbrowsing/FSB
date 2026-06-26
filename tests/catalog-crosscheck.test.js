@@ -169,41 +169,49 @@ async function main() {
   check(Array.isArray(gRead.failures) && gRead.failures.length === 0, '(g) getCurrentUser (camelCase read verb, graphql) declared read PASSES (no false-fail)');
 
   // ---- (h) MED-02: the read-only-safe-origin invariant ----------------------
-  // reddit.com is classified SAFE only because the vendored slice is read-only. The
-  // new checkReadOnlySafeOrigins gate makes that a checked invariant: a non-read op
-  // under reddit.com FAILS the build (forcing a re-classification to sensitive) so a
-  // future re-vendor that adds a reddit write cannot ship writable-under-Auto silently.
+  // grafana.com is classified SAFE only because the vendored slice is read-only
+  // (list_dashboards/get_dashboard/query_metrics). The checkReadOnlySafeOrigins gate
+  // makes that a checked invariant: a non-read op under grafana.com FAILS the build
+  // (forcing a re-classification to sensitive) so a future re-vendor that adds a grafana
+  // write cannot ship writable-under-Auto silently.
+  //
+  // RE-POINTED in 39.5-04: this block (and the fixture) USED to encode reddit.com. The
+  // full-source import proved the REAL reddit plugin has write ops (edit_text/send_message/
+  // delete/...), so reddit was reclassified SENSITIVE (out of READ_ONLY_SAFE_SERVICES) --
+  // the "reddit is read-only" premise is now FALSE. grafana is the still-read-only-safe
+  // origin that keeps the "a write on a safe origin FAILS the build" proof valid.
   check(typeof gate.checkReadOnlySafeOrigins === 'function',
     '(h) checkReadOnlySafeOrigins is a named export of the real gate (MED-02 safe-origin invariant)');
 
-  // The fixture: a HYPOTHETICAL reddit write descriptor (service reddit.com,
+  // The fixture: a HYPOTHETICAL grafana write descriptor (service grafana.com,
   // sideEffectClass write). Loaded from disk so the proof is the real gate over the
   // real fixture shape, not a fabricated inline object.
   const SAFE_WRITE_FIXTURE = path.join(ROOT, 'catalog', 'descriptors', '_fixtures', 'safe-origin-write.fixture.json');
-  check(fs.existsSync(SAFE_WRITE_FIXTURE), '(h) the safe-origin-write fixture exists on disk (a hypothetical reddit write)');
+  check(fs.existsSync(SAFE_WRITE_FIXTURE), '(h) the safe-origin-write fixture exists on disk (a hypothetical grafana write)');
   const safeWriteFixture = JSON.parse(fs.readFileSync(SAFE_WRITE_FIXTURE, 'utf8'));
-  check(safeWriteFixture.service === 'reddit.com' && safeWriteFixture.sideEffectClass === 'write',
-    '(h) the fixture is service reddit.com + sideEffectClass write (a read-only-safe origin gaining a write)');
+  check(safeWriteFixture.service === 'grafana.com' && safeWriteFixture.sideEffectClass === 'write',
+    '(h) the fixture is service grafana.com + sideEffectClass write (a read-only-safe origin gaining a write)');
   const hFail = gate.checkReadOnlySafeOrigins([safeWriteFixture]);
   check(Array.isArray(hFail.failures) && hFail.failures.length === 1,
-    '(h) checkReadOnlySafeOrigins([reddit write]) yields exactly one failure -> the build ABORTS (the safe-because-read-only assumption, enforced)');
-  check(hFail.failures.length > 0 && hFail.failures[0].indexOf('reddit.submit_post') !== -1 && /reddit\.com/.test(hFail.failures[0]),
-    '(h) the failure NAMES the offending slug reddit.submit_post and its service reddit.com');
+    '(h) checkReadOnlySafeOrigins([grafana write]) yields exactly one failure -> the build ABORTS (the safe-because-read-only assumption, enforced)');
+  check(hFail.failures.length > 0 && hFail.failures[0].indexOf('grafana.create_dashboard') !== -1 && /grafana\.com/.test(hFail.failures[0]),
+    '(h) the failure NAMES the offending slug grafana.create_dashboard and its service grafana.com');
 
   // A destructive op under the safe origin is ALSO caught (not only write).
   const hDestructive = gate.checkReadOnlySafeOrigins([
-    { slug: 'reddit.delete_post', service: 'reddit.com', sideEffectClass: 'destructive' },
+    { slug: 'grafana.delete_dashboard', service: 'grafana.com', sideEffectClass: 'destructive' },
   ]);
   check(Array.isArray(hDestructive.failures) && hDestructive.failures.length === 1,
-    '(h) a destructive op under reddit.com is ALSO flagged (write AND destructive trip the invariant)');
+    '(h) a destructive op under grafana.com is ALSO flagged (write AND destructive trip the invariant)');
 
-  // (i) NO FALSE-FAIL: the REAL emitted reddit READ descriptors PASS (they ARE
+  // (i) NO FALSE-FAIL: the REAL emitted grafana READ descriptors PASS (they ARE
   // read-only, the genuine current state). Loaded from disk -- the actual shipped ops.
-  const redditReads = ['opentabs__reddit__get_post.json', 'opentabs__reddit__list_subreddit_posts.json', 'opentabs__reddit__search_posts.json'];
-  const redditReadDescriptors = redditReads.map((n) => JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'descriptors', n), 'utf8')));
-  const iPass = gate.checkReadOnlySafeOrigins(redditReadDescriptors);
+  // (Re-pointed from reddit in 39.5-04: reddit is no longer read-only-safe; grafana is.)
+  const grafanaReads = ['opentabs__grafana__list_dashboards.json', 'opentabs__grafana__get_dashboard.json', 'opentabs__grafana__query_metrics.json'];
+  const grafanaReadDescriptors = grafanaReads.map((n) => JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'descriptors', n), 'utf8')));
+  const iPass = gate.checkReadOnlySafeOrigins(grafanaReadDescriptors);
   check(Array.isArray(iPass.failures) && iPass.failures.length === 0,
-    '(i) the 3 REAL emitted reddit READ descriptors PASS checkReadOnlySafeOrigins (no false-fail -- reddit is genuinely read-only today)');
+    '(i) the 3 REAL emitted grafana READ descriptors PASS checkReadOnlySafeOrigins (no false-fail -- grafana is genuinely read-only today)');
 
   // (j) a descriptor for an origin NOT in the read-only-safe set is ignored by this
   // invariant (a discord write is governed by classification/crosscheck, not here).

@@ -1,0 +1,41 @@
+{
+  "slug": "x.get_list",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get a list in x",
+    "look up a list in x",
+    "fetch a single list in x",
+    "view one specific list in x",
+    "get list in x",
+    "get list details in x"
+  ],
+  "description": "Get details about a list by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

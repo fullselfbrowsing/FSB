@@ -1,0 +1,39 @@
+{
+  "slug": "ytmusic.get_search_suggestions",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "get search suggestions in ytmusic",
+    "look up search suggestions in ytmusic",
+    "fetch a single search suggestions in ytmusic",
+    "view one specific search suggestions in ytmusic",
+    "get autocomplete suggestions for a search query in ytmusic"
+  ],
+  "description": "Get search autocomplete suggestions for a query",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Partial search text to get suggestions for"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/get-search-suggestions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

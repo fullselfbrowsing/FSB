@@ -1,0 +1,41 @@
+{
+  "slug": "datadog.trigger_synthetics_test",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "trigger a synthetics test in datadog",
+    "trigger synthetics test in datadog",
+    "trigger a synthetic test run in datadog"
+  ],
+  "description": "Trigger an on-demand run of a synthetic test. Returns the triggered results with batch ID.",
+  "actionVerb": "trigger",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "public_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of synthetic test public IDs to trigger"
+      }
+    },
+    "required": [
+      "public_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/trigger-synthetics-test.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "trigger"
+    }
+  }
+}

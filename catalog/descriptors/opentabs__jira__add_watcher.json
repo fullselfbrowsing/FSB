@@ -1,0 +1,42 @@
+{
+  "slug": "jira.add_watcher",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "add a watcher in jira",
+    "add watcher in jira",
+    "add a watcher to an issue in jira"
+  ],
+  "description": "Add a user as a watcher on a Jira issue. The user will receive notifications for issue updates.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_key": {
+        "type": "string",
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
+      },
+      "account_id": {
+        "type": "string",
+        "description": "Account ID of the user to add as watcher (use search_users to find IDs)"
+      }
+    },
+    "required": [
+      "issue_key",
+      "account_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/add-watcher.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "confluence.get_page_children",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get a page children in confluence",
+    "look up a page children in confluence",
+    "fetch a single page children in confluence",
+    "view one specific page children in confluence",
+    "get page children in confluence",
+    "list child pages of a page in confluence"
+  ],
+  "description": "List the child pages of a Confluence page. Useful for navigating the page tree.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Parent page ID"
+      },
+      "limit": {
+        "description": "Maximum number of children to return (default 25, max 250)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/get-page-children.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "onenote.create_page",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "create a page in onenote",
+    "add a page in onenote",
+    "make a new page in onenote",
+    "open a new page in onenote",
+    "create page in onenote",
+    "create a new page in a section with html content in onenote"
+  ],
+  "description": "Create a new page in a OneNote section. The page content is specified as HTML. The HTML must include a <title> element inside <head> for the page title. Supports standard HTML elements: headings (h1-h6), paragraphs (p), lists (ul/ol/li), tables (table/tr/td), images (img with src), links (a), and text formatting (b, i, u, strike). Example: <!DOCTYPE html><html><head><title>My Page</title></head><body><h1>Hello</h1><p>Content here</p></body></html>",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "section_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Section ID to create the page in"
+      },
+      "html": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page content as HTML. Must include <!DOCTYPE html><html><head><title>Page Title</title></head><body>...</body></html>"
+      }
+    },
+    "required": [
+      "section_id",
+      "html"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/create-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

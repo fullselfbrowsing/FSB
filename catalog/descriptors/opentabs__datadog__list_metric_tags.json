@@ -1,0 +1,39 @@
+{
+  "slug": "datadog.list_metric_tags",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list metric tags in datadog",
+    "show me my metric tags in datadog",
+    "view my metric tags in datadog",
+    "see all my metric tags in datadog",
+    "list tags for a metric in datadog"
+  ],
+  "description": "List all tags associated with a specific metric. Useful for understanding available dimensions for filtering and grouping.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "metric_name": {
+        "type": "string",
+        "description": "Metric name to get tags for (e.g., \"system.cpu.user\")"
+      }
+    },
+    "required": [
+      "metric_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-metric-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

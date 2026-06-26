@@ -1,0 +1,52 @@
+{
+  "slug": "reddit.send_message",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "send a message in reddit",
+    "post a message in reddit",
+    "write a new message in reddit",
+    "send message in reddit",
+    "send a private message in reddit"
+  ],
+  "description": "Send a private message to another Reddit user",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Recipient username (without u/ prefix)"
+      },
+      "subject": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message subject"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message body (supports Reddit markdown)"
+      }
+    },
+    "required": [
+      "to",
+      "subject",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "send"
+    }
+  }
+}

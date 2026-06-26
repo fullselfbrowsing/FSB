@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_trace",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a trace in datadog",
+    "look up a trace in datadog",
+    "fetch a single trace in datadog",
+    "view one specific trace in datadog",
+    "get trace in datadog",
+    "get a full apm trace by id in datadog"
+  ],
+  "description": "Get a full trace by trace ID from Datadog APM. Accepts either hex or decimal trace IDs. Returns all spans within the trace, including orphaned spans.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "trace_id": {
+        "type": "string",
+        "description": "Trace ID — accepts 32 hex characters (e.g., \"abcdef1234567890abcdef1234567890\") or decimal digits"
+      }
+    },
+    "required": [
+      "trace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-trace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

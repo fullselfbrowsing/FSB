@@ -1,0 +1,46 @@
+{
+  "slug": "chatgpt.discover_gpts",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "discover gpts in chatgpt",
+    "explore the gpt store in chatgpt",
+    "browse the chatgpt gpt store to discover custom gpts in chatgpt"
+  ],
+  "description": "Browse the ChatGPT GPT store to discover custom GPTs. Returns categorized lists of featured GPTs.",
+  "actionVerb": "discover",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "limit": {
+        "description": "Number of results per category (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "locale": {
+        "description": "Locale for results (default \"en-US\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/discover-gpts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "discover"
+    }
+  }
+}

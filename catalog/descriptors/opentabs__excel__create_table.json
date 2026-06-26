@@ -1,0 +1,44 @@
+{
+  "slug": "excel.create_table",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "create a table in excel",
+    "add a table in excel",
+    "make a new table in excel",
+    "open a new table in excel",
+    "create table in excel",
+    "create a table from a data range in excel"
+  ],
+  "description": "Create a new table from a data range. The range should contain the data (and optionally a header row). Set has_headers=true if the first row contains column headers.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Range address containing the data (e.g., \"Sheet1!A1:D10\")"
+      },
+      "has_headers": {
+        "description": "Whether the first row contains headers (default true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/create-table.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

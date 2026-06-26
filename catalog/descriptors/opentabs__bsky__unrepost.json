@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.unrepost",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "unrepost in bsky",
+    "remove a repost in bsky",
+    "unrepost in the bsky app",
+    "use bsky to unrepost"
+  ],
+  "description": "Remove a repost. Requires the AT URI of the repost record (returned by repost).",
+  "actionVerb": "unrepost",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "repost_uri": {
+        "type": "string",
+        "description": "AT URI of the repost record to remove"
+      }
+    },
+    "required": [
+      "repost_uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/unrepost.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unrepost"
+    }
+  }
+}

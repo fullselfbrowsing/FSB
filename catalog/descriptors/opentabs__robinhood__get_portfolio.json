@@ -1,0 +1,32 @@
+{
+  "slug": "robinhood.get_portfolio",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get a portfolio in robinhood",
+    "look up a portfolio in robinhood",
+    "fetch a single portfolio in robinhood",
+    "view one specific portfolio in robinhood",
+    "get portfolio in robinhood",
+    "get portfolio summary in robinhood"
+  ],
+  "description": "Get the Robinhood portfolio summary including total equity, market value, extended hours values, and previous close equity.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-portfolio.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

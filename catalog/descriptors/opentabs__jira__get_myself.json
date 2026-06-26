@@ -1,0 +1,32 @@
+{
+  "slug": "jira.get_myself",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get a myself in jira",
+    "look up a myself in jira",
+    "fetch a single myself in jira",
+    "view one specific myself in jira",
+    "get myself in jira",
+    "get the current user's profile in jira"
+  ],
+  "description": "Get the profile of the currently authenticated Jira user.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/get-myself.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

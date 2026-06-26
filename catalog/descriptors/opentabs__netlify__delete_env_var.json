@@ -1,0 +1,49 @@
+{
+  "slug": "netlify.delete_env_var",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "delete an env var in netlify",
+    "remove an env var in netlify",
+    "trash an env var in netlify",
+    "permanently delete an env var in netlify",
+    "delete env var in netlify",
+    "delete an environment variable in netlify"
+  ],
+  "description": "Delete an environment variable from a Netlify account by its key name. Optionally scope to a specific site. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "The account ID the variable belongs to"
+      },
+      "key": {
+        "type": "string",
+        "description": "The environment variable key name to delete"
+      },
+      "site_id": {
+        "description": "Optional site ID to scope to a specific site",
+        "type": "string"
+      }
+    },
+    "required": [
+      "account_id",
+      "key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/delete-env-var.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

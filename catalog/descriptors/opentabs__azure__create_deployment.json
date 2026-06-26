@@ -1,0 +1,75 @@
+{
+  "slug": "azure.create_deployment",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "create a deployment in azure",
+    "add a deployment in azure",
+    "make a new deployment in azure",
+    "open a new deployment in azure",
+    "create deployment in azure",
+    "create a template deployment in azure"
+  ],
+  "description": "Create or update a template deployment in a resource group. Provide an ARM template and optional parameters. The deployment runs asynchronously.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      },
+      "deployment_name": {
+        "type": "string",
+        "description": "Deployment name"
+      },
+      "template": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "ARM template JSON object"
+      },
+      "parameters": {
+        "description": "Template parameters (each key maps to { value: ... })",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "mode": {
+        "description": "Deployment mode (default: Incremental)",
+        "type": "string",
+        "enum": [
+          "Incremental",
+          "Complete"
+        ]
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name",
+      "deployment_name",
+      "template"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/create-deployment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "create"
+    }
+  }
+}

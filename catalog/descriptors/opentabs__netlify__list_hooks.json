@@ -1,0 +1,39 @@
+{
+  "slug": "netlify.list_hooks",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "list hooks in netlify",
+    "show me my hooks in netlify",
+    "view my hooks in netlify",
+    "see all my hooks in netlify",
+    "list site notification hooks in netlify"
+  ],
+  "description": "List notification hooks (outgoing webhooks) for a Netlify site. Returns hook type, trigger event, configuration data, and disabled status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to list hooks for"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/list-hooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

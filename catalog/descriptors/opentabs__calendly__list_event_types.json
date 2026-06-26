@@ -6,23 +6,19 @@
     "show me my event types in calendly",
     "view my event types in calendly",
     "see all my event types in calendly",
-    "list my calendly event types in calendly"
+    "list your scheduling event types in calendly"
   ],
-  "description": "List the Calendly event types (meeting templates) for your account. Returns each event type with its name, duration, and scheduling URL.",
+  "description": "List all event types for the current user. Event types define the scheduling templates (e.g. \"30 Minute Meeting\", \"Discovery Call\"). Returns paginated results with up to 10 event types per page.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "active": {
-        "description": "Only return active (bookable) event types",
-        "type": "boolean"
-      },
-      "limit": {
-        "description": "Maximum number of event types to return",
+      "page": {
+        "description": "Page number (default 1)",
         "type": "integer",
         "minimum": 1,
-        "maximum": 100
+        "maximum": 9007199254740991
       }
     },
     "additionalProperties": false

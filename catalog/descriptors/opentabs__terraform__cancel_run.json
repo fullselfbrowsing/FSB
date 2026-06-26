@@ -1,0 +1,41 @@
+{
+  "slug": "terraform.cancel_run",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "cancel a run in terraform",
+    "cancel run in terraform",
+    "cancel a run that is currently planning or awaiting confirmation in terraform"
+  ],
+  "description": "Cancel a run that is currently planning or awaiting confirmation.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "run_id": {
+        "type": "string",
+        "description": "Run ID (e.g., \"run-...\")"
+      },
+      "comment": {
+        "description": "Comment explaining the cancellation",
+        "type": "string"
+      }
+    },
+    "required": [
+      "run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/cancel-run.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "cancel"
+    }
+  }
+}

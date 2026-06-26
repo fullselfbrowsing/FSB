@@ -1,0 +1,70 @@
+{
+  "slug": "stackoverflow.get_user_answers",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get user answers in stackoverflow",
+    "look up user answers in stackoverflow",
+    "fetch a single user answers in stackoverflow",
+    "view one specific user answers in stackoverflow",
+    "get answers by a user in stackoverflow"
+  ],
+  "description": "Get answers posted by a specific Stack Overflow user. Returns the user's answers sorted by activity, creation date, or votes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "User ID"
+      },
+      "sort": {
+        "description": "Sort order (default: activity)",
+        "type": "string",
+        "enum": [
+          "activity",
+          "creation",
+          "votes"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-user-answers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "supabase.get_api_keys",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get api keys in supabase",
+    "look up api keys in supabase",
+    "fetch a single api keys in supabase",
+    "view one specific api keys in supabase",
+    "get project api keys in supabase"
+  ],
+  "description": "Get the API keys for a Supabase project. Returns the anon key, service_role key, and any publishable/secret keys.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-api-keys.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

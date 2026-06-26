@@ -1,0 +1,38 @@
+{
+  "slug": "cloudflare.list_email_routing_rules",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list email routing rules in cloudflare",
+    "show me my email routing rules in cloudflare",
+    "view my email routing rules in cloudflare",
+    "see all my email routing rules in cloudflare"
+  ],
+  "description": "List email routing rules for a zone. Email routing rules define how incoming emails are forwarded to destination addresses.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-email-routing-rules.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

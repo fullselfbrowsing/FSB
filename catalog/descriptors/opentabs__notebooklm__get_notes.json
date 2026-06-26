@@ -1,0 +1,39 @@
+{
+  "slug": "notebooklm.get_notes",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "get notes in notebooklm",
+    "look up notes in notebooklm",
+    "fetch a single notes in notebooklm",
+    "view one specific notes in notebooklm",
+    "get notes in a notebook in notebooklm"
+  ],
+  "description": "Get all notes in a notebook. Returns note IDs, titles, content, and timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/get-notes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

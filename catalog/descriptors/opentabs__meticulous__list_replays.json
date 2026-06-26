@@ -1,0 +1,45 @@
+{
+  "slug": "meticulous.list_replays",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "list replays in meticulous",
+    "show me my replays in meticulous",
+    "view my replays in meticulous",
+    "see all my replays in meticulous",
+    "list replays for a project in meticulous"
+  ],
+  "description": "List replays for a specific project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project ID"
+      },
+      "count": {
+        "default": 50,
+        "description": "Number of replays to return",
+        "type": "number"
+      }
+    },
+    "required": [
+      "project_id",
+      "count"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/list-replays.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

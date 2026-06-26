@@ -1,0 +1,45 @@
+{
+  "slug": "glama.get_server_score",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "get a server score in glama",
+    "look up a server score in glama",
+    "fetch a single server score in glama",
+    "view one specific server score in glama",
+    "get server score in glama",
+    "get quality and security scores for an mcp server in glama"
+  ],
+  "description": "Get the quality and security score breakdown for a specific MCP server. Returns license, quality, and security scores as numbers (0-100) or null if unavailable.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Owner/namespace slug of the server"
+      },
+      "slug": {
+        "type": "string",
+        "description": "Server slug"
+      }
+    },
+    "required": [
+      "namespace",
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/get-server-score.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

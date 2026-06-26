@@ -1,0 +1,38 @@
+{
+  "slug": "airbnb.search_suggestions",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "search suggestions in airbnb",
+    "get search autocomplete suggestions in airbnb",
+    "get autocomplete suggestions for a location search query in airbnb"
+  ],
+  "description": "Get autocomplete suggestions for a location search query. Returns suggested destinations with names and types.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search text to get suggestions for (e.g., \"Tokyo\", \"Paris\")"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/search-suggestions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

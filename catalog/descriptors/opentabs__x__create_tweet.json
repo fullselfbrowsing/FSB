@@ -1,0 +1,46 @@
+{
+  "slug": "x.create_tweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "create a tweet in x",
+    "add a tweet in x",
+    "make a new tweet in x",
+    "open a new tweet in x",
+    "create tweet in x",
+    "post a new tweet in x"
+  ],
+  "description": "Post a new tweet. Supports plain text and replies. To reply to a tweet, provide the reply_to_tweet_id parameter.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 280,
+        "description": "Tweet text (max 280 characters)"
+      },
+      "reply_to_tweet_id": {
+        "description": "Tweet ID to reply to",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/create-tweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

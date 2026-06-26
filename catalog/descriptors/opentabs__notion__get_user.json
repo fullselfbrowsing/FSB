@@ -1,0 +1,37 @@
+{
+  "slug": "notion.get_user",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "get an user in notion",
+    "look up an user in notion",
+    "fetch a single user in notion",
+    "view one specific user in notion",
+    "get user in notion",
+    "get a user's profile in notion"
+  ],
+  "description": "Get profile information for the current authenticated Notion user or a specific user by ID",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "description": "User ID (UUID). If omitted, returns the current user.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

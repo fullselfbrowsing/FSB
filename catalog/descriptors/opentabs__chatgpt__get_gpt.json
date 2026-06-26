@@ -1,0 +1,40 @@
+{
+  "slug": "chatgpt.get_gpt",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get a gpt in chatgpt",
+    "look up a gpt in chatgpt",
+    "fetch a single gpt in chatgpt",
+    "view one specific gpt in chatgpt",
+    "get gpt in chatgpt",
+    "get details about a custom gpt in chatgpt"
+  ],
+  "description": "Get detailed information about a specific custom GPT by its ID (e.g., \"g-alKfVrz9K\"). Returns the GPT name, description, author, and interaction count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "gpt_id": {
+        "type": "string",
+        "description": "GPT ID (e.g., \"g-alKfVrz9K\")"
+      }
+    },
+    "required": [
+      "gpt_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-gpt.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

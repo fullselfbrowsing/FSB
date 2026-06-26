@@ -1,0 +1,32 @@
+{
+  "slug": "carta.get_current_user",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get a current user in carta",
+    "look up a current user in carta",
+    "fetch a single current user in carta",
+    "view one specific current user in carta",
+    "get current user in carta",
+    "get current user profile in carta"
+  ],
+  "description": "Get the authenticated Carta user profile including name, email, user type, and portfolio info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

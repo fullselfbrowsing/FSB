@@ -1,0 +1,41 @@
+{
+  "slug": "reddit.get_subreddit",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "get a subreddit in reddit",
+    "look up a subreddit in reddit",
+    "fetch a single subreddit in reddit",
+    "view one specific subreddit in reddit",
+    "get subreddit in reddit",
+    "get subreddit details in reddit"
+  ],
+  "description": "Get detailed information about a subreddit including description, subscriber count, and rules",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Subreddit name without the r/ prefix (e.g., \"programming\")"
+      }
+    },
+    "required": [
+      "subreddit"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/get-subreddit.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

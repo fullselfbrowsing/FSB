@@ -1,0 +1,50 @@
+{
+  "slug": "dockerhub.get_tag",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "get a tag in dockerhub",
+    "look up a tag in dockerhub",
+    "fetch a single tag in dockerhub",
+    "view one specific tag in dockerhub",
+    "get tag in dockerhub",
+    "get tag details including digest and platforms in dockerhub"
+  ],
+  "description": "Get detailed information about a specific tag in a Docker Hub repository, including its digest, size, and platform-specific images.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Namespace (e.g., \"library\" for official images)"
+      },
+      "repository": {
+        "type": "string",
+        "description": "Repository name (e.g., \"nginx\")"
+      },
+      "tag": {
+        "type": "string",
+        "description": "Tag name (e.g., \"latest\", \"alpine\")"
+      }
+    },
+    "required": [
+      "namespace",
+      "repository",
+      "tag"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/get-tag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

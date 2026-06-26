@@ -1,0 +1,47 @@
+{
+  "slug": "twitch.get_streams_by_game",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get a streams by game in twitch",
+    "look up a streams by game in twitch",
+    "fetch a single streams by game in twitch",
+    "view one specific streams by game in twitch",
+    "get streams by game in twitch",
+    "get live streams for a game or category in twitch"
+  ],
+  "description": "Get live streams for a specific game/category. Provide either the game name (e.g., \"Just Chatting\") or game ID. Returns streams sorted by viewer count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Game name (e.g., \"Just Chatting\", \"Fortnite\")",
+        "type": "string"
+      },
+      "id": {
+        "description": "Game ID (alternative to name)",
+        "type": "string"
+      },
+      "first": {
+        "description": "Number of streams to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-streams-by-game.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

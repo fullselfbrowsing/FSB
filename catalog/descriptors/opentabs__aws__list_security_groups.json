@@ -1,0 +1,38 @@
+{
+  "slug": "aws.list_security_groups",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list security groups in aws",
+    "show me my security groups in aws",
+    "view my security groups in aws",
+    "see all my security groups in aws",
+    "list ec2 security groups in aws"
+  ],
+  "description": "List EC2 security groups in the current region. Returns group ID, name, description, and VPC ID.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_results": {
+        "description": "Maximum results (default 100)",
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 1000
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-security-groups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "chipotle.get_ordering_status",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get an ordering status in chipotle",
+    "look up an ordering status in chipotle",
+    "fetch a single ordering status in chipotle",
+    "view one specific ordering status in chipotle",
+    "get ordering status in chipotle",
+    "check online ordering availability flags in chipotle"
+  ],
+  "description": "Get the current online ordering status for Chipotle including delivery, group order, and catering availability flags.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "country": {
+        "description": "Country code (default \"US\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-ordering-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

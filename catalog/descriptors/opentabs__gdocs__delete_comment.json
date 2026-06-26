@@ -1,0 +1,44 @@
+{
+  "slug": "gdocs.delete_comment",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "delete a comment in gdocs",
+    "remove a comment in gdocs",
+    "trash a comment in gdocs",
+    "permanently delete a comment in gdocs",
+    "delete comment in gdocs",
+    "delete a comment thread in gdocs"
+  ],
+  "description": "Permanently delete a comment thread from a Google Doc. Only the comment author or the document owner can delete comments. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "comment_id": {
+        "type": "string",
+        "description": "Comment thread ID to delete (from list_comments)"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/delete-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

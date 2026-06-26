@@ -1,0 +1,42 @@
+{
+  "slug": "reddit.save",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "save in reddit",
+    "save or unsave a post/comment in reddit",
+    "save or unsave a post or comment to your saved items in reddit"
+  ],
+  "description": "Save or unsave a post or comment to your saved items",
+  "actionVerb": "save",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Fullname of the thing to save (e.g., \"t3_abc123\" for post, \"t1_xyz\" for comment)"
+      },
+      "unsave": {
+        "description": "Set to true to unsave instead of save (default: false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/save.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "save"
+    }
+  }
+}

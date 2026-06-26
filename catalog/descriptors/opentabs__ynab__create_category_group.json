@@ -1,0 +1,40 @@
+{
+  "slug": "ynab.create_category_group",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "create a category group in ynab",
+    "add a category group in ynab",
+    "make a new category group in ynab",
+    "open a new category group in ynab",
+    "create category group in ynab"
+  ],
+  "description": "Create a new category group in the active YNAB plan.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name of the new category group"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/create-category-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

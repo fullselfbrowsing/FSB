@@ -1,0 +1,45 @@
+{
+  "slug": "pandaexpress.navigate_to_checkout",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "navigate a to checkout in pandaexpress",
+    "navigate to checkout in pandaexpress",
+    "open the checkout page for a basket in pandaexpress"
+  ],
+  "description": "Sync a basket into the browser session and navigate to the checkout page. The user sees the payment page with their order ready — they only need to select a payment method and place the order. Call this after building a basket with add_product_to_basket.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID) to check out"
+      },
+      "restaurant_name": {
+        "description": "Restaurant name for display (auto-detected if omitted)",
+        "type": "string"
+      },
+      "restaurant_ext_ref": {
+        "description": "Restaurant external reference number (auto-detected if omitted)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "basket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/navigate-to-checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "navigate"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "outlook.delete_message",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a message in outlook",
+    "remove a message in outlook",
+    "trash a message in outlook",
+    "permanently delete a message in outlook",
+    "delete message in outlook",
+    "delete an email in outlook"
+  ],
+  "description": "Delete an email message. This moves it to Deleted Items (not permanent deletion).",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID to delete"
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/delete-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

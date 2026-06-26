@@ -1,0 +1,40 @@
+{
+  "slug": "leetcode.get_contest_history",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get a contest history in leetcode",
+    "look up a contest history in leetcode",
+    "fetch a single contest history in leetcode",
+    "view one specific contest history in leetcode",
+    "get contest history in leetcode",
+    "get contest participation history in leetcode"
+  ],
+  "description": "Get a user contest participation history. Returns each contest with the rating change, ranking, and whether the user attended.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-contest-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

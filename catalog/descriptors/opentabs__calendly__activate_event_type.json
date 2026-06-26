@@ -1,0 +1,39 @@
+{
+  "slug": "calendly.activate_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "activate an event type in calendly",
+    "activate event type in calendly",
+    "activate an event type for booking in calendly"
+  ],
+  "description": "Activate a previously deactivated event type, making it available for booking again.",
+  "actionVerb": "activate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Event type numeric ID to activate"
+      }
+    },
+    "required": [
+      "event_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/activate-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "activate"
+    }
+  }
+}

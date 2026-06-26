@@ -1,0 +1,63 @@
+{
+  "slug": "meticulous.get_test_run_screenshots",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get test run screenshots in meticulous",
+    "look up test run screenshots in meticulous",
+    "fetch a single test run screenshots in meticulous",
+    "view one specific test run screenshots in meticulous",
+    "get test run screenshot diffs in meticulous"
+  ],
+  "description": "Get screenshot diffs and test case screenshots for a test run. Each diff includes head/base replay info and screenshot comparison URLs (base image, head image, diff image).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "replay_diff_limit": {
+        "default": 50,
+        "description": "Max replay diffs to return",
+        "type": "number"
+      },
+      "replay_diff_offset": {
+        "default": 0,
+        "description": "Offset for replay diffs pagination",
+        "type": "number"
+      },
+      "test_case_limit": {
+        "default": 50,
+        "description": "Max test case results to return",
+        "type": "number"
+      },
+      "test_case_offset": {
+        "default": 0,
+        "description": "Offset for test case pagination",
+        "type": "number"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "replay_diff_limit",
+      "replay_diff_offset",
+      "test_case_limit",
+      "test_case_offset"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-test-run-screenshots.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -3,42 +3,49 @@
   "service": "www.yelp.com",
   "intentSynonyms": [
     "search businesses in yelp",
-    "search businesses on yelp in yelp",
-    "search yelp for local businesses (restaurants, shops, services) by term and location in yelp"
+    "search for businesses by keyword and location in yelp",
+    "search for businesses on yelp by keyword and location in yelp"
   ],
-  "description": "Search Yelp for local businesses (restaurants, shops, services) by term and location. Returns matching businesses with ratings, price level, and categories.",
+  "description": "Search for businesses on Yelp by keyword and location. Returns up to 10 results per page with business name, rating, review count, price range, categories, phone, and address. Use the start parameter to paginate through results.",
   "actionVerb": "search",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
-      "term": {
+      "query": {
         "type": "string",
-        "minLength": 1,
-        "description": "What to search for (e.g. coffee, plumber, sushi)"
+        "description": "Search keywords (e.g., \"pizza\", \"plumber\", \"coffee shop\")"
       },
       "location": {
         "type": "string",
-        "minLength": 1,
-        "description": "City, neighborhood, or address to search near"
+        "description": "Location to search near (e.g., \"San Jose, CA\", \"10001\", \"Manhattan\")"
       },
-      "price": {
-        "description": "Price level filter (1=$ to 4=$$$$)",
+      "start": {
+        "description": "Result offset for pagination (default 0, increment by 10)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "sort_by": {
+        "description": "Sort order (default \"recommended\")",
         "type": "string",
         "enum": [
-          "1",
-          "2",
-          "3",
-          "4"
+          "recommended",
+          "rating",
+          "review_count"
         ]
       },
+      "price": {
+        "description": "Price filter — comma-separated levels: \"1\" ($), \"2\" ($$), \"3\" ($$$), \"4\" ($$$$). Example: \"1,2\" for $ and $$",
+        "type": "string"
+      },
       "open_now": {
-        "description": "Only return businesses open now",
+        "description": "Filter to only businesses that are currently open",
         "type": "boolean"
       }
     },
     "required": [
-      "term",
+      "query",
       "location"
     ],
     "additionalProperties": false
@@ -50,8 +57,8 @@
     "sourcePath": "plugins/yelp/src/tools/search-businesses.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "api",
-      "httpMethod": "GET",
+      "transportHelper": null,
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

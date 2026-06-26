@@ -1,0 +1,39 @@
+{
+  "slug": "robinhood.get_ratings",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get ratings in robinhood",
+    "look up ratings in robinhood",
+    "fetch a single ratings in robinhood",
+    "view one specific ratings in robinhood",
+    "get analyst ratings for a stock in robinhood"
+  ],
+  "description": "Get analyst ratings for a stock by instrument UUID. Returns a summary of buy/hold/sell counts and individual analyst ratings with commentary. Use search_instruments to find the instrument ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instrument_id": {
+        "type": "string",
+        "description": "Instrument UUID — use search_instruments to find it"
+      }
+    },
+    "required": [
+      "instrument_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-ratings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

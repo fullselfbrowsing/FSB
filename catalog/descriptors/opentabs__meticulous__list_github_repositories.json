@@ -1,0 +1,31 @@
+{
+  "slug": "meticulous.list_github_repositories",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "list github repositories in meticulous",
+    "show me my github repositories in meticulous",
+    "view my github repositories in meticulous",
+    "see all my github repositories in meticulous",
+    "list connected github repos in meticulous"
+  ],
+  "description": "List GitHub repositories connected to the Meticulous organization via the GitHub App.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/list-github-repositories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

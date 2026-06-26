@@ -1,0 +1,93 @@
+{
+  "slug": "gitlab.list_pipelines",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list pipelines in gitlab",
+    "show me my pipelines in gitlab",
+    "view my pipelines in gitlab",
+    "see all my pipelines in gitlab",
+    "list ci/cd pipelines in gitlab"
+  ],
+  "description": "List CI/CD pipelines for a project. Can filter by status, ref, and source.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "status": {
+        "description": "Filter by pipeline status",
+        "type": "string",
+        "enum": [
+          "running",
+          "pending",
+          "success",
+          "failed",
+          "canceled",
+          "skipped",
+          "manual",
+          "scheduled"
+        ]
+      },
+      "ref": {
+        "description": "Filter by branch or tag name",
+        "type": "string"
+      },
+      "source": {
+        "description": "Filter by source (e.g., push, web, schedule, merge_request_event)",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "Sort field (default: id)",
+        "type": "string",
+        "enum": [
+          "id",
+          "status",
+          "ref",
+          "updated_at",
+          "user_id"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-pipelines.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

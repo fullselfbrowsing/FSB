@@ -1,0 +1,39 @@
+{
+  "slug": "leetcode.get_user_skill_stats",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get user skill stats in leetcode",
+    "look up user skill stats in leetcode",
+    "fetch a single user skill stats in leetcode",
+    "view one specific user skill stats in leetcode",
+    "get topic-based solving stats in leetcode"
+  ],
+  "description": "Get a user skill/topic tag statistics showing how many problems they have solved in each topic area, split by advanced, intermediate, and fundamental levels.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-user-skill-stats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

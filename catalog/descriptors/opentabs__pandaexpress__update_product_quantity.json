@@ -1,0 +1,52 @@
+{
+  "slug": "pandaexpress.update_product_quantity",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "update a product quantity in pandaexpress",
+    "edit a product quantity in pandaexpress",
+    "change the details of product quantity in pandaexpress",
+    "modify a product quantity in pandaexpress",
+    "update product quantity in pandaexpress",
+    "change quantity of an item in your order in pandaexpress"
+  ],
+  "description": "Change the quantity of a product already in the basket. Use the basket product instance ID (from get_basket products list), not the menu product ID. Set quantity to 0 to remove the item.",
+  "actionVerb": "update",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID)"
+      },
+      "basket_product_id": {
+        "type": "number",
+        "description": "Basket product instance ID (from get_basket products list)"
+      },
+      "quantity": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "New quantity (0 to remove the item)"
+      }
+    },
+    "required": [
+      "basket_id",
+      "basket_product_id",
+      "quantity"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/update-product-quantity.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "update"
+    }
+  }
+}

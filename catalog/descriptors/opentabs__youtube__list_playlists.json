@@ -1,0 +1,31 @@
+{
+  "slug": "youtube.list_playlists",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "list playlists in youtube",
+    "show me my playlists in youtube",
+    "view my playlists in youtube",
+    "see all my playlists in youtube",
+    "list your playlists in youtube"
+  ],
+  "description": "List the authenticated user's playlists including Watch Later, Liked Videos, and custom playlists. Each playlist includes its ID, title, and privacy status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/list-playlists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

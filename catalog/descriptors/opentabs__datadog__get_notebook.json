@@ -1,0 +1,42 @@
+{
+  "slug": "datadog.get_notebook",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a notebook in datadog",
+    "look up a notebook in datadog",
+    "fetch a single notebook in datadog",
+    "view one specific notebook in datadog",
+    "get notebook in datadog",
+    "get a notebook by id in datadog"
+  ],
+  "description": "Get full details of a Datadog notebook by ID, including its cells and metadata.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Notebook ID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

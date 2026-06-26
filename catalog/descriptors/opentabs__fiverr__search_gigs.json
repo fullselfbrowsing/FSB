@@ -1,0 +1,44 @@
+{
+  "slug": "fiverr.search_gigs",
+  "service": "fiverr.com",
+  "intentSynonyms": [
+    "search gigs in fiverr",
+    "search fiverr gigs by keyword in fiverr",
+    "search fiverr for gigs (services) matching a query in fiverr"
+  ],
+  "description": "Search Fiverr for gigs (services) matching a query. Returns a ranked page of gigs with title, seller, level, rating, starting price, and a link to each gig page. Use the `page` parameter to paginate. Pass a gig URL from a result to `get_gig_details` for full information. Reads Fiverr’s server-rendered search page — the most reliable source given Fiverr’s bot protection.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search keywords (e.g., \"logo design\", \"wordpress developer\")"
+      },
+      "page": {
+        "description": "Page number for pagination (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fiverr/src/tools/search-gigs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

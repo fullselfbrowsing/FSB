@@ -1,0 +1,32 @@
+{
+  "slug": "target.get_savings_summary",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get a savings summary in target",
+    "look up a savings summary in target",
+    "fetch a single savings summary in target",
+    "view one specific savings summary in target",
+    "get savings summary in target",
+    "get target savings breakdown by category in target"
+  ],
+  "description": "Get a savings breakdown showing RedCard savings, Target Circle offer savings, promotional savings, and totals. Covers the configured date range (typically the current year).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-savings-summary.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

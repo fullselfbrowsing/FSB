@@ -1,0 +1,39 @@
+{
+  "slug": "npm.get_package_dependencies",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get package dependencies in npm",
+    "look up package dependencies in npm",
+    "fetch a single package dependencies in npm",
+    "view one specific package dependencies in npm",
+    "get dependencies of a package in npm"
+  ],
+  "description": "Get the runtime and development dependencies of the latest version of an npm package.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Package name (e.g., \"express\")"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-package-dependencies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

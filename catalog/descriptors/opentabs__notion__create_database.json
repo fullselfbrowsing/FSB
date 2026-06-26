@@ -1,0 +1,57 @@
+{
+  "slug": "notion.create_database",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "create a database in notion",
+    "add a database in notion",
+    "make a new database in notion",
+    "open a new database in notion",
+    "create database in notion",
+    "create a new database in notion"
+  ],
+  "description": "Create a new database in a Notion page. Creates a basic database with a title column.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "parent_page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to create the database in"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Database title"
+      },
+      "properties": {
+        "description": "Additional property names with types: \"text\", \"number\", \"select\", \"multi_select\", \"checkbox\", \"url\", \"email\", \"phone\"",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "parent_page_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/create-database.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

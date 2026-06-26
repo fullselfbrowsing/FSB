@@ -1,0 +1,41 @@
+{
+  "slug": "terraform.apply_run",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "apply a run in terraform",
+    "apply run in terraform",
+    "apply a planned run in terraform"
+  ],
+  "description": "Apply a run that is waiting for confirmation. The run must be in \"planned\" or \"policy_checked\" status.",
+  "actionVerb": "apply",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "run_id": {
+        "type": "string",
+        "description": "Run ID (e.g., \"run-...\")"
+      },
+      "comment": {
+        "description": "Comment explaining the apply",
+        "type": "string"
+      }
+    },
+    "required": [
+      "run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/apply-run.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "apply"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "gcal.query_freebusy",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "query a freebusy in gcal",
+    "query freebusy in gcal",
+    "query free/busy information for calendars in gcal"
+  ],
+  "description": "Query free/busy information for one or more calendars within a time range. Returns time slots where events are scheduled. Useful for finding available meeting times.",
+  "actionVerb": "query",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "time_min": {
+        "type": "string",
+        "description": "Start of the time range as ISO 8601 timestamp"
+      },
+      "time_max": {
+        "type": "string",
+        "description": "End of the time range as ISO 8601 timestamp"
+      },
+      "calendar_ids": {
+        "description": "Calendar IDs to query (default [\"primary\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "time_zone": {
+        "description": "IANA time zone for the query",
+        "type": "string"
+      }
+    },
+    "required": [
+      "time_min",
+      "time_max"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/query-freebusy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "query"
+    }
+  }
+}

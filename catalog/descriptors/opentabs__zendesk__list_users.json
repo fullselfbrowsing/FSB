@@ -1,0 +1,53 @@
+{
+  "slug": "zendesk.list_users",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "list users in zendesk",
+    "show me my users in zendesk",
+    "view my users in zendesk",
+    "see all my users in zendesk",
+    "list users with optional role filter in zendesk"
+  ],
+  "description": "List users in the Zendesk account. Optionally filter by role and paginate results.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Number of results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "role": {
+        "description": "Filter by user role",
+        "type": "string",
+        "enum": [
+          "end-user",
+          "agent",
+          "admin"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/list-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

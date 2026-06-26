@@ -1,0 +1,44 @@
+{
+  "slug": "excel.delete_chart",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a chart in excel",
+    "remove a chart in excel",
+    "trash a chart in excel",
+    "permanently delete a chart in excel",
+    "delete chart in excel"
+  ],
+  "description": "Delete a chart from a worksheet by its name.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name"
+      },
+      "chart": {
+        "type": "string",
+        "description": "Chart name"
+      }
+    },
+    "required": [
+      "worksheet",
+      "chart"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/delete-chart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

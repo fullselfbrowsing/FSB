@@ -1,0 +1,45 @@
+{
+  "slug": "npm.get_package_version",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get a package version in npm",
+    "look up a package version in npm",
+    "fetch a single package version in npm",
+    "view one specific package version in npm",
+    "get package version in npm",
+    "get details for a specific package version in npm"
+  ],
+  "description": "Get detailed information about a specific version of an npm package, including dependencies and dev dependencies for that version.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Package name (e.g., \"express\")"
+      },
+      "version": {
+        "type": "string",
+        "description": "Version number (e.g., \"5.2.1\")"
+      }
+    },
+    "required": [
+      "name",
+      "version"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-package-version.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

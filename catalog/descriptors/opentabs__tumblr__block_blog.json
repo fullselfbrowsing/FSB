@@ -1,0 +1,42 @@
+{
+  "slug": "tumblr.block_blog",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "block a blog in tumblr",
+    "block blog in tumblr",
+    "block a tumblr blog in tumblr"
+  ],
+  "description": "Block a Tumblr blog. The blocked blog will no longer be able to interact with your blog.",
+  "actionVerb": "block",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Your blog name or identifier"
+      },
+      "blocked_blog": {
+        "type": "string",
+        "description": "Blog name to block"
+      }
+    },
+    "required": [
+      "blog_name",
+      "blocked_blog"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/block-blog.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "block"
+    }
+  }
+}

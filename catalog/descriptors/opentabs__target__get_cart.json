@@ -1,0 +1,32 @@
+{
+  "slug": "target.get_cart",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get a cart in target",
+    "look up a cart in target",
+    "fetch a single cart in target",
+    "view one specific cart in target",
+    "get cart in target",
+    "view current cart contents and total in target"
+  ],
+  "description": "View the current Target shopping cart contents including items, quantities, prices, and the cart total.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

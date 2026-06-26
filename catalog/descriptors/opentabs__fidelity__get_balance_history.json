@@ -1,0 +1,46 @@
+{
+  "slug": "fidelity.get_balance_history",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get a balance history in fidelity",
+    "look up a balance history in fidelity",
+    "fetch a single balance history in fidelity",
+    "view one specific balance history in fidelity",
+    "get balance history in fidelity",
+    "view portfolio balance over time in fidelity"
+  ],
+  "description": "Get historical portfolio balance data over a specified time range. Returns daily balance values and the total gain/loss for the period. Use for portfolio performance charting.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "range": {
+        "description": "Time range for balance history (default: 1Y)",
+        "type": "string",
+        "enum": [
+          "1M",
+          "3M",
+          "6M",
+          "YTD",
+          "1Y",
+          "3Y",
+          "5Y"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-balance-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

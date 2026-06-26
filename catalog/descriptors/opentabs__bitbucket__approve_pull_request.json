@@ -1,0 +1,49 @@
+{
+  "slug": "bitbucket.approve_pull_request",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "approve a pull request in bitbucket",
+    "approve pull request in bitbucket",
+    "approve a pull request as the authenticated user in bitbucket"
+  ],
+  "description": "Approve a pull request as the authenticated user.",
+  "actionVerb": "approve",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "pull_request_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Pull request ID"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "pull_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/approve-pull-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "approve"
+    }
+  }
+}

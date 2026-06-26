@@ -1,0 +1,45 @@
+{
+  "slug": "twilio.create_verify_service",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "create a verify service in twilio",
+    "add a verify service in twilio",
+    "make a new verify service in twilio",
+    "open a new verify service in twilio",
+    "create verify service in twilio"
+  ],
+  "description": "Create a new verification service for sending OTP codes via SMS, call, or email.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "friendly_name": {
+        "type": "string",
+        "description": "Friendly name for the verify service"
+      },
+      "code_length": {
+        "description": "Length of the verification code (default 6, range 4-10)",
+        "type": "integer",
+        "minimum": 4,
+        "maximum": 10
+      }
+    },
+    "required": [
+      "friendly_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/create-verify-service.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

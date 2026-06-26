@@ -82,13 +82,17 @@ global.MiniSearch = MiniSearch;
 // Phase 38 batch B sub-batch 2 (38-03) COMPLETES the comms/social/content category
 // with the messaging + content-read apps -- discord (4 ops: list_channels/list_messages
 // reads + send_message WRITE + delete_message DESTRUCTIVE; discord.com classified
-// SENSITIVE) + reddit (3 read-only content ops: list_subreddit_posts/get_post/
-// search_posts; reddit.com is the SAFE content tier). Both backing:'dom'. The
-// discord-vs-slack messaging collision (both have a "send a message to a channel" op)
+// SENSITIVE) + reddit content reads (get_post/list_posts/search_posts). Both backing:'dom'.
+// The discord-vs-slack messaging collision (both have a "send a message to a channel" op)
 // is the new wrong-invoke=0 probe in COLLISION_SET. reddit vendors *://reddit.com/* (the
 // apex) so the stem is 'reddit' (not 'www') -> opentabs__reddit__*; this is DISTINCT from
 // the hand-authored reddit-inbox.json (slug reddit.inbox, backing recipe), which this
 // corpus regex does NOT match (it is not an opentabs__reddit__* file -- no clobber).
+// (39.5-04 NOTE: the real reddit plugin -- unlike the earlier read-only-slice assumption --
+// ALSO ships write ops, so reddit is now classified SENSITIVE in service-denylist.json
+// '*.reddit.com', no longer the SAFE content tier; its reads still run under Auto. The
+// earlier hand-authored read op list_subreddit_posts was replaced by the real plugin's
+// list_posts and the stale orphan descriptor was deleted.)
 // Phase 39 batch C sub-batch 1 (39-02) GROWS the corpus with the food-delivery +
 // rideshare apps -- doordash/ubereats/grubhub/instacart (food/grocery delivery) +
 // uber/lyft (rideshare) -- the MOST-sensitive PAYMENT-bearing category, ALL screened
@@ -237,12 +241,15 @@ const COLLISION_SET = [
   // discord.list_messages (read a channel's messages) vs the discord WRITE -- the
   // read/write split within the same app must keep "catch up on" reading, not sending.
   { query: 'catch up on the messages in my discord channel', expected: 'discord.list_messages' },
-  // reddit content reads (the SAFE tier): "browse" a subreddit tops list_subreddit_posts
-  // (a held-out paraphrase of the indexed "show posts in a subreddit"), and a reddit
-  // KEYWORD SEARCH tops search_posts -- the "search ... for a keyword" intent token keeps
-  // it off get_post (whose verbs are get/look-up/fetch/read), so neither reddit read op
-  // cross-invokes the other.
-  { query: 'browse the posts in a subreddit on reddit', expected: 'reddit.list_subreddit_posts' },
+  // reddit content reads: "browse" a subreddit tops list_posts (a held-out paraphrase of
+  // the indexed "list posts from a subreddit"), and a reddit KEYWORD SEARCH tops
+  // search_posts -- the "search ... for a keyword" intent token keeps it off get_post
+  // (whose verbs are get/look-up/fetch/read), so neither reddit read op cross-invokes the
+  // other. (39.5-04 full-source import: the real reddit plugin emits list_posts -- NOT the
+  // earlier hand-authored list_subreddit_posts, which was deleted as a stale orphan; reddit
+  // is now classified SENSITIVE, not the SAFE content tier, because the real plugin also
+  // ships write ops -- but its READS still rank the same and run under Auto.)
+  { query: 'browse the posts in a subreddit on reddit', expected: 'reddit.list_posts' },
   { query: 'search reddit posts for a keyword', expected: 'reddit.search_posts' },
   // Phase-39 batch C sub-batch 1 (39-02, food-delivery + rideshare): the cross-app
   // PAYMENT-op collisions are the headline disambiguation probes for the most-sensitive

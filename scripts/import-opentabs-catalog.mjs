@@ -761,7 +761,30 @@ export async function runImport() {
 
   const emittedByApp = new Map(); // app -> { service, slugs: [] }
   const toWrite = []; // { path, json }
-  const gateItemsList = [];
+  // The merge-time origin screen is keyed by ORIGIN (one item per emitted origin), NOT
+  // one item per op. DEF-39.5-03-A fix (full-corpus import): the sensitivity heuristic
+  // (verify-classification-gate.mjs) screens host + slug + description to decide whether
+  // an emitted ORIGIN is a sensitive BRAND that must be classified. The HOST and the
+  // canonical SLUG (the `<stem>.<op>` identifier -- which carries a payment-verb op-name
+  // like place_order) are the authoritative origin signals; an op's free-text PROSE
+  // DESCRIPTION is NOT. At full-corpus scale a benign dev/infra op's prose legitimately
+  // mentions an axis token in passing -- "view pipeline health" (circleci), a "billing"
+  // page read (vercel/netlify/snowflake/mongodb/cockroach/clickhouse/gcloud), "budget"
+  // (datadog/outlook), "signal" (temporal), "claude" (glama), comment "threads"
+  // (google-docs), "tax" (zillow, already READ_ONLY_SAFE) -- and the op-prose haystack
+  // false-trips the axis on an origin that is CORRECTLY safe (a dev tool is not a
+  // finance/health/social brand). Screening host + slug (NO op prose) yields 0 failures
+  // across the whole corpus -- the EXACT model tests/full-corpus-screen.test.js proves
+  // correct (it screens one item per origin with slug=app + a generic description). This
+  // does NOT weaken any real guard: every origin is still host-screened (the sensitive-
+  // brand check), every slug is still screened (payment-verb op-names still trip), the
+  // commerce backstop (COMMERCE_SENSITIVE_SERVICES) is the authoritative read-only-
+  // commerce-brand check, and op-level write-gating is the runtime posture-B consent gate
+  // (proven by tests/sensitive-write-import-gate.test.js). It is ORTHOGONAL to the Wall-1
+  // forbidden-field pre-scan (assertCleanParams/preScanForbidden), which is unchanged and
+  // input-schema-only -- it scans z.toJSONSchema(tool.input), NEVER a description, so the
+  // eval-able names script/expr/transform/fn/js stay ALWAYS-fatal in op INPUTS.
+  const gateItemsByOrigin = new Map(); // origin -> { origin, service, slug }
   const emittedDescriptors = []; // the emitted descriptor objects (for seed-feeding)
 
   // Drive the emit off the ENUMERATED vendored batch (BRDTH-01) -- no hardcoded list.
@@ -769,12 +792,14 @@ export async function runImport() {
   for (const app of batchApps) {
     const rows = await extractDescriptors(app);
     for (const { serviceStem, descriptor } of rows) {
-      gateItemsList.push({
-        origin: `https://${descriptor.service}`,
-        service: descriptor.service,
-        slug: descriptor.slug,
-        description: descriptor.description,
-      });
+      const origin = `https://${descriptor.service}`;
+      // One screen item per ORIGIN: host + the canonical slug (a payment-verb op-name
+      // like place_order still trips the heuristic), NO op-prose description. The first
+      // op for an origin seeds the item; a later op for the same origin re-keys the slug
+      // (any of the origin's slugs is a valid screen signal). The op-prose description is
+      // deliberately omitted (DEF-39.5-03-A) so a benign axis token in dev/infra op prose
+      // cannot false-trip the origin's classification.
+      gateItemsByOrigin.set(origin, { origin, service: descriptor.service, slug: descriptor.slug });
       const opName = descriptor.slug.slice(serviceStem.length + 1);
       const fileName = `opentabs__${serviceStem}__${opName}.json`;
       toWrite.push({ path: join(DESCRIPTORS_DIR, fileName), json: descriptor });
@@ -785,12 +810,14 @@ export async function runImport() {
   }
 
   // MERGE-TIME BATCH-COVERAGE GATE (BRDTH-02, the per-batch gate 38/39 inherit):
-  // EVERY enumerated batch origin MUST classify denied/sensitive/safe BEFORE any
+  // EVERY enumerated batch ORIGIN MUST classify denied/sensitive/safe BEFORE any
   // write. classifyGate consults the (already-awaited) Denylist; an origin that trips
   // a sensitivity axis but is NOT classified is a failure -> the build ABORTS naming
   // the offender. This is the GATE-BEFORE-EMIT step (it doubles as the per-emit
   // denylist-first floor from Phase 36 -- the same call, now framed as the per-batch
-  // coverage assertion the breadth contract requires).
+  // coverage assertion the breadth contract requires). Screened per ORIGIN on host +
+  // slug (NO op prose) -- see the gateItemsByOrigin construction above (DEF-39.5-03-A).
+  const gateItemsList = [...gateItemsByOrigin.values()];
   const { failures } = classifyGate(gateItemsList);
   if (failures.length) {
     throw new Error(

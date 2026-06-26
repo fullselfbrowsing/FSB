@@ -1,0 +1,42 @@
+{
+  "slug": "pandaexpress.get_restaurant_menu",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get a restaurant menu in pandaexpress",
+    "look up a restaurant menu in pandaexpress",
+    "fetch a single restaurant menu in pandaexpress",
+    "view one specific restaurant menu in pandaexpress",
+    "get restaurant menu in pandaexpress",
+    "get menu for a panda express location in pandaexpress"
+  ],
+  "description": "Get the full menu for a specific Panda Express restaurant. Returns categories (e.g., \"Bigger Plates\", \"Sides\") with their products including name, description, price, and calories.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Restaurant ID (from find_restaurants)"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-restaurant-menu.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

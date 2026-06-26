@@ -1,0 +1,49 @@
+{
+  "slug": "msword.update_document",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "update a document in msword",
+    "edit a document in msword",
+    "change the details of document in msword",
+    "modify a document in msword",
+    "update document in msword",
+    "replace all text in a word document in msword"
+  ],
+  "description": "Replace the entire text content of an existing Word document (.docx). Downloads the document, replaces all body content with the new paragraphs, and re-uploads. WARNING: This removes all existing formatting (bold, italic, headings, etc.) — use replace_text_in_document for formatting-safe edits.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID of the .docx document to update"
+      },
+      "paragraphs": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "New text paragraphs to replace the document body content"
+      }
+    },
+    "required": [
+      "item_id",
+      "paragraphs"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/update-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

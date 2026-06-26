@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_metric_metadata",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a metric metadata in datadog",
+    "look up a metric metadata in datadog",
+    "fetch a single metric metadata in datadog",
+    "view one specific metric metadata in datadog",
+    "get metric metadata in datadog",
+    "get metric description, type, and unit info in datadog"
+  ],
+  "description": "Get metadata for a specific metric including type, description, unit, and integration name.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "metric_name": {
+        "type": "string",
+        "description": "Full metric name (e.g., \"system.cpu.user\", \"aws.ec2.cpuutilization\")"
+      }
+    },
+    "required": [
+      "metric_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-metric-metadata.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

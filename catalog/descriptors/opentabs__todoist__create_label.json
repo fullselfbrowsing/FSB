@@ -1,0 +1,54 @@
+{
+  "slug": "todoist.create_label",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "create a label in todoist",
+    "add a label in todoist",
+    "make a new label in todoist",
+    "open a new label in todoist",
+    "create label in todoist",
+    "create a new label in todoist"
+  ],
+  "description": "Create a new personal label. Only the name is required.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the new label"
+      },
+      "color": {
+        "description": "Label color name (e.g. \"berry_red\", \"blue\", \"green\")",
+        "type": "string"
+      },
+      "order": {
+        "description": "Position among labels",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "is_favorite": {
+        "description": "Whether to mark the label as a favorite",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/create-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

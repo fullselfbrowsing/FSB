@@ -1,0 +1,37 @@
+{
+  "slug": "dominos.add_deal_to_cart",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "add a deal to cart in dominos",
+    "add deal to cart in dominos",
+    "apply a deal/coupon to your cart in dominos"
+  ],
+  "description": "Apply a deal or coupon code to the cart. The deal may automatically add or discount products.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "deal_code": {
+        "type": "string",
+        "description": "Deal/coupon code"
+      }
+    },
+    "required": [
+      "deal_code"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/add-deal-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

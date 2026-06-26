@@ -1,0 +1,41 @@
+{
+  "slug": "newrelic.search_entities",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "search entities in newrelic",
+    "search monitored entities in newrelic",
+    "search for monitored entities (applications, hosts, dashboards, synthetic monitors, etc in newrelic"
+  ],
+  "description": "Search for monitored entities (applications, hosts, dashboards, synthetic monitors, etc.) by query. Use domain filters like \"domain IN ('APM', 'INFRA', 'BROWSER')\" or type filters like \"type = 'APPLICATION'\". Combine with name search: \"name LIKE 'my-app'\".",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Entity search query using NRQL-like syntax (e.g., \"name LIKE 'my-app' AND domain = 'APM'\")"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/search-entities.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "slug": "instagram.list_saved_posts",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "list saved posts in instagram",
+    "show me my saved posts in instagram",
+    "view my saved posts in instagram",
+    "see all my saved posts in instagram",
+    "list your saved posts in instagram"
+  ],
+  "description": "List posts saved by the authenticated user. Supports cursor pagination via max_id.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_id": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/list-saved-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "vercel.list_teams",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "list teams in vercel",
+    "show me my teams in vercel",
+    "view my teams in vercel",
+    "see all my teams in vercel",
+    "list vercel teams in vercel"
+  ],
+  "description": "List all teams the current user belongs to. Returns team names, slugs, billing plans, and roles.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of teams to return (default 20)",
+        "type": "number"
+      },
+      "since": {
+        "description": "Pagination cursor — timestamp to start from",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/list-teams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

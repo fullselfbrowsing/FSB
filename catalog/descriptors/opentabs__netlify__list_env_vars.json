@@ -1,0 +1,43 @@
+{
+  "slug": "netlify.list_env_vars",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "list env vars in netlify",
+    "show me my env vars in netlify",
+    "view my env vars in netlify",
+    "see all my env vars in netlify",
+    "list environment variables in netlify"
+  ],
+  "description": "List all environment variables for a Netlify account. Optionally scope to a specific site. Returns variable names, scopes, context-specific values, and secret status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "The account ID to list environment variables for"
+      },
+      "site_id": {
+        "description": "Optional site ID to scope variables to a specific site",
+        "type": "string"
+      }
+    },
+    "required": [
+      "account_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/list-env-vars.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

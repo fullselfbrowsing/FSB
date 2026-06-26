@@ -1,0 +1,93 @@
+{
+  "slug": "datadog.query_timeseries",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "query timeseries in datadog",
+    "run advanced timeseries queries with formulas in datadog",
+    "execute a multi-query timeseries request using the datadog internal query engine in datadog"
+  ],
+  "description": "Execute a multi-query timeseries request using the Datadog internal query engine. Supports metrics, logs, spans, and other data sources with formula support.",
+  "actionVerb": "query",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "queries": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "data_source": {
+              "type": "string",
+              "enum": [
+                "metrics",
+                "logs",
+                "spans",
+                "rum"
+              ],
+              "description": "Data source"
+            },
+            "query": {
+              "type": "string",
+              "description": "Query string"
+            },
+            "name": {
+              "type": "string",
+              "description": "Query reference name (e.g., \"a\", \"b\")"
+            }
+          },
+          "required": [
+            "data_source",
+            "query",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Array of queries to execute"
+      },
+      "from": {
+        "type": "number",
+        "description": "Start time (epoch milliseconds)"
+      },
+      "to": {
+        "type": "number",
+        "description": "End time (epoch milliseconds)"
+      },
+      "formulas": {
+        "description": "Optional formulas combining query results",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "formula": {
+              "type": "string",
+              "description": "Formula expression (e.g., \"a + b\", \"a / b * 100\")"
+            }
+          },
+          "required": [
+            "formula"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "queries",
+      "from",
+      "to"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/query-timeseries.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "query"
+    }
+  }
+}

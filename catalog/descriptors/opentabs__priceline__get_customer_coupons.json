@@ -1,0 +1,41 @@
+{
+  "slug": "priceline.get_customer_coupons",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get customer coupons in priceline",
+    "look up customer coupons in priceline",
+    "fetch a single customer coupons in priceline",
+    "view one specific customer coupons in priceline",
+    "get your available coupons in priceline"
+  ],
+  "description": "Get available coupons for the authenticated user. Coupons can be filtered by product type (STAY, FLY, DRIVE). Returns coupon codes, descriptions, expiration dates, and discount amounts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product": {
+        "description": "Product type to filter coupons (default STAY)",
+        "type": "string",
+        "enum": [
+          "STAY",
+          "FLY",
+          "DRIVE"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-customer-coupons.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

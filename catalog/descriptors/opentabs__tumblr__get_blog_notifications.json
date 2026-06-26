@@ -1,0 +1,43 @@
+{
+  "slug": "tumblr.get_blog_notifications",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get blog notifications in tumblr",
+    "look up blog notifications in tumblr",
+    "fetch a single blog notifications in tumblr",
+    "view one specific blog notifications in tumblr",
+    "list blog notifications in tumblr"
+  ],
+  "description": "Get recent notifications for a Tumblr blog including likes, reblogs, follows, and mentions.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or identifier (e.g., \"staff\" or \"staff.tumblr.com\")"
+      },
+      "before": {
+        "description": "Unix timestamp for pagination — return notifications before this time",
+        "type": "number"
+      }
+    },
+    "required": [
+      "blog_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-blog-notifications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "stackoverflow.get_my_profile",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get a my profile in stackoverflow",
+    "look up a my profile in stackoverflow",
+    "fetch a single my profile in stackoverflow",
+    "view one specific my profile in stackoverflow",
+    "get my profile in stackoverflow",
+    "get current user profile in stackoverflow"
+  ],
+  "description": "Get the currently authenticated Stack Overflow user's profile. Returns reputation, badge counts, question/answer counts, and profile information. Requires being logged in.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-my-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

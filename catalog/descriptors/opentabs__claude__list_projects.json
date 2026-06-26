@@ -1,0 +1,31 @@
+{
+  "slug": "claude.list_projects",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "list projects in claude",
+    "show me my projects in claude",
+    "view my projects in claude",
+    "see all my projects in claude",
+    "list all projects in claude"
+  ],
+  "description": "List all projects in the current organization. Returns project name, description, document and file counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

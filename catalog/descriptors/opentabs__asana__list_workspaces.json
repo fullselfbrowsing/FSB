@@ -1,0 +1,31 @@
+{
+  "slug": "asana.list_workspaces",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "list workspaces in asana",
+    "show me my workspaces in asana",
+    "view my workspaces in asana",
+    "see all my workspaces in asana",
+    "list all workspaces in asana"
+  ],
+  "description": "List all workspaces the current user has access to.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/list-workspaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

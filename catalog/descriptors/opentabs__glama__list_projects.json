@@ -1,0 +1,31 @@
+{
+  "slug": "glama.list_projects",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "list projects in glama",
+    "show me my projects in glama",
+    "view my projects in glama",
+    "see all my projects in glama",
+    "list all projects in the workspace in glama"
+  ],
+  "description": "List all projects in the workspace.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

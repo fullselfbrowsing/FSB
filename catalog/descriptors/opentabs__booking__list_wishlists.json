@@ -1,0 +1,31 @@
+{
+  "slug": "booking.list_wishlists",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "list wishlists in booking",
+    "show me my wishlists in booking",
+    "view my wishlists in booking",
+    "see all my wishlists in booking",
+    "list saved wishlists in booking"
+  ],
+  "description": "List the current user's saved wishlists on Booking.com. Returns wishlist names, item counts, and cover images.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/list-wishlists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

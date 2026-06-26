@@ -1,0 +1,63 @@
+{
+  "slug": "confluence.list_comment_replies",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list comment replies in confluence",
+    "show me my comment replies in confluence",
+    "view my comment replies in confluence",
+    "see all my comment replies in confluence",
+    "list replies to a comment in confluence"
+  ],
+  "description": "List replies (child comments) on a Confluence comment. Works for both inline and footer comments. Specify the comment type to use the correct API endpoint.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Parent comment ID to list replies for"
+      },
+      "comment_type": {
+        "type": "string",
+        "enum": [
+          "inline",
+          "footer"
+        ],
+        "description": "Type of the parent comment: \"inline\" or \"footer\""
+      },
+      "limit": {
+        "description": "Maximum number of replies to return (default 25, max 250)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "body_format": {
+        "description": "Body format to return: \"storage\" (HTML, default) or \"atlas_doc_format\" (ADF)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "comment_id",
+      "comment_type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/list-comment-replies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}
