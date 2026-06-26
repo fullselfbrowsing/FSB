@@ -121,18 +121,37 @@
   // hyphenated slug (/orgs/my-long-organization-name, /pages/my-document-title) or
   // a normal REST segment (/v1/charges) does NOT match any prefix below, so it
   // survives LITERAL and the legitimate recipe template still matches the real path
-  // on replay. There is deliberately NO broad "long base64url/hex segment" rule --
-  // the synthesizer's EXISTING prefixless-high-entropy parameterization already
-  // handles prefixless random path tokens (all-digit / UUID / hex>=16 / alnum>=20
-  // WITHOUT a separator); favor LITERAL on ambiguity. Masking a segment's SHAPE is
-  // STRUCTURE-ONLY: the path is an already-kept structural field; shape-matching a
-  // segment is NOT a credential value-read.
+  // on replay. There is deliberately NO broad "long base64url/hex/high-entropy-with-
+  // separator segment" rule -- adding one would FALSE-POSITIVE on benign hyphenated
+  // slugs (/orgs/my-long-organization-name) and break legitimate recipe templates;
+  // favor LITERAL on ambiguity.
+  //
+  // Coverage, stated honestly (do NOT over-claim a net the code does not provide):
+  //   - THIS path scrub masks the distinctive token PREFIXES only (JWT eyJ. / stripe
+  //     (sk|pk|rk)_ / github gh[opsur]_ / slack xox[bcpars]- / aws (AKIA|ASIA) /
+  //     google ya29. / MS-Graph u!), each anchored at segment start.
+  //   - The synthesizer (recipe-synthesizer.js _toPathTemplate / _LONG_TOKEN_RE)
+  //     parameterizes PREFIXLESS high-entropy segments that contain NO separator:
+  //     all-digit / UUID / hex>=16 / alnum>=20 over [0-9A-Za-z] ONLY (it does NOT
+  //     include '-'/'_', so base64url is out of its net by construction).
+  //   - RESIDUAL (accepted, uncommon): a prefixless high-entropy token that DOES
+  //     carry a '-'/'_' separator in a path SEGMENT is masked by neither layer. This
+  //     is NOT a documented vendored vector; reaching the persisted sink requires the
+  //     consent-gated capture->replay->promote to fire on a URL that embeds a raw
+  //     credential in a path segment (credentials normally ride headers/cookies). The
+  //     structure-only value-exclusion FLOOR (the loop never reads a header value /
+  //     body / query) and the named auth-carrier header denylist remain fully intact,
+  //     so this seam is confined to the path-SEGMENT defense-in-depth layer. Honesty
+  //     over a false-positive-prone widening.
+  //
+  // Masking a segment's SHAPE is STRUCTURE-ONLY: the path is an already-kept
+  // structural field; shape-matching a segment is NOT a credential value-read.
   var _TOKEN_SHAPES = [
     /^eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+/,   // JWT: the eyJ...'.' prefix is distinctive
     /^(sk|pk|rk)_(live|test)_[A-Za-z0-9]{8,}/,  // stripe sk_live_ / pk_test_ / rk_live_
     /^gh[opsur]_[A-Za-z0-9]{20,}/,              // github gho_/ghp_/ghs_/ghu_/ghr_
     /^xox[bcpars]-[A-Za-z0-9-]{8,}/,            // slack xoxb-/xoxc-/xoxp-/xoxa-/xoxr-/xoxs-
-    /^(AKIA|ASIA)[A-Z0-9]{16}$/,                // aws access key id (whole-segment)
+    /^(AKIA|ASIA)[A-Z0-9]{16}/,                 // aws access key id (prefix-anchored: AKIA/ASIA + 16 is distinctive, so a suffixed key id is still masked)
     /^ya29\.[A-Za-z0-9_-]+/,                    // google oauth access token
     /^u![A-Za-z0-9_-]+/                         // MS Graph share-id: u!<base64url> (excel-api.ts:145)
   ];
