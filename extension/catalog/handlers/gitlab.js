@@ -33,10 +33,18 @@
    * are referenced); it only builds bound spec(s) and calls ctx.executeBoundSpec, so the
    * active-tab origin-pin stays on the head path.
    *
-   * READ-ONLY: only the 5 READ slugs are ported; every spec is a GET. GitLab mutating
-   * ops (create_issue, update_issue, merge_merge_request, ...) require the
-   * <meta name="csrf-token"> dance and are Phase 41 (guarded writes). No CSRF token is
-   * read here.
+   * READS (Phase 40): the 5 READ slugs above; every read spec is a GET. No CSRF token
+   * is read on the read path.
+   *
+   * GUARDED WRITES (Phase 41, DEPTH-02): 3 fail-closed write slugs were APPENDED --
+   * gitlab.create_issue / create_merge_request / create_note (each UPGRADES its
+   * opentabs__gitlab__create_*.json breadth descriptor dom->T1a). Each ships FAIL-CLOSED
+   * (the github.issues.create pattern): handle() returns the dual-field
+   * RECIPE_DOM_FALLBACK_PENDING and NEVER calls ctx.executeBoundSpec -- NO mutation
+   * fires. The real mutating path requires the <meta name="csrf-token"> dance + a
+   * live-captured POST body ([ASSUMED-ENDPOINT]); the writes are inert until
+   * 41-HUMAN-UAT.md is satisfied. No CSRF token is read here (the writes fail closed
+   * before any spec build).
    *
    * LOGGED-OUT GUARD (CONTEXT Top Risk, "200-with-logged-out-body"): a logged-out
    * gitlab.com tab can answer a /api/v4 read with a 200 carrying a sign-in HTML page or
@@ -130,6 +138,56 @@
       page: { type: 'integer', minimum: 1 }
     },
     required: ['project'],
+    additionalProperties: false
+  };
+
+  // ---- Phase 41 (DEPTH-02) GUARDED-WRITE params schemas ---------------------
+  // Props mirrored EXACTLY from the opentabs__gitlab__create_*.json descriptors
+  // (the breadth write descriptors these slugs UPGRADE dom->T1a). The required path
+  // fields are set; additionalProperties:false everywhere -- the AI cannot smuggle
+  // extra fields into a credentialed same-origin write. These schemas scaffold the
+  // params a single live-capture flips to executable; the handlers below are
+  // fail-closed today (they NEVER build a spec or call ctx.executeBoundSpec).
+  var CREATE_ISSUE_PARAMS = {
+    type: 'object',
+    properties: {
+      project: { type: 'string', minLength: 1 },
+      title: { type: 'string', minLength: 1 },
+      description: { type: 'string' },
+      labels: { type: 'string' },
+      assignee_ids: { type: 'array', items: { type: 'number' } },
+      milestone_id: { type: 'number' },
+      confidential: { type: 'boolean' }
+    },
+    required: ['project', 'title'],
+    additionalProperties: false
+  };
+  var CREATE_MERGE_REQUEST_PARAMS = {
+    type: 'object',
+    properties: {
+      project: { type: 'string', minLength: 1 },
+      title: { type: 'string', minLength: 1 },
+      source_branch: { type: 'string', minLength: 1 },
+      target_branch: { type: 'string', minLength: 1 },
+      description: { type: 'string' },
+      labels: { type: 'string' },
+      assignee_id: { type: 'number' },
+      milestone_id: { type: 'number' },
+      remove_source_branch: { type: 'boolean' },
+      squash: { type: 'boolean' }
+    },
+    required: ['project', 'title', 'source_branch', 'target_branch'],
+    additionalProperties: false
+  };
+  var CREATE_NOTE_PARAMS = {
+    type: 'object',
+    properties: {
+      project: { type: 'string', minLength: 1 },
+      noteable_type: { type: 'string', enum: ['issues', 'merge_requests'] },
+      noteable_iid: { type: 'integer', minimum: 1, maximum: 9007199254740991 },
+      body: { type: 'string', minLength: 1 }
+    },
+    required: ['project', 'noteable_type', 'noteable_iid', 'body'],
     additionalProperties: false
   };
 
@@ -293,6 +351,77 @@
           + '/merge_requests' + buildQuery(a, ['project']);
         var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
         return guardShape(res, 'gitlab.list_merge_requests', true);
+      }
+    },
+
+    // ======================================================================
+    // Phase 41 (DEPTH-02) -- the 3 GUARDED WRITE slugs (FAIL-CLOSED).
+    // ----------------------------------------------------------------------
+    // EXACT opentabs dot-form write slugs so resolve() UPGRADES each breadth
+    // descriptor (backing:'dom', sideEffectClass:'write') dom->T1a -- the
+    // correctness keystone, distinct from the 5 read slugs above (no collision).
+    //
+    // EACH SHIPS FAIL-CLOSED, the github.issues.create pattern (github.js:111-123):
+    // handle() returns the dual-field RECIPE_DOM_FALLBACK_PENDING (reason
+    // unverified-gitlab-<verb>-mutation, fellBackToDom:true) and NEVER calls
+    // ctx.executeBoundSpec -- so NO mutation fires. Behaviorally identical to its
+    // T3-DOM descriptor today (both -> DOM fallback); the VALUE is the scaffolded
+    // params+endpoint+gating a single live-capture flips to executable -- without a
+    // new hand-port.
+    //
+    // [ASSUMED-ENDPOINT] -- the real GitLab frontend mutation requires the
+    // <meta name="csrf-token"> dance + a live-captured POST body (the gitlab-api.ts
+    // mutating path uses the CSRF token; gitlab-api.ts:13 base is the SAME-ORIGIN
+    // https://gitlab.com/api/v4 PATH). The handler scrapes NO token (it fails closed
+    // BEFORE any spec build), so the credential discipline holds trivially; when a
+    // future live-capture activates it, the CSRF token must stay only inside the
+    // bound spec (the github/gitlab discipline). These writes ship FAIL-CLOSED until
+    // 41-HUMAN-UAT.md (the gitlab guarded-write rows) is satisfied -- carried-forward,
+    // user-gated UAT debt, NON-blocking for CI (the headless gates pass: handle()
+    // returns RECIPE_DOM_FALLBACK_PENDING).
+
+    // ---- gitlab.create_issue (write -- fail-closed) ------------------------
+    'gitlab.create_issue': {
+      tier: 'T1a',
+      origin: GITLAB_ORIGIN,
+      sideEffectClass: 'write',
+      params: CREATE_ISSUE_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'gitlab.create_issue',
+          reason: 'unverified-gitlab-create-issue-mutation',
+          fellBackToDom: true
+        });
+      }
+    },
+
+    // ---- gitlab.create_merge_request (write -- fail-closed) ----------------
+    'gitlab.create_merge_request': {
+      tier: 'T1a',
+      origin: GITLAB_ORIGIN,
+      sideEffectClass: 'write',
+      params: CREATE_MERGE_REQUEST_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'gitlab.create_merge_request',
+          reason: 'unverified-gitlab-create-merge-request-mutation',
+          fellBackToDom: true
+        });
+      }
+    },
+
+    // ---- gitlab.create_note (write -- fail-closed) -------------------------
+    'gitlab.create_note': {
+      tier: 'T1a',
+      origin: GITLAB_ORIGIN,
+      sideEffectClass: 'write',
+      params: CREATE_NOTE_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'gitlab.create_note',
+          reason: 'unverified-gitlab-create-note-mutation',
+          fellBackToDom: true
+        });
       }
     }
   };
