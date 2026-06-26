@@ -43,7 +43,7 @@
 'use strict';
 
 import { z } from 'zod';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -383,7 +383,15 @@ export function assertCleanParams(params, opName) {
 // every other occurrence. The op name / slug is unchanged; only the input FIELD token is
 // canonicalized, matching the real upstream handle() which maps params.code -> the API's
 // `promotion_code` body field.
-function carveBusinessCodeField(params) {
+// LO-01 (39.5-REVIEW) defense-in-depth: the app/op narrowing is now asserted INSIDE the
+// function, not only at the single call site. The rename can therefore ONLY ever apply to
+// the EXACT (app === 'target' && opName === 'apply_promo_code') pair regardless of any
+// future second call site or test -- a stray invocation on an unintended schema returns a
+// no-op instead of silently renaming a legitimate `code` field (which would mask a Wall-1
+// hit assertCleanParams should catch). The FORBIDDEN set is untouched; this stays a
+// narrow, audited, per-op canonicalization of the one business-`code` input in the corpus.
+function carveBusinessCodeField(params, app, opName) {
+  if (!(app === 'target' && opName === 'apply_promo_code')) return;
   if (!params || typeof params !== 'object') return;
   const props = params.properties;
   if (
@@ -414,15 +422,23 @@ function carveBusinessCodeField(params) {
 export { verbPrefix };
 
 /**
- * inferSideEffect(tool, signals) -> { sideEffectClass, signals }
+ * inferSideEffect(tool, signals, serviceStem) -> { sideEffectClass, signals }
  *
  * Stamps the side-effect class via the SHARED deriveClass() (the same logic the
  * cross-check gate runs). signals: { transportHelper, httpMethod, opNameVerb }
  * persisted into provenance so the Plan-03 cross-check re-derives without re-parsing
  * TS. The opNameVerb is the camelCase-aware verb token (so a GraphQL camelCase op
  * yields a live verb signal, not a dead whole-identifier token).
+ *
+ * serviceStem (HI-01, 39.5-REVIEW): the canonical stem so deriveClass receives the SAME
+ * FULL `<stem>.<op>` slug the gate later re-derives from the committed descriptor. This
+ * lets the per-op SIDE_EFFECT_READ_CONFIRMED allowlist (keyed by full slug, e.g.
+ * `tripadvisor.check_saved`) and the override table resolve identically at STAMP time and
+ * at GATE time -- so the importer stamps the SAME class the gate derives (no importer-vs-
+ * gate asymmetry). When serviceStem is omitted (existing callers/tests), the slug falls
+ * back to `.<op>`, preserving the prior bare-op-name override behavior.
  */
-export function inferSideEffect(tool, signals) {
+export function inferSideEffect(tool, signals, serviceStem) {
   const opName = tool && tool.name ? String(tool.name) : '';
   const opNameVerb = verbPrefix(opName);
   const helper = String((signals && signals.transportHelper) || '').toLowerCase();
@@ -435,9 +451,11 @@ export function inferSideEffect(tool, signals) {
   };
 
   // Derive via the shared module, keyed by the persisted signals AND the slug (the
-  // override table + slug-recovered verb both resolve from the op-name). The slug
-  // here is `<service>.<op>` so overrideFloor() and the camelCase verb recovery fire.
-  const slug = opName ? '.' + opName : '';
+  // override table + slug-recovered verb + the confirmed-read allowlist all resolve from
+  // it). The slug is the FULL `<stem>.<op>` when serviceStem is supplied (so the gate and
+  // the importer key on the identical slug), else `.<op>` (back-compat).
+  const stem = serviceStem ? String(serviceStem) : '';
+  const slug = opName ? (stem ? stem + '.' + opName : '.' + opName) : '';
   const sideEffectClass = deriveClass(persisted, slug);
 
   return { sideEffectClass, signals: persisted };
@@ -712,7 +730,7 @@ export async function extractDescriptors(app) {
     // + per-op (keyed on the exact app+tool pair); the FORBIDDEN set is NOT weakened --
     // script/expr/transform/fn/js and a generic `code` on any other op stay always-fatal.
     if (app === 'target' && tool.name === 'apply_promo_code') {
-      carveBusinessCodeField(params);
+      carveBusinessCodeField(params, app, tool.name);
     }
 
     // Wall-1 recursive forbidden-field pre-scan, BETWEEN extraction and the
@@ -722,7 +740,10 @@ export async function extractDescriptors(app) {
 
     const opFileBase = opFileBaseOf(tool.name);
     const rawSignals = extractTransportSignals(app, opFileBase);
-    const { sideEffectClass, signals } = inferSideEffect(tool, rawSignals);
+    // Pass serviceStem so deriveClass keys on the FULL `<stem>.<op>` slug (HI-01): the
+    // per-op confirmed-read allowlist (tripadvisor.check_saved) + the override table then
+    // resolve the SAME way the crosscheck gate later re-derives from the committed slug.
+    const { sideEffectClass, signals } = inferSideEffect(tool, rawSignals, serviceStem);
 
     const slug = `${serviceStem}.${tool.name}`;
     const descriptor = {
@@ -830,20 +851,56 @@ export async function runImport() {
 
   // Write each descriptor FLAT (Pitfall 1: no opentabs/ subdir -- readJsonDir is non-recursive).
   if (!existsSync(DESCRIPTORS_DIR)) mkdirSync(DESCRIPTORS_DIR, { recursive: true });
+
+  // PRUNE-TO-MATCH (HI-02 root-cause fix, 39.5-REVIEW): the importer is now
+  // AUTHORITATIVE for the opentabs__*.json corpus. Before writing the freshly-emitted
+  // set, DELETE every committed opentabs__*.json that this run does NOT re-emit. This
+  // closes the orphan class the full-source import opened: when a vendored slice was
+  // swapped from an old hand-authored slice (e.g. *://www.doordash.com/* with
+  // place_order/cancel_order/...) to the real apex slice (*://*.doordash.com/* ->
+  // doordash.com with bookmark_store/get_order/...), the OLD descriptors had DIFFERENT
+  // filenames (different stem/op), so writeFileSync ADDED the new ones and ORPHANED the
+  // old -- nothing deleted them. The emitted filename set (toWrite) is the EXACT set the
+  // current vendored corpus backs (every entry traces to a real or hand-authored op the
+  // enumerate->extract path just produced), so any opentabs__*.json NOT in it has NO
+  // backing source and is a stale orphan. We delete ONLY the opentabs__ namespace -- the
+  // hand-authored non-opentabs descriptors (heads/recipes) are never touched. The 13
+  // hand-only apps + the hand-authored grafana slice are PRESERVED automatically: they
+  // are re-emitted by enumerateBatchApps (their hand-authored src/tools/*.ts ARE valid
+  // backing), so their filenames are IN toWrite and are never pruned.
+  const emittedFileNames = new Set(toWrite.map((w) => w.path.slice(DESCRIPTORS_DIR.length + 1)));
+  const existingOpentabsFiles = existsSync(DESCRIPTORS_DIR)
+    ? readdirSync(DESCRIPTORS_DIR).filter((n) => /^opentabs__.*\.json$/.test(n))
+    : [];
+  const prunedFiles = [];
+  for (const name of existingOpentabsFiles) {
+    if (!emittedFileNames.has(name)) {
+      unlinkSync(join(DESCRIPTORS_DIR, name));
+      prunedFiles.push(name);
+    }
+  }
+
   for (const { path, json } of toWrite) {
     writeFileSync(path, JSON.stringify(json, null, 2) + '\n', 'utf8');
   }
 
   // Fill catalog/descriptors/_fixtures/_provenance.json apps[] with per-app provenance.
+  // emittedByApp is the AUTHORITATIVE per-app set this run emitted; fillProvenance now
+  // also PRUNES any opentabs provenance entry for an app no longer emitted (HI-02: the
+  // 31-app disk-vs-manifest drift the review measured -- doordash manifest=11/disk=16 etc
+  // -- came from the same no-prune root cause; the manifest must track the emitted corpus).
   fillProvenance(emittedByApp);
 
   // EVAL SEED-FEEDING (BRDTH-01 eval-gate fix): mirror each emitted descriptor's
   // searchable shape into _fixtures/seed-descriptors.json so the eval harness (which
   // buildIndexes seed-descriptors.json but iterates intent-cases.json) has an indexed
   // descriptor for every emitted slug -> the intent-cases the later plans add resolve.
+  // Passes the emitted slug set so feedSeedDescriptors can DROP stale opentabs seed
+  // slugs no longer emitted (HI-02: the review found all 94 orphan slugs were ALSO in
+  // the seed index, polluting the shipped capability search -- they must be pruned too).
   feedSeedDescriptors(emittedDescriptors);
 
-  return { emitted: toWrite.length, apps: [...emittedByApp.keys()] };
+  return { emitted: toWrite.length, pruned: prunedFiles.length, apps: [...emittedByApp.keys()] };
 }
 
 // ---------------------------------------------------------------------------
@@ -870,9 +927,42 @@ function feedSeedDescriptors(emitted) {
   }
   if (!Array.isArray(seed)) seed = [];
 
+  // The freshly-emitted opentabs slug set + the set of emitted opentabs STEMS (the token
+  // before the first '.'). Used to PRUNE stale opentabs seed slugs (HI-02): the review
+  // found all orphan slugs were ALSO in this seed index -- e.g. the stale
+  // reddit.list_subreddit_posts (the real plugin emits list_posts) lingered here even
+  // after its descriptor was deleted -- polluting the shipped capability search.
+  const emittedSlugs = new Set();
+  const emittedStems = new Set();
+  for (const d of emitted) {
+    if (d && typeof d.slug === 'string') {
+      emittedSlugs.add(d.slug);
+      emittedStems.add(d.slug.split('.')[0]);
+    }
+  }
+
+  // PRUNE-TO-MATCH for the seed (HI-02): drop a seed entry IFF it is an OPENTABS-owned
+  // slug that this run no longer emits. The discriminator is exact and conservative: a
+  // seed slug is opentabs-owned when BOTH (a) its STEM is an emitted opentabs stem AND
+  // (b) its op token has NO hyphen (every one of the 2,383 emitted opentabs ops is
+  // hyphen-free snake_case; the hand-authored non-opentabs near-neighbors all use
+  // kebab-case ops -- slack.post-message / discord.send-message / trello.create-card /
+  // github.create-issue / calendar.* / dropbox.* / twitter.* / email.send / sms.send).
+  // So slack.post-message + discord.send-message (stem IS opentabs but op is kebab) are
+  // PRESERVED, email.send + sms.send (op hyphen-free but stem is NOT opentabs) are
+  // PRESERVED, and the stale reddit.list_subreddit_posts (opentabs stem + hyphen-free op,
+  // not re-emitted) is PRUNED. Non-opentabs entries are never touched.
   const bySlug = new Map();
   for (const entry of seed) {
-    if (entry && typeof entry.slug === 'string') bySlug.set(entry.slug, entry);
+    if (!entry || typeof entry.slug !== 'string') continue;
+    const slug = entry.slug;
+    const stem = slug.split('.')[0];
+    const op = slug.slice(stem.length + 1);
+    const isOpentabsOwned = emittedStems.has(stem) && op.length > 0 && !op.includes('-');
+    if (isOpentabsOwned && !emittedSlugs.has(slug)) {
+      continue; // stale opentabs seed slug -> prune (do not carry into the merged set)
+    }
+    bySlug.set(slug, entry);
   }
   for (const d of emitted) {
     if (!d || typeof d.slug !== 'string') continue;
@@ -899,6 +989,15 @@ function fillProvenance(emittedByApp) {
     prov = { apps: [] };
   }
   if (!Array.isArray(prov.apps)) prov.apps = [];
+
+  // PRUNE-TO-MATCH for the provenance manifest (HI-02): the review measured a 31-app
+  // drift between on-disk descriptor count and this manifest (doordash manifest=11/disk=16,
+  // tripadvisor 12/15, ebay 8/13, ...), the same no-prune root cause. emittedByApp is the
+  // AUTHORITATIVE per-app set this run emitted, so DROP any opentabs-sourced app entry not
+  // re-emitted this run. Non-opentabs entries (if any future manifest carries them) are
+  // preserved; today every entry is source:'opentabs'.
+  prov.apps = prov.apps.filter((a) => !a || a.source !== 'opentabs' || emittedByApp.has(a.app));
+
   for (const [app, info] of emittedByApp.entries()) {
     const entry = {
       app,
@@ -923,7 +1022,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
     .then((r) => {
       console.log(
         `import-opentabs-catalog: emitted ${r.emitted} flat descriptor(s) for [${r.apps.join(', ')}] ` +
-          `(closed params + provenance; gated by classifyGate before emit)`
+          `(pruned ${r.pruned} stale orphan descriptor(s); closed params + provenance; ` +
+          `gated by classifyGate before emit)`
       );
       process.exit(0);
     })
