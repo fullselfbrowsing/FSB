@@ -1,359 +1,762 @@
 [
-  { "intent": "message my team on slack", "expectedSlug": "slack.post-message" },
-  { "intent": "post a slack message to the channel", "expectedSlug": "slack.post-message" },
-  { "intent": "drop a note in our slack workspace", "expectedSlug": "slack.post-message" },
-
-  { "intent": "send a message on discord", "expectedSlug": "discord.send_message" },
-  { "intent": "post in the discord channel", "expectedSlug": "discord.send-message" },
-  { "intent": "ping everyone in my discord server", "expectedSlug": "discord.send-message" },
-
-  { "intent": "send an email to my colleague", "expectedSlug": "email.send" },
-  { "intent": "compose a new email and send it", "expectedSlug": "email.send" },
-  { "intent": "write an email message", "expectedSlug": "email.send" },
-
-  { "intent": "post a tweet to twitter", "expectedSlug": "twitter.post-tweet" },
-  { "intent": "tweet a status update", "expectedSlug": "twitter.post-tweet" },
-  { "intent": "publish a new tweet", "expectedSlug": "twitter.post-tweet" },
-
-  { "intent": "send a text message by sms", "expectedSlug": "sms.send" },
-  { "intent": "text my friend a quick sms", "expectedSlug": "sms.send" },
-  { "intent": "shoot off an sms text", "expectedSlug": "sms.send" },
-
-  { "intent": "open a new github issue", "expectedSlug": "github.create-issue" },
-  { "intent": "file a bug report on github", "expectedSlug": "github.create-issue" },
-  { "intent": "raise a github ticket for a problem", "expectedSlug": "github.create-issue" },
-
-  { "intent": "permanently delete a github repository", "expectedSlug": "github.delete-repo" },
-  { "intent": "remove my github repo for good", "expectedSlug": "github.delete-repo" },
-  { "intent": "destroy a github project repository", "expectedSlug": "github.delete-repo" },
-
-  { "intent": "delete a file from dropbox", "expectedSlug": "dropbox.delete-file" },
-  { "intent": "permanently remove a dropbox document", "expectedSlug": "dropbox.delete-file" },
-  { "intent": "erase a file in my dropbox", "expectedSlug": "dropbox.delete-file" },
-
-  { "intent": "show the cards on my trello board", "expectedSlug": "trello.list-cards" },
-  { "intent": "list my trello board cards", "expectedSlug": "trello.list-cards" },
-  { "intent": "view what cards are on trello", "expectedSlug": "trello.list-cards" },
-
-  { "intent": "add a new card to my trello board", "expectedSlug": "trello.create-card" },
-  { "intent": "create a trello card task", "expectedSlug": "trello.create-card" },
-  { "intent": "make a new card in trello", "expectedSlug": "trello.create-card" },
-
-  { "intent": "show my upcoming calendar events", "expectedSlug": "calendar.list-events" },
-  { "intent": "list the meetings on my calendar", "expectedSlug": "calendar.list-events" },
-  { "intent": "view my schedule for the week", "expectedSlug": "calendar.list-events" },
-
-  { "intent": "create a new calendar event", "expectedSlug": "calendar.create-event" },
-  { "intent": "schedule a meeting on my calendar", "expectedSlug": "calendar.create-event" },
-  { "intent": "book an appointment on my calendar", "expectedSlug": "calendar.create-event" },
-
-  { "intent": "create a new task in todoist", "expectedSlug": "todoist.create_task" },
-  { "intent": "add a to-do item to my todoist", "expectedSlug": "todoist.create_task" },
-  { "intent": "make a new todoist task", "expectedSlug": "todoist.create_task" },
-  { "intent": "create a task on todoist", "expectedSlug": "todoist.create_task" },
-
-  { "intent": "create an issue in linear", "expectedSlug": "linear.create_issue" },
-  { "intent": "open a new linear issue", "expectedSlug": "linear.create_issue" },
-  { "intent": "file a new issue in linear", "expectedSlug": "linear.create_issue" },
-
-  { "intent": "create a task in asana", "expectedSlug": "asana.create_task" },
-  { "intent": "add a new asana task", "expectedSlug": "asana.create_task" },
-  { "intent": "make a task in asana", "expectedSlug": "asana.create_task" },
-
-  { "intent": "list the tasks in my todoist", "expectedSlug": "todoist.list_tasks" },
-  { "intent": "show me my todoist to-do list", "expectedSlug": "todoist.list_tasks" },
-  { "intent": "what tasks do i have in todoist", "expectedSlug": "todoist.list_tasks" },
-
-  { "intent": "get a single todoist task by id", "expectedSlug": "todoist.get_task" },
-  { "intent": "look up one specific todoist task", "expectedSlug": "todoist.get_task" },
-  { "intent": "fetch a particular task from todoist", "expectedSlug": "todoist.get_task" },
-
-  { "intent": "update an existing todoist task", "expectedSlug": "todoist.update_task" },
-  { "intent": "edit the details of a todoist task", "expectedSlug": "todoist.update_task" },
-  { "intent": "change a task in todoist", "expectedSlug": "todoist.update_task" },
-
-  { "intent": "complete a task in todoist", "expectedSlug": "todoist.close_task" },
-  { "intent": "mark my todoist task as done", "expectedSlug": "todoist.close_task" },
-  { "intent": "check off a todoist task", "expectedSlug": "todoist.close_task" },
-
-  { "intent": "reopen a completed todoist task", "expectedSlug": "todoist.reopen_task" },
-  { "intent": "uncomplete a task in todoist", "expectedSlug": "todoist.reopen_task" },
-  { "intent": "restore a finished todoist task", "expectedSlug": "todoist.reopen_task" },
-
-  { "intent": "delete a task from todoist", "expectedSlug": "todoist.delete_task" },
-  { "intent": "permanently remove a todoist task", "expectedSlug": "todoist.delete_task" },
-  { "intent": "trash a todoist task for good", "expectedSlug": "todoist.delete_task" },
-
-  { "intent": "create a task in clickup", "expectedSlug": "clickup.create_task" },
-  { "intent": "add a new clickup task", "expectedSlug": "clickup.create_task" },
-  { "intent": "make a task in clickup", "expectedSlug": "clickup.create_task" },
-
-  { "intent": "list the tasks in clickup", "expectedSlug": "clickup.list_tasks" },
-  { "intent": "show me my clickup tasks", "expectedSlug": "clickup.list_tasks" },
-
-  { "intent": "create an issue in jira", "expectedSlug": "jira.create_issue" },
-  { "intent": "open a new jira issue", "expectedSlug": "jira.create_issue" },
-  { "intent": "file a new issue in jira", "expectedSlug": "jira.create_issue" },
-
-  { "intent": "search issues in jira", "expectedSlug": "jira.search_issues" },
-  { "intent": "find jira issues with jql", "expectedSlug": "jira.search_issues" },
-
-  { "intent": "create a page in confluence", "expectedSlug": "confluence.create_page" },
-  { "intent": "make a new confluence page", "expectedSlug": "confluence.create_page" },
-  { "intent": "add a new page in confluence", "expectedSlug": "confluence.create_page" },
-
-  { "intent": "update a page in confluence", "expectedSlug": "confluence.update_page" },
-  { "intent": "edit an existing confluence page", "expectedSlug": "confluence.update_page" },
-
-  { "intent": "list records in airtable", "expectedSlug": "airtable.list_records" },
-  { "intent": "show me the records in my airtable table", "expectedSlug": "airtable.list_records" },
-
-  { "intent": "create a record in airtable", "expectedSlug": "airtable.create_record" },
-  { "intent": "add a new airtable record", "expectedSlug": "airtable.create_record" },
-
-  { "intent": "delete a record in airtable", "expectedSlug": "airtable.delete_record" },
-  { "intent": "permanently remove an airtable record", "expectedSlug": "airtable.delete_record" },
-  { "intent": "trash a record from airtable for good", "expectedSlug": "airtable.delete_record" },
-
-  { "intent": "list issues in gitlab", "expectedSlug": "gitlab.list_issues" },
-  { "intent": "show me my gitlab issues", "expectedSlug": "gitlab.list_issues" },
-
-  { "intent": "create an issue in gitlab", "expectedSlug": "gitlab.create_issue" },
-
-  { "intent": "open a merge request in gitlab", "expectedSlug": "gitlab.create_merge_request" },
-  { "intent": "create a merge request in gitlab", "expectedSlug": "gitlab.create_merge_request" },
-
-  { "intent": "list pull requests in bitbucket", "expectedSlug": "bitbucket.list_pull_requests" },
-  { "intent": "show me my bitbucket pull requests", "expectedSlug": "bitbucket.list_pull_requests" },
-
-  { "intent": "list repositories in bitbucket", "expectedSlug": "bitbucket.list_repositories" },
-
-  { "intent": "open a pull request in bitbucket", "expectedSlug": "bitbucket.create_pull_request" },
-  { "intent": "create a pull request in bitbucket", "expectedSlug": "bitbucket.create_pull_request" },
-
-  { "intent": "list my vercel deployments", "expectedSlug": "vercel.list_deployments" },
-  { "intent": "show me my deployments in vercel", "expectedSlug": "vercel.list_deployments" },
-
-  { "intent": "list projects in vercel", "expectedSlug": "vercel.list_projects" },
-
-  { "intent": "trigger a new deployment in vercel", "expectedSlug": "vercel.create_deployment" },
-  { "intent": "create a deployment in vercel", "expectedSlug": "vercel.create_deployment" },
-
-  { "intent": "list sites in netlify", "expectedSlug": "netlify.list_sites" },
-  { "intent": "show me my netlify sites", "expectedSlug": "netlify.list_sites" },
-
-  { "intent": "list deploys for a site in netlify", "expectedSlug": "netlify.list_deploys" },
-
-  { "intent": "trigger a new deploy in netlify", "expectedSlug": "netlify.create_deploy" },
-  { "intent": "create a deploy in netlify", "expectedSlug": "netlify.create_deploy" },
-
-  { "intent": "list zones in cloudflare", "expectedSlug": "cloudflare.list_zones" },
-  { "intent": "show me my cloudflare zones", "expectedSlug": "cloudflare.list_zones" },
-
-  { "intent": "list dns records in cloudflare", "expectedSlug": "cloudflare.list_dns_records" },
-
-  { "intent": "purge the cloudflare cache", "expectedSlug": "cloudflare.purge_cache" },
-  { "intent": "purge cache in cloudflare", "expectedSlug": "cloudflare.purge_cache" },
-
-  { "intent": "list pipelines in circleci", "expectedSlug": "circleci.list_pipelines" },
-  { "intent": "show me my circleci pipelines", "expectedSlug": "circleci.list_pipelines" },
-
-  { "intent": "trigger a circleci pipeline", "expectedSlug": "circleci.trigger_pipeline" },
-  { "intent": "trigger pipeline in circleci", "expectedSlug": "circleci.trigger_pipeline" },
-
-  { "intent": "query datadog metrics", "expectedSlug": "datadog.query_metrics" },
-  { "intent": "query metrics in datadog", "expectedSlug": "datadog.query_metrics" },
-
-  { "intent": "list monitors in datadog", "expectedSlug": "datadog.list_monitors" },
-
-  { "intent": "list dashboards in datadog", "expectedSlug": "datadog.list_dashboards" },
-
-  { "intent": "list issues in sentry", "expectedSlug": "sentry.list_issues" },
-  { "intent": "show me my sentry issues", "expectedSlug": "sentry.list_issues" },
-
-  { "intent": "resolve an issue in sentry", "expectedSlug": "sentry.resolve_issue" },
-  { "intent": "mark a sentry issue as resolved", "expectedSlug": "sentry.resolve_issue" },
-
-  { "intent": "list insights in posthog", "expectedSlug": "posthog.list_insights" },
-  { "intent": "show me my posthog insights", "expectedSlug": "posthog.list_insights" },
-
-  { "intent": "query events in posthog", "expectedSlug": "posthog.query_events" },
-
-  { "intent": "list dashboards in posthog", "expectedSlug": "posthog.list_dashboards" },
-
-  { "intent": "show me my chatgpt conversations", "expectedSlug": "chatgpt.list_conversations" },
-  { "intent": "list my chatgpt conversations", "expectedSlug": "chatgpt.list_conversations" },
-  { "intent": "open a chatgpt conversation", "expectedSlug": "chatgpt.get_conversation" },
-  { "intent": "send a message in chatgpt", "expectedSlug": "chatgpt.send_message" },
-
-  { "intent": "show me my claude conversations", "expectedSlug": "claude.list_conversations" },
-  { "intent": "list my claude conversations", "expectedSlug": "claude.list_conversations" },
-  { "intent": "open a claude conversation", "expectedSlug": "claude.get_conversation" },
-  { "intent": "send a message to claude", "expectedSlug": "claude.send_message" },
-
-  { "intent": "show me my bluesky timeline", "expectedSlug": "bsky.list_timeline" },
-  { "intent": "scroll my bluesky feed", "expectedSlug": "bsky.list_timeline" },
-  { "intent": "look up a bluesky profile", "expectedSlug": "bsky.get_profile" },
-  { "intent": "post to bluesky", "expectedSlug": "bsky.create_post" },
-  { "intent": "delete one of my bluesky posts", "expectedSlug": "bsky.delete_post" },
-
-  { "intent": "show my mastodon timeline", "expectedSlug": "mastodon.list_timeline" },
-  { "intent": "read a single mastodon status by id", "expectedSlug": "mastodon.get_status" },
-  { "intent": "post a status to mastodon", "expectedSlug": "mastodon.create_status" },
-  { "intent": "delete a mastodon post", "expectedSlug": "mastodon.delete_status" },
-
-  { "intent": "show me my threads timeline", "expectedSlug": "threads.list_timeline" },
-  { "intent": "open a thread on threads", "expectedSlug": "threads.get_thread" },
-  { "intent": "publish a new thread on threads", "expectedSlug": "threads.create_thread" },
-
-  { "intent": "show me the channels in my discord server", "expectedSlug": "discord.list_channels" },
-  { "intent": "read my discord messages in a channel", "expectedSlug": "discord.list_messages" },
-  { "intent": "send a discord message", "expectedSlug": "discord.send_message" },
-  { "intent": "delete a discord message", "expectedSlug": "discord.delete_message" },
-
-  { "intent": "show posts in a subreddit", "expectedSlug": "reddit.list_subreddit_posts" },
-  { "intent": "read a single reddit post", "expectedSlug": "reddit.get_post" },
-  { "intent": "search reddit", "expectedSlug": "reddit.search_posts" },
-
-  { "intent": "show me restaurants on doordash", "expectedSlug": "doordash.list_restaurants" },
-  { "intent": "look up a doordash restaurant menu", "expectedSlug": "doordash.get_restaurant" },
-  { "intent": "show me my doordash order history", "expectedSlug": "doordash.list_orders" },
-  { "intent": "track my doordash order", "expectedSlug": "doordash.track_order" },
-  { "intent": "order food on doordash", "expectedSlug": "doordash.place_order" },
-  { "intent": "cancel my doordash order", "expectedSlug": "doordash.cancel_order" },
-
-  { "intent": "show me restaurants on ubereats", "expectedSlug": "ubereats.list_restaurants" },
-  { "intent": "look up an ubereats restaurant menu", "expectedSlug": "ubereats.get_menu" },
-  { "intent": "order food on ubereats", "expectedSlug": "ubereats.place_order" },
-  { "intent": "cancel my ubereats order", "expectedSlug": "ubereats.cancel_order" },
-
-  { "intent": "show me restaurants on grubhub", "expectedSlug": "grubhub.list_restaurants" },
-  { "intent": "show me my grubhub order history", "expectedSlug": "grubhub.list_orders" },
-  { "intent": "order food on grubhub", "expectedSlug": "grubhub.place_order" },
-  { "intent": "cancel my grubhub order", "expectedSlug": "grubhub.cancel_order" },
-
-  { "intent": "show me grocery stores on instacart", "expectedSlug": "instacart.list_stores" },
-  { "intent": "search for groceries on instacart", "expectedSlug": "instacart.search_products" },
-  { "intent": "checkout my instacart cart", "expectedSlug": "instacart.checkout" },
-  { "intent": "cancel my instacart order", "expectedSlug": "instacart.cancel_order" },
-
-  { "intent": "show me uber ride options", "expectedSlug": "uber.list_ride_options" },
-  { "intent": "estimate an uber fare", "expectedSlug": "uber.get_ride_estimate" },
-  { "intent": "list my uber trips", "expectedSlug": "uber.list_trips" },
-  { "intent": "request an uber ride", "expectedSlug": "uber.request_ride" },
-  { "intent": "cancel my uber ride", "expectedSlug": "uber.cancel_ride" },
-
-  { "intent": "show me lyft ride types", "expectedSlug": "lyft.list_ride_types" },
-  { "intent": "estimate a lyft fare", "expectedSlug": "lyft.get_ride_estimate" },
-  { "intent": "request a lyft ride", "expectedSlug": "lyft.request_ride" },
-  { "intent": "cancel my lyft ride", "expectedSlug": "lyft.cancel_ride" },
-
-  { "intent": "search for products on amazon", "expectedSlug": "amazon.search_products" },
-  { "intent": "look up a single amazon product", "expectedSlug": "amazon.get_product" },
-  { "intent": "show me my amazon order history", "expectedSlug": "amazon.list_orders" },
-  { "intent": "track my amazon order", "expectedSlug": "amazon.track_order" },
-  { "intent": "order this on amazon", "expectedSlug": "amazon.place_order" },
-  { "intent": "cancel my amazon order", "expectedSlug": "amazon.cancel_order" },
-
-  { "intent": "search listings on ebay", "expectedSlug": "ebay.search_listings" },
-  { "intent": "look up a single ebay listing", "expectedSlug": "ebay.get_listing" },
-  { "intent": "bid on an ebay auction", "expectedSlug": "ebay.place_bid" },
-  { "intent": "buy it now on ebay", "expectedSlug": "ebay.buy_now" },
-
-  { "intent": "search etsy listings", "expectedSlug": "etsy.search_listings" },
-  { "intent": "add an item to my etsy cart", "expectedSlug": "etsy.add_to_cart" },
-  { "intent": "checkout my etsy cart", "expectedSlug": "etsy.checkout" },
-
-  { "intent": "search for products on bestbuy", "expectedSlug": "bestbuy.search_products" },
-  { "intent": "order this on bestbuy", "expectedSlug": "bestbuy.place_order" },
-  { "intent": "cancel my bestbuy order", "expectedSlug": "bestbuy.cancel_order" },
-
-  { "intent": "search for products on costco", "expectedSlug": "costco.search_products" },
-  { "intent": "order this on costco", "expectedSlug": "costco.place_order" },
-
-  { "intent": "search for products on walmart", "expectedSlug": "walmart.search_products" },
-  { "intent": "order this on walmart", "expectedSlug": "walmart.place_order" },
-  { "intent": "cancel my walmart order", "expectedSlug": "walmart.cancel_order" },
-
-  { "intent": "search for products on target", "expectedSlug": "target.search_products" },
-  { "intent": "order this on target", "expectedSlug": "target.place_order" },
-
-  { "intent": "search stays on booking", "expectedSlug": "booking.search_stays" },
-  { "intent": "look up a booking property", "expectedSlug": "booking.get_property" },
-  { "intent": "show me my booking reservations", "expectedSlug": "booking.list_bookings" },
-  { "intent": "complete my booking.com reservation", "expectedSlug": "booking.complete_booking" },
-  { "intent": "cancel my booking", "expectedSlug": "booking.cancel_booking" },
-
-  { "intent": "search listings on airbnb", "expectedSlug": "airbnb.search_listings" },
-  { "intent": "look up an airbnb listing", "expectedSlug": "airbnb.get_listing" },
-  { "intent": "list my airbnb trips", "expectedSlug": "airbnb.list_trips" },
-  { "intent": "book a stay on airbnb", "expectedSlug": "airbnb.book_stay" },
-  { "intent": "cancel my airbnb reservation", "expectedSlug": "airbnb.cancel_reservation" },
-
-  { "intent": "search hotels on expedia", "expectedSlug": "expedia.search_hotels" },
-  { "intent": "list my expedia trips", "expectedSlug": "expedia.list_trips" },
-  { "intent": "book a flight on expedia", "expectedSlug": "expedia.book_flight" },
-  { "intent": "book a hotel on expedia", "expectedSlug": "expedia.book_hotel" },
-
-  { "intent": "find flights on kayak", "expectedSlug": "kayak.search_flights" },
-  { "intent": "find hotels on kayak", "expectedSlug": "kayak.search_hotels" },
-  { "intent": "look up a kayak price alert", "expectedSlug": "kayak.get_price_alert" },
-  { "intent": "create a price alert on kayak", "expectedSlug": "kayak.create_price_alert" },
-
-  { "intent": "search restaurants on opentable", "expectedSlug": "opentable.search_restaurants" },
-  { "intent": "look up an opentable restaurant", "expectedSlug": "opentable.get_restaurant" },
-  { "intent": "show me my opentable reservations", "expectedSlug": "opentable.list_reservations" },
-  { "intent": "reserve a table on opentable", "expectedSlug": "opentable.reserve_table" },
-  { "intent": "cancel my opentable reservation", "expectedSlug": "opentable.cancel_reservation" },
-
-  { "intent": "find events on ticketmaster", "expectedSlug": "ticketmaster.search_events" },
-  { "intent": "look up a ticketmaster event", "expectedSlug": "ticketmaster.get_event" },
-  { "intent": "show me my ticketmaster orders", "expectedSlug": "ticketmaster.list_orders" },
-  { "intent": "buy tickets on ticketmaster", "expectedSlug": "ticketmaster.buy_tickets" },
-
-  { "intent": "search events on stubhub", "expectedSlug": "stubhub.search_events" },
-  { "intent": "look up a stubhub listing", "expectedSlug": "stubhub.get_listing" },
-  { "intent": "buy tickets on stubhub", "expectedSlug": "stubhub.buy_tickets" },
-
-  { "intent": "find events on eventbrite", "expectedSlug": "eventbrite.search_events" },
-  { "intent": "register for an event on eventbrite", "expectedSlug": "eventbrite.register_for_event" },
-
-  { "intent": "find restaurants on yelp", "expectedSlug": "yelp.search_businesses" },
-  { "intent": "look up a business on yelp", "expectedSlug": "yelp.get_business" },
-  { "intent": "read reviews of a business on yelp", "expectedSlug": "yelp.list_reviews" },
-
-  { "intent": "search locations on tripadvisor", "expectedSlug": "tripadvisor.search_locations" },
-  { "intent": "read reviews of a location on tripadvisor", "expectedSlug": "tripadvisor.list_reviews" },
-
-  { "intent": "list my calendly event types", "expectedSlug": "calendly.list_event_types" },
-  { "intent": "check my calendly availability", "expectedSlug": "calendly.get_availability" },
-  { "intent": "show me my calendly scheduled events", "expectedSlug": "calendly.list_scheduled_events" },
-
-  { "intent": "list products on shopify", "expectedSlug": "shopify.list_products" },
-  { "intent": "look up a single shopify product", "expectedSlug": "shopify.get_product" },
-  { "intent": "show me my shopify order history", "expectedSlug": "shopify.list_orders" },
-  { "intent": "create an order on shopify", "expectedSlug": "shopify.create_order" },
-  { "intent": "cancel my shopify order", "expectedSlug": "shopify.cancel_order" },
-
-  { "intent": "search listings on craigslist", "expectedSlug": "craigslist.search_listings" },
-  { "intent": "look up a single craigslist listing", "expectedSlug": "craigslist.get_listing" },
-  { "intent": "post a new listing on craigslist", "expectedSlug": "craigslist.post_listing" },
-  { "intent": "delete my craigslist listing", "expectedSlug": "craigslist.delete_listing" },
-
-  { "intent": "find nearby dominos stores", "expectedSlug": "dominos.list_stores" },
-  { "intent": "look up a single dominos menu", "expectedSlug": "dominos.get_menu" },
-  { "intent": "order pizza on dominos", "expectedSlug": "dominos.place_order" },
-  { "intent": "track my dominos order", "expectedSlug": "dominos.track_order" },
-
-  { "intent": "find nearby chipotle locations", "expectedSlug": "chipotle.list_locations" },
-  { "intent": "look up a single chipotle menu", "expectedSlug": "chipotle.get_menu" },
-  { "intent": "place a chipotle order", "expectedSlug": "chipotle.place_order" },
-
-  { "intent": "search listings on zillow", "expectedSlug": "zillow.search_listings" },
-  { "intent": "look up a single zillow listing", "expectedSlug": "zillow.get_listing" },
-  { "intent": "look up a home value on zillow", "expectedSlug": "zillow.get_home_value" },
-
-  { "intent": "list dashboards on grafana", "expectedSlug": "grafana.list_dashboards" },
-  { "intent": "look up a single grafana dashboard", "expectedSlug": "grafana.get_dashboard" },
-  { "intent": "query metrics on grafana", "expectedSlug": "grafana.query_metrics" }
+  {
+    "intent": "message my team on slack",
+    "expectedSlug": "slack.post-message"
+  },
+  {
+    "intent": "post a slack message to the channel",
+    "expectedSlug": "slack.post-message"
+  },
+  {
+    "intent": "drop a note in our slack workspace",
+    "expectedSlug": "slack.post-message"
+  },
+  {
+    "intent": "send a message on discord",
+    "expectedSlug": "discord.send_message"
+  },
+  {
+    "intent": "post in the discord channel",
+    "expectedSlug": "discord.send-message"
+  },
+  {
+    "intent": "ping everyone in my discord server",
+    "expectedSlug": "discord.send-message"
+  },
+  {
+    "intent": "send an email to my colleague",
+    "expectedSlug": "email.send"
+  },
+  {
+    "intent": "compose a new email and send it",
+    "expectedSlug": "email.send"
+  },
+  {
+    "intent": "write an email message",
+    "expectedSlug": "email.send"
+  },
+  {
+    "intent": "post a tweet to twitter",
+    "expectedSlug": "twitter.post-tweet"
+  },
+  {
+    "intent": "tweet a status update",
+    "expectedSlug": "twitter.post-tweet"
+  },
+  {
+    "intent": "publish a new tweet",
+    "expectedSlug": "twitter.post-tweet"
+  },
+  {
+    "intent": "send a text message by sms",
+    "expectedSlug": "sms.send"
+  },
+  {
+    "intent": "text my friend a quick sms",
+    "expectedSlug": "sms.send"
+  },
+  {
+    "intent": "shoot off an sms text",
+    "expectedSlug": "sms.send"
+  },
+  {
+    "intent": "open a new github issue",
+    "expectedSlug": "github.create-issue"
+  },
+  {
+    "intent": "file a bug report on github",
+    "expectedSlug": "github.create-issue"
+  },
+  {
+    "intent": "raise a github ticket for a problem",
+    "expectedSlug": "github.create-issue"
+  },
+  {
+    "intent": "permanently delete a github repository",
+    "expectedSlug": "github.delete-repo"
+  },
+  {
+    "intent": "remove my github repo for good",
+    "expectedSlug": "github.delete-repo"
+  },
+  {
+    "intent": "destroy a github project repository",
+    "expectedSlug": "github.delete-repo"
+  },
+  {
+    "intent": "delete a file from dropbox",
+    "expectedSlug": "dropbox.delete-file"
+  },
+  {
+    "intent": "permanently remove a dropbox document",
+    "expectedSlug": "dropbox.delete-file"
+  },
+  {
+    "intent": "erase a file in my dropbox",
+    "expectedSlug": "dropbox.delete-file"
+  },
+  {
+    "intent": "show the cards on my trello board",
+    "expectedSlug": "trello.list-cards"
+  },
+  {
+    "intent": "list my trello board cards",
+    "expectedSlug": "trello.list-cards"
+  },
+  {
+    "intent": "view what cards are on trello",
+    "expectedSlug": "trello.list-cards"
+  },
+  {
+    "intent": "add a new card to my trello board",
+    "expectedSlug": "trello.create-card"
+  },
+  {
+    "intent": "create a trello card task",
+    "expectedSlug": "trello.create-card"
+  },
+  {
+    "intent": "make a new card in trello",
+    "expectedSlug": "trello.create-card"
+  },
+  {
+    "intent": "show my upcoming calendar events",
+    "expectedSlug": "calendar.list-events"
+  },
+  {
+    "intent": "list the meetings on my calendar",
+    "expectedSlug": "calendar.list-events"
+  },
+  {
+    "intent": "view my schedule for the week",
+    "expectedSlug": "calendar.list-events"
+  },
+  {
+    "intent": "create a new calendar event",
+    "expectedSlug": "calendar.create-event"
+  },
+  {
+    "intent": "schedule a meeting on my calendar",
+    "expectedSlug": "calendar.create-event"
+  },
+  {
+    "intent": "book an appointment on my calendar",
+    "expectedSlug": "calendar.create-event"
+  },
+  {
+    "intent": "create a new task in todoist",
+    "expectedSlug": "todoist.create_task"
+  },
+  {
+    "intent": "add a to-do item to my todoist",
+    "expectedSlug": "todoist.create_task"
+  },
+  {
+    "intent": "make a new todoist task",
+    "expectedSlug": "todoist.create_task"
+  },
+  {
+    "intent": "create a task on todoist",
+    "expectedSlug": "todoist.create_task"
+  },
+  {
+    "intent": "create an issue in linear",
+    "expectedSlug": "linear.create_issue"
+  },
+  {
+    "intent": "open a new linear issue",
+    "expectedSlug": "linear.create_issue"
+  },
+  {
+    "intent": "file a new issue in linear",
+    "expectedSlug": "linear.create_issue"
+  },
+  {
+    "intent": "create a task in asana",
+    "expectedSlug": "asana.create_task"
+  },
+  {
+    "intent": "add a new asana task",
+    "expectedSlug": "asana.create_task"
+  },
+  {
+    "intent": "make a task in asana",
+    "expectedSlug": "asana.create_task"
+  },
+  {
+    "intent": "list the tasks in my todoist",
+    "expectedSlug": "todoist.list_tasks"
+  },
+  {
+    "intent": "show me my todoist to-do list",
+    "expectedSlug": "todoist.list_tasks"
+  },
+  {
+    "intent": "what tasks do i have in todoist",
+    "expectedSlug": "todoist.list_tasks"
+  },
+  {
+    "intent": "get a single todoist task by id",
+    "expectedSlug": "todoist.get_task"
+  },
+  {
+    "intent": "look up one specific todoist task",
+    "expectedSlug": "todoist.get_task"
+  },
+  {
+    "intent": "fetch a particular task from todoist",
+    "expectedSlug": "todoist.get_task"
+  },
+  {
+    "intent": "update an existing todoist task",
+    "expectedSlug": "todoist.update_task"
+  },
+  {
+    "intent": "edit the details of a todoist task",
+    "expectedSlug": "todoist.update_task"
+  },
+  {
+    "intent": "change a task in todoist",
+    "expectedSlug": "todoist.update_task"
+  },
+  {
+    "intent": "complete a task in todoist",
+    "expectedSlug": "todoist.close_task"
+  },
+  {
+    "intent": "mark my todoist task as done",
+    "expectedSlug": "todoist.close_task"
+  },
+  {
+    "intent": "check off a todoist task",
+    "expectedSlug": "todoist.close_task"
+  },
+  {
+    "intent": "reopen a completed todoist task",
+    "expectedSlug": "todoist.reopen_task"
+  },
+  {
+    "intent": "uncomplete a task in todoist",
+    "expectedSlug": "todoist.reopen_task"
+  },
+  {
+    "intent": "restore a finished todoist task",
+    "expectedSlug": "todoist.reopen_task"
+  },
+  {
+    "intent": "delete a task from todoist",
+    "expectedSlug": "todoist.delete_task"
+  },
+  {
+    "intent": "permanently remove a todoist task",
+    "expectedSlug": "todoist.delete_task"
+  },
+  {
+    "intent": "trash a todoist task for good",
+    "expectedSlug": "todoist.delete_task"
+  },
+  {
+    "intent": "create an issue in jira",
+    "expectedSlug": "jira.create_issue"
+  },
+  {
+    "intent": "open a new jira issue",
+    "expectedSlug": "jira.create_issue"
+  },
+  {
+    "intent": "file a new issue in jira",
+    "expectedSlug": "jira.create_issue"
+  },
+  {
+    "intent": "search issues in jira",
+    "expectedSlug": "jira.search_issues"
+  },
+  {
+    "intent": "find jira issues with jql",
+    "expectedSlug": "jira.search_issues"
+  },
+  {
+    "intent": "create a page in confluence",
+    "expectedSlug": "confluence.create_page"
+  },
+  {
+    "intent": "make a new confluence page",
+    "expectedSlug": "confluence.create_page"
+  },
+  {
+    "intent": "add a new page in confluence",
+    "expectedSlug": "confluence.create_page"
+  },
+  {
+    "intent": "update a page in confluence",
+    "expectedSlug": "confluence.update_page"
+  },
+  {
+    "intent": "edit an existing confluence page",
+    "expectedSlug": "confluence.update_page"
+  },
+  {
+    "intent": "list records in airtable",
+    "expectedSlug": "airtable.list_records"
+  },
+  {
+    "intent": "show me the records in my airtable table",
+    "expectedSlug": "airtable.list_records"
+  },
+  {
+    "intent": "list issues in gitlab",
+    "expectedSlug": "gitlab.list_issues"
+  },
+  {
+    "intent": "show me my gitlab issues",
+    "expectedSlug": "gitlab.list_issues"
+  },
+  {
+    "intent": "create an issue in gitlab",
+    "expectedSlug": "gitlab.create_issue"
+  },
+  {
+    "intent": "open a merge request in gitlab",
+    "expectedSlug": "gitlab.create_merge_request"
+  },
+  {
+    "intent": "create a merge request in gitlab",
+    "expectedSlug": "gitlab.create_merge_request"
+  },
+  {
+    "intent": "list pull requests in bitbucket",
+    "expectedSlug": "bitbucket.list_pull_requests"
+  },
+  {
+    "intent": "show me my bitbucket pull requests",
+    "expectedSlug": "bitbucket.list_pull_requests"
+  },
+  {
+    "intent": "list repositories in bitbucket",
+    "expectedSlug": "bitbucket.list_repositories"
+  },
+  {
+    "intent": "open a pull request in bitbucket",
+    "expectedSlug": "bitbucket.create_pull_request"
+  },
+  {
+    "intent": "create a pull request in bitbucket",
+    "expectedSlug": "bitbucket.create_pull_request"
+  },
+  {
+    "intent": "list my vercel deployments",
+    "expectedSlug": "vercel.list_deployments"
+  },
+  {
+    "intent": "show me my deployments in vercel",
+    "expectedSlug": "vercel.list_deployments"
+  },
+  {
+    "intent": "list projects in vercel",
+    "expectedSlug": "vercel.list_projects"
+  },
+  {
+    "intent": "list sites in netlify",
+    "expectedSlug": "netlify.list_sites"
+  },
+  {
+    "intent": "show me my netlify sites",
+    "expectedSlug": "netlify.list_sites"
+  },
+  {
+    "intent": "list deploys for a site in netlify",
+    "expectedSlug": "netlify.list_deploys"
+  },
+  {
+    "intent": "list zones in cloudflare",
+    "expectedSlug": "cloudflare.list_zones"
+  },
+  {
+    "intent": "show me my cloudflare zones",
+    "expectedSlug": "cloudflare.list_zones"
+  },
+  {
+    "intent": "list dns records in cloudflare",
+    "expectedSlug": "cloudflare.list_dns_records"
+  },
+  {
+    "intent": "purge the cloudflare cache",
+    "expectedSlug": "cloudflare.purge_cache"
+  },
+  {
+    "intent": "purge cache in cloudflare",
+    "expectedSlug": "cloudflare.purge_cache"
+  },
+  {
+    "intent": "list pipelines in circleci",
+    "expectedSlug": "circleci.list_pipelines"
+  },
+  {
+    "intent": "show me my circleci pipelines",
+    "expectedSlug": "circleci.list_pipelines"
+  },
+  {
+    "intent": "trigger a circleci pipeline",
+    "expectedSlug": "circleci.trigger_pipeline"
+  },
+  {
+    "intent": "trigger pipeline in circleci",
+    "expectedSlug": "circleci.trigger_pipeline"
+  },
+  {
+    "intent": "query datadog metrics",
+    "expectedSlug": "datadog.query_metrics"
+  },
+  {
+    "intent": "query metrics in datadog",
+    "expectedSlug": "datadog.query_metrics"
+  },
+  {
+    "intent": "list monitors in datadog",
+    "expectedSlug": "datadog.list_monitors"
+  },
+  {
+    "intent": "list dashboards in datadog",
+    "expectedSlug": "datadog.list_dashboards"
+  },
+  {
+    "intent": "list insights in posthog",
+    "expectedSlug": "posthog.list_insights"
+  },
+  {
+    "intent": "show me my posthog insights",
+    "expectedSlug": "posthog.list_insights"
+  },
+  {
+    "intent": "list dashboards in posthog",
+    "expectedSlug": "posthog.list_dashboards"
+  },
+  {
+    "intent": "show me my chatgpt conversations",
+    "expectedSlug": "chatgpt.list_conversations"
+  },
+  {
+    "intent": "list my chatgpt conversations",
+    "expectedSlug": "chatgpt.list_conversations"
+  },
+  {
+    "intent": "open a chatgpt conversation",
+    "expectedSlug": "chatgpt.get_conversation"
+  },
+  {
+    "intent": "show me my claude conversations",
+    "expectedSlug": "claude.list_conversations"
+  },
+  {
+    "intent": "list my claude conversations",
+    "expectedSlug": "claude.list_conversations"
+  },
+  {
+    "intent": "open a claude conversation",
+    "expectedSlug": "claude.get_conversation"
+  },
+  {
+    "intent": "send a message to claude",
+    "expectedSlug": "claude.send_message"
+  },
+  {
+    "intent": "post to bluesky",
+    "expectedSlug": "bsky.create_post"
+  },
+  {
+    "intent": "delete one of my bluesky posts",
+    "expectedSlug": "bsky.delete_post"
+  },
+  {
+    "intent": "show my mastodon timeline",
+    "expectedSlug": "mastodon.list_timeline"
+  },
+  {
+    "intent": "read a single mastodon status by id",
+    "expectedSlug": "mastodon.get_status"
+  },
+  {
+    "intent": "post a status to mastodon",
+    "expectedSlug": "mastodon.create_status"
+  },
+  {
+    "intent": "delete a mastodon post",
+    "expectedSlug": "mastodon.delete_status"
+  },
+  {
+    "intent": "show me my threads timeline",
+    "expectedSlug": "threads.list_timeline"
+  },
+  {
+    "intent": "open a thread on threads",
+    "expectedSlug": "threads.get_thread"
+  },
+  {
+    "intent": "publish a new thread on threads",
+    "expectedSlug": "threads.create_thread"
+  },
+  {
+    "intent": "show me the channels in my discord server",
+    "expectedSlug": "discord.list_channels"
+  },
+  {
+    "intent": "send a discord message",
+    "expectedSlug": "discord.send_message"
+  },
+  {
+    "intent": "delete a discord message",
+    "expectedSlug": "discord.delete_message"
+  },
+  {
+    "intent": "read a single reddit post",
+    "expectedSlug": "reddit.get_post"
+  },
+  {
+    "intent": "search reddit",
+    "expectedSlug": "reddit.search_posts"
+  },
+  {
+    "intent": "show me my doordash order history",
+    "expectedSlug": "doordash.list_orders"
+  },
+  {
+    "intent": "show me restaurants on ubereats",
+    "expectedSlug": "ubereats.list_restaurants"
+  },
+  {
+    "intent": "look up an ubereats restaurant menu",
+    "expectedSlug": "ubereats.get_menu"
+  },
+  {
+    "intent": "order food on ubereats",
+    "expectedSlug": "ubereats.place_order"
+  },
+  {
+    "intent": "cancel my ubereats order",
+    "expectedSlug": "ubereats.cancel_order"
+  },
+  {
+    "intent": "show me restaurants on grubhub",
+    "expectedSlug": "grubhub.list_restaurants"
+  },
+  {
+    "intent": "show me my grubhub order history",
+    "expectedSlug": "grubhub.list_orders"
+  },
+  {
+    "intent": "order food on grubhub",
+    "expectedSlug": "grubhub.place_order"
+  },
+  {
+    "intent": "cancel my grubhub order",
+    "expectedSlug": "grubhub.cancel_order"
+  },
+  {
+    "intent": "search for groceries on instacart",
+    "expectedSlug": "instacart.search_products"
+  },
+  {
+    "intent": "show me lyft ride types",
+    "expectedSlug": "lyft.list_ride_types"
+  },
+  {
+    "intent": "estimate a lyft fare",
+    "expectedSlug": "lyft.get_ride_estimate"
+  },
+  {
+    "intent": "request a lyft ride",
+    "expectedSlug": "lyft.request_ride"
+  },
+  {
+    "intent": "cancel my lyft ride",
+    "expectedSlug": "lyft.cancel_ride"
+  },
+  {
+    "intent": "search for products on amazon",
+    "expectedSlug": "amazon.search_products"
+  },
+  {
+    "intent": "look up a single amazon product",
+    "expectedSlug": "amazon.get_product"
+  },
+  {
+    "intent": "show me my amazon order history",
+    "expectedSlug": "amazon.list_orders"
+  },
+  {
+    "intent": "track my amazon order",
+    "expectedSlug": "amazon.track_order"
+  },
+  {
+    "intent": "order this on amazon",
+    "expectedSlug": "amazon.place_order"
+  },
+  {
+    "intent": "cancel my amazon order",
+    "expectedSlug": "amazon.cancel_order"
+  },
+  {
+    "intent": "search etsy listings",
+    "expectedSlug": "etsy.search_listings"
+  },
+  {
+    "intent": "add an item to my etsy cart",
+    "expectedSlug": "etsy.add_to_cart"
+  },
+  {
+    "intent": "checkout my etsy cart",
+    "expectedSlug": "etsy.checkout"
+  },
+  {
+    "intent": "search for products on bestbuy",
+    "expectedSlug": "bestbuy.search_products"
+  },
+  {
+    "intent": "search for products on costco",
+    "expectedSlug": "costco.search_products"
+  },
+  {
+    "intent": "search for products on walmart",
+    "expectedSlug": "walmart.search_products"
+  },
+  {
+    "intent": "search for products on target",
+    "expectedSlug": "target.search_products"
+  },
+  {
+    "intent": "look up a booking property",
+    "expectedSlug": "booking.get_property"
+  },
+  {
+    "intent": "search hotels on expedia",
+    "expectedSlug": "expedia.search_hotels"
+  },
+  {
+    "intent": "list my expedia trips",
+    "expectedSlug": "expedia.list_trips"
+  },
+  {
+    "intent": "find flights on kayak",
+    "expectedSlug": "kayak.search_flights"
+  },
+  {
+    "intent": "find hotels on kayak",
+    "expectedSlug": "kayak.search_hotels"
+  },
+  {
+    "intent": "look up a kayak price alert",
+    "expectedSlug": "kayak.get_price_alert"
+  },
+  {
+    "intent": "create a price alert on kayak",
+    "expectedSlug": "kayak.create_price_alert"
+  },
+  {
+    "intent": "search restaurants on opentable",
+    "expectedSlug": "opentable.search_restaurants"
+  },
+  {
+    "intent": "look up an opentable restaurant",
+    "expectedSlug": "opentable.get_restaurant"
+  },
+  {
+    "intent": "show me my opentable reservations",
+    "expectedSlug": "opentable.list_reservations"
+  },
+  {
+    "intent": "reserve a table on opentable",
+    "expectedSlug": "opentable.reserve_table"
+  },
+  {
+    "intent": "cancel my opentable reservation",
+    "expectedSlug": "opentable.cancel_reservation"
+  },
+  {
+    "intent": "find events on ticketmaster",
+    "expectedSlug": "ticketmaster.search_events"
+  },
+  {
+    "intent": "look up a ticketmaster event",
+    "expectedSlug": "ticketmaster.get_event"
+  },
+  {
+    "intent": "show me my ticketmaster orders",
+    "expectedSlug": "ticketmaster.list_orders"
+  },
+  {
+    "intent": "buy tickets on ticketmaster",
+    "expectedSlug": "ticketmaster.buy_tickets"
+  },
+  {
+    "intent": "search events on stubhub",
+    "expectedSlug": "stubhub.search_events"
+  },
+  {
+    "intent": "look up a stubhub listing",
+    "expectedSlug": "stubhub.get_listing"
+  },
+  {
+    "intent": "buy tickets on stubhub",
+    "expectedSlug": "stubhub.buy_tickets"
+  },
+  {
+    "intent": "find events on eventbrite",
+    "expectedSlug": "eventbrite.search_events"
+  },
+  {
+    "intent": "register for an event on eventbrite",
+    "expectedSlug": "eventbrite.register_for_event"
+  },
+  {
+    "intent": "find restaurants on yelp",
+    "expectedSlug": "yelp.search_businesses"
+  },
+  {
+    "intent": "look up a business on yelp",
+    "expectedSlug": "yelp.get_business"
+  },
+  {
+    "intent": "list my calendly event types",
+    "expectedSlug": "calendly.list_event_types"
+  },
+  {
+    "intent": "show me my calendly scheduled events",
+    "expectedSlug": "calendly.list_scheduled_events"
+  },
+  {
+    "intent": "list products on shopify",
+    "expectedSlug": "shopify.list_products"
+  },
+  {
+    "intent": "look up a single shopify product",
+    "expectedSlug": "shopify.get_product"
+  },
+  {
+    "intent": "show me my shopify order history",
+    "expectedSlug": "shopify.list_orders"
+  },
+  {
+    "intent": "create an order on shopify",
+    "expectedSlug": "shopify.create_order"
+  },
+  {
+    "intent": "cancel my shopify order",
+    "expectedSlug": "shopify.cancel_order"
+  },
+  {
+    "intent": "look up a single chipotle menu",
+    "expectedSlug": "chipotle.get_menu"
+  },
+  {
+    "intent": "list dashboards on grafana",
+    "expectedSlug": "grafana.list_dashboards"
+  },
+  {
+    "intent": "look up a single grafana dashboard",
+    "expectedSlug": "grafana.get_dashboard"
+  },
+  {
+    "intent": "query metrics on grafana",
+    "expectedSlug": "grafana.query_metrics"
+  }
 ]

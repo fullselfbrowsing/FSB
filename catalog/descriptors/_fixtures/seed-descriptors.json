@@ -1,31 +1,5 @@
 [
   {
-    "slug": "airbnb.book_stay",
-    "service": "www.airbnb.com",
-    "intentSynonyms": [
-      "book a stay in airbnb",
-      "book stay in airbnb",
-      "book a stay on airbnb in airbnb"
-    ],
-    "description": "Book a paid Airbnb stay: reserve a listing for the chosen dates and guests. This charges your saved payment method and confirms the reservation -- a real money-moving action.",
-    "actionVerb": "book",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "airbnb.cancel_reservation",
-    "service": "www.airbnb.com",
-    "intentSynonyms": [
-      "cancel a reservation in airbnb",
-      "cancel reservation in airbnb",
-      "cancel my airbnb reservation in airbnb"
-    ],
-    "description": "Cancel an Airbnb reservation by its ID. This may be irreversible and is subject to the listing cancellation policy.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
     "slug": "airbnb.get_current_user",
     "service": "airbnb.com",
     "intentSynonyms": [
@@ -68,22 +42,6 @@
       "get inbox filter categories with unread counts in airbnb"
     ],
     "description": "Get the available inbox filter categories and their unread message counts.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "airbnb.get_listing",
-    "service": "www.airbnb.com",
-    "intentSynonyms": [
-      "get a listing in airbnb",
-      "look up a listing in airbnb",
-      "fetch a single listing in airbnb",
-      "view one specific listing in airbnb",
-      "get listing in airbnb",
-      "look up an airbnb listing in airbnb"
-    ],
-    "description": "Get the full details, amenities, and availability of a single Airbnb listing by its ID.",
     "actionVerb": "get",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -211,21 +169,6 @@
     "backing": "dom"
   },
   {
-    "slug": "airbnb.list_trips",
-    "service": "www.airbnb.com",
-    "intentSynonyms": [
-      "list trips in airbnb",
-      "show me my trips in airbnb",
-      "view my trips in airbnb",
-      "see all my trips in airbnb",
-      "show me my airbnb trips in airbnb"
-    ],
-    "description": "List your Airbnb trips (booked reservations). Optionally filter by status (upcoming, completed, cancelled).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "airbnb.list_wishlists",
     "service": "airbnb.com",
     "intentSynonyms": [
@@ -251,19 +194,6 @@
     "description": "Remove one or more listings from wishlists by wishlist item IDs. Get wishlist item IDs from the save_to_wishlist response or by listing wishlists.",
     "actionVerb": "remove",
     "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
-    "slug": "airbnb.search_listings",
-    "service": "www.airbnb.com",
-    "intentSynonyms": [
-      "search listings in airbnb",
-      "search listings on airbnb in airbnb",
-      "search airbnb for listings (homes, rooms, experiences) in a destination for a set of dates and number of guests in airbnb"
-    ],
-    "description": "Search Airbnb for listings (homes, rooms, experiences) in a destination for a set of dates and number of guests. Returns matching listings with nightly prices.",
-    "actionVerb": "search",
-    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -293,38 +223,6 @@
     "description": "Add a comment to a record. Comments are visible to all collaborators on the base.",
     "actionVerb": "create",
     "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "airtable.create_record",
-    "service": "airtable.com",
-    "intentSynonyms": [
-      "create a record in airtable",
-      "add a record in airtable",
-      "make a new record in airtable",
-      "open a new record in airtable",
-      "create record in airtable",
-      "create a new record in airtable"
-    ],
-    "description": "Create a new record in an Airtable table with the provided field values.",
-    "actionVerb": "create",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "airtable.delete_record",
-    "service": "airtable.com",
-    "intentSynonyms": [
-      "delete a record in airtable",
-      "remove a record in airtable",
-      "trash a record in airtable",
-      "permanently delete a record in airtable",
-      "delete record in airtable",
-      "delete a record permanently in airtable"
-    ],
-    "description": "Permanently delete a record from an Airtable table by its record ID. This action cannot be undone.",
-    "actionVerb": "delete",
-    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -432,22 +330,6 @@
       "update a single cell value in a record in airtable"
     ],
     "description": "Update a single cell value in a record. The value format depends on the field type: text fields accept strings, number fields accept numbers, select fields accept an object like {\"id\": \"selXxx\"}, and so on. Use get_base_schema to discover field IDs and types.",
-    "actionVerb": "update",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "airtable.update_record",
-    "service": "airtable.com",
-    "intentSynonyms": [
-      "update a record in airtable",
-      "edit a record in airtable",
-      "change the details of record in airtable",
-      "modify a record in airtable",
-      "update record in airtable",
-      "update an existing record in airtable"
-    ],
-    "description": "Update an existing Airtable record. A PATCH only changes the provided fields; omitted fields are left unchanged.",
     "actionVerb": "update",
     "sideEffectClass": "write",
     "backing": "dom"
@@ -1035,21 +917,6 @@
       "list tags in a workspace in asana"
     ],
     "description": "List all tags in a workspace.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "asana.list_tasks",
-    "service": "app.asana.com",
-    "intentSynonyms": [
-      "list tasks in asana",
-      "show me my tasks in asana",
-      "view my tasks in asana",
-      "see all my tasks in asana",
-      "list tasks with optional filters in asana"
-    ],
-    "description": "List tasks from Asana. Optionally filter by project, assignee, or workspace.",
     "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -1792,19 +1659,6 @@
     "backing": "dom"
   },
   {
-    "slug": "bestbuy.cancel_order",
-    "service": "www.bestbuy.com",
-    "intentSynonyms": [
-      "cancel an order in bestbuy",
-      "cancel order in bestbuy",
-      "cancel my bestbuy order in bestbuy"
-    ],
-    "description": "Cancel a Best Buy order by its ID. This may be irreversible once the order has entered shipping or pickup prep.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
     "slug": "bestbuy.get_cart",
     "service": "bestbuy.com",
     "intentSynonyms": [
@@ -1913,21 +1767,6 @@
     "backing": "dom"
   },
   {
-    "slug": "bestbuy.list_orders",
-    "service": "www.bestbuy.com",
-    "intentSynonyms": [
-      "list orders in bestbuy",
-      "show me my orders in bestbuy",
-      "view my orders in bestbuy",
-      "see all my orders in bestbuy",
-      "show me my bestbuy order history in bestbuy"
-    ],
-    "description": "List your recent Best Buy orders. Optionally filter by status (open, shipped, ready_for_pickup, delivered, cancelled).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "bestbuy.list_purchases",
     "service": "bestbuy.com",
     "intentSynonyms": [
@@ -1953,19 +1792,6 @@
     "description": "Navigate the browser to the Best Buy checkout page so the user can review the order, select payment, and complete the purchase. Call this after adding items to the cart.",
     "actionVerb": "navigate",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "bestbuy.place_order",
-    "service": "www.bestbuy.com",
-    "intentSynonyms": [
-      "place an order in bestbuy",
-      "place order in bestbuy",
-      "order this on bestbuy in bestbuy"
-    ],
-    "description": "Place a paid Best Buy order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -2387,32 +2213,6 @@
     "backing": "dom"
   },
   {
-    "slug": "booking.cancel_booking",
-    "service": "www.booking.com",
-    "intentSynonyms": [
-      "cancel a booking in booking",
-      "cancel booking in booking",
-      "cancel my booking reservation in booking"
-    ],
-    "description": "Cancel a Booking.com reservation by its ID. This may be irreversible and may incur a cancellation fee depending on the rate.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
-    "slug": "booking.complete_booking",
-    "service": "www.booking.com",
-    "intentSynonyms": [
-      "complete a booking in booking",
-      "complete booking in booking",
-      "complete my booking reservation in booking"
-    ],
-    "description": "Complete a paid Booking.com reservation: confirm a selected property and room for the chosen dates and guests. This charges your saved payment method and books the stay -- a real money-moving action.",
-    "actionVerb": "complete",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "booking.get_current_user",
     "service": "booking.com",
     "intentSynonyms": [
@@ -2472,21 +2272,6 @@
     ],
     "description": "Get the review summary for a property on Booking.com by searching for it. Returns the overall score, score breakdown by category, and review count. For individual review text, use navigate_to_property to open the property page.",
     "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "booking.list_bookings",
-    "service": "www.booking.com",
-    "intentSynonyms": [
-      "list bookings in booking",
-      "show me my bookings in booking",
-      "view my bookings in booking",
-      "see all my bookings in booking",
-      "show me my booking reservations in booking"
-    ],
-    "description": "List your Booking.com reservations. Optionally filter by status (upcoming, completed, cancelled).",
-    "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
   },
@@ -2568,19 +2353,6 @@
       "search for hotels, apartments, and other properties on booking in booking"
     ],
     "description": "Search for hotels, apartments, and other properties on Booking.com by destination, dates, and guests. Returns up to 25 results per page with pricing, ratings, and location details. Use offset for pagination.",
-    "actionVerb": "search",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "booking.search_stays",
-    "service": "www.booking.com",
-    "intentSynonyms": [
-      "search stays in booking",
-      "search stays on booking in booking",
-      "search booking in booking"
-    ],
-    "description": "Search Booking.com for places to stay (hotels, apartments, homes) in a destination for a set of dates and number of guests. Returns matching properties with prices.",
     "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -2816,22 +2588,6 @@
     "backing": "dom"
   },
   {
-    "slug": "bsky.get_profile",
-    "service": "bsky.app",
-    "intentSynonyms": [
-      "get a profile in bsky",
-      "look up a profile in bsky",
-      "fetch a single profile in bsky",
-      "view one specific profile in bsky",
-      "get profile in bsky",
-      "look up a bluesky profile in bsky"
-    ],
-    "description": "Get a Bluesky profile by handle or DID, including display name, bio, and follower counts.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "bsky.get_timeline",
     "service": "bsky.app",
     "intentSynonyms": [
@@ -2933,22 +2689,6 @@
       "see all my notifications in bsky"
     ],
     "description": "List the authenticated user's notifications including likes, reposts, follows, mentions, replies, and quotes. Supports cursor-based pagination.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "bsky.list_timeline",
-    "service": "bsky.app",
-    "intentSynonyms": [
-      "list a timeline in bsky",
-      "show me my timeline in bsky",
-      "view my timeline in bsky",
-      "see all my timeline in bsky",
-      "list timeline in bsky",
-      "show me my bluesky timeline in bsky"
-    ],
-    "description": "List recent posts from your Bluesky home timeline -- read your home feed of posts. Optionally page through with a cursor.",
     "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -3265,22 +3005,6 @@
     "description": "Permanently delete an event type by its numeric ID. This action cannot be undone. Active events scheduled through this event type are not affected.",
     "actionVerb": "delete",
     "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
-    "slug": "calendly.get_availability",
-    "service": "calendly.com",
-    "intentSynonyms": [
-      "get an availability in calendly",
-      "look up an availability in calendly",
-      "fetch a single availability in calendly",
-      "view one specific availability in calendly",
-      "get availability in calendly",
-      "check my calendly availability in calendly"
-    ],
-    "description": "Get the available open time slots for a Calendly event type over a date range. Returns bookable start times.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -3977,20 +3701,6 @@
     "backing": "dom"
   },
   {
-    "slug": "chatgpt.send_message",
-    "service": "chatgpt.com",
-    "intentSynonyms": [
-      "send a message in chatgpt",
-      "post a message in chatgpt",
-      "write a new message in chatgpt",
-      "send message in chatgpt"
-    ],
-    "description": "Send a message to ChatGPT. Posts the prompt to a conversation and returns the assistant reply; starts a new conversation when no conversation_id is given.",
-    "actionVerb": "send",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "chatgpt.star_conversation",
     "service": "chatgpt.com",
     "intentSynonyms": [
@@ -4285,49 +3995,6 @@
     "description": "Get available rewards from the Chipotle Rewards store. Returns redeemable offers with point costs, descriptions, and images.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "chipotle.list_locations",
-    "service": "www.chipotle.com",
-    "intentSynonyms": [
-      "list locations in chipotle",
-      "show me my locations in chipotle",
-      "view my locations in chipotle",
-      "see all my locations in chipotle",
-      "find nearby chipotle locations in chipotle"
-    ],
-    "description": "List nearby Chipotle locations by address or ZIP code, with their hours and pickup availability.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "chipotle.list_orders",
-    "service": "www.chipotle.com",
-    "intentSynonyms": [
-      "list orders in chipotle",
-      "show me my orders in chipotle",
-      "view my orders in chipotle",
-      "see all my orders in chipotle",
-      "show me my chipotle order history in chipotle"
-    ],
-    "description": "List your recent Chipotle orders. Optionally filter by status (active, completed, cancelled).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "chipotle.place_order",
-    "service": "www.chipotle.com",
-    "intentSynonyms": [
-      "place an order in chipotle",
-      "place order in chipotle",
-      "place a chipotle order in chipotle"
-    ],
-    "description": "Place a paid Chipotle order: submit a cart of menu items to a location for pickup or delivery. This charges your saved payment method -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -4785,21 +4452,6 @@
     "backing": "dom"
   },
   {
-    "slug": "circleci.list_workflows",
-    "service": "app.circleci.com",
-    "intentSynonyms": [
-      "list workflows in circleci",
-      "show me my workflows in circleci",
-      "view my workflows in circleci",
-      "see all my workflows in circleci",
-      "list workflows for a pipeline in circleci"
-    ],
-    "description": "List the workflows for a CircleCI pipeline by its pipeline ID.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "circleci.rerun_workflow",
     "service": "app.circleci.com",
     "intentSynonyms": [
@@ -5195,22 +4847,6 @@
     "backing": "dom"
   },
   {
-    "slug": "clickup.create_task",
-    "service": "app.clickup.com",
-    "intentSynonyms": [
-      "create a task in clickup",
-      "add a task in clickup",
-      "make a new task in clickup",
-      "open a new task in clickup",
-      "create task in clickup",
-      "create a new task in clickup"
-    ],
-    "description": "Create a new task in a ClickUp list. Requires a list_id and a name at minimum. Optionally set description, assignees, tags, status, priority, and due date.",
-    "actionVerb": "create",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "clickup.get_current_user",
     "service": "app.clickup.com",
     "intentSynonyms": [
@@ -5350,22 +4986,6 @@
     "backing": "dom"
   },
   {
-    "slug": "clickup.get_task",
-    "service": "app.clickup.com",
-    "intentSynonyms": [
-      "get a task in clickup",
-      "look up a task in clickup",
-      "fetch a single task in clickup",
-      "view one specific task in clickup",
-      "get task in clickup",
-      "get a task by id in clickup"
-    ],
-    "description": "Get detailed information about a specific ClickUp task by its ID.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "clickup.get_workspace",
     "service": "app.clickup.com",
     "intentSynonyms": [
@@ -5394,37 +5014,6 @@
     "description": "List all members in a ClickUp workspace including their name, email, role, and avatar. If no workspace_id is provided, uses the current workspace.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "clickup.list_tasks",
-    "service": "app.clickup.com",
-    "intentSynonyms": [
-      "list tasks in clickup",
-      "show me my tasks in clickup",
-      "view my tasks in clickup",
-      "see all my tasks in clickup",
-      "list tasks in a list in clickup"
-    ],
-    "description": "List tasks in a ClickUp list. Optionally filter by assignee, status, or archived state.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "clickup.update_task",
-    "service": "app.clickup.com",
-    "intentSynonyms": [
-      "update a task in clickup",
-      "edit a task in clickup",
-      "change the details of task in clickup",
-      "modify a task in clickup",
-      "update task in clickup",
-      "update an existing task in clickup"
-    ],
-    "description": "Update an existing ClickUp task. Only specified fields are changed; omitted fields remain unchanged.",
-    "actionVerb": "update",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -6702,19 +6291,6 @@
     "backing": "dom"
   },
   {
-    "slug": "confluence.search_pages",
-    "service": "atlassian.net",
-    "intentSynonyms": [
-      "search pages in confluence",
-      "search pages with cql in confluence",
-      "search for confluence pages using a cql (confluence query language) query string in confluence"
-    ],
-    "description": "Search for Confluence pages using a CQL (Confluence Query Language) query string.",
-    "actionVerb": "search",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "confluence.update_page",
     "service": "atlassian.net",
     "intentSynonyms": [
@@ -6882,21 +6458,6 @@
     "backing": "dom"
   },
   {
-    "slug": "costco.list_orders",
-    "service": "www.costco.com",
-    "intentSynonyms": [
-      "list orders in costco",
-      "show me my orders in costco",
-      "view my orders in costco",
-      "see all my orders in costco",
-      "show me my costco order history in costco"
-    ],
-    "description": "List your recent Costco orders. Optionally filter by status (open, shipped, delivered, cancelled).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "costco.navigate_to_cart",
     "service": "costco.com",
     "intentSynonyms": [
@@ -6949,19 +6510,6 @@
     "backing": "dom"
   },
   {
-    "slug": "costco.place_order",
-    "service": "www.costco.com",
-    "intentSynonyms": [
-      "place an order in costco",
-      "place order in costco",
-      "order this on costco in costco"
-    ],
-    "description": "Place a paid Costco order: submit a cart of products to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "costco.remove_list_item",
     "service": "costco.com",
     "intentSynonyms": [
@@ -6985,22 +6533,6 @@
     "description": "Search for products on Costco by reading the current search results page and enriching with full product details from the API. The browser must already be on a Costco search results page — call navigate_to_search first to navigate to the search page, wait for it to load, then call this tool to extract and enrich the results.",
     "actionVerb": "search",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "craigslist.delete_listing",
-    "service": "www.craigslist.org",
-    "intentSynonyms": [
-      "delete a listing in craigslist",
-      "remove a listing in craigslist",
-      "trash a listing in craigslist",
-      "permanently delete a listing in craigslist",
-      "delete listing in craigslist",
-      "delete my craigslist listing in craigslist"
-    ],
-    "description": "Delete one of your Craigslist listings by its ID. This permanently removes the classified ad.",
-    "actionVerb": "delete",
-    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -7046,22 +6578,6 @@
       "get the current user profile in craigslist"
     ],
     "description": "Get the currently authenticated Craigslist user profile including email, user ID, and default area.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "craigslist.get_listing",
-    "service": "www.craigslist.org",
-    "intentSynonyms": [
-      "get a listing in craigslist",
-      "look up a listing in craigslist",
-      "fetch a single listing in craigslist",
-      "view one specific listing in craigslist",
-      "get listing in craigslist",
-      "look up a single craigslist listing in craigslist"
-    ],
-    "description": "Get the full detail (title, price, description, contact, and posting date) of a single Craigslist listing by its ID.",
     "actionVerb": "get",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -7126,19 +6642,6 @@
     "backing": "dom"
   },
   {
-    "slug": "craigslist.post_listing",
-    "service": "www.craigslist.org",
-    "intentSynonyms": [
-      "post a listing in craigslist",
-      "post listing in craigslist",
-      "post a new listing on craigslist in craigslist"
-    ],
-    "description": "Post a new Craigslist classified listing in a region and category. NOTE this is NOT a payment op, but Craigslist is a sensitive marketplace origin so the write is consent-gated.",
-    "actionVerb": "post",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "craigslist.renew_all_postings",
     "service": "craigslist.org",
     "intentSynonyms": [
@@ -7149,19 +6652,6 @@
     "description": "Renew all eligible postings in bulk. Check list_renewable_postings first to see which postings are eligible. This action renews all renewable postings at once.",
     "actionVerb": "renew",
     "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "craigslist.search_listings",
-    "service": "www.craigslist.org",
-    "intentSynonyms": [
-      "search listings in craigslist",
-      "search listings on craigslist in craigslist",
-      "search craigslist classified listings by keyword within a city/region and category (for-sale, housing, jobs, services) in craigslist"
-    ],
-    "description": "Search Craigslist classified listings by keyword within a city/region and category (for-sale, housing, jobs, services).",
-    "actionVerb": "search",
-    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -8445,21 +7935,6 @@
     "backing": "dom"
   },
   {
-    "slug": "discord.list_messages",
-    "service": "discord.com",
-    "intentSynonyms": [
-      "list messages in discord",
-      "show me my messages in discord",
-      "view my messages in discord",
-      "see all my messages in discord",
-      "read my discord messages in a channel in discord"
-    ],
-    "description": "List recent messages in a Discord channel. Optionally page through history with a before/after message ID.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "discord.list_pinned_messages",
     "service": "discord.com",
     "intentSynonyms": [
@@ -8969,22 +8444,6 @@
     "backing": "dom"
   },
   {
-    "slug": "dominos.get_menu",
-    "service": "www.dominos.com",
-    "intentSynonyms": [
-      "get a menu in dominos",
-      "look up a menu in dominos",
-      "fetch a single menu in dominos",
-      "view one specific menu in dominos",
-      "get menu in dominos",
-      "look up a single dominos menu in dominos"
-    ],
-    "description": "Get the full menu (pizzas, sides, drinks, prices, and coupons) for a single Domino’s store by its store ID.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "dominos.get_menu_categories",
     "service": "dominos.com",
     "intentSynonyms": [
@@ -9046,36 +8505,6 @@
     "backing": "dom"
   },
   {
-    "slug": "dominos.list_orders",
-    "service": "www.dominos.com",
-    "intentSynonyms": [
-      "list orders in dominos",
-      "show me my orders in dominos",
-      "view my orders in dominos",
-      "see all my orders in dominos",
-      "show me my dominos order history in dominos"
-    ],
-    "description": "List your recent Domino’s orders. Optionally filter by status (active, completed, cancelled).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "dominos.list_stores",
-    "service": "www.dominos.com",
-    "intentSynonyms": [
-      "list stores in dominos",
-      "show me my stores in dominos",
-      "view my stores in dominos",
-      "see all my stores in dominos",
-      "find nearby dominos stores in dominos"
-    ],
-    "description": "List nearby Domino’s stores by address or ZIP code, with their hours and delivery/carryout availability.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "dominos.navigate_to_checkout",
     "service": "dominos.com",
     "intentSynonyms": [
@@ -9086,19 +8515,6 @@
     "description": "Navigate the browser to the Domino's checkout page so the user can review the order and place it. Call this after adding items to the cart.",
     "actionVerb": "navigate",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "dominos.place_order",
-    "service": "www.dominos.com",
-    "intentSynonyms": [
-      "place an order in dominos",
-      "place order in dominos",
-      "order pizza on dominos in dominos"
-    ],
-    "description": "Place a paid Domino’s order: submit a cart of menu items to a store for delivery or carryout. This charges your saved payment method -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -9141,19 +8557,6 @@
     "backing": "dom"
   },
   {
-    "slug": "dominos.track_order",
-    "service": "www.dominos.com",
-    "intentSynonyms": [
-      "track an order in dominos",
-      "track order in dominos",
-      "track my dominos order in dominos"
-    ],
-    "description": "Track the live status of a single Domino’s order by its ID (prep, baking, out for delivery, delivered).",
-    "actionVerb": "track",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "dominos.update_product_quantity",
     "service": "dominos.com",
     "intentSynonyms": [
@@ -9180,19 +8583,6 @@
     "description": "Save a store to your bookmarked/favorite stores list on DoorDash.",
     "actionVerb": "bookmark",
     "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "doordash.cancel_order",
-    "service": "www.doordash.com",
-    "intentSynonyms": [
-      "cancel an order in doordash",
-      "cancel order in doordash",
-      "cancel my doordash order in doordash"
-    ],
-    "description": "Cancel an in-progress DoorDash order by its ID. This may be irreversible once the restaurant has accepted it.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -9243,22 +8633,6 @@
     "backing": "dom"
   },
   {
-    "slug": "doordash.get_restaurant",
-    "service": "www.doordash.com",
-    "intentSynonyms": [
-      "get a restaurant in doordash",
-      "look up a restaurant in doordash",
-      "fetch a single restaurant in doordash",
-      "view one specific restaurant in doordash",
-      "get restaurant in doordash",
-      "look up a doordash restaurant menu in doordash"
-    ],
-    "description": "Get the details and menu of a single DoorDash restaurant by its ID.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "doordash.list_addresses",
     "service": "doordash.com",
     "intentSynonyms": [
@@ -9304,21 +8678,6 @@
     "backing": "dom"
   },
   {
-    "slug": "doordash.list_restaurants",
-    "service": "www.doordash.com",
-    "intentSynonyms": [
-      "list restaurants in doordash",
-      "show me my restaurants in doordash",
-      "view my restaurants in doordash",
-      "see all my restaurants in doordash",
-      "show me restaurants on doordash in doordash"
-    ],
-    "description": "List or search DoorDash restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "doordash.mark_notifications_read",
     "service": "doordash.com",
     "intentSynonyms": [
@@ -9329,32 +8688,6 @@
     "description": "Mark one or more DoorDash notifications as read by their IDs.",
     "actionVerb": "mark",
     "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "doordash.place_order",
-    "service": "www.doordash.com",
-    "intentSynonyms": [
-      "place an order in doordash",
-      "place order in doordash",
-      "order food on doordash in doordash"
-    ],
-    "description": "Place a paid DoorDash order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "doordash.track_order",
-    "service": "www.doordash.com",
-    "intentSynonyms": [
-      "track an order in doordash",
-      "track order in doordash",
-      "track my doordash order in doordash"
-    ],
-    "description": "Track the live delivery status and ETA of a single DoorDash order by its ID.",
-    "actionVerb": "track",
-    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -9417,19 +8750,6 @@
     "sideEffectClass": "destructive"
   },
   {
-    "slug": "ebay.buy_now",
-    "service": "www.ebay.com",
-    "intentSynonyms": [
-      "buy a now in ebay",
-      "buy now in ebay",
-      "buy it now on ebay in ebay"
-    ],
-    "description": "Buy an eBay fixed-price listing immediately (Buy It Now): submit the purchase to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
-    "actionVerb": "buy",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "ebay.get_current_user",
     "service": "ebay.com",
     "intentSynonyms": [
@@ -9477,22 +8797,6 @@
     "backing": "dom"
   },
   {
-    "slug": "ebay.get_listing",
-    "service": "www.ebay.com",
-    "intentSynonyms": [
-      "get a listing in ebay",
-      "look up a listing in ebay",
-      "fetch a single listing in ebay",
-      "view one specific listing in ebay",
-      "get listing in ebay",
-      "look up a single ebay listing in ebay"
-    ],
-    "description": "Get the full detail (title, current price, bids, time left, and seller) of a single eBay listing by its item ID.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "ebay.get_seller_profile",
     "service": "ebay.com",
     "intentSynonyms": [
@@ -9525,34 +8829,6 @@
     "backing": "dom"
   },
   {
-    "slug": "ebay.list_orders",
-    "service": "www.ebay.com",
-    "intentSynonyms": [
-      "list orders in ebay",
-      "show me my orders in ebay",
-      "view my orders in ebay",
-      "see all my orders in ebay",
-      "show me my ebay purchase history in ebay"
-    ],
-    "description": "List your recent eBay purchases / orders. Optionally filter by status (awaiting_payment, paid, shipped, delivered).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "ebay.place_bid",
-    "service": "www.ebay.com",
-    "intentSynonyms": [
-      "place a bid in ebay",
-      "place bid in ebay",
-      "bid on an ebay auction in ebay"
-    ],
-    "description": "Place a bid on an eBay auction listing. A winning bid is a binding obligation to pay -- this can charge your saved payment method if you win, a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "ebay.search_items",
     "service": "ebay.com",
     "intentSynonyms": [
@@ -9561,19 +8837,6 @@
       "search for items on ebay by keyword in ebay"
     ],
     "description": "Search for items on eBay by keyword. Returns listings with title, price, condition, and shipping info. Supports filtering by category, condition, and price range. Results are paginated.",
-    "actionVerb": "search",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "ebay.search_listings",
-    "service": "www.ebay.com",
-    "intentSynonyms": [
-      "search listings in ebay",
-      "search listings on ebay in ebay",
-      "search ebay marketplace listings by keyword in ebay"
-    ],
-    "description": "Search eBay marketplace listings by keyword. Optionally filter by category, condition, and buying format (auction or fixed-price).",
     "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -10168,32 +9431,6 @@
     ],
     "description": "Update worksheet properties such as name, position, or visibility. Only specified fields are changed; omitted fields remain unchanged.",
     "actionVerb": "update",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "expedia.book_flight",
-    "service": "www.expedia.com",
-    "intentSynonyms": [
-      "book a flight in expedia",
-      "book flight in expedia",
-      "book a flight on expedia in expedia"
-    ],
-    "description": "Book a paid Expedia flight: confirm a selected flight itinerary for the given passengers. This charges your saved payment method and tickets the flight -- a real money-moving action.",
-    "actionVerb": "book",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "expedia.book_hotel",
-    "service": "www.expedia.com",
-    "intentSynonyms": [
-      "book a hotel in expedia",
-      "book hotel in expedia",
-      "book a hotel on expedia in expedia"
-    ],
-    "description": "Book a paid Expedia hotel: confirm a selected hotel and room for the chosen dates and guests. This charges your saved payment method and reserves the room -- a real money-moving action.",
-    "actionVerb": "book",
     "sideEffectClass": "write",
     "backing": "dom"
   },
@@ -13997,32 +13234,6 @@
     "backing": "dom"
   },
   {
-    "slug": "instacart.cancel_order",
-    "service": "www.instacart.com",
-    "intentSynonyms": [
-      "cancel an order in instacart",
-      "cancel order in instacart",
-      "cancel my instacart order in instacart"
-    ],
-    "description": "Cancel an in-progress Instacart order by its ID. This may be irreversible once the shopper has started.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
-    "slug": "instacart.checkout",
-    "service": "www.instacart.com",
-    "intentSynonyms": [
-      "checkout in instacart",
-      "checkout my instacart cart in instacart",
-      "check out a paid instacart cart in instacart"
-    ],
-    "description": "Check out a paid Instacart cart: submit the cart of grocery items from a store to a delivery address. This charges your saved payment method and places the order -- a real money-moving action.",
-    "actionVerb": "checkout",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "instacart.delete_cart",
     "service": "instacart.com",
     "intentSynonyms": [
@@ -14159,21 +13370,6 @@
       "list recent orders in instacart"
     ],
     "description": "List recent Instacart orders with status, retailer, total, and item count. Supports cursor-based pagination. Returns orders sorted by most recent first.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "instacart.list_stores",
-    "service": "www.instacart.com",
-    "intentSynonyms": [
-      "list stores in instacart",
-      "show me my stores in instacart",
-      "view my stores in instacart",
-      "see all my stores in instacart",
-      "show me grocery stores on instacart in instacart"
-    ],
-    "description": "List Instacart grocery stores available for delivery to an address. Optionally filter by a search term (store or retailer name).",
     "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -15939,21 +15135,6 @@
       "list issue dependencies and relations in linear"
     ],
     "description": "List relations (blocks, is blocked by, relates to, duplicate of) for a Linear issue.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "linear.list_issues",
-    "service": "linear.app",
-    "intentSynonyms": [
-      "list issues in linear",
-      "show me my issues in linear",
-      "view my issues in linear",
-      "see all my issues in linear",
-      "list issues with optional filters in linear"
-    ],
-    "description": "List issues from Linear. Optionally filter by team, assignee, or state.",
     "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -18946,22 +18127,6 @@
       "create build hook in netlify"
     ],
     "description": "Create a new build hook for a Netlify site. Build hooks generate a URL that triggers a new build for the specified branch when POSTed to.",
-    "actionVerb": "create",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "netlify.create_deploy",
-    "service": "app.netlify.com",
-    "intentSynonyms": [
-      "create a deploy in netlify",
-      "add a deploy in netlify",
-      "make a new deploy in netlify",
-      "open a new deploy in netlify",
-      "create deploy in netlify",
-      "trigger a new deploy in netlify"
-    ],
-    "description": "Trigger a new deploy for a Netlify site. Requires a site_id; optionally set the deploy title and target branch.",
     "actionVerb": "create",
     "sideEffectClass": "write",
     "backing": "dom"
@@ -22698,19 +21863,6 @@
     "backing": "dom"
   },
   {
-    "slug": "posthog.query_events",
-    "service": "app.posthog.com",
-    "intentSynonyms": [
-      "query events in posthog",
-      "query captured events in posthog",
-      "query the captured events for a posthog project in posthog"
-    ],
-    "description": "Query the captured events for a PostHog project. Optionally filter by event name, distinct ID, or time range.",
-    "actionVerb": "query",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "posthog.run_query",
     "service": "us.posthog.com",
     "intentSynonyms": [
@@ -23597,21 +22749,6 @@
       "list posts from a subreddit in reddit"
     ],
     "description": "List posts from a subreddit or the front page. Supports sorting by hot, new, top, rising, and controversial. Use the \"after\" cursor for pagination.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "reddit.list_subreddit_posts",
-    "service": "reddit.com",
-    "intentSynonyms": [
-      "list subreddit posts in reddit",
-      "show me my subreddit posts in reddit",
-      "view my subreddit posts in reddit",
-      "see all my subreddit posts in reddit",
-      "show posts in a subreddit on reddit in reddit"
-    ],
-    "description": "List posts in a subreddit, sorted hot/new/top/rising. Optionally page through with an after cursor.",
     "actionVerb": "list",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -25228,21 +24365,6 @@
     "backing": "dom"
   },
   {
-    "slug": "sentry.list_issues",
-    "service": "sentry.io",
-    "intentSynonyms": [
-      "list issues in sentry",
-      "show me my issues in sentry",
-      "view my issues in sentry",
-      "see all my issues in sentry",
-      "list issues for a project in sentry"
-    ],
-    "description": "List the error issues for a Sentry project. Optionally filter by query, status, or environment.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "sentry.list_members",
     "service": "sentry.io",
     "intentSynonyms": [
@@ -25359,19 +24481,6 @@
     "description": "List all teams in the current Sentry organization. Returns team name, slug, member count, and creation date.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "sentry.resolve_issue",
-    "service": "sentry.io",
-    "intentSynonyms": [
-      "resolve an issue in sentry",
-      "resolve issue in sentry",
-      "mark a sentry error issue as resolved in sentry"
-    ],
-    "description": "Mark a Sentry error issue as resolved. Optionally resolve in the next release. This updates the issue status.",
-    "actionVerb": "resolve",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -28656,19 +27765,6 @@
     "backing": "dom"
   },
   {
-    "slug": "target.place_order",
-    "service": "www.target.com",
-    "intentSynonyms": [
-      "place an order in target",
-      "place order in target",
-      "order this on target in target"
-    ],
-    "description": "Place a paid Target order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
     "slug": "target.remove_cart_item",
     "service": "target.com",
     "intentSynonyms": [
@@ -30913,7 +30009,7 @@
     ],
     "description": "Check whether a location (restaurant, hotel, or attraction) is saved/bookmarked by the current user. Requires the location ID.",
     "actionVerb": "check",
-    "sideEffectClass": "write",
+    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -30975,22 +30071,6 @@
       "get hotel details in tripadvisor"
     ],
     "description": "Get detailed information about a TripAdvisor hotel including ratings, address, AI review summary, and price range. Provide the hotel URL path.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "tripadvisor.get_location",
-    "service": "www.tripadvisor.com",
-    "intentSynonyms": [
-      "get a location in tripadvisor",
-      "look up a location in tripadvisor",
-      "fetch a single location in tripadvisor",
-      "view one specific location in tripadvisor",
-      "get location in tripadvisor",
-      "look up a location on tripadvisor in tripadvisor"
-    ],
-    "description": "Get the details, address, rating, amenities, and ranking of a single Tripadvisor location by its ID.",
     "actionVerb": "get",
     "sideEffectClass": "read",
     "backing": "dom"
@@ -31099,34 +30179,6 @@
     ],
     "description": "List restaurants in a city or area on TripAdvisor. Returns a page of restaurant listings with names, ratings, and URLs. Uses the geo-based restaurant listing page URL. Use offset URLs for pagination (e.g., \"-oa30-\" for page 2).",
     "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "tripadvisor.list_reviews",
-    "service": "www.tripadvisor.com",
-    "intentSynonyms": [
-      "list reviews in tripadvisor",
-      "show me my reviews in tripadvisor",
-      "view my reviews in tripadvisor",
-      "see all my reviews in tripadvisor",
-      "read reviews of a location on tripadvisor in tripadvisor"
-    ],
-    "description": "List the recent traveler reviews for a Tripadvisor location by its ID. Returns review text, rating, and trip type.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "tripadvisor.search_locations",
-    "service": "www.tripadvisor.com",
-    "intentSynonyms": [
-      "search locations in tripadvisor",
-      "search locations on tripadvisor in tripadvisor",
-      "search tripadvisor for hotels, restaurants, and attractions by query and place in tripadvisor"
-    ],
-    "description": "Search Tripadvisor for hotels, restaurants, and attractions by query and place. Returns matching locations with ratings and review counts.",
-    "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"
   },
@@ -32336,19 +31388,6 @@
     "sideEffectClass": "mutate"
   },
   {
-    "slug": "uber.cancel_ride",
-    "service": "uber.com",
-    "intentSynonyms": [
-      "cancel a ride in uber",
-      "cancel ride in uber",
-      "cancel my uber ride in uber"
-    ],
-    "description": "Cancel an in-progress Uber ride by its trip ID. A cancellation fee may apply once a driver is en route.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
-    "backing": "dom"
-  },
-  {
     "slug": "uber.get_current_user",
     "service": "uber.com",
     "intentSynonyms": [
@@ -32426,22 +31465,6 @@
     "backing": "dom"
   },
   {
-    "slug": "uber.get_ride_estimate",
-    "service": "uber.com",
-    "intentSynonyms": [
-      "get a ride estimate in uber",
-      "look up a ride estimate in uber",
-      "fetch a single ride estimate in uber",
-      "view one specific ride estimate in uber",
-      "get ride estimate in uber",
-      "estimate an uber fare in uber"
-    ],
-    "description": "Get the fare and ETA estimate for a single Uber ride option between a pickup and dropoff.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "uber.get_travel_status",
     "service": "uber.com",
     "intentSynonyms": [
@@ -32470,49 +31493,6 @@
     "description": "Get the user's upcoming Uber trip or reservation. Returns the active or scheduled trip details, or null if no upcoming trip exists.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "uber.list_ride_options",
-    "service": "uber.com",
-    "intentSynonyms": [
-      "list ride options in uber",
-      "show me my ride options in uber",
-      "view my ride options in uber",
-      "see all my ride options in uber",
-      "show me uber ride options in uber"
-    ],
-    "description": "List the available Uber ride options (UberX, Comfort, XL, Black, ...) for a pickup and dropoff location.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "uber.list_trips",
-    "service": "uber.com",
-    "intentSynonyms": [
-      "list trips in uber",
-      "show me my trips in uber",
-      "view my trips in uber",
-      "see all my trips in uber",
-      "show me my uber trip history in uber"
-    ],
-    "description": "List your recent Uber trips. Optionally filter by status (active, completed, cancelled).",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "uber.request_ride",
-    "service": "uber.com",
-    "intentSynonyms": [
-      "request a ride in uber",
-      "request ride in uber",
-      "request an uber ride in uber"
-    ],
-    "description": "Request a paid Uber ride: book a selected ride option from a pickup to a dropoff. This charges your saved payment method and dispatches a driver -- a real money-moving action.",
-    "actionVerb": "request",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32597,22 +31577,6 @@
     ],
     "description": "Place a paid Uber Eats order: submit a cart of items from a restaurant to a delivery address. This charges your saved payment method and dispatches the order -- a real money-moving action.",
     "actionVerb": "place",
-    "sideEffectClass": "write",
-    "backing": "dom"
-  },
-  {
-    "slug": "vercel.create_deployment",
-    "service": "vercel.com",
-    "intentSynonyms": [
-      "create a deployment in vercel",
-      "add a deployment in vercel",
-      "make a new deployment in vercel",
-      "open a new deployment in vercel",
-      "create deployment in vercel",
-      "trigger a new deployment in vercel"
-    ],
-    "description": "Trigger a new Vercel deployment for a project. Requires a project name; optionally set the git source ref and target environment.",
-    "actionVerb": "create",
     "sideEffectClass": "write",
     "backing": "dom"
   },
@@ -32737,19 +31701,6 @@
     "description": "List all teams the current user belongs to. Returns team names, slugs, billing plans, and roles.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "walmart.cancel_order",
-    "service": "www.walmart.com",
-    "intentSynonyms": [
-      "cancel an order in walmart",
-      "cancel order in walmart",
-      "cancel my walmart order in walmart"
-    ],
-    "description": "Cancel a Walmart order by its ID. This may be irreversible once the order has entered shipping or pickup prep.",
-    "actionVerb": "cancel",
-    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -32883,19 +31834,6 @@
     "description": "Navigate the browser to Walmart search results for a query. Useful for browsing products visually.",
     "actionVerb": "navigate",
     "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "walmart.place_order",
-    "service": "www.walmart.com",
-    "intentSynonyms": [
-      "place an order in walmart",
-      "place order in walmart",
-      "order this on walmart in walmart"
-    ],
-    "description": "Place a paid Walmart order: submit a cart of products for shipping or in-store pickup. This charges your saved payment method and commits the order -- a real money-moving action.",
-    "actionVerb": "place",
-    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -34239,21 +33177,6 @@
     "backing": "dom"
   },
   {
-    "slug": "yelp.list_reviews",
-    "service": "www.yelp.com",
-    "intentSynonyms": [
-      "list reviews in yelp",
-      "show me my reviews in yelp",
-      "view my reviews in yelp",
-      "see all my reviews in yelp",
-      "read reviews of a business on yelp in yelp"
-    ],
-    "description": "List the recent reviews for a Yelp business by its ID. Returns review text, rating, and author.",
-    "actionVerb": "list",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "yelp.navigate_to_business",
     "service": "www.yelp.com",
     "intentSynonyms": [
@@ -35387,38 +34310,6 @@
     "backing": "dom"
   },
   {
-    "slug": "zillow.get_home_value",
-    "service": "www.zillow.com",
-    "intentSynonyms": [
-      "get a home value in zillow",
-      "look up a home value in zillow",
-      "fetch a single home value in zillow",
-      "view one specific home value in zillow",
-      "get home value in zillow",
-      "look up a home value on zillow in zillow"
-    ],
-    "description": "Look up the estimated market value (Zestimate) and value history of a home by its address or Zillow listing ID.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "zillow.get_listing",
-    "service": "www.zillow.com",
-    "intentSynonyms": [
-      "get a listing in zillow",
-      "look up a listing in zillow",
-      "fetch a single listing in zillow",
-      "view one specific listing in zillow",
-      "get listing in zillow",
-      "look up a single zillow listing in zillow"
-    ],
-    "description": "Get the full detail (address, price, photos, beds/baths, and description) of a single Zillow listing by its ID.",
-    "actionVerb": "get",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
     "slug": "zillow.get_market_overview",
     "service": "zillow.com",
     "intentSynonyms": [
@@ -35510,19 +34401,6 @@
       "search for foreclosure and pre-foreclosure properties on zillow in zillow"
     ],
     "description": "Search for foreclosure and pre-foreclosure properties on Zillow. Requires either a region_id (from search_locations) or map_bounds.",
-    "actionVerb": "search",
-    "sideEffectClass": "read",
-    "backing": "dom"
-  },
-  {
-    "slug": "zillow.search_listings",
-    "service": "www.zillow.com",
-    "intentSynonyms": [
-      "search listings in zillow",
-      "search listings on zillow in zillow",
-      "search zillow real-estate listings for sale or rent in a location, with optional price, beds, and home-type filters in zillow"
-    ],
-    "description": "Search Zillow real-estate listings for sale or rent in a location, with optional price, beds, and home-type filters.",
     "actionVerb": "search",
     "sideEffectClass": "read",
     "backing": "dom"

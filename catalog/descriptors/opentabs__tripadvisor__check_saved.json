@@ -8,7 +8,7 @@
   ],
   "description": "Check whether a location (restaurant, hotel, or attraction) is saved/bookmarked by the current user. Requires the location ID.",
   "actionVerb": "check",
-  "sideEffectClass": "write",
+  "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
