@@ -168,6 +168,32 @@
     return out;
   }
 
+  // The logged-out shape guard (CONTEXT Top Risk, "200-with-logged-out-body") --
+  // the Slack-envelope sibling of gitlab.js guardShape / notion.js guardRpcShape.
+  // A logged-out or stale-token app.slack.com tab answers a web-API POST with an
+  // HTTP 200 carrying Slack's auth-failure envelope { ok:false, error:"not_authed" }
+  // (or "invalid_auth"). executeBoundSpec keys success off fetch-completion, NOT off
+  // the Slack `ok` field, and the head-path rot classifier skips the body-shape row,
+  // so such a 200 would otherwise masquerade as a successful T1a read. When `ok` is
+  // explicitly false (the documented failure envelope), return the dual-field
+  // RECIPE_DOM_FALLBACK_PENDING so the breadth DOM path serves; otherwise return the
+  // executeBoundSpec result verbatim. Never masks a pin/fetch failure (success!==true
+  // is passed through unchanged) and never inspects or logs the token.
+  function guardSlackShape(result, slug) {
+    if (!result || result.success !== true) {
+      return result;   // pin / fetch failure -> return verbatim; do NOT mask it.
+    }
+    var d = result.data;
+    if (d && typeof d === 'object' && d.ok === false) {
+      return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+        slug: slug,
+        reason: 'slack-logged-out-or-rot',
+        fellBackToDom: true
+      });
+    }
+    return result;
+  }
+
   // Shared: scrape xoxc, then POST the given Slack web-API method with the token in
   // the body. The xoxd cookie rides same-origin automatically (no cookie header set).
   async function callSlackMethod(slug, method, fields, ctx) {
@@ -212,10 +238,11 @@
       params: CONVERSATIONS_LIST_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('slack.conversations.list', 'conversations.list', {
+        var res = await callSlackMethod('slack.conversations.list', 'conversations.list', {
           types: a.types || 'public_channel,private_channel',
           limit: a.limit || 100
         }, ctx);
+        return guardSlackShape(res, 'slack.conversations.list');
       }
     },
 
@@ -235,12 +262,13 @@
       params: LIST_CHANNELS_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('slack.list_channels', 'conversations.list', {
+        var res = await callSlackMethod('slack.list_channels', 'conversations.list', {
           types: a.types || 'public_channel,private_channel',
           limit: a.limit || 100,
           cursor: a.cursor,
           exclude_archived: a.exclude_archived
         }, ctx);
+        return guardSlackShape(res, 'slack.list_channels');
       }
     },
 
@@ -252,11 +280,12 @@
       params: LIST_MEMBERS_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('slack.list_members', 'conversations.members', {
+        var res = await callSlackMethod('slack.list_members', 'conversations.members', {
           channel: a.channel,
           limit: a.limit || 100,
           cursor: a.cursor
         }, ctx);
+        return guardSlackShape(res, 'slack.list_members');
       }
     },
 
@@ -268,9 +297,10 @@
       params: CHANNEL_INFO_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('slack.get_channel_info', 'conversations.info', {
+        var res = await callSlackMethod('slack.get_channel_info', 'conversations.info', {
           channel: a.channel
         }, ctx);
+        return guardSlackShape(res, 'slack.get_channel_info');
       }
     },
 
