@@ -160,7 +160,13 @@ Plans:
   2. A WRITE to a sensitive origin honors the DENY-04 per-origin mutating opt-in at the invoke gate (posture B); reads remain fully-open under Auto.
   3. A per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port: linear is documented-safe and may port; supabase / cloud-consoles / other UNVERIFIED origins must pass the CORS check or be demoted to T2-learned / T3-DOM.
   4. The head cap holds, INV-03 typed reasons stay byte-stable across all 7 providers, and the depth tests stay green.
-**Plans**: TBD
+**Plans**: 5 plans (4 waves)
+Plans:
+- [ ] 41-01-PLAN.md — Wave 0: the fail-closed guarded-write harness + the CORS / first-party-origin verification gate (negative-control + wired into validate:extension) + the INV-03 byte-equality extension + the dom->T1a write-slug upgrade assertions [wave 1]
+- [ ] 41-02-PLAN.md — gitlab guarded WRITES (create_issue/create_merge_request/create_note) on same-origin gitlab.com, fail-closed [ASSUMED-ENDPOINT] + the live-UAT manifest [wave 2]
+- [ ] 41-03-PLAN.md — notion guarded WRITES (create_page/update_page/create_database_item) on same-origin www.notion.so, fail-closed [ASSUMED-ENDPOINT] [wave 2]
+- [ ] 41-04-PLAN.md — slack.send_message guarded WRITE (distinct from the executable chat.postMessage) + the SC2 sensitive-origin mutating-opt-in proof through the live roster + UAT consolidation [wave 3]
+- [ ] 41-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension (incl the CORS-gate) + INV-01/02/03 + head-cap green + Wall-2 origin-pin UNCHANGED + the Pattern-D deferral recorded [wave 4]
 
 ### Phase 42: Discovery Seeding + Tail Learn
 **Goal**: Make the non-hand-ported tail invocable predictably by seeding all its origins (+ endpoint hints harvested from OpenTabs `*-api.ts`) so the existing Phase-31 network-capture path learns each origin on the first authenticated visit (consent-gated, promote-after-replay), and prove the capture-time structural redactor leaks no auth substring across the full 119-app field universe.
