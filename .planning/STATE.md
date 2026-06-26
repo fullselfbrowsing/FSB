@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_to_plan
-stopped_at: "Phase 41 (Depth 2 -- Remaining Hand-Ports + Guarded Writes, DEPTH-02) COMPLETE + verified PASS (gsd-verifier 4/4 SC, no findings; 41-VERIFICATION.md; 5/5 plans; full npm test EXIT 0 + validate:extension EXIT 0). Shipped 7 GUARDED WRITE heads, each FAIL-CLOSED (the github.issues.create pattern -- handle() returns dual-field RECIPE_DOM_FALLBACK_PENDING and NEVER calls ctx.executeBoundSpec; tests/guarded-write-failclosed.test.js asserts the executeBoundSpec recorder stays EMPTY, 36/0): gitlab x3 (create_issue/create_merge_request/create_note, gitlab.com), notion x3 (create_page/update_page/create_database_item, www.notion.so; append_block stays READ), slack x1 (send_message, app.slack.com -- DISTINCT from the executable slack.chat.postMessage, no collision). Each UPGRADES its opentabs write descriptor dom->T1a (slug-exact, write class; head-handler-upgrade 83/0). HEADLINE: the NEW CORS / first-party-origin gate (scripts/verify-origin-classification.mjs, wired into validate:extension) asserts every HEAD_HANDLER_MODULES head SAME-ORIGIN with its vendored <app>-api.ts base-URL; a separate-origin head FAILS the build, proven by a linear (client-api.linear.app) negative-control. SC2: a T1a write on the SENSITIVE app.slack.com origin honors the DENY-04 mutating opt-in through the LIVE roster (RECIPE_CONSENT_MUTATING_REQUIRED without the flag, allow with setOriginMutating, read allows; sensitive-write-import-gate 37/0). INVARIANTS: HEAD_HANDLER_MODULES=4 (<=30, NO new module); INV-03 byte-equality extended to the write reason; INV-01 frozen registry; INV-02 parity; Wall-2 origin-pin (RECIPE_ORIGIN_MISMATCH) UNCHANGED -- Pattern-D cross-origin execution NOT built (41-DEFERRAL.md records the demote of linear/datadog/jira/supabase to T3-DOM, deferred to a future user-blessed story). CARRIED-FORWARD human_needed (NON-blocking, writes ship fail-closed): live mutation-body capture for the 7 [ASSUMED-ENDPOINT] writes (41-HUMAN-UAT.md, 7 rows). Commits: 5b93bb00/b0650180/19bf3963/57365bee/9d2b6c94. Ready to plan Phase 42 (Discovery Seeding + Tail Learn, DSEED-01..02)."
-last_updated: "2026-06-26T18:12:15.693Z"
+status: verifying
+stopped_at: "Phase 41 (Depth 2 -- Remaining Hand-Ports + Guarded Writes, DEPTH-02) COMPLETE (5/5 plans executed, all atomic commits; full npm test EXIT 0 + validate:extension EXIT 0). 7 GUARDED WRITE heads ship FAIL-CLOSED (gitlab x3, notion x3, slack x1) -- handle() returns dual-field RECIPE_DOM_FALLBACK_PENDING and NEVER calls executeBoundSpec (guarded-write-failclosed.test.js asserts the recorder stays EMPTY, 36/0); each upgrades its opentabs write descriptor dom->T1a (head-handler-upgrade 83/0). NEW CORS / first-party-origin gate (verify-origin-classification.mjs, wired into validate:extension): all 4 heads SAME-ORIGIN, a separate-origin head FAILS the build (linear negative-control). SC2: a T1a write on the SENSITIVE app.slack.com origin honors the DENY-04 mutating opt-in through the LIVE roster (sensitive-write-import-gate 37/0). HEAD_HANDLER_MODULES=4 (<=30, no new module); INV-01/02/03 intact; Wall-2 origin-pin (RECIPE_ORIGIN_MISMATCH) UNCHANGED -- Pattern-D NOT built (41-DEFERRAL.md demotes linear/datadog/jira/supabase to T3-DOM, deferred). Carried-forward human_needed (NON-blocking, writes fail-closed): live mutation-body capture for the 7 [ASSUMED-ENDPOINT] writes (41-HUMAN-UAT.md). Commits 5b93bb00/b0650180/19bf3963/57365bee/9d2b6c94 + SUMMARYs. Ready to plan Phase 42."
+last_updated: "2026-06-26T19:58:14.303Z"
 last_activity: 2026-06-26
 progress:
-  total_phases: 10
-  completed_phases: 8
-  total_plans: 38
-  completed_plans: 38
-  percent: 80
+  total_phases: 11
+  completed_phases: 9
+  total_plans: 42
+  completed_plans: 44
+  percent: 100
 ---
 
 # Project State
@@ -32,10 +32,10 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 Phase: 42 (Discovery Seeding + Tail Learn) — READY TO PLAN
 Plan: 0 of 0 (not yet planned)
-Status: Phase 41 (Depth 2 — Remaining Hand-Ports + Guarded Writes, DEPTH-02) COMPLETE + verified PASS (gsd-verifier 4/4 SC, no findings; 41-VERIFICATION.md); Phase 42 ready to plan
+Status: Phase complete — ready for verification
 Last activity: 2026-06-26
 
-Progress: [████████░░] 80% (8 of 10 phases complete)
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -171,7 +171,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-26
+Last session: 2026-06-26T19:58:14.290Z
 Stopped at: Phase 41 (Depth 2 -- Remaining Hand-Ports + Guarded Writes, DEPTH-02) COMPLETE (5/5 plans executed, all atomic commits; full npm test EXIT 0 + validate:extension EXIT 0). 7 GUARDED WRITE heads ship FAIL-CLOSED (gitlab x3, notion x3, slack x1) -- handle() returns dual-field RECIPE_DOM_FALLBACK_PENDING and NEVER calls executeBoundSpec (guarded-write-failclosed.test.js asserts the recorder stays EMPTY, 36/0); each upgrades its opentabs write descriptor dom->T1a (head-handler-upgrade 83/0). NEW CORS / first-party-origin gate (verify-origin-classification.mjs, wired into validate:extension): all 4 heads SAME-ORIGIN, a separate-origin head FAILS the build (linear negative-control). SC2: a T1a write on the SENSITIVE app.slack.com origin honors the DENY-04 mutating opt-in through the LIVE roster (sensitive-write-import-gate 37/0). HEAD_HANDLER_MODULES=4 (<=30, no new module); INV-01/02/03 intact; Wall-2 origin-pin (RECIPE_ORIGIN_MISMATCH) UNCHANGED -- Pattern-D NOT built (41-DEFERRAL.md demotes linear/datadog/jira/supabase to T3-DOM, deferred). Carried-forward human_needed (NON-blocking, writes fail-closed): live mutation-body capture for the 7 [ASSUMED-ENDPOINT] writes (41-HUMAN-UAT.md). Commits 5b93bb00/b0650180/19bf3963/57365bee/9d2b6c94 + SUMMARYs. Ready to plan Phase 42.
 Resume file: None
 

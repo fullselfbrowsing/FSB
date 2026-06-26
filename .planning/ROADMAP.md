@@ -178,11 +178,11 @@ Plans:
   3. The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring (Stripe `session_api_key`, Instagram `csrftoken`, Linear `linear-client-id`, token-shape patterns, …) is persisted into any learned-recipe envelope, audit entry, or diagnostic ring at scale — capture reads structure only, never a header value/body/query.
 **Plans**: 5 plans (3 waves)
 Plans:
-- [ ] 42-01-PLAN.md — Wave 0: the discovery-seed harvester + discovery-seeds.json (origin->hints, provenance/SHA-pinned) + the seed-load/no-manifest-change keystone test + the 119-app redaction no-leak EXTENSION (DSEED-02 keystone, RED-first) + new-test registration [wave 0]
-- [ ] 42-02-PLAN.md — the redactor AUTH_CARRIER_DENYLIST 119-app extension (+ token-shape; turns the keystone GREEN, structure-only preserved) + the network-capture seed loader (lazy/no-throw) + the synthesizer recognition-bias (metadata-only, never executes) [wave 1]
-- [ ] 42-03-PLAN.md — the resolve() seed->T2 branch (seeded would-be-T3 -> T2 learn-pending; unseeded stays T3; LEARN-04 learned-first UNCHANGED; INV-01 shape untouched) + seed-resolve-t2 test [wave 1]
-- [ ] 42-04-PLAN.md — the RECIPE_LEARN_PENDING actionable affordance (additive reason/actionable/message; INV-03 byte-stable code) + its test [wave 1]
-- [ ] 42-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + the no-manifest-change assert + capture/consent/promote core UNCHANGED + INV-01/INV-03 green + the live first-visit human_needed slice (42-HUMAN-UAT.md) [wave 2]
+- [x] 42-01-PLAN.md — Wave 0: the discovery-seed harvester + discovery-seeds.json (origin->hints, provenance/SHA-pinned) + the seed-load/no-manifest-change keystone test + the 119-app redaction no-leak EXTENSION (DSEED-02 keystone, RED-first) + new-test registration [wave 0]
+- [x] 42-02-PLAN.md — the redactor AUTH_CARRIER_DENYLIST 119-app extension (+ token-shape; turns the keystone GREEN, structure-only preserved) + the network-capture seed loader (lazy/no-throw) + the synthesizer recognition-bias (metadata-only, never executes) [wave 1]
+- [x] 42-03-PLAN.md — the resolve() seed->T2 branch (seeded would-be-T3 -> T2 learn-pending; unseeded stays T3; LEARN-04 learned-first UNCHANGED; INV-01 shape untouched) + seed-resolve-t2 test [wave 1]
+- [x] 42-04-PLAN.md — the RECIPE_LEARN_PENDING actionable affordance (additive reason/actionable/message; INV-03 byte-stable code) + its test [wave 1]
+- [x] 42-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + the no-manifest-change assert + capture/consent/promote core UNCHANGED + INV-01/INV-03 green + the live first-visit human_needed slice (42-HUMAN-UAT.md) [wave 2]
 
 ### Phase 43: Catalog-Scale + Milestone Gate
 **Goal**: Close the milestone by proving full-corpus performance, hardening self-heal for the now-119-app rot surface, and gating on the full test suite — mirroring the v0.9.99 Phase-32 milestone-gate posture.
@@ -209,7 +209,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 39.5 Full OpenTabs Source Import (real ~117-plugin / ~2,306-op) [INSERTED] | 5/5 | Complete    | 2026-06-26 |
 | 40. Depth 1 — Top READ Hand-Ports | 5/5 | Complete   | 2026-06-26 |
 | 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 5/5 | Complete   | 2026-06-26 |
-| 42. Discovery Seeding + Tail Learn | 0/TBD | Not started | - |
+| 42. Discovery Seeding + Tail Learn | 5/5 | Complete   | 2026-06-26 |
 | 43. Catalog-Scale + Milestone Gate | 0/TBD | Not started | - |
 
 ## Completed Milestones

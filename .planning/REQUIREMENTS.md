@@ -34,8 +34,8 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 
 ### DSEED -- Discovery Seeding for the Tail
 
-- [ ] **DSEED-01**: The OpenTabs origins (+ known endpoint hints) seed the Phase-31 network-capture discovery so the non-hand-ported tail is learned on first authenticated visit, consent-gated.
-- [ ] **DSEED-02**: The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring is persisted at scale.
+- [x] **DSEED-01**: The OpenTabs origins (+ known endpoint hints) seed the Phase-31 network-capture discovery so the non-hand-ported tail is learned on first authenticated visit, consent-gated.
+- [x] **DSEED-02**: The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring is persisted at scale.
 
 ### SCALE -- Catalog Scale & Milestone Gate
 
@@ -85,8 +85,8 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 | BRDTH-03 | Phase 37 | Complete |
 | DEPTH-01 | Phase 40 | Complete |
 | DEPTH-02 | Phase 41 | Complete |
-| DSEED-01 | Phase 42 | Pending |
-| DSEED-02 | Phase 42 | Pending |
+| DSEED-01 | Phase 42 | Complete |
+| DSEED-02 | Phase 42 | Complete |
 | SCALE-01 | Phase 43 | Pending |
 | SCALE-02 | Phase 43 | Pending |
 
