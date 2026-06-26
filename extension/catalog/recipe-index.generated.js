@@ -2251,8 +2251,8 @@
         "add a task in asana",
         "make a new task in asana",
         "open a new task in asana",
-        "create task in asana",
-        "create a new task in asana"
+        "create a to-do in asana",
+        "create a to-do item in asana"
       ],
       "description": "Create a new task in a workspace. Optionally assign to a project, user, or parent task.",
       "actionVerb": "create",
@@ -2329,8 +2329,8 @@
         "remove a task in asana",
         "trash a task in asana",
         "permanently delete a task in asana",
-        "delete task in asana",
-        "delete a task permanently in asana"
+        "delete a to-do in asana",
+        "delete a to-do item in asana"
       ],
       "description": "Permanently delete a task by its GID. This action cannot be undone.",
       "actionVerb": "delete",
@@ -3005,8 +3005,10 @@
       "service": "app.asana.com",
       "intentSynonyms": [
         "search tasks in asana",
-        "search tasks in a workspace in asana",
-        "search for tasks in a workspace in asana"
+        "search a to-do in asana",
+        "search a to-do item in asana",
+        "search a todo in asana",
+        "search tasks in a workspace in asana"
       ],
       "description": "Search for tasks in a workspace. Supports filtering by text, assignee, completion status, due dates, and projects.",
       "actionVerb": "search",
@@ -3145,8 +3147,8 @@
         "edit a task in asana",
         "change the details of task in asana",
         "modify a task in asana",
-        "update task in asana",
-        "update an existing task in asana"
+        "update a to-do in asana",
+        "update a to-do item in asana"
       ],
       "description": "Update an existing task — change name, completion status, assignee, dates, or notes.",
       "actionVerb": "update",
@@ -7402,7 +7404,7 @@
         "make a new post in bsky",
         "open a new post in bsky",
         "create post in bsky",
-        "create a new post in bsky"
+        "create a post in bluesky"
       ],
       "description": "Create a new Bluesky post. Supports plain text. For replies, provide the parent and root post URIs and CIDs.",
       "actionVerb": "create",
@@ -7458,7 +7460,8 @@
         "remove a message in bsky",
         "trash a message in bsky",
         "permanently delete a message in bsky",
-        "delete message in bsky"
+        "delete message in bsky",
+        "delete a message in bluesky"
       ],
       "description": "Delete a message for yourself in a conversation.",
       "actionVerb": "delete",
@@ -7502,7 +7505,8 @@
         "remove a post in bsky",
         "trash a post in bsky",
         "permanently delete a post in bsky",
-        "delete post in bsky"
+        "delete post in bsky",
+        "delete a post in bluesky"
       ],
       "description": "Delete a post by its AT URI. Only the post author can delete their own posts. The rkey is extracted from the URI.",
       "actionVerb": "delete",
@@ -7539,6 +7543,7 @@
       "intentSynonyms": [
         "follow an user in bsky",
         "follow user in bsky",
+        "follow an user in bluesky",
         "follow a user in bsky"
       ],
       "description": "Follow a user. Requires the target user's DID. Returns the follow record URI (needed for unfollowing).",
@@ -7682,8 +7687,8 @@
         "look up a conversation in bsky",
         "fetch a single conversation in bsky",
         "view one specific conversation in bsky",
-        "get conversation in bsky",
-        "get conversation details in bsky"
+        "open a conversation in bsky",
+        "get conversation in bsky"
       ],
       "description": "Get details about a specific conversation by its ID.",
       "actionVerb": "get",
@@ -8259,8 +8264,7 @@
       "intentSynonyms": [
         "like a post in bsky",
         "like post in bsky",
-        "like post in the bsky app",
-        "use bsky to like a post"
+        "like a post in bluesky"
       ],
       "description": "Like a post. Requires the post's AT URI and CID. Returns the URI of the like record (needed for unliking).",
       "actionVerb": "like",
@@ -8304,6 +8308,7 @@
         "show me my conversations in bsky",
         "view my conversations in bsky",
         "see all my conversations in bsky",
+        "list conversations in bluesky",
         "list dm conversations in bsky"
       ],
       "description": "List the authenticated user's direct message conversations. Returns conversations sorted by most recent activity.",
@@ -8345,7 +8350,8 @@
         "list notifications in bsky",
         "show me my notifications in bsky",
         "view my notifications in bsky",
-        "see all my notifications in bsky"
+        "see all my notifications in bsky",
+        "list notifications in bluesky"
       ],
       "description": "List the authenticated user's notifications including likes, reposts, follows, mentions, replies, and quotes. Supports cursor-based pagination.",
       "actionVerb": "list",
@@ -8385,6 +8391,7 @@
       "intentSynonyms": [
         "mark a conversation read in bsky",
         "mark conversation read in bsky",
+        "mark a conversation read in bluesky",
         "mark a conversation as read in bsky"
       ],
       "description": "Mark a conversation as read.",
@@ -8422,6 +8429,7 @@
       "intentSynonyms": [
         "mark a notifications seen in bsky",
         "mark notifications seen in bsky",
+        "mark a notifications seen in bluesky",
         "mark notifications as seen in bsky"
       ],
       "description": "Mark all notifications as seen up to the current timestamp.",
@@ -8451,6 +8459,7 @@
       "intentSynonyms": [
         "mute an actor in bsky",
         "mute actor in bsky",
+        "mute an actor in bluesky",
         "mute a user in bsky"
       ],
       "description": "Mute a user. Their posts will no longer appear in your feed.",
@@ -8488,7 +8497,7 @@
       "intentSynonyms": [
         "mute a conversation in bsky",
         "mute conversation in bsky",
-        "mute a conversation to stop receiving notifications from it in bsky"
+        "mute a conversation in bluesky"
       ],
       "description": "Mute a conversation to stop receiving notifications from it.",
       "actionVerb": "mute",
@@ -8525,8 +8534,7 @@
       "intentSynonyms": [
         "mute a thread in bsky",
         "mute thread in bsky",
-        "mute thread in the bsky app",
-        "use bsky to mute a thread"
+        "mute a thread in bluesky"
       ],
       "description": "Mute a thread. Notifications from this thread will be suppressed.",
       "actionVerb": "mute",
@@ -8562,9 +8570,8 @@
       "service": "bsky.app",
       "intentSynonyms": [
         "repost in bsky",
-        "repost a post in bsky",
-        "repost in the bsky app",
-        "use bsky to repost"
+        "repost in bluesky",
+        "repost a post in bsky"
       ],
       "description": "Repost a post. Requires the post's AT URI and CID. Returns the URI of the repost record (needed for unreposting).",
       "actionVerb": "repost",
@@ -8605,8 +8612,8 @@
       "service": "bsky.app",
       "intentSynonyms": [
         "search posts in bsky",
-        "search posts by keyword in bsky",
-        "search for posts matching a query in bsky"
+        "search posts in bluesky",
+        "search posts by keyword in bsky"
       ],
       "description": "Search for posts matching a query. Supports filtering by author, mentions, language, URL, domain, and tags. Results can be sorted by latest or top.",
       "actionVerb": "search",
@@ -8688,8 +8695,8 @@
       "service": "bsky.app",
       "intentSynonyms": [
         "search users in bsky",
-        "search for users in bsky",
-        "search for users by keyword in bsky"
+        "search users in bluesky",
+        "search for users in bsky"
       ],
       "description": "Search for users by keyword. Returns paginated results matching the query against handles and display names.",
       "actionVerb": "search",
@@ -8736,6 +8743,7 @@
       "intentSynonyms": [
         "search an users typeahead in bsky",
         "search users typeahead in bsky",
+        "search an users typeahead in bluesky",
         "typeahead search for users in bsky"
       ],
       "description": "Typeahead search for users. Returns a quick list of matching users for autocomplete. Faster than full search but returns fewer results.",
@@ -8781,6 +8789,7 @@
         "post a message in bsky",
         "write a new message in bsky",
         "send message in bsky",
+        "send a message in bluesky",
         "send a dm in bsky"
       ],
       "description": "Send a direct message in a conversation.",
@@ -8823,6 +8832,7 @@
       "intentSynonyms": [
         "unfollow an user in bsky",
         "unfollow user in bsky",
+        "unfollow an user in bluesky",
         "unfollow a user in bsky"
       ],
       "description": "Unfollow a user. Requires the AT URI of the follow record (returned by follow_user or found in the viewer relationship).",
@@ -8860,6 +8870,7 @@
       "intentSynonyms": [
         "unlike a post in bsky",
         "unlike post in bsky",
+        "unlike a post in bluesky",
         "remove a like from a post in bsky"
       ],
       "description": "Remove a like from a post. Requires the AT URI of the like record (returned by like_post).",
@@ -8897,6 +8908,7 @@
       "intentSynonyms": [
         "unmute an actor in bsky",
         "unmute actor in bsky",
+        "unmute an actor in bluesky",
         "unmute a user in bsky"
       ],
       "description": "Unmute a user.",
@@ -8934,8 +8946,7 @@
       "intentSynonyms": [
         "unmute a conversation in bsky",
         "unmute conversation in bsky",
-        "unmute conversation in the bsky app",
-        "use bsky to unmute a conversation"
+        "unmute a conversation in bluesky"
       ],
       "description": "Unmute a conversation.",
       "actionVerb": "unmute",
@@ -8972,8 +8983,7 @@
       "intentSynonyms": [
         "unmute a thread in bsky",
         "unmute thread in bsky",
-        "unmute thread in the bsky app",
-        "use bsky to unmute a thread"
+        "unmute a thread in bluesky"
       ],
       "description": "Unmute a thread.",
       "actionVerb": "unmute",
@@ -9009,9 +9019,8 @@
       "service": "bsky.app",
       "intentSynonyms": [
         "unrepost in bsky",
-        "remove a repost in bsky",
-        "unrepost in the bsky app",
-        "use bsky to unrepost"
+        "unrepost in bluesky",
+        "remove a repost in bsky"
       ],
       "description": "Remove a repost. Requires the AT URI of the repost record (returned by repost).",
       "actionVerb": "unrepost",
@@ -10591,8 +10600,8 @@
         "look up a conversation in chatgpt",
         "fetch a single conversation in chatgpt",
         "view one specific conversation in chatgpt",
-        "get conversation in chatgpt",
-        "get a conversation with messages in chatgpt"
+        "open a conversation in chatgpt",
+        "get conversation in chatgpt"
       ],
       "description": "Get a ChatGPT conversation with its full message history. Messages are returned in chronological order following the active branch of the conversation tree.",
       "actionVerb": "get",
@@ -13120,10 +13129,8 @@
       "service": "app.circleci.com",
       "intentSynonyms": [
         "list schedules in circleci",
-        "show me my schedules in circleci",
-        "view my schedules in circleci",
-        "see all my schedules in circleci",
-        "list scheduled triggers in circleci"
+        "list scheduled triggers in circleci",
+        "list scheduled pipeline triggers for a project in circleci"
       ],
       "description": "List scheduled pipeline triggers for a project.",
       "actionVerb": "list",
@@ -13403,7 +13410,6 @@
         "create a conversation in claude",
         "add a conversation in claude",
         "make a new conversation in claude",
-        "open a new conversation in claude",
         "create conversation in claude",
         "create a conversation with an initial message in claude"
       ],
@@ -13570,8 +13576,8 @@
         "look up a conversation in claude",
         "fetch a single conversation in claude",
         "view one specific conversation in claude",
-        "get conversation in claude",
-        "get a conversation with messages in claude"
+        "open a conversation in claude",
+        "get conversation in claude"
       ],
       "description": "Get a conversation by UUID including its full message history. Returns conversation metadata and all messages with their text content, sender, and ordering.",
       "actionVerb": "get",
@@ -17469,8 +17475,7 @@
         "add an inline comment in confluence",
         "make a new inline comment in confluence",
         "open a new inline comment in confluence",
-        "create inline comment in confluence",
-        "create an inline comment on page text in confluence"
+        "create inline comment in confluence"
       ],
       "description": "Create an inline comment on specific text in a Confluence page. The comment is anchored to the selected text and appears as a margin note. Provide the exact text to anchor to, the total number of matches of that text on the page, and which match (0-based index) to anchor to.",
       "actionVerb": "create",
@@ -22881,7 +22886,6 @@
         "create a thread in discord",
         "add a thread in discord",
         "make a new thread in discord",
-        "open a new thread in discord",
         "create thread in discord",
         "create a new thread in discord"
       ],
@@ -24010,7 +24014,7 @@
         "make a new repository in dockerhub",
         "open a new repository in dockerhub",
         "create repository in dockerhub",
-        "create a new docker hub repository in dockerhub"
+        "create a repository in docker hub"
       ],
       "description": "Create a new Docker Hub repository in a namespace. The repository is created as a public image repository by default.",
       "actionVerb": "create",
@@ -24065,7 +24069,8 @@
         "remove a repository in dockerhub",
         "trash a repository in dockerhub",
         "permanently delete a repository in dockerhub",
-        "delete repository in dockerhub"
+        "delete repository in dockerhub",
+        "delete a repository in docker hub"
       ],
       "description": "Permanently delete a Docker Hub repository. This action cannot be undone. All tags and images in the repository will be deleted.",
       "actionVerb": "delete",
@@ -24276,6 +24281,7 @@
         "show me my organizations in dockerhub",
         "view my organizations in dockerhub",
         "see all my organizations in dockerhub",
+        "list organizations in docker hub",
         "list your docker hub organizations in dockerhub"
       ],
       "description": "List Docker Hub organizations the current user belongs to. Returns organization names, locations, and join dates.",
@@ -24320,6 +24326,7 @@
         "show me my repositories in dockerhub",
         "view my repositories in dockerhub",
         "see all my repositories in dockerhub",
+        "list repositories in docker hub",
         "list repositories in a namespace in dockerhub"
       ],
       "description": "List Docker Hub repositories in a namespace (user or organization). Defaults to the current user. Supports filtering by name and sorting.",
@@ -24378,6 +24385,7 @@
         "show me my tags in dockerhub",
         "view my tags in dockerhub",
         "see all my tags in dockerhub",
+        "list tags in docker hub",
         "list repository tags in dockerhub"
       ],
       "description": "List tags for a Docker Hub repository. Returns tag names, digests, sizes, platform support, and last update times. Use namespace \"library\" for official images (e.g., library/nginx).",
@@ -24432,6 +24440,7 @@
       "intentSynonyms": [
         "search a catalog in dockerhub",
         "search catalog in dockerhub",
+        "search a catalog in docker hub",
         "search docker hub catalog (images, models, extensions) in dockerhub"
       ],
       "description": "Search the Docker Hub catalog for images, extensions, and models. Returns rich metadata including categories, source type (official, verified publisher, community), and content types. This is the newer, more comprehensive search API.",
@@ -24499,8 +24508,8 @@
       "service": "hub.docker.com",
       "intentSynonyms": [
         "search repositories in dockerhub",
-        "search repositories by keyword in dockerhub",
-        "search docker hub repositories by keyword in dockerhub"
+        "search repositories in docker hub",
+        "search repositories by keyword in dockerhub"
       ],
       "description": "Search Docker Hub repositories by keyword. Returns matching repositories with pull counts, star counts, and official/automated status.",
       "actionVerb": "search",
@@ -24553,7 +24562,7 @@
         "change the details of repository in dockerhub",
         "modify a repository in dockerhub",
         "update repository in dockerhub",
-        "update repository description or visibility in dockerhub"
+        "update a repository in docker hub"
       ],
       "description": "Update a Docker Hub repository. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -26539,6 +26548,7 @@
       "intentSynonyms": [
         "add a named item in excel",
         "add named item in excel",
+        "add a named item in excel online",
         "create a named range or constant in excel"
       ],
       "description": "Add a named range or named value to the workbook. For a range, provide a reference like \"Sheet1!A1:C10\". For a value or formula, provide the value directly.",
@@ -26585,6 +26595,7 @@
       "intentSynonyms": [
         "add a table column in excel",
         "add table column in excel",
+        "add a table column in excel online",
         "add a column to a table in excel"
       ],
       "description": "Add a new column to a table. Provide values as a 2D array where the first value is the header name and subsequent values are the data for each existing row. Optionally specify an insertion index.",
@@ -26637,6 +26648,7 @@
       "intentSynonyms": [
         "add a table row in excel",
         "add table row in excel",
+        "add a table row in excel online",
         "add rows to a table in excel"
       ],
       "description": "Add one or more rows to a table. Values is a 2D array where each inner array is a row. The number of values in each row must match the number of table columns. Optionally specify an insertion index (0-based); rows are appended at the end if omitted.",
@@ -26689,6 +26701,7 @@
       "intentSynonyms": [
         "add a worksheet in excel",
         "add worksheet in excel",
+        "add a worksheet in excel online",
         "add a new worksheet in excel"
       ],
       "description": "Add a new worksheet to the currently open Excel workbook. Optionally specify a name for the new worksheet.",
@@ -26723,6 +26736,7 @@
       "intentSynonyms": [
         "calculate a workbook in excel",
         "calculate workbook in excel",
+        "calculate a workbook in excel online",
         "recalculate all formulas in excel"
       ],
       "description": "Recalculate all formulas in the workbook. Use calculation_type \"Recalculate\" for normal recalculation, \"Full\" to force recalculation of all formulas, or \"FullRebuild\" to rebuild the dependency chain and recalculate.",
@@ -26762,6 +26776,7 @@
       "intentSynonyms": [
         "clear a range in excel",
         "clear range in excel",
+        "clear a range in excel online",
         "clear cell contents or formatting in excel"
       ],
       "description": "Clear the contents, formatting, or both from a range of cells. Use apply_to to control what is cleared: \"All\" clears everything, \"Contents\" clears values and formulas only, \"Formats\" clears formatting only.",
@@ -26816,7 +26831,7 @@
         "make a new chart in excel",
         "open a new chart in excel",
         "create chart in excel",
-        "create a chart from data in excel"
+        "create a chart in excel online"
       ],
       "description": "Create a new chart in a worksheet from a data range. Supports chart types like ColumnClustered, Line, Pie, Bar, Area, and more. The source_data range should include headers.",
       "actionVerb": "create",
@@ -26875,7 +26890,7 @@
         "make a new table in excel",
         "open a new table in excel",
         "create table in excel",
-        "create a table from a data range in excel"
+        "create a table in excel online"
       ],
       "description": "Create a new table from a data range. The range should contain the data (and optionally a header row). Set has_headers=true if the first row contains column headers.",
       "actionVerb": "create",
@@ -26918,7 +26933,8 @@
         "remove a chart in excel",
         "trash a chart in excel",
         "permanently delete a chart in excel",
-        "delete chart in excel"
+        "delete chart in excel",
+        "delete a chart in excel online"
       ],
       "description": "Delete a chart from a worksheet by its name.",
       "actionVerb": "delete",
@@ -26963,7 +26979,7 @@
         "trash a range in excel",
         "permanently delete a range in excel",
         "delete range in excel",
-        "delete cells and shift remaining data in excel"
+        "delete a range in excel online"
       ],
       "description": "Delete cells at a range address, shifting remaining cells up or to the left. Use shift=\"Up\" to pull cells up or shift=\"Left\" to pull cells left.",
       "actionVerb": "delete",
@@ -27016,7 +27032,8 @@
         "remove a table in excel",
         "trash a table in excel",
         "permanently delete a table in excel",
-        "delete table in excel"
+        "delete table in excel",
+        "delete a table in excel online"
       ],
       "description": "Delete a table by name or ID. This removes the table object but keeps the data in the cells. Use convert_table_to_range instead if you want to explicitly convert first.",
       "actionVerb": "delete",
@@ -27056,7 +27073,7 @@
         "trash a table row in excel",
         "permanently delete a table row in excel",
         "delete table row in excel",
-        "delete a row from a table by index in excel"
+        "delete a table row in excel online"
       ],
       "description": "Delete a specific row from a table by its zero-based index. The row is permanently removed and subsequent rows shift up.",
       "actionVerb": "delete",
@@ -27103,7 +27120,7 @@
         "trash a worksheet in excel",
         "permanently delete a worksheet in excel",
         "delete worksheet in excel",
-        "delete a worksheet by name in excel"
+        "delete a worksheet in excel online"
       ],
       "description": "Delete a worksheet from the currently open Excel workbook by name. The workbook must have at least two worksheets — you cannot delete the last one.",
       "actionVerb": "delete",
@@ -27140,6 +27157,7 @@
       "intentSynonyms": [
         "evaluate a formula in excel",
         "evaluate formula in excel",
+        "evaluate a formula in excel online",
         "evaluate a formula and return the result in excel"
       ],
       "description": "Evaluate a formula expression without writing it to a cell. The formula is evaluated in the context of a specific worksheet. Returns the computed result. Useful for calculations, lookups, and data analysis without modifying the workbook.",
@@ -27409,6 +27427,7 @@
       "intentSynonyms": [
         "insert a range in excel",
         "insert range in excel",
+        "insert a range in excel online",
         "insert cells and shift existing data in excel"
       ],
       "description": "Insert new blank cells at a range address, shifting existing cells down or to the right. Use shift=\"Down\" to push cells down or shift=\"Right\" to push cells right.",
@@ -27462,6 +27481,7 @@
         "show me my charts in excel",
         "view my charts in excel",
         "see all my charts in excel",
+        "list charts in excel online",
         "list all charts in a worksheet in excel"
       ],
       "description": "List all charts in a worksheet. Returns chart names, IDs, dimensions, and positions.",
@@ -27501,6 +27521,7 @@
         "show me my named items in excel",
         "view my named items in excel",
         "see all my named items in excel",
+        "list named items in excel online",
         "list named ranges and constants in excel"
       ],
       "description": "List all named items (named ranges, constants) in the workbook. Named items are user-defined names that refer to ranges, values, or formulas.",
@@ -27532,6 +27553,7 @@
         "show me my tables in excel",
         "view my tables in excel",
         "see all my tables in excel",
+        "list tables in excel online",
         "list all tables in the workbook in excel"
       ],
       "description": "List all tables in the currently open Excel workbook. Returns table names, IDs, and display settings. Optionally filter by worksheet name to list only tables in a specific sheet.",
@@ -27568,6 +27590,7 @@
         "show me my worksheets in excel",
         "view my worksheets in excel",
         "see all my worksheets in excel",
+        "list worksheets in excel online",
         "list all worksheets in the workbook in excel"
       ],
       "description": "List all worksheets in the currently open Excel workbook. Returns worksheet names, IDs, positions, and visibility status.",
@@ -27596,8 +27619,8 @@
       "service": "excel.cloud.microsoft",
       "intentSynonyms": [
         "reauthenticate in excel",
-        "force a fresh microsoft graph token by clearing stale msal state and reloading the tab in excel",
-        "clear cached msal state and reload the sharepoint/onedrive tab to force a fresh microsoft graph token in excel"
+        "reauthenticate in excel online",
+        "force a fresh microsoft graph token by clearing stale msal state and reloading the tab in excel"
       ],
       "description": "Clear cached MSAL state and reload the SharePoint/OneDrive tab to force a fresh Microsoft Graph token. Use this when another Excel tool returns an authentication error pointing at this tool. After invoking, wait ~5 seconds for the tab to finish reloading, then retry the original operation.",
       "actionVerb": "reauthenticate",
@@ -27626,6 +27649,7 @@
       "intentSynonyms": [
         "sort a range in excel",
         "sort range in excel",
+        "sort a range in excel online",
         "sort data in a range by columns in excel"
       ],
       "description": "Sort data in a range by one or more columns. Each sort field specifies a zero-based column index and sort direction. Multiple fields create multi-level sorts (primary, secondary, etc.).",
@@ -27700,7 +27724,7 @@
         "change the details of range in excel",
         "modify a range in excel",
         "update range in excel",
-        "write values or formulas to a range in excel"
+        "update a range in excel online"
       ],
       "description": "Write values, formulas, or number formats to a specific range in a worksheet. The values must be a 2D array matching the range dimensions. Use null within the array to skip a cell. Pass formulas starting with \"=\" (e.g., \"=SUM(A1:A10)\"). Use \"\" (empty string) to clear a cell.",
       "actionVerb": "update",
@@ -27771,7 +27795,7 @@
         "change the details of worksheet in excel",
         "modify a worksheet in excel",
         "update worksheet in excel",
-        "update worksheet name, position, or visibility in excel"
+        "update a worksheet in excel online"
       ],
       "description": "Update worksheet properties such as name, position, or visibility. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -30052,8 +30076,8 @@
         "look up a conversation in fiverr",
         "fetch a single conversation in fiverr",
         "view one specific conversation in fiverr",
-        "get conversation in fiverr",
-        "read a conversation thread in fiverr"
+        "open a conversation in fiverr",
+        "get conversation in fiverr"
       ],
       "description": "Read the full message thread of a Fiverr conversation with a specific user. Returns messages (oldest first) with sender, recipient, text, timestamp, and attachment count, plus the unread count and whether the oldest page has been reached. Pass the other participant’s username, as returned by `list_conversations`.",
       "actionVerb": "get",
@@ -30325,6 +30349,7 @@
       "intentSynonyms": [
         "check a compatibility in ganalytics",
         "check compatibility in ganalytics",
+        "check a compatibility in google analytics",
         "check dimension/metric compatibility in ganalytics"
       ],
       "description": "Check which dimensions and metrics are compatible with each other for a given GA4 property. Not all dimension-metric combinations work together in a report. Use this before run_report to validate your query will succeed. Returns all available dimensions and metrics with a \"compatible\" flag indicating whether they can be used together in the same report.",
@@ -30486,6 +30511,7 @@
         "show me my accounts in ganalytics",
         "view my accounts in ganalytics",
         "see all my accounts in ganalytics",
+        "list accounts in google analytics",
         "list all ga accounts and properties in ganalytics"
       ],
       "description": "List all Google Analytics accounts and GA4 properties accessible to the current user. Returns accounts with their properties nested inside.",
@@ -30515,6 +30541,7 @@
       "intentSynonyms": [
         "run a batch report in ganalytics",
         "run batch report in ganalytics",
+        "run a batch report in google analytics",
         "run multiple reports in one request in ganalytics"
       ],
       "description": "Run multiple GA4 reports in a single request. More efficient than calling run_report multiple times — use this when you need several different views of the same property (e.g., traffic by country AND by device in one call). Supports up to 5 reports per batch. Each report can have different dimensions, metrics, and date ranges.",
@@ -30598,6 +30625,7 @@
       "intentSynonyms": [
         "run a realtime report in ganalytics",
         "run realtime report in ganalytics",
+        "run a realtime report in google analytics",
         "get realtime analytics data (last 30 minutes) in ganalytics"
       ],
       "description": "Run a realtime analytics report showing data from the last 30 minutes. Useful for monitoring live traffic, active users, current page views, and event activity. Common realtime dimensions: \"country\", \"city\", \"unifiedScreenName\", \"eventName\", \"platform\", \"deviceCategory\". Common realtime metrics: \"activeUsers\", \"eventCount\", \"screenPageViews\", \"conversions\". Not all standard dimensions/metrics are available in realtime — use get_metadata with the property ID to check availability.",
@@ -30664,6 +30692,7 @@
       "intentSynonyms": [
         "run a report in ganalytics",
         "run report in ganalytics",
+        "run a report in google analytics",
         "run a ga4 analytics report in ganalytics"
       ],
       "description": "Run a GA4 analytics report with specified dimensions, metrics, and date ranges. This is the primary reporting tool — supports all 374+ dimensions and 86+ metrics. Use get_metadata to discover available fields, and check_compatibility to verify combinations work together. Common dimensions: \"country\", \"city\", \"pagePath\", \"sessionSource\", \"deviceCategory\", \"browser\". Common metrics: \"activeUsers\", \"sessions\", \"screenPageViews\", \"bounceRate\", \"averageSessionDuration\", \"conversions\". Date formats: \"YYYY-MM-DD\", \"today\", \"yesterday\", \"NdaysAgo\" (e.g., \"7daysAgo\"). Returns up to 10000 rows per request; use offset for pagination.",
@@ -30753,7 +30782,7 @@
         "make a new calendar in gcal",
         "open a new calendar in gcal",
         "create calendar in gcal",
-        "create a new secondary calendar in gcal"
+        "create a calendar in google calendar"
       ],
       "description": "Create a new secondary calendar. The authenticated user becomes the owner of the new calendar.",
       "actionVerb": "create",
@@ -30805,7 +30834,7 @@
         "make a new event in gcal",
         "open a new event in gcal",
         "create event in gcal",
-        "create a new calendar event in gcal"
+        "create an event in google calendar"
       ],
       "description": "Create a new calendar event. For timed events, provide start_datetime and end_datetime in ISO 8601 format with timezone offset (e.g., \"2024-01-15T10:00:00-08:00\"). For all-day events, provide start_date and end_date in YYYY-MM-DD format (end_date is exclusive). At least one of (start_datetime or start_date) must be provided.",
       "actionVerb": "create",
@@ -30950,7 +30979,7 @@
         "trash a calendar in gcal",
         "permanently delete a calendar in gcal",
         "delete calendar in gcal",
-        "delete a secondary calendar in gcal"
+        "delete a calendar in google calendar"
       ],
       "description": "Delete a secondary calendar. Use calendars.clear for clearing all events on primary calendars. The primary calendar cannot be deleted.",
       "actionVerb": "delete",
@@ -30990,7 +31019,7 @@
         "trash an event in gcal",
         "permanently delete an event in gcal",
         "delete event in gcal",
-        "delete a calendar event in gcal"
+        "delete an event in google calendar"
       ],
       "description": "Delete an event from a calendar. For recurring events, this deletes the entire series. To delete a single instance, use the instance event ID.",
       "actionVerb": "delete",
@@ -31194,9 +31223,7 @@
       "service": "calendar.google.com",
       "intentSynonyms": [
         "list calendars in gcal",
-        "show me my calendars in gcal",
-        "view my calendars in gcal",
-        "see all my calendars in gcal",
+        "list calendars in google calendar",
         "list all calendars the user has access to in gcal"
       ],
       "description": "List all calendars on the user's calendar list. Returns primary and secondary calendars, subscribed calendars, and holiday calendars with their display settings.",
@@ -31237,6 +31264,7 @@
         "show me my event instances in gcal",
         "view my event instances in gcal",
         "see all my event instances in gcal",
+        "list event instances in google calendar",
         "list instances of a recurring event in gcal"
       ],
       "description": "List individual instances of a recurring event. Use timeMin/timeMax to scope the range of instances returned.",
@@ -31298,6 +31326,7 @@
         "show me my events in gcal",
         "view my events in gcal",
         "see all my events in gcal",
+        "list events in google calendar",
         "list events on a calendar in gcal"
       ],
       "description": "List events on a calendar. Returns upcoming events by default. Use timeMin/timeMax to specify a date range. Use q to search event text. Results are ordered by start time when singleEvents is true.",
@@ -31372,6 +31401,7 @@
         "show me my settings in gcal",
         "view my settings in gcal",
         "see all my settings in gcal",
+        "list settings in google calendar",
         "list all user calendar settings in gcal"
       ],
       "description": "List all user settings for the authenticated user. Returns settings like timezone, locale, date format, week start day, etc.",
@@ -31401,6 +31431,7 @@
       "intentSynonyms": [
         "move an event in gcal",
         "move event in gcal",
+        "move an event in google calendar",
         "move an event to another calendar in gcal"
       ],
       "description": "Move an event to another calendar. This changes the event organizer. Only default events can be moved — birthday, focusTime, fromGmail, outOfOffice, and workingLocation events cannot be moved.",
@@ -31447,6 +31478,7 @@
       "intentSynonyms": [
         "query a freebusy in gcal",
         "query freebusy in gcal",
+        "query a freebusy in google calendar",
         "query free/busy information for calendars in gcal"
       ],
       "description": "Query free/busy information for one or more calendars within a time range. Returns time slots where events are scheduled. Useful for finding available meeting times.",
@@ -31500,6 +31532,7 @@
       "intentSynonyms": [
         "quick an add event in gcal",
         "quick add event in gcal",
+        "quick an add event in google calendar",
         "create an event from natural language text in gcal"
       ],
       "description": "Create an event using natural language text. Google Calendar parses the text to extract event details like title, date, time, and location. Examples: \"Meeting with Bob tomorrow at 3pm\", \"Dinner at Olive Garden on Friday 7pm-9pm\".",
@@ -31549,8 +31582,8 @@
       "service": "calendar.google.com",
       "intentSynonyms": [
         "search events in gcal",
-        "search events across all calendars in gcal",
-        "search for events across all writable calendars by text query in gcal"
+        "search events in google calendar",
+        "search events across all calendars in gcal"
       ],
       "description": "Search for events across all writable calendars by text query. Searches event summary, description, location, and attendee names. Returns matching events from all calendars the user has write access to.",
       "actionVerb": "search",
@@ -31604,7 +31637,7 @@
         "change the details of calendar in gcal",
         "modify a calendar in gcal",
         "update calendar in gcal",
-        "update calendar metadata in gcal"
+        "update a calendar in google calendar"
       ],
       "description": "Update metadata for a calendar. Only the fields you provide will be changed. Uses PATCH semantics.",
       "actionVerb": "update",
@@ -31660,7 +31693,7 @@
         "change the details of event in gcal",
         "modify an event in gcal",
         "update event in gcal",
-        "update an existing event in gcal"
+        "update an event in google calendar"
       ],
       "description": "Update an existing event. Only the fields you provide will be changed; omitted fields remain unchanged. Uses PATCH semantics.",
       "actionVerb": "update",
@@ -31771,6 +31804,7 @@
       "intentSynonyms": [
         "disable a service in gcloud",
         "disable service in gcloud",
+        "disable a service in google cloud",
         "disable a gcp api service in gcloud"
       ],
       "description": "Disable a GCP API service in the project. WARNING: This may break resources that depend on this service.",
@@ -31812,6 +31846,7 @@
       "intentSynonyms": [
         "enable a service in gcloud",
         "enable service in gcloud",
+        "enable a service in google cloud",
         "enable a gcp api service in gcloud"
       ],
       "description": "Enable a GCP API service in the project. The service name is the API identifier (e.g., \"compute.googleapis.com\").",
@@ -32276,7 +32311,8 @@
         "list billing accounts in gcloud",
         "show me my billing accounts in gcloud",
         "view my billing accounts in gcloud",
-        "see all my billing accounts in gcloud"
+        "see all my billing accounts in gcloud",
+        "list billing accounts in google cloud"
       ],
       "description": "List billing accounts accessible to the current user.",
       "actionVerb": "list",
@@ -32318,6 +32354,7 @@
         "show me my buckets in gcloud",
         "view my buckets in gcloud",
         "see all my buckets in gcloud",
+        "list buckets in google cloud",
         "list cloud storage buckets in gcloud"
       ],
       "description": "List Cloud Storage buckets in the project.",
@@ -32363,7 +32400,8 @@
         "list cloud run services in gcloud",
         "show me my cloud run services in gcloud",
         "view my cloud run services in gcloud",
-        "see all my cloud run services in gcloud"
+        "see all my cloud run services in gcloud",
+        "list cloud run services in google cloud"
       ],
       "description": "List Cloud Run services in the project across all locations.",
       "actionVerb": "list",
@@ -32409,6 +32447,7 @@
         "show me my clusters in gcloud",
         "view my clusters in gcloud",
         "see all my clusters in gcloud",
+        "list clusters in google cloud",
         "list gke clusters in gcloud"
       ],
       "description": "List Google Kubernetes Engine (GKE) clusters in the project across all locations.",
@@ -32445,6 +32484,7 @@
         "show me my disks in gcloud",
         "view my disks in gcloud",
         "see all my disks in gcloud",
+        "list disks in google cloud",
         "list persistent disks in gcloud"
       ],
       "description": "List Compute Engine persistent disks. If no zone is specified, lists across all zones.",
@@ -32495,6 +32535,7 @@
         "show me my enabled services in gcloud",
         "view my enabled services in gcloud",
         "see all my enabled services in gcloud",
+        "list enabled services in google cloud",
         "list enabled api services in gcloud"
       ],
       "description": "List GCP API services enabled in the project. Each service represents an API that has been activated.",
@@ -32541,6 +32582,7 @@
         "show me my firewalls in gcloud",
         "view my firewalls in gcloud",
         "see all my firewalls in gcloud",
+        "list firewalls in google cloud",
         "list firewall rules in gcloud"
       ],
       "description": "List firewall rules in the project.",
@@ -32587,6 +32629,7 @@
         "show me my functions in gcloud",
         "view my functions in gcloud",
         "see all my functions in gcloud",
+        "list functions in google cloud",
         "list cloud functions in gcloud"
       ],
       "description": "List Cloud Functions in the project across all locations.",
@@ -32633,6 +32676,7 @@
         "show me my iam roles in gcloud",
         "view my iam roles in gcloud",
         "see all my iam roles in gcloud",
+        "list iam roles in google cloud",
         "list custom iam roles in gcloud"
       ],
       "description": "List custom IAM roles defined in the project. Use \"roles\" as a prefix to list predefined roles.",
@@ -32679,6 +32723,7 @@
         "show me my instances in gcloud",
         "view my instances in gcloud",
         "see all my instances in gcloud",
+        "list instances in google cloud",
         "list compute engine vm instances in gcloud"
       ],
       "description": "List Compute Engine VM instances in a zone. If no zone is specified, lists instances across all zones using aggregated list.",
@@ -32729,6 +32774,7 @@
         "show me my log entries in gcloud",
         "view my log entries in gcloud",
         "see all my log entries in gcloud",
+        "list log entries in google cloud",
         "list cloud logging entries in gcloud"
       ],
       "description": "List log entries from Cloud Logging. Supports advanced log filters (e.g., 'severity>=ERROR', 'resource.type=\"gce_instance\"').",
@@ -32783,6 +32829,7 @@
         "show me my networks in gcloud",
         "view my networks in gcloud",
         "see all my networks in gcloud",
+        "list networks in google cloud",
         "list vpc networks in gcloud"
       ],
       "description": "List VPC networks in the project.",
@@ -32829,6 +32876,7 @@
         "show me my objects in gcloud",
         "view my objects in gcloud",
         "see all my objects in gcloud",
+        "list objects in google cloud",
         "list objects in a storage bucket in gcloud"
       ],
       "description": "List objects in a Cloud Storage bucket. Supports prefix filtering for directory-like browsing.",
@@ -32886,6 +32934,7 @@
         "show me my projects in gcloud",
         "view my projects in gcloud",
         "see all my projects in gcloud",
+        "list projects in google cloud",
         "list accessible gcp projects in gcloud"
       ],
       "description": "List all GCP projects accessible to the current user. Returns project IDs, names, and lifecycle states.",
@@ -32928,6 +32977,7 @@
         "show me my service accounts in gcloud",
         "view my service accounts in gcloud",
         "see all my service accounts in gcloud",
+        "list service accounts in google cloud",
         "list iam service accounts in gcloud"
       ],
       "description": "List IAM service accounts in the project.",
@@ -32974,6 +33024,7 @@
         "show me my sql instances in gcloud",
         "view my sql instances in gcloud",
         "see all my sql instances in gcloud",
+        "list sql instances in google cloud",
         "list cloud sql instances in gcloud"
       ],
       "description": "List Cloud SQL database instances in the project.",
@@ -33018,6 +33069,7 @@
       "intentSynonyms": [
         "start an instance in gcloud",
         "start instance in gcloud",
+        "start an instance in google cloud",
         "start a stopped vm instance in gcloud"
       ],
       "description": "Start a stopped Compute Engine VM instance. The instance must be in TERMINATED or STOPPED state.",
@@ -33064,6 +33116,7 @@
       "intentSynonyms": [
         "stop an instance in gcloud",
         "stop instance in gcloud",
+        "stop an instance in google cloud",
         "stop a running vm instance in gcloud"
       ],
       "description": "Stop a running Compute Engine VM instance. The instance must be in RUNNING state.",
@@ -33110,6 +33163,7 @@
       "intentSynonyms": [
         "copy a document in gdocs",
         "copy document in gdocs",
+        "copy a document in google docs",
         "copy a google doc in gdocs"
       ],
       "description": "Create a copy of an existing Google Doc. You can optionally rename the new copy, move it into a folder, and set a Drive description.",
@@ -33162,7 +33216,7 @@
         "make a new comment in gdocs",
         "open a new comment in gdocs",
         "create comment in gdocs",
-        "add a comment to a document in gdocs"
+        "create a comment in google docs"
       ],
       "description": "Add a new comment to a Google Doc. Optionally anchor the comment to specific quoted text in the document. If quoted_text is provided, the comment appears as a margin note next to that text.",
       "actionVerb": "create",
@@ -33211,7 +33265,7 @@
         "make a new document in gdocs",
         "open a new document in gdocs",
         "create document in gdocs",
-        "create a new google doc in gdocs"
+        "create a document in google docs"
       ],
       "description": "Create a new blank Google Doc in Drive. Open the new document in Google Docs and call update_document when you want to add or replace its content.",
       "actionVerb": "create",
@@ -33260,7 +33314,7 @@
         "trash a comment in gdocs",
         "permanently delete a comment in gdocs",
         "delete comment in gdocs",
-        "delete a comment thread in gdocs"
+        "delete a comment in google docs"
       ],
       "description": "Permanently delete a comment thread from a Google Doc. Only the comment author or the document owner can delete comments. This action cannot be undone.",
       "actionVerb": "delete",
@@ -33303,7 +33357,8 @@
         "remove a document in gdocs",
         "trash a document in gdocs",
         "permanently delete a document in gdocs",
-        "delete document in gdocs"
+        "delete document in gdocs",
+        "delete a document in google docs"
       ],
       "description": "Permanently delete a Google Doc from Drive. This skips the trash and cannot be undone through the Google Docs plugin.",
       "actionVerb": "delete",
@@ -33343,7 +33398,7 @@
         "trash a reply in gdocs",
         "permanently delete a reply in gdocs",
         "delete reply in gdocs",
-        "delete a reply from a comment thread in gdocs"
+        "delete a reply in google docs"
       ],
       "description": "Permanently delete a reply from a comment thread on a Google Doc. Only the reply author or the document owner can delete replies. This action cannot be undone.",
       "actionVerb": "delete",
@@ -33533,6 +33588,7 @@
         "show me my comments in gdocs",
         "view my comments in gdocs",
         "see all my comments in gdocs",
+        "list comments in google docs",
         "list comments on a document in gdocs"
       ],
       "description": "List comment threads on a Google Doc, including replies, resolution status, and the quoted document text each comment is anchored to. Returns comments ordered by creation time. By default, only open (unresolved) comments are returned — use the status parameter to include resolved or all comments. Orphaned comments (anchored to text that was deleted from the document) are excluded by default.",
@@ -33596,6 +33652,7 @@
         "show me my recent documents in gdocs",
         "view my recent documents in gdocs",
         "see all my recent documents in gdocs",
+        "list recent documents in google docs",
         "list recently viewed google docs in gdocs"
       ],
       "description": "List recently viewed Google Docs from Drive, ordered by most recently viewed and then most recently modified.",
@@ -33643,7 +33700,7 @@
         "restore a completed a comment in gdocs",
         "mark not done a comment in gdocs",
         "reopen comment in gdocs",
-        "reopen a resolved comment thread in gdocs"
+        "reopen a comment in google docs"
       ],
       "description": "Reopen a previously resolved comment thread. In the Drive API, reopening is done by creating a reply with action \"reopen\".",
       "actionVerb": "reopen",
@@ -33684,6 +33741,7 @@
       "intentSynonyms": [
         "reply a to comment in gdocs",
         "reply to comment in gdocs",
+        "reply a to comment in google docs",
         "reply to a comment thread in gdocs"
       ],
       "description": "Add a reply to an existing comment thread on a Google Doc.",
@@ -33731,6 +33789,7 @@
       "intentSynonyms": [
         "resolve a comment in gdocs",
         "resolve comment in gdocs",
+        "resolve a comment in google docs",
         "resolve a comment thread in gdocs"
       ],
       "description": "Mark a comment thread as resolved (done). In the Drive API, resolving is done by creating a reply with action \"resolve\".",
@@ -33772,6 +33831,7 @@
       "intentSynonyms": [
         "restore a document in gdocs",
         "restore document in gdocs",
+        "restore a document in google docs",
         "restore a trashed document in gdocs"
       ],
       "description": "Restore a Google Doc from the Drive trash back to its previous location.",
@@ -33808,8 +33868,8 @@
       "service": "docs.google.com",
       "intentSynonyms": [
         "search documents in gdocs",
-        "search google docs by title or content in gdocs",
-        "search google docs by title and full-text content using the authenticated drive search index in gdocs"
+        "search documents in google docs",
+        "search google docs by title or content in gdocs"
       ],
       "description": "Search Google Docs by title and full-text content using the authenticated Drive search index. Trashed documents are excluded by default.",
       "actionVerb": "search",
@@ -33861,6 +33921,7 @@
       "intentSynonyms": [
         "trash a document in gdocs",
         "trash document in gdocs",
+        "trash a document in google docs",
         "move a document to the trash in gdocs"
       ],
       "description": "Move a Google Doc to the Drive trash. The document can still be restored later with restore_document.",
@@ -33901,7 +33962,7 @@
         "change the details of document title in gdocs",
         "modify a document title in gdocs",
         "update document title in gdocs",
-        "rename a google doc in gdocs"
+        "update a document title in google docs"
       ],
       "description": "Rename a Google Doc in Drive without changing its content.",
       "actionVerb": "update",
@@ -33944,6 +34005,7 @@
       "intentSynonyms": [
         "copy a file in gdrive",
         "copy file in gdrive",
+        "copy a file in google drive",
         "create a copy of a file in gdrive"
       ],
       "description": "Create a copy of a file. Optionally specify a new name and parent folder for the copy. Folders cannot be copied.",
@@ -33992,7 +34054,7 @@
         "make a new file in gdrive",
         "open a new file in gdrive",
         "create file in gdrive",
-        "create a new file in google drive in gdrive"
+        "create a file in google drive"
       ],
       "description": "Create a new empty file in Google Drive. For Google Workspace types, use: \"application/vnd.google-apps.document\" (Docs), \"application/vnd.google-apps.spreadsheet\" (Sheets), \"application/vnd.google-apps.presentation\" (Slides). For regular files, use standard MIME types like \"text/plain\". Specify parent_id to create inside a folder, otherwise it goes to My Drive root.",
       "actionVerb": "create",
@@ -34044,7 +34106,7 @@
         "make a new folder in gdrive",
         "open a new folder in gdrive",
         "create folder in gdrive",
-        "create a new folder in gdrive"
+        "create a folder in google drive"
       ],
       "description": "Create a new folder in Google Drive. Specify parent_id to create a nested folder, otherwise it goes to My Drive root.",
       "actionVerb": "create",
@@ -34092,7 +34154,7 @@
         "make a new permission in gdrive",
         "open a new permission in gdrive",
         "create permission in gdrive",
-        "share a file with someone in gdrive"
+        "create a permission in google drive"
       ],
       "description": "Share a file or folder with a user, group, domain, or make it public. For user/group sharing, provide an email address. For domain sharing, provide a domain name. Use type \"anyone\" to make the file accessible via link.",
       "actionVerb": "create",
@@ -34167,7 +34229,7 @@
         "trash a file in gdrive",
         "permanently delete a file in gdrive",
         "delete file in gdrive",
-        "permanently delete a file or folder in gdrive"
+        "delete a file in google drive"
       ],
       "description": "Permanently delete a file or folder. This bypasses the trash — the file cannot be recovered. For a safer alternative, use trash_file to move it to trash first.",
       "actionVerb": "delete",
@@ -34207,7 +34269,7 @@
         "trash a permission in gdrive",
         "permanently delete a permission in gdrive",
         "delete permission in gdrive",
-        "remove sharing access from a file in gdrive"
+        "delete a permission in google drive"
       ],
       "description": "Remove a sharing permission from a file or folder. Use list_permissions to find permission IDs.",
       "actionVerb": "delete",
@@ -34249,6 +34311,7 @@
       "intentSynonyms": [
         "empty a trash in gdrive",
         "empty trash in gdrive",
+        "empty a trash in google drive",
         "permanently delete all trashed files in gdrive"
       ],
       "description": "Permanently delete all files in the trash. This action cannot be undone. All trashed files will be permanently removed.",
@@ -34384,6 +34447,7 @@
         "show me my files in gdrive",
         "view my files in gdrive",
         "see all my files in gdrive",
+        "list files in google drive",
         "list files and folders in a drive folder in gdrive"
       ],
       "description": "List files and folders in Google Drive. By default lists items in the root \"My Drive\" folder. Use parent_id to list children of a specific folder. Supports ordering by name, modifiedTime, or createdTime. Trashed files are excluded by default.",
@@ -34438,6 +34502,7 @@
         "show me my permissions in gdrive",
         "view my permissions in gdrive",
         "see all my permissions in gdrive",
+        "list permissions in google drive",
         "list sharing permissions on a file in gdrive"
       ],
       "description": "List all sharing permissions on a file or folder. Returns who has access and their role (owner, writer, commenter, reader).",
@@ -34475,6 +34540,7 @@
       "intentSynonyms": [
         "move a file in gdrive",
         "move file in gdrive",
+        "move a file in google drive",
         "move a file to a different folder in gdrive"
       ],
       "description": "Move a file or folder to a different parent folder. Specify the current parent to remove and the new parent to add. Use \"root\" for My Drive root.",
@@ -34522,6 +34588,7 @@
       "intentSynonyms": [
         "restore a file in gdrive",
         "restore file in gdrive",
+        "restore a file in google drive",
         "restore a file from the trash in gdrive"
       ],
       "description": "Restore a file or folder from the trash back to its original location.",
@@ -34558,8 +34625,8 @@
       "service": "drive.google.com",
       "intentSynonyms": [
         "search files in gdrive",
-        "search files by name or content in gdrive",
-        "search for files and folders in google drive by name or full-text content in gdrive"
+        "search files in google drive",
+        "search files by name or content in gdrive"
       ],
       "description": "Search for files and folders in Google Drive by name or full-text content. The query searches file names and document content. Use mime_type to filter by type (e.g., \"application/vnd.google-apps.folder\" for folders, \"application/vnd.google-apps.document\" for Docs, \"application/vnd.google-apps.spreadsheet\" for Sheets). Trashed files are excluded by default.",
       "actionVerb": "search",
@@ -34614,6 +34681,7 @@
       "intentSynonyms": [
         "trash a file in gdrive",
         "trash file in gdrive",
+        "trash a file in google drive",
         "move a file to the trash in gdrive"
       ],
       "description": "Move a file or folder to the trash. Trashed files can be restored with restore_file or permanently deleted with empty_trash. Files in the trash are automatically deleted after 30 days.",
@@ -34654,7 +34722,7 @@
         "change the details of file in gdrive",
         "modify a file in gdrive",
         "update file in gdrive",
-        "update file or folder metadata in gdrive"
+        "update a file in google drive"
       ],
       "description": "Update file or folder metadata — rename, change description, or toggle starred status. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -34704,7 +34772,6 @@
         "create a conversation in gemini",
         "add a conversation in gemini",
         "make a new conversation in gemini",
-        "open a new conversation in gemini",
         "create conversation in gemini",
         "start a new gemini conversation in gemini"
       ],
@@ -34749,8 +34816,8 @@
         "look up a conversation in gemini",
         "fetch a single conversation in gemini",
         "view one specific conversation in gemini",
-        "get conversation in gemini",
-        "get messages from the current conversation in gemini"
+        "open a conversation in gemini",
+        "get conversation in gemini"
       ],
       "description": "Get the messages of the currently active Gemini conversation. Returns the conversation ID and all visible message turns (prompt/response pairs). If a conversation_id is provided and it does not match the current URL, the browser navigates to that conversation first. Note: only messages visible on screen are returned — very long conversations may be truncated.",
       "actionVerb": "get",
@@ -34935,8 +35002,8 @@
         "add an issue in gitlab",
         "make a new issue in gitlab",
         "open a new issue in gitlab",
-        "create issue in gitlab",
-        "create a new issue in gitlab"
+        "file an issue in gitlab",
+        "create a ticket in gitlab"
       ],
       "description": "Create a new issue in a project.",
       "actionVerb": "create",
@@ -35596,7 +35663,8 @@
         "show me my issues in gitlab",
         "view my issues in gitlab",
         "see all my issues in gitlab",
-        "list issues for a project in gitlab"
+        "list a ticket in gitlab",
+        "list a bug in gitlab"
       ],
       "description": "List issues for a project. By default returns opened issues sorted by creation date. Can filter by state, labels, assignee, milestone, and more.",
       "actionVerb": "list",
@@ -36244,7 +36312,8 @@
         "edit an issue in gitlab",
         "change the details of issue in gitlab",
         "modify an issue in gitlab",
-        "update issue in gitlab"
+        "update a ticket in gitlab",
+        "update a bug in gitlab"
       ],
       "description": "Update an existing issue. Only specified fields are changed.",
       "actionVerb": "update",
@@ -37243,8 +37312,8 @@
       "service": "www.google.com",
       "intentSynonyms": [
         "navigate to directions in gmaps",
-        "open directions between two points in gmaps",
-        "open google maps directions between an origin and destination in gmaps"
+        "navigate to directions in google maps",
+        "open directions between two points in gmaps"
       ],
       "description": "Open Google Maps directions between an origin and destination. Shows the route on the map with step-by-step navigation instructions, distance, and estimated travel time. Supports driving, transit, walking, and bicycling modes.",
       "actionVerb": "navigate",
@@ -37296,6 +37365,7 @@
       "intentSynonyms": [
         "navigate a to location in gmaps",
         "navigate to location in gmaps",
+        "navigate a to location in google maps",
         "pan the map to specific coordinates in gmaps"
       ],
       "description": "Navigate the Google Maps view to specific coordinates with a given zoom level. The map pans and zooms to the specified location.",
@@ -37344,6 +37414,7 @@
       "intentSynonyms": [
         "navigate a to place in gmaps",
         "navigate to place in gmaps",
+        "navigate a to place in google maps",
         "open a place on the map in gmaps"
       ],
       "description": "Navigate Google Maps to a specific place by name or address. Opens the place detail view showing information like hours, reviews, and photos.",
@@ -37381,6 +37452,7 @@
       "intentSynonyms": [
         "navigate a to search in gmaps",
         "navigate to search in gmaps",
+        "navigate a to search in google maps",
         "open search results on the map in gmaps"
       ],
       "description": "Open Google Maps search results for a query at a specific location. The map shows search results pinned on the map with a list panel. Optionally provide coordinates to search near a specific location.",
@@ -37432,6 +37504,7 @@
       "intentSynonyms": [
         "search a nearby in gmaps",
         "search nearby in gmaps",
+        "search a nearby in google maps",
         "search by category near coordinates in gmaps"
       ],
       "description": "Open a Google Maps search for a category of places near specific coordinates. Navigates the browser to show results on the map. Common categories: restaurants, hotels, gas stations, coffee, pharmacies, ATMs, grocery stores, parking, hospitals, banks.",
@@ -37482,8 +37555,8 @@
       "service": "www.google.com",
       "intentSynonyms": [
         "search places in gmaps",
-        "search for places near a location in gmaps",
-        "search for places on google maps by text query near a location in gmaps"
+        "search places in google maps",
+        "search for places near a location in gmaps"
       ],
       "description": "Search for places on Google Maps by text query near a location. Returns place names and IDs. Use get_current_view first to get coordinates for the search area, or provide explicit coordinates.",
       "actionVerb": "search",
@@ -37540,6 +37613,7 @@
       "intentSynonyms": [
         "set a travel mode in gmaps",
         "set travel mode in gmaps",
+        "set a travel mode in google maps",
         "switch driving/transit/walking/biking in gmaps"
       ],
       "description": "Change the travel mode for the current directions view. Only works when viewing directions (URL contains /dir/). Switches between driving, transit, walking, and bicycling modes.",
@@ -37583,6 +37657,7 @@
       "intentSynonyms": [
         "share a location in gmaps",
         "share location in gmaps",
+        "share a location in google maps",
         "get a shareable maps link in gmaps"
       ],
       "description": "Get a shareable Google Maps URL for the current map view or a specific location. The URL can be shared with others to show the same location on Google Maps.",
@@ -37627,6 +37702,7 @@
       "intentSynonyms": [
         "toggle a layer in gmaps",
         "toggle layer in gmaps",
+        "toggle a layer in google maps",
         "toggle traffic/transit/biking/terrain layer in gmaps"
       ],
       "description": "Toggle a map layer on Google Maps by navigating to the appropriate URL with the layer parameter. Supports traffic, transit, bicycling, and terrain layers.",
@@ -37670,6 +37746,7 @@
       "intentSynonyms": [
         "zoom a map in gmaps",
         "zoom map in gmaps",
+        "zoom a map in google maps",
         "zoom in or out on the map in gmaps"
       ],
       "description": "Change the zoom level of the current Google Maps view. Zoom in to see more detail or zoom out for a wider view. Zoom levels range from 1 (world) to 21 (building level). Common levels: 5 (country), 10 (city), 15 (streets), 18 (buildings), 20 (close-up).",
@@ -39890,8 +39967,9 @@
       "service": "instacart.com",
       "intentSynonyms": [
         "search products in instacart",
-        "search for grocery products in instacart",
-        "search for products across all available retailers near the delivery address in instacart"
+        "search groceries in instacart",
+        "search grocery items in instacart",
+        "search for grocery products in instacart"
       ],
       "description": "Search for products across all available retailers near the delivery address. Returns suggested items with thumbnails. Use get_location_context first if you need the zone ID. The search uses the user's current delivery location automatically.",
       "actionVerb": "search",
@@ -41184,6 +41262,8 @@
       "service": "atlassian.net",
       "intentSynonyms": [
         "assign an issue in jira",
+        "assign a ticket in jira",
+        "assign a bug in jira",
         "assign issue in jira",
         "assign or unassign an issue in jira"
       ],
@@ -41228,8 +41308,8 @@
         "add an issue in jira",
         "make a new issue in jira",
         "open a new issue in jira",
-        "create issue in jira",
-        "create a new jira issue in jira"
+        "file an issue in jira",
+        "create a ticket in jira"
       ],
       "description": "Create a new Jira issue in a project. Requires a project key, summary, and issue type.",
       "actionVerb": "create",
@@ -41300,7 +41380,8 @@
         "remove an issue in jira",
         "trash an issue in jira",
         "permanently delete an issue in jira",
-        "delete issue in jira"
+        "delete a ticket in jira",
+        "delete a bug in jira"
       ],
       "description": "Delete a Jira issue. Optionally delete all subtasks as well.",
       "actionVerb": "delete",
@@ -41491,8 +41572,9 @@
       "service": "atlassian.net",
       "intentSynonyms": [
         "link issues in jira",
-        "link two issues together in jira",
-        "create a link between two jira issues in jira"
+        "link a ticket in jira",
+        "link a bug in jira",
+        "link two issues together in jira"
       ],
       "description": "Create a link between two Jira issues. Common link types: \"Blocks\", \"is blocked by\", \"relates to\", \"duplicates\".",
       "actionVerb": "link",
@@ -41794,8 +41876,9 @@
       "service": "atlassian.net",
       "intentSynonyms": [
         "search issues in jira",
-        "search issues using jql in jira",
-        "search for jira issues using jql (jira query language) in jira"
+        "search a ticket in jira",
+        "search a bug in jira",
+        "search issues using jql in jira"
       ],
       "description": "Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.",
       "actionVerb": "search",
@@ -41881,6 +41964,8 @@
       "service": "atlassian.net",
       "intentSynonyms": [
         "transition an issue in jira",
+        "transition a ticket in jira",
+        "transition a bug in jira",
         "transition issue in jira",
         "change an issue's status in jira"
       ],
@@ -41926,8 +42011,8 @@
         "edit an issue in jira",
         "change the details of issue in jira",
         "modify an issue in jira",
-        "update issue in jira",
-        "update an existing issue in jira"
+        "update a ticket in jira",
+        "update a bug in jira"
       ],
       "description": "Update fields on an existing Jira issue. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -43390,8 +43475,9 @@
       "service": "linear.app",
       "intentSynonyms": [
         "archive an issue in linear",
-        "archive issue in linear",
-        "archive a linear issue in linear"
+        "archive a ticket in linear",
+        "archive a bug in linear",
+        "archive issue in linear"
       ],
       "description": "Archive a Linear issue. Archived issues are hidden from default views but can be restored.",
       "actionVerb": "archive",
@@ -43503,8 +43589,7 @@
         "add an attachment in linear",
         "make a new attachment in linear",
         "open a new attachment in linear",
-        "create attachment in linear",
-        "link a url to an issue in linear"
+        "create attachment in linear"
       ],
       "description": "Link a URL (PR, document, design file, etc.) to a Linear issue as an attachment.",
       "actionVerb": "create",
@@ -43715,8 +43800,8 @@
         "add an issue in linear",
         "make a new issue in linear",
         "open a new issue in linear",
-        "create issue in linear",
-        "create a new issue in linear"
+        "file an issue in linear",
+        "create a ticket in linear"
       ],
       "description": "Create a new issue in Linear. Requires a team ID and title at minimum.",
       "actionVerb": "create",
@@ -43803,8 +43888,7 @@
         "add an issue relation in linear",
         "make a new issue relation in linear",
         "open a new issue relation in linear",
-        "create issue relation in linear",
-        "create a relation between two issues in linear"
+        "create issue relation in linear"
       ],
       "description": "Create a relation between two Linear issues (blocks, is blocked by, relates to, or duplicate of).",
       "actionVerb": "create",
@@ -44156,8 +44240,8 @@
         "remove an issue in linear",
         "trash an issue in linear",
         "permanently delete an issue in linear",
-        "delete issue in linear",
-        "move an issue to the trash in linear"
+        "delete a ticket in linear",
+        "delete a bug in linear"
       ],
       "description": "Move a Linear issue to the trash. Trashed issues can be restored within 30 days.",
       "actionVerb": "delete",
@@ -45549,8 +45633,9 @@
       "service": "linear.app",
       "intentSynonyms": [
         "search issues in linear",
-        "search and filter issues in linear",
-        "search and filter linear issues in linear"
+        "search a ticket in linear",
+        "search a bug in linear",
+        "search and filter issues in linear"
       ],
       "description": "Search and filter Linear issues. Supports text search, filtering by team, assignee, state, label, project, and more. Returns paginated results.",
       "actionVerb": "search",
@@ -45825,8 +45910,8 @@
         "edit an issue in linear",
         "change the details of issue in linear",
         "modify an issue in linear",
-        "update issue in linear",
-        "update an existing issue in linear"
+        "update a ticket in linear",
+        "update a bug in linear"
       ],
       "description": "Update an existing Linear issue. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -51511,6 +51596,7 @@
       "intentSynonyms": [
         "append a to document in msword",
         "append to document in msword",
+        "append a to document in microsoft word",
         "append paragraphs to a word document in msword"
       ],
       "description": "Append paragraphs to the end of an existing Word document (.docx). Downloads the document, adds the new paragraphs after all existing content, and re-uploads. Existing content is preserved.",
@@ -51557,6 +51643,7 @@
       "intentSynonyms": [
         "copy an item in msword",
         "copy item in msword",
+        "copy an item in microsoft word",
         "copy a file or folder in msword"
       ],
       "description": "Copy a file or folder. The copy operation is asynchronous — returns success immediately. The new copy appears in the destination folder shortly after.",
@@ -51606,7 +51693,7 @@
         "make a new document in msword",
         "open a new document in msword",
         "create document in msword",
-        "create a new word document with text in msword"
+        "create a document in microsoft word"
       ],
       "description": "Create a new Word document (.docx) with the given text content. Each string in the paragraphs array becomes a separate paragraph in the document. The file is created at the specified path in OneDrive.",
       "actionVerb": "create",
@@ -51655,7 +51742,8 @@
         "add a folder in msword",
         "make a new folder in msword",
         "open a new folder in msword",
-        "create folder in msword"
+        "create folder in msword",
+        "create a folder in microsoft word"
       ],
       "description": "Create a new folder. Specify parent_id for nested folders, omit for root.",
       "actionVerb": "create",
@@ -51700,7 +51788,7 @@
         "make a new sharing link in msword",
         "open a new sharing link in msword",
         "create sharing link in msword",
-        "create a sharing link for a file or folder in msword"
+        "create a sharing link in microsoft word"
       ],
       "description": "Create a sharing link for a file or folder. Returns a URL that can be shared with others.",
       "actionVerb": "create",
@@ -51757,7 +51845,7 @@
         "trash an item in msword",
         "permanently delete an item in msword",
         "delete item in msword",
-        "delete a file or folder in msword"
+        "delete an item in microsoft word"
       ],
       "description": "Permanently delete a file or folder. This action cannot be undone.",
       "actionVerb": "delete",
@@ -51797,7 +51885,7 @@
         "trash a permission in msword",
         "permanently delete a permission in msword",
         "delete permission in msword",
-        "remove a sharing permission in msword"
+        "delete a permission in microsoft word"
       ],
       "description": "Remove a sharing permission from a file or folder.",
       "actionVerb": "delete",
@@ -52098,7 +52186,7 @@
         "view my children in msword",
         "see all my children in msword",
         "list children in msword",
-        "list files and folders in msword"
+        "list a children in microsoft word"
       ],
       "description": "List files and folders in a directory. Use item_id to specify the folder, or omit for root.",
       "actionVerb": "list",
@@ -52144,6 +52232,7 @@
         "show me my permissions in msword",
         "view my permissions in msword",
         "see all my permissions in msword",
+        "list permissions in microsoft word",
         "list sharing permissions in msword"
       ],
       "description": "List sharing permissions on a file or folder.",
@@ -52182,7 +52271,8 @@
         "list recent documents in msword",
         "show me my recent documents in msword",
         "view my recent documents in msword",
-        "see all my recent documents in msword"
+        "see all my recent documents in msword",
+        "list recent documents in microsoft word"
       ],
       "description": "List recently accessed documents from OneDrive.",
       "actionVerb": "list",
@@ -52221,7 +52311,7 @@
         "view my shared with me in msword",
         "see all my shared with me in msword",
         "list shared with me in msword",
-        "list files shared with me in msword"
+        "list a shared with me in microsoft word"
       ],
       "description": "List files and folders shared with the current user.",
       "actionVerb": "list",
@@ -52259,6 +52349,7 @@
         "show me my versions in msword",
         "view my versions in msword",
         "see all my versions in msword",
+        "list versions in microsoft word",
         "list file version history in msword"
       ],
       "description": "List version history of a file.",
@@ -52296,6 +52387,7 @@
       "intentSynonyms": [
         "move an item in msword",
         "move item in msword",
+        "move an item in microsoft word",
         "move a file or folder in msword"
       ],
       "description": "Move a file or folder to a new parent folder.",
@@ -52338,6 +52430,7 @@
       "intentSynonyms": [
         "rename an item in msword",
         "rename item in msword",
+        "rename an item in microsoft word",
         "rename a file or folder in msword"
       ],
       "description": "Rename a file or folder.",
@@ -52381,6 +52474,7 @@
       "intentSynonyms": [
         "replace a text in document in msword",
         "replace text in document in msword",
+        "replace a text in document in microsoft word",
         "find and replace text in a word document in msword"
       ],
       "description": "Find and replace text in an existing Word document (.docx). This is the recommended way to edit documents because it preserves all formatting (bold, italic, headings, styles). Replaces all occurrences of the search text with the replacement text within existing paragraph runs. The search is case-sensitive and matches exact strings.",
@@ -52429,6 +52523,7 @@
       "intentSynonyms": [
         "restore a version in msword",
         "restore version in msword",
+        "restore a version in microsoft word",
         "restore a file version in msword"
       ],
       "description": "Restore a file to a previous version.",
@@ -52470,8 +52565,8 @@
       "service": "word.cloud.microsoft",
       "intentSynonyms": [
         "search files in msword",
-        "search files and folders in msword",
-        "search for files and folders by name in onedrive in msword"
+        "search files in microsoft word",
+        "search files and folders in msword"
       ],
       "description": "Search for files and folders by name in OneDrive.",
       "actionVerb": "search",
@@ -52518,7 +52613,7 @@
         "change the details of document in msword",
         "modify a document in msword",
         "update document in msword",
-        "replace all text in a word document in msword"
+        "update a document in microsoft word"
       ],
       "description": "Replace the entire text content of an existing Word document (.docx). Downloads the document, replaces all body content with the new paragraphs, and re-uploads. WARNING: This removes all existing formatting (bold, italic, headings, etc.) — use replace_text_in_document for formatting-safe edits.",
       "actionVerb": "update",
@@ -52567,7 +52662,7 @@
         "change the details of file content in msword",
         "modify a file content in msword",
         "update file content in msword",
-        "update a file's content in msword"
+        "update a file content in microsoft word"
       ],
       "description": "Update the content of an existing file by its ID.",
       "actionVerb": "update",
@@ -52613,6 +52708,7 @@
       "intentSynonyms": [
         "upload a file in msword",
         "upload file in msword",
+        "upload a file in microsoft word",
         "upload a text file to onedrive in msword"
       ],
       "description": "Upload a text file to OneDrive. Creates a new file or overwrites existing. Specify the full path relative to drive root (e.g., \"Documents/report.txt\").",
@@ -60842,12 +60938,8 @@
       "slug": "outlook.get_schedule",
       "service": "outlook.cloud.microsoft",
       "intentSynonyms": [
-        "get a schedule in outlook",
-        "look up a schedule in outlook",
-        "fetch a single schedule in outlook",
-        "view one specific schedule in outlook",
-        "get schedule in outlook",
-        "view others' availability in outlook"
+        "view others' availability in outlook",
+        "look up free/busy availability for one or more people in the organization over a time window in outlook"
       ],
       "description": "Look up free/busy availability for one or more people in the organization over a time window. Returns each person's busy/tentative/out-of-office blocks (with subjects and locations where the requester is permitted to see them) and their working hours. Use this to view other people's calendars and find open meeting times.",
       "actionVerb": "get",
@@ -61324,8 +61416,7 @@
         "send a message in outlook",
         "post a message in outlook",
         "write a new message in outlook",
-        "send message in outlook",
-        "send an email in outlook"
+        "send message in outlook"
       ],
       "description": "Send a new email message. Supports plain text or HTML body, CC/BCC, and importance level.",
       "actionVerb": "send",
@@ -72789,8 +72880,9 @@
       "service": "sentry.io",
       "intentSynonyms": [
         "search issues in sentry",
-        "search and list issues with optional filters in sentry",
-        "search and list issues for a sentry organization in sentry"
+        "search a ticket in sentry",
+        "search a bug in sentry",
+        "search and list issues with optional filters in sentry"
       ],
       "description": "Search and list issues for a Sentry organization. Supports Sentry search syntax in the query parameter (e.g., \"is:unresolved\", \"assigned:me\", \"level:error\", \"first-seen:-24h\"). Filter by project IDs, environment, and time range. Results are paginated with a cursor.",
       "actionVerb": "search",
@@ -72861,8 +72953,8 @@
         "edit an issue in sentry",
         "change the details of issue in sentry",
         "modify an issue in sentry",
-        "update issue in sentry",
-        "update issue status, assignee, or other attributes in sentry"
+        "update a ticket in sentry",
+        "update a bug in sentry"
       ],
       "description": "Update an issue's attributes. Supports changing status (resolve, unresolve, ignore), assigning to a user or team, bookmarking, and marking as seen. Only specified fields are modified.",
       "actionVerb": "update",
@@ -83962,8 +84054,8 @@
         "look up a conversation in telegram",
         "fetch a single conversation in telegram",
         "view one specific conversation in telegram",
-        "get conversation in telegram",
-        "get details about a conversation in telegram"
+        "open a conversation in telegram",
+        "get conversation in telegram"
       ],
       "description": "Get detailed information about a specific conversation (dialog), including unread count, top message, and peer info.",
       "actionVerb": "get",
@@ -84872,10 +84964,8 @@
       "service": "cloud.temporal.io",
       "intentSynonyms": [
         "list schedules in temporal",
-        "show me my schedules in temporal",
-        "view my schedules in temporal",
-        "see all my schedules in temporal",
-        "list all schedules in the namespace in temporal"
+        "list all schedules in the namespace in temporal",
+        "list all schedules in a namespace in temporal"
       ],
       "description": "List all schedules in a namespace. Shows schedule IDs, workflow types, intervals/crons, recent action counts, and next scheduled times.",
       "actionVerb": "list",
@@ -86718,7 +86808,6 @@
         "create a thread in threads",
         "add a thread in threads",
         "make a new thread in threads",
-        "open a new thread in threads",
         "create thread in threads",
         "post a new thread in threads"
       ],
@@ -86764,8 +86853,8 @@
         "look up a thread in threads",
         "fetch a single thread in threads",
         "view one specific thread in threads",
-        "get thread in threads",
-        "open a thread on threads in threads"
+        "open a thread in threads",
+        "get thread in threads"
       ],
       "description": "Get a single Threads post and its replies by thread ID.",
       "actionVerb": "get",
@@ -88099,7 +88188,8 @@
         "mark done a task in todoist",
         "check off a task in todoist",
         "finish a task in todoist",
-        "close task in todoist"
+        "complete a to-do in todoist",
+        "complete a to-do item in todoist"
       ],
       "description": "Close (complete) a Todoist task by its ID. The task is marked as done.",
       "actionVerb": "close",
@@ -88347,8 +88437,8 @@
         "add a task in todoist",
         "make a new task in todoist",
         "open a new task in todoist",
-        "create task in todoist",
-        "create a new task in todoist"
+        "create a to-do in todoist",
+        "create a to-do item in todoist"
       ],
       "description": "Create a new task in Todoist. Requires content (title) at minimum. Optionally set project, section, parent, labels, priority, due date, assignee, and duration.",
       "actionVerb": "create",
@@ -88601,8 +88691,8 @@
         "remove a task in todoist",
         "trash a task in todoist",
         "permanently delete a task in todoist",
-        "delete task in todoist",
-        "delete a task permanently in todoist"
+        "delete a to-do in todoist",
+        "delete a to-do item in todoist"
       ],
       "description": "Permanently delete a Todoist task by its ID. This action cannot be undone.",
       "actionVerb": "delete",
@@ -89055,7 +89145,8 @@
         "show me my tasks in todoist",
         "view my tasks in todoist",
         "see all my tasks in todoist",
-        "list tasks with optional filters in todoist"
+        "list a to-do in todoist",
+        "list a to-do item in todoist"
       ],
       "description": "List tasks from Todoist. Optionally filter by project, section, or label.",
       "actionVerb": "list",
@@ -89178,8 +89269,8 @@
         "uncomplete a task in todoist",
         "restore a completed a task in todoist",
         "mark not done a task in todoist",
-        "reopen task in todoist",
-        "reopen a completed task in todoist"
+        "reopen a to-do in todoist",
+        "reopen a to-do item in todoist"
       ],
       "description": "Reopen a previously completed Todoist task by its ID.",
       "actionVerb": "reopen",
@@ -89456,8 +89547,8 @@
         "edit a task in todoist",
         "change the details of task in todoist",
         "modify a task in todoist",
-        "update task in todoist",
-        "update an existing task in todoist"
+        "update a to-do in todoist",
+        "update a to-do item in todoist"
       ],
       "description": "Update an existing Todoist task. Only specified fields are changed; omitted fields remain unchanged.",
       "actionVerb": "update",
@@ -98763,8 +98854,9 @@
       "service": "www.yelp.com",
       "intentSynonyms": [
         "search businesses in yelp",
-        "search for businesses by keyword and location in yelp",
-        "search for businesses on yelp by keyword and location in yelp"
+        "search restaurants in yelp",
+        "search places in yelp",
+        "search for businesses by keyword and location in yelp"
       ],
       "description": "Search for businesses on Yelp by keyword and location. Returns up to 10 results per page with business name, rating, review count, price range, categories, phone, and address. Use the start parameter to paginate through results.",
       "actionVerb": "search",
@@ -100881,6 +100973,7 @@
       "intentSynonyms": [
         "add a to playlist in ytmusic",
         "add to playlist in ytmusic",
+        "add a to playlist in youtube music",
         "add a song to a playlist in ytmusic"
       ],
       "description": "Add a song to a playlist on YouTube Music",
@@ -100926,7 +101019,7 @@
         "make a new playlist in ytmusic",
         "open a new playlist in ytmusic",
         "create playlist in ytmusic",
-        "create a new playlist in ytmusic"
+        "create a playlist in youtube music"
       ],
       "description": "Create a new playlist on YouTube Music",
       "actionVerb": "create",
@@ -100981,7 +101074,8 @@
         "remove a playlist in ytmusic",
         "trash a playlist in ytmusic",
         "permanently delete a playlist in ytmusic",
-        "delete playlist in ytmusic"
+        "delete playlist in ytmusic",
+        "delete a playlist in youtube music"
       ],
       "description": "Delete a playlist from YouTube Music",
       "actionVerb": "delete",
@@ -101281,6 +101375,7 @@
       "intentSynonyms": [
         "like a song in ytmusic",
         "like song in ytmusic",
+        "like a song in youtube music",
         "like a song on youtube music in ytmusic"
       ],
       "description": "Like a song on YouTube Music",
@@ -101320,6 +101415,7 @@
         "show me my playlists in ytmusic",
         "view my playlists in ytmusic",
         "see all my playlists in ytmusic",
+        "list playlists in youtube music",
         "list user's playlists in ytmusic"
       ],
       "description": "List the user's playlists from YouTube Music",
@@ -101354,6 +101450,7 @@
       "intentSynonyms": [
         "remove a from playlist in ytmusic",
         "remove from playlist in ytmusic",
+        "remove a from playlist in youtube music",
         "remove a song from a playlist in ytmusic"
       ],
       "description": "Remove a song from a playlist on YouTube Music",
@@ -101400,9 +101497,8 @@
       "service": "music.youtube.com",
       "intentSynonyms": [
         "search in ytmusic",
-        "search youtube music for songs, albums, artists, playlists, or videos in ytmusic",
-        "search in the ytmusic app",
-        "use ytmusic to search"
+        "search in youtube music",
+        "search youtube music for songs, albums, artists, playlists, or videos in ytmusic"
       ],
       "description": "Search YouTube Music for songs, albums, artists, playlists, or videos",
       "actionVerb": "search",
@@ -101450,6 +101546,7 @@
       "intentSynonyms": [
         "unlike a song in ytmusic",
         "unlike song in ytmusic",
+        "unlike a song in youtube music",
         "remove like from a song in ytmusic"
       ],
       "description": "Remove a like from a song on YouTube Music",
@@ -101537,8 +101634,8 @@
         "add a ticket in zendesk",
         "make a new ticket in zendesk",
         "open a new ticket in zendesk",
-        "create ticket in zendesk",
-        "create a new support ticket in zendesk"
+        "file a ticket in zendesk",
+        "create ticket in zendesk"
       ],
       "description": "Create a new support ticket in Zendesk. Requires a subject and initial comment body. Optionally set priority, type, tags, assignee, group, and requester. Returns the newly created ticket with its assigned ID.",
       "actionVerb": "create",

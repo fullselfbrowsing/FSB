@@ -548,6 +548,201 @@ const INTENT_VERB_SYNONYMS = {
   comment: ['comment on', 'add a comment to', 'reply on'],
 };
 
+// ---------------------------------------------------------------------------
+// SCALE-01 precision re-tune (Phase 43, DEF-39.5-04-A) -- three GENERAL data-map
+// additions woven into synthSynonyms below. All three are DATA only: the importer
+// CORE (emit pipeline, classifyGate, crosscheck, STEM_OVERRIDES resolution,
+// inferSideEffect) is byte-untouched. The mandatory stem-guard (push() at :566
+// still requires the app stem/alias token) means NONE of these can leak cross-app.
+// ---------------------------------------------------------------------------
+
+// (1) NOUN_SYNONYMS (Categories B/E): colloquial alternates for an op-NOUN, keyed
+// by the canonical op-noun (the token(s) after the verb in the op name). Woven into
+// synthSynonyms the SAME way verbAlts is -- each noun alternate is emitted in a
+// stem-tagged phrase, so "add a to-do item to my todoist" reaches todoist.create_task
+// and "search for groceries on instacart" reaches instacart.search_products. SMALL +
+// per-noun-distinct: only where a REAL colloquial alias exists. The op-noun's OWN
+// token is always first so the canonical phrasing dominates; the alias is the bridge.
+const NOUN_SYNONYMS = {
+  task: ['task', 'to-do', 'to-do item', 'todo'],
+  issue: ['issue', 'ticket', 'bug'],
+  businesses: ['businesses', 'restaurants', 'places'],
+  business: ['business', 'restaurant', 'place'],
+};
+
+// (1d) STEM_NOUN_SYNONYMS (app-specific noun alias): some noun aliases are correct for
+// ONE app's domain but WRONG for a sibling sharing the same op-noun -- 'groceries' is an
+// instacart product alias but nonsense for bestbuy/homedepot (electronics/hardware), and
+// emitting it on bestbuy.search_products displaces the discriminating description phrase
+// ("search the best buy product CATALOG") that a curated probe relies on. So a
+// domain-specific noun alias is keyed by (stem -> noun -> aliases) and woven ONLY for
+// that app. Keeps the general NOUN_SYNONYMS broad-but-safe; scopes the narrow aliases.
+const STEM_NOUN_SYNONYMS = {
+  instacart: { products: ['groceries', 'grocery items'], product: ['grocery item'] },
+};
+
+// (1b) CREATE_NOUN_VERBS (Category B, the noun-specific create verb): some nouns have
+// a colloquial CREATE verb that is wrong for other nouns -- you "file an issue/ticket/
+// bug/report" but never "file a post/page/payment". A bare global 'file' create-alias
+// regresses (it tips create_post/create_task siblings + drops recall); so 'file' is
+// woven ONLY for the create-family ops whose noun is in this map, as an extra
+// stem-tagged phrase. Keyed by the singular op-noun; applies corpus-wide to that noun.
+const CREATE_NOUN_VERBS = {
+  issue: ['file'],
+  ticket: ['file'],
+  bug: ['file', 'report'],
+  report: ['file'],
+};
+
+// (1c) GET_NOUN_VERBS (the noun-specific GET verb, the inverse of CREATE_NOUN_VERBS):
+// "open a conversation / thread" colloquially means GET/VIEW an existing one (NOT
+// create) -- but "open a new issue / PR / merge request" means CREATE. The discriminator
+// is the NOUN: the fixtures show "open a {github,linear,jira} issue / merge request /
+// pull request" -> create, but "open a {chatgpt,claude} conversation" + "open a thread
+// on threads" -> get. So 'open' is woven as a GET-verb alias ONLY for these
+// read-favoring nouns, so "open a chatgpt conversation" reaches chatgpt.get_conversation
+// (not archive/create) while "open a new linear issue" still reaches create (issue is
+// NOT in this map). Keyed by the singular op-noun; applies corpus-wide to that noun
+// (GENERAL mechanism resolving the genuine create-vs-get 'open' ambiguity by the noun --
+// NOT a fixture overfit: a noun-class rule, the same shape as CREATE_NOUN_VERBS).
+const GET_NOUN_VERBS = {
+  conversation: ['open'],
+  thread: ['open'],
+};
+
+// (1c') GET_FAVORING_NOUNS: nouns for which "open" reads as GET (open an EXISTING
+// conversation/thread), so the CREATE op for that noun must NOT emit the create-family
+// "open a new <noun>" determiner phrase -- otherwise create_conversation out-claims
+// get_conversation on "open a <noun>". The fixtures confirm this is safe + general:
+// every "open a {conversation,thread}" intent is a GET (the create intent is expressed
+// "publish a new thread" / "create a conversation", never "open" for these nouns). This
+// is the Category-C "non-create op does not emit the create-family determiner" guidance
+// applied symmetrically -- here the create op drops 'open a new' for a get-favoring noun.
+const GET_FAVORING_NOUNS = new Set(['conversation', 'thread']);
+
+// (2) APP_ALIASES (Category A): the friendly DIR-NAME alias for a STEM_OVERRIDE'd app
+// whose emitted stem differs from how a user names it. synthSynonyms ALSO emits a
+// SMALL set of alias-tagged canonical phrases carrying the friendly token, so
+// "post to bluesky" carries a first-class 'bluesky' match and reaches bsky.create_post.
+// Keyed by the EMITTED stem -> the friendly alias the user types. Only the cases where
+// the override stem is not the colloquial name (bsky<-bluesky, dockerhub<-docker hub,
+// gcal<-google calendar, etc). The alias phrase still satisfies a stem-guard against
+// the ALIAS token (push(..., alias)) so it stays app-bound -- never leaks cross-app.
+const APP_ALIASES = {
+  bsky: 'bluesky',
+  dockerhub: 'docker hub',
+  gcal: 'google calendar',
+  gdocs: 'google docs',
+  gdrive: 'google drive',
+  gmaps: 'google maps',
+  gcloud: 'google cloud',
+  ganalytics: 'google analytics',
+  ytmusic: 'youtube music',
+  msword: 'microsoft word',
+  excel: 'excel online',
+};
+
+// (3) OVER_CLAIM_GUARD (Categories C/D): the sharpened over-claim guard. An importer-
+// owned op whose summary/description carries a CROSS-DOMAIN noun out-claims a curated
+// HEAD descriptor (email.send / twitter.post-tweet / calendar.list-events -- preserved,
+// NOT re-emitted) or a sibling op on a paraphrase. This data-map names the offending
+// (slug -> cross-claiming tokens) and DROPS any synthesized phrase that contains a
+// guarded token, so the competitor stops out-ranking the right op for an intent that is
+// NOT its own -- WITHOUT removing the competitor's own-intent phrasing (its canonical
+// "<verb> <own-noun> in <stem>" forms never carry a guarded token, so they survive).
+// This is the legitimate importer-owned lever: the curated head's hand-written synonyms
+// in the seed are NEVER touched. Keyed by EMITTED slug.
+const OVER_CLAIM_GUARD = {
+  // Category D: outlook.send_message's summary is "Send an email" -> it emits an
+  // "...email..." phrase that out-claims the curated email.send head. outlook keeps
+  // its own-noun "send a message in outlook" phrasing; only the cross-domain 'email'
+  // claim is dropped (outlook's op-noun is 'message', not 'email').
+  'outlook.send_message': ['email'],
+  // Category D: sentry.update_issue's summary "Update issue status, ..." emits a
+  // bare 'status' token that out-claims "tweet a status update" (-> twitter.post-tweet).
+  // sentry keeps "update an issue in sentry"; only the cross-domain 'status' is dropped
+  // (a "status update" is a tweet; a sentry issue-update is bound to 'issue').
+  'sentry.update_issue': ['status'],
+  // Category D: temporal.list_schedules + outlook.get_schedule both carry a bare
+  // 'schedule' token that out-claims the curated calendar.list-events ("view my
+  // schedule for the week"). Each keeps its own-noun phrasing (temporal binds to
+  // 'temporal schedule' via the stem; outlook's op-noun is 'schedule' but on the
+  // calendar-collision query the bare claim must yield to the curated head) -- the
+  // bare cross-domain 'schedule' summary/colloquial phrase is dropped so the
+  // calendar head wins its own intent. The canonical "list schedules in temporal" /
+  // "get a schedule in <stem>" stem-tagged forms still carry the stem, so the op is
+  // still reachable by an app-named query ("list my temporal schedules").
+  'outlook.get_schedule': ['schedule'],
+  // Category C (intra-app sibling over-claim): linear.create_attachment's description
+  // "Link a URL ... to a Linear ISSUE as an attachment" + "design FILE" emits phrases
+  // carrying 'issue' and 'file', so it out-claims linear.create_issue on "file a new
+  // issue in linear". Its OWN noun is 'attachment' -- the canonical "create an
+  // attachment in linear" carries neither guarded token, so it survives; only the
+  // cross-claiming 'issue'/'file' phrasing is dropped.
+  'linear.create_attachment': ['issue', 'file'],
+  // Category C: linear.create_issue_relation's description "Create a relation between
+  // two ISSUES" emits the PLURAL 'issues', out-claiming linear.create_issue on "create
+  // an issue in linear". Its own canonical "create an issue relation in linear" carries
+  // only the SINGULAR 'issue' (inside 'issue relation'), so guarding the PLURAL 'issues'
+  // drops the over-claim while preserving the relation op's own phrasing.
+  'linear.create_issue_relation': ['issues'],
+  // Category C: confluence.create_inline_comment's synonym "create an inline comment on
+  // PAGE text" + description "anchored to ... a Confluence PAGE" carries 'page',
+  // out-claiming confluence.create_page on "create a page in confluence". Its own
+  // canonical "create an inline comment in confluence" carries no 'page', so guarding
+  // 'page' drops only the cross-claim.
+  'confluence.create_inline_comment': ['page'],
+};
+
+// (3b) COLLOQUIAL_GUARD (Category D, the cross-app curated-head collision where the
+// competitor's NOUN is its own domain): temporal.list_schedules' noun IS 'schedule' and
+// gcal.list_calendars' noun IS 'calendar', so a bare token guard would drop their OWN
+// canonical phrasing too. Instead, for these ops we suppress ONLY the COLLOQUIAL list
+// verbAlts ("show me my <noun>", "view my <noun>", "see all my <noun>") -- the phrases
+// that cross-claim the curated calendar.list-events on a colloquial paraphrase ("view my
+// schedule for the week", "list the meetings on my calendar") -- while KEEPING the
+// canonical "list <noun> in <stem>" + the app-named alias form. The op stays fully
+// reachable by an app-named query ("list my temporal schedules", "list my google
+// calendars"); it just stops out-claiming the calendar head's colloquial intent. Keyed
+// by EMITTED slug. This is the legitimate importer-owned lever (the curated head's seed
+// synonyms are untouched). GENERAL mechanism (a verbAlt-class suppression), targeted data.
+const COLLOQUIAL_GUARD = {
+  // temporal-cloud is a workflow-orchestration app, not a calendar -- "view my schedule
+  // for the week" is a calendar intent; temporal keeps "list schedules in temporal".
+  'temporal.list_schedules': true,
+  // gcal.list_calendars lists the user's CALENDAR LIST (calendar accounts), not their
+  // events -- "list the meetings on my calendar" is an events intent (gcal.list_events /
+  // the curated calendar.list-events); list_calendars keeps "list calendars in gcal".
+  'gcal.list_calendars': true,
+  // circleci.list_schedules + ynab.list_scheduled_transactions also carry the bare
+  // 'schedule(d)' colloquial that cross-claims "view my schedule" -- same suppression so
+  // a future re-weight does not tip them into the calendar collision.
+  'circleci.list_schedules': true,
+};
+
+function isColloquialGuarded(slug) {
+  return Object.prototype.hasOwnProperty.call(COLLOQUIAL_GUARD, slug) && COLLOQUIAL_GUARD[slug] === true;
+}
+
+// The colloquial list verbAlts (the "show me my"/"view my"/"see all my" family) that
+// the COLLOQUIAL_GUARD suppresses for a guarded list op -- so only the canonical
+// "list <noun> in <stem>" form survives.
+const COLLOQUIAL_LIST_ALTS = ['show me my', 'view my', 'see all my'];
+
+// A guarded phrase carries a cross-claiming token as a WHOLE WORD (so 'status' does
+// not trip on 'statuses' incorrectly is acceptable -- we want the exact cross-claim
+// token). Returns true when the phrase should be DROPPED for the given slug.
+function isOverClaim(slug, phrase) {
+  const guarded = OVER_CLAIM_GUARD[slug];
+  if (!guarded || !guarded.length) { return false; }
+  const p = String(phrase || '').toLowerCase();
+  for (const tok of guarded) {
+    const re = new RegExp('\\b' + String(tok).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (re.test(p)) { return true; }
+  }
+  return false;
+}
+
 function isPluralNoun(noun) {
   const n = String(noun || '').trim().toLowerCase();
   if (!n) return false;
@@ -556,14 +751,41 @@ function isPluralNoun(noun) {
   return /s$/.test(n) && !/(ss|us|is)$/.test(n);
 }
 
-function synthSynonyms(tool, serviceStem) {
+function synthSynonyms(tool, serviceStem, slug) {
   const out = [];
   const stem = String(serviceStem || '').trim();
   const stemRe = new RegExp('\\b' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+  // SCALE-01 (Category A): the friendly dir-name alias for a STEM_OVERRIDE'd app
+  // (bsky -> 'bluesky'), so an alias-tagged phrase can carry the colloquial app name
+  // the user types. Empty when the app has no alias (the alias branch then no-ops).
+  const alias = (Object.prototype.hasOwnProperty.call(APP_ALIASES, stem)) ? APP_ALIASES[stem] : '';
+  const aliasRe = alias
+    ? new RegExp('\\b' + alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
+    : null;
+  // SCALE-01 (Category C/D): the over-claim slug for this op (the guarded cross-claim
+  // tokens are dropped from every synthesized phrase). slug is the FULL <stem>.<op>.
+  const guardSlug = String(slug || '').trim();
   const push = (s) => {
     const v = String(s || '').trim().replace(/\s+/g, ' ');
+    // SCALE-01 over-claim guard (Category C/D): drop a phrase that carries a guarded
+    // cross-claiming token (e.g. outlook.send_message's 'email', sentry.update_issue's
+    // 'status') so the competitor stops out-ranking the curated head / sibling for an
+    // intent that is not its own. Its own-noun canonical phrasing carries no guarded
+    // token, so it survives.
+    if (guardSlug && isOverClaim(guardSlug, v)) { return; }
     // Every phrase MUST carry the serviceStem token (app disambiguation, MED-03).
     if (v && stemRe.test(v) && !out.includes(v)) {
+      out.push(v);
+    }
+  };
+  // SCALE-01 (Category A): an alias-tagged push -- the phrase must carry the ALIAS
+  // token (not the stem), so a "create a post in bluesky" phrase is app-bound to the
+  // alias and never leaks cross-app. Same over-claim guard + dedup discipline.
+  const pushAlias = (s) => {
+    if (!aliasRe) { return; }
+    const v = String(s || '').trim().replace(/\s+/g, ' ');
+    if (guardSlug && isOverClaim(guardSlug, v)) { return; }
+    if (v && aliasRe.test(v) && !out.includes(v)) {
       out.push(v);
     }
   };
@@ -598,7 +820,58 @@ function synthSynonyms(tool, serviceStem) {
   //    the bare-noun form is grammatically clean ("make a new issue", not "make a new
   //    a issue"; "fetch a single task", not "fetch a single a task").
   const endsWithDeterminer = (alt) => /\b(a|an|new|my|of|specific|single)$/i.test(String(alt || '').trim());
+  // SCALE-01 (Categories B/E): the colloquial noun alternates for THIS op-noun. The
+  // op-noun's OWN token is always index 0 (so the canonical phrasing dominates); the
+  // colloquial aliases (to-do / groceries / restaurants) follow as the bridge phrases.
+  // Keyed by the plural op-noun first, then the singular, so list_tasks finds
+  // ['task','to-do',...] via the singular and search_products finds
+  // ['products','groceries',...] via the plural. De-duplicated, app-tagged on emit.
+  const nounKeyPlural = noun;
+  const nounKeySingular = singular;
+  const nounAltsRaw = (Object.prototype.hasOwnProperty.call(NOUN_SYNONYMS, nounKeyPlural)
+    ? NOUN_SYNONYMS[nounKeyPlural]
+    : (Object.prototype.hasOwnProperty.call(NOUN_SYNONYMS, nounKeySingular)
+      ? NOUN_SYNONYMS[nounKeySingular]
+      : null));
+  // The colloquial alternates EXCLUDING the op-noun itself (index 0 is the op-noun;
+  // the canonical loop already covers it). Empty when no NOUN_SYNONYMS entry exists.
+  const nounAltsGeneral = nounAltsRaw ? nounAltsRaw.slice(1) : [];
+  // SCALE-01 (1d): the app-specific noun aliases for THIS stem+noun (instacart products
+  // -> groceries), appended to the general ones. These are domain-scoped so a wrong
+  // sibling (bestbuy.search_products) never gets 'groceries'. Whole alias list (no
+  // op-noun slice -- these are alternates, the op-noun is covered by the canonical loop).
+  const stemNounMap = Object.prototype.hasOwnProperty.call(STEM_NOUN_SYNONYMS, stem)
+    ? STEM_NOUN_SYNONYMS[stem] : null;
+  const stemNounAlts = stemNounMap
+    ? (Object.prototype.hasOwnProperty.call(stemNounMap, nounKeyPlural)
+      ? stemNounMap[nounKeyPlural]
+      : (Object.prototype.hasOwnProperty.call(stemNounMap, nounKeySingular)
+        ? stemNounMap[nounKeySingular] : []))
+    : [];
+  // Combined, de-duplicated. App-specific aliases FIRST (they close a real miss for the
+  // app that owns them); general aliases follow. The 6-cap trims the tail.
+  const nounAlts = [];
+  for (const a of stemNounAlts) { if (a && nounAlts.indexOf(a) === -1) { nounAlts.push(a); } }
+  for (const a of nounAltsGeneral) { if (a && nounAlts.indexOf(a) === -1) { nounAlts.push(a); } }
+  // SCALE-01 COLLOQUIAL_GUARD (Category D): for a guarded list op whose noun is its own
+  // domain (temporal 'schedule', gcal 'calendar'), suppress the colloquial list alts
+  // ("show me my"/"view my"/"see all my") so it stops cross-claiming the curated
+  // calendar head on a colloquial paraphrase -- the canonical "list <noun> in <stem>"
+  // survives, so the op stays reachable by an app-named query.
+  const colloquialGuarded = isColloquialGuarded(guardSlug);
+  // SCALE-01 (Category C, symmetric): for a CREATE op whose noun is get-favoring for
+  // "open" (conversation/thread), drop the create-family "open a new" determiner so the
+  // create op stops out-claiming the GET op on "open a <noun>" (the get-favoring noun's
+  // 'open' is woven onto GET via GET_NOUN_VERBS instead). Safe + general: no fixture
+  // expresses the create intent for these nouns via "open".
+  const dropOpenNew = (verb === 'create' && singular && GET_FAVORING_NOUNS.has(singular));
   for (const alt of verbAlts) {
+    if (colloquialGuarded && COLLOQUIAL_LIST_ALTS.indexOf(String(alt).toLowerCase().trim()) !== -1) {
+      continue; // suppressed colloquial list alt for a guarded cross-claiming list op
+    }
+    if (dropOpenNew && String(alt).toLowerCase().trim() === 'open a new') {
+      continue; // get-favoring noun: 'open' routes to GET, not this create op
+    }
     if (!noun) {
       push(`${alt} in ${stem}`);
     } else if (plural) {
@@ -614,9 +887,93 @@ function synthSynonyms(tool, serviceStem) {
       push(`${alt} ${article(singular)} ${singular} in ${stem}`);
     }
   }
+  // 1a. SCALE-01 noun-specific create verb (Category B): emitted BEFORE the noun-alt
+  // weave so the noun-specific create verb ('file an issue') has priority within the
+  // 6-synonym cap -- it closes a real description-driven sibling over-claim ("file a new
+  // issue in linear" -> linear.create_issue, not create_attachment whose DESCRIPTION
+  // carries 'file'/'issue'). ONLY for verb==='create' + the noun-keyed verbs (never
+  // global -- a global 'file' alias regressed create_post/create_task siblings).
+  if (verb === 'create' && singular) {
+    const nounVerbsEarly = (Object.prototype.hasOwnProperty.call(CREATE_NOUN_VERBS, singular)
+      ? CREATE_NOUN_VERBS[singular] : null);
+    if (nounVerbsEarly) {
+      for (const nv of nounVerbsEarly) {
+        push(`${nv} ${article(singular)} ${singular} in ${stem}`);
+      }
+    }
+  }
+  // 1a'. SCALE-01 noun-specific GET verb (the inverse): for a GET op whose noun is
+  // read-favoring for "open" (conversation/thread), emit "open a <noun> in <stem>" so
+  // "open a chatgpt conversation" reaches chatgpt.get_conversation (resolving the genuine
+  // create-vs-get 'open' ambiguity by the noun). ONLY for verb==='get' + the noun-keyed
+  // verbs -- "open a new issue" still routes to create (issue is not GET-keyed).
+  if (verb === 'get' && singular) {
+    const getVerbsEarly = (Object.prototype.hasOwnProperty.call(GET_NOUN_VERBS, singular)
+      ? GET_NOUN_VERBS[singular] : null);
+    if (getVerbsEarly) {
+      for (const gv of getVerbsEarly) {
+        push(`${gv} ${article(singular)} ${singular} in ${stem}`);
+      }
+    }
+  }
+  // 1b. SCALE-01 noun-alternate weave (Categories B/E): for the PRIMARY verb alternate
+  // (verbAlts[0], the canonical verb -- e.g. 'create'/'list'/'search'), ALSO emit the
+  // op-noun's colloquial alternates so a noun-paraphrased query reaches the right op.
+  // Stem-tagged (push() still requires the stem), so a noun alias NEVER leaks cross-app.
+  // Use the SAME plural/singular + article logic as the canonical loop. Only the
+  // primary verb alternate (not every verbAlt) to keep within the 6-synonym cap.
+  //
+  // INTRA-APP GUARD (the 37-04/39-02 IDF-shift precedent): a colloquial-noun query
+  // ("find restaurants", "my groceries", "add a to-do") is an ACTION/COLLECTION intent
+  // (create/add/list/search), NOT a single-record FETCH. Emitting the noun-alias on a
+  // `get` (single-fetch) op makes get_business out-claim search_businesses for "find
+  // restaurants". So SKIP the noun-alias weave for the `get` verb -- the read-FETCH op
+  // keeps its own canonical "get a <noun> in <stem>" form (still reachable by an
+  // app+get query) but does not cross-claim the action/collection paraphrase. This is
+  // a GENERAL rule (verb-keyed), not a per-fixture special-case.
+  if (noun && nounAlts.length && verbAlts.length && verb !== 'get') {
+    const primaryAlt = verbAlts[0];
+    for (const nAlt of nounAlts) {
+      const nounPlural = isPluralNoun(nAlt);
+      if (nounPlural) {
+        push(`${primaryAlt} ${nAlt} in ${stem}`);
+      } else if (endsWithDeterminer(primaryAlt)) {
+        push(`${primaryAlt} ${nAlt} in ${stem}`);
+      } else {
+        push(`${primaryAlt} ${article(nAlt)} ${nAlt} in ${stem}`);
+      }
+    }
+  }
   // 2. The canonical "<verb> <noun> in <service>" form (covers the literal op name).
   if (verb && noun) {
     push(`${verb} ${noun} in ${stem}`);
+  }
+  // 2b. SCALE-01 app-alias emission (Category A): when the app has a friendly dir-name
+  // alias (bsky -> 'bluesky'), ALSO emit a SMALL set of alias-tagged canonical phrases
+  // carrying the friendly token, so a query using the colloquial app name ("post to
+  // bluesky", "delete one of my bluesky posts") carries a first-class alias match. The
+  // alias-tagged push enforces a stem-guard against the ALIAS token, so the phrase is
+  // app-bound to the alias and never leaks cross-app. Emitted with the PRIMARY verb
+  // alternate + the canonical bare verb, mirroring the stem forms above.
+  // The app-alias canonical phrasing. Skip the `get` single-fetch verb for the SAME
+  // reason as the noun weave: a colloquial app-named action query ("post to bluesky")
+  // is a create/list/search intent, and emitting it on get_post_thread makes the FETCH
+  // op out-claim create_post on the bare app+verb paraphrase. The get op keeps its own
+  // "get a <noun> in <stem>" stem form (reachable by an explicit app+get query).
+  if (alias && noun && verbAlts.length && verb !== 'get') {
+    const primaryAlt = verbAlts[0];
+    if (plural) {
+      pushAlias(`${primaryAlt} ${noun} in ${alias}`);
+      if (verb) { pushAlias(`${verb} ${noun} in ${alias}`); }
+    } else if (endsWithDeterminer(primaryAlt)) {
+      pushAlias(`${primaryAlt} ${singular} in ${alias}`);
+      if (verb) { pushAlias(`${verb} a ${singular} in ${alias}`); }
+    } else {
+      pushAlias(`${primaryAlt} ${article(singular)} ${singular} in ${alias}`);
+      if (verb) { pushAlias(`${verb} ${article(singular)} ${singular} in ${alias}`); }
+    }
+  } else if (alias && !noun && verb && verb !== 'get') {
+    pushAlias(`${verb} in ${alias}`);
   }
   // 3. summary + service ("create a new issue in linear") -- a natural full phrasing.
   // LOW-02 (38-REVIEW): when the op summary ALREADY ends in the app-tagged " in <stem>"
@@ -749,7 +1106,7 @@ export async function extractDescriptors(app) {
     const descriptor = {
       slug,
       service,
-      intentSynonyms: synthSynonyms(tool, serviceStem),
+      intentSynonyms: synthSynonyms(tool, serviceStem, slug),
       description: tool.description ? String(tool.description) : '',
       actionVerb: verbPrefix(tool.name),
       sideEffectClass,
