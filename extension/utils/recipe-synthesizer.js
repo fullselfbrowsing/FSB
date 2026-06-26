@@ -67,6 +67,54 @@
       : (typeof FsbLearnedRecipeStore !== 'undefined' ? FsbLearnedRecipeStore : null);
   }
 
+  // ---- Phase 42 (DSEED-01): typeof-guarded discovery-seeds accessor ----------
+  // Reads the loaded seeds via FsbNetworkCapture.getSeedForOrigin(origin). Guarded
+  // so the Node synthesizer suite (where capture is absent) degrades to "no seed"
+  // and synthesis behaves EXACTLY as before. METADATA ONLY: a seed match raises a
+  // recognition flag; it NEVER initiates a fetch and NEVER changes the executable
+  // recipe vocab. synthesize() stays pure (no chrome.*, no network).
+  function _capture() {
+    return (typeof global !== 'undefined' && global.FsbNetworkCapture)
+      ? global.FsbNetworkCapture
+      : (typeof FsbNetworkCapture !== 'undefined' ? FsbNetworkCapture : null);
+  }
+
+  // _seedMatches(origin, observedPath, template) -> true when the captured call's
+  // origin is seeded AND its path corresponds to a seeded hint (the raw observed
+  // path OR the synthesized template matches a hint path exactly, OR -- when the
+  // hint path is a static prefix like '/v1' or '/shares' -- the observed path starts
+  // with it). A seeded origin with NO path hints (origin-only seed) still matches on
+  // ORIGIN alone (the seed biases recognition that this is a known seeded endpoint).
+  function _seedMatches(origin, observedPath, template) {
+    try {
+      var cap = _capture();
+      if (!cap || typeof cap.getSeedForOrigin !== 'function') { return false; }
+      var seed = cap.getSeedForOrigin(origin);
+      if (!seed || typeof seed !== 'object') { return false; }
+      var hints = Array.isArray(seed.hints) ? seed.hints : [];
+      // A path-bearing hint set raises recognition only when a hint path corresponds
+      // to this captured call; an origin-only seed (no path hints) matches on origin.
+      var pathHints = [];
+      for (var i = 0; i < hints.length; i++) {
+        if (hints[i] && typeof hints[i].path === 'string' && hints[i].path.length > 0) {
+          pathHints.push(hints[i].path);
+        }
+      }
+      if (pathHints.length === 0) { return true; }   // origin-only seed -> recognition on origin
+      for (var j = 0; j < pathHints.length; j++) {
+        var hp = pathHints[j];
+        if (observedPath === hp || template === hp) { return true; }
+        // static-prefix hint (e.g. '/v1', '/shares', '/graphql'): the observed path
+        // riding under it corresponds to the seeded endpoint family.
+        if (typeof observedPath === 'string' && (observedPath === hp || observedPath.indexOf(hp + '/') === 0)) { return true; }
+        if (typeof template === 'string' && (template === hp || template.indexOf(hp + '/') === 0)) { return true; }
+      }
+      return false;
+    } catch (_e) {
+      return false;   // fail closed to "no seed match" -- never throw, never execute
+    }
+  }
+
   // ---- Closed-vocab constants ---------------------------------------------
   // SCHEMA_VERSION follows the Phase-32 bump to 2 (the CURRENT stamp): NEW
   // synthesized learned recipes carry schemaVersion:2. This does NOT invalidate
@@ -354,10 +402,22 @@
         flaggedForPhase32: auth.flaggedForPhase32 === true
       };
 
+      // Phase 42 (DSEED-01): seed recognition bias. If this CAPTURED call's origin is
+      // seeded AND its path corresponds to a seeded hint, stamp a METADATA seedMatch
+      // flag on the candidate BOOKKEEPING (a sibling of flaggedForPhase32) -- NOT on
+      // the schema-validated recipe core (closed additionalProperties:false). The flag
+      // can only RAISE recognition that a captured call matches a known seeded
+      // endpoint; it NEVER initiates a fetch, NEVER changes the executable recipe vocab
+      // (origin/endpoint/method/authStrategy/extract/expectedShape stay byte-identical
+      // to the no-seed synthesis), and NEVER changes whether the candidate is
+      // promote-after-replay-gated. synthesize() stays pure (no chrome.*, no network).
+      var seedMatch = _seedMatches(origin, observedCall.path, template);
+
       return {
         recipe: recipe,
         descriptor: descriptor,
         flaggedForPhase32: auth.flaggedForPhase32 === true,
+        seedMatch: seedMatch === true,
         replayArgs: pathInfo.replayArgs || {}
       };
     } catch (_e) {
