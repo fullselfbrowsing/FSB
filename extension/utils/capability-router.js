@@ -762,9 +762,28 @@
         // The consent gate above and the executeBoundSpec origin-pin downstream are
         // unchanged. When NO learned recipe is attached the RECIPE_LEARN_PENDING
         // stub still fires (no-op, no execution).
-        out = entry.recipe
-          ? await _runDeclarativeTier(slug, args, c, 'T2', entry.recipe, { trustedProvenance: 'local' })
-          : _err('RECIPE_LEARN_PENDING', { slug: slug });
+        // Phase 42 (DSEED-01, SC2): the no-learned-recipe leg now surfaces an
+        // ACTIONABLE affordance instead of a silent no-op. The code stays the
+        // byte-stable 'RECIPE_LEARN_PENDING' (INV-03: code===errorCode===error); the
+        // { reason, actionable, message } fields are ADDITIVE (merged by _err). The
+        // origin is derived from what the branch already has -- prefer the resolved
+        // descriptor's origin, fall back to the active call origin `c.origin`; if
+        // neither yields an origin, build the message WITHOUT the host (still present
+        // + actionable). The T2-WITH-recipe dispatch leg is UNCHANGED.
+        if (entry.recipe) {
+          out = await _runDeclarativeTier(slug, args, c, 'T2', entry.recipe, { trustedProvenance: 'local' });
+        } else {
+          var learnOrigin = (entry.descriptor && entry.descriptor.origin) || c.origin || null;
+          var learnMsg = learnOrigin
+            ? ('Open ' + learnOrigin + ' while signed in so FSB can learn this capability from your own traffic.')
+            : 'Open the site while signed in so FSB can learn this capability from your own traffic.';
+          out = _err('RECIPE_LEARN_PENDING', {
+            slug: slug,
+            reason: 'not-yet-learned',
+            actionable: true,
+            message: learnMsg
+          });
+        }
         break;
 
       case 'T3':
