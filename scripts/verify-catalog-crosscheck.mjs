@@ -235,6 +235,115 @@ export function checkReadOnlySafeOrigins(descriptors) {
   return { failures };
 }
 
+// ---- THE COMMERCE-SENSITIVE BACKSTOP (Phase 39.5-03, BRDTH-02/03; the INVERSE of --
+//      READ_ONLY_SAFE_SERVICES) ------------------------------------------------------
+//
+// THE TRAP THIS CLOSES (the gap NEITHER existing gate catches): the conservative
+// commerce reconciliation keeps every commerce/payment/travel/paid-booking/marketplace
+// brand SENSITIVE even though most real ops at the pinned SHA are read-only -- a
+// fail-safe so any FUTURE op-set change that makes a money-mover writable is posture-B
+// gated rather than running under Auto. But a NET-NEW READ-ONLY commerce brand
+// (homedepot/priceline/redfin/starbucks/pandaexpress and any further brand the vendored
+// urlPatterns surface) emits ONLY list/get/search ops and its host carries NO place-
+// order/checkout/charge token, so:
+//   - verify-classification-gate.mjs classifyGate does NOT abort on it (no axis trip), and
+//   - checkPaymentOpsNotSafeInvocable (above) does NOT key on it (no payment VERB/op-name).
+// So if a commerce brand is OMITTED from sensitiveOrigins (or DOWNGRADED to safe), it
+// ships SAFE-under-Auto SILENTLY -- neither gate fails the build. The fix is an
+// ENUMERATED roster + this build-failing backstop, NOT a heuristic.
+//
+// checkCommerceSensitiveClassified mirrors checkReadOnlySafeOrigins in the INVERSE
+// direction: where the read-only-safe guard asserts a curated safe origin stays read,
+// this asserts every curated commerce origin classifies SENSITIVE (or denied). It is
+// corpus-INDEPENDENT (pure roster + classify(), not the descriptor set), so it is
+// checkable BEFORE the Plan-39.5-04 import and catches exactly the read-only commerce
+// brand the other two gates cannot. It ALSO asserts the commerce roster is DISJOINT from
+// READ_ONLY_SAFE_SERVICES -- a brand cannot be both safe-because-read-only and
+// conservatively-sensitive, which blocks the exact downgrade-to-READ_ONLY_SAFE attack.
+//
+// COMMERCE_SENSITIVE_SERVICES holds the BARE EMITTED service hosts (the SAME host-string
+// form as READ_ONLY_SAFE_SERVICES) -- the host readPluginMeta derives from
+// urlPatterns[0] after stripping a leading '*.' (so the apex-emitting brands are
+// ebay.com / walmart.com / target.com / booking.com / homedepot.com / ..., and the
+// literal-www brands are www.amazon.com / www.etsy.com / www.opentable.com / ...). These
+// are the origins the importer ACTUALLY gates at Plan 04, so classifyFn must return
+// sensitive/denied for each here. The roster = the curated set (food-delivery/rideshare/
+// retail/marketplace/travel/ticketing) + the spike-named net-new (homedepot/priceline/
+// redfin/starbucks/pandaexpress) + fiverr (freelance marketplace) + coinbase (fintech).
+// zillow/grafana/calendly/yelp/tripadvisor/reddit are NOT here -- they are genuinely-non-
+// commerce reads in READ_ONLY_SAFE_SERVICES (the disjointness assertion enforces this).
+const COMMERCE_SENSITIVE_SERVICES = new Set([
+  // food-delivery / food-order
+  'doordash.com', 'www.ubereats.com', 'www.grubhub.com', 'instacart.com',
+  'dominos.com', 'chipotle.com', 'starbucks.com', 'pandaexpress.com',
+  // rideshare
+  'uber.com', 'lyft.com',
+  // retail / marketplace
+  'www.amazon.com', 'ebay.com', 'www.etsy.com', 'bestbuy.com', 'costco.com',
+  'walmart.com', 'target.com', 'homedepot.com', 'craigslist.org', 'shopify.com',
+  'fiverr.com',
+  // travel / paid-booking
+  'booking.com', 'airbnb.com', 'expedia.com', 'www.kayak.com', 'priceline.com',
+  'www.opentable.com', 'redfin.com',
+  // ticketing
+  'www.ticketmaster.com', 'www.stubhub.com', 'www.eventbrite.com',
+  // fintech / crypto (a money-adjacent brand kept sensitive)
+  'coinbase.com',
+]);
+
+/**
+ * checkCommerceSensitiveClassified(classifyFn) -> { failures: string[] }
+ *
+ * For each service in COMMERCE_SENSITIVE_SERVICES assert classifyFn('https://'+service)
+ * returns sensitive===true OR denied===true; otherwise push a failure naming the brand
+ * (it would ship SAFE-under-Auto on its emitted origin -- a commerce/payment brand must
+ * be sensitive so its writes are posture-B gated). ALSO assert the roster is DISJOINT
+ * from READ_ONLY_SAFE_SERVICES (a brand cannot be both). classifyFn is the service-
+ * denylist classify() (the gate is build-time; runCli awaits Denylist.load() first). A
+ * missing classifyFn fails EVERY roster brand (fail-closed: an absent denylist must not
+ * silently pass the commerce roster).
+ */
+export function checkCommerceSensitiveClassified(classifyFn) {
+  const failures = [];
+  const classify = typeof classifyFn === 'function' ? classifyFn : null;
+
+  for (const service of COMMERCE_SENSITIVE_SERVICES) {
+    // Disjointness: a commerce-sensitive brand must NOT also be in READ_ONLY_SAFE.
+    if (READ_ONLY_SAFE_SERVICES.has(service)) {
+      failures.push(
+        service + ' is on BOTH the COMMERCE_SENSITIVE roster and READ_ONLY_SAFE_SERVICES ' +
+        '-- a brand cannot be both conservatively-sensitive (commerce) and safe-because-' +
+        'read-only. Remove it from one set (a commerce/payment brand belongs on the ' +
+        'commerce roster; a genuinely-non-commerce read belongs in READ_ONLY_SAFE).'
+      );
+    }
+
+    let cls = { sensitive: false, denied: false };
+    if (classify) {
+      try { cls = classify('https://' + service) || cls; } catch (_e) { cls = { sensitive: false, denied: false }; }
+    }
+    const governed = !!(cls && (cls.sensitive === true || cls.denied === true));
+    if (!governed) {
+      failures.push(
+        service + ' is on the COMMERCE_SENSITIVE roster but classifies SAFE (NOT ' +
+        'sensitive/denied) -- a commerce/payment/travel/marketplace brand must be ' +
+        'sensitive so its writes are posture-B gated, and so a future op-set change ' +
+        'cannot silently make it writable-under-Auto. classifyGate (no payment token ' +
+        'on its host) and the payment-op guard (no payment verb in a read-only op set) ' +
+        'CANNOT catch a missed read-only commerce brand -- this roster is the only gate ' +
+        'that can. FIX: classify ' + service + ' sensitive in extension/config/' +
+        'service-denylist.json (the pattern MUST cover this exact emitted host), or ' +
+        'remove it from COMMERCE_SENSITIVE_SERVICES if it is genuinely non-commerce.'
+      );
+    }
+  }
+  return { failures };
+}
+
+// Export the roster too so the Task-2 full-corpus screen test drives the SAME roster
+// the build gate uses (a test over a divergent roster proves nothing about the gate).
+export { COMMERCE_SENSITIVE_SERVICES };
+
 // ---- THE PAYMENT-OP GUARD (Phase 39, BRDTH-02; the headline money-no-movement- --
 //      under-Auto CI assertion) --------------------------------------------------
 //
@@ -419,9 +528,17 @@ async function runCli() {
   await Denylist.load();
   const paymentOnly = checkPaymentOpsNotSafeInvocable(corpus, Denylist.classify);
 
-  const allFailures = failures.concat(safeOnly.failures, paymentOnly.failures);
+  // Phase 39.5-03 COMMERCE-SENSITIVE BACKSTOP (the inverse of the read-only-safe guard):
+  // every enumerated commerce/payment/travel/marketplace brand MUST classify sensitive,
+  // and the roster MUST be disjoint from READ_ONLY_SAFE_SERVICES. Corpus-independent
+  // (pure roster + classify()), so an omitted/downgraded commerce brand -- including a
+  // NET-NEW READ-ONLY one neither classifyGate nor the payment-op guard can catch --
+  // FAILS THE BUILD. Merge its failures into the same exit-decision set.
+  const commerceOnly = checkCommerceSensitiveClassified(Denylist.classify);
+
+  const allFailures = failures.concat(safeOnly.failures, paymentOnly.failures, commerceOnly.failures);
   if (allFailures.length > 0) {
-    console.error('verify-catalog-crosscheck: FAIL (an under-stated side-effect class, a non-read op on a read-only-safe origin, or a payment op that is safe-and-API-invocable)');
+    console.error('verify-catalog-crosscheck: FAIL (an under-stated side-effect class, a non-read op on a read-only-safe origin, a payment op that is safe-and-API-invocable, or a commerce-roster brand that classifies SAFE / overlaps READ_ONLY_SAFE)');
     for (const f of allFailures) {
       console.error('  - ' + f);
     }
@@ -431,8 +548,11 @@ async function runCli() {
     'verify-catalog-crosscheck: PASS (' + checked.length +
     ' descriptors with signals; every declared sideEffectClass >= its derived ' +
     'fail-safe-high class -- no under-stated destructive/mutating op; every ' +
-    'read-only-safe origin (reddit) emits read-only ops, MED-02; and no payment-bearing ' +
-    'op is safe-and-API-invocable -- the money-no-movement-under-Auto guard, Phase 39)'
+    'read-only-safe origin (reddit) emits read-only ops, MED-02; no payment-bearing ' +
+    'op is safe-and-API-invocable -- the money-no-movement-under-Auto guard, Phase 39; ' +
+    'and all ' + COMMERCE_SENSITIVE_SERVICES.size + ' COMMERCE_SENSITIVE brands classify ' +
+    'sensitive AND are disjoint from READ_ONLY_SAFE -- the conservative-commerce build ' +
+    'invariant, Phase 39.5-03)'
   );
   process.exit(0);
 }
