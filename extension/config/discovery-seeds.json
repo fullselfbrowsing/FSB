@@ -1,0 +1,2283 @@
+{
+  "https://airbnb.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": "GET",
+        "path": "/"
+      },
+      {
+        "op": "graphqlMutation",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "airbnb",
+      "source": "airbnb-api.ts"
+    }
+  },
+  "https://airtable.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/v0.3"
+      },
+      {
+        "op": "apiGet",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiPost",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "airtable",
+      "source": "airtable-api.ts"
+    }
+  },
+  "https://www.amazon.com": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "amazon",
+      "source": "amazon-api.ts"
+    }
+  },
+  "https://app.amplitude.com": {
+    "hints": [
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "amplitude",
+      "source": "amplitude-api.ts"
+    }
+  },
+  "https://app.asana.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/api/1.0"
+      }
+    ],
+    "provenance": {
+      "app": "asana",
+      "source": "asana-api.ts"
+    }
+  },
+  "https://console.aws.amazon.com": {
+    "hints": [
+      {
+        "op": "awsApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "aws-console",
+      "source": "aws-api.ts"
+    }
+  },
+  "https://portal.azure.com": {
+    "hints": [
+      {
+        "op": "armApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "armDelete",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "azure",
+      "source": "azure-api.ts"
+    }
+  },
+  "https://bestbuy.com": {
+    "hints": [],
+    "provenance": {
+      "app": "bestbuy",
+      "source": null
+    }
+  },
+  "https://bitbucket.org": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/!api/2.0"
+      },
+      {
+        "op": "apiRaw",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "bitbucket",
+      "source": "bitbucket-api.ts"
+    }
+  },
+  "https://bsky.app": {
+    "hints": [],
+    "provenance": {
+      "app": "bluesky",
+      "source": null
+    }
+  },
+  "https://booking.com": {
+    "hints": [
+      {
+        "op": "fetchPage",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "booking",
+      "source": "booking-api.ts"
+    }
+  },
+  "https://calendly.com": {
+    "hints": [],
+    "provenance": {
+      "app": "calendly",
+      "source": null
+    }
+  },
+  "https://app.carta.com": {
+    "hints": [],
+    "provenance": {
+      "app": "carta",
+      "source": null
+    }
+  },
+  "https://chatgpt.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/backend-api"
+      }
+    ],
+    "provenance": {
+      "app": "chatgpt",
+      "source": "chatgpt-api.ts"
+    }
+  },
+  "https://chipotle.com": {
+    "hints": [
+      {
+        "op": "apiPost",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "chipotle",
+      "source": "chipotle-api.ts"
+    }
+  },
+  "https://app.circleci.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": null,
+        "path": "/api/v2"
+      },
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "circleci",
+      "source": "circleci-api.ts"
+    }
+  },
+  "https://claude.ai": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": "POST",
+        "path": "/api"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api"
+      },
+      {
+        "op": "apiStream",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "orgApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "claude",
+      "source": "claude-api.ts"
+    }
+  },
+  "https://console.clickhouse.cloud": {
+    "hints": [],
+    "provenance": {
+      "app": "clickhouse",
+      "source": null
+    }
+  },
+  "https://app.clickup.com": {
+    "hints": [],
+    "provenance": {
+      "app": "clickup",
+      "source": null
+    }
+  },
+  "https://dash.cloudflare.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": null,
+        "path": "/api/v4"
+      },
+      {
+        "op": "cloudflareApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "cloudflare",
+      "source": "cloudflare-api.ts"
+    }
+  },
+  "https://cockroachlabs.cloud": {
+    "hints": [
+      {
+        "op": "grpc",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "cockroachdb",
+      "source": "cockroachdb-api.ts"
+    }
+  },
+  "https://coinbase.com": {
+    "hints": [
+      {
+        "op": "gql_endpoint",
+        "method": "POST",
+        "path": "/graphql/query"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/graphql/query"
+      },
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "coinbase",
+      "source": "coinbase-api.ts"
+    }
+  },
+  "https://atlassian.net": {
+    "hints": [
+      {
+        "op": "apiV2",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiV1",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "confluence",
+      "source": "confluence-api.ts"
+    }
+  },
+  "https://costco.com": {
+    "hints": [
+      {
+        "op": "fetchProducts",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchInventory",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchLists",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchListEntries",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "addToList",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "createList",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "deleteListEntry",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "deleteList",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "geocodeLocation",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "costco",
+      "source": "costco-api.ts"
+    }
+  },
+  "https://craigslist.org": {
+    "hints": [
+      {
+        "op": "wapi_base",
+        "method": null,
+        "path": "/web/v8"
+      },
+      {
+        "op": "capi_base",
+        "method": null,
+        "path": "/web/v8"
+      },
+      {
+        "op": "wapi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "capi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "accountsApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "craigslist",
+      "source": "craigslist-api.ts"
+    }
+  },
+  "https://datadoghq.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/v1/logs-analytics/list"
+      },
+      {
+        "op": "apiGet",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiPost",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiPut",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiDelete",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiGetText",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiUiPost",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "searchLogsInternal",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "datadog",
+      "source": "datadog-api.ts"
+    }
+  },
+  "https://discord.com": {
+    "hints": [
+      {
+        "op": "waitForDiscordAuth",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "discordApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "discord",
+      "source": "discord-api.ts"
+    }
+  },
+  "https://hub.docker.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/"
+      },
+      {
+        "op": "searchApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "docker-hub",
+      "source": "docker-hub-api.ts"
+    }
+  },
+  "https://dominos.com": {
+    "hints": [
+      {
+        "op": "gql_endpoint",
+        "method": "POST",
+        "path": "/api/web-bff/graphql"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/web-bff/graphql"
+      },
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "dominos",
+      "source": "dominos-api.ts"
+    }
+  },
+  "https://doordash.com": {
+    "hints": [
+      {
+        "op": "graphql_base",
+        "method": "POST",
+        "path": "/graphql"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/graphql"
+      },
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "doordash",
+      "source": "doordash-api.ts"
+    }
+  },
+  "https://ebay.com": {
+    "hints": [
+      {
+        "op": "fetchPage",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchJson",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "ebay",
+      "source": "ebay-api.ts"
+    }
+  },
+  "https://www.etsy.com": {
+    "hints": [],
+    "provenance": {
+      "app": "etsy",
+      "source": null
+    }
+  },
+  "https://www.eventbrite.com": {
+    "hints": [],
+    "provenance": {
+      "app": "eventbrite",
+      "source": null
+    }
+  },
+  "https://excel.cloud.microsoft": {
+    "hints": [
+      {
+        "op": null,
+        "method": null,
+        "path": "/me"
+      },
+      {
+        "op": "resolveWorkbookContext",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "workbookApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getUserInfo",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "excel-online",
+      "source": "excel-api.ts"
+    }
+  },
+  "https://expedia.com": {
+    "hints": [
+      {
+        "op": "graphql_url",
+        "method": "POST",
+        "path": "/graphql"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/graphql"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/v4/typeahead"
+      },
+      {
+        "op": "typeahead",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "expedia",
+      "source": "expedia-api.ts"
+    }
+  },
+  "https://facebook.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/graphql"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/ajax/typeahead/search/facebar/query"
+      },
+      {
+        "op": "searchTypeahead",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "facebook",
+      "source": "facebook-api.ts"
+    }
+  },
+  "https://digital.fidelity.com": {
+    "hints": [
+      {
+        "op": "portfolio_graphql_url",
+        "method": "POST",
+        "path": "/ftgw/digital/portfolio/api/graphql"
+      },
+      {
+        "op": "portfolioGraphql",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fidelityRest",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "fidelity",
+      "source": "fidelity-api.ts"
+    }
+  },
+  "https://figma.com": {
+    "hints": [
+      {
+        "op": "figmaApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "figma",
+      "source": "figma-api.ts"
+    }
+  },
+  "https://fiverr.com": {
+    "hints": [
+      {
+        "op": "fetchPerseusProps",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchInboxJson",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "sendInboxMessage",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "fiverr",
+      "source": "fiverr-api.ts"
+    }
+  },
+  "https://gemini.google.com": {
+    "hints": [
+      {
+        "op": "callRpc",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "sendMessage",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getModels",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "gemini",
+      "source": "gemini-api.ts"
+    }
+  },
+  "https://github.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "GET",
+        "path": "/_graphql"
+      },
+      {
+        "op": "pageJson",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "turboData",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "discoverMutationIds",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getMutationId",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "discoverQueryId",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "pageEmbeddedData",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "formPost",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "submitPageForm",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "submitDirectForm",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchRawText",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "github",
+      "source": "github-api.ts"
+    }
+  },
+  "https://gitlab.com": {
+    "hints": [
+      {
+        "op": "apiRaw",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "gitlab",
+      "source": "gitlab-api.ts"
+    }
+  },
+  "https://glama.ai": {
+    "hints": [
+      {
+        "op": "navigateAndLoad",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "glama",
+      "source": "glama-api.ts"
+    }
+  },
+  "https://analytics.google.com": {
+    "hints": [
+      {
+        "op": "suiteApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "dataApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "google-analytics",
+      "source": "ga-api.ts"
+    }
+  },
+  "https://calendar.google.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/calendar/v3"
+      }
+    ],
+    "provenance": {
+      "app": "google-calendar",
+      "source": "google-calendar-api.ts"
+    }
+  },
+  "https://console.cloud.google.com": {
+    "hints": [
+      {
+        "op": "gcpApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "google-cloud",
+      "source": "gcloud-api.ts"
+    }
+  },
+  "https://docs.google.com": {
+    "hints": [
+      {
+        "op": "drive_api_base",
+        "method": null,
+        "path": "/drive/v3"
+      },
+      {
+        "op": "driveApiRaw",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "driveApiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "google-docs",
+      "source": "google-docs-api.ts"
+    }
+  },
+  "https://drive.google.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/drive/v3"
+      },
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "google-drive",
+      "source": "google-drive-api.ts"
+    }
+  },
+  "https://www.google.com": {
+    "hints": [
+      {
+        "op": "searchPlaces",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchPageData",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "google-maps",
+      "source": "maps-api.ts"
+    }
+  },
+  "https://grafana.com": {
+    "hints": [],
+    "provenance": {
+      "app": "grafana",
+      "source": null
+    }
+  },
+  "https://www.grubhub.com": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "grubhub",
+      "source": "grubhub-api.ts"
+    }
+  },
+  "https://hack2hire.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": "GET",
+        "path": "/algro/v1"
+      }
+    ],
+    "provenance": {
+      "app": "hack2hire",
+      "source": "hack2hire-api.ts"
+    }
+  },
+  "https://news.ycombinator.com": {
+    "hints": [
+      {
+        "op": "fetchStoryPage",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchItem",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchStoryComments",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "submitComment",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchUser",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "hackernews",
+      "source": "hackernews-api.ts"
+    }
+  },
+  "https://homedepot.com": {
+    "hints": [
+      {
+        "op": "graphql_url",
+        "method": "POST",
+        "path": "/federation-gateway/graphql"
+      },
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "addToCartRest",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "homedepot",
+      "source": "homedepot-api.ts"
+    }
+  },
+  "https://instacart.com": {
+    "hints": [
+      {
+        "op": "gql_endpoint",
+        "method": "GET",
+        "path": "/graphql"
+      },
+      {
+        "op": null,
+        "method": "GET",
+        "path": "/graphql"
+      },
+      {
+        "op": "gqlQuery",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "gqlMutation",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "instacart",
+      "source": "instacart-api.ts"
+    }
+  },
+  "https://instagram.com": {
+    "hints": [],
+    "provenance": {
+      "app": "instagram",
+      "source": null
+    }
+  },
+  "https://www.kayak.com": {
+    "hints": [],
+    "provenance": {
+      "app": "kayak",
+      "source": null
+    }
+  },
+  "https://leetcode.com": {
+    "hints": [
+      {
+        "op": "graphql_url",
+        "method": "GET",
+        "path": "/graphql"
+      },
+      {
+        "op": "rest",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "pollSubmissionResult",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "leetcode",
+      "source": "leetcode-api.ts"
+    }
+  },
+  "https://linear.app": {
+    "hints": [
+      {
+        "op": "graphql_endpoint",
+        "method": "POST",
+        "path": "/graphql"
+      }
+    ],
+    "provenance": {
+      "app": "linear",
+      "source": "linear-api.ts"
+    }
+  },
+  "https://linkedin.com": {
+    "hints": [
+      {
+        "op": "messaging_graphql_base",
+        "method": "GET",
+        "path": "/voyager/api/voyagerMessagingGraphQL/graphql"
+      },
+      {
+        "op": "getMyProfileUrn",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "messagingGraphql",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "messagingAction",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "linkedin",
+      "source": "linkedin-api.ts"
+    }
+  },
+  "https://lucid.app": {
+    "hints": [],
+    "provenance": {
+      "app": "lucid",
+      "source": null
+    }
+  },
+  "https://lyft.com": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "lyft",
+      "source": "lyft-api.ts"
+    }
+  },
+  "https://mastodon.social": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "mastodon",
+      "source": "mastodon-api.ts"
+    }
+  },
+  "https://medium.com": {
+    "hints": [
+      {
+        "op": "graphql_url",
+        "method": "POST",
+        "path": "/_/graphql"
+      },
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "medium",
+      "source": "medium-api.ts"
+    }
+  },
+  "https://app.meticulous.ai": {
+    "hints": [
+      {
+        "op": null,
+        "method": null,
+        "path": "/api/graphql"
+      }
+    ],
+    "provenance": {
+      "app": "meticulous",
+      "source": "meticulous-api.ts"
+    }
+  },
+  "https://word.cloud.microsoft": {
+    "hints": [
+      {
+        "op": "graph_api_base",
+        "method": null,
+        "path": "/v1.0"
+      },
+      {
+        "op": "resolveDocumentContext",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "microsoft-word",
+      "source": "microsoft-word-api.ts"
+    }
+  },
+  "https://agent.minimax.io": {
+    "hints": [
+      {
+        "op": "apiGet",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiPost",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "minimax-agent",
+      "source": "minimax-api.ts"
+    }
+  },
+  "https://cloud.mongodb.com": {
+    "hints": [],
+    "provenance": {
+      "app": "mongodb-atlas",
+      "source": null
+    }
+  },
+  "https://netflix.com": {
+    "hints": [
+      {
+        "op": "waitForNetflixAuth",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "netflix",
+      "source": "netflix-api.ts"
+    }
+  },
+  "https://app.netlify.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/access-control/bb-api/api/v1"
+      }
+    ],
+    "provenance": {
+      "app": "netlify",
+      "source": "netlify-api.ts"
+    }
+  },
+  "https://one.newrelic.com": {
+    "hints": [
+      {
+        "op": "graphql_url",
+        "method": "POST",
+        "path": "/graphql"
+      }
+    ],
+    "provenance": {
+      "app": "newrelic",
+      "source": "newrelic-api.ts"
+    }
+  },
+  "https://notebooklm.google.com": {
+    "hints": [
+      {
+        "op": "rpc",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "notebooklm",
+      "source": "notebooklm-api.ts"
+    }
+  },
+  "https://notion.so": {
+    "hints": [
+      {
+        "op": "notionApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getSpaceId",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "notion",
+      "source": "notion-api.ts"
+    }
+  },
+  "https://www.npmjs.com": {
+    "hints": [
+      {
+        "op": "spiferack",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "npm",
+      "source": "npm-api.ts"
+    }
+  },
+  "https://onenote.cloud.microsoft": {
+    "hints": [],
+    "provenance": {
+      "app": "onenote",
+      "source": null
+    }
+  },
+  "https://onlyfans.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/api2/v2"
+      }
+    ],
+    "provenance": {
+      "app": "onlyfans",
+      "source": "onlyfans-api.ts"
+    }
+  },
+  "https://www.opentable.com": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "opentable",
+      "source": "opentable-api.ts"
+    }
+  },
+  "https://outlook.cloud.microsoft": {
+    "hints": [
+      {
+        "op": "graph_api_base",
+        "method": null,
+        "path": "/v1.0"
+      },
+      {
+        "op": "outlook_api_base",
+        "method": null,
+        "path": "/api/v2.0"
+      }
+    ],
+    "provenance": {
+      "app": "outlook",
+      "source": "outlook-api.ts"
+    }
+  },
+  "https://pandaexpress.com": {
+    "hints": [],
+    "provenance": {
+      "app": "panda-express",
+      "source": null
+    }
+  },
+  "https://pinterest.com": {
+    "hints": [
+      {
+        "op": "resourceGet",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "resourcePost",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "pinterest",
+      "source": "pinterest-api.ts"
+    }
+  },
+  "https://us.posthog.com": {
+    "hints": [
+      {
+        "op": "softDelete",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "posthog",
+      "source": "posthog-api.ts"
+    }
+  },
+  "https://powerpoint.cloud.microsoft": {
+    "hints": [
+      {
+        "op": "requireAuth",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getCurrentDriveId",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "powerpoint",
+      "source": "powerpoint-api.ts"
+    }
+  },
+  "https://priceline.com": {
+    "hints": [
+      {
+        "op": "rest",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "autocomplete",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "flyGraphql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "priceline",
+      "source": "priceline-api.ts"
+    }
+  },
+  "https://www.reddit.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/me.json"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/svc/shreddit/token"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/comment"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/compose"
+      }
+    ],
+    "provenance": {
+      "app": "reddit",
+      "source": "reddit-api.ts"
+    }
+  },
+  "https://redfin.com": {
+    "hints": [],
+    "provenance": {
+      "app": "redfin",
+      "source": null
+    }
+  },
+  "https://retool.com": {
+    "hints": [],
+    "provenance": {
+      "app": "retool",
+      "source": null
+    }
+  },
+  "https://robinhood.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/"
+      },
+      {
+        "op": "getAccountNumber",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "robinhood",
+      "source": "robinhood-api.ts"
+    }
+  },
+  "https://sentry.io": {
+    "hints": [
+      {
+        "op": "waitForSentryAuth",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "sentryApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "sentry",
+      "source": "sentry-api.ts"
+    }
+  },
+  "https://shopify.com": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "shopify",
+      "source": "shopify-api.ts"
+    }
+  },
+  "https://app.shortcut.com": {
+    "hints": [
+      {
+        "op": "waitForShortcutAuth",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "shortcut",
+      "source": "shortcut-api.ts"
+    }
+  },
+  "https://slack.com": {
+    "hints": [],
+    "provenance": {
+      "app": "slack",
+      "source": null
+    }
+  },
+  "https://app.slack.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/client.userBoot"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api"
+      }
+    ],
+    "provenance": {
+      "app": "slack-enterprise",
+      "source": "slack-enterprise-api.ts"
+    }
+  },
+  "https://app.snowflake.com": {
+    "hints": [
+      {
+        "op": "runQuery",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchChunk",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "listEntities",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "snowflake",
+      "source": "snowflake-api.ts"
+    }
+  },
+  "https://open.spotify.com": {
+    "hints": [
+      {
+        "op": "graphql_api",
+        "method": "POST",
+        "path": "/pathfinder/v2/query"
+      }
+    ],
+    "provenance": {
+      "app": "spotify",
+      "source": "spotify-api.ts"
+    }
+  },
+  "https://stackoverflow.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": "GET",
+        "path": "/2.3"
+      }
+    ],
+    "provenance": {
+      "app": "stackoverflow",
+      "source": "stackoverflow-api.ts"
+    }
+  },
+  "https://starbucks.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": "GET",
+        "path": "/apiproxy/v1"
+      },
+      {
+        "op": "orchestraApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "apiArray",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "starbucks",
+      "source": "starbucks-api.ts"
+    }
+  },
+  "https://store.steampowered.com": {
+    "hints": [
+      {
+        "op": "storeGet",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "storePost",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "steam",
+      "source": "steam-api.ts"
+    }
+  },
+  "https://dashboard.stripe.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/v1"
+      },
+      {
+        "op": null,
+        "method": null,
+        "path": "/v1"
+      }
+    ],
+    "provenance": {
+      "app": "stripe",
+      "source": "stripe-api.ts"
+    }
+  },
+  "https://www.stubhub.com": {
+    "hints": [],
+    "provenance": {
+      "app": "stubhub",
+      "source": null
+    }
+  },
+  "https://supabase.com": {
+    "hints": [],
+    "provenance": {
+      "app": "supabase",
+      "source": null
+    }
+  },
+  "https://target.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/"
+      },
+      {
+        "op": "redskyApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "cartsApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "typeaheadApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "target",
+      "source": "target-api.ts"
+    }
+  },
+  "https://teams.live.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/v1/threads"
+      },
+      {
+        "op": "getSkypeIdentity",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "chatApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "createThread",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "threadApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "teams",
+      "source": "teams-api.ts"
+    }
+  },
+  "https://web.telegram.org": {
+    "hints": [
+      {
+        "op": "invokeApi",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "callManager",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getInputPeer",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getInputUser",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getInputChannel",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "telegram",
+      "source": "telegram-api.ts"
+    }
+  },
+  "https://cloud.temporal.io": {
+    "hints": [],
+    "provenance": {
+      "app": "temporal-cloud",
+      "source": null
+    }
+  },
+  "https://app.terraform.io": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/api/v2"
+      },
+      {
+        "op": null,
+        "method": null,
+        "path": "/api/v2"
+      }
+    ],
+    "provenance": {
+      "app": "terraform-cloud",
+      "source": "terraform-cloud-api.ts"
+    }
+  },
+  "https://www.threads.net": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "threads",
+      "source": "threads-api.ts"
+    }
+  },
+  "https://www.ticketmaster.com": {
+    "hints": [],
+    "provenance": {
+      "app": "ticketmaster",
+      "source": null
+    }
+  },
+  "https://tiktok.com": {
+    "hints": [
+      {
+        "op": "fetchSSRData",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "resolveSecUid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "tiktok",
+      "source": "tiktok-api.ts"
+    }
+  },
+  "https://tinder.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/"
+      },
+      {
+        "op": null,
+        "method": null,
+        "path": "/v2/recs/core"
+      },
+      {
+        "op": "apiDirect",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "tinder",
+      "source": "tinder-api.ts"
+    }
+  },
+  "https://app.todoist.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/api/v1"
+      },
+      {
+        "op": null,
+        "method": null,
+        "path": "/api/v1"
+      },
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "todoist",
+      "source": "todoist-api.ts"
+    }
+  },
+  "https://tripadvisor.com": {
+    "hints": [
+      {
+        "op": "graphql_url",
+        "method": "POST",
+        "path": "/data/graphql/ids"
+      },
+      {
+        "op": "fetchSsrData",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchLdJson",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "tripadvisor",
+      "source": "tripadvisor-api.ts"
+    }
+  },
+  "https://tumblr.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": "GET",
+        "path": "/api/v2"
+      },
+      {
+        "op": null,
+        "method": "GET",
+        "path": "/api/v2"
+      }
+    ],
+    "provenance": {
+      "app": "tumblr",
+      "source": "tumblr-api.ts"
+    }
+  },
+  "https://console.twilio.com": {
+    "hints": [
+      {
+        "op": "subApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "twilio",
+      "source": "twilio-api.ts"
+    }
+  },
+  "https://twitch.tv": {
+    "hints": [
+      {
+        "op": "gql",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "twitch",
+      "source": "twitch-api.ts"
+    }
+  },
+  "https://uber.com": {
+    "hints": [],
+    "provenance": {
+      "app": "uber",
+      "source": null
+    }
+  },
+  "https://www.ubereats.com": {
+    "hints": [
+      {
+        "op": "apiVoid",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "ubereats",
+      "source": "ubereats-api.ts"
+    }
+  },
+  "https://vercel.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": null,
+        "path": "/api"
+      },
+      {
+        "op": "vercelApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "vercel",
+      "source": "vercel-api.ts"
+    }
+  },
+  "https://walmart.com": {
+    "hints": [
+      {
+        "op": "fetchPageData",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchBootstrapData",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "walmart",
+      "source": "walmart-api.ts"
+    }
+  },
+  "https://webflow.com": {
+    "hints": [
+      {
+        "op": "api_base",
+        "method": null,
+        "path": "/api"
+      },
+      {
+        "op": null,
+        "method": null,
+        "path": "/api"
+      }
+    ],
+    "provenance": {
+      "app": "webflow",
+      "source": "webflow-api.ts"
+    }
+  },
+  "https://web.whatsapp.com": {
+    "hints": [
+      {
+        "op": "loadMessages",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "openChat",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "sendTextMessage",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "setArchive",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "setPin",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "sendConversationMute",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "markChatSeen",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "deleteChat",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "clearChat",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "starMessages",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "deleteMessages",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "revokeMessages",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "blockContact",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "unblockContact",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "createGroup",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "queryGroupInviteCode",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "revokeGroupInvite",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "whatsapp",
+      "source": "whatsapp-api.ts"
+    }
+  },
+  "https://wikipedia.org": {
+    "hints": [
+      {
+        "op": "waitForReady",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "wikipedia",
+      "source": "wikipedia-api.ts"
+    }
+  },
+  "https://x.com": {
+    "hints": [
+      {
+        "op": "graphql_base",
+        "method": "POST",
+        "path": "/i/api/graphql"
+      },
+      {
+        "op": "graphqlQuery",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "graphqlMutation",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "restApi",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "x",
+      "source": "x-api.ts"
+    }
+  },
+  "https://www.yelp.com": {
+    "hints": [
+      {
+        "op": "fetchPageData",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "fetchAutocompleteSuggestions",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "yelp",
+      "source": "yelp-api.ts"
+    }
+  },
+  "https://app.ynab.com": {
+    "hints": [
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/v1/catalog"
+      },
+      {
+        "op": null,
+        "method": "POST",
+        "path": "/api/v2"
+      },
+      {
+        "op": "catalog",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "syncBudget",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "syncWrite",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "ynab",
+      "source": "ynab-api.ts"
+    }
+  },
+  "https://youtube.com": {
+    "hints": [],
+    "provenance": {
+      "app": "youtube",
+      "source": null
+    }
+  },
+  "https://music.youtube.com": {
+    "hints": [],
+    "provenance": {
+      "app": "youtube-music",
+      "source": null
+    }
+  },
+  "https://zendesk.com": {
+    "hints": [
+      {
+        "op": "apiRaw",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "zendesk",
+      "source": "zendesk-api.ts"
+    }
+  },
+  "https://zillow.com": {
+    "hints": [
+      {
+        "op": "search",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "autocomplete",
+        "method": null,
+        "path": null
+      },
+      {
+        "op": "getUserFromSearchResponse",
+        "method": null,
+        "path": null
+      }
+    ],
+    "provenance": {
+      "app": "zillow",
+      "source": "zillow-api.ts"
+    }
+  },
+  "_meta": {
+    "generator": "harvest-discovery-seeds.mjs",
+    "vendorSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "generatedAt": "2026-06-26T19:35:35.212Z",
+    "originCount": 128,
+    "hintCount": 255
+  }
+}
