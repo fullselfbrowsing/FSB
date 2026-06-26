@@ -137,13 +137,19 @@
 
 ### Phase 40: Depth 1 — Top READ Hand-Ports
 **Goal**: Upgrade the hot subset already discoverable from breadth by hand-porting the highest-value READ heads as first-class T1a/T1b handlers exactly like the shipped `github.js` — own first-party origin, `executeBoundSpec`-only, scraped tokens never logged — so the most-used reads run on the API fast path instead of DOM. This phase OWNS DEPTH-01 (the hand-port contract + the read heads); Phase 41 owns the guarded-write requirement.
-**Depends on**: Phase 39 (depth upgrades apps that are already discoverable from the completed breadth corpus). Per-app CORS/first-party-origin verification gates any separate-API-origin head (linear is documented-safe).
+**Depends on**: Phase 39 (depth upgrades apps that are already discoverable from the completed breadth corpus). Per-app CORS/first-party-origin verification gates any separate-API-origin head (linear is documented-safe). NOTE (planning 40): the vendored source proves linear's GraphQL is a separate origin (client-api.linear.app via CORS) -> deferred to Phase 41's CORS-gate; replaced by gitlab (same-origin gitlab.com/api/v4). Verified same-origin ports this phase: gitlab, slack, notion.
 **Requirements**: DEPTH-01
 **Success Criteria** (what must be TRUE):
   1. ~8-12 highest-value READ heads (linear.issues.list, jira.search, datadog.query, vercel.deployments, …) ship as T1a/T1b handlers via the `github.js` contract: each targets its app's OWN first-party origin (the separate-origin public API is forbidden — the session cookie does not cross), self-registers via `registerHandler`, is listed in `HEAD_HANDLER_MODULES`, and is loaded via `background.js importScripts`.
   2. Each hand-port calls `ctx.executeBoundSpec` ONLY (never a browser scripting/tabs API) so the active-tab origin-pin holds, and scraped CSRF/tokens live only inside the bound spec — a test asserts no api-subdomain appears and no token reaches a log line.
   3. Both front doors hit the registered handlers through the SAME `FsbCapabilityRouter.invoke` (INV-02), and the head-handler tests (origin-separation, no-token-logging) plus router parity stay green; the head cap (~15-30) is enforced by a CI assertion on `HEAD_HANDLER_MODULES`.
-**Plans**: TBD
+**Plans**: 5 plans (3 waves)
+Plans:
+- [ ] 40-01-PLAN.md — Wave 0 test infra: dom->T1a upgrade-assertion harness (slug-exact keystone) + head-cap 4-module/CAP-30 update + per-app test scaffolds + npm-test wiring [wave 1]
+- [ ] 40-02-PLAN.md — gitlab NEW module: 5 READ T1a heads on same-origin gitlab.com/api/v4 + HEAD_HANDLER_MODULES 3->4 + background.js importScripts [wave 2]
+- [ ] 40-03-PLAN.md — slack EXTEND: 3 READ heads (list_channels/list_members/get_channel_info) via callSlackMethod (xoxc in body, never logged) [wave 2]
+- [ ] 40-04-PLAN.md — notion EXTEND: 2 READ heads (search/get_database) via buildRpcSpec same-origin /api/v3 [wave 2]
+- [ ] 40-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + INV-01/INV-02/origin-pin/head-cap green + live-UAT debt handoff [wave 3]
 
 ### Phase 41: Depth 2 — Remaining Hand-Ports + Guarded Writes
 **Goal**: Complete the depth head with the remaining hand-ports including WRITE ops, holding writes fail-closed to DOM fallback until a live-captured mutation body confirms them, re-enforcing the DENY-04 mutating opt-in on sensitive origins, and gating any separate-API-origin (Pattern-D) port behind a per-app CORS verification so an unverified port can never silently fail.
