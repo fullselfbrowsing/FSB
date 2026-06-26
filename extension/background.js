@@ -241,6 +241,11 @@ try { importScripts('utils/network-capture.js'); } catch (e) { console.error('[F
 try { importScripts('utils/recipe-synthesizer.js'); } catch (e) { console.error('[FSB] Failed to load recipe-synthesizer.js:', e.message); }
 try { importScripts('utils/learned-recipe-store.js'); } catch (e) { console.error('[FSB] Failed to load learned-recipe-store.js:', e.message); }
 try { importScripts('utils/discovery-session.js'); } catch (e) { console.error('[FSB] Failed to load discovery-session.js:', e.message); }
+// SCALE-02 (Phase 43): the per-origin re-learn coalescing/back-off scheduler. Loaded
+// AFTER the discovery stack it debounces; additive (no manifest/permission change). It
+// is NOT a capability-*.js module (it only schedules a consent-gated fn call, never binds
+// or executes a recipe) so it stays off the recipe-path allowlist by construction (Wall-1).
+try { importScripts('utils/relearn-scheduler.js'); } catch (e) { console.error('[FSB] Failed to load relearn-scheduler.js:', e.message); }
 
 // Hydrate the learned-recipe sync mirror at service-worker startup (Plan 06) so a
 // recipe promoted in a PRIOR SW lifetime surfaces synchronously via the catalog's
