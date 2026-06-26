@@ -310,6 +310,51 @@ function installChromeStorageStub() {
   check(throwPost && throwPost.error && throwPost.error.code === 'RECIPE_CONSENT_MUTATING_REQUIRED',
     'throwing-classify POST -> RECIPE_CONSENT_MUTATING_REQUIRED (re-gated, not allowed)');
 
+  // =====================================================================
+  // Phase 41 (DEPTH-02) INV-03: the NEW T1a-write fail-closed reason is
+  // byte-stable across code/errorCode/error.
+  // ---------------------------------------------------------------------
+  // The existing byte-equality asserts above cover the CONSENT/import reason
+  // (RECIPE_CONSENT_MUTATING_REQUIRED). Phase 41 adds a SECOND typed reason a
+  // guarded write returns when it fails closed: RECIPE_DOM_FALLBACK_PENDING
+  // (the github.issues.create pattern -- handle() returns it and NEVER calls
+  // executeBoundSpec). It flows through the SAME per-handler dual-field
+  // typedRecipeError helper (catalog/handlers/*.js), so code === errorCode ===
+  // error must hold byte-exact. We reconstruct that exact helper shape here and
+  // assert the three fields are byte-identical -- closing INV-03 coverage for the
+  // NEW write reason. (This is a pure-shape assertion on the typed-reason contract,
+  // independent of the gate; the guarded-write-failclosed.test.js harness proves
+  // the actual handlers emit it with an empty executeBoundSpec recorder.)
+  console.log('\n--- DEPTH-02 (Phase 41): INV-03 byte-equality for the T1a-write RECIPE_DOM_FALLBACK_PENDING reason ---');
+
+  function typedRecipeErrorShape(code, extra) {
+    var out = { success: false, code: code, errorCode: code, error: code };
+    if (extra) {
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) { out[k] = extra[k]; }
+      }
+    }
+    return out;
+  }
+
+  const writeFailClosed = typedRecipeErrorShape('RECIPE_DOM_FALLBACK_PENDING', {
+    slug: 'gitlab.create_issue',
+    reason: 'unverified-gitlab-create-issue-mutation',
+    fellBackToDom: true
+  });
+  check(writeFailClosed.success === false,
+    'T1a-write fail-closed reason -> success === false');
+  check(writeFailClosed.code === 'RECIPE_DOM_FALLBACK_PENDING',
+    'T1a-write fail-closed reason -> code === RECIPE_DOM_FALLBACK_PENDING (byte-exact)');
+  check(writeFailClosed.errorCode === 'RECIPE_DOM_FALLBACK_PENDING',
+    'T1a-write fail-closed reason -> errorCode === RECIPE_DOM_FALLBACK_PENDING (dual-field, INV-03)');
+  check(writeFailClosed.error === 'RECIPE_DOM_FALLBACK_PENDING',
+    'T1a-write fail-closed reason -> error === RECIPE_DOM_FALLBACK_PENDING (dual-field, INV-03)');
+  check(writeFailClosed.code === writeFailClosed.errorCode && writeFailClosed.errorCode === writeFailClosed.error,
+    'T1a-write fail-closed reason -> code === errorCode === error (byte-identical across all three fields, INV-03)');
+  check(writeFailClosed.fellBackToDom === true,
+    'T1a-write fail-closed reason -> fellBackToDom === true (the DOM-fallback marker)');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {

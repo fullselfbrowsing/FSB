@@ -81,7 +81,29 @@ const PORTED = [
   { slug: 'slack.get_channel_info', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
   // notion x2 -- EXTEND existing module (40-04), origin https://www.notion.so
   { slug: 'notion.search', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
-  { slug: 'notion.get_database', origin: 'https://www.notion.so', handlerFile: 'notion.js' }
+  { slug: 'notion.get_database', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
+
+  // ===== Phase 41 (DEPTH-02) guarded WRITE slugs ============================
+  // Each EXISTS as catalog/descriptors/opentabs__<app>__<op>.json (backing:'dom',
+  // sideEffectClass:'WRITE'). The write head registers the EXACT slug so resolve()
+  // UPGRADES the breadth WRITE descriptor dom->T1a (slug-exact, the same mechanism as
+  // the read rows). expectWrite drives an ADDITIONAL assertion that the upgraded
+  // descriptor.sideEffectClass === 'write' (the write rows carry the write class --
+  // distinct from the read rows). The existsSync Wave-0-RED guard still applies: the
+  // handler files exist, so each write row resolves the breadth T3 until ITS plan adds
+  // the slug -> a deterministic FAIL (the correct RED), GREEN once the slug is registered.
+  // gitlab x3 -- EXTEND the existing module (41-02), origin https://gitlab.com
+  { slug: 'gitlab.create_issue', origin: 'https://gitlab.com', handlerFile: 'gitlab.js', expectWrite: true },
+  { slug: 'gitlab.create_merge_request', origin: 'https://gitlab.com', handlerFile: 'gitlab.js', expectWrite: true },
+  { slug: 'gitlab.create_note', origin: 'https://gitlab.com', handlerFile: 'gitlab.js', expectWrite: true },
+  // notion x3 -- EXTEND the existing module (41-03), origin https://www.notion.so
+  // (append_block is a READ descriptor -> excluded; create_database_item is the WRITE.)
+  { slug: 'notion.create_page', origin: 'https://www.notion.so', handlerFile: 'notion.js', expectWrite: true },
+  { slug: 'notion.update_page', origin: 'https://www.notion.so', handlerFile: 'notion.js', expectWrite: true },
+  { slug: 'notion.create_database_item', origin: 'https://www.notion.so', handlerFile: 'notion.js', expectWrite: true },
+  // slack x1 -- EXTEND the existing module (41-04), origin https://app.slack.com
+  // (slug-DISTINCT from the hand-only executable slack.chat.postMessage -- no collision.)
+  { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js', expectWrite: true }
 ];
 
 // The descriptor whose backing:'dom' T3 resolution proves the BEFORE leg, and
@@ -180,6 +202,15 @@ function freshCatalog(handlerFiles) {
       'UPGRADE ' + row.slug + ' exposes a handler with an async handle');
     check(res && res.origin === row.origin,
       'UPGRADE ' + row.slug + ' resolves the first-party origin ' + row.origin + ' (Wall 2)');
+
+    // Phase 41: the WRITE rows must upgrade dom->T1a AND carry the write class -- the
+    // descriptor.sideEffectClass === 'write' distinguishes a guarded write head from a
+    // read head (both upgrade dom->T1a; only the write is mutating-gated + fail-closed).
+    if (row.expectWrite) {
+      check(res && res.descriptor && res.descriptor.sideEffectClass === 'write',
+        'UPGRADE ' + row.slug + ' carries descriptor.sideEffectClass === write (the guarded-write class); got ' +
+        (res && res.descriptor ? res.descriptor.sideEffectClass : 'null'));
+    }
   });
 
   // ===== NEGATIVE CONTROL: a wrong slug is a dead duplicate, NOT an upgrade ========
