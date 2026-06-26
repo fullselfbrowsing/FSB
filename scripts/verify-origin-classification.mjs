@@ -64,9 +64,20 @@ const VENDOR_PLUGINS = join(ROOT, 'vendor', 'opentabs-snapshot', 'plugins');
 // (github ships no opentabs plugin -- its first-party origin is https://github.com).
 // A head global absent from this map FAILS the gate (an unmapped head cannot be
 // origin-verified -> fail closed, never silently pass).
+//
+// `dynamicWorkspace: true` (slack ONLY) marks an app whose vendored API base is NOT a
+// static literal but a runtime-interpolated `${workspaceUrl}/api/<method>` (slack-api.ts
+// builds it off auth.workspaceUrl, which is app.slack.com on the new client OR a
+// per-workspace <team>.slack.com subdomain on the classic client, line 138). That base
+// CANNOT be extracted as a single literal, so a generic null->fallback would
+// rubber-stamp slack against its own fallbackBaseUrl (WR-01). Instead the gate
+// REQUIRES the vendored api.ts to actually contain that dynamic form (readDynamicWorkspaceBase),
+// then asserts it is SAME-REGISTRABLE-DOMAIN with the head origin (*.slack.com vs
+// app.slack.com) -- a visible, asserted accommodation, NOT a silent fallback. A future
+// dynamic-workspace base that is NOT same-registrable-domain with the head still FAILS.
 const HEAD_APP_MAP = {
   FsbHandlerGithub: { app: null, fallbackBaseUrl: 'https://github.com' },
-  FsbHandlerSlack: { app: 'slack', fallbackBaseUrl: 'https://app.slack.com' },
+  FsbHandlerSlack: { app: 'slack', fallbackBaseUrl: 'https://app.slack.com', dynamicWorkspace: true },
   FsbHandlerNotion: { app: 'notion', fallbackBaseUrl: 'https://www.notion.so' },
   FsbHandlerGitlab: { app: 'gitlab', fallbackBaseUrl: 'https://gitlab.com' }
 };
@@ -86,7 +97,33 @@ function originHost(value) {
 }
 
 /**
- * classifyOriginPattern(handlerOrigin, apiBaseUrl)
+ * registrableDomain(value) -> the registrable domain (eTLD+1, e.g. 'slack.com' for both
+ * app.slack.com and myteam.slack.com), lower-cased, or null if unparseable. Used ONLY
+ * for the slack dynamic-workspace accommodation (WR-01): the per-workspace runtime base
+ * is *.slack.com, so the gate asserts SAME-REGISTRABLE-DOMAIN with the head's app.slack.com
+ * origin rather than strict same-origin. Deliberately a conservative last-two-labels
+ * heuristic (no public-suffix-list dependency in build tooling): correct for the simple
+ * registrable domains in play (slack.com). It is NOT used for the strict same-origin
+ * path -- gitlab/notion/github stay full-origin-equality. A host with fewer than two
+ * labels (e.g. 'localhost') returns the host unchanged.
+ */
+function registrableDomain(value) {
+  const origin = originHost(value);
+  if (!origin) { return null; }
+  let host;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch (e) {
+    return null;
+  }
+  if (!host) { return null; }
+  const labels = host.split('.');
+  if (labels.length <= 2) { return host; }
+  return labels.slice(-2).join('.');
+}
+
+/**
+ * classifyOriginPattern(handlerOrigin, apiBaseUrl, opts)
  *   -> { sameOrigin, separate, apiOrigin, handlerOrigin, reason }
  *
  * sameOrigin === the API base-URL's origin host EQUALS the handler origin host (a PATH
@@ -94,8 +131,19 @@ function originHost(value) {
  * separate === a different host / subdomain (client-api.linear.app vs linear.app) or an
  * unparseable input. The two are mutually exclusive. `reason` is null when same-origin,
  * else a CORS_SEPARATE_ORIGIN (or CORS_UNRESOLVABLE_ORIGIN) string naming both origins.
+ *
+ * opts.dynamicWorkspace === true (slack ONLY, WR-01): `apiBaseUrl` is a per-workspace
+ * runtime base (a *.slack.com subdomain that varies per team) reduced to a representative
+ * origin by the caller. For this app the gate CANNOT require strict same-origin (the
+ * runtime host is dynamic), so it asserts SAME-REGISTRABLE-DOMAIN instead: the api base
+ * and the head origin must share a registrable domain (slack.com). When they do, the
+ * result is sameOrigin:true with an EXPLICIT reason marker
+ * (SAME_REGISTRABLE_DOMAIN_DYNAMIC_WORKSPACE) recording the accommodation -- it is NOT a
+ * silent fallback. When they do NOT (a future app whose dynamic base left the
+ * registrable family), it FAILS with CORS_SEPARATE_ORIGIN exactly like the strict path.
  */
-export function classifyOriginPattern(handlerOrigin, apiBaseUrl) {
+export function classifyOriginPattern(handlerOrigin, apiBaseUrl, opts) {
+  const options = opts || {};
   const hOrigin = originHost(handlerOrigin);
   const aOrigin = originHost(apiBaseUrl);
   if (!hOrigin || !aOrigin) {
@@ -107,6 +155,30 @@ export function classifyOriginPattern(handlerOrigin, apiBaseUrl) {
       reason: 'CORS_UNRESOLVABLE_ORIGIN: handler="' + String(handlerOrigin) +
         '" apiBaseUrl="' + String(apiBaseUrl) + '" -- one origin did not parse; ' +
         'a head whose origin cannot be verified must be demoted to T3-DOM'
+    };
+  }
+  // ---- Dynamic-workspace accommodation (slack): same-registrable-domain, ASSERTED ----
+  if (options.dynamicWorkspace) {
+    const hReg = registrableDomain(hOrigin);
+    const aReg = registrableDomain(aOrigin);
+    const sameReg = !!hReg && !!aReg && hReg === aReg;
+    return {
+      sameOrigin: sameReg,
+      separate: !sameReg,
+      apiOrigin: aOrigin,
+      handlerOrigin: hOrigin,
+      reason: sameReg
+        ? 'SAME_REGISTRABLE_DOMAIN_DYNAMIC_WORKSPACE: head origin ' + hOrigin +
+          ' shares registrable domain ' + hReg + ' with its DYNAMIC per-workspace API base ' +
+          aOrigin + ' (slack-api.ts builds ${workspaceUrl}/api/<method> off a *.slack.com ' +
+          'subdomain). The runtime executeBoundSpec origin-pin holds the head to ' + hOrigin +
+          ', so no per-workspace subdomain is silently targeted -- this is an EXPLICIT, ' +
+          'reviewed same-registrable-domain accommodation, not a fallback rubber-stamp.'
+        : 'CORS_SEPARATE_ORIGIN: head origin ' + hOrigin + ' does NOT share a registrable ' +
+          'domain with its dynamic API base ' + aOrigin + ' (' + String(hReg) + ' != ' +
+          String(aReg) + ') -- a dynamic-workspace base outside the head registrable family ' +
+          'cannot ride the first-party cookie; demote this head to T3-DOM (Pattern-D ' +
+          'cross-origin execution is deferred, see 41-DEFERRAL.md)'
     };
   }
   const same = hOrigin === aOrigin;
@@ -165,6 +237,37 @@ function readApiBaseUrl(app) {
   return m ? m[0] : null;
 }
 
+// ---- Detect a DYNAMIC per-workspace API base in a vendored <app>-api.ts (slack) -----
+// slack-api.ts has no static https:// base literal; the runtime base is built as
+// `${auth.workspaceUrl}/api/<method>` (slack-api.ts:431) where workspaceUrl is a
+// *.slack.com subdomain resolved per workspace (app.slack.com on the new client, or
+// `https://${team.domain}.slack.com` on the classic client, line 138). readApiBaseUrl
+// returns null for such a file; rather than letting that null silently fall back, the
+// gate PROVES the dynamic form is genuinely present so the same-registrable-domain
+// accommodation is grounded in the vendored source (WR-01). Returns true only when both
+// (a) the `${...workspaceUrl}/api/` interpolation AND (b) a literal *.slack.com origin
+// (the classic-client per-workspace host) appear in the source. If a vendored refresh
+// dropped that form, this returns false -> checkOriginClassification fails closed.
+function readDynamicWorkspaceBase(app) {
+  if (!app) { return null; }
+  const apiFile = join(VENDOR_PLUGINS, app, 'src', app + '-api.ts');
+  if (!existsSync(apiFile)) { return null; }
+  const text = readFileSync(apiFile, 'utf8');
+  // (a) the runtime fetch base: `${...workspaceUrl}/api/...`
+  const dynRe = /\$\{[^}]*workspaceUrl\s*\}\s*\/api\//;
+  // (b) a literal *.slack.com per-workspace origin (proves the slack registrable family)
+  const slackHostRe = /https:\/\/(?:\$\{[^}]+\}|[a-z0-9.-]+)\.slack\.com/i;
+  if (dynRe.test(text) && slackHostRe.test(text)) {
+    // The representative origin used for the same-registrable-domain assertion: the
+    // classic-client per-workspace host carries the *.slack.com registrable domain that
+    // the dynamic base resolves within. We pin it to a representative subdomain so the
+    // classifier compares registrable domains (slack.com), NOT a static app.slack.com
+    // (which would collapse back into the rubber-stamp the fallback caused).
+    return 'https://workspace.slack.com';
+  }
+  return null;
+}
+
 /**
  * checkOriginClassification(headsOverride, opts) -> { results, failures }
  *
@@ -200,8 +303,42 @@ export function checkOriginClassification(headsOverride, opts) {
     // Prefer the vendored api.ts base-URL; fall back to the documented base for an app
     // with no vendored plugin (github).
     const vendored = readApiBaseUrl(mapping.app);
-    const apiBaseUrl = vendored || mapping.fallbackBaseUrl;
-    const classification = classifyOriginPattern(head.origin, apiBaseUrl);
+    const hasVendoredFile = mapping.app
+      && existsSync(join(VENDOR_PLUGINS, mapping.app, 'src', mapping.app + '-api.ts'));
+
+    let apiBaseUrl;
+    let classifyOpts;
+    if (vendored) {
+      // A genuine extracted literal base (gitlab/notion) -> strict same-origin.
+      apiBaseUrl = vendored;
+      classifyOpts = undefined;
+    } else if (mapping.dynamicWorkspace && readDynamicWorkspaceBase(mapping.app)) {
+      // slack: no literal base, but the vendored source genuinely carries the dynamic
+      // ${workspaceUrl}/api/ *.slack.com form -> assert SAME-REGISTRABLE-DOMAIN, NOT a
+      // silent fallback (WR-01). The representative *.slack.com origin drives the
+      // registrable-domain comparison against the head's app.slack.com.
+      apiBaseUrl = readDynamicWorkspaceBase(mapping.app);
+      classifyOpts = { dynamicWorkspace: true };
+    } else if (hasVendoredFile) {
+      // A MAPPED app WITH a vendored api.ts that yields NEITHER a literal base NOR (for a
+      // dynamic-workspace app) the proven dynamic form -> do NOT silently fall back to the
+      // documented base (that is the rubber-stamp WR-01 closed). Fail closed: the base is
+      // unresolvable and the head must be re-reviewed before it can ship.
+      const reason = 'CORS_UNRESOLVABLE_ORIGIN: head ' + head.global + ' maps to vendored ' +
+        'app "' + mapping.app + '" whose <app>-api.ts yielded no extractable API base-URL ' +
+        '(and no recognized dynamic-workspace form) -- refusing the silent documented-base ' +
+        'fallback; resolve the vendored base or demote this head to T3-DOM';
+      results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: null,
+        classification: { sameOrigin: false, separate: true, reason: reason } });
+      failures.push(reason);
+      continue;
+    } else {
+      // No vendored plugin at all (github) -> the documented first-party fallback base.
+      apiBaseUrl = mapping.fallbackBaseUrl;
+      classifyOpts = undefined;
+    }
+
+    const classification = classifyOriginPattern(head.origin, apiBaseUrl, classifyOpts);
     results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: apiBaseUrl,
       classification: classification });
     if (!classification.sameOrigin) {
@@ -222,7 +359,14 @@ function runCli() {
   }
 
   for (const r of results) {
-    const verdict = r.classification.sameOrigin ? 'SAME-ORIGIN' : 'SEPARATE';
+    // A dynamic-workspace same-registrable-domain accommodation (slack) prints a
+    // DISTINCT verdict so it is never mistaken for a plain same-origin pass (WR-01).
+    const reason = r.classification && r.classification.reason;
+    const isDynamic = typeof reason === 'string'
+      && reason.indexOf('SAME_REGISTRABLE_DOMAIN_DYNAMIC_WORKSPACE') === 0;
+    const verdict = r.classification.sameOrigin
+      ? (isDynamic ? 'SAME-REGISTRABLE (dynamic workspace)' : 'SAME-ORIGIN')
+      : 'SEPARATE';
     console.log('  ' + verdict + '  ' + r.global + '  head=' + String(r.handlerOrigin) +
       '  api=' + String(r.apiBaseUrl));
   }
