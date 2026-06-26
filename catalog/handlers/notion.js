@@ -200,6 +200,12 @@
   };
 
   // ---- Self-registration into the catalog (shipped SW path) ----------------
+  // IN-03 note: the head registers descriptor.service as the app subdomain
+  // 'www.notion.so' (the first-party origin the spec pins), whereas the breadth
+  // opentabs__notion__*.json descriptor records the bare registrable domain
+  // 'notion.so'. These are intentionally different fields -- resolve() upgrades
+  // dom->T1a on the byte-exact SLUG (not the service string), and the origin-pin
+  // uses the spec's origin, so the distinction is cosmetic, not a mismatch.
   if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
       && typeof FsbCapabilityCatalog.registerHandler === 'function') {
     for (var slug in handlers) {
