@@ -108,6 +108,14 @@ function makeCtx(origin, tabId, opts) {
         let data;
         if (isProbe) {
           data = null;
+        } else if (Object.prototype.hasOwnProperty.call(options, 'readData')) {
+          // NEGATIVE-path override (IN-01): the caller drives the actual read/RPC
+          // response body (NOT the probe -- the probe still answers with its canned
+          // token text so the slack handler proceeds to the guarded POST). Lets a
+          // test feed a logged-out body (a gitlab error envelope / null / { ok:false })
+          // so the per-app shape guard's FAIL branch is exercised. `readData:null` is
+          // honored (hasOwnProperty presence check, not a truthiness test).
+          data = options.readData;
         } else if (isGitlabRest) {
           // A logged-in GitLab REST read: list_* endpoints return an array; a
           // single-resource path (.../issues/<iid> or .../projects/<id>) returns an
@@ -385,6 +393,31 @@ const Schema = require(SCHEMA_PATH);
       'gitlab.list_projects targets /api/v4/projects');
     check(glListOut && glListOut.success === true,
       'gitlab.list_projects.handle returns success for a logged-in array body');
+
+    // NEGATIVE (IN-01): a logged-out /api/v4 read answers 200 with a non-array
+    // (a sign-in/redirect body parsed to an object) -> guardShape(wantArray=true)
+    // must reject it with the dual-field RECIPE_DOM_FALLBACK_PENDING (NOT success),
+    // proving the wrong-shape branch actually fires. readData drives the REST body.
+    const glListNeg = makeCtx('https://gitlab.com', 41, { readData: { ok: false } });
+    const glListNegOut = await gl['gitlab.list_projects'].handle({}, glListNeg.ctx);
+    check(glListNegOut && glListNegOut.success === false
+      && glListNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && glListNegOut.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+      && glListNegOut.error === 'RECIPE_DOM_FALLBACK_PENDING'
+      && glListNegOut.fellBackToDom === true,
+      'gitlab.list_projects rejects a non-array logged-out body -> RECIPE_DOM_FALLBACK_PENDING');
+
+    // NEGATIVE (IN-02): a GitLab error envelope that coincidentally carries an `id`
+    // ({ id, message:"404 ..." }) must STILL be rejected by the tightened get_*
+    // guard (looksLikeGitlabError) -> RECIPE_DOM_FALLBACK_PENDING, not a false success.
+    const glGetNeg = makeCtx('https://gitlab.com', 41, {
+      readData: { id: 7, message: '404 Project Not Found' }
+    });
+    const glGetNegOut = await gl['gitlab.get_project'].handle({ project: 'g/p' }, glGetNeg.ctx);
+    check(glGetNegOut && glGetNegOut.success === false
+      && glGetNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && glGetNegOut.fellBackToDom === true,
+      'gitlab.get_project rejects an id-bearing GitLab error envelope -> RECIPE_DOM_FALLBACK_PENDING');
   }
 
   // =========================================================================
@@ -439,6 +472,23 @@ const Schema = require(SCHEMA_PATH);
         'slack.list_channels does NOT place xoxc in a request header (body-only)');
       check(sl40Out && sl40Out.success === true,
         'slack.list_channels.handle returns the executeBoundSpec result');
+
+      // NEGATIVE (IN-01 + WR-01): the xoxc probe still succeeds (a token is scraped),
+      // but the web-API POST returns Slack's HTTP-200 auth-failure envelope
+      // { ok:false } (a logged-out / stale-token response). guardSlackShape must
+      // convert that masquerading "success" into the dual-field
+      // RECIPE_DOM_FALLBACK_PENDING so DOM serves -- proving the WR-01 guard fires.
+      const sl40Neg = makeCtx('https://app.slack.com', 42, { readData: { ok: false, error: 'not_authed' } });
+      const sl40NegOut = await sl40['slack.list_channels'].handle({}, sl40Neg.ctx);
+      const sl40NegPost = sl40Neg.calls.find(function (c) { return c.spec && c.spec.method === 'POST'; });
+      check(!!sl40NegPost,
+        'slack.list_channels still issues the POST (the guard runs on its result, not before)');
+      check(sl40NegOut && sl40NegOut.success === false
+        && sl40NegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+        && sl40NegOut.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+        && sl40NegOut.error === 'RECIPE_DOM_FALLBACK_PENDING'
+        && sl40NegOut.fellBackToDom === true,
+        'slack.list_channels rejects an { ok:false } logged-out 200 -> RECIPE_DOM_FALLBACK_PENDING');
     } else {
       check(false, 'slack.list_channels.handle is invocable (Phase 40-03 -- behavioral checks pending)');
     }
@@ -491,6 +541,19 @@ const Schema = require(SCHEMA_PATH);
         'notion.search POST spec is pinned to https://www.notion.so');
       check(nt40Out && nt40Out.success === true,
         'notion.search.handle returns the executeBoundSpec result');
+
+      // NEGATIVE (IN-01): a logged-out www.notion.so /api/v3 RPC answers 200 with a
+      // sign-in/redirect body that parses to null (not the expected recordMap/results
+      // object) -> guardRpcShape must reject it with the dual-field
+      // RECIPE_DOM_FALLBACK_PENDING (NOT success), proving the wrong-shape branch fires.
+      const nt40Neg = makeCtx('https://www.notion.so', 43, { readData: null });
+      const nt40NegOut = await nt40['notion.search'].handle({ query: 'roadmap' }, nt40Neg.ctx);
+      check(nt40NegOut && nt40NegOut.success === false
+        && nt40NegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+        && nt40NegOut.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+        && nt40NegOut.error === 'RECIPE_DOM_FALLBACK_PENDING'
+        && nt40NegOut.fellBackToDom === true,
+        'notion.search rejects a null logged-out RPC body -> RECIPE_DOM_FALLBACK_PENDING');
     } else {
       check(false, 'notion.search.handle is invocable (Phase 40-04 -- behavioral checks pending)');
     }
