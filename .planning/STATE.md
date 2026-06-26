@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
 status: executing
-stopped_at: "Completed 39.5-02-PLAN.md (full-corpus STEM_OVERRIDES collision-free [127 enumerated apps -> 127 distinct opentabs__<stem>__ prefixes; 6 collision groups disambiguated incl 4-way console]; no-duplicate-stem CI gate scripts/verify-no-duplicate-stem.mjs [dual-export + CLI, re-derives via the importer's OWN exports, wired into validate:extension + npm test, FAILS on a synthetic collision]; target.apply_promo_code code->promo_code carve [the ONLY forbidden-in-input op, script/expr/transform/fn/js kept always-fatal]; SKIP_APPS={sqlpad}+empty-origin clean-skip; core path untouched INV-01/Wall-1 hold; validate:extension exit 0, 236 committed descriptors unchanged, no import ran [that is 39.5-04]; 39.5-03 unblocked)"
-last_updated: "2026-06-25T20:41:41.459Z"
-last_activity: 2026-06-25
+stopped_at: "Completed 39.5-03-PLAN.md (THE security plan -- full-corpus re-screening + conservative-commerce build invariant). linkedin.com -> sensitive (*.linkedin.com social axis); youtube.com+www.youtube.com -> denied (exact-host media/ToS, DENY-01 precedent; music.youtube.com alone did NOT cover the apex). CRITICAL host-form finding: the real plugins vendor *.<brand> urlPatterns and readPluginMeta strips the *. -> the importer emits the BARE APEX host, so 18 commerce www-exact denylist entries did NOT cover the emitted origin (would ship SAFE-under-Auto) -> WIDENED to *. apex-suffix; net-new homedepot/priceline/redfin/starbucks/pandaexpress + fiverr added sensitive; zillow stays READ_ONLY_SAFE. Added COMMERCE_SENSITIVE_SERVICES (32 emitted hosts) + exported checkCommerceSensitiveClassified to verify-catalog-crosscheck.mjs (inverse of READ_ONLY_SAFE_SERVICES) -- asserts every commerce brand classifies sensitive AND roster disjoint from READ_ONLY_SAFE; wired into validate:extension so an omitted/downgraded commerce brand FAILS THE BUILD (catches a read-only commerce brand classifyGate + the payment-op guard both miss). tests/full-corpus-screen.test.js: classifyGate over 127 enumerated real-app origins = 0 failures (classify-complete) + backstop green/non-vacuous/bites. validate:extension exit 0, 228 committed descriptors unchanged, NO import ran [that is 39.5-04]. service-denylist.test.js synced (PASS=63). Deferred DEF-39.5-03-A: end-to-end importer op-DESCRIPTION classifyGate false-trips (linear/supabase/vercel/... -- pre-existing, belongs to 39.5-04). 39.5-04 unblocked on the screening half.)"
+last_updated: "2026-06-26T08:23:01.579Z"
+last_activity: 2026-06-26
 progress:
   total_phases: 11
   completed_phases: 5
-  total_plans: 27
-  completed_plans: 26
-  percent: 96
+  total_plans: 35
+  completed_plans: 27
+  percent: 77
 ---
 
 # Project State
@@ -31,11 +31,11 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 39.5 (Full OpenTabs Source Import) — EXECUTING
-Plan: 3 of 5
-Status: Ready to execute
-Last activity: 2026-06-25
+Plan: 4 of 5
+Status: Ready to execute (39.5-03 complete — the full-corpus screening + conservative-commerce build invariant landed; 39.5-04 is the actual full-source import)
+Last activity: 2026-06-26
 
-Progress: [██████████] 96%
+Progress: [████████░░] 77%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -125,6 +125,9 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase ?]: 39.5-01: vendored 115 real OpenTabs src slices (39 overlaps regenerated + 76 net-new); real grafana skipped to preserve the hand-authored grafana.com slice + sqlpad skipped (empty origin) -- net 129 plugin dirs
 - [Phase ?]: 39.5-01: recorded the 13 hand-authored-only apps as source:hand-authored no-upstream markers in vendor _provenance.json; real-app provenance filled by the importer at Plan 39.5-04
 - [Phase 39.5]: 39.5-02: disambiguated all 6 stem-collision groups to DISTINCT brand stems + ~20 single wrong-stem apps (127/127 collision-free); added the no-duplicate-stem CI gate (re-derives via the importer's own enumerateBatchApps/readPluginMeta/displayServiceStem so it cannot drift); implemented target.apply_promo_code as a narrow per-op code->promo_code carve (FORBIDDEN set untouched); BLOCKER C empty-origin skip is forward-defensive (no empty-origin app vendored at this SHA)
+- [Phase 39.5]: 39.5-03 (BRDTH-02/03): re-screened the full ~114-origin corpus -- linkedin.com sensitive (*.linkedin.com social axis) + youtube.com+www.youtube.com denied (exact-host media/ToS, DENY-01 precedent; music.youtube.com alone did NOT cover the apex the real plugin emits)
+- [Phase 39.5]: 39.5-03: the real plugins vendor *.<brand> urlPatterns and readPluginMeta strips the *. -> the importer emits the BARE APEX host; 18 commerce www-exact denylist entries did NOT suffix-match the apex (would ship SAFE-under-Auto on the emitted origin) so they were WIDENED to *. apex-suffix; net-new homedepot/priceline/redfin/starbucks/pandaexpress + fiverr added sensitive; zillow stays READ_ONLY_SAFE (the spike's deliberate read-only-vs-commerce distinction; redfin is the named commerce brand)
+- [Phase 39.5]: 39.5-03: COMMERCE_SENSITIVE_SERVICES (32 emitted hosts) + exported checkCommerceSensitiveClassified added to verify-catalog-crosscheck.mjs (the inverse of READ_ONLY_SAFE_SERVICES) -- asserts every commerce brand classifies sensitive AND the roster is DISJOINT from READ_ONLY_SAFE; wired into validate:extension so an omitted/downgraded commerce brand FAILS THE BUILD (catches a read-only commerce brand classifyGate [no payment token] + the payment-op guard [no payment verb] both miss). The conservative-commerce manual review is now a checked build invariant. validate:extension exit 0, 228 committed descriptors unchanged; tests/full-corpus-screen.test.js proves classify-complete + the backstop green/non-vacuous
 
 ### Pending Todos
 
@@ -159,7 +162,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-25T20:41:41.314Z
+Last session: 2026-06-26T08:22:27.645Z
 Stopped at: Completed 39.5-02-PLAN.md (full-corpus STEM_OVERRIDES collision-free [127 enumerated apps -> 127 distinct opentabs__<stem>__ prefixes; 6 collision groups disambiguated incl 4-way console]; no-duplicate-stem CI gate scripts/verify-no-duplicate-stem.mjs [dual-export + CLI, re-derives via the importer's OWN exports, wired into validate:extension + npm test, FAILS on a synthetic collision]; target.apply_promo_code code->promo_code carve [the ONLY forbidden-in-input op, script/expr/transform/fn/js kept always-fatal]; SKIP_APPS={sqlpad}+empty-origin clean-skip; core path untouched INV-01/Wall-1 hold; validate:extension exit 0, 236 committed descriptors unchanged, no import ran [that is 39.5-04]; 39.5-03 unblocked)
 Resume file: None
 
