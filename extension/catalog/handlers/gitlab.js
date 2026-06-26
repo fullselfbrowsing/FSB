@@ -179,12 +179,25 @@
     };
   }
 
+  // A top-level GitLab error envelope carries a string `message` (e.g.
+  // { message: "401 Unauthorized" } / { message: "404 Project Not Found" }) or a
+  // string `error` (e.g. { error: "invalid_token" }) -- neither of which a real
+  // project/issue resource body has. Used to reject an error envelope that happens
+  // to also carry an id/iid field (IN-02: the get_* heuristic was looser than its
+  // "id-bearing OBJECT" intent). Conservative: keyed only on the two documented
+  // GitLab error markers, so a legitimate resource body is never excluded.
+  function looksLikeGitlabError(data) {
+    return !!data && typeof data === 'object'
+      && (typeof data.message === 'string' || typeof data.error === 'string');
+  }
+
   // The logged-out shape guard. executeBoundSpec returns { success, data, ... } where
   // `data` is the parsed body. A logged-out gitlab.com tab answers a /api/v4 read with
   // a 200 sign-in HTML page or a redirect -> `data` is NOT the expected JSON shape.
-  // wantArray: list_* expect an array; get_* expect an id-bearing object. On a wrong
-  // shape, return the dual-field RECIPE_DOM_FALLBACK_PENDING so the breadth DOM path
-  // serves; otherwise return the executeBoundSpec result verbatim.
+  // wantArray: list_* expect an array; get_* expect an id-bearing object that is NOT a
+  // GitLab error envelope (IN-02 hardening). On a wrong shape, return the dual-field
+  // RECIPE_DOM_FALLBACK_PENDING so the breadth DOM path serves; otherwise return the
+  // executeBoundSpec result verbatim.
   function guardShape(result, slug, wantArray) {
     if (!result || result.success !== true) {
       return result;   // pin / fetch failure -> return verbatim; do NOT mask it.
@@ -195,6 +208,7 @@
       ok = Array.isArray(data);
     } else {
       ok = !!data && typeof data === 'object' && !Array.isArray(data)
+        && !looksLikeGitlabError(data)
         && (Object.prototype.hasOwnProperty.call(data, 'id')
           || Object.prototype.hasOwnProperty.call(data, 'iid'));
     }
