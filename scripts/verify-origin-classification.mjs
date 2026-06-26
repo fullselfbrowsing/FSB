@@ -199,20 +199,48 @@ export function classifyOriginPattern(handlerOrigin, apiBaseUrl, opts) {
 // Mirrors tests/head-handler-cap.test.js: match `var HEAD_HANDLER_MODULES = [ ... ];`
 // non-greedily, then pull each entry's global:'...' and origin:'...' fields. The
 // manifest is a flat array of object literals (no nested ]), so the first ] closes it.
-function parseHeadModules(source) {
+//
+// IN-01 hardening: entries are split with a BRACE-BALANCED scan (not the old
+// /\{[^}]*\}/g, which matched only a `{...}` with no inner `}` and would silently
+// TRUNCATE a future nested-brace entry -- e.g. { global:'...', meta:{region:'us'},
+// origin:'...' } would have been chunked as `{ global:'...', meta:{region:'us'}`,
+// dropping `origin` and mis-parsing the head as origin:null). The depth scan keeps each
+// top-level `{ ... }` entry whole regardless of nesting, so a future nested entry parses
+// correctly instead of failing closed on a confusing mis-parse. String literals are
+// tracked so a `}` inside a quoted value does not falsely close an entry.
+export function parseHeadModules(source) {
   const declMatch = source.match(/var\s+HEAD_HANDLER_MODULES\s*=\s*\[([\s\S]*?)\]\s*;/);
   if (!declMatch) { return null; }
   const body = declMatch[1];
-  // Split into entries on the `}` boundary so global+origin stay paired per entry.
   const heads = [];
-  const entryRe = /\{[^}]*\}/g;
-  let m;
-  while ((m = entryRe.exec(body)) !== null) {
-    const chunk = m[0];
-    const g = chunk.match(/global\s*:\s*'([^']+)'/);
-    const o = chunk.match(/origin\s*:\s*'([^']+)'/);
-    if (g) {
-      heads.push({ global: g[1], origin: o ? o[1] : null });
+  let depth = 0;
+  let start = -1;
+  let quote = null;       // the active string-literal delimiter (' " `) or null
+  let escaped = false;    // the previous char was a backslash inside a string
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (quote) {
+      // Inside a string literal: only a matching un-escaped delimiter closes it.
+      if (escaped) { escaped = false; }
+      else if (ch === '\\') { escaped = true; }
+      else if (ch === quote) { quote = null; }
+      continue;
+    }
+    if (ch === '\'' || ch === '"' || ch === '`') { quote = ch; continue; }
+    if (ch === '{') {
+      if (depth === 0) { start = i; }
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const chunk = body.slice(start, i + 1);
+        const g = chunk.match(/global\s*:\s*'([^']+)'/);
+        const o = chunk.match(/origin\s*:\s*'([^']+)'/);
+        if (g) {
+          heads.push({ global: g[1], origin: o ? o[1] : null });
+        }
+        start = -1;
+      }
     }
   }
   return heads;
