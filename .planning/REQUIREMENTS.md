@@ -29,7 +29,7 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 
 ### DEPTH -- Depth: Hand-Ported Handlers (~15-30 apps)
 
-- [ ] **DEPTH-01**: The depth shortlist (~22 apps: linear, datadog, vercel, jira, netlify, todoist, circleci, cloudflare, sentry, posthog, ... reads first) is hand-ported as T1a/T1b handlers via the `github.js` contract: own first-party origin, executeBoundSpec-only, scraped tokens never logged.
+- [x] **DEPTH-01**: The depth shortlist (~22 apps: linear, datadog, vercel, jira, netlify, todoist, circleci, cloudflare, sentry, posthog, ... reads first) is hand-ported as T1a/T1b handlers via the `github.js` contract: own first-party origin, executeBoundSpec-only, scraped tokens never logged.
 - [ ] **DEPTH-02**: Hand-ported WRITE ops fail closed and, on sensitive origins, honor the DENY-04 mutating opt-in; a per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port (linear is documented-safe; supabase / cloud-consoles must be verified or demoted to T2/T3).
 
 ### DSEED -- Discovery Seeding for the Tail
@@ -83,7 +83,7 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 | BRDTH-01 | Phase 37 | Complete |
 | BRDTH-02 | Phase 37 | Complete |
 | BRDTH-03 | Phase 37 | Complete |
-| DEPTH-01 | Phase 40 | Pending |
+| DEPTH-01 | Phase 40 | Complete |
 | DEPTH-02 | Phase 41 | Pending |
 | DSEED-01 | Phase 42 | Pending |
 | DSEED-02 | Phase 42 | Pending |

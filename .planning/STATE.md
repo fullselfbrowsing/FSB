@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: ready_to_plan
-stopped_at: "Phase 39.5 (Full OpenTabs Source Import) COMPLETE + verified PASS (gsd-verifier: 4/4 SC, no findings). Security headline proven on a REAL payment op: shipped amazon.place_order (write, backing:dom, sensitive origin) under Auto -> RECIPE_CONSENT_MUTATING_REQUIRED (no order placed); reads run free; per-origin mutating flag elevates. (The earlier doordash proof was on a stale orphan -- real doordash has no place_order @SHA -- re-pointed to amazon's real write.) Full real-source OpenTabs catalog imported via the frozen pipeline: realAppCount=129, 2,314 descriptors (opentabs 2,306 / head 8 / learn 0 / dead 0); 13 hand-only apps PRESERVED (augment); 77 orphan descriptors pruned via runImport prune-to-match + the new verify-no-orphan-descriptor.mjs CI guard; tripadvisor.check_saved reclassified read (GraphQL query) via per-slug allowlist; commerce backstop now asserts apex+www (closed opentable/ticketmaster/stubhub/eventbrite apex gaps). Gates green: npm test EXIT 0, validate:extension EXIT 0 (6 sub-gates incl no-duplicate-stem + no-orphan), index 1.371MB<2MB + cold-start 11.40ms<100ms over the full corpus, INV-01/Wall-1 intact, recall@5=0.995 + curated wrong-invoke=0. Full-corpus search precision (wrong-invoke=0) DEFERRED to Phase 43 SCALE-01 (DEF-39.5-04-A). NEXT: Phase 40 (Depth 1 -- Top READ Hand-Ports, DEPTH-01)."
-last_updated: "2026-06-26"
+status: verifying
+stopped_at: "Phase 40 (Depth 1 -- Top READ Hand-Ports, DEPTH-01) COMPLETE (all 5 plans executed; ready for verification). Hand-ported 10 top READ ops as first-class T1a heads across 4 head modules (github/slack/notion/gitlab), each UPGRADING its existing opentabs breadth descriptor dom->T1a by registering the EXACT dot-form slug (proven byte-exact by the new tests/head-handler-upgrade.test.js, 48/0, incl a wrong-slug negative control + a BEFORE(T3)/AFTER(T1a) leg). NEW module: gitlab x5 (list_projects/get_project/list_issues/get_issue/list_merge_requests on same-origin gitlab.com/api/v4, GitHub-GET template). EXTENDS: slack x3 (list_channels/list_members/get_channel_info via callSlackMethod, xoxc-in-body) + notion x2 (search/get_database via buildRpcSpec, /api/v3). APP-SELECTION CORRECTION: linear DEFERRED to Phase 41 (its GraphQL is a separate-origin client-api.linear.app CORS port = Phase-41 CORS-gate); gitlab substituted as the same-origin NEW module. Security battery green: Wall-2 origin-pin (RECIPE_ORIGIN_MISMATCH before executeScript), no api-subdomain, no scraped token logged, per-handler logged-out shape guard (RECIPE_DOM_FALLBACK_PENDING, no 200-with-logged-out-body), HEAD_HANDLER_MODULES=4 (<=30). INV-01 (frozen non-trigger registry hash unmoved, capability tools out of TOOL_REGISTRY) + INV-02 (both front doors -> the SAME FsbCapabilityRouter.invoke) intact; opentabs descriptors UNCHANGED (2306, 0 orphans). Gates: npm test EXIT 0, validate:extension EXIT 0 (6 sub-gates). Carried-forward human_needed: per-app live endpoint-correctness on authenticated tabs (handlers ship fail-closed). NEXT: Phase 41 (Depth 2 -- Remaining Hand-Ports + Guarded Writes, DEPTH-02; inherits the deferred linear CORS port + the live-UAT debt)."
+last_updated: "2026-06-26T11:24:53.967Z"
 last_activity: 2026-06-26
 progress:
-  total_phases: 10
-  completed_phases: 6
-  total_plans: 28
-  completed_plans: 28
-  percent: 60
+  total_phases: 11
+  completed_phases: 7
+  total_plans: 32
+  completed_plans: 34
+  percent: 100
 ---
 
 # Project State
@@ -26,16 +26,16 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 40 — Depth 1 (Top READ Hand-Ports, DEPTH-01)
+**Current focus:** Phase 40 — Depth 1 (Top READ Hand-Ports, DEPTH-01) COMPLETE; next is Phase 41 (Depth 2 + Guarded Writes)
 
 ## Current Position
 
-Phase: 40 (Depth 1 — Top READ Hand-Ports) — READY TO PLAN
-Plan: 0 of 0 (not yet planned)
-Status: Phase 39.5 COMPLETE + verified PASS (4/4 SC); Phase 40 ready to plan
+Phase: 40 (Depth 1 — Top READ Hand-Ports) — COMPLETE (ready for verification)
+Plan: 5 of 5 complete
+Status: Phase complete — ready for verification (npm test EXIT 0, validate:extension EXIT 0; 10 slugs upgraded dom->T1a; 4 head modules <=30; INV-01/02 + Wall 1/2 intact)
 Last activity: 2026-06-26
 
-Progress: [██████░░░░] 60% (6 of 10 phases complete)
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -47,7 +47,7 @@ Progress: [██████░░░░] 60% (6 of 10 phases complete)
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
 | 39.5 | Full OpenTabs Source Import (real ~117-plugin / ~2,374-op) [INSERTED] | (continues BRDTH-01..03; closes parity) | ✓ Complete (2026-06-26) |
-| 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
+| 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | ✓ Complete (2026-06-26) |
 | 41 | Depth 2 — Remaining Hand-Ports + Guarded Writes | DEPTH-02 (1) | Not started |
 | 42 | Discovery Seeding + Tail Learn | DSEED-01..02 (2) | Not started |
 | 43 | Catalog-Scale + Milestone Gate | SCALE-01..02 (2) | Not started |
@@ -133,6 +133,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase 39.5]: Phase 39.5-05: the full-corpus search-PRECISION (wrong-invoke) is the Phase-43 SCALE-01 eval-harness re-tune deliverable -- RECORDED as the baseline (DEF-39.5-04-A), NOT asserted to 0; an honest, tracked, documented phase boundary (corpus-tier collision probes individually tagged), curated collision proofs + structural/security gates stay HARD-green.
 - [Phase 39.5]: Phase 39.5-05: SCALE-01 breadth budget PROVEN at the full corpus -- real serialized minisearch index 1.415MB < 2MB + cold-start ~12ms < 100ms over 2,391 descriptors (storeFields-trim lever NOT engaged; capability-search.js UNCHANGED, INV-01/Wall-1 intact); cold-start assert widened 10ms->100ms is the REAL SCALE-01 SW-wake budget. realAppCount=145, 0 dead; full npm test EXIT 0; Phase 39.5 parity-complete.
 - [Phase 39.5]: Phase 39.5 CODE REVIEW + FIX + VERIFY (close): the gsd-code-reviewer surfaced 5 findings; all fixed + the gsd-verifier confirmed PASS (4/4 SC, no findings; 39.5-VERIFICATION.md). HI-02 (the headline correction): the augment was NON-pruning -> 77 stale orphan descriptors (hand-authored op-slices superseded by the real source's different op-sets) lingered, inflating realAppCount to 145. Fix: `runImport` now PRUNES-to-match (deletes every opentabs__* not in the freshly-emitted set) + a new `scripts/verify-no-orphan-descriptor.mjs` CI guard (build-fails on any committed descriptor lacking backing vendored source; wired into validate:extension). Post-prune the catalog is the TRUE parity surface: realAppCount=129, 2,314 descriptors (opentabs 2,306 / head 8 / learn 0 / dead 0); the 13 hand-only apps preserved (augment intact). HI-01: tripadvisor.check_saved was a GraphQL QUERY mislabeled write by fail-safe-high -> reclassified read via a narrow per-slug `SIDE_EFFECT_READ_CONFIRMED` allowlist (CANNOT downgrade a real write -- meticulous.check_for_flakes stays write) + tripadvisor.com apex added to READ_ONLY_SAFE + checkReadOnlySafeOrigins made host-form-agnostic (www<->apex via isReadOnlySafeService). MED-02 (another apex-vs-www instance): the commerce backstop now asserts BOTH apex AND www forms -> surfaced+closed a REAL latent gap (opentable/ticketmaster/stubhub/eventbrite were exact-host www.* so their apex classified SAFE -> widened apex-suffix). LO-01: promo_code carve narrowed inside carveBusinessCodeField. SECURITY HEADLINE re-proven on a REAL payment op: the old doordash.place_order e2e proof was on a STALE ORPHAN (real doordash has no place_order @SHA) -> sensitive-write-import-gate.test.js re-pointed to amazon.place_order (a genuine payment write: under Auto -> RECIPE_CONSENT_MUTATING_REQUIRED, no order placed; reads free; per-origin flag elevates). All gates green: npm test EXIT 0, validate:extension EXIT 0 (6 sub-gates incl no-duplicate-stem + no-orphan), index 1.371MB<2MB + cold-start 11.40ms<100ms, recall@5=0.995 + curated wrong-invoke=0, INV-01/Wall-1 intact. Full-corpus search precision stays DEFERRED to Phase 43 SCALE-01 (DEF-39.5-04-A). Commits 8e5ddfc0 / 86de8e48 / f04280f2 / a2348f71 / 32328a08. PHASE 39.5 COMPLETE -- TRUE OpenTabs parity (the milestone's literal goal) achieved; ready for Phase 40 (Depth 1 -- the hand-ports that migrate descriptors from the dom bucket into the head bucket).
+- [Phase 40]: Phase 40 (DEPTH-01 -- Top READ Hand-Ports) COMPLETE (5 plans, 3 waves). Migrated 10 top READ ops from the dom bucket into the head bucket as first-class T1a handlers across 4 head modules (github/slack/notion/gitlab), each UPGRADING its existing opentabs breadth descriptor dom->T1a by registering the EXACT dot-form slug. THE CORRECTNESS KEYSTONE: a NEW tests/head-handler-upgrade.test.js (48/0) proves each ported slug resolve()s T1a byte-exact (descriptor preserved) -- with a wrong-slug NEGATIVE CONTROL (gitlab.list_projectz != upgrade, it is a dead duplicate) + a BEFORE(T3)/AFTER(T1a) leg toggling handler presence over the real backing:dom descriptor. NEW module: catalog/handlers/gitlab.js x5 (list_projects/get_project/list_issues/get_issue/list_merge_requests) GET on same-origin gitlab.com/api/v4 (GitHub-GET template; a PATH on gitlab.com, NOT an api-host subdomain -- verified in vendor gitlab-api.ts:13); HEAD_HANDLER_MODULES 3->4 (<=30), background.js importScripts +1, recipe-path-guard allowlist +1, lattice byte-freeze importScripts count 186->187/182->183. EXTENDS (no new module): slack.js x3 (list_channels/list_members/get_channel_info via callSlackMethod -- xoxc scraped into the BODY never logged, xoxd cookie) + notion.js x2 (search/get_database via buildRpcSpec -- POST same-origin /api/v3, token_v2 cookie; added a typedRecipeError+guardRpcShape logged-out guard notion.js lacked). APP-SELECTION CORRECTION (planner-verified, plan-checker APPROVED): CONTEXT/ROADMAP named linear the flagship, but vendor linear-api.ts:18 hardcodes https://client-api.linear.app/graphql -- a SEPARATE-origin CORS port the Wall-2 origin-pin correctly rejects = Phase-41 CORS-gate material; honored first-party-origin-ONLY over the illustrative app name -> linear DEFERRED to Phase 41, gitlab substituted as the same-origin NEW module. SECURITY: every head spec.origin = the app's OWN first-party origin (Wall-2 origin-pin -> RECIPE_ORIGIN_MISMATCH before executeScript; no api-subdomain string; no chrome.scripting/tabs; executeBoundSpec called exactly once per read); per-handler logged-out shape guard (array for list_* / id-object for get_* / non-null-object for RPC) -> dual-field RECIPE_DOM_FALLBACK_PENDING so a 200-with-logged-out-body never masquerades as success. INV-01 (frozen EXPECTED_NON_TRIGGER_REGISTRY_HASH unmoved, both capability tools out of TOOL_REGISTRY -- autopilot-parity 17/0) + INV-02 (both front doors -> the SAME FsbCapabilityRouter.invoke -- router 46/0) intact; opentabs descriptors UNCHANGED (2306, 0 orphans -- the heads upgrade via REGISTRY-first, no descriptor edit). Gates: full npm test EXIT 0, validate:extension EXIT 0 (6 sub-gates). Carried-forward human_needed: per-app live endpoint-correctness on authenticated tabs (the [ASSUMED] gitlab /api/v4 paths, slack /api/conversations.* methods + xoxc page location, notion /api/v3 op names -- all ship fail-closed). Commits 857def96/10aee588/8724eef8 (W0 infra) + 9e8cad5a/0f47d417/54c5ea2d (gitlab) + 4ec6190c/3f17714e (slack) + cb9e5b36/856db643 (notion) + 358dca62 (battery fix) + per-plan SUMMARY docs. The new-module + extend-module depth contract is demonstrated end-to-end; Phase 41 (DEPTH-02) inherits the deferred linear CORS port + the live-UAT debt.
 
 ### Pending Todos
 
@@ -167,7 +168,7 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-26
+Last session: 2026-06-26T11:24:53.962Z
 Stopped at: Phase 39.5 (Full OpenTabs Source Import) COMPLETE + verified PASS (gsd-verifier 4/4 SC, no findings; 39.5-VERIFICATION.md). Full real-source OpenTabs catalog imported via the frozen pipeline (realAppCount=129, 2,314 descriptors, opentabs 2,306 / head 8 / dead 0); 13 hand-only apps preserved (augment); 77 orphans pruned (runImport prune-to-match + verify-no-orphan-descriptor.mjs guard). Security headline proven on a REAL payment op (amazon.place_order write -> RECIPE_CONSENT_MUTATING_REQUIRED under Auto; doordash proof was a stale orphan, re-pointed). npm test EXIT 0 + validate:extension EXIT 0 (6 sub-gates); index 1.371MB<2MB + cold-start 11.40ms; INV-01/Wall-1 intact. Full-corpus search precision DEFERRED to Phase 43 SCALE-01 (DEF-39.5-04-A). Ready to plan Phase 40.
 Resume file: None
 

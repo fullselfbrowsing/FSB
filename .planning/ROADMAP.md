@@ -145,11 +145,11 @@
   3. Both front doors hit the registered handlers through the SAME `FsbCapabilityRouter.invoke` (INV-02), and the head-handler tests (origin-separation, no-token-logging) plus router parity stay green; the head cap (~15-30) is enforced by a CI assertion on `HEAD_HANDLER_MODULES`.
 **Plans**: 5 plans (3 waves)
 Plans:
-- [ ] 40-01-PLAN.md — Wave 0 test infra: dom->T1a upgrade-assertion harness (slug-exact keystone) + head-cap 4-module/CAP-30 update + per-app test scaffolds + npm-test wiring [wave 1]
-- [ ] 40-02-PLAN.md — gitlab NEW module: 5 READ T1a heads on same-origin gitlab.com/api/v4 + HEAD_HANDLER_MODULES 3->4 + background.js importScripts [wave 2]
-- [ ] 40-03-PLAN.md — slack EXTEND: 3 READ heads (list_channels/list_members/get_channel_info) via callSlackMethod (xoxc in body, never logged) [wave 2]
-- [ ] 40-04-PLAN.md — notion EXTEND: 2 READ heads (search/get_database) via buildRpcSpec same-origin /api/v3 [wave 2]
-- [ ] 40-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + INV-01/INV-02/origin-pin/head-cap green + live-UAT debt handoff [wave 3]
+- [x] 40-01-PLAN.md — Wave 0 test infra: dom->T1a upgrade-assertion harness (slug-exact keystone) + head-cap 4-module/CAP-30 update + per-app test scaffolds + npm-test wiring [wave 1]
+- [x] 40-02-PLAN.md — gitlab NEW module: 5 READ T1a heads on same-origin gitlab.com/api/v4 + HEAD_HANDLER_MODULES 3->4 + background.js importScripts [wave 2]
+- [x] 40-03-PLAN.md — slack EXTEND: 3 READ heads (list_channels/list_members/get_channel_info) via callSlackMethod (xoxc in body, never logged) [wave 2]
+- [x] 40-04-PLAN.md — notion EXTEND: 2 READ heads (search/get_database) via buildRpcSpec same-origin /api/v3 [wave 2]
+- [x] 40-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + INV-01/INV-02/origin-pin/head-cap green + live-UAT debt handoff [wave 3]
 
 ### Phase 41: Depth 2 — Remaining Hand-Ports + Guarded Writes
 **Goal**: Complete the depth head with the remaining hand-ports including WRITE ops, holding writes fail-closed to DOM fallback until a live-captured mutation body confirms them, re-enforcing the DENY-04 mutating opt-in on sensitive origins, and gating any separate-API-origin (Pattern-D) port behind a per-app CORS verification so an unverified port can never silently fail.
@@ -195,7 +195,7 @@ Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 �
 | 38. Breadth B — Comms / Social / Content | 3/3 | Complete    | 2026-06-25 |
 | 39. Breadth C — Commerce / Travel / Misc | 7/7 | Complete    | 2026-06-25 |
 | 39.5 Full OpenTabs Source Import (real ~117-plugin / ~2,306-op) [INSERTED] | 5/5 | Complete    | 2026-06-26 |
-| 40. Depth 1 — Top READ Hand-Ports | 0/TBD | Not started | - |
+| 40. Depth 1 — Top READ Hand-Ports | 5/5 | Complete   | 2026-06-26 |
 | 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 0/TBD | Not started | - |
 | 42. Discovery Seeding + Tail Learn | 0/TBD | Not started | - |
 | 43. Catalog-Scale + Milestone Gate | 0/TBD | Not started | - |
