@@ -5,7 +5,9 @@
 // A BUILD-TIME harvester (alongside import-opentabs-catalog.mjs) that reads each
 // vendored plugins/<app>/src/*-api.ts and emits extension/config/discovery-seeds.json:
 //   { "<origin>": { hints:[{op,method,path}], provenance:{app,source} }, ...,
-//     "_meta": { generator, vendorSha, generatedAt, originCount, hintCount } }
+//     "_meta": { generator, vendorSha, originCount, hintCount } }
+// NOTE (IN-01): NO 'generatedAt' -- the output is byte-REPRODUCIBLE (vendorSha is the
+// provenance anchor) so a no-op rerun yields an empty git diff.
 //
 // The ORIGIN is derived EXACTLY like the importer's readPluginMeta:
 //   package.json.opentabs.urlPatterns[0].match(/:\/\/([^/]+)\//) -> strip a leading
@@ -262,10 +264,14 @@ function main() {
   }
 
   const vendorSha = resolveVendorSha();
+  // IN-01: NO wall-clock 'generatedAt' -- it made the artifact non-byte-reproducible
+  // (a regen never matched the committed file, defeating a "seeds are fresh vs the
+  // pinned vendor SHA" byte-equality check). vendorSha IS the provenance anchor; it
+  // pins the INPUT snapshot, and dropping the timestamp makes the OUTPUT deterministic
+  // so `harvest -> git diff` is empty on a no-op rerun.
   seeds._meta = {
     generator: 'harvest-discovery-seeds.mjs',
     vendorSha: vendorSha,
-    generatedAt: new Date().toISOString(),
     originCount: originCount,
     hintCount: hintCount
   };
