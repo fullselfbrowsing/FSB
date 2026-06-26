@@ -39,8 +39,8 @@ Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+,
 
 ### SCALE -- Catalog Scale & Milestone Gate
 
-- [ ] **SCALE-01**: The search index and catalog stay within budget at ~2,523 descriptors (searchable-text indexed; params schema-on-hit / out-of-band; sharded by service), proven by the extended SURF-06 eval harness with size/load-time assertions (index < ~1-2 MB; loadJSON + first search < ~50-100 ms).
-- [ ] **SCALE-02**: Recipe-rot self-heal is hardened for 119-app scale (per-origin re-learn coalescing / back-off); the typed fallback reason stays byte-equal across all 7 providers (INV-03); full `npm test` exits 0 (the milestone gate).
+- [x] **SCALE-01**: The search index and catalog stay within budget at ~2,523 descriptors (searchable-text indexed; params schema-on-hit / out-of-band; sharded by service), proven by the extended SURF-06 eval harness with size/load-time assertions (index < ~1-2 MB; loadJSON + first search < ~50-100 ms).
+- [x] **SCALE-02**: Recipe-rot self-heal is hardened for 119-app scale (per-origin re-learn coalescing / back-off); the typed fallback reason stays byte-equal across all 7 providers (INV-03); full `npm test` exits 0 (the milestone gate).
 
 ## v2 Requirements
 
@@ -87,8 +87,8 @@ Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes 
 | DEPTH-02 | Phase 41 | Complete |
 | DSEED-01 | Phase 42 | Complete |
 | DSEED-02 | Phase 42 | Complete |
-| SCALE-01 | Phase 43 | Pending |
-| SCALE-02 | Phase 43 | Pending |
+| SCALE-01 | Phase 43 | Complete |
+| SCALE-02 | Phase 43 | Complete |
 
 **Coverage:**
 - v1 requirements: 17 total

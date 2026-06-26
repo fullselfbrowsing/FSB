@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: executing
+status: verifying
 stopped_at: "Phase 42 (Discovery Seeding + Tail Learn, DSEED-01/02) COMPLETE + verified PASS (gsd-verifier 3/3 SC, 17/17 must-haves, no findings; 42-VERIFICATION.md). DSEED-01: NEW harvest-discovery-seeds.mjs -> discovery-seeds.json (128 origins / 255 hints, SHA-pinned, byte-reproducible); network-capture loader reads it with NO manifest/permission change; a hint biases recognition ONLY, never executes (the consent-gated promote-after-replay path reused byte-unchanged, fail->DISCARD). SC2: resolve() seed branch -> T2 (learn-pending, no recipe) for seeded would-be-T3 origins (T3 unseeded); LEARN-04 + INV-01 byte-unchanged; RECIPE_LEARN_PENDING gains additive actionable/message (INV-03 code byte-stable). DSEED-02 (security headline): the structure-only redactor's AUTH_CARRIER_DENYLIST extended to the 119-app universe + a NEW path-segment token scrub (masks JWT/stripe/github/slack/aws/google/the vendored MS-Graph u! share-id to :tok; benign slugs survive) -> ZERO auth substring across all 3 sinks at scale (redaction 130/0). A plan-checker BLOCKER (path-segment token leak into the learned-recipe envelope) was caught + fixed pre-execution. Capture/consent core byte-UNCHANGED. Gates: full npm test EXIT 0, validate:extension EXIT 0. Carried-forward human_needed (NON-blocking, the hint never executes): live first-visit capture per seeded origin (42-HUMAN-UAT.md, 3 rows). Ready to plan Phase 43 (the FINAL phase / milestone gate)."
-last_updated: "2026-06-26T21:51:48.168Z"
+last_updated: "2026-06-26T22:00:01.388Z"
 last_activity: 2026-06-26
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 46
-  completed_plans: 47
+  completed_plans: 48
   percent: 100
 ---
 
@@ -30,12 +30,12 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 
 ## Current Position
 
-Phase: 43 (Catalog-Scale + Milestone Gate) — EXECUTING (the FINAL v1.0.0 phase)
-Plan: 3 of 4 complete (43-01 RED scaffolds + scale-gate; 43-02 precision wrong-invoke 0.079->0.000 HARD; 43-03 SCALE-02 self-heal impl -- 3 tests GREEN)
-Status: Phase executing — 43-04 (THE MILESTONE GATE: full npm test EXIT 0) next
+Phase: 43 (Catalog-Scale + Milestone Gate) — COMPLETE (the FINAL v1.0.0 phase; all 4 plans done)
+Plan: 4 of 4 complete (43-01 RED scaffolds + scale-gate; 43-02 precision wrong-invoke 0.079->0.000 HARD; 43-03 SCALE-02 self-heal -- 3 tests GREEN; 43-04 THE MILESTONE GATE -- full npm test EXIT 0)
+Status: Phase complete — v1.0.0 MILESTONE GATE MET (full npm test EXIT 0); ready for Phase-43 verification, then the milestone lifecycle (audit -> complete -> cleanup)
 Last activity: 2026-06-26
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -141,6 +141,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase ?]: 43-01: authored 3 SCALE-02 self-heal RED-first contract tests (relearn-coalescing/rot-recurrence-classify/app-degraded-surfacing) defining the scheduler export seam (FsbRelearnScheduler.scheduleRelearn + flush + BASE/MAX_BACKOFF_MS + MAX_TRACKED_ORIGINS) + the additive store seam (recordRot/dispositionFor/recordOk/getOriginHealth/RECURRENCE_SYSTEMIC_THRESHOLD) for Plan 43-03; registered all 3 in npm test; confirmed full-corpus-scale.test.js is the SCALE-01 gate at 1.371MB/11.5ms/621B/2314
 - [Phase ?]: 43-02 (SCALE-01 precision re-tune, DEF-39.5-04-A CLOSED): drove full-corpus eval wrong-invoke 0.079->0.000 (15/190->0/190) via robust GENERAL metadata-source enrichment in the importer (NOT fixture overfit) -- NOUN_SYNONYMS (to-do/restaurants), STEM_NOUN_SYNONYMS (instacart groceries, app-scoped to avoid bestbuy regression), CREATE_NOUN_VERBS ('file an issue', noun-scoped not global), GET_NOUN_VERBS+GET_FAVORING_NOUNS ('open a conversation'->get, 'open a PR/issue'->create preserved), APP_ALIASES (bluesky), OVER_CLAIM_GUARD (trim outlook 'email'/sentry 'status'/linear.create_attachment 'issue'-'file'/confluence inline-comment 'page'), COLLOQUIAL_GUARD (suppress temporal/gcal 'view my' so calendar.list-events wins); re-imported via frozen machinery + re-emitted seed+catalog (NOT hand-edited); importer CORE byte-untouched; FLIPPED eval to HARD wrong-invoke===0; recall@5=1.000 HARD; breadth curated HARD=0 (a bestbuy 'catalog' IDF-shift regression was caught + fixed at the metadata source); scale 1.372MB/11.8ms/621B unchanged; INV-01 IIFE/djb2 byte-stable; validate:extension green
 - [Phase ?]: 43-03 (SCALE-02 self-heal impl, the net-new): turned 43-01's 3 RED tests GREEN. NEW extension/utils/relearn-scheduler.js (per-origin coalescing: N rot events on one origin -> ONE consent-gated re-learn, no thundering-herd; exponential back-off BASE 5s x2/attempt capped 5min via injectable now()/flush seam; bounded MAX_TRACKED_ORIGINS=64 LRU; consent-preserving+fail-safe -- invokes the supplied runDiscovery, captures nothing; dual-export IIFE, dynamic-code-free, NOT capability-* so off the recipe-path allowlist by construction -- Wall-1 holds). ADDITIVE on learned-recipe-store.js: recordRot/dispositionFor/recordOk per-(origin,slug) recurrence (>=3 systemic, reset-on-success, bounded RECURRENCE_CAP=24, T-32-PASS security passthrough never counted) + getOriginHealth(origin) degraded/needs-re-port accessor (all-quarantined -> degraded:true, reads the same _syncMirror as getLearnedSync) -- envelope/cap/LRU/quarantine/getLearnedSync/promote byte-unchanged. Additive importScripts in background.js after discovery-session.js. NO router-side adoption (the RED test pins only the scheduler's own behavior; _quarantineAndRelearn/consent gate/executeBoundSpec/tier dispatch/classifyRecipeBroken untouched). relearn-coalescing 16/0 + rot-recurrence-classify 19/0 + app-degraded-surfacing 14/0; recipe-path-guard + validate:extension + consent/router/store regression all green
+- [Phase ?]: 43-04 (THE MILESTONE GATE, v1.0.0 FINAL close): full npm test EXIT 0 over the whole catalog + all guards -- the authoritative v1.0.0 milestone signal. Sub-gates: INV-03 7-provider byte-equal (distinct=['RECIPE_DOM_FALLBACK_PENDING'] length 1, 31 passed); MIT provenance (127 apps MIT+SHA-pinned, PIN.md verbatim grant+disclaimer, Wall-1 no-runtime-js, 20 passed); SCALE-01 scale (1.372MB/11.7ms/621.7B/2314, 8 passed); SCALE-01 precision (eval wrong-invoke=0.000 HARD + recall@5=1.000, 16 passed; breadth curated=0.000 HARD, 52 passed); SCALE-02 self-heal (relearn-coalescing 16/0 + rot-recurrence-classify 19/0 + app-degraded-surfacing 14/0); INV-01 MCP surface + INV-02 autopilot parity; validate:extension EXIT 0 (INV-01..04 + Walls 1/2). Wrote 43-MILESTONE-GATE.md (gate table + npm-test-EXIT-0 + carried-forward NON-blocking UAT 41/42-HUMAN-UAT). 1 deviation [Rule 1/3]: lattice-provider-bridge-smoke background.js importScripts byte-freeze 187/183->188/184 for 43-03's additive relearn-scheduler importScripts (not reverting the legitimate module). v1.0.0 MILESTONE MET
 
 ### Pending Todos
 
