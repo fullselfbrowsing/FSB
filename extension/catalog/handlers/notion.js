@@ -30,6 +30,16 @@
    * 29-HUMAN-UAT.md). The /api/v3 + token_v2 mechanics ARE web-search-verified; the
    * exact request shape is not.
    *
+   * GUARDED WRITES (Phase 41, DEPTH-02): 3 fail-closed write slugs were APPENDED --
+   * notion.create_page / update_page / create_database_item (each UPGRADES its
+   * opentabs__notion__*.json breadth WRITE descriptor dom->T1a). Each ships FAIL-CLOSED
+   * (the github.issues.create pattern): handle() returns the dual-field
+   * RECIPE_DOM_FALLBACK_PENDING and NEVER calls buildRpcSpec or ctx.executeBoundSpec --
+   * NO mutation fires. The real mutating path is a POST /api/v3 submitTransaction RPC
+   * whose op + body are [ASSUMED-ENDPOINT]; the writes are inert until 41-HUMAN-UAT.md
+   * is satisfied. notion.append_block is sideEffectClass:'read' in its descriptor and
+   * stays a READ (NOT a write head).
+   *
    * Module shell: the dual-export IIFE mirror of capability-interpreter.js:372-385 --
    * the service worker reads global.FsbHandlerNotion after importScripts and the
    * module self-registers its slugs into FsbCapabilityCatalog at load; Node tests
@@ -70,6 +80,52 @@
       database_id: { type: 'string', minLength: 1 }
     },
     required: ['database_id'],
+    additionalProperties: false
+  };
+
+  // ---- Phase 41 (DEPTH-02) GUARDED-WRITE params schemas ---------------------
+  // Props mirrored EXACTLY from the opentabs__notion__create_page/update_page/
+  // create_database_item.json descriptors (the breadth write descriptors these slugs
+  // UPGRADE dom->T1a). The required fields are set; additionalProperties:false
+  // everywhere -- the AI cannot smuggle extra fields into a credentialed same-origin
+  // RPC. These schemas scaffold the params a single live-capture flips to executable;
+  // the handlers below are fail-closed today (they NEVER call buildRpcSpec or
+  // ctx.executeBoundSpec). NOTE: notion.append_block is sideEffectClass:'read' in its
+  // descriptor -> it is NOT a write head; create_database_item (verified write) is used.
+  var CREATE_PAGE_PARAMS = {
+    type: 'object',
+    properties: {
+      title: { type: 'string', minLength: 1 },
+      parent_page_id: { type: 'string' },
+      icon: { type: 'string' },
+      content: { type: 'string' }
+    },
+    required: ['title'],
+    additionalProperties: false
+  };
+  var UPDATE_PAGE_PARAMS = {
+    type: 'object',
+    properties: {
+      page_id: { type: 'string', minLength: 1 },
+      title: { type: 'string' },
+      icon: { type: 'string' },
+      cover: { type: 'string' }
+    },
+    required: ['page_id'],
+    additionalProperties: false
+  };
+  var CREATE_DATABASE_ITEM_PARAMS = {
+    type: 'object',
+    properties: {
+      database_id: { type: 'string', minLength: 1 },
+      title: { type: 'string', minLength: 1 },
+      properties: {
+        type: 'object',
+        propertyNames: { type: 'string' },
+        additionalProperties: { type: 'string' }
+      }
+    },
+    required: ['database_id', 'title'],
     additionalProperties: false
   };
 
@@ -195,6 +251,76 @@
           requests: [{ id: a.database_id, table: 'block' }]
         }), ctx.tabId);
         return guardRpcShape(res, 'notion.get_database');
+      }
+    },
+
+    // ======================================================================
+    // Phase 41 (DEPTH-02) -- the 3 GUARDED WRITE slugs (FAIL-CLOSED).
+    // ----------------------------------------------------------------------
+    // EXACT opentabs dot-form write slugs so resolve() UPGRADES each breadth
+    // descriptor (backing:'dom', sideEffectClass:'write') dom->T1a -- the
+    // correctness keystone, distinct from the read slugs above (no collision).
+    //
+    // EACH SHIPS FAIL-CLOSED, the github.issues.create pattern (github.js:111-123):
+    // handle() returns the dual-field RECIPE_DOM_FALLBACK_PENDING (reason
+    // unverified-notion-<verb>-mutation, fellBackToDom:true) and NEVER calls
+    // buildRpcSpec or ctx.executeBoundSpec -- so NO mutation fires. Behaviorally
+    // identical to its T3-DOM descriptor today; the VALUE is the scaffolded
+    // params+endpoint+gating a single live-capture flips to executable.
+    //
+    // [ASSUMED-ENDPOINT] -- Notion mutations are POST /api/v3 submitTransaction RPCs
+    // (www.notion.so/api/v3 is the SAME-ORIGIN PATH, notion-api.ts:102; the token_v2
+    // HttpOnly cookie authenticates same-origin). The exact submitTransaction op + body
+    // shape require a live-captured body; the writes ship FAIL-CLOSED until
+    // 41-HUMAN-UAT.md (the notion rows recorded in Plan 04) is satisfied. The handler
+    // builds NO spec and reads NO token (it fails closed before any RPC).
+    //
+    // NOTE: notion.append_block is sideEffectClass:'read' in its descriptor and stays a
+    // READ (notion.search/get_database/append_block reads). create_database_item is the
+    // genuine WRITE used here to keep 3 verified writes.
+
+    // ---- notion.create_page (write -- fail-closed) -------------------------
+    'notion.create_page': {
+      tier: 'T1a',
+      origin: NOTION_ORIGIN,
+      sideEffectClass: 'write',
+      params: CREATE_PAGE_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'notion.create_page',
+          reason: 'unverified-notion-create-page-mutation',
+          fellBackToDom: true
+        });
+      }
+    },
+
+    // ---- notion.update_page (write -- fail-closed) -------------------------
+    'notion.update_page': {
+      tier: 'T1a',
+      origin: NOTION_ORIGIN,
+      sideEffectClass: 'write',
+      params: UPDATE_PAGE_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'notion.update_page',
+          reason: 'unverified-notion-update-page-mutation',
+          fellBackToDom: true
+        });
+      }
+    },
+
+    // ---- notion.create_database_item (write -- fail-closed) ----------------
+    'notion.create_database_item': {
+      tier: 'T1a',
+      origin: NOTION_ORIGIN,
+      sideEffectClass: 'write',
+      params: CREATE_DATABASE_ITEM_PARAMS,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: 'notion.create_database_item',
+          reason: 'unverified-notion-create-database-item-mutation',
+          fellBackToDom: true
+        });
       }
     }
   };
