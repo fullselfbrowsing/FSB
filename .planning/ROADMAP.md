@@ -176,7 +176,13 @@ Plans:
   1. The OpenTabs origins (+ known endpoint hints) seed the Phase-31 network-capture discovery via a `discovery-seeds.json`; `network-capture.js` reads the hints (no manifest/permission change), and a seeded origin is verified to learn a T2 recipe via promote-after-replay (consent-gated) — a hint only biases recognition, never executes, until a real captured + replayed call promotes it.
   2. A descriptor whose origin has a seed resolves to T2 (learn-pending) and a learned T2 recipe outranks the descriptor-T3 on the next visit, so the hot tail upgrades to the API fast path from the user's own traffic; `RECIPE_LEARN_PENDING` surfaces as an actionable "open the site while logged in to learn it" affordance, not a silent no-op.
   3. The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring (Stripe `session_api_key`, Instagram `csrftoken`, Linear `linear-client-id`, token-shape patterns, …) is persisted into any learned-recipe envelope, audit entry, or diagnostic ring at scale — capture reads structure only, never a header value/body/query.
-**Plans**: TBD
+**Plans**: 5 plans (3 waves)
+Plans:
+- [ ] 42-01-PLAN.md — Wave 0: the discovery-seed harvester + discovery-seeds.json (origin->hints, provenance/SHA-pinned) + the seed-load/no-manifest-change keystone test + the 119-app redaction no-leak EXTENSION (DSEED-02 keystone, RED-first) + new-test registration [wave 0]
+- [ ] 42-02-PLAN.md — the redactor AUTH_CARRIER_DENYLIST 119-app extension (+ token-shape; turns the keystone GREEN, structure-only preserved) + the network-capture seed loader (lazy/no-throw) + the synthesizer recognition-bias (metadata-only, never executes) [wave 1]
+- [ ] 42-03-PLAN.md — the resolve() seed->T2 branch (seeded would-be-T3 -> T2 learn-pending; unseeded stays T3; LEARN-04 learned-first UNCHANGED; INV-01 shape untouched) + seed-resolve-t2 test [wave 1]
+- [ ] 42-04-PLAN.md — the RECIPE_LEARN_PENDING actionable affordance (additive reason/actionable/message; INV-03 byte-stable code) + its test [wave 1]
+- [ ] 42-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + the no-manifest-change assert + capture/consent/promote core UNCHANGED + INV-01/INV-03 green + the live first-visit human_needed slice (42-HUMAN-UAT.md) [wave 2]
 
 ### Phase 43: Catalog-Scale + Milestone Gate
 **Goal**: Close the milestone by proving full-corpus performance, hardening self-heal for the now-119-app rot surface, and gating on the full test suite — mirroring the v0.9.99 Phase-32 milestone-gate posture.
