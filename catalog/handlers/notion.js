@@ -157,19 +157,39 @@
     return out;
   }
 
+  // A top-level Notion error envelope carries a string `name` (e.g.
+  // { name: 'unauthorized' } / { name: 'ValidationError' }, the shape notion-api.ts
+  // parses on a non-ok response: { name?, message?, debugMessage? }) or a string
+  // `errorId` (Notion's documented internal-API error marker) -- neither of which a
+  // legitimate /api/v3 read body carries. Used to reject an error envelope returned
+  // with a 200 (the logged-out / stale-auth case) that would otherwise pass the
+  // "non-null object" check. Conservative and keyed ONLY on the documented error
+  // markers (parity with gitlab.js looksLikeGitlabError): a legitimate read body --
+  // a getSpaces user-id-keyed map, a search results object, or a recordMap record
+  // fetch -- carries neither marker, so it is never excluded.
+  function looksLikeNotionError(data) {
+    return !!data && typeof data === 'object' && !Array.isArray(data)
+      && (typeof data.name === 'string' || typeof data.errorId === 'string');
+  }
+
   // The logged-out guard (CONTEXT Top Risk, "200-with-logged-out-body"): a
   // logged-out www.notion.so tab can answer an /api/v3 RPC with a 200 carrying a
   // sign-in/redirect body. executeBoundSpec returns { success, data, ... } where
   // `data` is the parsed RPC payload. The RPC reads return a non-null object/array
   // (search -> a results object; a record fetch -> a recordMap object). On a wrong
-  // shape (null / primitive), return the dual-field RECIPE_DOM_FALLBACK_PENDING so
-  // the breadth DOM path serves; otherwise return the result verbatim.
+  // shape (null / primitive) OR a Notion error envelope masquerading as a 200
+  // (IN-04 hardening: parity with gitlab's error-envelope rejection -- a logged-out
+  // body that happens to be a non-null object no longer slips through), return the
+  // dual-field RECIPE_DOM_FALLBACK_PENDING so the breadth DOM path serves; otherwise
+  // return the result verbatim. Reads only; the notion WRITES are fail-closed and
+  // never reach this guard.
   function guardRpcShape(result, slug) {
     if (!result || result.success !== true) {
       return result;   // pin / fetch failure -> return verbatim; do NOT mask it.
     }
     var data = result.data;
-    var ok = !!data && (typeof data === 'object');   // object or array; not null/primitive
+    var ok = !!data && (typeof data === 'object')   // object or array; not null/primitive
+      && !looksLikeNotionError(data);               // and NOT a logged-out error envelope
     if (!ok) {
       return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
         slug: slug,
