@@ -432,6 +432,111 @@
     return collected;
   }
 
+  // ---- discovery-seeds loader (Phase 42 DSEED-01; mirror service-denylist.js) -
+  //
+  // CRITICAL per SC1: this loader reads METADATA only. It adds NO host permission,
+  // NO manifest change, and is NOT a fetch right to the seeded origins. It does NOT
+  // call startSession differently, does NOT touch the consent gate (_runGate), and
+  // does NOT change the capture core. The seeds are consulted later (the synthesizer
+  // recognition bias + the resolve() seed->T2 branch), NEVER to initiate a network
+  // call. A hint biases recognition; it never executes.
+  //
+  // Posture mirrors service-denylist.js EXACTLY: a module-level cache + a lazy
+  // initializer that (a) in SW/browser fetches chrome.runtime.getURL('config/
+  // discovery-seeds.json'); (b) under Node require()s ../config/discovery-seeds.json;
+  // (c) on ANY failure degrades to EMPTY seeds ({}) and emits a single best-effort
+  // warn -- NEVER throws on the boot path.
+  var _seeds = null;            // null = not yet loaded; {} or populated = loaded
+  var _seedsLoadWarned = false;
+
+  function _captureChrome() {
+    return (typeof globalThis !== 'undefined' && globalThis.chrome) ? globalThis.chrome : null;
+  }
+
+  function _warnSeedsMissing(detail) {
+    if (_seedsLoadWarned) { return; }
+    _seedsLoadWarned = true;
+    var msg = 'discovery-seeds.json could not be loaded -- seeds are EMPTY (recognition bias off); capture/consent unaffected';
+    try {
+      if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
+        globalThis.rateLimitedWarn('BG', 'discovery-seeds-missing', msg, { detail: String(detail || 'unknown') });
+        return;
+      }
+    } catch (_e) { /* fall through */ }
+    try { console.warn('[FSB BG] ' + msg); } catch (_e2) { /* console may be absent */ }
+  }
+
+  function _applySeeds(data) {
+    _seeds = (data && typeof data === 'object') ? data : {};
+  }
+
+  // Synchronous best-effort lazy load for the Node/require path (the SW path resolves
+  // via the async fetch in loadSeeds(); getSeedsSync degrades to {} until then).
+  function _tryRequireSeeds() {
+    try {
+      if (typeof require === 'function') {
+        // Resolve relative to this module: ../config/discovery-seeds.json.
+        return require('../config/discovery-seeds.json');
+      }
+    } catch (_e) {
+      _warnSeedsMissing((_e && _e.message) ? _e.message : 'require threw');
+    }
+    return null;
+  }
+
+  // loadSeeds() -> Promise<void>. The SW boot path; mirrors service-denylist load().
+  var _seedsLoadPromise = null;
+  function loadSeeds() {
+    if (_seeds !== null) { return Promise.resolve(); }
+    if (_seedsLoadPromise) { return _seedsLoadPromise; }
+    _seedsLoadPromise = (async function () {
+      var fetchErr = null;
+      var chrome = _captureChrome();
+      if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
+        try {
+          var url = chrome.runtime.getURL('config/discovery-seeds.json');
+          var resp = await fetch(url);
+          if (resp && resp.ok) { _applySeeds(await resp.json()); return; }
+          fetchErr = 'fetch status ' + (resp ? resp.status : 'no-response');
+        } catch (_e) {
+          fetchErr = (_e && _e.message) ? _e.message : 'fetch threw';
+        }
+      }
+      var viaRequire = _tryRequireSeeds();
+      if (viaRequire) { _applySeeds(viaRequire); return; }
+      _warnSeedsMissing(fetchErr);
+      _applySeeds({});   // degrade to empty -- never throw on boot
+    })().catch(function (e) {
+      _warnSeedsMissing((e && e.message) ? e.message : String(e));
+      _applySeeds({});
+    });
+    return _seedsLoadPromise;
+  }
+
+  // getSeedsSync() -> the loaded seeds object (or {} if not yet loaded). On the Node
+  // path it lazily require()s once so the catalog/synthesizer suites see the real
+  // seeds without an explicit loadSeeds() await; on the SW path it returns whatever
+  // loadSeeds() has populated (or {} until then). NEVER throws.
+  function getSeedsSync() {
+    if (_seeds === null) {
+      var viaRequire = _tryRequireSeeds();
+      _applySeeds(viaRequire || {});
+    }
+    return _seeds || {};
+  }
+
+  // getSeedForOrigin(origin) -> { hints, provenance } | null. A bare-origin lookup
+  // into the loaded seeds; the _meta key is never a match. Metadata read only.
+  function getSeedForOrigin(origin) {
+    if (typeof origin !== 'string' || origin.length === 0) { return null; }
+    var seeds = getSeedsSync();
+    if (!seeds || typeof seeds !== 'object') { return null; }
+    if (!Object.prototype.hasOwnProperty.call(seeds, origin)) { return null; }
+    if (origin === '_meta') { return null; }
+    var entry = seeds[origin];
+    return (entry && typeof entry === 'object') ? entry : null;
+  }
+
   // ---- Export shape (dual-export IIFE; mirror consent-policy-store.js) ------
   var exportsObj = {
     startSession: startSession,
@@ -439,7 +544,12 @@
     _onCdpEvent: _onCdpEvent,
     _filterResourceType: _filterResourceType,
     _getObservedCalls: _getObservedCalls,
-    _getLastEndedCalls: _getLastEndedCalls
+    _getLastEndedCalls: _getLastEndedCalls,
+    // Phase 42 (DSEED-01) ADDITIVE seed accessors -- metadata only, no fetch right,
+    // no manifest change. The existing surface above is UNCHANGED (byte-stable).
+    loadSeeds: loadSeeds,
+    getSeedsSync: getSeedsSync,
+    getSeedForOrigin: getSeedForOrigin
   };
 
   global.FsbNetworkCapture = exportsObj;   // SW importScripts consumer reads this global
