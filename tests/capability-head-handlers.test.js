@@ -86,19 +86,40 @@ function makeCtx(origin, tabId, opts) {
       async executeBoundSpec(spec, tid) {
         calls.push({ spec: spec, tabId: tid });
         // Answer a read-only GET probe with a canned token payload (the scrape
-        // source) so the handler's next spec carries the token it read.
-        const isProbe = spec && spec.method === 'GET';
+        // source) so the handler's next spec carries the token it read. The
+        // slack/github GET on their OWN origin is a from:'response' token probe;
+        // the gitlab GET on /api/v4 is a real REST read (NOT a probe) -- it must
+        // receive a logged-in body so the gitlab logged-out shape guard sees real
+        // data (an array for list_*, an id-bearing object for get_*).
+        const url = (spec && typeof spec.url === 'string') ? spec.url : '';
+        const isGet = spec && spec.method === 'GET';
+        const isGitlabRest = isGet && url.indexOf('/api/v4') !== -1;
+        const isProbe = isGet && !isGitlabRest;
         let text = null;
-        if (isProbe && spec && typeof spec.url === 'string' && spec.url.indexOf('app.slack.com') !== -1) {
+        if (isProbe && url.indexOf('app.slack.com') !== -1) {
           text = Object.prototype.hasOwnProperty.call(options, 'slackProbeText')
             ? options.slackProbeText
             : '<html><script>window.boot = {"xoxc":"xoxc-TEST-SYNTHETIC"};</script></html>';
-        } else if (isProbe && spec && typeof spec.url === 'string' && spec.url.indexOf('github.com') !== -1) {
+        } else if (isProbe && url.indexOf('github.com') !== -1) {
           text = Object.prototype.hasOwnProperty.call(options, 'githubProbeText')
             ? options.githubProbeText
             : '<html><head><meta name="csrf-token" content="csrf-TEST-SYNTHETIC"></head></html>';
         }
-        const data = isProbe ? null : { ok: true };
+        let data;
+        if (isProbe) {
+          data = null;
+        } else if (isGitlabRest) {
+          // A logged-in GitLab REST read: list_* endpoints return an array; a
+          // single-resource path (.../issues/<iid> or .../projects/<id>) returns an
+          // id-bearing object. Heuristic: a trailing numeric/encoded id segment ->
+          // object, else array (mirrors the /api/v4 contract the guard checks).
+          const tail = url.split('?')[0].replace(/\/+$/, '');
+          const lastSeg = tail.substring(tail.lastIndexOf('/') + 1);
+          const looksLikeId = /^\d+$/.test(lastSeg) || /%2F/i.test(lastSeg) || (/^[0-9]+$/.test(decodeURIComponent(lastSeg)));
+          data = looksLikeId ? { id: 1, iid: 1 } : [{ id: 1 }];
+        } else {
+          data = { ok: true };
+        }
         return {
           success: true,
           status: 200,
@@ -304,6 +325,175 @@ const Schema = require(SCHEMA_PATH);
       'notion.getSpaces POST spec is pinned to https://www.notion.so');
     check(ntOut && ntOut.success === true,
       'notion.getSpaces.handle returns the executeBoundSpec result');
+  }
+
+  // =========================================================================
+  // Phase 40 (DEPTH-01) -- GitLab NEW head module -- catalog/handlers/gitlab.js
+  // (5 READ T1a slugs on the first-party origin https://gitlab.com/api/v4).
+  // Scaffolded in 40-01 so 40-02 edits ONLY catalog/handlers/gitlab.js. RED until
+  // gitlab.js lands (existsSync-guarded so the suite does not crash pre-40-02).
+  // =========================================================================
+  const gitlabPath = path.join(HANDLERS_DIR, 'gitlab.js');
+  check(fs.existsSync(gitlabPath), 'catalog/handlers/gitlab.js exists (Phase 40-02)');
+  if (fs.existsSync(gitlabPath)) {
+    const gl = require(gitlabPath);
+    const glSrc = readSource(gitlabPath);
+
+    check(gl['gitlab.list_projects'] && gl['gitlab.list_projects'].tier === 'T1a'
+      && typeof gl['gitlab.list_projects'].handle === 'function',
+      'gitlab.list_projects is a tier:T1a entry with an async handle');
+    check(gl['gitlab.list_projects'] && gl['gitlab.list_projects'].origin === 'https://gitlab.com',
+      'gitlab.list_projects targets the first-party origin https://gitlab.com');
+    check(gl['gitlab.list_projects'] && gl['gitlab.list_projects'].sideEffectClass === 'read',
+      'gitlab.list_projects is a READ slug');
+    check(gl['gitlab.get_issue'] && gl['gitlab.get_issue'].tier === 'T1a'
+      && gl['gitlab.get_issue'].sideEffectClass === 'read'
+      && typeof gl['gitlab.get_issue'].handle === 'function',
+      'gitlab.get_issue is a tier:T1a READ entry with an async handle');
+    check(gl['gitlab.get_issue'] && gl['gitlab.get_issue'].origin === 'https://gitlab.com',
+      'gitlab.get_issue targets https://gitlab.com (NOT api.gitlab.com)');
+    check(gl['gitlab.get_issue'] && gl['gitlab.get_issue'].params
+      && Array.isArray(gl['gitlab.get_issue'].params.required)
+      && gl['gitlab.get_issue'].params.required.indexOf('project') !== -1
+      && gl['gitlab.get_issue'].params.required.indexOf('issue_iid') !== -1,
+      'gitlab.get_issue exposes a params schema requiring project + issue_iid');
+
+    // SECURITY: same-origin /api/v4 only; NO separate api.gitlab.com host; no chrome.*.
+    check(glSrc.indexOf('/api/v4') !== -1,
+      'gitlab.js targets the same-origin /api/v4 path');
+    check(glSrc.indexOf('api.gitlab.com') === -1,
+      'gitlab.js references NO separate-origin api.gitlab.com (origin-pin correctness)');
+    check(!/chrome\.(scripting|tabs)/.test(glSrc),
+      'gitlab.js references NO chrome.scripting/chrome.tabs (the pin lives in executeBoundSpec)');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf)\b/i.test(glSrc),
+      'gitlab.js does NOT console-log a token/cookie/csrf-bearing variable');
+
+    // list_projects: a single same-origin GET to /api/v4/projects pinned to gitlab.com.
+    const glList = makeCtx('https://gitlab.com', 41);
+    const glListOut = await gl['gitlab.list_projects'].handle({}, glList.ctx);
+    check(glList.calls.length === 1,
+      'gitlab.list_projects.handle calls ctx.executeBoundSpec exactly once');
+    check(glList.calls.length === 1 && glList.calls[0].spec
+      && glList.calls[0].spec.method === 'GET',
+      'gitlab.list_projects builds a GET spec');
+    check(glList.calls.length === 1 && glList.calls[0].spec
+      && glList.calls[0].spec.origin === 'https://gitlab.com',
+      'gitlab.list_projects builds a spec pinned to origin https://gitlab.com');
+    check(glList.calls.length === 1 && glList.calls[0].spec
+      && typeof glList.calls[0].spec.url === 'string'
+      && glList.calls[0].spec.url.indexOf('/api/v4/projects') !== -1,
+      'gitlab.list_projects targets /api/v4/projects');
+    check(glListOut && glListOut.success === true,
+      'gitlab.list_projects.handle returns success for a logged-in array body');
+  }
+
+  // =========================================================================
+  // Phase 40 (DEPTH-01) -- Slack EXTEND -- catalog/handlers/slack.js
+  // (3 new READ T1a slugs via callSlackMethod; token in BODY never logged).
+  // Scaffolded in 40-01 so 40-03 edits ONLY catalog/handlers/slack.js. RED until
+  // the new slugs land.
+  // =========================================================================
+  if (fs.existsSync(slackPath)) {
+    const sl40 = require(slackPath);
+    const sl40Src = readSource(slackPath);
+
+    check(sl40['slack.list_channels'] && sl40['slack.list_channels'].tier === 'T1a'
+      && sl40['slack.list_channels'].sideEffectClass === 'read'
+      && typeof sl40['slack.list_channels'].handle === 'function',
+      'slack.list_channels is a tier:T1a READ entry with an async handle');
+    check(sl40['slack.list_channels'] && sl40['slack.list_channels'].origin === 'https://app.slack.com',
+      'slack.list_channels targets the first-party origin https://app.slack.com');
+    check(sl40['slack.get_channel_info'] && sl40['slack.get_channel_info'].tier === 'T1a'
+      && sl40['slack.get_channel_info'].sideEffectClass === 'read'
+      && typeof sl40['slack.get_channel_info'].handle === 'function',
+      'slack.get_channel_info is a tier:T1a READ entry with an async handle');
+    check(sl40['slack.get_channel_info'] && sl40['slack.get_channel_info'].origin === 'https://app.slack.com',
+      'slack.get_channel_info targets https://app.slack.com');
+    check(sl40['slack.get_channel_info'] && sl40['slack.get_channel_info'].params
+      && Array.isArray(sl40['slack.get_channel_info'].params.required)
+      && sl40['slack.get_channel_info'].params.required.indexOf('channel') !== -1,
+      'slack.get_channel_info exposes a params schema requiring channel');
+
+    // Token-in-body discipline still holds for the new slugs (no console name).
+    check(!/console\.\w+\([^)]*\b(xoxc|xoxd|token)\b/i.test(sl40Src),
+      'slack.js does NOT console-log an xoxc/xoxd/token-bearing variable (extends safe)');
+
+    // list_channels: scrape xoxc, POST same-origin /api with the token in the BODY.
+    // Guarded by slug presence so the suite REDs cleanly pre-40-03 (no FATAL crash
+    // from invoking an undefined handle).
+    if (sl40['slack.list_channels'] && typeof sl40['slack.list_channels'].handle === 'function') {
+      const sl40Read = makeCtx('https://app.slack.com', 42);
+      const sl40Out = await sl40['slack.list_channels'].handle({}, sl40Read.ctx);
+      const sl40Post = sl40Read.calls.find(function (c) { return c.spec && c.spec.method === 'POST'; });
+      check(!!sl40Post, 'slack.list_channels issues a POST spec (Slack web API is POST)');
+      check(sl40Post && sl40Post.spec.origin === 'https://app.slack.com',
+        'slack.list_channels POST spec is pinned to https://app.slack.com');
+      var sl40Body = '';
+      if (sl40Post && sl40Post.spec) {
+        sl40Body = (typeof sl40Post.spec.body === 'string') ? sl40Post.spec.body : JSON.stringify(sl40Post.spec.body || {});
+      }
+      check(sl40Body.indexOf('xoxc') !== -1 || sl40Body.indexOf('token') !== -1,
+        'slack.list_channels places the xoxc token in the request BODY (not a header)');
+      var sl40Headers = JSON.stringify((sl40Post && sl40Post.spec && sl40Post.spec.headers) || {});
+      check(sl40Headers.indexOf('xoxc') === -1,
+        'slack.list_channels does NOT place xoxc in a request header (body-only)');
+      check(sl40Out && sl40Out.success === true,
+        'slack.list_channels.handle returns the executeBoundSpec result');
+    } else {
+      check(false, 'slack.list_channels.handle is invocable (Phase 40-03 -- behavioral checks pending)');
+    }
+  }
+
+  // =========================================================================
+  // Phase 40 (DEPTH-01) -- Notion EXTEND -- catalog/handlers/notion.js
+  // (2 new READ T1a slugs via buildRpcSpec; same-origin /api/v3 POST).
+  // Scaffolded in 40-01 so 40-04 edits ONLY catalog/handlers/notion.js. RED until
+  // the new slugs land.
+  // =========================================================================
+  if (fs.existsSync(notionPath)) {
+    const nt40 = require(notionPath);
+    const nt40Src = readSource(notionPath);
+
+    check(nt40['notion.search'] && nt40['notion.search'].tier === 'T1a'
+      && nt40['notion.search'].sideEffectClass === 'read'
+      && typeof nt40['notion.search'].handle === 'function',
+      'notion.search is a tier:T1a READ entry with an async handle');
+    check(nt40['notion.search'] && nt40['notion.search'].origin === 'https://www.notion.so',
+      'notion.search targets the first-party origin https://www.notion.so');
+    check(nt40['notion.search'] && nt40['notion.search'].params
+      && Array.isArray(nt40['notion.search'].params.required)
+      && nt40['notion.search'].params.required.indexOf('query') !== -1,
+      'notion.search exposes a params schema requiring query');
+    check(nt40['notion.get_database'] && nt40['notion.get_database'].tier === 'T1a'
+      && nt40['notion.get_database'].sideEffectClass === 'read'
+      && typeof nt40['notion.get_database'].handle === 'function',
+      'notion.get_database is a tier:T1a READ entry with an async handle');
+    check(nt40['notion.get_database'] && nt40['notion.get_database'].origin === 'https://www.notion.so',
+      'notion.get_database targets https://www.notion.so');
+    check(nt40['notion.get_database'] && nt40['notion.get_database'].params
+      && Array.isArray(nt40['notion.get_database'].params.required)
+      && nt40['notion.get_database'].params.required.indexOf('database_id') !== -1,
+      'notion.get_database exposes a params schema requiring database_id');
+
+    check(nt40Src.indexOf('api.notion.com') === -1,
+      'notion.js references NO separate-origin api.notion.com (extends safe)');
+
+    // search: a single same-origin POST to /api/v3 pinned to www.notion.so.
+    // Guarded by slug presence so the suite REDs cleanly pre-40-04 (no FATAL crash).
+    if (nt40['notion.search'] && typeof nt40['notion.search'].handle === 'function') {
+      const nt40Ctx = makeCtx('https://www.notion.so', 43);
+      const nt40Out = await nt40['notion.search'].handle({ query: 'roadmap' }, nt40Ctx.ctx);
+      const nt40Post = nt40Ctx.calls.find(function (c) { return c.spec && c.spec.method === 'POST'; });
+      check(!!nt40Post, 'notion.search issues a POST spec (/api/v3 is POST-only RPC)');
+      check(nt40Post && typeof nt40Post.spec.url === 'string' && nt40Post.spec.url.indexOf('/api/v3') !== -1,
+        'notion.search POSTs the same-origin /api/v3 RPC endpoint');
+      check(nt40Post && nt40Post.spec.origin === 'https://www.notion.so',
+        'notion.search POST spec is pinned to https://www.notion.so');
+      check(nt40Out && nt40Out.success === true,
+        'notion.search.handle returns the executeBoundSpec result');
+    } else {
+      check(false, 'notion.search.handle is invocable (Phase 40-04 -- behavioral checks pending)');
+    }
   }
 
   // =========================================================================
