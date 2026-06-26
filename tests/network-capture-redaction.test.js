@@ -229,7 +229,10 @@ const BODY_SECRET = 'bodyPASSWORD-hunter2';
   const SK_PATH = 'sk_' + 'live_DISTINCTSENTINEL123pathABCDEFG';
   const GHO_PATH = 'gho_DISTINCTtokenPATH1234567890abcdef';
   const XOX_PATH = 'xoxb-DISTINCTslackPATH-1234567890';
-  const AKIA_PATH = 'AKIADISTINCTAWSPATH99';
+  // A REAL-shaped AWS access key id: 'AKIA' + exactly 16 [A-Z0-9] (the actual leak
+  // vector). 'AKIA' + 'DISTINCTAWS9X99Z' = 4 + 16 = 20 chars, matching the precise
+  // ^(AKIA|ASIA)[A-Z0-9]{16}$ shape the scrub masks.
+  const AKIA_PATH = 'AKIADISTINCTAWS9X99Z';
   const YA29_PATH = 'ya29.DISTINCTgoogleOAuthPATHtoken';
   const USHARE_PATH = 'u!aHR0cHM_DISTINCT-ABshareIdPATH';
   const PATH_TOKEN_CASES = [
@@ -238,7 +241,7 @@ const BODY_SECRET = 'bodyPASSWORD-hunter2';
     { url: 'https://app.example.com/s/' + SK_PATH, sentinel: 'DISTINCTSENTINEL123', label: 'stripe sk_live_ in path' },
     { url: 'https://app.example.com/x/' + GHO_PATH, sentinel: 'DISTINCTtokenPATH', label: 'github gho_ in path' },
     { url: 'https://app.example.com/i/' + XOX_PATH, sentinel: 'DISTINCTslackPATH', label: 'slack xoxb- in path' },
-    { url: 'https://app.example.com/k/' + AKIA_PATH, sentinel: 'DISTINCTAWSPATH', label: 'aws AKIA in path' },
+    { url: 'https://app.example.com/k/' + AKIA_PATH, sentinel: 'DISTINCTAWS', label: 'aws AKIA in path' },
     { url: 'https://app.example.com/g/' + YA29_PATH, sentinel: 'DISTINCTgoogleOAuthPATH', label: 'google ya29. in path' },
     { url: 'https://app.example.com/shares/' + USHARE_PATH + '/driveItem', sentinel: 'DISTINCT-ABshareIdPATH', label: 'MS Graph u! share-id in path' }
   ];
