@@ -241,7 +241,12 @@
   var HEAD_HANDLER_MODULES = [
     { global: 'FsbHandlerGithub', service: 'github.com', origin: 'https://github.com' },
     { global: 'FsbHandlerSlack', service: 'app.slack.com', origin: 'https://app.slack.com' },
-    { global: 'FsbHandlerNotion', service: 'www.notion.so', origin: 'https://www.notion.so' }
+    { global: 'FsbHandlerNotion', service: 'www.notion.so', origin: 'https://www.notion.so' },
+    // Phase 40 (DEPTH-01): the GitLab READ head -- 5 same-origin gitlab.com/api/v4
+    // reads, the same-origin replacement for the deferred linear (40-01 decision_note).
+    // 4th module, <=30. seedHeadHandlers() seeds its slugs from this manifest
+    // (defense-in-depth alongside the module self-register).
+    { global: 'FsbHandlerGitlab', service: 'gitlab.com', origin: 'https://gitlab.com' }
   ];
 
   function _readGlobal(name) {
