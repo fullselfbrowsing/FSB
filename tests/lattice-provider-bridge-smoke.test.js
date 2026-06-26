@@ -593,8 +593,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 30/31 is swept in because those phases left this byte-freeze count stale.
   // Phase 34 (safe file upload): 186 mentions (+1 -- utils/upload-path-denylist.js).
   // Phase 40 (DEPTH-01): 187 mentions (+1 -- catalog/handlers/gitlab.js, the 4th bundled-head handler).
+  // Phase 43 (SCALE-02): 188 mentions (+1 -- utils/relearn-scheduler.js, the per-origin re-learn
+  // coalescing/back-off scheduler wired additively after discovery-session.js, Plan 43-03).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 187, 'background.js importScripts count = 187 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js)');
+  passAssertEqual(importScriptsCount, 188, 'background.js importScripts count = 188 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -609,8 +611,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 32 adds 1 (utils/capability-rot-detector.js, Plan 32-03) -> 181.
   // Phase 34 adds 1 (utils/upload-path-denylist.js) -> 182.
   // Phase 40 adds 1 (catalog/handlers/gitlab.js, the 4th bundled-head handler) -> 183.
+  // Phase 43 adds 1 (utils/relearn-scheduler.js, the SCALE-02 re-learn scheduler, Plan 43-03) -> 184.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 183, 'background.js importScripts() call sites = 183 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js)');
+  passAssertEqual(importScriptsCallSites, 184, 'background.js importScripts() call sites = 184 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
