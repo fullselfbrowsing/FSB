@@ -597,25 +597,25 @@
       var slugs = Object.keys(perOrigin);
       if (!slugs.length) { return healthy; } // no learned recipes -> healthy default
       var anyLive = false;
-      var allQuarantined = true;
       for (var i = 0; i < slugs.length; i++) {
         var entry = perOrigin[slugs[i]];
         if (!entry || typeof entry !== 'object') { continue; }
         if (entry.quarantined === true) { continue; }
         // a live (non-quarantined) recipe whose recurrence has NOT crossed systemic
         // counts as healthy; a live recipe trending systemic is itself degraded surface.
-        allQuarantined = false;
         if (dispositionFor(origin, slugs[i]) !== 'systemic') {
           anyLive = true;
         }
       }
       if (anyLive) { return healthy; }
-      // ALL learned recipes are quarantined (or the only live ones crossed systemic) ->
-      // the origin is degraded / needs re-port (VISIBLE, not a silent failure).
-      if (allQuarantined || !anyLive) {
-        return { degraded: true, status: 'needs-re-port', origin: origin };
-      }
-      return healthy;
+      // Execution only reaches here when anyLive is FALSE (the early `if (anyLive) return
+      // healthy` above guarantees it): every learned recipe for this origin is quarantined
+      // (or the only live ones crossed systemic). So the origin is unconditionally degraded
+      // / needs re-port (VISIBLE, not a silent failure). LO-01 (43-REVIEW): the former
+      // `if (allQuarantined || !anyLive)` guard was always true at this point -- a dead
+      // guard whose `allQuarantined` tracker + unreachable trailing `return healthy` only
+      // misled a reader into thinking a fall-through case existed. Both removed.
+      return { degraded: true, status: 'needs-re-port', origin: origin };
     } catch (_e) {
       return healthy;
     }
