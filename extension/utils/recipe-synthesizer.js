@@ -105,9 +105,11 @@
         var hp = pathHints[j];
         if (observedPath === hp || template === hp) { return true; }
         // static-prefix hint (e.g. '/v1', '/shares', '/graphql'): the observed path
-        // riding under it corresponds to the seeded endpoint family.
-        if (typeof observedPath === 'string' && (observedPath === hp || observedPath.indexOf(hp + '/') === 0)) { return true; }
-        if (typeof template === 'string' && (template === hp || template.indexOf(hp + '/') === 0)) { return true; }
+        // riding under it corresponds to the seeded endpoint family. The exact-equal
+        // case is already handled above, so only the trailing-slash prefix match
+        // remains here (requires hp + '/' so '/v1' matches '/v1/charges' but NOT '/v1abc').
+        if (typeof observedPath === 'string' && observedPath.indexOf(hp + '/') === 0) { return true; }
+        if (typeof template === 'string' && template.indexOf(hp + '/') === 0) { return true; }
       }
       return false;
     } catch (_e) {
