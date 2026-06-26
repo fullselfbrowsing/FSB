@@ -139,6 +139,141 @@ const BODY_SECRET = 'bodyPASSWORD-hunter2';
     check(serialized.indexOf(sub) === -1, "serialized redacted artifact contains NO '" + sub + "' substring");
   }
 
+  // =========================================================================
+  // PHASE 42 (DSEED-02) EXTENSION -- the 119-app auth-carrier no-leak at scale.
+  // Three APPENDED blocks (the existing cases above stay GREEN + UNCHANGED):
+  //   (1) 119-app HEADER-carrier universe: NONE of the carrier NAMES survive in
+  //       headerNames; NO sentinel/token VALUE survives anywhere.
+  //   (2) PATH-token-in-segment (the SC3 sink-#1 vector): a token shape embedded in
+  //       a URL PATH SEGMENT is masked to ':tok'; ZERO sentinel token substring in
+  //       red.path OR the serialized artifact.
+  //   (3) BENIGN-slug NEGATIVE (no false-positive): a hyphenated org/repo slug
+  //       survives LITERAL (NOT masked) so legitimate recipe templates still match.
+  //
+  // RED-FIRST: blocks (1)+(2) FAIL against the not-yet-extended redactor (carrier
+  // NAMES + path tokens survive); Plan 02 (denylist extension + _shapeUrl path
+  // scrub) turns them GREEN. Block (3) is GREEN today and MUST STAY GREEN.
+  // =========================================================================
+  console.log('--- DSEED-02: 119-app auth-carrier universe no-leak (RED until Plan 02) ---');
+
+  // ---- (1) 119-app HEADER-carrier universe -------------------------------------
+  // The auth-carrier NAME universe audited from the vendored *-api.ts getAuth()/
+  // header-construction structs: the SC-named carriers PLUS a representative spread
+  // of the cross-app families. Each is seeded as a header NAME with a DISTINCTIVE
+  // sentinel VALUE (so a passing no-VALUE assertion is non-vacuous).
+  const H = (n) => n; // identity, for readability of the carrier-name list
+  const HEADER_CARRIERS = [
+    // SC-named
+    H('session_api_key'), H('csrf_token'), H('csrftoken'), H('linear-client-id'), H('organization'),
+    // cross-app X- families
+    H('x-csrf-token'), H('x-csrftoken'), H('x-xsrf-token'), H('x-amz-security-token'), H('x-amz-date'),
+    H('x-auth-token'), H('x-session-token'), H('x-api-key'), H('x-airtable-application-id'),
+    H('x-airbnb-api-key'), H('x-ig-app-id'), H('x-modhash'), H('x-thd-customer-token'),
+    H('x-booking-csrf-token'), H('x-stripe-csrf-token'), H('x-dd-csrf-token'), H('x-twitter-auth-type'),
+    H('x-notion-active-user-header'), H('x-restli-protocol-version'), H('x-org'),
+    // bare / underscore auth carriers
+    H('authorization'), H('cookie'), H('sessionid'), H('auth-token'), H('xsrftoken'),
+    H('access_token'), H('id_token'), H('refresh_token')
+  ];
+  // distinctive sentinel VALUES (each value is unique so a leak is unambiguous)
+  const HV_PREFIX = 'SENTINELvalue119_';
+  const TOKEN_SHAPED_VALUE_SK = 'sk_' + 'live_DISTINCThdr119ABCDEFGH';
+  const TOKEN_SHAPED_VALUE_JWT = 'eyJhbGciOiJIUzI1NiHDR119.payloadDISTINCThdr.sigDISTINCThdr';
+  const hostileHeaders = {};
+  HEADER_CARRIERS.forEach((name, i) => { hostileHeaders[name] = HV_PREFIX + i + '_' + name; });
+  // a token-shaped value parked in a benign-NAME header (the structure-only floor:
+  // even a NAME NOT on the denylist must leak no VALUE -- the loop never reads values)
+  hostileHeaders['x-unknown-benign-carrier'] = TOKEN_SHAPED_VALUE_SK;
+  hostileHeaders['x-another-unknown'] = TOKEN_SHAPED_VALUE_JWT;
+  hostileHeaders['Content-Type'] = 'application/json';
+
+  const hostileReq = {
+    method: 'POST',
+    url: 'https://app.example.com/v1/widgets/42',
+    headers: hostileHeaders
+  };
+  const hostileResp = {
+    status: 200, mimeType: 'application/json',
+    headers: { 'Set-Cookie': 'sid=' + HV_PREFIX + 'resp' }
+  };
+  const redHostile = Redactor.redactRequest(hostileReq);
+  const redHostileResp = Redactor.redactResponse(hostileResp);
+
+  // (a) NONE of the auth-carrier NAMES survive in headerNames (RED until Plan 02)
+  const hostileNames = ((redHostile && redHostile.headerNames) || []).map((n) => String(n).toLowerCase());
+  for (const carrier of HEADER_CARRIERS) {
+    check(hostileNames.indexOf(carrier.toLowerCase()) === -1,
+      "119-app: auth carrier name '" + carrier + "' is REMOVED from headerNames");
+  }
+  // (b) the serialized whole artifact (the learned-recipe-envelope-shaped sink)
+  //     contains NONE of the sentinel VALUES nor the token-shaped VALUES.
+  const hostileSerialized = JSON.stringify({ request: redHostile, response: redHostileResp });
+  HEADER_CARRIERS.forEach((name, i) => {
+    const v = HV_PREFIX + i + '_' + name;
+    check(hostileSerialized.indexOf(v) === -1, "119-app: header sentinel VALUE for '" + name + "' does NOT survive");
+  });
+  // the structure-only floor: a token-shaped VALUE in an UNKNOWN-name header never
+  // appears (the loop reads names only -- this is GREEN today, the keystone floor).
+  check(hostileSerialized.indexOf(TOKEN_SHAPED_VALUE_SK) === -1,
+    'structure-only floor: sk_live_ VALUE in an UNKNOWN-name header never appears (names-only loop)');
+  check(hostileSerialized.indexOf(TOKEN_SHAPED_VALUE_JWT) === -1,
+    'structure-only floor: JWT-shaped VALUE in an UNKNOWN-name header never appears (names-only loop)');
+  check(hostileSerialized.indexOf(HV_PREFIX) === -1,
+    '119-app: NO sentinel-value prefix substring survives anywhere in the artifact');
+
+  // ---- (2) PATH-token-in-segment (the SC3 sink-#1 vector, RED until Plan 02) ----
+  // Each distinctive token shape rides a URL PATH SEGMENT. Run through redactRequest;
+  // BOTH red.path AND the serialized artifact must contain ZERO of the sentinel token
+  // substrings (each token-shaped segment masked to ':tok').
+  const JWT_PATH = 'eyJhbGciOiJIUzPATH.payloadDISTINCTjwtPATH.sigDISTINCTjwtPATH';
+  const SK_PATH = 'sk_' + 'live_DISTINCTSENTINEL123pathABCDEFG';
+  const GHO_PATH = 'gho_DISTINCTtokenPATH1234567890abcdef';
+  const XOX_PATH = 'xoxb-DISTINCTslackPATH-1234567890';
+  const AKIA_PATH = 'AKIADISTINCTAWSPATH99';
+  const YA29_PATH = 'ya29.DISTINCTgoogleOAuthPATHtoken';
+  const USHARE_PATH = 'u!aHR0cHM_DISTINCT-ABshareIdPATH';
+  const PATH_TOKEN_CASES = [
+    { url: 'https://app.example.com/auth/callback/' + JWT_PATH, sentinel: 'DISTINCTjwtPATH', label: 'JWT in OAuth callback path' },
+    { url: 'https://app.example.com/reset/' + JWT_PATH, sentinel: 'DISTINCTjwtPATH', label: 'JWT in reset path' },
+    { url: 'https://app.example.com/s/' + SK_PATH, sentinel: 'DISTINCTSENTINEL123', label: 'stripe sk_live_ in path' },
+    { url: 'https://app.example.com/x/' + GHO_PATH, sentinel: 'DISTINCTtokenPATH', label: 'github gho_ in path' },
+    { url: 'https://app.example.com/i/' + XOX_PATH, sentinel: 'DISTINCTslackPATH', label: 'slack xoxb- in path' },
+    { url: 'https://app.example.com/k/' + AKIA_PATH, sentinel: 'DISTINCTAWSPATH', label: 'aws AKIA in path' },
+    { url: 'https://app.example.com/g/' + YA29_PATH, sentinel: 'DISTINCTgoogleOAuthPATH', label: 'google ya29. in path' },
+    { url: 'https://app.example.com/shares/' + USHARE_PATH + '/driveItem', sentinel: 'DISTINCT-ABshareIdPATH', label: 'MS Graph u! share-id in path' }
+  ];
+  for (const tc of PATH_TOKEN_CASES) {
+    const r = Redactor.redactRequest({ method: 'GET', url: tc.url, headers: {} });
+    const ser = JSON.stringify({ request: r, response: redResp });
+    check(r && typeof r.path === 'string' && r.path.indexOf(tc.sentinel) === -1,
+      'path-token: ' + tc.label + ' -- sentinel ABSENT from red.path (masked)');
+    check(ser.indexOf(tc.sentinel) === -1,
+      'path-token: ' + tc.label + ' -- sentinel ABSENT from serialized artifact');
+    // non-vacuous: the masked path must show the ':tok' placeholder (proves the scrub
+    // fired, not that URL parsing silently dropped the segment).
+    check(r && typeof r.path === 'string' && r.path.indexOf(':tok') !== -1,
+      'path-token: ' + tc.label + " -- ':tok' placeholder present in red.path (scrub fired)");
+  }
+
+  // ---- (3) BENIGN-slug NEGATIVE (no false-positive; GREEN today + after Plan 02) ----
+  // A benign hyphenated org/repo slug must survive LITERAL (NOT masked to :tok), so a
+  // legitimate recipe template still matches the real path on replay.
+  const benignReq = { method: 'GET', url: 'https://github.example.com/orgs/my-long-organization-name/repos', headers: {} };
+  const benignRed = Redactor.redactRequest(benignReq);
+  check(benignRed && typeof benignRed.path === 'string' && benignRed.path.indexOf('my-long-organization-name') !== -1,
+    'benign-slug: hyphenated org slug "my-long-organization-name" SURVIVES literal in red.path (no false-positive)');
+  check(benignRed && typeof benignRed.path === 'string' && benignRed.path === '/orgs/my-long-organization-name/repos',
+    'benign-slug: the whole benign path is preserved verbatim (NOT masked to :tok)');
+  // additional benign shapes the precise distinctive-prefix set must NOT mask:
+  const benignReq2 = { method: 'GET', url: 'https://app.example.com/pages/my-document-title-2024/edit', headers: {} };
+  const benignRed2 = Redactor.redactRequest(benignReq2);
+  check(benignRed2 && benignRed2.path.indexOf('my-document-title-2024') !== -1,
+    'benign-slug: a long hyphenated document title survives literal (no over-match)');
+  const benignReq3 = { method: 'GET', url: 'https://dashboard.stripe.com/v1/charges', headers: {} };
+  const benignRed3 = Redactor.redactRequest(benignReq3);
+  check(benignRed3 && benignRed3.path === '/v1/charges',
+    'benign-slug: a normal REST path (/v1/charges) survives literal');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {
