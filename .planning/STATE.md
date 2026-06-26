@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: Full App Catalog (OpenTabs Parity)
-status: verifying
-stopped_at: "Completed 39.5-05-PLAN.md (FINAL plan -- full-corpus SCALE assert [real index 1.415MB < 2MB + cold-start ~12ms < 100ms over 2,391 descriptors, flatness 620B FLAT, storeFields-trim NOT engaged]; coverage close [realAppCount=145, head=8/learn=0/dom=2383, 0 dead, augment guard green]; the honest breadth->Phase-43 search-precision boundary [eval recall@5>=0.9 HARD + full-corpus wrong-invoke RECORDED as the Phase-43 SCALE-01 baseline DEF-39.5-04-A; curated collision proofs HARD wrong-invoke=0; corpus-tier probes individually tagged]; full npm test EXIT 0; validate:extension EXIT 0; INV-01/Wall-1 intact). Phase 39.5 all 5 plans complete -> ready_for_verification."
-last_updated: "2026-06-26T09:21:10.742Z"
+status: ready_to_plan
+stopped_at: "Phase 39.5 (Full OpenTabs Source Import) COMPLETE + verified PASS (gsd-verifier: 4/4 SC, no findings). Security headline proven on a REAL payment op: shipped amazon.place_order (write, backing:dom, sensitive origin) under Auto -> RECIPE_CONSENT_MUTATING_REQUIRED (no order placed); reads run free; per-origin mutating flag elevates. (The earlier doordash proof was on a stale orphan -- real doordash has no place_order @SHA -- re-pointed to amazon's real write.) Full real-source OpenTabs catalog imported via the frozen pipeline: realAppCount=129, 2,314 descriptors (opentabs 2,306 / head 8 / learn 0 / dead 0); 13 hand-only apps PRESERVED (augment); 77 orphan descriptors pruned via runImport prune-to-match + the new verify-no-orphan-descriptor.mjs CI guard; tripadvisor.check_saved reclassified read (GraphQL query) via per-slug allowlist; commerce backstop now asserts apex+www (closed opentable/ticketmaster/stubhub/eventbrite apex gaps). Gates green: npm test EXIT 0, validate:extension EXIT 0 (6 sub-gates incl no-duplicate-stem + no-orphan), index 1.371MB<2MB + cold-start 11.40ms<100ms over the full corpus, INV-01/Wall-1 intact, recall@5=0.995 + curated wrong-invoke=0. Full-corpus search precision (wrong-invoke=0) DEFERRED to Phase 43 SCALE-01 (DEF-39.5-04-A). NEXT: Phase 40 (Depth 1 -- Top READ Hand-Ports, DEPTH-01)."
+last_updated: "2026-06-26"
 last_activity: 2026-06-26
 progress:
-  total_phases: 11
+  total_phases: 10
   completed_phases: 6
-  total_plans: 27
-  completed_plans: 29
-  percent: 100
+  total_plans: 28
+  completed_plans: 28
+  percent: 60
 ---
 
 # Project State
@@ -26,16 +26,16 @@ See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-
 See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** Phase 39.5 — Full OpenTabs Source Import
+**Current focus:** Phase 40 — Depth 1 (Top READ Hand-Ports, DEPTH-01)
 
 ## Current Position
 
-Phase: 39.5 (Full OpenTabs Source Import) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
+Phase: 40 (Depth 1 — Top READ Hand-Ports) — READY TO PLAN
+Plan: 0 of 0 (not yet planned)
+Status: Phase 39.5 COMPLETE + verified PASS (4/4 SC); Phase 40 ready to plan
 Last activity: 2026-06-26
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 60% (6 of 10 phases complete)
 
 ## Roadmap At A Glance (v1.0.0, Phases 35-43)
 
@@ -46,7 +46,7 @@ Progress: [██████████] 100%
 | 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | ✓ Complete (2026-06-25) |
 | 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
 | 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
-| 39.5 | Full OpenTabs Source Import (real ~117-plugin / ~2,374-op) [INSERTED] | (continues BRDTH-01..03; closes parity) | Not started |
+| 39.5 | Full OpenTabs Source Import (real ~117-plugin / ~2,374-op) [INSERTED] | (continues BRDTH-01..03; closes parity) | ✓ Complete (2026-06-26) |
 | 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | Not started |
 | 41 | Depth 2 — Remaining Hand-Ports + Guarded Writes | DEPTH-02 (1) | Not started |
 | 42 | Discovery Seeding + Tail Learn | DSEED-01..02 (2) | Not started |
@@ -132,6 +132,7 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase ?]: Phase 39.5-04: DEF-39.5-03-A resolved + search-precision-at-scale deferred to Phase 43. (1) DEF-39.5-03-A (the deferred full-corpus classifyGate false-trips): verify-classification-gate.mjs now screens each emitted ORIGIN on host + canonical SLUG only and DROPS the op free-text prose from the CI sweep input -- an op's prose is not an origin signal, and at full-corpus scale a benign dev/infra op's prose legitimately mentions an axis token in passing (a 'billing' page read, 'budget'/'signal'/'health'/'tax') which false-tripped the axis on a CORRECTLY-safe origin. The host check (sensitive brand) + the slug check (a payment-verb op-name) both survive -> NOT a gate weakening; import-classify-gate-call.test.js exits 0 over the full corpus. (2) DEFERRED to Phase 43 (SCALE-01/02, the documented Top Risk): search-PRECISION-at-scale -- capability-search-eval.test.js (13 passed, 3 failed) + breadth-search-return.test.js (76 passed, 16 failed after the in-scope reddit-orphan probe fix) fail on cross-app near-neighbor ranking collisions (wrong-invoke 0.060/0.188; recall@5 0.992/1.000 -- the right op IS in the top-5) + the index-size (1450KB) + cold-start (13.83ms) budgets over the full ~2,400-corpus the import mandates. NONE of the residual collisions involves the Option-A surface (reddit/calendly/grafana/doordash -- verified 0). NOT in 39.5-04's verify/success-criteria/validate:extension (exit-0 green); the fix is the Phase-43 architectural mandate (intentSynonym enrichment + owned-origin ranking bias + index searchable-text-only + cold-start benchmark). Logged in deferred-items.md as DEF-39.5-04-A.
 - [Phase 39.5]: Phase 39.5-05: the full-corpus search-PRECISION (wrong-invoke) is the Phase-43 SCALE-01 eval-harness re-tune deliverable -- RECORDED as the baseline (DEF-39.5-04-A), NOT asserted to 0; an honest, tracked, documented phase boundary (corpus-tier collision probes individually tagged), curated collision proofs + structural/security gates stay HARD-green.
 - [Phase 39.5]: Phase 39.5-05: SCALE-01 breadth budget PROVEN at the full corpus -- real serialized minisearch index 1.415MB < 2MB + cold-start ~12ms < 100ms over 2,391 descriptors (storeFields-trim lever NOT engaged; capability-search.js UNCHANGED, INV-01/Wall-1 intact); cold-start assert widened 10ms->100ms is the REAL SCALE-01 SW-wake budget. realAppCount=145, 0 dead; full npm test EXIT 0; Phase 39.5 parity-complete.
+- [Phase 39.5]: Phase 39.5 CODE REVIEW + FIX + VERIFY (close): the gsd-code-reviewer surfaced 5 findings; all fixed + the gsd-verifier confirmed PASS (4/4 SC, no findings; 39.5-VERIFICATION.md). HI-02 (the headline correction): the augment was NON-pruning -> 77 stale orphan descriptors (hand-authored op-slices superseded by the real source's different op-sets) lingered, inflating realAppCount to 145. Fix: `runImport` now PRUNES-to-match (deletes every opentabs__* not in the freshly-emitted set) + a new `scripts/verify-no-orphan-descriptor.mjs` CI guard (build-fails on any committed descriptor lacking backing vendored source; wired into validate:extension). Post-prune the catalog is the TRUE parity surface: realAppCount=129, 2,314 descriptors (opentabs 2,306 / head 8 / learn 0 / dead 0); the 13 hand-only apps preserved (augment intact). HI-01: tripadvisor.check_saved was a GraphQL QUERY mislabeled write by fail-safe-high -> reclassified read via a narrow per-slug `SIDE_EFFECT_READ_CONFIRMED` allowlist (CANNOT downgrade a real write -- meticulous.check_for_flakes stays write) + tripadvisor.com apex added to READ_ONLY_SAFE + checkReadOnlySafeOrigins made host-form-agnostic (www<->apex via isReadOnlySafeService). MED-02 (another apex-vs-www instance): the commerce backstop now asserts BOTH apex AND www forms -> surfaced+closed a REAL latent gap (opentable/ticketmaster/stubhub/eventbrite were exact-host www.* so their apex classified SAFE -> widened apex-suffix). LO-01: promo_code carve narrowed inside carveBusinessCodeField. SECURITY HEADLINE re-proven on a REAL payment op: the old doordash.place_order e2e proof was on a STALE ORPHAN (real doordash has no place_order @SHA) -> sensitive-write-import-gate.test.js re-pointed to amazon.place_order (a genuine payment write: under Auto -> RECIPE_CONSENT_MUTATING_REQUIRED, no order placed; reads free; per-origin flag elevates). All gates green: npm test EXIT 0, validate:extension EXIT 0 (6 sub-gates incl no-duplicate-stem + no-orphan), index 1.371MB<2MB + cold-start 11.40ms<100ms, recall@5=0.995 + curated wrong-invoke=0, INV-01/Wall-1 intact. Full-corpus search precision stays DEFERRED to Phase 43 SCALE-01 (DEF-39.5-04-A). Commits 8e5ddfc0 / 86de8e48 / f04280f2 / a2348f71 / 32328a08. PHASE 39.5 COMPLETE -- TRUE OpenTabs parity (the milestone's literal goal) achieved; ready for Phase 40 (Depth 1 -- the hand-ports that migrate descriptors from the dom bucket into the head bucket).
 
 ### Pending Todos
 
@@ -166,13 +167,13 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-26T09:21:10.736Z
-Stopped at: Completed 39.5-05-PLAN.md (FINAL plan -- full-corpus SCALE assert [real index 1.415MB < 2MB + cold-start ~12ms < 100ms over 2,391 descriptors, flatness 620B FLAT, storeFields-trim NOT engaged]; coverage close [realAppCount=145, head=8/learn=0/dom=2383, 0 dead, augment guard green]; the honest breadth->Phase-43 search-precision boundary [eval recall@5>=0.9 HARD + full-corpus wrong-invoke RECORDED as the Phase-43 SCALE-01 baseline DEF-39.5-04-A; curated collision proofs HARD wrong-invoke=0; corpus-tier probes individually tagged]; full npm test EXIT 0; validate:extension EXIT 0; INV-01/Wall-1 intact). Phase 39.5 all 5 plans complete -> ready_for_verification.
+Last session: 2026-06-26
+Stopped at: Phase 39.5 (Full OpenTabs Source Import) COMPLETE + verified PASS (gsd-verifier 4/4 SC, no findings; 39.5-VERIFICATION.md). Full real-source OpenTabs catalog imported via the frozen pipeline (realAppCount=129, 2,314 descriptors, opentabs 2,306 / head 8 / dead 0); 13 hand-only apps preserved (augment); 77 orphans pruned (runImport prune-to-match + verify-no-orphan-descriptor.mjs guard). Security headline proven on a REAL payment op (amazon.place_order write -> RECIPE_CONSENT_MUTATING_REQUIRED under Auto; doordash proof was a stale orphan, re-pointed). npm test EXIT 0 + validate:extension EXIT 0 (6 sub-gates); index 1.371MB<2MB + cold-start 11.40ms; INV-01/Wall-1 intact. Full-corpus search precision DEFERRED to Phase 43 SCALE-01 (DEF-39.5-04-A). Ready to plan Phase 40.
 Resume file: None
 
 ## Next Actions
 
-Execute 39-07-PLAN.md (the FINAL plan of Phase 39 — the full-corpus coverage report: the head/learn/DOM/dead breakdown across the now-COMPLETE ~228-descriptor / 53-app real set, success criterion 3). 39-02..06 imported the entire commerce/travel/misc batch DOM-only via the frozen screen-then-import contract; 39-06 (the COMPLETION sub-batch) closed real-app coverage of the vendored OpenTabs surface (53 dirs, 0 unaccounted) and produced the DERIVED completeness manifest `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` — 39-07's coverage-report `realAppCount` check verifies the emitted catalog against every VENDORED+IMPORTED manifest row (a missing one FAILS 39-07). Every payment op (create_order/place_order/checkout/buy_tickets/request_ride/book_*/reserve_table) ships backing:'dom' DOM-only on a sensitive origin (the payment-op CI guard passes); the read-only apps (zillow/grafana/yelp/tripadvisor/calendly/reddit) are read-only-locked via READ_ONLY_SAFE_SERVICES. Cold-start headroom 375.8KB/73.4% of the 512KB budget (circuit breaker NOT fired; the authoritative full-corpus SCALE-01 gate stays Phase 43). Recommended: `/gsd-execute-phase 39` (resumes at 39-07). Side Phase 999.1 (click heuristics) is Backlog — NOT v1.0.0; the autonomous run skips it.
+Plan Phase 40 (Depth 1 — Top READ Hand-Ports — DEPTH-01). Phases 35-39 + the inserted 39.5 are complete and verified: the full real-source OpenTabs catalog (~129 apps / 2,314 descriptors) now ships DOM-only (backing:'dom') behind the closed-vocab interpreter, with commerce/payment origins sensitive (posture-B gated), the no-orphan + no-duplicate-stem + payment-op CI guards green, and INV-01/Wall-1 intact. Phase 40 begins DEPTH: hand-port the TOP READ ops for the highest-value apps — migrating those descriptors from the `dom` bucket into the `head` bucket (T1a/T1b handlers via `registerHandler`/`HEAD_HANDLER_MODULES`, the `catalog/handlers/github.js` shape), so the AI invokes a precise typed read instead of falling back to DOM. Cap the head at ~15-30 (the HEAD_HANDLER_MODULES CI assertion — avoid head sprawl → MV3 ban). Per-app CORS / first-party-origin verification is required before each port commits (linear documented-safe; supabase/mongodb-atlas/circleci/cloud-console UNVERIFIED; gapi-bridge deferred to v2). Recommended: `/gsd-plan-phase 40`. Side Phase 999.1 (click heuristics) is Backlog — NOT v1.0.0; the autonomous run skips it. Carried-forward user-gated debt: live-browser UAT for guarded writes (Phase 41 human_needed) + release/publish actions.
 
 ### (historical) Phase 37 planning context
 
