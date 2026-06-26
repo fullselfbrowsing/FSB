@@ -133,7 +133,7 @@
 - [x] 39.5-02-PLAN.md — Extend STEM_OVERRIDES (~40, collision-free) + the no-duplicate-stem CI gate + the target.apply_promo_code carve + the grafana/sqlpad skip [wave 2]
 - [x] 39.5-03-PLAN.md — Re-screen: classify linkedin (sensitive) + youtube (denied) + the conservative commerce reconciliation + the full-corpus classifyGate test [wave 3]
 - [x] 39.5-04-PLAN.md — Run the full import (~2,374 descriptors, augment) + regenerate the catalog + pass the full-scale gates (classifyGate / crosscheck+payment-op / no-dead-entry / no-dup-stem) + update the coverage test [wave 4]
-- [ ] 39.5-05-PLAN.md — Full-corpus SCALE assert (index <~2MB, cold-start <~100ms) + coverage close (realAppCount ~130) + full `npm test` green [wave 5]
+- [x] 39.5-05-PLAN.md — Full-corpus SCALE assert (index <~2MB, cold-start <~100ms) + coverage close (realAppCount ~130) + full `npm test` green [wave 5]
 
 ### Phase 40: Depth 1 — Top READ Hand-Ports
 **Goal**: Upgrade the hot subset already discoverable from breadth by hand-porting the highest-value READ heads as first-class T1a/T1b handlers exactly like the shipped `github.js` — own first-party origin, `executeBoundSpec`-only, scraped tokens never logged — so the most-used reads run on the API fast path instead of DOM. This phase OWNS DEPTH-01 (the hand-port contract + the read heads); Phase 41 owns the guarded-write requirement.
