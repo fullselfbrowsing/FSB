@@ -125,24 +125,29 @@ check(recall >= 0.9, `recall@5 ${recall.toFixed(3)} >= 0.9 (SURF-06 / D-13 -- HA
 // corpus has many cross-app + intra-app near-neighbor ranking ties (e.g. "write an email" ->
 // outlook.send_message vs email.send; "tweet a status update" -> sentry.update_issue vs
 // twitter.post-tweet; "open a chatgpt conversation" get-vs-archive-vs-create). Phase 43
-// drove the full-corpus wrong-invoke from the recorded 0.079 (15/190) to ZERO via ROBUST,
-// GENERAL metadata-source synonym enrichment in the importer (NOT fixture overfitting): a
-// NOUN_SYNONYMS map (to-do/groceries/restaurants), a STEM_NOUN_SYNONYMS scope (instacart
-// groceries without a bestbuy regression), noun-scoped create/get verbs ('file an issue',
-// 'open a conversation'->get), app-alias emission (bluesky), an OVER_CLAIM_GUARD (trim a
-// competitor's cross-domain token), and a COLLOQUIAL_GUARD (suppress a list op's colloquial
-// alts that cross-claim the curated calendar head) -- then RE-IMPORT through the frozen
-// machinery. The WHOLE eval + the WHOLE breadth collision set were re-verified for the
-// IDF-shift regression (a bestbuy 'catalog' displacement was caught + fixed at the metadata
-// source). This assertion is now HARD: full-corpus wrong-invoke === 0 (it would FAIL if a
-// future change re-introduced a wrong-invoke). recall@5 >= 0.9 stays HARD. The CURATED
-// cross-app collision proofs (the breadth-contract MED-01/MED-03 surface) stay HARD
-// wrong-invoke=0 in tests/breadth-search-return.test.js. The structural/security gates
-// (classifyGate, crosscheck incl payment-op + commerce backstop, no-dead-entry,
-// no-duplicate-stem, recipe-path-guard) stay HARD-green and are NOT touched.
-console.log(`  SCALE-01 (DEF-39.5-04-A CLOSED): full-corpus wrong-invoke=${wrongRate.toFixed(3)} over ${FIXTURES.length} fixtures -- driven to 0 by robust metadata enrichment (HARD); recall@5=${recall.toFixed(3)} is the HARD gate here`);
+// drove THIS 190-fixture eval's wrong-invoke from the recorded 0.079 (15/190) to ZERO via
+// noun/verb-class metadata-source synonym enrichment in the importer: a NOUN_SYNONYMS map
+// (to-do/groceries/restaurants), a STEM_NOUN_SYNONYMS scope (instacart groceries without a bestbuy
+// regression), noun-scoped create/get verbs ('file/log/report a bug', 'open a conversation'->get),
+// app-alias emission + alias-tagged post-verbs (bluesky), an OVER_CLAIM_GUARD / CREATE_FAVORING_NOUN
+// guard (drop a competitor's cross-claiming token), and a COLLOQUIAL_GUARD -- then RE-IMPORT through
+// the frozen machinery. The WHOLE eval + the WHOLE breadth collision set were re-verified for the
+// IDF-shift regression (a bestbuy 'catalog' displacement was caught + fixed at the metadata source).
+//
+// HONEST SCOPE (43-REVIEW HI-02): this `=== 0` is a HARD REGRESSION PIN over the 190-FIXTURE SET --
+// NOT, by itself, evidence of fully-general out-of-eval precision. The common create/get intents
+// generalize (the HI-02 follow-up made the bug->issue create-noun class + the bluesky app-alias +
+// post-verb class generalize to unseen paraphrases), but the BREADTH corpus-tier wrong-invoke (the
+// broader adversarial cross-app/near-neighbor frontier in tests/breadth-search-return.test.js) is a
+// RECORDED baseline, NOT closed -- the honest, still-open precision boundary (carried-forward future
+// work). Do NOT read this 0 as full general precision. recall@5 >= 0.9 stays HARD. The CURATED
+// collision proofs (the breadth-contract MED-01/MED-03 surface, incl the 3 HI-02-promoted
+// bsky/linear/instacart paraphrases) stay HARD wrong-invoke=0 in tests/breadth-search-return.test.js.
+// The structural/security gates (classifyGate, crosscheck incl payment-op + commerce backstop,
+// no-dead-entry, no-duplicate-stem, recipe-path-guard) stay HARD-green and are NOT touched.
+console.log(`  SCALE-01 (DEF-39.5-04-A): 190-fixture eval wrong-invoke=${wrongRate.toFixed(3)} -- a HARD regression pin over this fixture set (NOT proof of fully-general precision; the breadth corpus-tier is the recorded open frontier); recall@5=${recall.toFixed(3)} is the HARD gate here`);
 check(wrongRate === 0,
-  `SCALE-01 (DEF-39.5-04-A, HARD): full-corpus wrong-invoke ${wrongRate.toFixed(3)} === 0 over the ${FIXTURES.length}-fixture paraphrase set -- the re-tune deliverable landed (robust intentSynonym/noun-alias/app-alias/over-claim enrichment, NOT fixture overfit); recall@5 stays HARD >= 0.9; the curated collision proofs stay HARD=0 in breadth-search-return`);
+  `SCALE-01 (DEF-39.5-04-A, HARD): 190-fixture eval wrong-invoke ${wrongRate.toFixed(3)} === 0 over the ${FIXTURES.length}-fixture paraphrase set -- a HARD REGRESSION PIN (the common create/get intents generalize; the broader breadth corpus-tier is a RECORDED open frontier, NOT claimed closed -- 43-REVIEW HI-02); recall@5 stays HARD >= 0.9; the curated collision proofs (incl the 3 HI-02 promotions) stay HARD=0 in breadth-search-return`);
 
 // ---- CGEN-04: serialized-index-size + SW cold-start budget (at full-corpus scale) ----
 // Phase 36 Plan 04 added the MEASUREMENT MACHINERY before breadth landed; Phase 39.5-04's

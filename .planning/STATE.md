@@ -31,7 +31,7 @@ See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus 
 ## Current Position
 
 Phase: 43 (Catalog-Scale + Milestone Gate) — COMPLETE (the FINAL v1.0.0 phase; all 4 plans done)
-Plan: 4 of 4 complete (43-01 RED scaffolds + scale-gate; 43-02 precision wrong-invoke 0.079->0.000 HARD; 43-03 SCALE-02 self-heal -- 3 tests GREEN; 43-04 THE MILESTONE GATE -- full npm test EXIT 0)
+Plan: 4 of 4 complete (43-01 RED scaffolds + scale-gate; 43-02 precision 190-fixture eval wrong-invoke 0.079->0.000 HARD [a regression PIN over that set -- NOT fully-general; the breadth corpus-tier is a RECORDED open frontier, 43-REVIEW HI-02 corrected the overclaim + generalized the named bsky/linear-bug cases]; 43-03 SCALE-02 self-heal -- now WIRED into the live rot path [43-REVIEW HI-01: capability-router routes the re-learn through the coalescing/back-off scheduler + recordRot; 3 unit tests + 1 live-path wiring test GREEN]; 43-04 THE MILESTONE GATE -- full npm test EXIT 0)
 Status: Phase complete — v1.0.0 MILESTONE GATE MET (full npm test EXIT 0); ready for Phase-43 verification, then the milestone lifecycle (audit -> complete -> cleanup)
 Last activity: 2026-06-26
 
