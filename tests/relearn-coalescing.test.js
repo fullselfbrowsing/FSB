@@ -132,16 +132,34 @@ const clearTimer = () => {};
   let aCalls = 0;
   const fnA = () => { aCalls++; return Promise.resolve({ ok: true }); };
 
+  // MED-01 (43-REVIEW): drive the TIMER-FIRE path so the N->1 assertion is
+  // NON-VACUOUS. A no-op setTimer + a single flush() would pass even with the
+  // coalescing guard removed (one flush runs _runOrigin once regardless of how many
+  // schedule calls armed a timer). Instead, CAPTURE every callback scheduleRelearn
+  // arms via setTimer, then invoke ALL captured callbacks (the real window-fire
+  // path). With the coalescing guard intact, the 2nd..Nth schedule for one origin
+  // COALESCE -- they do NOT arm a second timer -- so exactly ONE callback is captured
+  // and the fn runs once. With the guard REMOVED (sabotage), each schedule arms its
+  // own timer -> N callbacks fire -> aCalls exceeds 1 (the assertion reds). This is
+  // the load-bearing "N concurrent timer fires collapse to 1" proof.
+  let firedA = [];
+  const capturingSetTimer = (cb) => { firedA.push(cb); return firedA.length; };
+
   // Feed N (5) rot events for the SAME origin within the coalescing window.
   for (let i = 0; i < 5; i++) {
-    scheduleRelearn(originA, fnA, { now, setTimer, clearTimer });
+    scheduleRelearn(originA, fnA, { now, setTimer: capturingSetTimer, clearTimer });
   }
-  // Deterministically run the due re-learn (the flush seam stands in for the
-  // window firing) and await the fn's resolution.
-  await (typeof SCHED.flush === 'function' ? SCHED.flush(originA) : Promise.resolve());
-
+  // The coalescing guard means only the FIRST schedule armed a timer; the other 4
+  // collapsed into it. (Sabotage that removes the guard would capture 5 callbacks.)
+  check(firedA.length === 1,
+    'COALESCING (timer-fire, NON-VACUOUS): 5 rot events on one origin arm EXACTLY ONE coalescing-window timer (got ' + firedA.length + ' captured callbacks) -- the 2nd..5th calls coalesce; removing the guard would arm 5');
+  // Invoke ALL captured timer callbacks (the real window-fire path), then await the
+  // scheduler's microtasks so the re-learn fn settles.
+  for (const cb of firedA) { if (typeof cb === 'function') { cb(); } }
+  await Promise.resolve();
+  await Promise.resolve();
   check(aCalls === 1,
-    'COALESCING: 5 rot events on one origin within the coalescing window invoke the re-learn fn EXACTLY ONCE (got ' + aCalls + ') -- no thundering-herd of CDP attaches');
+    'COALESCING: 5 rot events on one origin within the coalescing window invoke the re-learn fn EXACTLY ONCE (got ' + aCalls + ') -- no thundering-herd of CDP attaches (firing all armed timers still yields ONE re-learn; with the guard removed N timers fire N re-learns)');
 
   // Two DISTINCT origins each get their OWN single re-learn (keyed by origin).
   if (typeof SCHED._reset === 'function') { SCHED._reset(); }
