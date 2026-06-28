@@ -68,7 +68,7 @@ Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-se
 
 Want to run FSB standalone from the extension popup/side panel? Open settings, paste an API key (xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, or custom), and start there — no MCP needed.
 
-**On OpenClaw?** Load the FSB skill from [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md). The skill runs the doctor flow, prints the canonical OpenClaw stdio config block, and offers consent-gated install for any other MCP hosts on the same machine. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds; the skill prints + you paste, never auto-writes.
+**On OpenClaw?** Load the FSB skill from [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md). The skill runs the doctor flow, prints the canonical OpenClaw stdio config block, and offers confirmation-based install for any other MCP hosts on the same machine. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds; the skill prints + you paste, never auto-writes.
 
 ### What It Does
 
@@ -77,7 +77,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Discovers live provider model lists and falls back to bundled defaults.
 - Uses 56 canonical extension tool definitions and 66 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
-- Invokes signed, consent-gated first-party API capabilities through the MCP capability surface.
+- Invokes signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
@@ -104,13 +104,13 @@ FSB is most reliable when the task can be expressed as page structure and user a
 |------|------------------|
 | DOM analysis | Captures visible and structural page data, element refs, selectors, forms, ARIA labels, and DOM deltas. |
 | Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
-| Capability catalog | Searches and invokes signed, consent-gated first-party API capabilities through `search_capabilities` and `invoke_capability`. |
+| Capability catalog | Searches and invokes signed, audited, denylist-gated first-party API capabilities through `search_capabilities` and `invoke_capability`. Sensitive origins are flagged, while denylisted origins remain blocked. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
 | UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
-| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, capability consent/audit gates, upload-path denylisting, and restricted-tab recovery messaging. |
+| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
 | Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
 | DOM live preview | PhantomStream-backed capture, renderer, protocol, media mirroring, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
@@ -120,7 +120,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 ## What's New
 
-**Native Capability Catalog (preview): first-party API execution.** Beyond DOM automation, FSB can now search and invoke real first-party authenticated API capabilities with `search_capabilities` and `invoke_capability`. The capability tools register outside the core tool registry, use an origin-biased router, require per-origin consent, verify signed recipes, write no-secrets audit records, and can learn or self-heal recipes through consent-gated discovery. The API-integration model is inspired by **OpenTabs** (see [Acknowledgements](#acknowledgements)). Capability execution is in preview with live-browser UAT pending; the headless test suite is green.
+**Native Capability Catalog (preview): first-party API execution.** Beyond DOM automation, FSB can now search and invoke real first-party authenticated API capabilities with `search_capabilities` and `invoke_capability`. The capability tools register outside the core tool registry, use an origin-biased router, allow non-denied origins under Auto, block denylisted origins, verify signed recipes, and write no-secrets audit records. Sensitive origins are surfaced as flags in the UI/audit trail; network-capture discovery still requires extra confirmation for sensitive origins. The API-integration model is inspired by **OpenTabs** (see [Acknowledgements](#acknowledgements)). Capability execution is in preview with live-browser UAT pending; the headless test suite is green.
 
 **`upload_file`: real file input uploads.** MCP clients and FSB autopilot can now call `upload_file(selector, file_path, tab_id?)` to set an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
 
@@ -138,7 +138,7 @@ Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its o
 |------|---------|
 | [`extension/`](./extension/README.md) | Chrome extension package. Load this directory as an unpacked MV3 extension. |
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
-| [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md) | OpenClaw skill: doctor + stdio printer + consent-gated multi-host install. |
+| [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md) | OpenClaw skill: doctor + stdio printer + confirmation-based multi-host install. |
 | [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
 | `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
@@ -530,7 +530,7 @@ Use separate API keys for development and production, rotate keys regularly, res
 - CAPTCHA solving support is a framework and optional service integration, not a guarantee.
 - The extension can interact with the active page, tabs, and debugger-backed coordinate tools because those permissions are declared in the MV3 manifest.
 - `upload_file` requires an absolute local path, blocks known sensitive path patterns, and records audit metadata without persisting the disk path.
-- Capability invokes are default-off per origin and run through consent, mutation, signature, and audit gates.
+- Capability invokes allow every non-denied origin under Auto and run through denylist, mutation, signature, and audit gates. Sensitive origins are flagged for review; network-capture discovery on sensitive origins still requires extra confirmation.
 - Saved credentials and payment methods require explicit user configuration and unlock flows.
 - Automation should be treated like a fast assistant operating your browser, not like an unattended production worker.
 
@@ -612,7 +612,7 @@ The root README should describe what a new user needs to understand before insta
 
 ## Acknowledgements
 
-- **OpenTabs** inspired FSB's Native Capability Catalog (first-party API execution: turning authenticated browser sessions into reusable, signed, consent-gated API capabilities). Thanks for the direction on this approach.
+- **OpenTabs** inspired FSB's Native Capability Catalog (first-party API execution: turning authenticated browser sessions into reusable, signed, audited API capabilities). Thanks for the direction on this approach.
 
 ## License
 

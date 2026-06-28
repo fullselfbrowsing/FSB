@@ -112,7 +112,7 @@ Instruction-only or UI-driven targets include JetBrains, ChatGPT, Claude.ai, and
 
 ### OpenClaw
 
-The canonical OpenClaw onboarding path is the FSB skill at `skills/FSB Skill/` in the repo root. Loading the skill into a fresh OpenClaw runs the doctor flow, prints the canonical OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` install flag in this CLI stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints and the user pastes, never auto-writes the OpenClaw config.
+The canonical OpenClaw onboarding path is the FSB skill at `skills/FSB Skill/` in the repo root. Loading the skill into a fresh OpenClaw runs the doctor flow, prints the canonical OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers confirmation-based install for any other MCP hosts detected on the same machine. The bare `--openclaw` install flag in this CLI stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints and the user pastes, never auto-writes the OpenClaw config.
 
 To build a reproducible publish artifact for ClawHub, run `npm run package:skill` from the repo root. It zips `skills/FSB Skill/` into `dist/skill/FSB-Skill-<version>.zip` (version stamped from `SKILL.md` frontmatter). Publishing is user-gated: `clawhub login` and then `clawhub publish "skills/FSB Skill"`. See `.planning/v0.9.61-CLAWHUB-PUBLISH-QA.md` for the pre-publish QA checklist.
 
@@ -486,7 +486,7 @@ Notes:
 | Tool | Purpose |
 |------|---------|
 | `search_capabilities` | Search first-party API capabilities by intent and return schema-on-hit results. |
-| `invoke_capability` | Invoke a selected capability in the authenticated browser session with validated params and consent/audit gates. |
+| `invoke_capability` | Invoke a selected capability in the authenticated browser session with validated params, origin denylist checks, recipe signatures, and no-secrets audit records. |
 
 ### Observability (5)
 
