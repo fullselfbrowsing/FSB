@@ -9,13 +9,20 @@
   if (!FSB) return;
 
   var DEBOUNCE_MS = 200;
+  var FORM_VALUE_LISTENER_CAPTURE = true;
   var registry = new Map();
 
   function optsFor(extract, attrName) {
     if (extract === 'attribute' && attrName) {
-      return { attributes: true, attributeFilter: [attrName] };
+      return { attributes: true, attributeFilter: [attrName], subtree: true };
     }
     return { childList: true, characterData: true, subtree: true };
+  }
+
+  function isFormValueElement(node) {
+    if (!node || !node.tagName) return false;
+    var tag = String(node.tagName).toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select';
   }
 
   function readValue(leaf, extract, attrName) {
@@ -96,6 +103,60 @@
     }
   }
 
+  function scheduleFlush(triggerId, entry) {
+    if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
+    entry.debounceTimer = setTimeout(function() {
+      flush(triggerId);
+    }, DEBOUNCE_MS);
+  }
+
+  function eventTargetsLeaf(event, leaf) {
+    if (!event || !leaf) return false;
+    var target = event.target || null;
+    if (target === leaf) return true;
+
+    if (typeof event.composedPath === 'function') {
+      try {
+        var path = event.composedPath();
+        if (path && path.indexOf(leaf) !== -1) return true;
+      } catch (_e) {
+        // Fall back to contains() below.
+      }
+    }
+
+    if (target && typeof leaf.contains === 'function') {
+      try {
+        return leaf.contains(target);
+      } catch (_e2) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function attachFormValueListeners(triggerId, entry) {
+    if (entry.extract === 'attribute' || !isFormValueElement(entry.leaf)) return;
+    if (!entry.container || typeof entry.container.addEventListener !== 'function') return;
+
+    var listener = function(event) {
+      var leaf = resolveLeaf(entry.selector);
+      if (!eventTargetsLeaf(event, leaf)) return;
+      scheduleFlush(triggerId, entry);
+    };
+    entry.formValueListener = listener;
+    entry.container.addEventListener('input', listener, FORM_VALUE_LISTENER_CAPTURE);
+    entry.container.addEventListener('change', listener, FORM_VALUE_LISTENER_CAPTURE);
+  }
+
+  function detachFormValueListeners(entry) {
+    if (!entry || !entry.formValueListener) return;
+    if (entry.container && typeof entry.container.removeEventListener === 'function') {
+      entry.container.removeEventListener('input', entry.formValueListener, FORM_VALUE_LISTENER_CAPTURE);
+      entry.container.removeEventListener('change', entry.formValueListener, FORM_VALUE_LISTENER_CAPTURE);
+    }
+    entry.formValueListener = null;
+  }
+
   function flush(triggerId) {
     var entry = registry.get(triggerId);
     if (!entry) return;
@@ -116,6 +177,7 @@
     if (entry.observer && typeof entry.observer.disconnect === 'function') {
       entry.observer.disconnect();
     }
+    detachFormValueListeners(entry);
     if (entry.leaf && entry.leaf.dataset && entry.leaf.dataset.fsbTriggerArmed === triggerId) {
       delete entry.leaf.dataset.fsbTriggerArmed;
     }
@@ -147,17 +209,16 @@
       leaf: leaf,
       selector: selector,
       extract: extract || 'text',
-      attrName: attrName || null
+      attrName: attrName || null,
+      formValueListener: null
     };
 
     entry.observer = new MutationObserver(function() {
-      if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
-      entry.debounceTimer = setTimeout(function() {
-        flush(triggerId);
-      }, DEBOUNCE_MS);
+      scheduleFlush(triggerId, entry);
     });
 
     entry.observer.observe(container, optsFor(entry.extract, entry.attrName));
+    attachFormValueListeners(triggerId, entry);
     if (leaf.dataset) {
       leaf.dataset.fsbTriggerArmed = triggerId;
     }

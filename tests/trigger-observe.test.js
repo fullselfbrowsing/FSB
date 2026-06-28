@@ -24,9 +24,14 @@ function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function listenerCaptureMode(options) {
+  return options === true || !!(options && options.capture === true);
+}
+
 function makeNode(opts) {
   opts = opts || {};
   const attrs = Object.assign({}, opts.attrs || {});
+  const eventListeners = {};
   const node = {
     tagName: (opts.tag || 'div').toUpperCase(),
     textContent: opts.text || '',
@@ -34,6 +39,7 @@ function makeNode(opts) {
     id: opts.id || '',
     dataset: Object.assign({}, opts.dataset || {}),
     attributes: attrs,
+    _eventListeners: eventListeners,
     parentElement: null,
     parentNode: null,
     _isConnected: opts.connected !== false,
@@ -43,6 +49,67 @@ function makeNode(opts) {
       if (name === 'role' && opts.role) return opts.role;
       if (name === 'data-testid' && opts.testid) return opts.testid;
       return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : null;
+    },
+    addEventListener(type, fn, options) {
+      if (!eventListeners[type]) eventListeners[type] = [];
+      eventListeners[type].push({ fn, capture: listenerCaptureMode(options) });
+    },
+    removeEventListener(type, fn, options) {
+      const listeners = eventListeners[type] || [];
+      const capture = listenerCaptureMode(options);
+      const index = listeners.findIndex((entry) => entry.fn === fn && entry.capture === capture);
+      if (index !== -1) listeners.splice(index, 1);
+    },
+    listenerCount(type) {
+      return (eventListeners[type] || []).length;
+    },
+    contains(candidate) {
+      for (let cur = candidate; cur; cur = cur.parentElement || cur.parentNode || null) {
+        if (cur === node) return true;
+      }
+      return false;
+    },
+    dispatchEvent(event) {
+      if (!event || !event.type) throw new Error('event.type is required');
+      if (!event.target) event.target = node;
+
+      const path = [];
+      for (let cur = node; cur; cur = cur.parentElement || cur.parentNode || null) {
+        path.push(cur);
+      }
+      if (typeof event.composedPath !== 'function') {
+        event.composedPath = () => path.slice();
+      }
+
+      let stopped = false;
+      const originalStopPropagation = event.stopPropagation;
+      event.stopPropagation = function() {
+        stopped = true;
+        event.cancelBubble = true;
+        if (typeof originalStopPropagation === 'function') {
+          originalStopPropagation.call(event);
+        }
+      };
+
+      const dispatchTo = (current, capture) => {
+        const listeners = (current._eventListeners[event.type] || [])
+          .filter((entry) => entry.capture === capture)
+          .slice();
+        listeners.forEach((entry) => {
+          if (!stopped) entry.fn.call(current, event);
+        });
+      };
+
+      path.slice().reverse().forEach((current) => {
+        if (!stopped) dispatchTo(current, true);
+      });
+      if (!stopped) dispatchTo(node, false);
+      if (event.bubbles !== false) {
+        path.slice(1).forEach((current) => {
+          if (!stopped) dispatchTo(current, false);
+        });
+      }
+      return true;
     }
   };
   if (opts.parent) {
@@ -200,10 +267,11 @@ check('optsFor text/number observes childList + characterData + subtree only', (
   assert.deepEqual(plain(triggerObserve.optsFor('number')), { childList: true, characterData: true, subtree: true });
 });
 
-check('optsFor attribute uses attributeFilter only', () => {
+check('optsFor attribute uses attributeFilter and subtree', () => {
   assert.deepEqual(plain(triggerObserve.optsFor('attribute', 'data-price')), {
     attributes: true,
-    attributeFilter: ['data-price']
+    attributeFilter: ['data-price'],
+    subtree: true
   });
 });
 
@@ -235,6 +303,84 @@ check('one mutation burst coalesces to one triggerValueChanged report', () => {
   assert.equal(sendMessages[0].action, 'triggerValueChanged');
   assert.equal(sendMessages[0].trigger_id, 'trg_burst');
   assert.deepEqual(plain(sendMessages[0].value), { text: '$12' });
+});
+
+check('form value events report only the watched leaf value', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'form-root' });
+  const leaf = makeNode({ tag: 'input', value: 'old', parent: container });
+  const other = makeNode({ tag: 'input', value: 'ignored', parent: container });
+  queryResolver = () => leaf;
+
+  const started = triggerObserve.start('trg_form', '#field', 'text');
+  assert.equal(started.ok, true);
+  assert.equal(container.listenerCount('input'), 1);
+  assert.equal(container.listenerCount('change'), 1);
+
+  other.value = 'ignored update';
+  other.dispatchEvent({ type: 'input', bubbles: true });
+  assert.equal(timers.size, 0);
+  assert.equal(sendMessages.length, 0);
+
+  leaf.value = '  updated value  ';
+  leaf.dispatchEvent({ type: 'input', bubbles: true });
+  assert.equal(sendMessages.length, 0);
+  assert.equal(timers.size, 1);
+  flushTimers();
+
+  assert.equal(sendMessages.length, 1);
+  assert.equal(sendMessages[0].action, 'triggerValueChanged');
+  assert.equal(sendMessages[0].trigger_id, 'trg_form');
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'updated value' });
+
+  triggerObserve.stop('trg_form');
+  assert.equal(container.listenerCount('input'), 0);
+  assert.equal(container.listenerCount('change'), 0);
+});
+
+check('capture form value listeners survive stopped bubbling input events', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'capture-form-root' });
+  const leaf = makeNode({ tag: 'input', value: 'old', parent: container });
+  queryResolver = () => leaf;
+
+  assert.equal(triggerObserve.start('trg_capture_form', '#capture-field', 'text').ok, true);
+  assert.equal(container.listenerCount('input'), 1);
+  leaf.addEventListener('input', (event) => {
+    event.stopPropagation();
+  });
+
+  leaf.value = '  captured update  ';
+  leaf.dispatchEvent({ type: 'input', bubbles: true });
+  assert.equal(sendMessages.length, 0);
+  assert.equal(timers.size, 1);
+  flushTimers();
+
+  assert.equal(sendMessages.length, 1);
+  assert.equal(sendMessages[0].trigger_id, 'trg_capture_form');
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'captured update' });
+
+  triggerObserve.stop('trg_capture_form');
+  assert.equal(container.listenerCount('input'), 0);
+  assert.equal(container.listenerCount('change'), 0);
+});
+
+check('disconnectAll removes delegated form value listeners', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'disconnect-form-root' });
+  const leaf = makeNode({ tag: 'select', value: 'a', parent: container });
+  queryResolver = () => leaf;
+
+  assert.equal(triggerObserve.start('trg_select', '#select', 'text').ok, true);
+  assert.equal(container.listenerCount('input'), 1);
+  assert.equal(container.listenerCount('change'), 1);
+  triggerObserve.disconnectAll();
+  assert.equal(container.listenerCount('input'), 0);
+  assert.equal(container.listenerCount('change'), 0);
+  assert.equal(triggerObserve.registry.size, 0);
 });
 
 check('idempotent start disconnects prior observer before re-observe', () => {

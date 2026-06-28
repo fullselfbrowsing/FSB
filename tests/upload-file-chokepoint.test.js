@@ -149,6 +149,8 @@ async function assertFailedUploadRedactsPathInLogs() {
   const result = await executeUploadFile(7, 'input[type=file]', filePath);
 
   assert.strictEqual(result.success, false, 'failed upload returns failure');
+  assert(!result.error.includes(filePath), 'failed upload result does not contain the absolute path');
+  assert(result.error.includes(fileName), 'failed upload result uses basename in redacted message');
   const serializedLogs = JSON.stringify(calls.log);
   assert(!serializedLogs.includes(filePath), 'failed upload logs do not contain the absolute path');
   assert(serializedLogs.includes(fileName), 'failed upload log uses basename in redacted message');

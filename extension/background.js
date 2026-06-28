@@ -14650,9 +14650,10 @@ async function executeUploadFile(tabId, selector, filePath) {
     return { success: true, method: 'cdp_set_file_input', selector, file: fileName, hadEffect: true };
   } catch (error) {
     const msg = error && error.message ? error.message : String(error);
-    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactPathForUploadLog(msg) });
+    const redactedMsg = redactPathForUploadLog(msg);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactedMsg });
     await audit('error', 'allow', (error && error.name) ? error.name : 'Error');
-    return { success: false, error: 'upload_file failed: ' + msg };
+    return { success: false, error: 'upload_file failed: ' + redactedMsg };
   } finally {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }

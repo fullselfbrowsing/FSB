@@ -85,6 +85,15 @@ async function run() {
   check(Array.isArray(publicTools) && publicTools.length > 0,
     'getPublicTools() returns a non-empty public tool list');
 
+  const systemPrompt = agentLoop.buildSystemPrompt('check my notifications', 'https://github.com/notifications');
+  check(systemPrompt.indexOf('search_capabilities') !== -1,
+    'buildSystemPrompt advertises search_capabilities despite out-of-registry tool visibility');
+  check(systemPrompt.indexOf('invoke_capability') !== -1,
+    'buildSystemPrompt advertises invoke_capability despite out-of-registry tool visibility');
+  check(systemPrompt.indexOf('RECIPE_DOM_FALLBACK_PENDING') !== -1
+      && systemPrompt.indexOf('RECIPE_EXPIRED') !== -1,
+    'buildSystemPrompt preserves capability rot fallback reasons for DOM recovery');
+
   PROVIDER_KEYS.forEach(function (provider) {
     let formatted = null;
     let threw = null;
