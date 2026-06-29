@@ -1,6 +1,6 @@
 # Phase 44 T1 Readiness Matrix
 
-**Generated:** 2026-06-29T20:36:31.227Z
+**Generated:** 2026-06-29T21:34:34.899Z
 
 This report is generated from `extension/catalog/recipe-index.generated.js` plus the live `capability-catalog.js` resolver. It is the v1.1.0 truth surface: catalog/search support means a capability is searchable and routable, not that every app has direct API execution today.
 
@@ -11,17 +11,17 @@ This report is generated from `extension/catalog/recipe-index.generated.js` plus
 | Total descriptors | 2314 |
 | App stems | 128 |
 | Distinct service hosts | 129 |
-| T0/T1a/T1b resolved descriptors | 26 |
-| T1 ready executable descriptors | 21 |
+| T0/T1a/T1b resolved descriptors | 50 |
+| T1 ready executable descriptors | 45 |
 | T1 guarded fail-closed writes | 5 |
 | Learn-pending descriptors | 0 |
-| DOM/discovery-pending descriptors | 2094 |
+| DOM/discovery-pending descriptors | 2070 |
 | Blocked descriptors | 194 |
-| Catalog tail not direct API-ready | 2288 |
+| Catalog tail not direct API-ready | 2264 |
 
 ## What This Means
 
-The catalog spans 128 app stems. That 128-app breadth is catalog/search support, not direct API execution for every app. `invoke_capability` executes only proven T0/T1a/T1b handlers or recipes today; guarded writes return fail-closed pending UAT; the remaining 2288-descriptor tail stays DOM/discovery, learn-pending, or blocked by denylist.
+The catalog spans 128 app stems. That 128-app breadth is catalog/search support, not direct API execution for every app. `invoke_capability` executes only proven T0/T1a/T1b handlers or recipes today; guarded writes return fail-closed pending UAT; the remaining 2264-descriptor tail stays DOM/discovery, learn-pending, or blocked by denylist.
 
 Non-denied origins are allowed under Auto for ordinary capability invoke. Denylisted origins remain blocked. Sensitive origins are flagged in UI/audit records, while extra confirmation remains scoped to network-capture discovery.
 
@@ -29,10 +29,10 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 
 | Status | Count |
 |--------|------:|
-| t1-ready | 21 |
+| t1-ready | 45 |
 | t1-guarded-fail-closed | 5 |
 | learn-pending | 0 |
-| discovery-pending | 2094 |
+| discovery-pending | 2070 |
 | blocked | 194 |
 | unknown | 0 |
 
@@ -48,14 +48,14 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 | `aws` | 16 | 0 | 0 | 0 | 16 | 0 |
 | `azure` | 26 | 0 | 0 | 0 | 26 | 0 |
 | `bestbuy` | 11 | 0 | 0 | 0 | 11 | 0 |
-| `bitbucket` | 27 | 0 | 0 | 0 | 27 | 0 |
+| `bitbucket` | 27 | 3 | 0 | 0 | 24 | 0 |
 | `booking` | 10 | 0 | 0 | 0 | 10 | 0 |
 | `bsky` | 38 | 0 | 0 | 0 | 38 | 0 |
 | `calendly` | 15 | 0 | 0 | 0 | 15 | 0 |
 | `carta` | 20 | 0 | 0 | 0 | 0 | 20 |
 | `chatgpt` | 20 | 0 | 0 | 0 | 20 | 0 |
 | `chipotle` | 16 | 0 | 0 | 0 | 16 | 0 |
-| `circleci` | 33 | 0 | 0 | 0 | 33 | 0 |
+| `circleci` | 33 | 10 | 0 | 0 | 23 | 0 |
 | `claude` | 14 | 0 | 0 | 0 | 14 | 0 |
 | `clickhouse` | 9 | 0 | 0 | 0 | 9 | 0 |
 | `clickup` | 11 | 0 | 0 | 0 | 11 | 0 |
@@ -110,7 +110,7 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 | `mongodb` | 20 | 0 | 0 | 0 | 20 | 0 |
 | `msword` | 27 | 0 | 0 | 0 | 27 | 0 |
 | `netflix` | 18 | 0 | 0 | 0 | 0 | 18 |
-| `netlify` | 40 | 0 | 0 | 0 | 40 | 0 |
+| `netlify` | 40 | 4 | 0 | 0 | 36 | 0 |
 | `newrelic` | 22 | 0 | 0 | 0 | 22 | 0 |
 | `notebooklm` | 19 | 0 | 0 | 0 | 19 | 0 |
 | `notion` | 20 | 8 | 0 | 0 | 12 | 0 |
@@ -156,7 +156,7 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 | `twitch` | 14 | 0 | 0 | 0 | 0 | 14 |
 | `uber` | 8 | 0 | 0 | 0 | 8 | 0 |
 | `ubereats` | 5 | 0 | 0 | 0 | 5 | 0 |
-| `vercel` | 8 | 0 | 0 | 0 | 8 | 0 |
+| `vercel` | 8 | 7 | 0 | 0 | 1 | 0 |
 | `walmart` | 10 | 0 | 0 | 0 | 10 | 0 |
 | `webflow` | 15 | 0 | 0 | 0 | 15 | 0 |
 | `whatsapp` | 21 | 0 | 0 | 0 | 21 | 0 |

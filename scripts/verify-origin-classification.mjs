@@ -87,7 +87,8 @@ const HEAD_APP_MAP = {
   FsbHandlerGitlab: { app: 'gitlab', fallbackBaseUrl: 'https://gitlab.com' },
   FsbHandlerNetlify: { app: 'netlify', fallbackBaseUrl: 'https://app.netlify.com' },
   FsbHandlerBitbucket: { app: 'bitbucket', fallbackBaseUrl: 'https://bitbucket.org' },
-  FsbHandlerCircleci: { app: 'circleci', fallbackBaseUrl: 'https://app.circleci.com' }
+  FsbHandlerCircleci: { app: 'circleci', fallbackBaseUrl: 'https://app.circleci.com' },
+  FsbHandlerVercel: { app: 'vercel', fallbackBaseUrl: 'https://vercel.com' }
 };
 
 /**
@@ -276,16 +277,19 @@ function readApiBaseUrl(app) {
 }
 
 // Some same-origin app runtimes declare only a relative API base in <app>-api.ts
-// (Netlify /access-control/..., Bitbucket /!api/2.0, CircleCI /api/v2). That is a
-// stronger same-origin signal, not an unresolvable base: combine the reviewed handler
-// fallback origin with the relative path and keep the normal strict same-origin check.
+// (Netlify /access-control/..., Bitbucket /!api/2.0, CircleCI /api/v2). Vercel builds
+// `/api${endpoint}` inline instead of via a named constant. These are stronger
+// same-origin signals, not unresolvable bases: combine the reviewed handler fallback
+// origin with the relative path and keep the normal strict same-origin check.
 function readRelativeApiBase(app) {
   if (!app) { return null; }
   const apiFile = join(VENDOR_PLUGINS, app, 'src', app + '-api.ts');
   if (!existsSync(apiFile)) { return null; }
   const text = readFileSync(apiFile, 'utf8');
   const m = text.match(/const\s+API[A-Z0-9_]*\s*=\s*['"](\/[^'"]*)['"]/);
-  return m ? m[1] : null;
+  if (m) { return m[1]; }
+  const templatedEndpoint = text.match(/['"`](\/api)\$\{endpoint\}/);
+  return templatedEndpoint ? templatedEndpoint[1] : null;
 }
 
 // ---- Detect a DYNAMIC per-workspace API base in a vendored <app>-api.ts (slack) -----

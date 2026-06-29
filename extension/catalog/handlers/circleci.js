@@ -34,6 +34,45 @@
     required: ['project_slug'],
     additionalProperties: false
   };
+  var GET_PIPELINE_PARAMS = {
+    type: 'object',
+    properties: { pipeline_id: { type: 'string' } },
+    required: ['pipeline_id'],
+    additionalProperties: false
+  };
+  var GET_PIPELINE_WORKFLOWS_PARAMS = {
+    type: 'object',
+    properties: {
+      pipeline_id: { type: 'string' },
+      page_token: { type: 'string' }
+    },
+    required: ['pipeline_id'],
+    additionalProperties: false
+  };
+  var GET_WORKFLOW_PARAMS = {
+    type: 'object',
+    properties: { workflow_id: { type: 'string' } },
+    required: ['workflow_id'],
+    additionalProperties: false
+  };
+  var GET_WORKFLOW_JOBS_PARAMS = {
+    type: 'object',
+    properties: {
+      workflow_id: { type: 'string' },
+      page_token: { type: 'string' }
+    },
+    required: ['workflow_id'],
+    additionalProperties: false
+  };
+  var GET_JOB_PARAMS = {
+    type: 'object',
+    properties: {
+      project_slug: { type: 'string' },
+      job_number: { type: 'integer' }
+    },
+    required: ['project_slug', 'job_number'],
+    additionalProperties: false
+  };
 
   function typedRecipeError(code, extra) {
     var out = { success: false, code: code, errorCode: code, error: code };
@@ -154,6 +193,106 @@
         var url = CIRCLECI_API_BASE + '/project/' + encodePathPreservingSlash(a.project_slug);
         var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
         return guardObject(res, 'circleci.get_project');
+      }
+    },
+
+    'circleci.get_pipeline': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_PIPELINE_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/pipeline/' + encodeURIComponent(String(a.pipeline_id));
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardObject(res, 'circleci.get_pipeline');
+      }
+    },
+
+    'circleci.get_pipeline_workflows': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_PIPELINE_WORKFLOWS_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/pipeline/' + encodeURIComponent(String(a.pipeline_id)) +
+          '/workflow' + buildQuery([
+            ['page-token', a.page_token]
+          ]);
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardItems(res, 'circleci.get_pipeline_workflows');
+      }
+    },
+
+    'circleci.get_workflow': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_WORKFLOW_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/workflow/' + encodeURIComponent(String(a.workflow_id));
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardObject(res, 'circleci.get_workflow');
+      }
+    },
+
+    'circleci.get_workflow_jobs': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_WORKFLOW_JOBS_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/workflow/' + encodeURIComponent(String(a.workflow_id)) +
+          '/job' + buildQuery([
+            ['page-token', a.page_token]
+          ]);
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardItems(res, 'circleci.get_workflow_jobs');
+      }
+    },
+
+    'circleci.get_job': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_JOB_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/project/' + encodePathPreservingSlash(a.project_slug) +
+          '/job/' + encodeURIComponent(String(a.job_number));
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardObject(res, 'circleci.get_job');
+      }
+    },
+
+    'circleci.get_job_artifacts': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_JOB_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/project/' + encodePathPreservingSlash(a.project_slug) +
+          '/' + encodeURIComponent(String(a.job_number)) + '/artifacts';
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardItems(res, 'circleci.get_job_artifacts');
+      }
+    },
+
+    'circleci.get_job_tests': {
+      tier: 'T1a',
+      origin: CIRCLECI_ORIGIN,
+      sideEffectClass: 'read',
+      params: GET_JOB_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var url = CIRCLECI_API_BASE + '/project/' + encodePathPreservingSlash(a.project_slug) +
+          '/' + encodeURIComponent(String(a.job_number)) + '/tests';
+        var res = await ctx.executeBoundSpec(buildGetSpec(url), ctx.tabId);
+        return guardItems(res, 'circleci.get_job_tests');
       }
     }
   };

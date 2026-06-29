@@ -143,6 +143,7 @@ const RECIPE_PATH_ALLOWLIST = [
   'catalog/handlers/netlify.js',
   'catalog/handlers/bitbucket.js',
   'catalog/handlers/circleci.js',
+  'catalog/handlers/vercel.js',
   // Phase 30 (SIGN-01, D-05): the JCS + Ed25519 verify module reached from
   // interpretRecipe. NAMED capability-* so Check 4's disk glob AUTO-covers it
   // (Pitfall 5). Registered AHEAD of its creation (Plan 03 writes it), the

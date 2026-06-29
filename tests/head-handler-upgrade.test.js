@@ -61,7 +61,7 @@ function check(cond, msg) {
   }
 }
 
-// ---- The Phase-40/41/46 ported slugs + their FIRST-PARTY origins --------------
+// ---- The Phase-40/41/46/48 ported slugs + their FIRST-PARTY origins -----------
 //
 // Each slug EXISTS as catalog/descriptors/opentabs__<app>__<op>.json (backing:
 // 'dom', sideEffectClass:'read', DOT-form slug). The slug strings here are read
@@ -88,6 +88,22 @@ const PORTED = [
   { slug: 'circleci.get_current_user', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
   { slug: 'circleci.list_pipelines', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
   { slug: 'circleci.get_project', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  // circleci x7 -- EXTEND same-origin read module (48), origin https://app.circleci.com
+  { slug: 'circleci.get_pipeline', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_pipeline_workflows', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_workflow', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_workflow_jobs', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_job', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_job_artifacts', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_job_tests', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  // vercel x7 -- NEW same-origin read module (48), origin https://vercel.com
+  { slug: 'vercel.get_user', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
+  { slug: 'vercel.list_teams', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
+  { slug: 'vercel.list_projects', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
+  { slug: 'vercel.get_project', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
+  { slug: 'vercel.list_deployments', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
+  { slug: 'vercel.get_deployment', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
+  { slug: 'vercel.list_domains', origin: 'https://vercel.com', handlerFile: 'vercel.js' },
   // slack x3 -- EXTEND existing module (40-03), origin https://app.slack.com
   { slug: 'slack.list_channels', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
   { slug: 'slack.list_members', origin: 'https://app.slack.com', handlerFile: 'slack.js' },

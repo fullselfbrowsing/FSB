@@ -111,6 +111,8 @@
 
 ## Phase 48: High-Value Read Ports — Second Batch
 
+- [x] Phase 48: High-Value Read Ports — Second Batch (completed 2026-06-29)
+
 **Goal:** Use the Phase 47 outcome to port another batch of read descriptors, including Pattern-D/GAPI candidates if the architecture is proven.
 
 **Depends on:** Phases 46 and 47.
@@ -122,7 +124,10 @@
 2. The coverage report shows a measurable increase in apps with at least one executable read path.
 3. Apps still unsuitable for T1 are documented with the reason: denied, ToS-sensitive, auth unavailable, cross-origin unsafe, or live-UAT missing.
 
-**Plans:** pending.
+**Plans:**
+- [x] 48-01: Vercel same-origin read head.
+- [x] 48-02: CircleCI same-origin read expansion.
+- [x] 48-03: Gate, search, and readiness-report closeout.
 
 ## Phase 49: Guarded Writes Activation Pipeline
 
@@ -162,7 +167,7 @@
 | 45. T1 Porting Scaffold + Handler Contract Hardening | 3/3 | Complete | 2026-06-29 |
 | 46. Same-Origin Read Ports — First High-Value Batch | 3/3 | Complete | 2026-06-29 |
 | 47. Pattern-D + GAPI Bridge Architecture | 3/3 | Complete | 2026-06-29 |
-| 48. High-Value Read Ports — Second Batch | 0/? | Not started | — |
+| 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
 | 49. Guarded Writes Activation Pipeline | 0/? | Not started | — |
 | 50. T1 Expansion Gate + Next-Batch Plan | 0/? | Not started | — |
 

@@ -42,6 +42,7 @@ const EXPECTED_HEAD_GLOBALS = [
   'FsbHandlerNetlify',
   'FsbHandlerBitbucket',
   'FsbHandlerCircleci',
+  'FsbHandlerVercel',
 ];
 
 let passed = 0;
@@ -85,8 +86,8 @@ check(headEntryCount <= CAP,
   `HEAD_HANDLER_MODULES.length ${headEntryCount} <= CAP ${CAP} (the head stays descriptors-only; breadth never sprawls)`);
 
 // ---- Today's exact head -- breadth adds DATA, depth adds narrow same-origin heads --
-check(headEntryCount === 7,
-  `HEAD_HANDLER_MODULES has exactly 7 entries (Phase 46 adds 3 read heads; the head stays <=30); got ${headEntryCount}`);
+check(headEntryCount === 8,
+  `HEAD_HANDLER_MODULES has exactly 8 entries (Phase 48 adds the Vercel read head; the head stays <=30); got ${headEntryCount}`);
 const missingGlobals = EXPECTED_HEAD_GLOBALS.filter((g) => !foundGlobals.includes(g));
 check(missingGlobals.length === 0,
   `the expected head globals are present (missing: [${missingGlobals.join(', ') || 'none'}])`);

@@ -274,7 +274,8 @@
     { global: 'FsbHandlerGitlab', service: 'gitlab.com', origin: 'https://gitlab.com' },
     { global: 'FsbHandlerNetlify', service: 'app.netlify.com', origin: 'https://app.netlify.com' },
     { global: 'FsbHandlerBitbucket', service: 'bitbucket.org', origin: 'https://bitbucket.org' },
-    { global: 'FsbHandlerCircleci', service: 'app.circleci.com', origin: 'https://app.circleci.com' }
+    { global: 'FsbHandlerCircleci', service: 'app.circleci.com', origin: 'https://app.circleci.com' },
+    { global: 'FsbHandlerVercel', service: 'vercel.com', origin: 'https://vercel.com' }
   ];
 
   function _readGlobal(name) {

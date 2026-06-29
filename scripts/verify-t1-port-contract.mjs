@@ -35,6 +35,7 @@ export const HANDLER_BY_APP = Object.freeze({
   netlify: 'netlify.js',
   notion: 'notion.js',
   slack: 'slack.js',
+  vercel: 'vercel.js',
 });
 
 export const ACTIVE_WRITE_UAT_SLUGS = Object.freeze([

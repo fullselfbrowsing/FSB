@@ -128,7 +128,8 @@ function makeCtx(origin, tabId, opts) {
         const isNetlifyRest = isGet && url.indexOf('https://app.netlify.com/access-control/bb-api/api/v1') === 0;
         const isBitbucketRest = isGet && url.indexOf('https://bitbucket.org/!api/2.0') === 0;
         const isCircleciRest = isGet && url.indexOf('https://app.circleci.com/api/v2') === 0;
-        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest;
+        const isVercelRest = isGet && url.indexOf('https://vercel.com/api') === 0;
+        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest && !isVercelRest;
         let text = null;
         if (isProbe && url.indexOf('app.slack.com') !== -1) {
           text = Object.prototype.hasOwnProperty.call(options, 'slackProbeText')
@@ -201,12 +202,46 @@ function makeCtx(origin, tabId, opts) {
             data = { uuid: '{repo-test}', slug: 'repo-test', name: 'Repository test' };
           }
         } else if (url.indexOf('https://app.circleci.com/api/v2') === 0) {
-          if (url.indexOf('/pipeline') !== -1) {
+          const pathOnly = url.split('?')[0];
+          if (pathOnly.indexOf('/pipeline/') !== -1 && /\/workflow$/.test(pathOnly)) {
+            data = { items: [{ id: 'workflow-test', name: 'build', status: 'success' }] };
+          } else if (pathOnly.indexOf('/pipeline/') !== -1) {
+            data = { id: 'pipeline-test', number: 1, project_slug: 'gh/org/repo' };
+          } else if (pathOnly.indexOf('/workflow/') !== -1 && /\/job$/.test(pathOnly)) {
+            data = { items: [{ id: 'job-test', name: 'build', status: 'success', job_number: 42 }] };
+          } else if (pathOnly.indexOf('/workflow/') !== -1) {
+            data = { id: 'workflow-test', name: 'build', status: 'success' };
+          } else if (pathOnly.indexOf('/artifacts') !== -1) {
+            data = { items: [{ path: 'artifact.txt', url: 'https://example.invalid/artifact.txt' }] };
+          } else if (pathOnly.indexOf('/tests') !== -1) {
+            data = { items: [{ name: 'test passes', result: 'success' }] };
+          } else if (pathOnly.indexOf('/project/') !== -1 && pathOnly.indexOf('/job/') !== -1) {
+            data = { id: 'job-test', name: 'build', status: 'success', job_number: 42 };
+          } else if (pathOnly.indexOf('/pipeline') !== -1) {
             data = { items: [{ id: 'pipeline-test', number: 1, project_slug: 'gh/org/repo' }] };
           } else if (url.indexOf('/me') !== -1) {
             data = { id: 'user-test', login: 'circle-user', name: 'Circle User' };
           } else {
             data = { id: 'project-test', slug: 'gh/org/repo', name: 'repo' };
+          }
+        } else if (url.indexOf('https://vercel.com/api') === 0) {
+          const pathOnly = url.split('?')[0];
+          if (pathOnly.indexOf('/www/user') !== -1) {
+            data = { user: { uid: 'user-test', email: 'user@example.invalid', username: 'vercel-user' } };
+          } else if (pathOnly.indexOf('/v2/teams') !== -1) {
+            data = { teams: [{ id: 'team-test', slug: 'team-test', name: 'Team Test' }] };
+          } else if (pathOnly.indexOf('/v9/projects/') !== -1 && /\/domains$/.test(pathOnly)) {
+            data = { domains: [{ name: 'example.invalid', configured: true }] };
+          } else if (pathOnly.indexOf('/v9/projects/') !== -1) {
+            data = { id: 'prj-test', name: 'project-test' };
+          } else if (pathOnly.indexOf('/v9/projects') !== -1) {
+            data = { projects: [{ id: 'prj-test', name: 'project-test' }], pagination: { count: 1, next: null } };
+          } else if (pathOnly.indexOf('/v6/deployments') !== -1) {
+            data = { deployments: [{ uid: 'dpl-test', name: 'project-test', url: 'project-test.vercel.app' }], pagination: { count: 1, next: null } };
+          } else if (pathOnly.indexOf('/v13/deployments/') !== -1) {
+            data = { uid: 'dpl-test', name: 'project-test', url: 'project-test.vercel.app' };
+          } else {
+            data = { ok: true };
           }
         } else {
           data = { ok: true };
@@ -823,12 +858,148 @@ const Schema = require(SCHEMA_PATH);
       'https://app.circleci.com/api/v2/project/gh/org/repo',
       'circleci.get_project targets /api/v2/project/:project_slug');
 
+    check(cc['circleci.get_pipeline'] && cc['circleci.get_pipeline'].tier === 'T1a'
+      && cc['circleci.get_pipeline'].sideEffectClass === 'read'
+      && typeof cc['circleci.get_pipeline'].handle === 'function',
+      'circleci.get_pipeline is a tier:T1a READ entry with an async handle');
+    check(cc['circleci.get_job_tests'] && cc['circleci.get_job_tests'].tier === 'T1a'
+      && cc['circleci.get_job_tests'].sideEffectClass === 'read'
+      && typeof cc['circleci.get_job_tests'].handle === 'function',
+      'circleci.get_job_tests is a tier:T1a READ entry with an async handle');
+
+    const ccPipeline = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_pipeline'].handle({ pipeline_id: 'pipeline-123' }, ccPipeline.ctx);
+    check(ccPipeline.calls.length === 1 && ccPipeline.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/pipeline/pipeline-123',
+      'circleci.get_pipeline targets /api/v2/pipeline/:pipeline_id');
+
+    const ccPipelineWorkflows = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_pipeline_workflows'].handle({ pipeline_id: 'pipeline-123', page_token: 'next-token' }, ccPipelineWorkflows.ctx);
+    check(ccPipelineWorkflows.calls.length === 1 && ccPipelineWorkflows.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/pipeline/pipeline-123/workflow?page-token=next-token',
+      'circleci.get_pipeline_workflows targets /api/v2/pipeline/:pipeline_id/workflow with page-token');
+
+    const ccWorkflow = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_workflow'].handle({ workflow_id: 'workflow-123' }, ccWorkflow.ctx);
+    check(ccWorkflow.calls.length === 1 && ccWorkflow.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/workflow/workflow-123',
+      'circleci.get_workflow targets /api/v2/workflow/:workflow_id');
+
+    const ccWorkflowJobs = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_workflow_jobs'].handle({ workflow_id: 'workflow-123', page_token: 'job-token' }, ccWorkflowJobs.ctx);
+    check(ccWorkflowJobs.calls.length === 1 && ccWorkflowJobs.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/workflow/workflow-123/job?page-token=job-token',
+      'circleci.get_workflow_jobs targets /api/v2/workflow/:workflow_id/job with page-token');
+
+    const ccJob = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_job'].handle({ project_slug: 'gh/org/repo', job_number: 42 }, ccJob.ctx);
+    check(ccJob.calls.length === 1 && ccJob.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/project/gh/org/repo/job/42',
+      'circleci.get_job targets /api/v2/project/:project_slug/job/:job_number');
+
+    const ccArtifacts = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_job_artifacts'].handle({ project_slug: 'gh/org/repo', job_number: 42 }, ccArtifacts.ctx);
+    check(ccArtifacts.calls.length === 1 && ccArtifacts.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/project/gh/org/repo/42/artifacts',
+      'circleci.get_job_artifacts targets /api/v2/project/:project_slug/:job_number/artifacts');
+
+    const ccTests = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_job_tests'].handle({ project_slug: 'gh/org/repo', job_number: 42 }, ccTests.ctx);
+    check(ccTests.calls.length === 1 && ccTests.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/project/gh/org/repo/42/tests',
+      'circleci.get_job_tests targets /api/v2/project/:project_slug/:job_number/tests');
+
     const ccNeg = makeCtx('https://app.circleci.com', 48, { readData: { message: 'not authenticated' } });
     const ccNegOut = await cc['circleci.get_current_user'].handle({}, ccNeg.ctx);
     check(ccNegOut && ccNegOut.success === false
       && ccNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
       && ccNegOut.fellBackToDom === true,
       'circleci.get_current_user rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
+  }
+
+  const vercelPath = path.join(HANDLERS_DIR, 'vercel.js');
+  check(fs.existsSync(vercelPath), 'catalog/handlers/vercel.js exists (Phase 48)');
+  if (fs.existsSync(vercelPath)) {
+    const vc = require(vercelPath);
+    const vcSrc = readSource(vercelPath);
+
+    check(vc['vercel.list_projects'] && vc['vercel.list_projects'].tier === 'T1a'
+      && vc['vercel.list_projects'].sideEffectClass === 'read'
+      && typeof vc['vercel.list_projects'].handle === 'function',
+      'vercel.list_projects is a tier:T1a READ entry with an async handle');
+    check(vc['vercel.get_project'] && vc['vercel.get_project'].origin === 'https://vercel.com',
+      'vercel.get_project targets the first-party origin https://vercel.com');
+    check(vc['vercel.get_project'] && vc['vercel.get_project'].params
+      && Array.isArray(vc['vercel.get_project'].params.required)
+      && vc['vercel.get_project'].params.required.indexOf('project') !== -1,
+      'vercel.get_project exposes a params schema requiring project');
+    check(!/chrome\.(scripting|tabs)/.test(vcSrc),
+      'vercel.js references NO chrome.scripting/chrome.tabs');
+    check(!/\bfetch\s*\(/.test(vcSrc),
+      'vercel.js performs no direct network call');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf|authorization|bearer)\b/i.test(vcSrc),
+      'vercel.js does NOT console-log a secret-bearing variable');
+
+    const vcUser = makeCtx('https://vercel.com', 49);
+    const vcUserOut = await vc['vercel.get_user'].handle({}, vcUser.ctx);
+    check(vcUser.calls.length === 1 && vcUser.calls[0].spec.method === 'GET',
+      'vercel.get_user builds one GET spec');
+    check(vcUser.calls.length === 1 && vcUser.calls[0].spec.origin === 'https://vercel.com',
+      'vercel.get_user pins the spec to vercel.com');
+    check(vcUser.calls.length === 1 && vcUser.calls[0].spec.url ===
+      'https://vercel.com/api/www/user',
+      'vercel.get_user targets /api/www/user');
+    check(vcUserOut && vcUserOut.success === true,
+      'vercel.get_user accepts a logged-in user payload');
+
+    const vcTeams = makeCtx('https://vercel.com', 49);
+    await vc['vercel.list_teams'].handle({ limit: 10, since: 'cursor-1' }, vcTeams.ctx);
+    check(vcTeams.calls.length === 1 && vcTeams.calls[0].spec.url ===
+      'https://vercel.com/api/v2/teams?limit=10&since=cursor-1',
+      'vercel.list_teams targets /api/v2/teams with pagination');
+
+    const vcProjects = makeCtx('https://vercel.com', 49);
+    await vc['vercel.list_projects'].handle({ limit: 25, from: 'cursor-2', search: 'docs' }, vcProjects.ctx);
+    check(vcProjects.calls.length === 1 && vcProjects.calls[0].spec.url ===
+      'https://vercel.com/api/v9/projects?limit=25&from=cursor-2&search=docs',
+      'vercel.list_projects targets /api/v9/projects with filters');
+
+    const vcProject = makeCtx('https://vercel.com', 49);
+    await vc['vercel.get_project'].handle({ project: 'project-test' }, vcProject.ctx);
+    check(vcProject.calls.length === 1 && vcProject.calls[0].spec.url ===
+      'https://vercel.com/api/v9/projects/project-test',
+      'vercel.get_project targets /api/v9/projects/:project');
+
+    const vcDeployments = makeCtx('https://vercel.com', 49);
+    await vc['vercel.list_deployments'].handle({
+      limit: 20,
+      from: '1700000000000',
+      project: 'project-test',
+      target: 'production',
+      state: 'READY'
+    }, vcDeployments.ctx);
+    check(vcDeployments.calls.length === 1 && vcDeployments.calls[0].spec.url ===
+      'https://vercel.com/api/v6/deployments?limit=20&from=1700000000000&projectId=project-test&target=production&state=READY',
+      'vercel.list_deployments maps project to projectId and targets /api/v6/deployments');
+
+    const vcDeployment = makeCtx('https://vercel.com', 49);
+    await vc['vercel.get_deployment'].handle({ deployment_id: 'dpl_123' }, vcDeployment.ctx);
+    check(vcDeployment.calls.length === 1 && vcDeployment.calls[0].spec.url ===
+      'https://vercel.com/api/v13/deployments/dpl_123',
+      'vercel.get_deployment targets /api/v13/deployments/:deployment_id');
+
+    const vcDomains = makeCtx('https://vercel.com', 49);
+    await vc['vercel.list_domains'].handle({ project: 'project-test' }, vcDomains.ctx);
+    check(vcDomains.calls.length === 1 && vcDomains.calls[0].spec.url ===
+      'https://vercel.com/api/v9/projects/project-test/domains',
+      'vercel.list_domains targets /api/v9/projects/:project/domains');
+
+    const vcNeg = makeCtx('https://vercel.com', 49, { readData: { error: { message: 'not authenticated' } } });
+    const vcNegOut = await vc['vercel.list_projects'].handle({}, vcNeg.ctx);
+    check(vcNegOut && vcNegOut.success === false
+      && vcNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && vcNegOut.fellBackToDom === true,
+      'vercel.list_projects rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
   }
 
   // =========================================================================
@@ -1020,7 +1191,7 @@ const Schema = require(SCHEMA_PATH);
     }
   });
 
-  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js'].forEach(function (name) {
+  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js', 'vercel.js'].forEach(function (name) {
     const src = path.join(HANDLERS_DIR, name);
     const ext = path.join(EXT_HANDLERS_DIR, name);
     check(fs.existsSync(ext), 'extension/catalog/handlers/' + name + ' exists for unpacked dev loads');
