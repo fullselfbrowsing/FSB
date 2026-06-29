@@ -28,7 +28,7 @@
     "showcase:build": "npm --prefix showcase/angular run build",
     "showcase:serve": "npm --prefix showcase/angular run start",
     "showcase:smoke": "npm --prefix showcase/angular run smoke:crawler",
-    "validate:extension": "node scripts/validate-extension.mjs && node scripts/verify-recipe-path-guard.mjs && node scripts/verify-classification-gate.mjs && node scripts/verify-catalog-crosscheck.mjs && node scripts/verify-no-duplicate-stem.mjs && node scripts/verify-origin-classification.mjs && node --import tsx scripts/verify-no-orphan-descriptor.mjs && node scripts/verify-t1-readiness-gate.mjs && node scripts/verify-t1-port-contract.mjs",
+    "validate:extension": "node scripts/validate-extension.mjs && node scripts/verify-recipe-path-guard.mjs && node scripts/verify-classification-gate.mjs && node scripts/verify-catalog-crosscheck.mjs && node scripts/verify-no-duplicate-stem.mjs && node scripts/verify-origin-classification.mjs && node scripts/verify-pattern-d-gapi-gate.mjs && node --import tsx scripts/verify-no-orphan-descriptor.mjs && node scripts/verify-t1-readiness-gate.mjs && node scripts/verify-t1-port-contract.mjs",
     "ci": "npm run validate:extension && npm test && npm run test:mcp-smoke && npm run showcase:build && npm run showcase:smoke"
   },
   "keywords": [

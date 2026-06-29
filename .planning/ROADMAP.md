@@ -91,6 +91,8 @@
 
 ## Phase 47: Pattern-D + GAPI Bridge Architecture
 
+- [x] Phase 47: Pattern-D + GAPI Bridge Architecture (completed 2026-06-29)
+
 **Goal:** Design and prove the missing architecture for apps whose useful APIs are separate-origin, per-org-subdomain, or page-bridge mediated, without breaking the active-tab credential boundary.
 
 **Depends on:** Phase 45.
@@ -102,7 +104,10 @@
 2. A Google Workspace GAPI bridge spike determines whether Docs/Drive/Calendar can be handled through `window.gapi.client.request` safely.
 3. Negative-control tests prove unverified cross-origin ports fail closed and cannot bypass origin/consent gates.
 
-**Plans:** pending.
+**Plans:**
+- [x] 47-01: Pattern-D decision for separate-origin and per-org APIs.
+- [x] 47-02: GAPI bridge decision for Google Workspace APIs.
+- [x] 47-03: CI gate, negative controls, and closeout.
 
 ## Phase 48: High-Value Read Ports — Second Batch
 
@@ -156,7 +161,7 @@
 | 44. T1 Readiness Inventory + Status Surface | 3/3 | Complete | 2026-06-29 |
 | 45. T1 Porting Scaffold + Handler Contract Hardening | 3/3 | Complete | 2026-06-29 |
 | 46. Same-Origin Read Ports — First High-Value Batch | 3/3 | Complete | 2026-06-29 |
-| 47. Pattern-D + GAPI Bridge Architecture | 0/? | Not started | — |
+| 47. Pattern-D + GAPI Bridge Architecture | 3/3 | Complete | 2026-06-29 |
 | 48. High-Value Read Ports — Second Batch | 0/? | Not started | — |
 | 49. Guarded Writes Activation Pipeline | 0/? | Not started | — |
 | 50. T1 Expansion Gate + Next-Batch Plan | 0/? | Not started | — |
