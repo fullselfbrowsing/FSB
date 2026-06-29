@@ -42,7 +42,10 @@
 2. `search_capabilities`, docs, and any relevant UI copy distinguish T1-ready, fail-closed, learn-pending, and DOM/discovery-pending states without stale overclaims.
 3. CI fails if a descriptor is marked T1-ready without a registered handler/recipe plus tests.
 
-**Plans:** pending.
+**Plans:**
+- [ ] 44-01: T1 readiness matrix generator and evidence report.
+- [ ] 44-02: Status-surface and documentation honesty pass.
+- [ ] 44-03: T1 readiness CI guard and phase closeout.
 
 ## Phase 45: T1 Porting Scaffold + Handler Contract Hardening
 

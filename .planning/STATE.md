@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: T1 App Execution Expansion
-status: defining_requirements
-stopped_at: "v1.0.0 archived; v1.1.0 T1 App Execution Expansion started. Next step: plan Phase 44 (T1 Readiness Inventory + Status Surface)."
-last_updated: "2026-06-29"
+status: planning
+stopped_at: "Phase 44 planned with three execution plans. Next step: execute 44-01 (T1 readiness matrix generator and evidence report)."
+last_updated: "2026-06-29T20:15:00-05:00"
 last_activity: 2026-06-29
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -25,14 +25,14 @@ See: .planning/milestones/v1.0.0-ROADMAP.md and .planning/milestones/v1.0.0-REQU
 See: .planning/milestones/v1.0.0-MILESTONE-AUDIT.md (audit passed; non-blocking T1/live-UAT debt recorded)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.1.0 focuses on turning the v1.0.0 catalog tail into verified direct T1 execution where safe and technically provable.
-**Current focus:** v1.1.0 milestone planning -- start with Phase 44 T1 readiness inventory and status-surface correction.
+**Current focus:** v1.1.0 milestone execution -- start with Phase 44 Plan 01, the T1 readiness matrix generator and evidence report.
 
 ## Current Position
 
-Phase: 44 (T1 Readiness Inventory + Status Surface) -- NOT STARTED
-Plan: --
-Status: Defining requirements / ready to plan Phase 44
-Last activity: 2026-06-29 -- archived v1.0.0 and opened v1.1.0 T1 App Execution Expansion
+Phase: 44 (T1 Readiness Inventory + Status Surface) -- PLANNED
+Plan: 44-01 (T1 readiness matrix generator and evidence report) -- READY TO EXECUTE
+Status: Planning complete / ready to execute Phase 44
+Last activity: 2026-06-29 -- planned Phase 44 with 3 execution plans
 
 Progress: [----------] 0%
 
@@ -40,7 +40,7 @@ Progress: [----------] 0%
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Not started |
+| 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Planned; 3 plans ready |
 | 45 | T1 Porting Scaffold + Handler Contract Hardening | T1R-04/05/09 | Not started |
 | 46 | Same-Origin Read Ports -- First High-Value Batch | T1R-06 | Not started |
 | 47 | Pattern-D + GAPI Bridge Architecture | T1R-07/08 | Not started |
@@ -134,7 +134,7 @@ None active.
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). v1.0.0 does NOT block on this debt.
+Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). v1.1.0 tracks this debt separately from the T1 expansion work.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
@@ -155,13 +155,13 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-26T21:19:54.238Z
-Stopped at: Phase 42 (Discovery Seeding + Tail Learn, DSEED-01/02) COMPLETE + verified PASS (gsd-verifier 3/3 SC, 17/17 must-haves, no findings; 42-VERIFICATION.md). DSEED-01: NEW harvest-discovery-seeds.mjs -> discovery-seeds.json (128 origins / 255 hints, SHA-pinned, byte-reproducible); network-capture loader reads it with NO manifest/permission change; a hint biases recognition ONLY, never executes (the consent-gated promote-after-replay path reused byte-unchanged, fail->DISCARD). SC2: resolve() seed branch -> T2 (learn-pending, no recipe) for seeded would-be-T3 origins (T3 unseeded); LEARN-04 + INV-01 byte-unchanged; RECIPE_LEARN_PENDING gains additive actionable/message (INV-03 code byte-stable). DSEED-02 (security headline): the structure-only redactor's AUTH_CARRIER_DENYLIST extended to the 119-app universe + a NEW path-segment token scrub (masks JWT/stripe/github/slack/aws/google/the vendored MS-Graph u! share-id to :tok; benign slugs survive) -> ZERO auth substring across all 3 sinks at scale (redaction 130/0). A plan-checker BLOCKER (path-segment token leak into the learned-recipe envelope) was caught + fixed pre-execution. Capture/consent core byte-UNCHANGED. Gates: full npm test EXIT 0, validate:extension EXIT 0. Carried-forward human_needed (NON-blocking, the hint never executes): live first-visit capture per seeded origin (42-HUMAN-UAT.md, 3 rows). Ready to plan Phase 43 (the FINAL phase / milestone gate).
+Last session: 2026-06-29T20:15:00-05:00
+Stopped at: Phase 44 (T1 Readiness Inventory + Status Surface) planned with 3 execution plans. v1.0.0 is archived; v1.1.0 is active. The next executable step is 44-01: build `scripts/report-t1-readiness.mjs`, add `tests/t1-readiness-report.test.js`, and generate the Phase 44 readiness evidence files.
 Resume file: None
 
 ## Next Actions
 
-Plan Phase 43 (Catalog-Scale + Milestone Gate — SCALE-01/02) — the FINAL v1.0.0 phase. Phases 35-42 + the inserted 39.5 are complete and verified: the full real-source OpenTabs catalog (~129 apps / 2,306 opentabs descriptors) ships DOM-only behind the closed-vocab interpreter (breadth); Phase 40 hand-ported 10 T1a READ heads + Phase 41 the 7 guarded WRITE heads (depth, all fail-closed, the CORS shipping gate, the SC2 mutating-opt-in proof); Phase 42 seeded the residual tail (discovery-seeds.json, 128 origins) into the consent-gated capture→learn→promote path + extended the structure-only redactor to a 119-app no-leak (tail). Phase 43 CLOSES the milestone: **SCALE-01** — prove full-corpus performance (the search index + catalog stay within budget at ~2,523 descriptors: searchable-text indexed, params schema-on-hit, index < ~1-2MB, loadJSON + first-search < ~50-100ms) via the extended eval harness with size/load-time assertions, AND the full-corpus search-PRECISION re-tune (wrong-invoke=0, DEF-39.5-04-A — intentSynonym enrichment + owned-origin ranking bias); **SCALE-02** — harden recipe-rot self-heal for the 119-app surface (per-origin re-learn coalescing / back-off), keep the typed fallback reason byte-equal across the 7 providers (INV-03), and **full `npm test` exits 0 = THE MILESTONE GATE**. CARRIED-FORWARD into the milestone close (all human_needed, NON-blocking -- the surfaces ship fail-closed/inert): (1) live mutation-body capture for the 7 guarded writes (41-HUMAN-UAT.md); (2) live first-visit discovery capture per seeded origin (42-HUMAN-UAT.md); (3) Pattern-D cross-origin execution (41-DEFERRAL.md). Recommended: `/gsd-plan-phase 43`. Side Phase 999.1 (click heuristics) is Backlog — NOT v1.0.0; the autonomous run skips it. After Phase 43: the milestone lifecycle (audit → complete → cleanup).
+Execute Phase 44 Plan 01. Build the readiness report generator, classifier tests, and generated markdown/JSON evidence over all committed descriptors. This is the required first step before any v1.1.0 app porting work.
 
 ### (historical) Phase 37 planning context
 
