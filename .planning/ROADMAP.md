@@ -131,6 +131,8 @@
 
 ## Phase 49: Guarded Writes Activation Pipeline
 
+- [x] Phase 49: Guarded Writes Activation Pipeline (completed 2026-06-29)
+
 **Goal:** Turn fail-closed write/destructive candidates into executable T1 only after live mutation-body capture, consent gate verification, and redacted audit proof.
 
 **Depends on:** Phases 44-48.
@@ -142,7 +144,10 @@
 2. A reusable live UAT template records method/path/body shape, CSRF/token location, Chrome/extension version, and redacted outcome without storing secrets.
 3. At least one low-risk write activation is completed end-to-end, or the milestone explicitly records why no write met the safety bar.
 
-**Plans:** pending.
+**Plans:**
+- [x] 49-01: Write activation evidence ledger.
+- [x] 49-02: Evidence verifier and validation gate.
+- [x] 49-03: Live-UAT template and closeout decision.
 
 ## Phase 50: T1 Expansion Gate + Next-Batch Plan
 
@@ -168,7 +173,7 @@
 | 46. Same-Origin Read Ports — First High-Value Batch | 3/3 | Complete | 2026-06-29 |
 | 47. Pattern-D + GAPI Bridge Architecture | 3/3 | Complete | 2026-06-29 |
 | 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
-| 49. Guarded Writes Activation Pipeline | 0/? | Not started | — |
+| 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
 | 50. T1 Expansion Gate + Next-Batch Plan | 0/? | Not started | — |
 
 ## Completed Milestones

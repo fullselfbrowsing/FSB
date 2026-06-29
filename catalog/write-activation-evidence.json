@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "generatedFor": "v1.1.0-t1-expansion",
+  "policy": "A write/destructive capability can be t1-ready only with a recorded active evidence entry or a named legacy exception. Guarded writes must remain fail-closed until live mutation-body evidence is recorded.",
+  "activeWrites": [
+    {
+      "slug": "notion.create_page",
+      "status": "active",
+      "observedAt": "2026-06-29",
+      "evidenceRef": ".planning/phases/41-depth-2-remaining-hand-ports-guarded-writes/41-HUMAN-UAT.md",
+      "method": "POST",
+      "pathShape": "/api/v3/saveTransactions",
+      "bodyShape": "transactions[] with block set operations; properties.title uses Notion title array",
+      "authShape": "same-origin cookie; x-notion-active-user-header and x-notion-space-id only inside bound spec",
+      "verification": "getRecordValues verifies the created block",
+      "redaction": "no cookie, token, user id, or space id recorded"
+    },
+    {
+      "slug": "notion.update_page",
+      "status": "active",
+      "observedAt": "2026-06-29",
+      "evidenceRef": ".planning/phases/41-depth-2-remaining-hand-ports-guarded-writes/41-HUMAN-UAT.md",
+      "method": "POST",
+      "pathShape": "/api/v3/saveTransactions",
+      "bodyShape": "transactions[] with set operations for title, icon, and cover plus update for object metadata",
+      "authShape": "same-origin cookie; x-notion-active-user-header and x-notion-space-id only inside bound spec",
+      "verification": "getRecordValues verifies the updated block",
+      "redaction": "no cookie, token, user id, or space id recorded"
+    },
+    {
+      "slug": "notion.create_database",
+      "status": "active",
+      "observedAt": "2026-06-29",
+      "evidenceRef": ".planning/phases/41-depth-2-remaining-hand-ports-guarded-writes/41-HUMAN-UAT.md",
+      "method": "POST",
+      "pathShape": "/api/v3/saveTransactions",
+      "bodyShape": "transactions[] creates collection, collection_view_page, and collection_view records",
+      "authShape": "same-origin cookie; x-notion-active-user-header and x-notion-space-id only inside bound spec",
+      "verification": "getRecordValues verifies the collection",
+      "redaction": "no cookie, token, user id, or space id recorded"
+    },
+    {
+      "slug": "notion.create_database_item",
+      "status": "active",
+      "observedAt": "2026-06-29",
+      "evidenceRef": ".planning/phases/41-depth-2-remaining-hand-ports-guarded-writes/41-HUMAN-UAT.md",
+      "method": "POST",
+      "pathShape": "/api/v3/saveTransactions",
+      "bodyShape": "transactions[] creates a block row and maps property names through collection schema ids",
+      "authShape": "same-origin cookie; x-notion-active-user-header and x-notion-space-id only inside bound spec",
+      "verification": "getRecordValues verifies the row",
+      "redaction": "no cookie, token, user id, or space id recorded"
+    },
+    {
+      "slug": "slack.chat.postMessage",
+      "status": "legacy-active",
+      "observedAt": "legacy",
+      "evidenceRef": "catalog/handlers/slack.js",
+      "method": "POST",
+      "pathShape": "/api/chat.postMessage",
+      "bodyShape": "form body contains token carrier, channel, text, and optional thread_ts",
+      "authShape": "xoxc-like token carrier in body; xoxd-like HttpOnly cookie rides same-origin",
+      "verification": "legacy active hand-head retained; not precedent for broad slack.send_message activation",
+      "redaction": "no literal token or cookie value recorded",
+      "legacyReason": "slack.chat.postMessage predates the Phase 49 activation ledger and has no OpenTabs breadth descriptor; slack.send_message remains guarded fail-closed until fresh live evidence exists"
+    }
+  ],
+  "guardedWrites": [
+    {
+      "slug": "github.issues.create",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-github-create-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": ["method", "path", "bodyShape", "csrfLocation", "auditRedactionProof", "loadedExtensionSmoke"]
+    },
+    {
+      "slug": "gitlab.create_issue",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-gitlab-create-issue-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": ["method", "path", "bodyShape", "csrfLocation", "auditRedactionProof", "loadedExtensionSmoke"]
+    },
+    {
+      "slug": "gitlab.create_merge_request",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-gitlab-create-merge-request-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": ["method", "path", "bodyShape", "csrfLocation", "auditRedactionProof", "loadedExtensionSmoke"]
+    },
+    {
+      "slug": "gitlab.create_note",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-gitlab-create-note-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": ["method", "path", "bodyShape", "csrfLocation", "auditRedactionProof", "loadedExtensionSmoke"]
+    },
+    {
+      "slug": "slack.send_message",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-slack-send-message-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": ["method", "path", "bodyShape", "tokenLocation", "auditRedactionProof", "loadedExtensionSmoke"]
+    }
+  ]
+}
