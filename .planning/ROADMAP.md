@@ -51,6 +51,8 @@
 
 ## Phase 45: T1 Porting Scaffold + Handler Contract Hardening
 
+- [x] Phase 45: T1 Porting Scaffold + Handler Contract Hardening (completed 2026-06-29)
+
 **Goal:** Build the reusable test and implementation scaffold for app ports so each new T1 handler has origin-pin, logged-out guard, shape guard, no-secret logging, consent classification, and byte-stable fallback behavior by default.
 
 **Depends on:** Phase 44.
@@ -62,7 +64,10 @@
 2. Shared tests can be applied to every new T1 port: origin match, executeBoundSpec-only, no token/log leak, logged-out body rejected, expected shape guard, and router parity.
 3. The fail-closed guarded-write harness is generalized so write/destructive ports cannot accidentally execute before UAT evidence is recorded.
 
-**Plans:** pending.
+**Plans:**
+- [x] 45-01: Port contract library and scaffold CLI.
+- [x] 45-02: Current-catalog contract verifier.
+- [x] 45-03: Documentation and phase closeout.
 
 ## Phase 46: Same-Origin Read Ports — First High-Value Batch
 
@@ -144,7 +149,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 44. T1 Readiness Inventory + Status Surface | 3/3 | Complete | 2026-06-29 |
-| 45. T1 Porting Scaffold + Handler Contract Hardening | 0/? | Not started | — |
+| 45. T1 Porting Scaffold + Handler Contract Hardening | 3/3 | Complete | 2026-06-29 |
 | 46. Same-Origin Read Ports — First High-Value Batch | 0/? | Not started | — |
 | 47. Pattern-D + GAPI Bridge Architecture | 0/? | Not started | — |
 | 48. High-Value Read Ports — Second Batch | 0/? | Not started | — |
