@@ -4,8 +4,8 @@
 /**
  * Phase 41 Plan 01 (DEPTH-02) -- the SC1 fail-closed guarded-write proof harness.
  *
- * THE SECURITY KEYSTONE of the guarded-write phase. Every WRITE head shipped this
- * milestone ships FAIL-CLOSED: handle() returns the dual-field
+ * THE SECURITY KEYSTONE of the guarded-write phase. Every still-unactivated WRITE head
+ * in this harness ships FAIL-CLOSED: handle() returns the dual-field
  * RECIPE_DOM_FALLBACK_PENDING and NEVER calls ctx.executeBoundSpec -- so NO mutation
  * fires for an [ASSUMED-ENDPOINT] write until a live-captured body activates it (the
  * shipped github.issues.create pattern, catalog/handlers/github.js:111-123).
@@ -59,23 +59,20 @@ function check(cond, msg) {
   }
 }
 
-// ---- The Phase-41 guarded WRITE slugs + their handler modules + first-party origins.
+// ---- The remaining fail-closed WRITE slugs + their handler modules + first-party origins.
 //
 // Each slug EXISTS as catalog/descriptors/opentabs__<app>__<op>.json (backing:'dom',
 // sideEffectClass:'write', DOT-form slug). The write head registers the EXACT slug so
 // resolve() upgrades the breadth descriptor dom->T1a (proven separately in
 // head-handler-upgrade.test.js); THIS harness proves each write is INERT (fail-closed).
 // origin is the app's OWN first-party origin (Wall 2). handlerFile is the module that
-// ports the write.
+// ports the write. Notion writes are intentionally absent: the UAT-smoked Notion
+// saveTransactions handlers are active and are tested in capability-head-handlers.
 const WRITE_HEADS = [
   // gitlab x3 -- EXTEND the existing module (41-02), origin https://gitlab.com
   { slug: 'gitlab.create_issue', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
   { slug: 'gitlab.create_merge_request', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
   { slug: 'gitlab.create_note', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
-  // notion x3 -- EXTEND the existing module (41-03), origin https://www.notion.so
-  { slug: 'notion.create_page', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
-  { slug: 'notion.update_page', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
-  { slug: 'notion.create_database_item', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
   // slack x1 -- EXTEND the existing module (41-04), origin https://app.slack.com
   { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js' }
 ];

@@ -6,7 +6,7 @@
  * THE TRAP THIS CLOSES: a T1a head builds a credentialed same-origin-cookie spec and
  * hands it to executeBoundSpec, which pins the active tab to spec.origin (Wall 2). That
  * is SAFE only when the handler origin is SAME-ORIGIN with the app's real API base-URL
- * -- a PATH on the first-party origin (gitlab.com/api/v4, www.notion.so/api/v3). If a
+ * -- a PATH on the first-party origin (gitlab.com/api/v4, app.notion.com/api/v3). If a
  * head's API actually lives on a SEPARATE subdomain (linear -> client-api.linear.app)
  * or a per-org wildcard (*.datadoghq.com, *.atlassian.net), the first-party session
  * cookie does NOT cross that origin -- porting it would require a CORS-verified
@@ -78,7 +78,12 @@ const VENDOR_PLUGINS = join(ROOT, 'vendor', 'opentabs-snapshot', 'plugins');
 const HEAD_APP_MAP = {
   FsbHandlerGithub: { app: null, fallbackBaseUrl: 'https://github.com' },
   FsbHandlerSlack: { app: 'slack', fallbackBaseUrl: 'https://app.slack.com', dynamicWorkspace: true },
-  FsbHandlerNotion: { app: 'notion', fallbackBaseUrl: 'https://www.notion.so' },
+  FsbHandlerNotion: {
+    app: 'notion',
+    fallbackBaseUrl: 'https://app.notion.com',
+    observedRuntimeBaseUrl: 'https://app.notion.com/api/v3',
+    expectedStaleVendoredBaseUrl: 'https://www.notion.so/api/v3'
+  },
   FsbHandlerGitlab: { app: 'gitlab', fallbackBaseUrl: 'https://gitlab.com' }
 };
 
@@ -104,7 +109,8 @@ function originHost(value) {
  * origin rather than strict same-origin. Deliberately a conservative last-two-labels
  * heuristic (no public-suffix-list dependency in build tooling): correct for the simple
  * registrable domains in play (slack.com). It is NOT used for the strict same-origin
- * path -- gitlab/notion/github stay full-origin-equality. A host with fewer than two
+ * path -- gitlab/notion/github stay full-origin-equality unless a head has an explicit
+ * observedRuntimeBaseUrl override. A host with fewer than two
  * labels (e.g. 'localhost') returns the host unchanged.
  */
 function registrableDomain(value) {
@@ -249,7 +255,8 @@ export function parseHeadModules(source) {
 // ---- Read the app's real API base-URL from the vendored <app>-api.ts as TEXT ------
 // The base-URL appears as a string literal in the plugin's api module (the SAME
 // extraction the Phase-40 planner used): gitlab-api.ts -> 'https://gitlab.com/api/v4';
-// notion-api.ts -> `https://www.notion.so/api/v3/...`; slack-api.ts builds
+// notion-api.ts is currently a stale `https://www.notion.so/api/v3/...` snapshot while
+// the observed authenticated runtime is app.notion.com; slack-api.ts builds
 // `${workspaceUrl}/api/${method}` off the app.slack.com origin. We scan for the FIRST
 // https:// literal that carries an /api path on the plugin's own origin. Returns the
 // base-URL string or null (an app with no vendored plugin uses its fallbackBaseUrl).
@@ -336,7 +343,31 @@ export function checkOriginClassification(headsOverride, opts) {
 
     let apiBaseUrl;
     let classifyOpts;
-    if (vendored) {
+    if (mapping.observedRuntimeBaseUrl) {
+      // Notion-only runtime migration override: the vendored OpenTabs snapshot still
+      // carries www.notion.so/api/v3, while the live authenticated runtime verified on
+      // 2026-06-29 uses app.notion.com/api/v3. Accept the observed base only when the
+      // stale vendored base is exactly the expected Notion API path, so this cannot
+      // become a generic same-registrable-domain or cross-origin bypass.
+      const expectedStale = mapping.expectedStaleVendoredBaseUrl;
+      const vendoredOk = typeof vendored === 'string'
+        && typeof expectedStale === 'string'
+        && vendored.indexOf(expectedStale) === 0;
+      const observedOk = originHost(mapping.observedRuntimeBaseUrl) === originHost(mapping.fallbackBaseUrl);
+      if (!vendoredOk || !observedOk) {
+        const reason = 'CORS_OBSERVED_RUNTIME_OVERRIDE_MISMATCH: head ' + head.global +
+          ' requested observed runtime base "' + String(mapping.observedRuntimeBaseUrl) +
+          '" but vendored base "' + String(vendored) + '" did not match expected stale base "' +
+          String(expectedStale) + '" or observed/fallback origins diverged -- refusing a ' +
+          'runtime override that is not explicitly pinned to the reviewed Notion migration';
+        results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: mapping.observedRuntimeBaseUrl,
+          classification: { sameOrigin: false, separate: true, reason: reason } });
+        failures.push(reason);
+        continue;
+      }
+      apiBaseUrl = mapping.observedRuntimeBaseUrl;
+      classifyOpts = undefined;
+    } else if (vendored) {
       // A genuine extracted literal base (gitlab/notion) -> strict same-origin.
       apiBaseUrl = vendored;
       classifyOpts = undefined;

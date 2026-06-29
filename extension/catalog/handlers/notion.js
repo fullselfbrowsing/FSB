@@ -18,27 +18,25 @@
    * token is needed for these reads (the cookie alone authenticates).
    *
    * THE ORIGIN-PIN (D-09 + D-12, Pitfall 3 credential-replay): every spec targets
-   * Notion's OWN first-party origin https://www.notion.so so token_v2 attaches. The
+   * Notion's OWN first-party app origin https://app.notion.com so token_v2 attaches. The
    * handler NEVER injects into a page itself (no browser-extension scripting/tabs
    * APIs); it builds bound spec(s) and calls ctx.executeBoundSpec, which re-pins the
    * active tab before any side effect. No separate-origin API host appears (asserted
    * by the test).
    *
-   * [ASSUMED] -- the /api/v3 op PATHS and the request body shapes below are training/
-   * inference-derived and MUST be confirmed against a live authenticated www.notion.so
+   * [ASSUMED] -- the READ /api/v3 op PATHS and request body shapes below are training/
+   * inference-derived and MUST be confirmed against a live authenticated app.notion.com
    * tab before the head is trusted (29-03 Task 4, recorded as human_needed live-UAT in
    * 29-HUMAN-UAT.md). The /api/v3 + token_v2 mechanics ARE web-search-verified; the
    * exact request shape is not.
    *
-   * GUARDED WRITES (Phase 41, DEPTH-02): 3 fail-closed write slugs were APPENDED --
-   * notion.create_page / update_page / create_database_item (each UPGRADES its
-   * opentabs__notion__*.json breadth WRITE descriptor dom->T1a). Each ships FAIL-CLOSED
-   * (the github.issues.create pattern): handle() returns the dual-field
-   * RECIPE_DOM_FALLBACK_PENDING and NEVER calls buildRpcSpec or ctx.executeBoundSpec --
-   * NO mutation fires. The real mutating path is a POST /api/v3 submitTransaction RPC
-   * whose op + body are [ASSUMED-ENDPOINT]; the writes are inert until 41-HUMAN-UAT.md
-   * is satisfied. notion.append_block is sideEffectClass:'read' in its descriptor and
-   * stays a READ (NOT a write head).
+   * ACTIVE WRITES (2026-06-29 live UAT): 4 write slugs are activated against the
+   * observed same-origin runtime: app.notion.com POST /api/v3/saveTransactions.
+   * Title/icon/cover property writes use command:"set" for array/string property
+   * paths; object-shaped metadata updates use command:"update". Each write verifies
+   * the resulting record through getRecordValues. notion.append_block is mutating in
+   * practice but is still classified as sideEffectClass:'read' in its descriptor, so
+   * it stays out of this activation patch.
    *
    * Module shell: the dual-export IIFE mirror of capability-interpreter.js:372-385 --
    * the service worker reads global.FsbHandlerNotion after importScripts and the
@@ -47,7 +45,7 @@
    * tabs APIs, no network of its own. NO EMOJIS, ASCII-only source.
    */
 
-  var NOTION_ORIGIN = 'https://www.notion.so';
+  var NOTION_ORIGIN = 'https://app.notion.com';
   var GET_SPACES_PARAMS = {
     type: 'object',
     properties: {},
@@ -83,15 +81,12 @@
     additionalProperties: false
   };
 
-  // ---- Phase 41 (DEPTH-02) GUARDED-WRITE params schemas ---------------------
+  // ---- Active write params schemas -----------------------------------------
   // Props mirrored EXACTLY from the opentabs__notion__create_page/update_page/
-  // create_database_item.json descriptors (the breadth write descriptors these slugs
-  // UPGRADE dom->T1a). The required fields are set; additionalProperties:false
-  // everywhere -- the AI cannot smuggle extra fields into a credentialed same-origin
-  // RPC. These schemas scaffold the params a single live-capture flips to executable;
-  // the handlers below are fail-closed today (they NEVER call buildRpcSpec or
-  // ctx.executeBoundSpec). NOTE: notion.append_block is sideEffectClass:'read' in its
-  // descriptor -> it is NOT a write head; create_database_item (verified write) is used.
+  // create_database/create_database_item.json descriptors. The required fields are set;
+  // additionalProperties:false everywhere -- the AI cannot smuggle extra fields into a
+  // credentialed same-origin RPC. NOTE: notion.append_block is sideEffectClass:'read'
+  // in its descriptor -> it is NOT activated in this write patch.
   var CREATE_PAGE_PARAMS = {
     type: 'object',
     properties: {
@@ -128,16 +123,38 @@
     required: ['database_id', 'title'],
     additionalProperties: false
   };
+  var CREATE_DATABASE_PARAMS = {
+    type: 'object',
+    properties: {
+      parent_page_id: { type: 'string', minLength: 1 },
+      title: { type: 'string', minLength: 1 },
+      properties: {
+        type: 'object',
+        propertyNames: { type: 'string' },
+        additionalProperties: { type: 'string' }
+      }
+    },
+    required: ['parent_page_id', 'title'],
+    additionalProperties: false
+  };
 
   // Build a POST /api/v3/<op> RPC spec. The token_v2 cookie rides same-origin; the
-  // body is the op's JSON request. [ASSUMED] op path + body shape -- captured in Task 4.
-  function buildRpcSpec(op, requestBody) {
+  // body is the op's JSON request. For saveTransactions, Notion also expects the
+  // active user and space ids in first-party headers; those values are resolved from
+  // same-origin Notion RPC responses, never from cookies or page text.
+  function buildRpcSpec(op, requestBody, extraHeaders) {
+    var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (extraHeaders) {
+      for (var k in extraHeaders) {
+        if (Object.prototype.hasOwnProperty.call(extraHeaders, k) && extraHeaders[k]) {
+          headers[k] = extraHeaders[k];
+        }
+      }
+    }
     return {
-      // [ASSUMED-ENDPOINT: capture live in 29-03 Task 4] -- Notion's same-origin
-      // internal RPC op path (e.g. /api/v3/getSpaces).
       url: NOTION_ORIGIN + '/api/v3/' + op,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: headers,
       body: JSON.stringify(requestBody || {}),
       query: {},
       authStrategy: 'same-origin-cookie',
@@ -173,7 +190,7 @@
   }
 
   // The logged-out guard (CONTEXT Top Risk, "200-with-logged-out-body"): a
-  // logged-out www.notion.so tab can answer an /api/v3 RPC with a 200 carrying a
+  // logged-out app.notion.com tab can answer an /api/v3 RPC with a 200 carrying a
   // sign-in/redirect body. executeBoundSpec returns { success, data, ... } where
   // `data` is the parsed RPC payload. The RPC reads return a non-null object/array
   // (search -> a results object; a record fetch -> a recordMap object). On a wrong
@@ -181,8 +198,7 @@
   // (IN-04 hardening: parity with gitlab's error-envelope rejection -- a logged-out
   // body that happens to be a non-null object no longer slips through), return the
   // dual-field RECIPE_DOM_FALLBACK_PENDING so the breadth DOM path serves; otherwise
-  // return the result verbatim. Reads only; the notion WRITES are fail-closed and
-  // never reach this guard.
+  // return the result verbatim. Write handlers use dedicated save/verification guards.
   function guardRpcShape(result, slug) {
     if (!result || result.success !== true) {
       return result;   // pin / fetch failure -> return verbatim; do NOT mask it.
@@ -198,6 +214,343 @@
       });
     }
     return result;
+  }
+
+  function rpcFallback(slug, reason, result) {
+    var extra = { slug: slug, reason: reason, fellBackToDom: true };
+    if (result && typeof result.status === 'number') {
+      extra.status = result.status;
+    }
+    return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', extra);
+  }
+
+  function randomUuid() {
+    var c = global.crypto || (typeof crypto !== 'undefined' ? crypto : null);
+    if (c && typeof c.randomUUID === 'function') {
+      return c.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (ch) {
+      var r = Math.floor(Math.random() * 16);
+      var v = ch === 'x' ? r : ((r & 0x3) | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function compactId(id) {
+    return String(id || '').replace(/-/g, '');
+  }
+
+  function notionUrl(id) {
+    return NOTION_ORIGIN + '/' + compactId(id);
+  }
+
+  function hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
+  function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function firstOwnKey(obj) {
+    if (!isPlainObject(obj)) { return ''; }
+    for (var key in obj) {
+      if (hasOwn(obj, key)) { return key; }
+    }
+    return '';
+  }
+
+  function extractSession(data) {
+    if (!isPlainObject(data) || looksLikeNotionError(data)) { return null; }
+
+    if (typeof data.userId === 'string' && typeof data.spaceId === 'string') {
+      return { userId: data.userId, spaceId: data.spaceId };
+    }
+
+    for (var userId in data) {
+      if (!hasOwn(data, userId)) { continue; }
+      var user = data[userId];
+      if (!isPlainObject(user)) { continue; }
+      var spaces = isPlainObject(user.space) ? user.space : null;
+      var spaceId = firstOwnKey(spaces);
+      if (spaceId) {
+        return { userId: userId, spaceId: spaceId };
+      }
+    }
+
+    return null;
+  }
+
+  function extractSessionFromText(text) {
+    if (typeof text !== 'string' || !text) { return null; }
+    var uuid = '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})';
+    var userMatch = text.match(new RegExp('^\\s*\\{\\s*"' + uuid + '"\\s*:\\s*\\{', 'i'))
+      || text.match(new RegExp('"notion_user"\\s*:\\s*\\{\\s*"' + uuid + '"\\s*:', 'i'))
+      || text.match(new RegExp('"users"\\s*:\\s*\\{\\s*"' + uuid + '"\\s*:', 'i'));
+    var spaceMatch = text.match(new RegExp('"space"\\s*:\\s*\\{\\s*"' + uuid + '"\\s*:', 'i'));
+    if (userMatch && userMatch[1] && spaceMatch && spaceMatch[1]) {
+      return { userId: userMatch[1], spaceId: spaceMatch[1] };
+    }
+    return null;
+  }
+
+  function extractSessionFromResult(result) {
+    var session = result && isOkRpc(result) ? extractSession(result.data) : null;
+    if (!session && result && result.success === true) {
+      session = extractSessionFromText(result.text);
+    }
+    return session;
+  }
+
+  async function executeRpc(op, requestBody, ctx, slug, extraHeaders) {
+    if (!ctx || typeof ctx.executeBoundSpec !== 'function') {
+      return rpcFallback(slug, 'notion-bound-fetch-unavailable');
+    }
+    try {
+      return await ctx.executeBoundSpec(buildRpcSpec(op, requestBody || {}, extraHeaders), ctx.tabId);
+    } catch (e) {
+      return rpcFallback(slug, 'notion-rpc-threw');
+    }
+  }
+
+  function isOkRpc(result) {
+    if (!result || result.success !== true) { return false; }
+    if (typeof result.status === 'number' && (result.status < 200 || result.status >= 300)) {
+      return false;
+    }
+    return !looksLikeNotionError(result.data);
+  }
+
+  async function resolveSession(ctx, slug) {
+    var res = await executeRpc('getSpaces', {}, ctx, slug);
+    var session = extractSessionFromResult(res);
+    if (!session) {
+      res = await executeRpc('getSpacesInitial', {}, ctx, slug);
+      session = extractSessionFromResult(res);
+    }
+    if (!session || !session.userId || !session.spaceId) {
+      return { error: rpcFallback(slug, 'notion-session-unavailable', res) };
+    }
+    return { session: session };
+  }
+
+  function sessionHeaders(session) {
+    return {
+      'x-notion-active-user-header': session.userId,
+      'x-notion-space-id': session.spaceId
+    };
+  }
+
+  async function saveTransactions(ctx, session, operations, slug) {
+    var res = await executeRpc('saveTransactions', {
+      requestId: randomUuid(),
+      transactions: [{
+        id: randomUuid(),
+        spaceId: session.spaceId,
+        operations: operations
+      }]
+    }, ctx, slug, sessionHeaders(session));
+    if (!isOkRpc(res)) {
+      return { error: rpcFallback(slug, 'notion-save-transactions-failed', res) };
+    }
+    return { result: res };
+  }
+
+  async function getRecordValues(ctx, session, requests, slug) {
+    var res = await executeRpc('getRecordValues', {
+      requests: requests
+    }, ctx, slug, sessionHeaders(session));
+    if (!isOkRpc(res) || !res.data || !Array.isArray(res.data.results)) {
+      return { error: rpcFallback(slug, 'notion-record-verification-failed', res) };
+    }
+    return { data: res.data };
+  }
+
+  function recordValue(data, index) {
+    return data && data.results && data.results[index]
+      ? data.results[index].value
+      : null;
+  }
+
+  function nowMs() {
+    return Date.now();
+  }
+
+  function editedBy(session, timestamp) {
+    return {
+      last_edited_time: timestamp,
+      last_edited_by_id: session.userId,
+      last_edited_by_table: 'notion_user'
+    };
+  }
+
+  function blockArgs(blockId, type, parentId, parentTable, session, extra) {
+    var t = nowMs();
+    var args = {
+      type: type,
+      id: blockId,
+      version: 1,
+      parent_id: parentId,
+      parent_table: parentTable || 'block',
+      alive: true,
+      created_time: t,
+      created_by_id: session.userId,
+      created_by_table: 'notion_user',
+      last_edited_time: t,
+      last_edited_by_id: session.userId,
+      last_edited_by_table: 'notion_user',
+      space_id: session.spaceId
+    };
+    if (extra) {
+      for (var k in extra) {
+        if (hasOwn(extra, k)) { args[k] = extra[k]; }
+      }
+    }
+    return args;
+  }
+
+  function editorPermission(session) {
+    return [{ type: 'user_permission', role: 'editor', user_id: session.userId }];
+  }
+
+  function textProperty(value) {
+    return [[String(value)]];
+  }
+
+  function readTitle(record, fallback) {
+    if (record && record.properties && record.properties.title
+        && record.properties.title[0] && record.properties.title[0][0]) {
+      return record.properties.title[0][0];
+    }
+    if (record && record.name && record.name[0] && record.name[0][0]) {
+      return record.name[0][0];
+    }
+    return fallback || null;
+  }
+
+  var PROPERTY_TYPES = {
+    text: 'text',
+    number: 'number',
+    select: 'select',
+    multi_select: 'multi_select',
+    checkbox: 'checkbox',
+    url: 'url',
+    email: 'email',
+    phone: 'phone_number'
+  };
+
+  function schemaPropId(schema) {
+    var id = compactId(randomUuid()).slice(0, 4);
+    while (schema && hasOwn(schema, id)) {
+      id = compactId(randomUuid()).slice(0, 4);
+    }
+    return id;
+  }
+
+  function buildCollectionSchema(properties, slug) {
+    var schema = { title: { name: 'Name', type: 'title' } };
+    var props = properties || {};
+    for (var name in props) {
+      if (!hasOwn(props, name)) { continue; }
+      var raw = String(props[name] || '').toLowerCase();
+      var notionType = PROPERTY_TYPES[raw];
+      if (!notionType) {
+        return {
+          error: rpcFallback(slug, 'notion-unsupported-property-type')
+        };
+      }
+      schema[schemaPropId(schema)] = { name: name, type: notionType };
+    }
+    return { schema: schema };
+  }
+
+  function findSchemaEntry(schema, propName) {
+    if (!isPlainObject(schema)) { return null; }
+    var needle = String(propName || '').toLowerCase();
+    for (var id in schema) {
+      if (!hasOwn(schema, id)) { continue; }
+      var def = schema[id];
+      var name = def && typeof def.name === 'string' ? def.name.toLowerCase() : '';
+      if (name === needle) {
+        return { id: id, def: def };
+      }
+    }
+    return null;
+  }
+
+  function mapDatabaseProperties(schema, title, properties) {
+    var out = { title: textProperty(title) };
+    var props = properties || {};
+    for (var propName in props) {
+      if (!hasOwn(props, propName)) { continue; }
+      var entry = findSchemaEntry(schema, propName);
+      if (!entry || entry.id === 'title') { continue; }
+      var def = entry.def || {};
+      var propType = typeof def.type === 'string' ? def.type : 'text';
+      var propValue = String(props[propName]);
+      if (propType === 'select' || propType === 'multi_select') {
+        var options = Array.isArray(def.options) ? def.options : [];
+        var match = null;
+        for (var i = 0; i < options.length; i++) {
+          var option = options[i] || {};
+          if (String(option.value || '').toLowerCase() === propValue.toLowerCase()) {
+            match = option;
+            break;
+          }
+        }
+        out[entry.id] = match && match.id ? [[propValue, [['a', match.id]]]] : textProperty(propValue);
+      } else if (propType === 'checkbox') {
+        var normalized = propValue.toLowerCase();
+        out[entry.id] = textProperty(normalized === 'true' || normalized === 'yes' ? 'Yes' : 'No');
+      } else {
+        out[entry.id] = textProperty(propValue);
+      }
+    }
+    return out;
+  }
+
+  function pageResponse(id, title, record) {
+    return {
+      success: true,
+      page: {
+        id: id,
+        url: notionUrl(id),
+        title: readTitle(record, title)
+      },
+      data: {
+        pageId: id,
+        pageUrl: notionUrl(id),
+        title: readTitle(record, title)
+      }
+    };
+  }
+
+  function databaseResponse(id, title, record) {
+    return {
+      success: true,
+      database: {
+        id: id,
+        title: readTitle(record, title)
+      },
+      data: {
+        databaseId: id,
+        title: readTitle(record, title)
+      }
+    };
+  }
+
+  function itemResponse(id, title, record) {
+    return {
+      success: true,
+      item: {
+        id: id,
+        title: readTitle(record, title)
+      },
+      data: {
+        itemId: id,
+        title: readTitle(record, title)
+      }
+    };
   }
 
   var handlers = {
@@ -275,79 +628,289 @@
     },
 
     // ======================================================================
-    // Phase 41 (DEPTH-02) -- the 3 GUARDED WRITE slugs (FAIL-CLOSED).
+    // Active Notion writes (2026-06-29 live UAT).
     // ----------------------------------------------------------------------
-    // EXACT opentabs dot-form write slugs so resolve() UPGRADES each breadth
-    // descriptor (backing:'dom', sideEffectClass:'write') dom->T1a -- the
-    // correctness keystone, distinct from the read slugs above (no collision).
+    // These slugs are the UAT-smoked Notion mutations that work through
+    // app.notion.com POST /api/v3/saveTransactions. The handler still uses only
+    // ctx.executeBoundSpec; it never scripts the page, reads cookies/tokens, or expands
+    // the MCP surface. Session context comes from getSpaces/getSpacesInitial, then
+    // every mutation is verified through getRecordValues.
     //
-    // EACH SHIPS FAIL-CLOSED, the github.issues.create pattern (github.js:111-123):
-    // handle() returns the dual-field RECIPE_DOM_FALLBACK_PENDING (reason
-    // unverified-notion-<verb>-mutation, fellBackToDom:true) and NEVER calls
-    // buildRpcSpec or ctx.executeBoundSpec -- so NO mutation fires. Behaviorally
-    // identical to its T3-DOM descriptor today; the VALUE is the scaffolded
-    // params+endpoint+gating a single live-capture flips to executable.
-    //
-    // [ASSUMED-ENDPOINT] -- Notion mutations are POST /api/v3 submitTransaction RPCs
-    // (www.notion.so/api/v3 is the SAME-ORIGIN PATH, notion-api.ts:102; the token_v2
-    // HttpOnly cookie authenticates same-origin). The exact submitTransaction op + body
-    // shape require a live-captured body; the writes ship FAIL-CLOSED until
-    // 41-HUMAN-UAT.md (the notion rows recorded in Plan 04) is satisfied. The handler
-    // builds NO spec and reads NO token (it fails closed before any RPC).
-    //
-    // NOTE: notion.append_block is sideEffectClass:'read' in its descriptor and stays a
-    // READ (notion.search/get_database/append_block reads). create_database_item is the
-    // genuine WRITE used here to keep 3 verified writes.
+    // NOTE: notion.append_block is mutating in practice, but its descriptor is still
+    // sideEffectClass:'read'. It stays out of this activation patch.
 
-    // ---- notion.create_page (write -- fail-closed) -------------------------
+    // ---- notion.create_page (write) ---------------------------------------
     'notion.create_page': {
       tier: 'T1a',
       origin: NOTION_ORIGIN,
       sideEffectClass: 'write',
       params: CREATE_PAGE_PARAMS,
       async handle(args, ctx) {
-        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
-          slug: 'notion.create_page',
-          reason: 'unverified-notion-create-page-mutation',
-          fellBackToDom: true
-        });
+        var a = args || {};
+        var resolved = await resolveSession(ctx, 'notion.create_page');
+        if (resolved.error) { return resolved.error; }
+        var session = resolved.session;
+        var pageId = randomUuid();
+        var parentId = a.parent_page_id || session.spaceId;
+        var parentTable = a.parent_page_id ? 'block' : 'space';
+        var parentListPath = a.parent_page_id ? ['content'] : ['pages'];
+        var operations = [
+          {
+            pointer: { table: 'block', id: pageId, spaceId: session.spaceId },
+            command: 'set',
+            path: [],
+            args: blockArgs(pageId, 'page', parentId, parentTable, session, {
+              permissions: editorPermission(session)
+            })
+          },
+          {
+            pointer: { table: 'block', id: pageId, spaceId: session.spaceId },
+            command: 'set',
+            path: ['properties', 'title'],
+            args: textProperty(a.title)
+          },
+          {
+            pointer: { table: parentTable, id: parentId, spaceId: session.spaceId },
+            command: 'listAfter',
+            path: parentListPath,
+            args: { id: pageId }
+          }
+        ];
+        if (a.icon !== undefined) {
+          operations.push({
+            pointer: { table: 'block', id: pageId, spaceId: session.spaceId },
+            command: 'set',
+            path: ['format', 'page_icon'],
+            args: a.icon
+          });
+        }
+        if (a.content) {
+          var blockId = randomUuid();
+          operations.push({
+            pointer: { table: 'block', id: blockId, spaceId: session.spaceId },
+            command: 'set',
+            path: [],
+            args: blockArgs(blockId, 'text', pageId, 'block', session, {
+              properties: { title: textProperty(a.content) }
+            })
+          });
+          operations.push({
+            pointer: { table: 'block', id: pageId, spaceId: session.spaceId },
+            command: 'listAfter',
+            path: ['content'],
+            args: { id: blockId }
+          });
+        }
+        var saved = await saveTransactions(ctx, session, operations, 'notion.create_page');
+        if (saved.error) { return saved.error; }
+        var verified = await getRecordValues(ctx, session, [{ id: pageId, table: 'block' }], 'notion.create_page');
+        if (verified.error) { return verified.error; }
+        var record = recordValue(verified.data, 0);
+        if (!record) { return rpcFallback('notion.create_page', 'notion-created-page-missing'); }
+        return pageResponse(pageId, a.title, record);
       }
     },
 
-    // ---- notion.update_page (write -- fail-closed) -------------------------
+    // ---- notion.update_page (write) ---------------------------------------
     'notion.update_page': {
       tier: 'T1a',
       origin: NOTION_ORIGIN,
       sideEffectClass: 'write',
       params: UPDATE_PAGE_PARAMS,
       async handle(args, ctx) {
-        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
-          slug: 'notion.update_page',
-          reason: 'unverified-notion-update-page-mutation',
-          fellBackToDom: true
+        var a = args || {};
+        var resolved = await resolveSession(ctx, 'notion.update_page');
+        if (resolved.error) { return resolved.error; }
+        var session = resolved.session;
+        var operations = [];
+        if (a.title !== undefined) {
+          operations.push({
+            pointer: { table: 'block', id: a.page_id, spaceId: session.spaceId },
+            command: 'set',
+            path: ['properties', 'title'],
+            args: textProperty(a.title)
+          });
+        }
+        if (a.icon !== undefined) {
+          operations.push({
+            pointer: { table: 'block', id: a.page_id, spaceId: session.spaceId },
+            command: 'set',
+            path: ['format', 'page_icon'],
+            args: a.icon
+          });
+        }
+        if (a.cover !== undefined) {
+          operations.push({
+            pointer: { table: 'block', id: a.page_id, spaceId: session.spaceId },
+            command: 'set',
+            path: ['format', 'page_cover'],
+            args: a.cover
+          });
+        }
+        operations.push({
+          pointer: { table: 'block', id: a.page_id, spaceId: session.spaceId },
+          command: 'update',
+          path: [],
+          args: editedBy(session, nowMs())
         });
+        var saved = await saveTransactions(ctx, session, operations, 'notion.update_page');
+        if (saved.error) { return saved.error; }
+        var verified = await getRecordValues(ctx, session, [{ id: a.page_id, table: 'block' }], 'notion.update_page');
+        if (verified.error) { return verified.error; }
+        var record = recordValue(verified.data, 0);
+        if (!record) { return rpcFallback('notion.update_page', 'notion-updated-page-missing'); }
+        return pageResponse(a.page_id, a.title, record);
       }
     },
 
-    // ---- notion.create_database_item (write -- fail-closed) ----------------
+    // ---- notion.create_database (write) -----------------------------------
+    'notion.create_database': {
+      tier: 'T1a',
+      origin: NOTION_ORIGIN,
+      sideEffectClass: 'write',
+      params: CREATE_DATABASE_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var resolved = await resolveSession(ctx, 'notion.create_database');
+        if (resolved.error) { return resolved.error; }
+        var session = resolved.session;
+        var parent = await getRecordValues(ctx, session, [{ id: a.parent_page_id, table: 'block' }], 'notion.create_database');
+        if (parent.error) { return parent.error; }
+        if (!recordValue(parent.data, 0)) {
+          return rpcFallback('notion.create_database', 'notion-parent-page-missing');
+        }
+        var builtSchema = buildCollectionSchema(a.properties, 'notion.create_database');
+        if (builtSchema.error) { return builtSchema.error; }
+
+        var collectionId = randomUuid();
+        var collectionViewPageId = randomUuid();
+        var collectionViewId = randomUuid();
+        var t = nowMs();
+        var operations = [
+          {
+            pointer: { table: 'collection', id: collectionId, spaceId: session.spaceId },
+            command: 'set',
+            path: [],
+            args: {
+              id: collectionId,
+              version: 1,
+              name: textProperty(a.title),
+              schema: builtSchema.schema,
+              parent_id: collectionViewPageId,
+              parent_table: 'block',
+              alive: true,
+              space_id: session.spaceId
+            }
+          },
+          {
+            pointer: { table: 'block', id: collectionViewPageId, spaceId: session.spaceId },
+            command: 'set',
+            path: [],
+            args: {
+              type: 'collection_view_page',
+              id: collectionViewPageId,
+              version: 1,
+              collection_id: collectionId,
+              view_ids: [collectionViewId],
+              parent_id: a.parent_page_id,
+              parent_table: 'block',
+              alive: true,
+              created_time: t,
+              created_by_id: session.userId,
+              created_by_table: 'notion_user',
+              last_edited_time: t,
+              last_edited_by_id: session.userId,
+              last_edited_by_table: 'notion_user',
+              space_id: session.spaceId,
+              permissions: editorPermission(session)
+            }
+          },
+          {
+            pointer: { table: 'collection_view', id: collectionViewId, spaceId: session.spaceId },
+            command: 'set',
+            path: [],
+            args: {
+              id: collectionViewId,
+              version: 1,
+              type: 'table',
+              name: 'Default view',
+              parent_id: collectionViewPageId,
+              parent_table: 'block',
+              alive: true,
+              page_sort: [],
+              space_id: session.spaceId
+            }
+          },
+          {
+            pointer: { table: 'block', id: a.parent_page_id, spaceId: session.spaceId },
+            command: 'listAfter',
+            path: ['content'],
+            args: { id: collectionViewPageId }
+          }
+        ];
+        var saved = await saveTransactions(ctx, session, operations, 'notion.create_database');
+        if (saved.error) { return saved.error; }
+        var verified = await getRecordValues(ctx, session, [{ id: collectionId, table: 'collection' }], 'notion.create_database');
+        if (verified.error) { return verified.error; }
+        var record = recordValue(verified.data, 0);
+        if (!record) { return rpcFallback('notion.create_database', 'notion-created-database-missing'); }
+        return databaseResponse(collectionId, a.title, record);
+      }
+    },
+
+    // ---- notion.create_database_item (write) ------------------------------
     'notion.create_database_item': {
       tier: 'T1a',
       origin: NOTION_ORIGIN,
       sideEffectClass: 'write',
       params: CREATE_DATABASE_ITEM_PARAMS,
       async handle(args, ctx) {
-        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
-          slug: 'notion.create_database_item',
-          reason: 'unverified-notion-create-database-item-mutation',
-          fellBackToDom: true
-        });
+        var a = args || {};
+        var resolved = await resolveSession(ctx, 'notion.create_database_item');
+        if (resolved.error) { return resolved.error; }
+        var session = resolved.session;
+        var coll = await getRecordValues(ctx, session, [{ id: a.database_id, table: 'collection' }], 'notion.create_database_item');
+        if (coll.error) { return coll.error; }
+        var collData = recordValue(coll.data, 0);
+        if (!collData) {
+          return rpcFallback('notion.create_database_item', 'notion-database-missing');
+        }
+        var parentId = collData.parent_id;
+        if (!parentId) {
+          return rpcFallback('notion.create_database_item', 'notion-database-parent-missing');
+        }
+        var itemId = randomUuid();
+        var itemProperties = mapDatabaseProperties(collData.schema || {}, a.title, a.properties);
+        var operations = [
+          {
+            pointer: { table: 'block', id: itemId, spaceId: session.spaceId },
+            command: 'set',
+            path: [],
+            args: blockArgs(itemId, 'page', a.database_id, 'collection', session, {
+              properties: itemProperties
+            })
+          },
+          {
+            pointer: { table: 'block', id: parentId, spaceId: session.spaceId },
+            command: 'listAfter',
+            path: ['content'],
+            args: { id: itemId }
+          }
+        ];
+        var saved = await saveTransactions(ctx, session, operations, 'notion.create_database_item');
+        if (saved.error) { return saved.error; }
+        var verified = await getRecordValues(ctx, session, [{ id: itemId, table: 'block' }], 'notion.create_database_item');
+        if (verified.error) { return verified.error; }
+        var record = recordValue(verified.data, 0);
+        if (!record) { return rpcFallback('notion.create_database_item', 'notion-created-database-item-missing'); }
+        return itemResponse(itemId, a.title, record);
       }
     }
   };
 
   // ---- Self-registration into the catalog (shipped SW path) ----------------
   // IN-03 note: the head registers descriptor.service as the app subdomain
-  // 'www.notion.so' (the first-party origin the spec pins), whereas the breadth
+  // 'app.notion.com' (the first-party origin the spec pins), whereas the breadth
   // opentabs__notion__*.json descriptor records the bare registrable domain
   // 'notion.so'. These are intentionally different fields -- resolve() upgrades
   // dom->T1a on the byte-exact SLUG (not the service string), and the origin-pin
@@ -361,7 +924,7 @@
           handler: handlers[slug],
           origin: handlers[slug].origin,
           params: handlers[slug].params,
-          descriptor: { slug: slug, service: 'www.notion.so', sideEffectClass: handlers[slug].sideEffectClass, params: handlers[slug].params }
+          descriptor: { slug: slug, service: 'app.notion.com', sideEffectClass: handlers[slug].sideEffectClass, params: handlers[slug].params }
         });
       }
     }

@@ -9,7 +9,7 @@
  * file is the per-handler behavioral gate:
  *
  *   - CAT-02 each T1a handler exposes its declared slugs with tier:'T1a', its
- *     web app's OWN first-party origin (github.com / app.slack.com / www.notion.so),
+ *     web app's OWN first-party origin (github.com / app.slack.com / app.notion.com),
  *     a sideEffectClass, and an async handle(args, ctx).
  *   - CAT-02 handle(args, ctx) builds a bound spec pinned to the handler origin and
  *     calls ctx.executeBoundSpec EXACTLY ONCE for a single-call read, returning its
@@ -67,6 +67,37 @@ function readJson(p) {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
+function parseSpecBody(spec) {
+  if (!spec || spec.body === undefined || spec.body === null) { return {}; }
+  if (typeof spec.body === 'string') {
+    try { return JSON.parse(spec.body); } catch (e) { return {}; }
+  }
+  return spec.body;
+}
+
+function defaultNotionRecordValue(request) {
+  const id = request && request.id ? request.id : 'record-test';
+  const table = request && request.table ? request.table : 'block';
+  if (table === 'collection') {
+    return {
+      id: id,
+      name: [['Verified database']],
+      parent_id: 'collection-view-page-test',
+      schema: {
+        title: { name: 'Name', type: 'title' },
+        status: { name: 'Status', type: 'text' },
+        choice: { name: 'Choice', type: 'select', options: [{ id: 'opt-a', value: 'Ready' }] }
+      }
+    };
+  }
+  return {
+    id: id,
+    type: 'page',
+    properties: { title: [['Verified title']] },
+    content: []
+  };
+}
+
 // A recording stub ctx.executeBoundSpec: captures the spec(s) a handler builds,
 // returns a canned logged-in 200. The handler must never call chrome.* -- it only
 // touches this ctx member (the real pin lives in the real executeBoundSpec, proven
@@ -106,6 +137,7 @@ function makeCtx(origin, tabId, opts) {
             : '<html><head><meta name="csrf-token" content="csrf-TEST-SYNTHETIC"></head></html>';
         }
         let data;
+        let status = 200;
         if (isProbe) {
           data = null;
         } else if (Object.prototype.hasOwnProperty.call(options, 'readData')) {
@@ -125,12 +157,37 @@ function makeCtx(origin, tabId, opts) {
           const lastSeg = tail.substring(tail.lastIndexOf('/') + 1);
           const looksLikeId = /^\d+$/.test(lastSeg) || /%2F/i.test(lastSeg) || (/^[0-9]+$/.test(decodeURIComponent(lastSeg)));
           data = looksLikeId ? { id: 1, iid: 1 } : [{ id: 1 }];
+        } else if (url.indexOf('https://app.notion.com/api/v3/') === 0) {
+          const op = url.substring(url.lastIndexOf('/') + 1);
+          if (op === 'getSpaces' || op === 'getSpacesInitial') {
+            if (Object.prototype.hasOwnProperty.call(options, 'notionSessionText')) {
+              data = null;
+              text = options.notionSessionText;
+            } else {
+              data = options.notionNoSession ? {} : { 'user-test': { space: { 'space-test': {} } } };
+            }
+          } else if (op === 'saveTransactions') {
+            status = Object.prototype.hasOwnProperty.call(options, 'notionSaveStatus')
+              ? options.notionSaveStatus
+              : 200;
+            data = Object.prototype.hasOwnProperty.call(options, 'notionSaveData')
+              ? options.notionSaveData
+              : { ok: true };
+          } else if (op === 'getRecordValues') {
+            const body = parseSpecBody(spec);
+            const requests = Array.isArray(body.requests) ? body.requests : [];
+            data = { results: requests.map(function (request) {
+              return { value: defaultNotionRecordValue(request) };
+            }) };
+          } else {
+            data = { ok: true };
+          }
         } else {
           data = { ok: true };
         }
         return {
           success: true,
-          status: 200,
+          status: status,
           finalUrl: (spec && spec.url) || null,
           redirected: false,
           data: data,
@@ -307,8 +364,8 @@ const Schema = require(SCHEMA_PATH);
     check(nt['notion.getSpaces'] && nt['notion.getSpaces'].tier === 'T1a'
       && typeof nt['notion.getSpaces'].handle === 'function',
       'notion.getSpaces is a tier:T1a entry with an async handle');
-    check(nt['notion.getSpaces'] && nt['notion.getSpaces'].origin === 'https://www.notion.so',
-      'notion.getSpaces targets the first-party origin https://www.notion.so');
+    check(nt['notion.getSpaces'] && nt['notion.getSpaces'].origin === 'https://app.notion.com',
+      'notion.getSpaces targets the first-party origin https://app.notion.com');
     check(nt['notion.getSpaces'] && nt['notion.getSpaces'].sideEffectClass === 'read',
       'notion.getSpaces is a READ slug');
     check(nt['notion.loadPage'] && nt['notion.loadPage'].params
@@ -321,7 +378,7 @@ const Schema = require(SCHEMA_PATH);
     check(!/chrome\.(scripting|tabs)/.test(ntSrc),
       'notion.js references NO chrome.scripting/chrome.tabs');
 
-    const ntCtx = makeCtx('https://www.notion.so', 31);
+    const ntCtx = makeCtx('https://app.notion.com', 31);
     const ntOut = await nt['notion.getSpaces'].handle({}, ntCtx.ctx);
     check(ntCtx.calls.length >= 1,
       'notion.getSpaces.handle calls ctx.executeBoundSpec at least once');
@@ -329,10 +386,147 @@ const Schema = require(SCHEMA_PATH);
     check(!!ntPost, 'notion.getSpaces issues a POST spec (/api/v3 is POST-only RPC)');
     check(ntPost && typeof ntPost.spec.url === 'string' && ntPost.spec.url.indexOf('/api/v3') !== -1,
       'notion.getSpaces POSTs the same-origin /api/v3 RPC endpoint');
-    check(ntPost && ntPost.spec.origin === 'https://www.notion.so',
-      'notion.getSpaces POST spec is pinned to https://www.notion.so');
+    check(ntPost && ntPost.spec.origin === 'https://app.notion.com',
+      'notion.getSpaces POST spec is pinned to https://app.notion.com');
     check(ntOut && ntOut.success === true,
       'notion.getSpaces.handle returns the executeBoundSpec result');
+
+    const ntCreate = makeCtx('https://app.notion.com', 31);
+    const ntCreateOut = await nt['notion.create_page'].handle({
+      title: 'Created page',
+      content: 'Created body',
+      icon: 'T'
+    }, ntCreate.ctx);
+    const ntCreateSave = ntCreate.calls.find(function (c) {
+      return c.spec && c.spec.url === 'https://app.notion.com/api/v3/saveTransactions';
+    });
+    const ntCreateVerify = ntCreate.calls.find(function (c) {
+      return c.spec && c.spec.url === 'https://app.notion.com/api/v3/getRecordValues';
+    });
+    const ntCreateBody = parseSpecBody(ntCreateSave && ntCreateSave.spec);
+    const ntCreateOps = ntCreateBody.transactions && ntCreateBody.transactions[0]
+      ? ntCreateBody.transactions[0].operations
+      : [];
+    const ntCreateTitleOp = ntCreateOps.find(function (op) {
+      return op.command === 'set' && JSON.stringify(op.path) === JSON.stringify(['properties', 'title']);
+    });
+    check(!!ntCreateSave,
+      'notion.create_page calls executeBoundSpec with /api/v3/saveTransactions');
+    check(ntCreateSave && ntCreateSave.spec.headers
+      && ntCreateSave.spec.headers['x-notion-active-user-header'] === 'user-test'
+      && ntCreateSave.spec.headers['x-notion-space-id'] === 'space-test',
+      'notion.create_page sends active user and space headers only inside the bound spec');
+    check(ntCreateTitleOp && JSON.stringify(ntCreateTitleOp.args) === JSON.stringify([['Created page']]),
+      'notion.create_page uses command:set for properties.title with the Notion title array');
+    check(!!ntCreateVerify,
+      'notion.create_page verifies the created page with getRecordValues');
+    check(ntCreateOut && ntCreateOut.success === true && ntCreateOut.data && ntCreateOut.data.pageUrl
+      && ntCreateOut.data.pageUrl.indexOf('https://app.notion.com/') === 0,
+      'notion.create_page returns a success payload pinned to app.notion.com');
+
+    const ntTextSession = makeCtx('https://app.notion.com', 31, {
+      notionSessionText: '{"11111111-1111-4111-8111-111111111111":{"__version__":3,"notion_user":{"11111111-1111-4111-8111-111111111111":{}},"space":{"22222222-2222-4222-8222-222222222222":{}}'
+    });
+    await nt['notion.create_page'].handle({ title: 'Text session page' }, ntTextSession.ctx);
+    const ntTextSessionSave = ntTextSession.calls.find(function (c) {
+      return c.spec && c.spec.url === 'https://app.notion.com/api/v3/saveTransactions';
+    });
+    check(ntTextSessionSave && ntTextSessionSave.spec.headers
+      && ntTextSessionSave.spec.headers['x-notion-active-user-header'] === '11111111-1111-4111-8111-111111111111'
+      && ntTextSessionSave.spec.headers['x-notion-space-id'] === '22222222-2222-4222-8222-222222222222',
+      'notion.create_page resolves session ids from capped getSpaces text when parsed data is null');
+
+    const ntUpdate = makeCtx('https://app.notion.com', 31);
+    const ntUpdateOut = await nt['notion.update_page'].handle({
+      page_id: 'page-test',
+      title: 'Updated page',
+      icon: 'U',
+      cover: '/images/cover.png'
+    }, ntUpdate.ctx);
+    const ntUpdateSave = ntUpdate.calls.find(function (c) {
+      return c.spec && c.spec.url === 'https://app.notion.com/api/v3/saveTransactions';
+    });
+    const ntUpdateBody = parseSpecBody(ntUpdateSave && ntUpdateSave.spec);
+    const ntUpdateOps = ntUpdateBody.transactions && ntUpdateBody.transactions[0]
+      ? ntUpdateBody.transactions[0].operations
+      : [];
+    const ntUpdateSetPaths = ntUpdateOps.filter(function (op) { return op.command === 'set'; })
+      .map(function (op) { return JSON.stringify(op.path); }).sort();
+    check(!!ntUpdateSave,
+      'notion.update_page calls executeBoundSpec with /api/v3/saveTransactions');
+    check(ntUpdateSetPaths.indexOf(JSON.stringify(['properties', 'title'])) !== -1
+      && ntUpdateSetPaths.indexOf(JSON.stringify(['format', 'page_icon'])) !== -1
+      && ntUpdateSetPaths.indexOf(JSON.stringify(['format', 'page_cover'])) !== -1,
+      'notion.update_page uses command:set for title, icon, and cover paths');
+    check(ntUpdateOps.some(function (op) { return op.command === 'update' && JSON.stringify(op.path) === '[]'; }),
+      'notion.update_page keeps command:update scoped to object-shaped metadata');
+    check(ntUpdateOut && ntUpdateOut.success === true,
+      'notion.update_page verifies and returns success');
+
+    const ntDb = makeCtx('https://app.notion.com', 31);
+    const ntDbOut = await nt['notion.create_database'].handle({
+      parent_page_id: 'page-parent',
+      title: 'Created database',
+      properties: { Status: 'text' }
+    }, ntDb.ctx);
+    const ntDbSave = ntDb.calls.find(function (c) {
+      return c.spec && c.spec.url === 'https://app.notion.com/api/v3/saveTransactions';
+    });
+    const ntDbBody = parseSpecBody(ntDbSave && ntDbSave.spec);
+    const ntDbOps = ntDbBody.transactions && ntDbBody.transactions[0]
+      ? ntDbBody.transactions[0].operations
+      : [];
+    check(!!ntDbSave,
+      'notion.create_database calls executeBoundSpec with /api/v3/saveTransactions');
+    check(ntDbOps.some(function (op) { return op.pointer && op.pointer.table === 'collection' && op.command === 'set'; })
+      && ntDbOps.some(function (op) { return op.pointer && op.pointer.table === 'collection_view' && op.command === 'set'; })
+      && ntDbOps.some(function (op) { return op.args && op.args.type === 'collection_view_page' && op.command === 'set'; }),
+      'notion.create_database creates collection, collection_view_page, and collection_view records');
+    check(ntDbOut && ntDbOut.success === true && ntDbOut.data && ntDbOut.data.databaseId,
+      'notion.create_database verifies the collection and returns a database id');
+
+    const ntItem = makeCtx('https://app.notion.com', 31);
+    const ntItemOut = await nt['notion.create_database_item'].handle({
+      database_id: 'database-test',
+      title: 'Created row',
+      properties: { Status: 'Ready' }
+    }, ntItem.ctx);
+    const ntItemSave = ntItem.calls.find(function (c) {
+      return c.spec && c.spec.url === 'https://app.notion.com/api/v3/saveTransactions';
+    });
+    const ntItemBody = parseSpecBody(ntItemSave && ntItemSave.spec);
+    const ntItemOps = ntItemBody.transactions && ntItemBody.transactions[0]
+      ? ntItemBody.transactions[0].operations
+      : [];
+    const ntItemBlock = ntItemOps.find(function (op) { return op.pointer && op.pointer.table === 'block' && op.command === 'set'; });
+    check(!!ntItemSave,
+      'notion.create_database_item calls executeBoundSpec with /api/v3/saveTransactions');
+    check(ntItemBlock && ntItemBlock.args && ntItemBlock.args.properties
+      && JSON.stringify(ntItemBlock.args.properties.status) === JSON.stringify([['Ready']]),
+      'notion.create_database_item maps property names through the collection schema');
+    check(ntItemOut && ntItemOut.success === true && ntItemOut.data && ntItemOut.data.itemId,
+      'notion.create_database_item verifies the row and returns an item id');
+
+    const ntNoSession = makeCtx('https://app.notion.com', 31, { notionNoSession: true });
+    const ntNoSessionOut = await nt['notion.create_page'].handle({ title: 'No session' }, ntNoSession.ctx);
+    check(ntNoSessionOut && ntNoSessionOut.success === false
+      && ntNoSessionOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && ntNoSessionOut.reason === 'notion-session-unavailable',
+      'notion.create_page returns a typed fallback when session/space resolution fails');
+    check(!ntNoSession.calls.some(function (c) { return c.spec && c.spec.url.indexOf('/api/v3/saveTransactions') !== -1; }),
+      'notion.create_page missing-session path does not call saveTransactions');
+
+    const ntSaveErr = makeCtx('https://app.notion.com', 31, {
+      notionSaveStatus: 400,
+      notionSaveData: { name: 'ValidationError', message: 'secret-id-redacted-by-handler-test' }
+    });
+    const ntSaveErrOut = await nt['notion.create_page'].handle({ title: 'Save error' }, ntSaveErr.ctx);
+    check(ntSaveErrOut && ntSaveErrOut.success === false
+      && ntSaveErrOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && ntSaveErrOut.reason === 'notion-save-transactions-failed'
+      && ntSaveErrOut.status === 400
+      && JSON.stringify(ntSaveErrOut).indexOf('secret-id-redacted-by-handler-test') === -1,
+      'notion saveTransactions error envelopes return typed fallback without exposing Notion error details');
   }
 
   // =========================================================================
@@ -508,8 +702,8 @@ const Schema = require(SCHEMA_PATH);
       && nt40['notion.search'].sideEffectClass === 'read'
       && typeof nt40['notion.search'].handle === 'function',
       'notion.search is a tier:T1a READ entry with an async handle');
-    check(nt40['notion.search'] && nt40['notion.search'].origin === 'https://www.notion.so',
-      'notion.search targets the first-party origin https://www.notion.so');
+    check(nt40['notion.search'] && nt40['notion.search'].origin === 'https://app.notion.com',
+      'notion.search targets the first-party origin https://app.notion.com');
     check(nt40['notion.search'] && nt40['notion.search'].params
       && Array.isArray(nt40['notion.search'].params.required)
       && nt40['notion.search'].params.required.indexOf('query') !== -1,
@@ -518,8 +712,8 @@ const Schema = require(SCHEMA_PATH);
       && nt40['notion.get_database'].sideEffectClass === 'read'
       && typeof nt40['notion.get_database'].handle === 'function',
       'notion.get_database is a tier:T1a READ entry with an async handle');
-    check(nt40['notion.get_database'] && nt40['notion.get_database'].origin === 'https://www.notion.so',
-      'notion.get_database targets https://www.notion.so');
+    check(nt40['notion.get_database'] && nt40['notion.get_database'].origin === 'https://app.notion.com',
+      'notion.get_database targets https://app.notion.com');
     check(nt40['notion.get_database'] && nt40['notion.get_database'].params
       && Array.isArray(nt40['notion.get_database'].params.required)
       && nt40['notion.get_database'].params.required.indexOf('database_id') !== -1,
@@ -528,25 +722,25 @@ const Schema = require(SCHEMA_PATH);
     check(nt40Src.indexOf('api.notion.com') === -1,
       'notion.js references NO separate-origin api.notion.com (extends safe)');
 
-    // search: a single same-origin POST to /api/v3 pinned to www.notion.so.
+    // search: a single same-origin POST to /api/v3 pinned to app.notion.com.
     // Guarded by slug presence so the suite REDs cleanly pre-40-04 (no FATAL crash).
     if (nt40['notion.search'] && typeof nt40['notion.search'].handle === 'function') {
-      const nt40Ctx = makeCtx('https://www.notion.so', 43);
+      const nt40Ctx = makeCtx('https://app.notion.com', 43);
       const nt40Out = await nt40['notion.search'].handle({ query: 'roadmap' }, nt40Ctx.ctx);
       const nt40Post = nt40Ctx.calls.find(function (c) { return c.spec && c.spec.method === 'POST'; });
       check(!!nt40Post, 'notion.search issues a POST spec (/api/v3 is POST-only RPC)');
       check(nt40Post && typeof nt40Post.spec.url === 'string' && nt40Post.spec.url.indexOf('/api/v3') !== -1,
         'notion.search POSTs the same-origin /api/v3 RPC endpoint');
-      check(nt40Post && nt40Post.spec.origin === 'https://www.notion.so',
-        'notion.search POST spec is pinned to https://www.notion.so');
+      check(nt40Post && nt40Post.spec.origin === 'https://app.notion.com',
+        'notion.search POST spec is pinned to https://app.notion.com');
       check(nt40Out && nt40Out.success === true,
         'notion.search.handle returns the executeBoundSpec result');
 
-      // NEGATIVE (IN-01): a logged-out www.notion.so /api/v3 RPC answers 200 with a
+      // NEGATIVE (IN-01): a logged-out app.notion.com /api/v3 RPC answers 200 with a
       // sign-in/redirect body that parses to null (not the expected recordMap/results
       // object) -> guardRpcShape must reject it with the dual-field
       // RECIPE_DOM_FALLBACK_PENDING (NOT success), proving the wrong-shape branch fires.
-      const nt40Neg = makeCtx('https://www.notion.so', 43, { readData: null });
+      const nt40Neg = makeCtx('https://app.notion.com', 43, { readData: null });
       const nt40NegOut = await nt40['notion.search'].handle({ query: 'roadmap' }, nt40Neg.ctx);
       check(nt40NegOut && nt40NegOut.success === false
         && nt40NegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'

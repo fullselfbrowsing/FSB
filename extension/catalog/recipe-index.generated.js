@@ -103,7 +103,7 @@
     },
     {
       "slug": "notion.loadPage",
-      "service": "www.notion.so",
+      "service": "app.notion.com",
       "intentSynonyms": [
         "load a notion page",
         "open a notion page",
@@ -139,7 +139,7 @@
     },
     {
       "slug": "notion.getSpaces",
-      "service": "www.notion.so",
+      "service": "app.notion.com",
       "intentSynonyms": [
         "list my notion spaces",
         "show my notion workspaces",

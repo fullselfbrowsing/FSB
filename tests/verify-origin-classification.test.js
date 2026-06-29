@@ -20,7 +20,7 @@
  *       with their correct origins; PLUS a synthetic NESTED-brace entry parses whole
  *       (IN-01 hardening: origin is captured, not dropped to null).
  *   (b) the classifier returns sameOrigin:true for gitlab.com/api/v4,
- *       www.notion.so/api/v3, AND the slack dynamic-workspace accommodation
+ *       app.notion.com/api/v3, AND the slack dynamic-workspace accommodation
  *       (same-registrable-domain, explicit SAME_REGISTRABLE_DOMAIN_DYNAMIC_WORKSPACE
  *       reason) -- including the real end-to-end checkOriginClassification() over the
  *       live catalog + vendored slack-api.ts.
@@ -75,8 +75,8 @@ function check(cond, msg) {
     '(a) FsbHandlerGithub origin parsed as https://github.com');
   check(byGlobal.FsbHandlerSlack === 'https://app.slack.com',
     '(a) FsbHandlerSlack origin parsed as https://app.slack.com');
-  check(byGlobal.FsbHandlerNotion === 'https://www.notion.so',
-    '(a) FsbHandlerNotion origin parsed as https://www.notion.so');
+  check(byGlobal.FsbHandlerNotion === 'https://app.notion.com',
+    '(a) FsbHandlerNotion origin parsed as https://app.notion.com');
   check(byGlobal.FsbHandlerGitlab === 'https://gitlab.com',
     '(a) FsbHandlerGitlab origin parsed as https://gitlab.com');
 
@@ -112,9 +112,9 @@ function check(cond, msg) {
   const gl = gate.classifyOriginPattern('https://gitlab.com', 'https://gitlab.com/api/v4');
   check(gl.sameOrigin === true && gl.separate === false && gl.reason === null,
     '(b) gitlab.com vs gitlab.com/api/v4 -> sameOrigin:true (strict same-origin path)');
-  const nt = gate.classifyOriginPattern('https://www.notion.so', 'https://www.notion.so/api/v3/${endpoint}');
+  const nt = gate.classifyOriginPattern('https://app.notion.com', 'https://app.notion.com/api/v3/${endpoint}');
   check(nt.sameOrigin === true && nt.separate === false && nt.reason === null,
-    '(b) www.notion.so vs www.notion.so/api/v3 -> sameOrigin:true (strict same-origin path)');
+    '(b) app.notion.com vs app.notion.com/api/v3 -> sameOrigin:true (strict same-origin path)');
   const sl = gate.classifyOriginPattern('https://app.slack.com', 'https://workspace.slack.com', { dynamicWorkspace: true });
   check(sl.sameOrigin === true && sl.separate === false,
     '(b) slack app.slack.com vs *.slack.com dynamic base -> sameOrigin:true (registrable-domain accommodation)');
@@ -140,6 +140,27 @@ function check(cond, msg) {
   const realGitlab = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerGitlab') : null;
   check(!!realGitlab && realGitlab.apiBaseUrl === 'https://gitlab.com/api/v4',
     '(b) the REAL gitlab head is verified against its genuinely-extracted vendored base gitlab.com/api/v4');
+  const realNotion = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerNotion') : null;
+  check(!!realNotion && realNotion.apiBaseUrl === 'https://app.notion.com/api/v3'
+    && realNotion.classification && realNotion.classification.sameOrigin === true,
+    '(b) the REAL notion head uses the explicit observed runtime override app.notion.com/api/v3 and still classifies same-origin');
+
+  const badNotionOverride = gate.checkOriginClassification(
+    [{ global: 'FsbHandlerNotionBad', origin: 'https://app.notion.com' }],
+    {
+      appMap: {
+        FsbHandlerNotionBad: {
+          app: 'notion',
+          fallbackBaseUrl: 'https://app.notion.com',
+          observedRuntimeBaseUrl: 'https://app.notion.com/api/v3',
+          expectedStaleVendoredBaseUrl: 'https://wrong.notion.so/api/v3'
+        }
+      }
+    }
+  );
+  check(badNotionOverride && badNotionOverride.failures.length === 1
+    && badNotionOverride.failures[0].indexOf('CORS_OBSERVED_RUNTIME_OVERRIDE_MISMATCH') === 0,
+    '(b) a malformed Notion observed-runtime override fails closed instead of broadening the CORS gate');
 
   // ===== (c) separate-origin / wildcard FAIL rows ============================
   const linear = gate.classifyOriginPattern('https://linear.app', 'https://client-api.linear.app/graphql');

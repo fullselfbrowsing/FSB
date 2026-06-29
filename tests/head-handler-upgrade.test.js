@@ -79,9 +79,9 @@ const PORTED = [
   { slug: 'slack.list_channels', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
   { slug: 'slack.list_members', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
   { slug: 'slack.get_channel_info', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
-  // notion x2 -- EXTEND existing module (40-04), origin https://www.notion.so
-  { slug: 'notion.search', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
-  { slug: 'notion.get_database', origin: 'https://www.notion.so', handlerFile: 'notion.js' },
+  // notion x2 -- EXTEND existing module (40-04), origin https://app.notion.com
+  { slug: 'notion.search', origin: 'https://app.notion.com', handlerFile: 'notion.js' },
+  { slug: 'notion.get_database', origin: 'https://app.notion.com', handlerFile: 'notion.js' },
 
   // ===== Phase 41 (DEPTH-02) guarded WRITE slugs ============================
   // Each EXISTS as catalog/descriptors/opentabs__<app>__<op>.json (backing:'dom',
@@ -96,11 +96,12 @@ const PORTED = [
   { slug: 'gitlab.create_issue', origin: 'https://gitlab.com', handlerFile: 'gitlab.js', expectWrite: true },
   { slug: 'gitlab.create_merge_request', origin: 'https://gitlab.com', handlerFile: 'gitlab.js', expectWrite: true },
   { slug: 'gitlab.create_note', origin: 'https://gitlab.com', handlerFile: 'gitlab.js', expectWrite: true },
-  // notion x3 -- EXTEND the existing module (41-03), origin https://www.notion.so
+  // notion x4 -- EXTEND the existing module (41-03), origin https://app.notion.com
   // (append_block is a READ descriptor -> excluded; create_database_item is the WRITE.)
-  { slug: 'notion.create_page', origin: 'https://www.notion.so', handlerFile: 'notion.js', expectWrite: true },
-  { slug: 'notion.update_page', origin: 'https://www.notion.so', handlerFile: 'notion.js', expectWrite: true },
-  { slug: 'notion.create_database_item', origin: 'https://www.notion.so', handlerFile: 'notion.js', expectWrite: true },
+  { slug: 'notion.create_page', origin: 'https://app.notion.com', handlerFile: 'notion.js', expectWrite: true },
+  { slug: 'notion.update_page', origin: 'https://app.notion.com', handlerFile: 'notion.js', expectWrite: true },
+  { slug: 'notion.create_database', origin: 'https://app.notion.com', handlerFile: 'notion.js', expectWrite: true },
+  { slug: 'notion.create_database_item', origin: 'https://app.notion.com', handlerFile: 'notion.js', expectWrite: true },
   // slack x1 -- EXTEND the existing module (41-04), origin https://app.slack.com
   // (slug-DISTINCT from the hand-only executable slack.chat.postMessage -- no collision.)
   { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js', expectWrite: true }
@@ -112,7 +113,7 @@ const PORTED = [
 // 40-04), but the BEFORE/AFTER mechanism is generic -- it seeds the real
 // descriptor JSON and toggles only whether the handler is required.
 const BEFORE_AFTER_SLUG = 'notion.search';
-const BEFORE_AFTER_ORIGIN = 'https://www.notion.so';
+const BEFORE_AFTER_ORIGIN = 'https://app.notion.com';
 const BEFORE_AFTER_HANDLER = 'notion.js';
 
 const NEGATIVE_SLUG = 'gitlab.list_projectz';   // a deliberate typo -- must NOT upgrade
@@ -204,8 +205,8 @@ function freshCatalog(handlerFiles) {
       'UPGRADE ' + row.slug + ' resolves the first-party origin ' + row.origin + ' (Wall 2)');
 
     // Phase 41: the WRITE rows must upgrade dom->T1a AND carry the write class -- the
-    // descriptor.sideEffectClass === 'write' distinguishes a guarded write head from a
-    // read head (both upgrade dom->T1a; only the write is mutating-gated + fail-closed).
+    // descriptor.sideEffectClass === 'write' distinguishes a mutating head from a read
+    // head (both upgrade dom->T1a; only the write is mutation-gated by consent).
     if (row.expectWrite) {
       check(res && res.descriptor && res.descriptor.sideEffectClass === 'write',
         'UPGRADE ' + row.slug + ' carries descriptor.sideEffectClass === write (the guarded-write class); got ' +
