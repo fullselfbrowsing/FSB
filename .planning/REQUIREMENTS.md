@@ -1,100 +1,68 @@
-# Requirements: FSB (Full Self-Browsing) -- v1.0.0 Full App Catalog (OpenTabs Parity)
+# Requirements: FSB (Full Self-Browsing) -- v1.1.0 T1 App Execution Expansion
 
-**Defined:** 2026-06-23
-**Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback) -- no new MCP tool, no new router branch, INV-01..04 + Walls 1/2 preserved by construction.
+**Defined:** 2026-06-29
+**Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely. v1.1.0 focuses on converting the v1.0.0 catalog tail from search/discovery support into verified direct T1 execution where it is technically and safely provable.
 
 ## v1 Requirements
 
-Requirements for the v1.0.0 milestone. Each maps to a roadmap phase (Phases 35+, continuing integer numbering from v0.9.99's Phase 34). Source: github.com/opentabs-dev/opentabs (MIT, 119 plugins / 2,523 ops), pinned by commit SHA; attribution already in README Acknowledgements.
+Requirements for the v1.1.0 milestone. Each maps to roadmap phases beginning at Phase 44.
 
-### DENY -- Denylist Expansion & Import-Time Classification Gate (lands FIRST)
+### T1R -- T1 Readiness, Porting, and Verification
 
-- [x] **DENY-01**: `extension/config/service-denylist.json` deniedOrigins is expanded to hard-block the categorically-prohibited OpenTabs apps (brokerage/trading: robinhood, fidelity, carta; ToS-hostile media/social: netflix, spotify, twitch, steam, youtube-music, tinder, onlyfans; and the write-paths of instagram/facebook/tiktok/x) BEFORE any of those descriptors can be emitted.
-- [x] **DENY-02**: sensitiveOrigins is expanded to the allowed-but-sensitive tier (payments: stripe, coinbase, twilio; budgeting: ynab; messaging-app writes; finance reads) so they classify as sensitive (Ask / mutating-gated), not denied.
-- [x] **DENY-03**: A build-time classification gate (in the importer and CI) refuses to emit a descriptor whose origin is not explicitly classified denied / sensitive / safe; an unclassified sensitive-or-ToS origin fails the build (fail-closed).
-- [x] **DENY-04**: Sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (posture B): reads run under Auto everywhere, but a WRITE to a sensitive origin requires the per-origin mutating flag (already present in storage, re-gated here); non-sensitive origins remain fully-open under Auto. Scopes the friction removed in v0.9.99 Phase 30 to sensitive origins only.
-
-### CGEN -- Codegen Import Pipeline & No-Dead-Entry Resolution
-
-- [x] **CGEN-01**: A build-time `scripts/import-opentabs-catalog.mjs` (run under tsx) extracts each OpenTabs op's metadata (slug, params via z.toJSONSchema, service/origin, action verb, description) into provenance-stamped descriptor JSON under `catalog/descriptors/opentabs/`, pinned to an OpenTabs commit SHA; NO runtime OpenTabs/plugin-sdk dependency ships (Wall 1).
-- [x] **CGEN-02**: Each op's side-effect class is inferred from its transport verb (apiGet -> read; apiPost/apiPut/apiDelete -> write/destructive) plus an override table; a descriptor-vs-derived cross-check fails the build when a descriptor under-states a destructive op.
-- [x] **CGEN-03**: `capability-catalog.js resolve()` gains a single fallback branch so a descriptor-only slug (no bundled handler or recipe) resolves to T3 (DOM) or T2 (learn-pending when seeded) -- no searchable-but-uninvocable dead entries; verified by a harness assertion over the full catalog.
-- [x] **CGEN-04**: The generated catalog is committed and inlined by `scripts/package-extension.mjs` via the existing readJsonDir path with a stable `catalogVersion`; the IIFE shape and djb2 hashing are unchanged.
-
-### BRDTH -- Breadth: All-App Descriptor Import
-
-- [x] **BRDTH-01**: Descriptors for all real OpenTabs apps (excluding the e2e-test / prescript-test fixtures and the DENY-01 denied set) are imported and returned by `search_capabilities`, with intent synonyms and side-effect class per op.
-- [x] **BRDTH-02**: Apps are imported in category batches ordered least-sensitive -> most-sensitive; each batch is gated on its origins being denylist-classified (DENY-03) before merge.
-- [x] **BRDTH-03**: Each imported descriptor carries an invocability/backing-status signal (recipe / handler / learn-pending / DOM) so a user or agent can distinguish day-one-invocable apps from discovery-pending ones.
-
-### DEPTH -- Depth: Hand-Ported Handlers (~15-30 apps)
-
-- [x] **DEPTH-01**: The read-heads-first hand-port contract is established and the top verified-origin READ heads are ported as T1a handlers via the `github.js` contract (own first-party origin, executeBoundSpec-only, scraped tokens never logged), each UPGRADING its existing opentabs breadth descriptor dom→T1a. Phase 40 delivered **10 READ heads across 3 apps on verified same-origin internal APIs** — gitlab×5 (`gitlab.com/api/v4`, NEW module), slack×3 (`app.slack.com`, extend), notion×2 (`www.notion.so`, extend) — within the SC1 8–12 band. The originally-illustrated apps whose REAL first-party API turned out to be a **separate origin / per-org subdomain** (linear→`client-api.linear.app`, datadog→`*.datadoghq.com`, jira→`*.atlassian.net`, vercel/sentry/etc.) are DEFERRED to Phase 41 (DEPTH-02 owns the per-app CORS / first-party-origin verification gate that precedes any separate-API-origin Pattern-D port). The remaining READ heads ride alongside the writes in Phase 41's "remaining hand-ports."
-- [x] **DEPTH-02**: Hand-ported WRITE ops fail closed and, on sensitive origins, honor the DENY-04 mutating opt-in; a per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port (linear is documented-safe; supabase / cloud-consoles must be verified or demoted to T2/T3).
-
-### DSEED -- Discovery Seeding for the Tail
-
-- [x] **DSEED-01**: The OpenTabs origins (+ known endpoint hints) seed the Phase-31 network-capture discovery so the non-hand-ported tail is learned on first authenticated visit, consent-gated.
-- [x] **DSEED-02**: The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring is persisted at scale.
-
-### SCALE -- Catalog Scale & Milestone Gate
-
-- [x] **SCALE-01**: The search index and catalog stay within budget at ~2,523 descriptors (searchable-text indexed; params schema-on-hit / out-of-band; sharded by service), proven by the extended SURF-06 eval harness with size/load-time assertions (index < ~1-2 MB; loadJSON + first search < ~50-100 ms).
-- [x] **SCALE-02**: Recipe-rot self-heal is hardened for 119-app scale (per-origin re-learn coalescing / back-off); the typed fallback reason stays byte-equal across all 7 providers (INV-03); full `npm test` exits 0 (the milestone gate).
+- [ ] **T1R-01**: Generate an authoritative T1 readiness matrix over all 2,314 descriptors, including app, slug, side-effect class, current tier/backing, origin class, suspected auth pattern, same-origin/separate-origin feasibility, and next action.
+- [ ] **T1R-02**: Update search/UI/docs language so catalog support, T1-ready execution, fail-closed guarded writes, T2 learn-pending, and T3 DOM/discovery-pending are visibly distinct and cannot be overclaimed.
+- [ ] **T1R-03**: Add a CI guard that prevents a descriptor from being marked T1-ready unless it has a registered handler or recipe plus required verification coverage.
+- [ ] **T1R-04**: Provide a reusable T1 port scaffold for same-origin reads, same-origin writes, and separate-origin candidates.
+- [ ] **T1R-05**: Every new T1 port must prove origin-pin, executeBoundSpec-only execution, logged-out/body shape guards, no-secret logging, consent compatibility, and router parity.
+- [ ] **T1R-06**: Port a first batch of high-value read descriptors to executable T1/T1b, selected by readiness feasibility, user value, and low side-effect risk.
+- [ ] **T1R-07**: Implement or explicitly reject a Pattern-D execution architecture for separate-origin/per-org-subdomain APIs, with negative-control tests proving unsafe ports fail closed.
+- [ ] **T1R-08**: Spike and decide the Google Workspace GAPI bridge handler family for Docs, Drive, and Calendar through a page-owned `window.gapi.client.request` trampoline.
+- [ ] **T1R-09**: Preserve all v1.0.0 security walls: no OpenTabs runtime/plugin code, no new MCP tool-per-app surface, no secret persistence, and denylist/sensitive-origin behavior unchanged unless deliberately re-scoped.
+- [ ] **T1R-10**: Generalize the live UAT template for guarded writes/destructive actions, recording method/path/body shape and CSRF/token location redacted to shape only.
+- [ ] **T1R-11**: Activate write/destructive T1 handlers only when live mutation-body UAT and consent/audit checks pass; otherwise keep them fail-closed with explicit reasons.
+- [ ] **T1R-12**: Close with a before/after T1 coverage report, full regression suite, validate:extension, and prioritized next-batch plan for the remaining tail.
 
 ## v2 Requirements
 
-Acknowledged but deferred beyond v1.0.0; not in this roadmap.
+Acknowledged but deferred beyond v1.1.0 unless pulled into an approved phase.
 
-### Deferred Capability Families
+### Full Tail Completion
 
-- **GAPI-01**: gapi-bridge handler family for the Google Workspace apps (docs / drive / calendar) invoked via the page's `window.gapi.client.request` trampoline -- needs a dedicated handler-shape spike.
-- **CLOUD-01**: Cloud-console Pattern-D ports (aws-console, azure, google-cloud, terraform-cloud) -- pending per-app CORS verification of dashboard-vs-API origin.
-- **UATX-01**: Per-app live guarded-write UAT closeout across the hand-ported depth tier (human_needed, mirrors the v0.9.99 live-UAT posture).
+- **T1ALL-01**: Make every safe, non-denied descriptor in the 2,314-descriptor catalog executable as T1/T1b where technically possible.
+- **T1ALL-02**: Close all live UAT for write/destructive actions across supported apps.
+- **T1ALL-03**: Add user-facing health/readiness surfaces for app-level degraded and needs-re-port states.
 
 ## Out of Scope
 
-Explicit exclusions (anti-features from research), documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
-| Hand-porting all 2,523 ops as bundled imperative handlers | MV3 Wall 1 / Web-Store-ban risk; the head stays curated, the tail is descriptors + learned/DOM |
-| Runtime dependency on @opentabs-dev/plugin-sdk (or any OpenTabs code) | MV3 bans remotely-hosted code; the import is build-time metadata only |
-| ToS-hostile apps as API-invocable (netflix, spotify, twitch, steam, tinder, onlyfans, instagram/tiktok/x writes) | Site Terms of Service; denylisted or DOM-only |
-| Brokerage trade execution (robinhood / fidelity / carta trades) | Financial-harm surface under an opt-out default; denied outright |
-| e2e-test / prescript-test plugins | OpenTabs CI fixtures, not real apps |
+| Claiming all 2,288 remaining T3 descriptors are T1-ready without per-app proof | Unsafe and inaccurate; each app requires origin/auth/shape/UAT verification. |
+| Shipping OpenTabs plugin runtime code in the extension | Violates MV3 Wall 1; OpenTabs remains metadata/provenance input only. |
+| Activating finance/payment/social/destructive writes from guessed endpoints | Writes stay fail-closed until live request shape and consent/audit behavior are proven. |
+| Adding one MCP tool per app or per operation | Breaks the progressive-disclosure surface; the two capability tools remain the boundary. |
+| Weakening denylist or sensitive-origin policy to inflate T1 coverage | Security posture is a gate, not a metric to game. |
 
 ## Traceability
 
-Finalized by the roadmapper; each requirement maps to exactly one phase. 100% coverage, 0 orphans.
-
-Note on breadth phases: BRDTH-01/02/03 are OWNED by Phase 37, which establishes the breadth contract (all real apps return from search with intent synonyms + side-effect class + backing-status, each batch gated on denylist coverage). Phases 38 (Comms/Social/Content) and 39 (Commerce/Travel/Misc) are sensitivity-ascending CONTINUATION batches that extend the same three requirements to more categories; they own no additional v1.0.0 REQ-ID. Depth splits cleanly: DEPTH-01 (the hand-port contract + read heads) is owned by Phase 40; DEPTH-02 (guarded writes + DENY-04 re-enforcement + per-app CORS gate) is owned by Phase 41, which continues the same hand-port mechanism for the remaining heads.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DENY-01 | Phase 35 | Complete |
-| DENY-02 | Phase 35 | Complete |
-| DENY-03 | Phase 35 | Complete |
-| DENY-04 | Phase 35 | Complete |
-| CGEN-01 | Phase 36 | Complete |
-| CGEN-02 | Phase 36 | Complete |
-| CGEN-03 | Phase 36 | Complete |
-| CGEN-04 | Phase 36 | Complete |
-| BRDTH-01 | Phase 37 | Complete |
-| BRDTH-02 | Phase 37 | Complete |
-| BRDTH-03 | Phase 37 | Complete |
-| DEPTH-01 | Phase 40 | Complete |
-| DEPTH-02 | Phase 41 | Complete |
-| DSEED-01 | Phase 42 | Complete |
-| DSEED-02 | Phase 42 | Complete |
-| SCALE-01 | Phase 43 | Complete |
-| SCALE-02 | Phase 43 | Complete |
+| T1R-01 | Phase 44 | Pending |
+| T1R-02 | Phase 44 | Pending |
+| T1R-03 | Phase 44 | Pending |
+| T1R-04 | Phase 45 | Pending |
+| T1R-05 | Phase 45 | Pending |
+| T1R-06 | Phase 46, Phase 48 | Pending |
+| T1R-07 | Phase 47, Phase 48 | Pending |
+| T1R-08 | Phase 47, Phase 48 | Pending |
+| T1R-09 | Phase 45 | Pending |
+| T1R-10 | Phase 49 | Pending |
+| T1R-11 | Phase 49 | Pending |
+| T1R-12 | Phase 50 | Pending |
 
 **Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 17 (DENY 4 -> P35; CGEN 4 -> P36; BRDTH 3 -> P37 [P38/P39 continue the contract]; DEPTH-01 -> P40, DEPTH-02 -> P41; DSEED 2 -> P42; SCALE 2 -> P43)
+- v1 requirements: 12 total
+- Mapped to phases: 12
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-06-23 -- v1.0.0 Full App Catalog (OpenTabs Parity)*
-*Last updated: 2026-06-24 -- traceability finalized by roadmapper (9 phases 35-43; DEPTH-02 mapped to Phase 41; BRDTH continuation batches 38-39 noted)*
+*Requirements defined: 2026-06-29 -- v1.1.0 T1 App Execution Expansion milestone started after closing v1.0.0.*

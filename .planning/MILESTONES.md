@@ -1,5 +1,29 @@
 # Project Milestones: FSB (Full Self-Browsing)
 
+## v1.0.0 Full App Catalog (OpenTabs Parity) (Shipped: 2026-06-29)
+
+**Phases completed:** 10 phases (35-43, including inserted 39.5), 46 plans, 17/17 requirements satisfied.
+
+**Archive:** `.planning/milestones/v1.0.0-ROADMAP.md`, `.planning/milestones/v1.0.0-REQUIREMENTS.md`, `.planning/milestones/v1.0.0-MILESTONE-AUDIT.md`, and `.planning/milestones/v1.0.0-phases/`.
+
+**Audit status:** `passed` -- automated milestone gate met. Non-blocking debt carried forward: live guarded-write UAT, live discovery first-visit UAT, Pattern-D cross-origin execution, and T1 expansion for the DOM/discovery tail.
+
+**Key accomplishments:**
+
+- Imported the full allowed OpenTabs-derived catalog surface into FSB's existing capability tiers: 2,314 descriptors across 128 app stems / 129 services, all searchable with side-effect class and backing-status signals.
+- Expanded the denylist/sensitive-origin classification gates before broad reach landed, preserving denylist as the hard block while sensitive origins are flagged/audited and discovery-sensitive confirmation remains scoped to network capture.
+- Built and verified the no-dead-entry resolution path so every searchable descriptor resolves to a tier rather than a dead `RECIPE_NOT_FOUND` result.
+- Added selected T1/T1b direct execution heads across GitHub, GitLab, Notion, Reddit, and Slack, including live-verified Notion write execution after the app.notion.com/saveTransactions runtime patch.
+- Seeded the remaining tail into discovery/learn flows and extended redaction coverage across the OpenTabs auth-field universe.
+- Closed the scale gate: full-corpus index stayed within budget, precision regression pins passed, recipe-rot self-heal was wired, and `npm test` / `validate:extension` passed in the milestone gate.
+
+**Accepted closeout caveats:**
+
+- The milestone did not make all 2,288 remaining T3 descriptors direct T1. That is now the explicit v1.1.0 T1 App Execution Expansion milestone.
+- Live UAT remains recorded rather than fabricated for guarded writes and first-visit discovery learning.
+
+---
+
 ## v0.12.0 PhantomStream Package Migration (Shipped: 2026-06-17)
 
 **Phases completed:** 5 phases (21-25), 19 plans, 24/24 requirements satisfied.

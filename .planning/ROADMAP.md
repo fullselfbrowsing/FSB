@@ -2,223 +2,167 @@
 
 ## Milestones
 
-- **v0.10.0 Autopilot via Lattice SDK** — Phases 01-13, shipped 2026-06-15.
-- **v0.11.0 Trigger Tool (Reactive DOM Monitoring)** — Phases 14-20, completed 2026-06-17; release actions and browser UAT remain user-gated.
-- **v0.12.0 PhantomStream Package Migration** — Phases 21-25, completed 2026-06-17; live Chrome-extension UAT remains user-gated.
-- **v0.9.99 Native Capability Catalog (FSB API Execution)** — Phases 26-34, code-complete 2026-06-23 (full npm test EXIT 0); live-browser UAT debt carried forward. Phase 999.1 (click heuristics) retained in Backlog.
-- 🚧 **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, IN PROGRESS. Scales the v0.9.99 capability path from a 4-service head to the full ~119-app / ~2,523-op OpenTabs surface by feeding the existing tiers (breadth = descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback). Denylist-first, category-batched.
+- ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
+- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-50, IN PROGRESS. Convert the catalog-tail from discovery-pending toward verified T1 execution, starting with a full readiness matrix, shared handler/recipe scaffolds, same-origin read batches, Pattern-D/GAPI bridge spikes, and guarded-write activation workflow.
 
 ## Active Milestone
 
-**v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43.
+**v1.1.0 T1 App Execution Expansion** — Phases 44-50.
 
-**Milestone Goal:** Take FSB's capability catalog from the 4-service bundled head to the full ~119-app OpenTabs surface — every app discoverable via `search_capabilities` and invocable through the existing tiers — adding a hand-ported depth tier, an expanded service denylist, and seeded discovery, all WITHOUT violating MV3 Wall 1 (recipes stay closed-vocabulary data, never shipped code). The milestone is **NOT** a rebuild and **NOT** a port of OpenTabs' code: it is "feed the existing tiers, don't add tiers." Breadth = codegen closed-vocabulary **descriptors** (data) so every app returns from search; depth = hand-port ~15-30 top apps as T1a/T1b handlers exactly like the shipped `github.js`; the tail is reached by seeded network-capture discovery (T2) and the universal DOM fallback (T3). No new MCP tool, no new router branch, no new tier — INV-01..04 and Walls 1/2 are preserved by construction. The single new build-time stack is `zod@^4.4.3` + `tsx@^4.22.4` (devDeps only) to run OpenTabs' own `z.toJSONSchema()` extraction; nothing OpenTabs ships into the extension at runtime (Wall 1).
+**Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” The milestone is focused only on T1 readiness: identifying which of the 2,288 remaining T3 descriptors can become T1, building the missing execution substrate for same-origin and separate-origin apps, porting high-value read paths first, and activating writes only after live mutation-body UAT. It must not overclaim all-app direct API readiness without per-app proof.
 
-**Source:** `github.com/opentabs-dev/opentabs` (MIT, 119 plugins / 2,523 ops), pinned by commit SHA; attribution already in README Acknowledgements.
+**Baseline entering this milestone:**
 
-**Hard invariants (carried from v0.9.99 — every phase respects these):**
-- **INV-01 MCP wire contracts UNTOUCHED.** The existing ~63 MCP tool schemas stay byte-identical; the 2 capability tools (`search_capabilities`, `invoke_capability`) stay OUTSIDE `TOOL_REGISTRY`. Breadth adds DATA + depth adds handlers behind the SAME 2 tools — no new MCP tool, no schema change; the frozen non-trigger registry hash stays unmoved.
-- **INV-02 Tool-surface parity at the runtime layer.** Both front doors (MCP dispatcher + autopilot `tool-executor`) keep calling the SAME `FsbCapabilityRouter.invoke`; hand-ports register into the SAME catalog both doors read. No autopilot-only path.
-- **INV-03 Provider parity.** Typed reasons (`RECIPE_DOM_FALLBACK_PENDING`, `RECIPE_LEARN_PENDING`, `RECIPE_CONSENT_BLOCKED`) stay byte-equal across all 7 `universal-provider.js` targets via the `/^RECIPE_.+$/` passthrough.
-- **INV-04 MV3-survivability preserved.** The `agent-loop.js` `setTimeout`-chained iterator is load-bearing and untouched; invoke stays a single bounded async op. Codegen is build-time only.
+- Total descriptors: **2,314**.
+- T1/T1b today: **26 descriptors** across GitHub, GitLab, Notion, Reddit, and Slack.
+- Actually executable/recipe-backed today: **21 descriptors**.
+- T1 fail-closed guarded writes today: **5 descriptors**.
+- Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
+- App stems with no direct T1 path: **123**.
 
-**Architectural Walls (non-negotiable):**
-- **Wall 1 (MV3 no remotely-hosted code):** descriptors are closed-vocabulary DATA; the importer NEVER emits a forbidden field name (`script`/`expr`/`transform`/`code`/`fn`/`js`); `verify-recipe-path-guard.mjs` stays green. OpenTabs is import-time metadata only — its `dist/`/`handle()` runtime is never shipped.
-- **Wall 2 (execution context):** every credentialed call still goes through `capability-fetch.js executeBoundSpec` in the page MAIN world with the active-tab origin-pin; hand-ports are `executeBoundSpec`-only; CDP capture stays discovery-only.
+**Hard invariants:**
 
-## Phases
+- Keep the two-tool MCP surface: `search_capabilities` and `invoke_capability`; do not add one tool per app.
+- Preserve MV3 Wall 1: descriptors and recipes are closed-vocabulary data; no OpenTabs runtime/plugin code ships.
+- Preserve Wall 2 unless explicitly extended by a verified Pattern-D design: credentialed execution stays origin-pinned and same-session.
+- Writes and destructive actions stay fail-closed until live request shape, consent behavior, and no-secret logging are proven.
+- Denylisted origins remain blocked; sensitive origins stay flagged/audited and apply the current invoke/discovery consent semantics.
+- Search must distinguish “directly invocable T1” from “discovery-pending DOM/T2.” No UI/API overclaiming.
 
-**Phase Numbering:**
-- Integer phases continue from v0.9.99's Phase 34 — this milestone runs Phases 35-43. Numbering never restarts at 1. Phases 26-34 (v0.9.99) and 999.1 are untouched.
-- Decimal phases (35.1, 35.2) remain reserved for urgent insertions (marked INSERTED) and execute between their surrounding integers.
+## Phase 44: T1 Readiness Inventory + Status Surface
 
-**Ordering principle (all four researchers converged — do not reorder):** denylist before reach → pipeline before content → breadth before depth within a category (least-sensitive → most-sensitive) → discovery seeding after breadth + depth → scale gate last.
+**Goal:** Create the authoritative T1 readiness matrix for all 2,314 descriptors and make status visible to developers and users so “catalog supported” is never confused with “direct API-ready.”
 
-- [ ] **Phase 35: Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)** - Expand `service-denylist.json` denied+sensitive to cover ALL banking/payments/brokerage/crypto/health + ToS-hostile categories across the 119 BEFORE anything imports; a fail-closed import-time CI gate; the posture-B sensitive-origin write re-gate; vendored MIT snapshot + provenance scaffold.
-- [ ] **Phase 36: Codegen Pipeline + No-Dead-Entry Resolution** - The tsx/zod descriptor importer + side-effect cross-check guard + the load-bearing `resolve()` descriptor-only → T3/T2 fallback (no searchable-but-uninvocable dead entries), proven on one non-sensitive smoke category at full-scale eval + SW cold-start budget.
-- [ ] **Phase 37: Breadth A — Dev / Productivity (least-sensitive)** - Import descriptors for the non-sensitive dev/PM/cloud/observability apps so they return from `search_capabilities` with intent synonyms, side-effect class, and a backing-status signal; establishes the category-batch-gated-on-denylist contract.
-- [ ] **Phase 38: Breadth B — Comms / Social / Content (sensitivity-screened)** - Extend the breadth import to comms/social/content apps, each included only after Phase 35 covers its origin (denylist-coverage assertion per batch); ToS-hostile apps routed DOM-only/denied.
-- [ ] **Phase 39: Breadth C — Commerce / Travel / Misc (most-sensitive)** - Extend the breadth import to commerce/travel/misc apps; payment-bearing flows fail-closed (T3 DOM) or denied; completes descriptor coverage of all real OpenTabs apps.
-- [ ] **Phase 40: Depth 1 — Top READ Hand-Ports** - Hand-port the highest-value READ heads (~8-12) as T1a/T1b handlers via the `github.js` contract (own first-party origin, `executeBoundSpec`-only, tokens never logged) so the hot subset upgrades from descriptor-T3 to the API fast path.
-- [x] **Phase 41: Depth 2 — Remaining Hand-Ports + Guarded Writes** - Hand-port the remaining heads incl. WRITE ops that fail-closed to DOM fallback until live-captured; a per-app CORS / first-party-origin gate precedes any separate-API-origin (Pattern-D) port; sensitive-origin writes honor the DENY-04 mutating opt-in. ✓ Complete (2026-06-26): 7 guarded writes (gitlab/notion/slack) fail-closed; the CORS-gate ships in validate:extension; SC2 proven on slack.send_message; Pattern-D demoted-to-T3-DOM (41-DEFERRAL.md); HEAD_HANDLER_MODULES=4 ≤30; full npm test EXIT 0.
-- [ ] **Phase 42: Discovery Seeding + Tail Learn** - Seed all non-hand-ported origins (+ endpoint hints harvested from OpenTabs `*-api.ts`) so the tail is learned on first authenticated visit (consent-gated, promote-after-replay); the structural redactor verified against the full 119-app auth-field universe.
-- [ ] **Phase 43: Catalog-Scale + Milestone Gate** - Prove the search index + catalog stay within budget at ~2,523 descriptors; harden recipe-rot self-heal for 119-app scale; 7-provider parity byte-equal; full `npm test` EXIT 0 (the milestone gate).
+**Depends on:** v1.0.0 archive.
 
-## Phase Details
+**Requirements:** T1R-01, T1R-02, T1R-03.
 
-### Phase 35: Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)
-**Goal**: Make the service-denylist cover every categorically-prohibited and allowed-but-sensitive origin across the 119-app set, and make that coverage un-bypassable, BEFORE any descriptor that could reach a finance/health/ToS-hostile app is ever emitted — under the shipped opt-out Auto default the denylist is the ONE hard floor, so this is a hard dependency for every later phase, not a parallel track.
-**Depends on**: Nothing within v1.0.0 (extends the v0.9.99 substrate; `service-denylist.js` loader unchanged). Strictly first.
-**Requirements**: DENY-01, DENY-02, DENY-03, DENY-04
-**Success Criteria** (what must be TRUE):
-  1. `service-denylist.json` `deniedOrigins` hard-blocks the categorically-prohibited OpenTabs apps (brokerage/trading: robinhood, fidelity, carta; ToS-hostile media/social: netflix, spotify, twitch, steam, youtube-music, tinder, onlyfans; and the write-paths of instagram/facebook/tiktok/x) — confirmed by a test asserting each prohibited origin classifies `denied`.
-  2. `service-denylist.json` `sensitiveOrigins` classifies the allowed-but-sensitive tier (payments: stripe, coinbase, twilio; budgeting: ynab; messaging-app writes; finance reads) as sensitive (Ask / mutating-gated), not denied — confirmed by a test over the sensitive roster.
-  3. A build-time classification gate (in the importer and CI) refuses to emit a descriptor whose origin is not explicitly classified denied / sensitive / safe; an unclassified sensitive-or-ToS origin fails the build (fail-closed) — proven by a fixture that fails the build when a sensitive origin is left unclassified.
-  4. Sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (posture B): a WRITE to a sensitive origin requires the per-origin mutating flag; reads run under Auto everywhere; non-sensitive origins remain fully-open under Auto — the friction removed in v0.9.99 Phase 30 is re-scoped to sensitive origins only.
-  5. The vendored MIT snapshot (`vendor/opentabs-snapshot/` + `PIN.md` = commit SHA + license) and the `_provenance.json` scaffold are in place, and `docs/LEGAL.md` names the ToS-hostility axis as a distinct categorization criterion.
-**Plans**: 4 plans (2 waves)
-  - [x] 35-01-PLAN.md — Denylist roster expansion: deniedOrigins + sensitiveOrigins for the named DENY-01/02 roster (exact-host forms) + per-origin classify() assertions [wave 1]
-  - [x] 35-04-PLAN.md — OpenTabs provenance scaffold (PIN.md SHA + verbatim MIT, _provenance.json) + docs/LEGAL.md Categorization Axes [wave 1]
-  - [x] 35-02-PLAN.md — Fail-closed classification gate (verify-classification-gate.mjs, classifyGate export + CLI) + proof fixture, chained into validate:extension [wave 2]
-  - [x] 35-03-PLAN.md — Posture-B sensitive-write re-gate in _evaluateConsent (RECIPE_CONSENT_MUTATING_REQUIRED, scoped to classify().sensitive) [wave 2]
+**Success Criteria:**
+1. A generated readiness report classifies every descriptor by app, slug, side-effect class, current tier, backing, origin class, auth pattern, likely same-origin/separate-origin route, and recommended next action.
+2. `search_capabilities`, docs, and any relevant UI copy distinguish T1-ready, fail-closed, learn-pending, and DOM/discovery-pending states without stale overclaims.
+3. CI fails if a descriptor is marked T1-ready without a registered handler/recipe plus tests.
 
-### Phase 36: Codegen Pipeline + No-Dead-Entry Resolution
-**Goal**: Build the descriptor import pipeline and the load-bearing "no dead descriptor" resolution so that the moment 2,523 descriptors land they are both safe (side-effect class cross-checked, escalate-to-write on disagreement) and invocable (every searchable slug resolves to a non-null tier) — the pipeline and the quality gate must exist before any real content import.
-**Depends on**: Phase 35 (denylist + classification gate must be green before the importer emits anything).
-**Requirements**: CGEN-01, CGEN-02, CGEN-03, CGEN-04
-**Success Criteria** (what must be TRUE):
-  1. A build-time `scripts/import-opentabs-catalog.mjs` (run under tsx) extracts each OpenTabs op's metadata (slug, params via `z.toJSONSchema`, service/origin, action verb, description) into provenance-stamped descriptor JSON under `catalog/descriptors/opentabs/`, pinned to the OpenTabs commit SHA, with NO runtime OpenTabs/plugin-sdk dependency shipped (Wall 1).
-  2. Each op's side-effect class is inferred from its transport verb (apiGet → read; apiPost/apiPut/apiDelete → write/destructive) plus an override table, and a descriptor-vs-derived cross-check (`verify-catalog-crosscheck.mjs`, chained into `validate:extension`) fails the build when a descriptor under-states a destructive op — proven by a destructive-op sample test (`void_invoice`, `delete_customer` class `destructive`; GraphQL/RPC POSTs never class `read`).
-  3. `capability-catalog.js resolve()` gains a single fallback branch so a descriptor-only slug (no bundled handler or recipe) resolves to T3 (DOM) or T2 (learn-pending when seeded) — a harness assertion proves every slug `search_capabilities` can return resolves to a non-null tier, so `invoke` never returns `RECIPE_NOT_FOUND` for a searchable slug.
-  4. The generated catalog is committed and inlined by `scripts/package-extension.mjs` via the existing `readJsonDir` path with a stable `catalogVersion`; the IIFE shape and djb2 hashing are unchanged; on one non-sensitive smoke category the full-scale eval harness re-passes (recall@k, wrong-invoke=0) and the SW cold-start parse stays within budget.
-**Plans**: 4 plans (Wave 1: 36-01; Wave 2: 36-02, 36-03, 36-04)
-- [x] 36-01-PLAN.md — CGEN-01: build-time tsx importer (z.toJSONSchema extraction + recursive Wall-1 forbidden-field pre-scan + classifyGate-before-emit + flat provenance-stamped descriptors); deps hardened to devDeps; phase-wide test/gate registration
-- [x] 36-02-PLAN.md — CGEN-03: the load-bearing resolve() descriptor-only fallback (T3 default / T2 when backing:learn) + no-dead-entry harness + router invoke proof (never RECIPE_NOT_FOUND for a searchable slug)
-- [x] 36-03-PLAN.md — CGEN-02: verify-catalog-crosscheck.mjs (verb-map + GraphQL/RPC carve-out + override table, MAX-merge fail-safe-high) fails the build on an under-stated destructive op; void_invoice/delete_customer sample test
-- [x] 36-04-PLAN.md — CGEN-04: catalog inlining via the unchanged readJsonDir/IIFE/djb2 path (INV-01) + smoke-category eval re-pass (recall@5>=0.9, wrong-invoke=0) + cold-start size/time asserts + HEAD_HANDLER_MODULES cap
+**Plans:** pending.
 
-### Phase 37: Breadth A — Dev / Productivity (least-sensitive)
-**Goal**: Import descriptors for the least-sensitive dev/PM/cloud/observability apps and, in doing so, establish the breadth contract every later batch reuses: all real apps return from search with rich intent synonyms + side-effect class + a backing-status signal, and every batch is gated on its origins being denylist-classified before merge. This phase OWNS the BRDTH-01/02/03 requirements; Phases 38-39 extend the same contract to more categories.
-**Depends on**: Phase 36 (the importer + no-dead-entry resolution + cross-check + full-scale search proof must exist first).
-**Requirements**: BRDTH-01, BRDTH-02, BRDTH-03
-**Success Criteria** (what must be TRUE):
-  1. Descriptors for the dev/productivity OpenTabs apps (linear, jira, confluence, clickup, asana, airtable, vercel, circleci, cloudflare, datadog-read, …; excluding the e2e-test/prescript-test fixtures and the DENY-01 denied set) are imported and returned by `search_capabilities` with intent synonyms and side-effect class per op.
-  2. The apps are imported as a category batch and the merge carries a denylist-coverage assertion (DENY-03) — establishing the "import in category batches ordered least-sensitive → most-sensitive, each gated on its origins being classified" rule that Phases 38-39 inherit.
-  3. Each imported descriptor carries an invocability/backing-status signal (recipe / handler / learn-pending / DOM) so a user or agent can distinguish day-one-invocable apps from discovery-pending ones, and `search_capabilities` annotates by it (no confident invocable hit for a pending-only descriptor).
-  4. The crosscheck CI gate and the eval harness stay green on the growing corpus; the descriptor-only → T3/T2 fallback is verified for this batch.
-**Plans**: 4 plans (4 waves -- sequential; each sub-batch regenerates the shared catalog snapshot)
-  - [x] 37-01-PLAN.md — Breadth contract machinery (importer batch-enumeration + MED-03 synonym fix + backing-status enum + search annotation + merge-time classifyGate batch gate) + vendor linear/asana + Wave-0 proof tests [wave 1] (BRDTH-01/02/03)
-  - [x] 37-02-PLAN.md — Vendor clickup/jira/confluence/airtable (data-only, reuses the contract) + regen snapshot + extend eval [wave 2] (BRDTH-01)
-  - [x] 37-03-PLAN.md — Vendor gitlab/bitbucket/vercel/netlify (data-only) + regen snapshot + extend eval [wave 3] (BRDTH-01)
-  - [x] 37-04-PLAN.md — Vendor cloudflare/circleci/datadog/sentry/posthog (data-only) + regen snapshot + re-assert crosscheck/no-dead-entry/eval/cold-start over the complete batch [wave 4] (BRDTH-01)
+## Phase 45: T1 Porting Scaffold + Handler Contract Hardening
 
-### Phase 38: Breadth B — Comms / Social / Content (sensitivity-screened)
-**Goal**: Extend the Phase-37 breadth contract to the comms / social / content apps — the first batch where ToS-hostility and write-sensitivity bite — importing each app's descriptors only after Phase 35 covers its origin, and routing ToS-hostile apps to DOM-only/denied rather than API-invocable.
-**Depends on**: Phase 37 (reuses the breadth pipeline + the backing-status + the batch-gating contract). Continuation of BRDTH-01/02/03 to additional categories (no new v1.0.0 REQ-ID owned).
-**Success Criteria** (what must be TRUE):
-  1. Descriptors for the screened comms/social/content apps (discord, bluesky, reddit-extra, chatgpt, claude, …) are imported and returned by `search_capabilities`, each included only after a per-app sensitivity check.
-  2. A denylist-coverage assertion for this batch passes before merge (every sensitive social/messaging origin in the batch is classified denied-or-sensitive); ToS-hostile apps carry a DOM-only routing marker (T3) and are never fully-API-invocable-by-default.
-  3. The crosscheck CI gate and the eval harness stay green as the corpus grows; descriptor-only slugs in this batch resolve to a non-null tier.
-**Plans**: 3 plans (sensitivity-ascending; the screening lands first and gates the import)
-- [x] 38-01-PLAN.md — Per-app sensitivity screening: classify every comms/social/content batch origin (denied/sensitive/safe) in service-denylist.json + extend the docs/LEGAL.md Categorization Axes; prove the fail-closed merge gate (unclassified social origin aborts), the posture-B sensitive-write re-gate (discord), and the conservative DOM-only default (frozen backing:'dom', no machinery edit)
-- [x] 38-02-PLAN.md — Import the AI-chat + microblog/fediverse sub-batch (chatgpt, claude, bluesky, mastodon, threads) as DOM-only data via the frozen importer (gated on 38-01); regen snapshot; per-wave crosscheck + no-dead-entry + eval + cold-start green
-- [x] 38-03-PLAN.md — Import the messaging + content-read sub-batch (discord writes, reddit reads) completing the category; prove the sensitive-write gating END-TO-END on the REAL emitted opentabs__discord__send_message descriptor through the live consent gate; regen snapshot; full-category gates green
+**Goal:** Build the reusable test and implementation scaffold for app ports so each new T1 handler has origin-pin, logged-out guard, shape guard, no-secret logging, consent classification, and byte-stable fallback behavior by default.
 
-### Phase 39: Breadth C — Commerce / Travel / Misc (most-sensitive)
-**Goal**: Complete descriptor coverage of all real OpenTabs apps by importing the commerce / travel / misc batch (the most-sensitive end of the ascending order), screening out or denying payment-bearing flows so no descriptor arms a money-moving operation under Auto.
-**Depends on**: Phase 38 (final, most-sensitive breadth batch on the same gated pipeline). Continuation of BRDTH-01/02/03 (no new v1.0.0 REQ-ID owned).
-**Success Criteria** (what must be TRUE):
-  1. Descriptors for the commerce/travel/misc apps (booking, airbnb, bestbuy, costco, craigslist, dominos, chipotle, calendly, …) are imported and returned by `search_capabilities`, completing coverage of all real apps (excluding fixtures + the denied set).
-  2. A denylist-coverage assertion passes for this batch; payment-flow ops fail-closed (T3 DOM) or are denied — no payment-bearing op is API-invocable under Auto.
-  3. After this batch the discoverable-AND-invocable coverage breakdown (head / learn-on-visit / DOM-only / dead) is reportable across the full ~117-app real set, and the crosscheck + eval harness stay green at the now-near-full corpus.
-**Plans**: 7 plans (7 waves -- sequential; the payment screening lands first and gates every import; each import sub-batch regenerates the shared catalog snapshot; the coverage report + the end-to-end payment-write proof close the phase)
-  - [x] 39-01-PLAN.md -- Payment-screening machinery: classify the commerce/travel/misc origins per the payment/money-movement axis (payment->sensitive, money-movement->denied, read-only->safe) in service-denylist.json; widen the classification-gate heuristic with payment tokens; add the payment-op CI guard (no payment op safe-and-API-invocable) to the crosscheck; LEGAL axis; fail-closed fixtures + proofs [wave 1] (BRDTH-01/02/03)
-  - [x] 39-02-PLAN.md -- Import the food-delivery + rideshare sub-batch (doordash, ubereats, uber, lyft, grubhub, instacart) as DOM-only data on sensitive origins via the frozen importer; regen snapshot; per-wave gates incl. the payment-op guard [wave 2] (BRDTH-01/02/03)
-  - [x] 39-03-PLAN.md -- Import the retail/marketplace sub-batch (amazon, ebay, etsy, bestbuy, costco, walmart, target); regen snapshot; per-wave gates incl. the payment-op guard [wave 3] (BRDTH-01/02/03)
-  - [x] 39-04-PLAN.md -- Import the travel/transport sub-batch (booking, airbnb, expedia, kayak, opentable); regen snapshot; per-wave gates incl. the payment-op guard [wave 4] (BRDTH-01/02/03)
-  - [x] 39-05-PLAN.md -- Import the events/local-services/scheduling sub-batch (ticketmaster, stubhub, eventbrite [sensitive]; yelp, tripadvisor, calendly [safe, read-only-locked]); extend the roster + READ_ONLY_SAFE; regen snapshot; per-wave gates [wave 5] (BRDTH-01/02/03)
-  - [x] 39-06-PLAN.md -- Import the remaining commerce/misc apps (shopify, craigslist, dominos, chipotle [sensitive]; zillow, grafana [safe]) completing coverage of ALL real apps; regen snapshot; per-wave gates [wave 6] (BRDTH-01/02/03)
-  - [x] 39-07-PLAN.md -- Full-corpus coverage report (head/learn-on-visit/DOM-only/dead across ~117 apps) + the END-TO-END payment-write proof on a REAL emitted payment descriptor (place_order -> RECIPE_CONSENT_MUTATING_REQUIRED, posture B) + the full-corpus gate re-assert [wave 7] (BRDTH-01/02/03)
+**Depends on:** Phase 44.
 
-### Phase 39.5: Full OpenTabs Source Import (real ~117-plugin / ~2,374-op catalog) [INSERTED]
-**Goal**: Achieve true OpenTabs parity — replace the hand-authored representative breadth corpus (~53 apps / ~228 descriptors) with the REAL OpenTabs source imported via the proven pipeline. Fetch the pinned-SHA repo tarball, vendor all 117 real plugin metadata slices (no sdk-stub — the real `@opentabs-dev/plugin-sdk` imports cleanly under tsx), run the frozen importer to emit ~2,374 real descriptors, re-screen all ~114 origins, and AUGMENT (preserve the 13 hand-authored-only apps that have no upstream at the SHA). De-risked by FULL-PARITY-SPIKE.md (GO; 117/117 clean dry-run imports).
-**Depends on**: Phase 39 (reuses the frozen screen-then-import pipeline + the payment-op guard + the screen-then-import contract at full scale). Continuation of BRDTH-01/02/03 (no new v1.0.0 REQ-ID owned) — closes the milestone's literal "OpenTabs Parity" goal.
-**Success Criteria** (what must be TRUE):
-  1. The 117 real OpenTabs plugins (119 dirs − 2 CI fixtures) are vendored from the pinned SHA (real `src/**` metadata, no stub) and imported as ~2,374 descriptors (excluding grafana/sqlpad empty-origin + carving `target.apply_promo_code`'s `code` forbidden field); the 40 overlapping hand-authored apps are regenerated from real source; the 13 hand-authored-only apps (amazon/shopify/lyft/ubereats/threads/mastodon/etc.) are PRESERVED (augment, not replace). Coverage report shows realAppCount ≈ 117 real + 13 hand-only.
-  2. STEM_OVERRIDES is extended for all ~40 wrong/colliding-stem apps (6 collision groups incl 4-way `console`) with a CI no-duplicate-stem assertion; 0 colliding `opentabs__<stem>__*` filenames.
-  3. All ~114 origins are denylist-classified before merge (classifyGate fail-closed); linkedin.com + youtube.com classified; commerce/payment brands kept SENSITIVE (conservative — reads under Auto, future writes gated) so NO payment op is safe-and-API-invocable (the payment-op guard passes at full scale).
-  4. The serialized search index + cold-start stay within the SCALE-01 budget (assert index < ~2MB + loadJSON+first-search < ~100ms at the full ~2,374-op corpus); crosscheck + no-dead-entry + eval (recall@5, wrong-invoke=0) + full `npm test` green; Wall 1 holds (no opentabs/sdk runtime shipped); INV-01 IIFE/djb2 shape intact.
-**Plans**: 5 plans (planned from FULL-PARITY-SPIKE.md)
-- [x] 39.5-01-PLAN.md — Fetch the pinned-SHA tarball + vendor the 117 real plugin slices (augment-preserving: 13 hand-only + grafana preserved) + PIN/provenance + the Wave-0 augment guard test [wave 1]
-- [x] 39.5-02-PLAN.md — Extend STEM_OVERRIDES (~40, collision-free) + the no-duplicate-stem CI gate + the target.apply_promo_code carve + the grafana/sqlpad skip [wave 2]
-- [x] 39.5-03-PLAN.md — Re-screen: classify linkedin (sensitive) + youtube (denied) + the conservative commerce reconciliation + the full-corpus classifyGate test [wave 3]
-- [x] 39.5-04-PLAN.md — Run the full import (~2,374 descriptors, augment) + regenerate the catalog + pass the full-scale gates (classifyGate / crosscheck+payment-op / no-dead-entry / no-dup-stem) + update the coverage test [wave 4]
-- [x] 39.5-05-PLAN.md — Full-corpus SCALE assert (index <~2MB, cold-start <~100ms) + coverage close (realAppCount ~130) + full `npm test` green [wave 5]
+**Requirements:** T1R-04, T1R-05, T1R-09.
 
-### Phase 40: Depth 1 — Top READ Hand-Ports
-**Goal**: Upgrade the hot subset already discoverable from breadth by hand-porting the highest-value READ heads as first-class T1a/T1b handlers exactly like the shipped `github.js` — own first-party origin, `executeBoundSpec`-only, scraped tokens never logged — so the most-used reads run on the API fast path instead of DOM. This phase OWNS DEPTH-01 (the hand-port contract + the read heads); Phase 41 owns the guarded-write requirement.
-**Depends on**: Phase 39 (depth upgrades apps that are already discoverable from the completed breadth corpus). Per-app CORS/first-party-origin verification gates any separate-API-origin head (linear is documented-safe). NOTE (planning 40): the vendored source proves linear's GraphQL is a separate origin (client-api.linear.app via CORS) -> deferred to Phase 41's CORS-gate; replaced by gitlab (same-origin gitlab.com/api/v4). Verified same-origin ports this phase: gitlab, slack, notion.
-**Requirements**: DEPTH-01
-**Success Criteria** (what must be TRUE):
-  1. ~8-12 highest-value READ heads (linear.issues.list, jira.search, datadog.query, vercel.deployments, …) ship as T1a/T1b handlers via the `github.js` contract: each targets its app's OWN first-party origin (the separate-origin public API is forbidden — the session cookie does not cross), self-registers via `registerHandler`, is listed in `HEAD_HANDLER_MODULES`, and is loaded via `background.js importScripts`.
-  2. Each hand-port calls `ctx.executeBoundSpec` ONLY (never a browser scripting/tabs API) so the active-tab origin-pin holds, and scraped CSRF/tokens live only inside the bound spec — a test asserts no api-subdomain appears and no token reaches a log line.
-  3. Both front doors hit the registered handlers through the SAME `FsbCapabilityRouter.invoke` (INV-02), and the head-handler tests (origin-separation, no-token-logging) plus router parity stay green; the head cap (~15-30) is enforced by a CI assertion on `HEAD_HANDLER_MODULES`.
-**Plans**: 5 plans (3 waves)
-Plans:
-- [x] 40-01-PLAN.md — Wave 0 test infra: dom->T1a upgrade-assertion harness (slug-exact keystone) + head-cap 4-module/CAP-30 update + per-app test scaffolds + npm-test wiring [wave 1]
-- [x] 40-02-PLAN.md — gitlab NEW module: 5 READ T1a heads on same-origin gitlab.com/api/v4 + HEAD_HANDLER_MODULES 3->4 + background.js importScripts [wave 2]
-- [x] 40-03-PLAN.md — slack EXTEND: 3 READ heads (list_channels/list_members/get_channel_info) via callSlackMethod (xoxc in body, never logged) [wave 2]
-- [x] 40-04-PLAN.md — notion EXTEND: 2 READ heads (search/get_database) via buildRpcSpec same-origin /api/v3 [wave 2]
-- [x] 40-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + INV-01/INV-02/origin-pin/head-cap green + live-UAT debt handoff [wave 3]
+**Success Criteria:**
+1. A handler/recipe port template and generator or checklist exists for same-origin reads, same-origin writes, and separate-origin candidates.
+2. Shared tests can be applied to every new T1 port: origin match, executeBoundSpec-only, no token/log leak, logged-out body rejected, expected shape guard, and router parity.
+3. The fail-closed guarded-write harness is generalized so write/destructive ports cannot accidentally execute before UAT evidence is recorded.
 
-### Phase 41: Depth 2 — Remaining Hand-Ports + Guarded Writes
-**Goal**: Complete the depth head with the remaining hand-ports including WRITE ops, holding writes fail-closed to DOM fallback until a live-captured mutation body confirms them, re-enforcing the DENY-04 mutating opt-in on sensitive origins, and gating any separate-API-origin (Pattern-D) port behind a per-app CORS verification so an unverified port can never silently fail.
-**Depends on**: Phase 40 (continues the `github.js`-shape hand-port mechanism; adds the write + CORS-gate dimension).
-**Requirements**: DEPTH-02
-**Success Criteria** (what must be TRUE):
-  1. The remaining heads (~7-18) ship, and every WRITE op fails closed to `RECIPE_DOM_FALLBACK_PENDING` (the `github.issues.create` pattern) until a live-captured mutation body is confirmed — a guarded write never stamps success for an unverified mutation, and each `[ASSUMED-ENDPOINT]` carries a `human_needed` live-UAT (recorded, not fabricated).
-  2. A WRITE to a sensitive origin honors the DENY-04 per-origin mutating opt-in at the invoke gate (posture B); reads remain fully-open under Auto.
-  3. A per-app CORS / first-party-origin verification gate precedes any separate-API-origin (Pattern-D) port: linear is documented-safe and may port; supabase / cloud-consoles / other UNVERIFIED origins must pass the CORS check or be demoted to T2-learned / T3-DOM.
-  4. The head cap holds, INV-03 typed reasons stay byte-stable across all 7 providers, and the depth tests stay green.
-**Plans**: 5 plans (4 waves)
-Plans:
-- [x] 41-01-PLAN.md — Wave 0: the fail-closed guarded-write harness + the CORS / first-party-origin verification gate (negative-control + wired into validate:extension) + the INV-03 byte-equality extension + the dom->T1a write-slug upgrade assertions [wave 1]
-- [x] 41-02-PLAN.md — gitlab guarded WRITES (create_issue/create_merge_request/create_note) on same-origin gitlab.com, fail-closed [ASSUMED-ENDPOINT] + the live-UAT manifest [wave 2]
-- [x] 41-03-PLAN.md — notion guarded WRITES (create_page/update_page/create_database_item) on same-origin www.notion.so, fail-closed [ASSUMED-ENDPOINT] [wave 2]
-- [x] 41-04-PLAN.md — slack.send_message guarded WRITE (distinct from the executable chat.postMessage) + the SC2 sensitive-origin mutating-opt-in proof through the live roster + UAT consolidation [wave 3]
-- [x] 41-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension (incl the CORS-gate) + INV-01/02/03 + head-cap green + Wall-2 origin-pin UNCHANGED + the Pattern-D deferral recorded [wave 4]
+**Plans:** pending.
 
-### Phase 42: Discovery Seeding + Tail Learn
-**Goal**: Make the non-hand-ported tail invocable predictably by seeding all its origins (+ endpoint hints harvested from OpenTabs `*-api.ts`) so the existing Phase-31 network-capture path learns each origin on the first authenticated visit (consent-gated, promote-after-replay), and prove the capture-time structural redactor leaks no auth substring across the full 119-app field universe.
-**Depends on**: Phase 41 (seeds the residual tail that neither breadth-T3 nor depth-T1a covers with the API fast path). Reuses the Phase-31 discovery machinery unchanged except for reading endpoint hints.
-**Requirements**: DSEED-01, DSEED-02
-**Success Criteria** (what must be TRUE):
-  1. The OpenTabs origins (+ known endpoint hints) seed the Phase-31 network-capture discovery via a `discovery-seeds.json`; `network-capture.js` reads the hints (no manifest/permission change), and a seeded origin is verified to learn a T2 recipe via promote-after-replay (consent-gated) — a hint only biases recognition, never executes, until a real captured + replayed call promotes it.
-  2. A descriptor whose origin has a seed resolves to T2 (learn-pending) and a learned T2 recipe outranks the descriptor-T3 on the next visit, so the hot tail upgrades to the API fast path from the user's own traffic; `RECIPE_LEARN_PENDING` surfaces as an actionable "open the site while logged in to learn it" affordance, not a silent no-op.
-  3. The capture-time structural redactor is extended and verified against the 119-app field universe so no auth substring (Stripe `session_api_key`, Instagram `csrftoken`, Linear `linear-client-id`, token-shape patterns, …) is persisted into any learned-recipe envelope, audit entry, or diagnostic ring at scale — capture reads structure only, never a header value/body/query.
-**Plans**: 5 plans (3 waves)
-Plans:
-- [x] 42-01-PLAN.md — Wave 0: the discovery-seed harvester + discovery-seeds.json (origin->hints, provenance/SHA-pinned) + the seed-load/no-manifest-change keystone test + the 119-app redaction no-leak EXTENSION (DSEED-02 keystone, RED-first) + new-test registration [wave 0]
-- [x] 42-02-PLAN.md — the redactor AUTH_CARRIER_DENYLIST 119-app extension (+ token-shape; turns the keystone GREEN, structure-only preserved) + the network-capture seed loader (lazy/no-throw) + the synthesizer recognition-bias (metadata-only, never executes) [wave 1]
-- [x] 42-03-PLAN.md — the resolve() seed->T2 branch (seeded would-be-T3 -> T2 learn-pending; unseeded stays T3; LEARN-04 learned-first UNCHANGED; INV-01 shape untouched) + seed-resolve-t2 test [wave 1]
-- [x] 42-04-PLAN.md — the RECIPE_LEARN_PENDING actionable affordance (additive reason/actionable/message; INV-03 byte-stable code) + its test [wave 1]
-- [x] 42-05-PLAN.md — Final battery: full npm test EXIT 0 + validate:extension + the no-manifest-change assert + capture/consent/promote core UNCHANGED + INV-01/INV-03 green + the live first-visit human_needed slice (42-HUMAN-UAT.md) [wave 2]
+## Phase 46: Same-Origin Read Ports — First High-Value Batch
 
-### Phase 43: Catalog-Scale + Milestone Gate
-**Goal**: Close the milestone by proving full-corpus performance, hardening self-heal for the now-119-app rot surface, and gating on the full test suite — mirroring the v0.9.99 Phase-32 milestone-gate posture.
-**Depends on**: Phase 42 (full-corpus scale, parity, and provenance close after breadth + depth + discovery are all in).
-**Requirements**: SCALE-01, SCALE-02
-**Success Criteria** (what must be TRUE):
-  1. The search index and catalog stay within budget at ~2,523 descriptors (searchable-text indexed; params schema-on-hit / out-of-band; sharded by service / split into `descriptor-index.generated.js` if the single IIFE parse is too costly), proven by the extended SURF-06 eval harness with size/load-time assertions (serialized index < ~1-2 MB; `loadJSON` + first search < ~50-100 ms on SW wake) and wrong-invoke=0 at full scale.
-  2. Recipe-rot self-heal is hardened for 119-app scale: per-origin re-learn coalescing / back-off (no thundering-herd of CDP attaches when one vendor changes site-wide), recurrence-based systemic-vs-transient classification, and an app-level degraded/needs-re-port surfacing.
-  3. The typed fallback reason stays byte-equal across all 7 providers (INV-03), per-app MIT provenance/attribution is complete, and full `npm test` exits 0 — the milestone gate; INV-01..04 + Walls 1/2 guards all green.
-**Plans**: 4 plans
+**Goal:** Convert a first batch of high-value read descriptors from T3 to executable T1 where the app’s authenticated web runtime uses same-origin APIs and can be proven without weakening Wall 2.
 
-Plans:
-- [x] 43-01-PLAN.md — Wave-0 self-heal test scaffolds (RED-first) + npm-test registration + SCALE-01 scale-gate confirm
-- [x] 43-02-PLAN.md — SCALE-01 precision re-tune: importer synonym data-map enrichment, re-import, flip full-corpus wrong-invoke to a HARD assertion
-- [x] 43-03-PLAN.md — SCALE-02 self-heal impl: per-origin coalescing/back-off scheduler + recurrence counter + degraded accessor (turns 43-01 RED tests green)
-- [x] 43-04-PLAN.md — THE MILESTONE GATE: full npm test EXIT 0 + INV-03/provenance/scale/precision/self-heal sign-off + carried-forward NON-blocking UAT debt
+**Depends on:** Phase 45.
+
+**Requirements:** T1R-06.
+
+**Success Criteria:**
+1. At least 10 additional read descriptors across multiple apps become executable T1/T1b with passing handler tests and live-smoke notes where credentials are available.
+2. Candidate apps are selected from the readiness matrix by same-origin feasibility, user value, and low side-effect risk.
+3. Each new read port preserves existing descriptor metadata and search ranking while flipping backing/status honestly.
+
+**Plans:** pending.
+
+## Phase 47: Pattern-D + GAPI Bridge Architecture
+
+**Goal:** Design and prove the missing architecture for apps whose useful APIs are separate-origin, per-org-subdomain, or page-bridge mediated, without breaking the active-tab credential boundary.
+
+**Depends on:** Phase 45.
+
+**Requirements:** T1R-07, T1R-08.
+
+**Success Criteria:**
+1. A Pattern-D execution design is implemented or explicitly rejected for separate-origin app APIs such as Linear, Datadog/Jira per-org subdomains, Supabase, and cloud consoles.
+2. A Google Workspace GAPI bridge spike determines whether Docs/Drive/Calendar can be handled through `window.gapi.client.request` safely.
+3. Negative-control tests prove unverified cross-origin ports fail closed and cannot bypass origin/consent gates.
+
+**Plans:** pending.
+
+## Phase 48: High-Value Read Ports — Second Batch
+
+**Goal:** Use the Phase 47 outcome to port another batch of read descriptors, including Pattern-D/GAPI candidates if the architecture is proven.
+
+**Depends on:** Phases 46 and 47.
+
+**Requirements:** T1R-06, T1R-07, T1R-08.
+
+**Success Criteria:**
+1. A second batch of read descriptors becomes executable T1/T1b using either same-origin handlers, declarative recipes, Pattern-D, or GAPI bridge paths.
+2. The coverage report shows a measurable increase in apps with at least one executable read path.
+3. Apps still unsuitable for T1 are documented with the reason: denied, ToS-sensitive, auth unavailable, cross-origin unsafe, or live-UAT missing.
+
+**Plans:** pending.
+
+## Phase 49: Guarded Writes Activation Pipeline
+
+**Goal:** Turn fail-closed write/destructive candidates into executable T1 only after live mutation-body capture, consent gate verification, and redacted audit proof.
+
+**Depends on:** Phases 44-48.
+
+**Requirements:** T1R-10, T1R-11.
+
+**Success Criteria:**
+1. Existing fail-closed writes are either activated with live evidence or remain explicitly fail-closed with current reasons.
+2. A reusable live UAT template records method/path/body shape, CSRF/token location, Chrome/extension version, and redacted outcome without storing secrets.
+3. At least one low-risk write activation is completed end-to-end, or the milestone explicitly records why no write met the safety bar.
+
+**Plans:** pending.
+
+## Phase 50: T1 Expansion Gate + Next-Batch Plan
+
+**Goal:** Close the milestone with an honest T1 coverage gate, full regression suite, and a prioritized backlog for the remaining 2,288-descendant tail.
+
+**Depends on:** Phase 49.
+
+**Requirements:** T1R-12.
+
+**Success Criteria:**
+1. Full `npm test` and `npm run validate:extension` pass with the expanded T1 set.
+2. The readiness report is regenerated and checked into the milestone evidence with before/after counts.
+3. The next T1 batch is ranked by value, feasibility, and risk; no “all apps are T1-ready” claim is made unless every relevant descriptor has executable proof.
+
+**Plans:** pending.
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 35 → 36 → 37 → 38 → 39 → 40 → 41 → 42 → 43 (decimal insertions, if any, run between their surrounding integers). Denylist-first (35) and pipeline-before-content (36) are hard ordering constraints — no breadth batch merges before its origins are denylist-classified.
-
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 35. Denylist Expansion + Import-Time Classification Gate | 4/4 | Complete    | 2026-06-24 |
-| 36. Codegen Pipeline + No-Dead-Entry Resolution | 4/4 | Complete    | 2026-06-24 |
-| 37. Breadth A — Dev / Productivity | 4/4 | Complete    | 2026-06-25 |
-| 38. Breadth B — Comms / Social / Content | 3/3 | Complete    | 2026-06-25 |
-| 39. Breadth C — Commerce / Travel / Misc | 7/7 | Complete    | 2026-06-25 |
-| 39.5 Full OpenTabs Source Import (real ~117-plugin / ~2,306-op) [INSERTED] | 5/5 | Complete    | 2026-06-26 |
-| 40. Depth 1 — Top READ Hand-Ports | 5/5 | Complete   | 2026-06-26 |
-| 41. Depth 2 — Remaining Hand-Ports + Guarded Writes | 5/5 | Complete   | 2026-06-26 |
-| 42. Discovery Seeding + Tail Learn | 5/5 | Complete   | 2026-06-26 |
-| 43. Catalog-Scale + Milestone Gate | 4/4 | Complete   | 2026-06-26 |
+| 44. T1 Readiness Inventory + Status Surface | 0/? | Not started | — |
+| 45. T1 Porting Scaffold + Handler Contract Hardening | 0/? | Not started | — |
+| 46. Same-Origin Read Ports — First High-Value Batch | 0/? | Not started | — |
+| 47. Pattern-D + GAPI Bridge Architecture | 0/? | Not started | — |
+| 48. High-Value Read Ports — Second Batch | 0/? | Not started | — |
+| 49. Guarded Writes Activation Pipeline | 0/? | Not started | — |
+| 50. T1 Expansion Gate + Next-Batch Plan | 0/? | Not started | — |
 
 ## Completed Milestones
+
+<details>
+<summary>v1.0.0 Full App Catalog (OpenTabs Parity) — Phases 35-43, SHIPPED 2026-06-29</summary>
+
+Archive files:
+
+- `.planning/milestones/v1.0.0-ROADMAP.md`
+- `.planning/milestones/v1.0.0-REQUIREMENTS.md`
+- `.planning/milestones/v1.0.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v1.0.0-phases/`
+
+Outcome: full OpenTabs-derived catalog/search/discovery surface shipped with 2,314 descriptors across 128 app stems / 129 services. The milestone deliberately fed the existing tier model rather than hand-porting every action: 26 descriptors resolve to T1/T1b today, 5 guarded writes remain fail-closed, and 2,288 descriptors remain T3 DOM/discovery-tail. Full milestone audit passed; non-blocking live UAT and T1 expansion debt are carried forward.
+
+</details>
+
+
 
 <details>
 <summary>v0.9.99 Native Capability Catalog (FSB API Execution) — Phases 26-34, CODE-COMPLETE 2026-06-23</summary>

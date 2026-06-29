@@ -1,100 +1,78 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0.0
-milestone_name: Full App Catalog (OpenTabs Parity)
-status: milestone_gate_met
-stopped_at: "Phase 43 (Catalog-Scale + Milestone Gate, SCALE-01/02) COMPLETE + verified PASS (gsd-verifier 3/3 SC; 43-VERIFICATION.md) -- the FINAL v1.0.0 phase. THE v1.0.0 MILESTONE GATE IS MET: full npm test EXIT 0 in the REAL working tree (authoritative; 142 suites all 0 failed). SCALE-01: the full-corpus scale is on budget (index 1.372MB<2MB, cold-start ~11ms<100ms, 621.7B/descriptor flat, 2314 descriptors -- full-corpus-scale.test.js the authoritative gate) AND the search-precision re-tune (DEF-39.5-04-A) drove the 190-fixture SURF-06 eval wrong-invoke 0.079->0.000 HARD (recall@5=1.000) via robust importer DATA-MAP enrichment (NOUN/verb classes + app-alias + over-claim guard; importer CORE byte-untouched, seed re-emitted by the frozen machinery). HONEST FRAMING (HI-02 fix): the 190-fixture wrong-invoke=0 is a HARD REGRESSION PIN; the breadth corpus-tier (~0.526) is a RECORDED open adversarial frontier (future work), NOT claimed fully general. SCALE-02: recipe-rot self-heal hardened + GENUINELY WIRED (HI-01 fix -- proven non-vacuous): capability-router._quarantineAndRelearn routes the consent-gated re-learn THROUGH FsbRelearnScheduler.scheduleRelearn (per-origin coalescing/back-off, no thundering-herd) + recordRot (recurrence systemic>=3 vs transient) + getOriginHealth (degraded surfacing); relearn-scheduler.js off the recipe-path allowlist (Wall-1); ADDITIVE (consent gate / executeBoundSpec / tier dispatch / classifyRecipeBroken / cap-LRU-quarantine UNCHANGED). INV-03 typed reason byte-equal across all 7 providers (provider-parity distinct=1); per-app MIT provenance complete (127 apps + SHA); INV-01..04 + Walls 1/2 all green (validate:extension EXIT 0). Code review 0C/2H/2M/2L all fixed. NON-blocking milestone debt for the audit: W-1 (getOriginHealth has no production consumer yet -- the status-accessor form is satisfied; a UI reader is post-milestone), the carried-forward live UAT (41/42-HUMAN-UAT.md, fail-closed/inert). NEXT: the v1.0.0 milestone lifecycle -- audit -> complete -> cleanup."
-last_updated: "2026-06-26"
-last_activity: 2026-06-26
+milestone: v1.1.0
+milestone_name: T1 App Execution Expansion
+status: defining_requirements
+stopped_at: "v1.0.0 archived; v1.1.0 T1 App Execution Expansion started. Next step: plan Phase 44 (T1 Readiness Inventory + Status Surface)."
+last_updated: "2026-06-29"
+last_activity: 2026-06-29
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 47
-  completed_plans: 47
-  percent: 100
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v1.0.0 Full App Catalog milestone framing + INV-01..04 + Walls 1/2)
-See: .planning/ROADMAP.md (active milestone v1.0.0, Phases 35-43; v0.9.99 Phases 26-34 code-complete)
-See: .planning/REQUIREMENTS.md (17 v1.0.0 requirements: DENY/CGEN/BRDTH/DEPTH/DSEED/SCALE; 17/17 mapped, 0 orphaned)
-See: .planning/research/SUMMARY.md (decision-ready synthesis; the convergent denylist-first 9-phase spine)
-See: .planning/research/ARCHITECTURE.md (real file-path integration map + the 9-phase decomposition)
-See: .planning/MILESTONES.md (prior milestones; v0.9.99 ended at Phase 34, plus side Phase 999.1)
+See: .planning/PROJECT.md (v1.1.0 T1 App Execution Expansion framing + v1.0.0 shipped baseline)
+See: .planning/ROADMAP.md (active milestone v1.1.0, Phases 44-50)
+See: .planning/REQUIREMENTS.md (12 v1.1.0 requirements: T1R-01..12)
+See: .planning/milestones/v1.0.0-ROADMAP.md and .planning/milestones/v1.0.0-REQUIREMENTS.md (archived Full App Catalog milestone)
+See: .planning/milestones/v1.0.0-MILESTONE-AUDIT.md (audit passed; non-blocking T1/live-UAT debt recorded)
 
-**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.0.0 scales the v0.9.99 capability path from a 4-service head to the full ~119-app OpenTabs surface by FEEDING THE EXISTING TIERS (breadth = closed-vocab descriptors as data; depth = hand-ported handlers; tail = seeded discovery + DOM fallback).
-**Current focus:** v1.0.0 milestone lifecycle — audit → complete → cleanup (all 10 phases done; the milestone gate is MET)
+**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.1.0 focuses on turning the v1.0.0 catalog tail into verified direct T1 execution where safe and technically provable.
+**Current focus:** v1.1.0 milestone planning -- start with Phase 44 T1 readiness inventory and status-surface correction.
 
 ## Current Position
 
-Phase: 43 (Catalog-Scale + Milestone Gate) — COMPLETE (the FINAL v1.0.0 phase; all 4 plans done)
-Plan: 4 of 4 complete (43-01 RED scaffolds + scale-gate; 43-02 precision 190-fixture eval wrong-invoke 0.079->0.000 HARD [a regression PIN over that set -- NOT fully-general; the breadth corpus-tier is a RECORDED open frontier, 43-REVIEW HI-02 corrected the overclaim + generalized the named bsky/linear-bug cases]; 43-03 SCALE-02 self-heal -- now WIRED into the live rot path [43-REVIEW HI-01: capability-router routes the re-learn through the coalescing/back-off scheduler + recordRot; 3 unit tests + 1 live-path wiring test GREEN]; 43-04 THE MILESTONE GATE -- full npm test EXIT 0)
-Status: Phase 43 COMPLETE + verified PASS (gsd-verifier 3/3 SC; 43-VERIFICATION.md) — v1.0.0 MILESTONE GATE MET (full npm test EXIT 0 in the real tree, authoritative); ready for the milestone lifecycle (audit -> complete -> cleanup)
-Last activity: 2026-06-26
+Phase: 44 (T1 Readiness Inventory + Status Surface) -- NOT STARTED
+Plan: --
+Status: Defining requirements / ready to plan Phase 44
+Last activity: 2026-06-29 -- archived v1.0.0 and opened v1.1.0 T1 App Execution Expansion
 
-Progress: [██████████] 100%
+Progress: [----------] 0%
 
-## Roadmap At A Glance (v1.0.0, Phases 35-43)
+## Roadmap At A Glance (v1.1.0, Phases 44-50)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 35 | Denylist Expansion + Import-Time Classification Gate (LANDS FIRST) | DENY-01..04 (4) | ✓ Complete (2026-06-24) |
-| 36 | Codegen Pipeline + No-Dead-Entry Resolution | CGEN-01..04 (4) | ✓ Complete (2026-06-24) |
-| 37 | Breadth A — Dev / Productivity (least-sensitive) | BRDTH-01..03 (3) | ✓ Complete (2026-06-25) |
-| 38 | Breadth B — Comms / Social / Content (sensitivity-screened) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
-| 39 | Breadth C — Commerce / Travel / Misc (most-sensitive) | (continues BRDTH-01..03) | ✓ Complete (2026-06-25) |
-| 39.5 | Full OpenTabs Source Import (real ~117-plugin / ~2,374-op) [INSERTED] | (continues BRDTH-01..03; closes parity) | ✓ Complete (2026-06-26) |
-| 40 | Depth 1 — Top READ Hand-Ports | DEPTH-01 (1) | ✓ Complete (2026-06-26) |
-| 41 | Depth 2 — Remaining Hand-Ports + Guarded Writes | DEPTH-02 (1) | ✓ Complete (2026-06-26) |
-| 42 | Discovery Seeding + Tail Learn | DSEED-01..02 (2) | ✓ Complete (2026-06-26) |
-| 43 | Catalog-Scale + Milestone Gate | SCALE-01..02 (2) | ✓ Complete (2026-06-26) |
+| 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Not started |
+| 45 | T1 Porting Scaffold + Handler Contract Hardening | T1R-04/05/09 | Not started |
+| 46 | Same-Origin Read Ports -- First High-Value Batch | T1R-06 | Not started |
+| 47 | Pattern-D + GAPI Bridge Architecture | T1R-07/08 | Not started |
+| 48 | High-Value Read Ports -- Second Batch | T1R-06/07/08 | Not started |
+| 49 | Guarded Writes Activation Pipeline | T1R-10/11 | Not started |
+| 50 | T1 Expansion Gate + Next-Batch Plan | T1R-12 | Not started |
 
-Coverage: 17/17 v1.0.0 requirements mapped, 0 orphaned. BRDTH-01/02/03 owned by Phase 37; Phases 38-39 are sensitivity-ascending continuation batches of the same contract.
+Coverage: 12/12 v1.1.0 requirements mapped, 0 orphaned.
 
-Ordering principle (all four researchers converge — do not reorder): **denylist before reach** (35 strictly first; under opt-out Auto the denylist is the ONE hard floor; the import-time gate makes the ordering a CI failure, not a hope) → **pipeline before content** (36's no-dead-entry resolve() branch + cross-check + full-scale search proof before 2,523 descriptors land) → **breadth before depth** least-sensitive → most-sensitive (37-39, each batch gated on denylist coverage) → **discovery after breadth + depth** (42 seeds the residual tail) → **scale gate last** (43).
+## v1.0.0 Shipped Baseline
 
-## Hard Invariants (bind every phase — carried from v0.9.99)
+- Catalog/search support: 2,314 descriptors across 128 app stems / 129 services.
+- Direct T1/T1b today: 26 descriptors across GitHub, GitLab, Notion, Reddit, and Slack.
+- Actually executable/recipe-backed today: 21 descriptors.
+- T1 fail-closed guarded writes today: 5 descriptors.
+- Remaining T3 DOM/discovery-tail: 2,288 descriptors (1,614 read, 508 write, 166 destructive).
+- App stems with no direct T1 path: 123.
 
-- **INV-01:** existing ~63 MCP tool schemas stay byte-identical; the 2 capability tools stay OUTSIDE `TOOL_REGISTRY`. Breadth adds DATA + depth adds handlers behind the SAME 2 tools — no new MCP tool; the frozen non-trigger registry hash stays unmoved.
-- **INV-02:** both front doors (MCP dispatcher + autopilot `tool-executor`) call the SAME `FsbCapabilityRouter.invoke`; hand-ports register into the SAME catalog. No autopilot-only path.
-- **INV-03:** typed reasons (`RECIPE_DOM_FALLBACK_PENDING`, `RECIPE_LEARN_PENDING`, `RECIPE_CONSENT_BLOCKED`) byte-equal across all 7 `universal-provider.js` targets.
-- **INV-04:** the `agent-loop.js` `setTimeout` iterator is load-bearing and untouched; invoke is a single bounded async op; codegen is build-time only.
+## Hard Invariants
 
-## Architectural Walls (non-negotiable, shape every phase)
-
-- **Wall 1 (MV3 no remotely-hosted code):** descriptors are closed-vocab DATA; the importer NEVER emits a forbidden field name (script/expr/transform/code/fn/js); `verify-recipe-path-guard.mjs` stays green. OpenTabs is import-time metadata only — its `dist/`/`handle()` runtime is never shipped.
-- **Wall 2 (execution context):** every credentialed call goes through `capability-fetch.js executeBoundSpec` in the page MAIN world with the active-tab origin-pin; hand-ports are `executeBoundSpec`-only; CDP capture stays discovery-only.
-
-## v0.9.99 Substrate (FIXED — integrate with, do not redesign)
-
-Tiers T0/T1a/T1b/T2-learned/T3-DOM; the closed-vocab interpreter; the consent gate (opt-out Auto default, denylist = the ONE hard floor); the 2 out-of-`TOOL_REGISTRY` MCP tools. Real integration seams (read live on branch `automation`): `capability-catalog.js resolve()`/`REGISTRY`/`HEAD_HANDLER_MODULES`/`seedHeadHandlers`/`registerHandler`; `capability-router.js invoke()`/`_evaluateConsent`/tier dispatch; `capability-search.js buildIndex`/`catalogVersion`; `scripts/package-extension.mjs readJsonDir` + the generated `recipe-index.generated.js` IIFE; `catalog/handlers/github.js` (T1a hand-port shape); `extension/config/service-denylist.json` + `service-denylist.js` loader; `network-capture.js` discovery path; `verify-recipe-path-guard.mjs` Wall-1 guard.
-
-## Top Risks (from research — bake into phase planning)
-
-- **Security-ordering trap (THE HEADLINE, Phase 35):** opt-out Auto makes finance/health/social apps writable the moment their descriptor lands; six finance apps (stripe, coinbase, robinhood, fidelity, carta, ynab) are absent from the current 4-origin denylist; a gap in the JSON array is indistinguishable from an allow decision. Fix: denylist expansion + import-time classification gate lands FIRST; no descriptor-import phase merges until that gate is green.
-- **Discoverable-but-uninvocable dead descriptors (Phase 36):** `resolve()` returns null for any non-REGISTRY slug, but search indexes ALL descriptors → ~2,523 searchable-but-uninvocable entries without a single `resolve()` fallback branch mapping descriptor-only → T3/T2. The load-bearing code change.
-- **Side-effect mis-classification at scale (Phase 36):** GraphQL/RPC mutations tunnel through POST → "class by HTTP method" mis-labels destructive ops as read → fully writable with no friction. Fix: verb-map + GraphQL/RPC carve-out + fail-safe-high (disagreement → write); recipe-wins runtime cross-check; sample-test `void_invoice`/`delete_customer`.
-- **Cloning the imperative model → head sprawl → MV3 ban (Phases 36-41):** breadth = descriptors-only (data); cap the head at ~15-30 with a CI assertion on `HEAD_HANDLER_MODULES`; the tail is learned, never streamed-as-code.
-- **One-size codegen vs per-app auth diversity (Phases 36, 42):** bespoke auth onto the 4-member enum compiles but is wrong → 200-with-logged-out-body that looks like success under Auto. Fix: decouple discoverable from invocable; never auto-mint a recipe from guessed auth; bespoke auth is head-only or learn-only (observe-then-replay-clean before promotion).
-- **Token leakage across 119 bespoke auth shapes (Phase 42):** structural capture-time redaction (never reads a value) + a no-leak test extended to the full 119-app field universe + token-shape patterns.
-- **Search precision + SW cold-start at ~2,523 docs (Phases 36, 43):** rich intentSynonyms (>=3-4/op) + owned-origin bias + a full-scale eval-harness re-run (wrong-invoke=0); index searchable-text-only + schema-on-hit + deferred hydration + a CI cold-start benchmark.
-- **Recipe-rot thundering-herd at 119-app scale (Phase 43):** per-origin re-learn coalescing + back-off + recurrence-based systemic-vs-transient + app-level degraded surfacing.
-- **ToS/legal exposure (Phases 35, 38):** a ToS-hostility axis distinct from finance sensitivity → DOM-only or denylist for social/adult/messaging; `docs/LEGAL.md` names the axis.
-
-## Research Flags (phases likely needing a `--research-phase` spike at plan time)
-
-- **Phase 36:** the zod→closed-`params` flattening edge cases (`z.union`→permissive `anyOf`, `z.record`/`z.enum`) + the forbidden-field-name pre-scan interaction (fixture-backed pass); the side-effect verb-map + GraphQL/RPC carve-out (destructive-op sample as acceptance test); the full-scale eval-harness fixture (cross-app near neighbors) + the SW cold-start budget (concrete numbers).
-- **Phases 40-41 (per-app):** each Pattern-D/E port needs a per-app CORS / first-party-origin verification before commitment — linear is documented-safe; supabase, mongodb-atlas, circleci, and any cloud-console are UNVERIFIED; gapi-bridge (google-calendar) is a distinct handler shape (deferred to v2 GAPI-01). Live-capture UAT for guarded writes is human_needed.
-- **Phase 42:** structural-redaction completeness against 119 unknown auth field shapes; promote-after-replay behavior with seeded hints.
+- Keep the two-tool capability surface: `search_capabilities` and `invoke_capability`.
+- Preserve MV3 Wall 1: descriptors/recipes are data; no OpenTabs runtime/plugin code ships.
+- Preserve Wall 2 or extend it only through a verified Pattern-D design with negative controls.
+- Writes/destructive actions stay fail-closed until live mutation-body UAT and consent/audit checks pass.
+- Denylist and sensitive-origin behavior remain security gates, not coverage metrics to game.
+- Search/status copy must distinguish T1-ready from DOM/discovery-pending.
 
 ## Accumulated Context
 
 ### Decisions
 
-Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..04 + Walls 1/2). One v1.0.0 posture decision was surfaced by research and RESOLVED in requirements: **DENY-04 (posture B)** — sensitive-classified origins re-enforce the per-origin mutating opt-in at the invoke gate (reads run under Auto everywhere; a WRITE to a sensitive origin requires the per-origin mutating flag; non-sensitive stays fully-open). This re-scopes the friction removed in v0.9.99 Phase 30 to sensitive origins only; the denylist still covers the catastrophic worst.
+Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..04 + Walls 1/2). One v1.0.0 posture decision was surfaced by research as **DENY-04 (posture B)**, then superseded by the final consent patch: capability invoke is fully open for non-denied origins, sensitive origins are flagged/audited rather than forced to Ask, and the extra sensitive-origin confirmation is scoped to network-capture discovery. The denylist remains the hard block.
 
 - [Phase ?]: Phase 35-01 (DENY-01/02): IG/FB/TikTok/X classified sensitive-not-denied (reads under Auto, writes mutating-gated by posture B Plan 35-03); fully-denied reserved for brokerage + ToS-hostile media. Exact-host forms (music.youtube.com NOT *.youtube.com; dashboard.stripe.com NOT api.stripe.com) avoid over-broadening.
 - [Phase 35]: Phase 35-04: catalog-side provenance scaffold placed under catalog/descriptors/_fixtures/ (not top-level descriptors/) because the non-recursive readJsonDir inlines every top-level descriptors/*.json into the shipped recipe-index.generated.js; _fixtures/ is excluded (proven via catalog regen showing 8 descriptors + SHA absent + validate-extension green).
@@ -166,7 +144,7 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 | uat_gap | Phase 31 / live discovery UAT | human_needed | v0.9.99 Phase 31 |
 | uat_gap | Phase 32 / 32-HUMAN-UAT.md (UAT-32-01 live self-healing) | human_needed; partial | v0.9.99 Phase 32 |
 | uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | human_needed | v0.9.99 Phase 33 |
-| uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | human_needed | v0.9.99 Phase 34 |
+| uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | partial: UAT-34-02 pass; UAT-34-01 MCP text-file smoke pass, binary/submit checks still human_needed; UAT-34-03/04 still human_needed | v0.9.99 Phase 34 |
 | uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | human_needed/partial | prior closes |
 
 Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0; `clawhub publish "skills/FSB Skill"`; public package publication.

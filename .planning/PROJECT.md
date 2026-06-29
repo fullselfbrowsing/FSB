@@ -10,9 +10,10 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v0.12.0 PhantomStream Package Migration -- completed 2026-06-17. FSB now delegates generic dashboard DOM live-preview capture, renderer, protocol, relay classification, compression, stale-frame, sanitizer, and remote-control frame behavior to the pinned `@full-self-browsing/phantom-stream@0.1.0` package while keeping FSB-specific pairing, task/status traffic, dashboard state, overlay identity, and debugger ownership adapters. Live Chrome-extension UAT remains user-gated and recorded as `human_needed`.
+**Last completed:** v1.0.0 Full App Catalog (OpenTabs Parity) -- milestone gate met and archived 2026-06-29. FSB now has a full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services, with T1/T1b direct execution for selected heads and the remaining catalog tail routed through DOM/discovery/learn tiers.
 
 **Recent shipping cadence:**
+- v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 - v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
 - v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
 - v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
@@ -31,23 +32,28 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone: v1.0.0 Full App Catalog (OpenTabs Parity)
+## Current Milestone: v1.1.0 T1 App Execution Expansion
 
-**Goal:** Take FSB's capability catalog from the 4-service bundled head to the full ~119-app OpenTabs surface -- every app discoverable via `search_capabilities` and invocable through the existing tiers -- adding a hand-ported depth tier, an expanded service denylist, and seeded discovery, all WITHOUT violating MV3 Wall 1 (recipes stay closed-vocabulary data, never shipped code).
+**Goal:** Convert the v1.0.0 catalog tail from search/discovery support toward verified direct T1 execution through `invoke_capability`, starting with the readiness matrix, shared porting scaffold, same-origin read batches, Pattern-D/GAPI bridge decisions, and guarded-write activation workflow.
 
 **Target features:**
-- **Breadth -- descriptor import (all 119 apps).** Codegen FSB catalog descriptors (slug, service, intent synonyms, action verb, side-effect class, params JSON-Schema) from OpenTabs' MIT plugin manifests so every app returns from `search_capabilities`. Scale the build-time generator (`scripts/package-extension.mjs` -> `recipe-index.generated.js`) from ~10 to thousands of descriptors with a stable `catalogVersion`.
-- **Depth -- bundled-head expansion (~15-30 top apps).** Hand-port the highest-value apps (linear, jira, vercel, datadog, stripe, ...) as first-class T1a/T1b handlers exactly like github/slack/notion: own first-party origin, `executeBoundSpec`-only, scraped tokens never logged.
-- **Denylist expansion (lands FIRST).** Before any finance/health/social app is reachable under the shipped opt-out Auto default (v0.9.99 Phase 30), grow `extension/config/service-denylist.json` deniedOrigins + sensitiveOrigins to cover banking/payments/health and ToS-hostile categories across the imported set.
-- **Discovery seeding/hardening.** Seed the 119 origins + known endpoint hints so the Phase 31 network-capture discovery path reliably learns the tail that is not hand-ported, consent-gated.
-- **Catalog-scale + provenance.** Per-app descriptor provenance/attribution (MIT), the descriptor-vs-recipe side-effect cross-check at scale, and a search index that stays performant at thousands of descriptors.
+- **T1 readiness inventory.** Generate the authoritative per-descriptor matrix over all 2,314 descriptors: current tier/backing, side-effect class, origin/auth feasibility, same-origin vs separate-origin route, and next action.
+- **Status honesty.** Make `search_capabilities`, docs, and UI copy distinguish T1-ready, fail-closed, learn-pending, and DOM/discovery-pending states so catalog support is never mistaken for direct API execution.
+- **Porting scaffold.** Standardize T1 handler/recipe verification: origin-pin, `executeBoundSpec`-only calls, logged-out/body shape guards, no-secret logging, consent behavior, and router parity.
+- **Read-first T1 expansion.** Port high-value read descriptors first, prioritizing same-origin web runtimes and low side-effect risk.
+- **Pattern-D/GAPI bridge work.** Decide and prove the missing architecture for separate-origin/per-org-subdomain APIs and Google Workspace `window.gapi.client.request` handlers.
+- **Guarded writes.** Activate writes/destructive handlers only after live mutation-body UAT and redacted audit evidence; otherwise keep them fail-closed.
 
 **Key context:**
-- Extends v0.9.99's architecture verbatim: closed-vocabulary recipes = DATA bound by the fixed interpreter (Wall 1); authenticated fetch in the page MAIN world (Wall 2); tiers T0/T1a/T1b/T2-learned/T3-DOM. Carries INV-01..04 (MCP wire contracts byte-stable, tool-surface parity, 7-provider parity, MV3 iterator untouched).
-- Honors the v0.9.99 strategy rather than overturning it: "port + learn, do NOT clone OpenTabs' npm-per-plugin model." Breadth = descriptor import + tiered backing (NOT 2,523 hand-written code handlers); depth = a curated head; tail = learned discovery.
-- Source: `github.com/opentabs-dev/opentabs` (MIT, 119 plugins / 2,523 ops); attribution already in README Acknowledgements.
-- Phases continue from v0.9.99's Phase 34 -> start at Phase 35, batched by category. Denylist expansion is sequenced before any sensitive app becomes reachable.
-- v0.9.99 carries forward its human_needed live-browser UAT debt (UAT-27/29/30/31/32-01); v1.0.0 does not block on it.
+- v1.0.0 shipped the catalog scale, not all-app direct execution: 26 descriptors resolve to T1/T1b today; 2,288 descriptors remain T3 DOM/discovery-tail.
+- T1 expansion is not allowed to weaken MV3 Wall 1, Wall 2, the denylist, sensitive-origin policy, or the two-tool capability surface.
+- The new milestone starts at Phase 44 and continues numbering from the completed v1.0.0 roadmap.
+
+## Last Milestone: v1.0.0 Full App Catalog (OpenTabs Parity)
+
+**Status:** Archived on 2026-06-29. Audit passed; automated milestone gate met. Archive files live under `.planning/milestones/v1.0.0-*`.
+
+**Outcome:** FSB imported the full allowed OpenTabs-derived catalog surface into existing capability tiers: 2,314 descriptors across 128 app stems / 129 services, with side-effect classification, backing-status annotation, denylist/sensitive-origin gating, discovery seeding, scale gates, and selected T1 heads. The milestone deliberately did not hand-port every descriptor; that T1 expansion debt is now the explicit v1.1.0 milestone.
 
 ## Last Milestone: v0.9.99 Native Capability Catalog (FSB API Execution)
 
@@ -411,7 +417,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.0.0 Full App Catalog (OpenTabs Parity) -- requirements + roadmap being defined; phases continue from v0.9.99's Phase 34 -> start at Phase 35, batched by category. v0.9.99 Native Capability Catalog is code-complete (full npm test EXIT 0; Phases 26-34); its live-browser UAT debt and Phase 999.1 carry forward. v1.0.0 requirement REQ-IDs are populated below by the roadmapper.)
+(Milestone v1.1.0 T1 App Execution Expansion -- requirements and roadmap defined on 2026-06-29; phases continue from v1.0.0's Phase 43 -> start at Phase 44. v1.0.0 Full App Catalog is archived with 2,314 searchable descriptors, 26 T1/T1b descriptors, and 2,288 DOM/discovery-tail descriptors carried forward as explicit T1 expansion work.)
 
 ### Validated (v0.9.99)
 
@@ -676,4 +682,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-23 -- v1.0.0 Full App Catalog (OpenTabs Parity) milestone started; PROJECT.md + STATE.md switched, requirements + roadmap in progress (research-first). v0.9.99 Native Capability Catalog is code-complete (full npm test EXIT 0; Phases 26-34); live-browser UAT debt (UAT-27/29/30/31/32-01) + Phase 999.1 carried forward. Phases continue at 35.*
+*Last updated: 2026-06-29 -- v1.0.0 Full App Catalog archived; v1.1.0 T1 App Execution Expansion started. Phases continue at 44.*
