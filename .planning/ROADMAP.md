@@ -31,6 +31,8 @@
 
 ## Phase 44: T1 Readiness Inventory + Status Surface
 
+- [x] Phase 44: T1 Readiness Inventory + Status Surface (completed 2026-06-29)
+
 **Goal:** Create the authoritative T1 readiness matrix for all 2,314 descriptors and make status visible to developers and users so “catalog supported” is never confused with “direct API-ready.”
 
 **Depends on:** v1.0.0 archive.
@@ -43,9 +45,9 @@
 3. CI fails if a descriptor is marked T1-ready without a registered handler/recipe plus tests.
 
 **Plans:**
-- [ ] 44-01: T1 readiness matrix generator and evidence report.
-- [ ] 44-02: Status-surface and documentation honesty pass.
-- [ ] 44-03: T1 readiness CI guard and phase closeout.
+- [x] 44-01: T1 readiness matrix generator and evidence report.
+- [x] 44-02: Status-surface and documentation honesty pass.
+- [x] 44-03: T1 readiness CI guard and phase closeout.
 
 ## Phase 45: T1 Porting Scaffold + Handler Contract Hardening
 
@@ -141,7 +143,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 44. T1 Readiness Inventory + Status Surface | 0/? | Not started | — |
+| 44. T1 Readiness Inventory + Status Surface | 3/3 | Complete | 2026-06-29 |
 | 45. T1 Porting Scaffold + Handler Contract Hardening | 0/? | Not started | — |
 | 46. Same-Origin Read Ports — First High-Value Batch | 0/? | Not started | — |
 | 47. Pattern-D + GAPI Bridge Architecture | 0/? | Not started | — |

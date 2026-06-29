@@ -5,22 +5,25 @@
  * invocability-annotation proof.
  *
  * The breadth contract requires search_capabilities to annotate each hit by its
- * backing-status so a user/agent distinguishes a day-one-invocable app (a bundled
- * recipe or a registered handler) from a discovery-pending one (a DOM/learn-backed
- * descriptor with no recipe yet). T-37-02: a pending-only descriptor must NEVER be
+ * backing/readiness status so a user/agent distinguishes a day-one-invocable app
+ * (a bundled recipe or a registered handler) from a guarded fail-closed write and a
+ * discovery-pending descriptor. T-37-02: a pending-only descriptor must NEVER be
  * surfaced as a confident invocable hit.
  *
  * The annotation fields were added to extension/utils/capability-search.js:
  *   - backing       -- the canonical seam enum (recipe/handler/learn/dom)
- *   - backingStatus -- the DISPLAY label (handler/recipe carry the enum; dom ->
- *                      'discovery-pending'; learn -> 'learn-pending')
- *   - invocable     -- a boolean, true IFF backing is 'handler' or 'recipe'
+ *   - backingStatus/readinessStatus -- the DISPLAY label (`t1-ready`,
+ *                      `t1-guarded-fail-closed`, `discovery-pending`,
+ *                      `learn-pending`)
+ *   - invocable     -- a boolean, true IFF readinessStatus is `t1-ready`
  *
  * Proof: plant the MiniSearch UMD constructor + a FsbRecipeIndex catalog carrying a
  * backing:'handler' descriptor (a github head slug) and a backing:'dom' descriptor
  * (an opentabs__ slug), require capability-search.js, buildOrRestore(), then assert:
- *   - the handler-backed hit -> invocable === true, backing === 'handler',
- *     backingStatus === 'handler' (a confident invocable hit).
+ *   - the handler-backed read hit -> invocable === true, backing === 'handler',
+ *     readinessStatus === 't1-ready' (a confident invocable hit).
+ *   - the guarded handler write hit -> invocable === false, backing === 'handler',
+ *     readinessStatus === 't1-guarded-fail-closed'.
  *   - the dom-backed hit RETURNS from search (discoverable) but -> invocable ===
  *     false, backing === 'dom', backingStatus === 'discovery-pending' (returned but
  *     NOT a confident invocable hit).
@@ -47,7 +50,7 @@ const MiniSearch = require(path.join(REPO_ROOT, 'extension', 'lib', 'minisearch.
 global.MiniSearch = MiniSearch;
 
 // ---- Two contrasting descriptors: a handler head + a dom-backed opentabs slug
-// HANDLER (a github head, day-one invocable -> a confident invocable hit).
+// HANDLER read (a github head, day-one invocable -> a confident invocable hit).
 const HANDLER_DESCRIPTOR = {
   slug: 'github.issues.list',
   service: 'github.com',
@@ -59,6 +62,21 @@ const HANDLER_DESCRIPTOR = {
   description: 'List your assigned GitHub issues (T1a persisted-query handler, read)',
   actionVerb: 'list',
   sideEffectClass: 'read',
+  backing: 'handler'
+};
+
+// GUARDED HANDLER write (a registered head slug, but fail-closed until UAT).
+const GUARDED_DESCRIPTOR = {
+  slug: 'github.issues.create',
+  service: 'github.com',
+  intentSynonyms: [
+    'create a github issue',
+    'open a new github issue',
+    'file a github issue'
+  ],
+  description: 'Create a new GitHub issue (guarded fail-closed write)',
+  actionVerb: 'create',
+  sideEffectClass: 'write',
   backing: 'handler'
 };
 
@@ -81,7 +99,7 @@ const DOM_DESCRIPTOR = {
 // Plant the build-time catalog the module reads. NO recipes -> neither slug is
 // recipe-backed, so each descriptor's OWN backing enum drives the annotation (a
 // paired recipe would override to 'recipe' -- intentionally absent here).
-global.FsbRecipeIndex = { descriptors: [HANDLER_DESCRIPTOR, DOM_DESCRIPTOR], recipes: [] };
+global.FsbRecipeIndex = { descriptors: [HANDLER_DESCRIPTOR, GUARDED_DESCRIPTOR, DOM_DESCRIPTOR], recipes: [] };
 
 const CapabilitySearch = require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-search.js'));
 const { search, buildOrRestore } = CapabilitySearch;
@@ -100,8 +118,23 @@ const { search, buildOrRestore } = CapabilitySearch;
     "the handler-backed hit is a CONFIDENT invocable hit (invocable === true)");
   check(handlerHit && handlerHit.backing === 'handler',
     "the handler-backed hit carries backing === 'handler'");
-  check(handlerHit && handlerHit.backingStatus === 'handler',
-    "the handler-backed hit's backingStatus === 'handler' (no pending label)");
+  check(handlerHit && handlerHit.backingStatus === 't1-ready',
+    "the handler-backed hit's backingStatus === 't1-ready'");
+  check(handlerHit && handlerHit.readinessStatus === 't1-ready',
+    "the handler-backed hit's readinessStatus === 't1-ready'");
+
+  // ---- The guarded handler-backed hit: searchable but NOT invocable yet -----
+  const guardedHits = search('create a github issue', null, 5);
+  const guardedHit = guardedHits.find(function (h) { return h.slug === 'github.issues.create'; });
+  check(!!guardedHit, 'the guarded github write slug returns from search');
+  check(guardedHit && guardedHit.invocable === false,
+    'the guarded write is NOT a confident invocable hit until live mutation-body UAT');
+  check(guardedHit && guardedHit.backing === 'handler',
+    "the guarded write keeps canonical backing === 'handler'");
+  check(guardedHit && guardedHit.backingStatus === 't1-guarded-fail-closed',
+    "the guarded write's backingStatus === 't1-guarded-fail-closed'");
+  check(guardedHit && guardedHit.readinessStatus === 't1-guarded-fail-closed',
+    "the guarded write's readinessStatus === 't1-guarded-fail-closed'");
 
   // ---- The dom-backed hit: RETURNS but is NOT a confident invocable hit ------
   const domHits = search('create a issue in linear', null, 5);
@@ -113,6 +146,8 @@ const { search, buildOrRestore } = CapabilitySearch;
     "the dom-backed hit carries the canonical backing enum 'dom'");
   check(domHit && domHit.backingStatus === 'discovery-pending',
     "the dom-backed hit's backingStatus DISPLAY label === 'discovery-pending'");
+  check(domHit && domHit.readinessStatus === 'discovery-pending',
+    "the dom-backed hit's readinessStatus === 'discovery-pending'");
 
   // ---- The distinction is real: the two annotations differ ------------------
   check(handlerHit && domHit && handlerHit.invocable !== domHit.invocable,

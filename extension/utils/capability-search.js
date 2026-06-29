@@ -103,32 +103,69 @@
     return 'read';
   }
 
-  // ---- BRDTH-03: backing-status enum + the invocable/display annotation ------
+  // ---- BRDTH-03 / Phase 44: readiness status + invocable annotation ----------
   // The CANONICAL backing field value is one of recipe/handler/learn/dom (the value
-  // resolve() in capability-catalog.js routes to a seam tier; 'learn' -> T2, 'dom' ->
-  // T3). A descriptor with no backing defaults to 'dom' (the safe DOM-fallback seam,
-  // matching the resolve() else-branch). 'discovery-pending'/'learn-pending' is the
-  // DISPLAY LABEL only -- never the field value -> no resolve() change.
+  // resolve() in capability-catalog.js routes to a seam tier; 'learn' -> T2, 'dom'
+  // -> T3). A descriptor with no backing defaults to 'dom' (the safe DOM-fallback
+  // seam, matching the resolve() else-branch). readinessStatus/backingStatus are
+  // DISPLAY LABELS only -- never the field value -> no resolve() change.
+  //
+  // Phase 44 adds a narrow status override for the current T1 handler slugs whose
+  // descriptors still carry backing:'dom' from the breadth import. This keeps
+  // search_capabilities honest without changing invoke routing: proven handler/recipe
+  // slugs display t1-ready, known guarded writes display t1-guarded-fail-closed, and
+  // the rest of the catalog tail remains learn-pending or discovery-pending.
+  var T1_READY_SLUGS = {
+    'github.issues.list': true,
+    'github.notifications': true,
+    'reddit.inbox': true,
+    'notion.loadPage': true,
+    'notion.getSpaces': true,
+    'notion.get_database': true,
+    'notion.search': true,
+    'notion.create_page': true,
+    'notion.update_page': true,
+    'notion.create_database': true,
+    'notion.create_database_item': true,
+    'gitlab.list_projects': true,
+    'gitlab.get_project': true,
+    'gitlab.list_issues': true,
+    'gitlab.get_issue': true,
+    'gitlab.list_merge_requests': true,
+    'slack.conversations.list': true,
+    'slack.chat.postMessage': true,
+    'slack.list_channels': true,
+    'slack.list_members': true,
+    'slack.get_channel_info': true
+  };
+  var T1_GUARDED_FAIL_CLOSED_SLUGS = {
+    'github.issues.create': true,
+    'gitlab.create_issue': true,
+    'gitlab.create_merge_request': true,
+    'gitlab.create_note': true,
+    'slack.send_message': true
+  };
+
   function normalizeBacking(value) {
     var b = String(value || '').toLowerCase();
     if (b === 'recipe' || b === 'handler' || b === 'learn' || b === 'dom') { return b; }
     return 'dom'; // absent/unknown -> the DOM-fallback seam (resolve() else -> T3)
   }
-  // A descriptor is a CONFIDENT INVOCABLE hit ONLY when it is backed by a bundled
-  // recipe or a registered handler (day-one invocable). A backing 'learn'/'dom'
-  // descriptor RETURNS from search but is discovery-pending -- never surfaced as a
-  // confident invocable hit (T-37-02: a pending-only descriptor must not look
-  // invocable). The DISPLAY label maps learn -> 'learn-pending', dom -> 'discovery-
-  // pending'; recipe/handler carry no pending label.
-  function isInvocableBacking(backing) {
+  function readinessStatus(slug, backing) {
+    if (T1_GUARDED_FAIL_CLOSED_SLUGS[slug]) { return 't1-guarded-fail-closed'; }
+    if (T1_READY_SLUGS[slug]) { return 't1-ready'; }
     var b = normalizeBacking(backing);
-    return b === 'recipe' || b === 'handler';
-  }
-  function backingDisplayLabel(backing) {
-    var b = normalizeBacking(backing);
+    if (b === 'recipe' || b === 'handler') { return 't1-ready'; }
     if (b === 'learn') { return 'learn-pending'; }
-    if (b === 'dom') { return 'discovery-pending'; }
-    return b; // recipe / handler -> the backing itself (no pending label)
+    return 'discovery-pending';
+  }
+  // A descriptor is a confident invocable hit only when it is t1-ready. Guarded
+  // fail-closed writes are searchable but should not be presented as executable yet.
+  function isInvocableBacking(slug, backing) {
+    return readinessStatus(slug, backing) === 't1-ready';
+  }
+  function backingDisplayLabel(slug, backing) {
+    return readinessStatus(slug, backing);
   }
 
   // ---- Pure index builder (the SINGLE source of truth the eval test reuses) ---
@@ -297,12 +334,12 @@
     return hits.slice(0, k).map(function(h) {
       var recipe = _slugToRecipe[h.slug] || {};
       var descriptor = _slugToDescriptor[h.slug] || {};
-      // BRDTH-03 backing annotation: a recipe/handler-backed hit is a CONFIDENT
-      // invocable hit (invocable:true); a learn/dom-backed hit RETURNS but is
-      // discovery-pending (invocable:false, backingStatus display label) -- never
-      // presented as a confident invocable hit (T-37-02). A hit with a paired recipe
-      // in the slug->recipe map is recipe-backed even if its stored backing differs.
+      // BRDTH-03 / Phase 44 status annotation: a t1-ready hit is confident
+      // invocable; guarded fail-closed, learn, and DOM hits return for discovery
+      // but are not presented as executable. A hit with a paired recipe in the
+      // slug->recipe map is recipe-backed even if its stored backing differs.
       var backing = (_slugToRecipe[h.slug]) ? 'recipe' : normalizeBacking(h.backing);
+      var status = readinessStatus(h.slug, backing);
       return {
         slug: h.slug,
         service: h.service,
@@ -311,8 +348,9 @@
         score: h.score,
         params: recipe.params || descriptor.params || null, // schema-on-hit (D-08)
         backing: backing,                                    // canonical seam enum
-        backingStatus: backingDisplayLabel(backing),         // display label
-        invocable: isInvocableBacking(backing)               // confident-invocable flag
+        backingStatus: status,                               // display label
+        readinessStatus: status,                             // Phase 44 status label
+        invocable: isInvocableBacking(h.slug, backing)       // confident-invocable flag
       };
     });
   }

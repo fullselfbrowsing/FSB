@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: T1 App Execution Expansion
-status: planning
-stopped_at: "Phase 44 planned with three execution plans. Next step: execute 44-01 (T1 readiness matrix generator and evidence report)."
-last_updated: "2026-06-29T20:15:00-05:00"
+status: in_progress
+stopped_at: "Phase 44 complete and verified. Next step: plan Phase 45 (T1 Porting Scaffold + Handler Contract Hardening)."
+last_updated: "2026-06-29T15:38:28-05:00"
 last_activity: 2026-06-29
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 3
+  percent: 14
 ---
 
 # Project State
@@ -25,22 +25,22 @@ See: .planning/milestones/v1.0.0-ROADMAP.md and .planning/milestones/v1.0.0-REQU
 See: .planning/milestones/v1.0.0-MILESTONE-AUDIT.md (audit passed; non-blocking T1/live-UAT debt recorded)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.1.0 focuses on turning the v1.0.0 catalog tail into verified direct T1 execution where safe and technically provable.
-**Current focus:** v1.1.0 milestone execution -- start with Phase 44 Plan 01, the T1 readiness matrix generator and evidence report.
+**Current focus:** v1.1.0 milestone execution -- Phase 44 is complete; next is Phase 45 planning for the reusable T1 porting scaffold and handler contract hardening.
 
 ## Current Position
 
-Phase: 44 (T1 Readiness Inventory + Status Surface) -- PLANNED
-Plan: 44-01 (T1 readiness matrix generator and evidence report) -- READY TO EXECUTE
-Status: Planning complete / ready to execute Phase 44
-Last activity: 2026-06-29 -- planned Phase 44 with 3 execution plans
+Phase: 45 (T1 Porting Scaffold + Handler Contract Hardening) -- NEXT
+Plan: pending
+Status: Phase 44 complete / ready to plan Phase 45
+Last activity: 2026-06-29 -- completed Phase 44 readiness inventory/status surface
 
-Progress: [----------] 0%
+Progress: [#---------] 14%
 
 ## Roadmap At A Glance (v1.1.0, Phases 44-50)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Planned; 3 plans ready |
+| 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Complete; 3/3 plans verified |
 | 45 | T1 Porting Scaffold + Handler Contract Hardening | T1R-04/05/09 | Not started |
 | 46 | Same-Origin Read Ports -- First High-Value Batch | T1R-06 | Not started |
 | 47 | Pattern-D + GAPI Bridge Architecture | T1R-07/08 | Not started |
@@ -67,6 +67,14 @@ Coverage: 12/12 v1.1.0 requirements mapped, 0 orphaned.
 - Writes/destructive actions stay fail-closed until live mutation-body UAT and consent/audit checks pass.
 - Denylist and sensitive-origin behavior remain security gates, not coverage metrics to game.
 - Search/status copy must distinguish T1-ready from DOM/discovery-pending.
+
+## Phase 44 Completion Snapshot
+
+- `scripts/report-t1-readiness.mjs` generated `44-T1-READINESS.md/json` from the committed catalog and live resolver.
+- Current readiness counts: 2,314 descriptors, 128 app stems, 21 T1-ready, 5 guarded fail-closed, 2,094 discovery-pending, 194 blocked.
+- `capability-search.js` now exposes `readinessStatus` and keeps catalog-tail hits from looking direct API-ready.
+- `scripts/verify-t1-readiness-gate.mjs` is wired into `npm run validate:extension`.
+- Verification passed: `node tests/t1-readiness-report.test.js`, `node tests/t1-readiness-gate.test.js`, `node tests/backing-status-annotation.test.js`, `node tests/breadth-search-return.test.js`, and `npm run validate:extension`.
 
 ## Accumulated Context
 
@@ -155,13 +163,13 @@ Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guar
 
 ## Session Continuity
 
-Last session: 2026-06-29T20:15:00-05:00
-Stopped at: Phase 44 (T1 Readiness Inventory + Status Surface) planned with 3 execution plans. v1.0.0 is archived; v1.1.0 is active. The next executable step is 44-01: build `scripts/report-t1-readiness.mjs`, add `tests/t1-readiness-report.test.js`, and generate the Phase 44 readiness evidence files.
+Last session: 2026-06-29T15:38:28-05:00
+Stopped at: Phase 44 (T1 Readiness Inventory + Status Surface) complete and verified. v1.1.0 is active. The next executable step is to plan Phase 45: T1 Porting Scaffold + Handler Contract Hardening.
 Resume file: None
 
 ## Next Actions
 
-Execute Phase 44 Plan 01. Build the readiness report generator, classifier tests, and generated markdown/JSON evidence over all committed descriptors. This is the required first step before any v1.1.0 app porting work.
+Plan Phase 45. Build the reusable handler/recipe porting scaffold and contract tests using the Phase 44 readiness matrix as the candidate source.
 
 ### (historical) Phase 37 planning context
 

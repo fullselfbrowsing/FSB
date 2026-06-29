@@ -50,6 +50,7 @@ const path = require('path');
 
 const REPO_ROOT = path.join(__dirname, '..');
 const DESCRIPTORS_DIR = path.join(REPO_ROOT, 'catalog', 'descriptors');
+const GENERATED_INDEX = require(path.join(REPO_ROOT, 'extension', 'catalog', 'recipe-index.generated.js'));
 
 let passed = 0;
 let failed = 0;
@@ -127,6 +128,9 @@ const corpusFiles = fs.readdirSync(DESCRIPTORS_DIR)
 const corpus = corpusFiles.map(function (name) {
   return JSON.parse(fs.readFileSync(path.join(DESCRIPTORS_DIR, name), 'utf8'));
 });
+const readyHeadDescriptor = GENERATED_INDEX.descriptors.find(function (d) {
+  return d && d.slug === 'github.issues.list';
+});
 
 // Phase-39 batch C sub-batch 5 (39-06, COMPLETION -- remaining commerce + read-only misc) GROWS the
 // corpus with the FINAL real apps, CLOSING real-app coverage. The PAYMENT-bearing commerce apps shopify
@@ -144,8 +148,10 @@ const corpus = corpusFiles.map(function (name) {
 check(corpus.length >= 228,
   'loaded the REAL emitted dev/productivity + COMPLETE comms/social/content + food-delivery/rideshare + retail/marketplace + travel/transport + events/local-services/scheduling + COMPLETION commerce/misc corpus (got ' + corpus.length + ' descriptors: 70 dev/productivity + 24 comms/social/content + 31 food-delivery/rideshare + 34 retail/marketplace + 24 travel/transport + 21 events/local-services/scheduling + 24 completion commerce/misc [5 shopify + 4 craigslist + 5 dominos + 4 chipotle + 3 zillow + 3 grafana -- Phase-39 batch C sub-batch 5; shopify/dominos/chipotle backing:dom on SENSITIVE origins with create_order/place_order payment ops DOM-only-on-sensitive, craigslist SENSITIVE marketplace, zillow/grafana read-only-safe (no payment verb)] -- real-app coverage COMPLETE)');
 
-// Plant the build-time catalog global the module's buildOrRestore() reads.
-global.FsbRecipeIndex = { descriptors: corpus, recipes: [] };
+// Plant the build-time catalog global the module's buildOrRestore() reads. Add one
+// proven T1-ready head descriptor so this breadth test also proves the status contrast
+// between catalog-tail discovery hits and direct API-ready hits.
+global.FsbRecipeIndex = { descriptors: corpus.concat(readyHeadDescriptor ? [readyHeadDescriptor] : []), recipes: [] };
 
 // Single source of truth: the runtime module's INDEX_OPTIONS + search.
 const CapabilitySearch = require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-search.js'));
@@ -723,6 +729,21 @@ function heldOutParaphrase(d) {
   // corpus-tier set is fully tagged and bounded), NOT that wrong-invoke is 0 (Phase 43's job).
   check(corpusCount > 0 && corpusWrongInvoke <= corpusCount,
     'RETRIEVAL (corpus-tier): the ' + corpusCount + ' full-corpus collision ranking ties are RECORDED as the Phase-43 SCALE-01 baseline (corpus wrong-invoke=' + corpusWrongRate.toFixed(3) + ', recall-misses=' + corpusRecallMisses + ', DEF-39.5-04-A) -- a TRACKED, DOCUMENTED phase boundary; wrong-invoke=0 is Phase 43 eval-harness re-tune, the curated surface above stays HARD=0');
+
+  // ---- Phase 44 status contrast: catalog support != direct API execution -----
+  const airbnbHit = (search('get airbnb search results', null, 5) || []).find(function (h) {
+    return h.slug === 'airbnb.get_search_results';
+  });
+  check(airbnbHit && airbnbHit.backing === 'dom' && airbnbHit.invocable === false &&
+      airbnbHit.readinessStatus === 'discovery-pending',
+    'Phase 44: a DOM-only Airbnb catalog hit returns for discovery but is NOT direct API-ready');
+
+  const githubHeadHit = (search('list my github issues', null, 5) || []).find(function (h) {
+    return h.slug === 'github.issues.list';
+  });
+  check(githubHeadHit && githubHeadHit.backing === 'handler' && githubHeadHit.invocable === true &&
+      githubHeadHit.readinessStatus === 't1-ready',
+    'Phase 44: a proven GitHub head hit is marked t1-ready and invocable');
 
   console.log('\nbreadth-search-return: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);

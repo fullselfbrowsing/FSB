@@ -77,7 +77,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Discovers live provider model lists and falls back to bundled defaults.
 - Uses 56 canonical extension tool definitions and 66 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
-- Invokes signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
+- Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
@@ -104,7 +104,7 @@ FSB is most reliable when the task can be expressed as page structure and user a
 |------|------------------|
 | DOM analysis | Captures visible and structural page data, element refs, selectors, forms, ARIA labels, and DOM deltas. |
 | Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
-| Capability catalog | Searches and invokes signed, audited, denylist-gated first-party API capabilities through `search_capabilities` and `invoke_capability`. Sensitive origins are flagged, while denylisted origins remain blocked. |
+| Capability catalog | Searches the 128-app catalog and invokes verified signed, audited, denylist-gated T1/T1b first-party API capabilities through `search_capabilities` and `invoke_capability`. Catalog-tail hits remain learn-pending, discovery-pending, or guarded fail-closed until proven. Sensitive origins are flagged, while denylisted origins remain blocked. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
 | UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
@@ -120,7 +120,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 ## What's New
 
-**Native Capability Catalog (preview): first-party API execution.** Beyond DOM automation, FSB can now search and invoke real first-party authenticated API capabilities with `search_capabilities` and `invoke_capability`. The capability tools register outside the core tool registry, use an origin-biased router, allow non-denied origins under Auto, block denylisted origins, verify signed recipes, and write no-secrets audit records. Sensitive origins are surfaced as flags in the UI/audit trail; network-capture discovery still requires extra confirmation for sensitive origins. The API-integration model is inspired by **OpenTabs** (see [Acknowledgements](#acknowledgements)). Capability execution is in preview with live-browser UAT pending; the headless test suite is green.
+**Native Capability Catalog (preview): first-party API execution.** Beyond DOM automation, FSB can search a 128-app capability catalog and invoke verified first-party authenticated API capabilities with `search_capabilities` and `invoke_capability`. The current direct execution surface is the proven T1/T1b head: executable handlers/recipes run through an origin-biased router, signed recipe verification, denylist checks, mutation serialization, and no-secrets audit records. Catalog-tail hits are still useful for routing, but they are explicitly labeled learn-pending, discovery-pending, or guarded fail-closed instead of being presented as direct API-ready. Non-denied origins are allowed under Auto for ordinary invoke; denylisted origins remain blocked. Sensitive origins are surfaced as flags in the UI/audit trail; network-capture discovery still requires extra confirmation for sensitive origins. The API-integration model is inspired by **OpenTabs** (see [Acknowledgements](#acknowledgements)). Capability execution is in preview with live-browser UAT pending; the headless test suite is green.
 
 **`upload_file`: real file input uploads.** MCP clients and FSB autopilot can now call `upload_file(selector, file_path, tab_id?)` to set an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
 
@@ -425,7 +425,7 @@ The MCP server exposes a curated public surface around that registry plus direct
 | Observability | 5 | `list_sessions`, `get_logs`, `search_memory` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
-Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools.
+Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
 
 ---
 
@@ -530,7 +530,7 @@ Use separate API keys for development and production, rotate keys regularly, res
 - CAPTCHA solving support is a framework and optional service integration, not a guarantee.
 - The extension can interact with the active page, tabs, and debugger-backed coordinate tools because those permissions are declared in the MV3 manifest.
 - `upload_file` requires an absolute local path, blocks known sensitive path patterns, and records audit metadata without persisting the disk path.
-- Capability invokes allow every non-denied origin under Auto and run through denylist, mutation, signature, and audit gates. Sensitive origins are flagged for review; network-capture discovery on sensitive origins still requires extra confirmation.
+- Capability invokes allow every non-denied origin under Auto and run through denylist, mutation, signature, and audit gates. Only verified T1/T1b capabilities execute directly; guarded or catalog-tail capabilities return typed pending/fallback responses. Sensitive origins are flagged for review; network-capture discovery on sensitive origins still requires extra confirmation.
 - Saved credentials and payment methods require explicit user configuration and unlock flows.
 - Automation should be treated like a fast assistant operating your browser, not like an unattended production worker.
 

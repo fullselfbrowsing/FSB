@@ -485,8 +485,10 @@ Notes:
 
 | Tool | Purpose |
 |------|---------|
-| `search_capabilities` | Search first-party API capabilities by intent and return schema-on-hit results. |
-| `invoke_capability` | Invoke a selected capability in the authenticated browser session with validated params, origin denylist checks, recipe signatures, and no-secrets audit records. |
+| `search_capabilities` | Search the 128-app capability catalog by intent and return schema-on-hit results with readiness labels. |
+| `invoke_capability` | Invoke a selected verified T1/T1b capability in the authenticated browser session with validated params, origin denylist checks, recipe signatures, mutation serialization, and no-secrets audit records. Guarded or catalog-tail hits return typed pending/fallback responses rather than pretending to execute. |
+
+`search_capabilities` is broader than direct API execution. Results can be `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, or `discovery-pending`. Non-denied origins are allowed under Auto for ordinary invoke; sensitive origins are flagged and audited; network-capture discovery on sensitive origins still requires extra confirmation; denylisted origins remain blocked.
 
 ### Observability (5)
 
