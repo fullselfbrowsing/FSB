@@ -44,7 +44,15 @@ export const GUARDED_FAIL_CLOSED_SLUGS = [
   'slack.send_message',
 ];
 
-const HANDLER_MODULES = ['github.js', 'slack.js', 'notion.js', 'gitlab.js'];
+const HANDLER_MODULES = [
+  'github.js',
+  'slack.js',
+  'notion.js',
+  'gitlab.js',
+  'netlify.js',
+  'bitbucket.js',
+  'circleci.js',
+];
 const EXECUTABLE_TIERS = new Set(['T0', 'T1a', 'T1b']);
 const GUARDED_SET = new Set(GUARDED_FAIL_CLOSED_SLUGS);
 

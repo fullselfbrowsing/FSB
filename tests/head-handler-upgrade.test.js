@@ -61,7 +61,7 @@ function check(cond, msg) {
   }
 }
 
-// ---- The 10 Phase-40 ported slugs + their FIRST-PARTY origins ----------------
+// ---- The Phase-40/41/46 ported slugs + their FIRST-PARTY origins --------------
 //
 // Each slug EXISTS as catalog/descriptors/opentabs__<app>__<op>.json (backing:
 // 'dom', sideEffectClass:'read', DOT-form slug). The slug strings here are read
@@ -75,6 +75,19 @@ const PORTED = [
   { slug: 'gitlab.list_issues', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
   { slug: 'gitlab.get_issue', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
   { slug: 'gitlab.list_merge_requests', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
+  // netlify x4 -- NEW same-origin read module (46), origin https://app.netlify.com
+  { slug: 'netlify.list_sites', origin: 'https://app.netlify.com', handlerFile: 'netlify.js' },
+  { slug: 'netlify.get_site', origin: 'https://app.netlify.com', handlerFile: 'netlify.js' },
+  { slug: 'netlify.list_deploys', origin: 'https://app.netlify.com', handlerFile: 'netlify.js' },
+  { slug: 'netlify.list_forms', origin: 'https://app.netlify.com', handlerFile: 'netlify.js' },
+  // bitbucket x3 -- NEW same-origin read module (46), origin https://bitbucket.org
+  { slug: 'bitbucket.list_workspaces', origin: 'https://bitbucket.org', handlerFile: 'bitbucket.js' },
+  { slug: 'bitbucket.list_repositories', origin: 'https://bitbucket.org', handlerFile: 'bitbucket.js' },
+  { slug: 'bitbucket.get_repository', origin: 'https://bitbucket.org', handlerFile: 'bitbucket.js' },
+  // circleci x3 -- NEW same-origin read module (46), origin https://app.circleci.com
+  { slug: 'circleci.get_current_user', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.list_pipelines', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
+  { slug: 'circleci.get_project', origin: 'https://app.circleci.com', handlerFile: 'circleci.js' },
   // slack x3 -- EXTEND existing module (40-03), origin https://app.slack.com
   { slug: 'slack.list_channels', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
   { slug: 'slack.list_members', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
@@ -181,7 +194,7 @@ function freshCatalog(handlerFiles) {
     Catalog.seedHeadHandlers();   // re-assert from the manifest (defense in depth)
   }
 
-  // ===== The 10 ported slugs: each must resolve T1a, byte-exact, with a handle ====
+  // ===== Every ported slug must resolve T1a, byte-exact, with a handle =============
   PORTED.forEach(function (row) {
     var handlerExists = fs.existsSync(path.join(HANDLERS_DIR, row.handlerFile));
     var res = Catalog.resolve(row.slug, row.origin);

@@ -32,10 +32,17 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const CATALOG_MODULE_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-catalog.js');
 
 const CAP = 30;
-// The head globals expected today (github/slack/notion + gitlab, Phase 40's 4th
-// module). Locking the identities (not just the count) catches a silent SWAP that
-// keeps the count at 4 but changes which handlers ship.
-const EXPECTED_HEAD_GLOBALS = ['FsbHandlerGithub', 'FsbHandlerSlack', 'FsbHandlerNotion', 'FsbHandlerGitlab'];
+// The head globals expected today. Locking the identities (not just the count)
+// catches a silent SWAP that keeps the count stable but changes which handlers ship.
+const EXPECTED_HEAD_GLOBALS = [
+  'FsbHandlerGithub',
+  'FsbHandlerSlack',
+  'FsbHandlerNotion',
+  'FsbHandlerGitlab',
+  'FsbHandlerNetlify',
+  'FsbHandlerBitbucket',
+  'FsbHandlerCircleci',
+];
 
 let passed = 0;
 let failed = 0;
@@ -77,12 +84,12 @@ console.log(`  METRICS: HEAD_HANDLER_MODULES.length=${headEntryCount} CAP=${CAP}
 check(headEntryCount <= CAP,
   `HEAD_HANDLER_MODULES.length ${headEntryCount} <= CAP ${CAP} (the head stays descriptors-only; breadth never sprawls)`);
 
-// ---- Today's exact head (github/slack/notion/gitlab) -- breadth adds DATA, depth adds heads --
-check(headEntryCount === 4,
-  `HEAD_HANDLER_MODULES has exactly 4 entries (Phase 40 adds gitlab; the head stays <=30); got ${headEntryCount}`);
+// ---- Today's exact head -- breadth adds DATA, depth adds narrow same-origin heads --
+check(headEntryCount === 7,
+  `HEAD_HANDLER_MODULES has exactly 7 entries (Phase 46 adds 3 read heads; the head stays <=30); got ${headEntryCount}`);
 const missingGlobals = EXPECTED_HEAD_GLOBALS.filter((g) => !foundGlobals.includes(g));
 check(missingGlobals.length === 0,
-  `the head globals are github/slack/notion/gitlab (missing: [${missingGlobals.join(', ') || 'none'}])`);
+  `the expected head globals are present (missing: [${missingGlobals.join(', ') || 'none'}])`);
 
 // ---- Exit convention --------------------------------------------------------
 console.log(`\nhead-handler-cap: ${passed} passed, ${failed} failed`);

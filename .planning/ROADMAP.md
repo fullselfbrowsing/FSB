@@ -71,6 +71,8 @@
 
 ## Phase 46: Same-Origin Read Ports — First High-Value Batch
 
+- [x] Phase 46: Same-Origin Read Ports — First High-Value Batch (completed 2026-06-29)
+
 **Goal:** Convert a first batch of high-value read descriptors from T3 to executable T1 where the app’s authenticated web runtime uses same-origin APIs and can be proven without weakening Wall 2.
 
 **Depends on:** Phase 45.
@@ -82,7 +84,10 @@
 2. Candidate apps are selected from the readiness matrix by same-origin feasibility, user value, and low side-effect risk.
 3. Each new read port preserves existing descriptor metadata and search ranking while flipping backing/status honestly.
 
-**Plans:** pending.
+**Plans:**
+- [x] 46-01: Candidate selection and Netlify/Bitbucket/CircleCI handler ports.
+- [x] 46-02: Catalog wiring, search readiness, and same-origin classifier gates.
+- [x] 46-03: Verification, UAT notes, and phase closeout.
 
 ## Phase 47: Pattern-D + GAPI Bridge Architecture
 
@@ -150,7 +155,7 @@
 |-------|----------------|--------|-----------|
 | 44. T1 Readiness Inventory + Status Surface | 3/3 | Complete | 2026-06-29 |
 | 45. T1 Porting Scaffold + Handler Contract Hardening | 3/3 | Complete | 2026-06-29 |
-| 46. Same-Origin Read Ports — First High-Value Batch | 0/? | Not started | — |
+| 46. Same-Origin Read Ports — First High-Value Batch | 3/3 | Complete | 2026-06-29 |
 | 47. Pattern-D + GAPI Bridge Architecture | 0/? | Not started | — |
 | 48. High-Value Read Ports — Second Batch | 0/? | Not started | — |
 | 49. Guarded Writes Activation Pipeline | 0/? | Not started | — |

@@ -125,7 +125,10 @@ function makeCtx(origin, tabId, opts) {
         const url = (spec && typeof spec.url === 'string') ? spec.url : '';
         const isGet = spec && spec.method === 'GET';
         const isGitlabRest = isGet && url.indexOf('/api/v4') !== -1;
-        const isProbe = isGet && !isGitlabRest;
+        const isNetlifyRest = isGet && url.indexOf('https://app.netlify.com/access-control/bb-api/api/v1') === 0;
+        const isBitbucketRest = isGet && url.indexOf('https://bitbucket.org/!api/2.0') === 0;
+        const isCircleciRest = isGet && url.indexOf('https://app.circleci.com/api/v2') === 0;
+        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest;
         let text = null;
         if (isProbe && url.indexOf('app.slack.com') !== -1) {
           text = Object.prototype.hasOwnProperty.call(options, 'slackProbeText')
@@ -181,6 +184,29 @@ function makeCtx(origin, tabId, opts) {
             }) };
           } else {
             data = { ok: true };
+          }
+        } else if (url.indexOf('https://app.netlify.com/access-control/bb-api/api/v1') === 0) {
+          const pathOnly = url.split('?')[0];
+          if (pathOnly.indexOf('/deploys') !== -1 || pathOnly.indexOf('/forms') !== -1 || /\/sites$/.test(pathOnly)) {
+            data = [{ id: 'netlify-test', name: 'Test site' }];
+          } else {
+            data = { id: 'netlify-test', name: 'Test site' };
+          }
+        } else if (url.indexOf('https://bitbucket.org/!api/2.0') === 0) {
+          const pathOnly = url.split('?')[0];
+          const repoSegs = pathOnly.split('/repositories/')[1];
+          if (pathOnly.indexOf('/workspaces') !== -1 || (repoSegs && repoSegs.split('/').length < 2)) {
+            data = { values: [{ uuid: '{workspace-test}', slug: 'workspace-test', name: 'Workspace test' }] };
+          } else {
+            data = { uuid: '{repo-test}', slug: 'repo-test', name: 'Repository test' };
+          }
+        } else if (url.indexOf('https://app.circleci.com/api/v2') === 0) {
+          if (url.indexOf('/pipeline') !== -1) {
+            data = { items: [{ id: 'pipeline-test', number: 1, project_slug: 'gh/org/repo' }] };
+          } else if (url.indexOf('/me') !== -1) {
+            data = { id: 'user-test', login: 'circle-user', name: 'Circle User' };
+          } else {
+            data = { id: 'project-test', slug: 'gh/org/repo', name: 'repo' };
           }
         } else {
           data = { ok: true };
@@ -615,6 +641,197 @@ const Schema = require(SCHEMA_PATH);
   }
 
   // =========================================================================
+  // Phase 46 (T1R-06) -- first same-origin read batch: Netlify, Bitbucket,
+  // CircleCI. These are GET-only, cookie-backed first-party relative API ports.
+  // =========================================================================
+  const netlifyPath = path.join(HANDLERS_DIR, 'netlify.js');
+  check(fs.existsSync(netlifyPath), 'catalog/handlers/netlify.js exists (Phase 46)');
+  if (fs.existsSync(netlifyPath)) {
+    const nf = require(netlifyPath);
+    const nfSrc = readSource(netlifyPath);
+
+    check(nf['netlify.list_sites'] && nf['netlify.list_sites'].tier === 'T1a'
+      && nf['netlify.list_sites'].sideEffectClass === 'read'
+      && typeof nf['netlify.list_sites'].handle === 'function',
+      'netlify.list_sites is a tier:T1a READ entry with an async handle');
+    check(nf['netlify.get_site'] && nf['netlify.get_site'].origin === 'https://app.netlify.com',
+      'netlify.get_site targets the first-party origin https://app.netlify.com');
+    check(nf['netlify.list_sites'] && nf['netlify.list_sites'].params
+      && Array.isArray(nf['netlify.list_sites'].params.required)
+      && nf['netlify.list_sites'].params.required.indexOf('account_slug') !== -1,
+      'netlify.list_sites exposes a params schema requiring account_slug');
+    check(!/chrome\.(scripting|tabs)/.test(nfSrc),
+      'netlify.js references NO chrome.scripting/chrome.tabs');
+    check(!/\bfetch\s*\(/.test(nfSrc),
+      'netlify.js performs no direct network call');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf|authorization|bearer)\b/i.test(nfSrc),
+      'netlify.js does NOT console-log a secret-bearing variable');
+
+    const nfList = makeCtx('https://app.netlify.com', 46);
+    const nfListOut = await nf['netlify.list_sites'].handle({
+      account_slug: 'team-test',
+      page: 2,
+      per_page: 50,
+      name: 'docs'
+    }, nfList.ctx);
+    check(nfList.calls.length === 1 && nfList.calls[0].spec.method === 'GET',
+      'netlify.list_sites builds one GET spec');
+    check(nfList.calls.length === 1 && nfList.calls[0].spec.origin === 'https://app.netlify.com',
+      'netlify.list_sites pins the spec to app.netlify.com');
+    check(nfList.calls.length === 1 && nfList.calls[0].spec.url ===
+      'https://app.netlify.com/access-control/bb-api/api/v1/team-test/sites?page=2&per_page=50&name=docs',
+      'netlify.list_sites targets the vendored same-origin account sites path with query filters');
+    check(nfListOut && nfListOut.success === true,
+      'netlify.list_sites accepts a logged-in array body');
+
+    const nfGet = makeCtx('https://app.netlify.com', 46);
+    await nf['netlify.get_site'].handle({ site_id: 'site-123' }, nfGet.ctx);
+    check(nfGet.calls.length === 1 && nfGet.calls[0].spec.url ===
+      'https://app.netlify.com/access-control/bb-api/api/v1/sites/site-123',
+      'netlify.get_site targets /sites/:site_id');
+
+    const nfDeploys = makeCtx('https://app.netlify.com', 46);
+    await nf['netlify.list_deploys'].handle({ site_id: 'site-123', page: 3, per_page: 10 }, nfDeploys.ctx);
+    check(nfDeploys.calls.length === 1 && nfDeploys.calls[0].spec.url ===
+      'https://app.netlify.com/access-control/bb-api/api/v1/sites/site-123/deploys?page=3&per_page=10',
+      'netlify.list_deploys targets /sites/:site_id/deploys with pagination');
+
+    const nfForms = makeCtx('https://app.netlify.com', 46);
+    await nf['netlify.list_forms'].handle({ site_id: 'site-123' }, nfForms.ctx);
+    check(nfForms.calls.length === 1 && nfForms.calls[0].spec.url ===
+      'https://app.netlify.com/access-control/bb-api/api/v1/sites/site-123/forms',
+      'netlify.list_forms targets /sites/:site_id/forms');
+
+    const nfNeg = makeCtx('https://app.netlify.com', 46, { readData: { ok: false } });
+    const nfNegOut = await nf['netlify.list_sites'].handle({ account_slug: 'team-test' }, nfNeg.ctx);
+    check(nfNegOut && nfNegOut.success === false
+      && nfNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && nfNegOut.fellBackToDom === true,
+      'netlify.list_sites rejects a non-array logged-out body -> RECIPE_DOM_FALLBACK_PENDING');
+  }
+
+  const bitbucketPath = path.join(HANDLERS_DIR, 'bitbucket.js');
+  check(fs.existsSync(bitbucketPath), 'catalog/handlers/bitbucket.js exists (Phase 46)');
+  if (fs.existsSync(bitbucketPath)) {
+    const bb = require(bitbucketPath);
+    const bbSrc = readSource(bitbucketPath);
+
+    check(bb['bitbucket.list_workspaces'] && bb['bitbucket.list_workspaces'].tier === 'T1a'
+      && bb['bitbucket.list_workspaces'].sideEffectClass === 'read'
+      && typeof bb['bitbucket.list_workspaces'].handle === 'function',
+      'bitbucket.list_workspaces is a tier:T1a READ entry with an async handle');
+    check(bb['bitbucket.get_repository'] && bb['bitbucket.get_repository'].origin === 'https://bitbucket.org',
+      'bitbucket.get_repository targets the first-party origin https://bitbucket.org');
+    check(bb['bitbucket.get_repository'] && bb['bitbucket.get_repository'].params
+      && Array.isArray(bb['bitbucket.get_repository'].params.required)
+      && bb['bitbucket.get_repository'].params.required.indexOf('workspace') !== -1
+      && bb['bitbucket.get_repository'].params.required.indexOf('repo_slug') !== -1,
+      'bitbucket.get_repository exposes a params schema requiring workspace + repo_slug');
+    check(!/chrome\.(scripting|tabs)/.test(bbSrc),
+      'bitbucket.js references NO chrome.scripting/chrome.tabs');
+    check(!/\bfetch\s*\(/.test(bbSrc),
+      'bitbucket.js performs no direct network call');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf|authorization|bearer)\b/i.test(bbSrc),
+      'bitbucket.js does NOT console-log a secret-bearing variable');
+
+    const bbWorkspaces = makeCtx('https://bitbucket.org', 47);
+    const bbWorkspacesOut = await bb['bitbucket.list_workspaces'].handle({ page: 2, pagelen: 25 }, bbWorkspaces.ctx);
+    check(bbWorkspaces.calls.length === 1 && bbWorkspaces.calls[0].spec.method === 'GET',
+      'bitbucket.list_workspaces builds one GET spec');
+    check(bbWorkspaces.calls.length === 1 && bbWorkspaces.calls[0].spec.origin === 'https://bitbucket.org',
+      'bitbucket.list_workspaces pins the spec to bitbucket.org');
+    check(bbWorkspaces.calls.length === 1 && bbWorkspaces.calls[0].spec.url ===
+      'https://bitbucket.org/!api/2.0/workspaces?page=2&pagelen=25',
+      'bitbucket.list_workspaces targets /!api/2.0/workspaces with pagination');
+    check(bbWorkspacesOut && bbWorkspacesOut.success === true,
+      'bitbucket.list_workspaces accepts a logged-in values[] page');
+
+    const bbRepos = makeCtx('https://bitbucket.org', 47);
+    await bb['bitbucket.list_repositories'].handle({
+      workspace: 'team-test',
+      page: 1,
+      pagelen: 10,
+      query: 'name ~ "fsb"'
+    }, bbRepos.ctx);
+    check(bbRepos.calls.length === 1 && bbRepos.calls[0].spec.url ===
+      'https://bitbucket.org/!api/2.0/repositories/team-test?page=1&pagelen=10&q=name%20~%20%22fsb%22',
+      'bitbucket.list_repositories maps query to Bitbucket q and targets /repositories/:workspace');
+
+    const bbGet = makeCtx('https://bitbucket.org', 47);
+    await bb['bitbucket.get_repository'].handle({ workspace: 'team-test', repo_slug: 'fsb' }, bbGet.ctx);
+    check(bbGet.calls.length === 1 && bbGet.calls[0].spec.url ===
+      'https://bitbucket.org/!api/2.0/repositories/team-test/fsb',
+      'bitbucket.get_repository targets /repositories/:workspace/:repo_slug');
+
+    const bbNeg = makeCtx('https://bitbucket.org', 47, { readData: { type: 'error', error: { message: 'no auth' } } });
+    const bbNegOut = await bb['bitbucket.get_repository'].handle({ workspace: 'team-test', repo_slug: 'fsb' }, bbNeg.ctx);
+    check(bbNegOut && bbNegOut.success === false
+      && bbNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && bbNegOut.fellBackToDom === true,
+      'bitbucket.get_repository rejects a Bitbucket error envelope -> RECIPE_DOM_FALLBACK_PENDING');
+  }
+
+  const circleciPath = path.join(HANDLERS_DIR, 'circleci.js');
+  check(fs.existsSync(circleciPath), 'catalog/handlers/circleci.js exists (Phase 46)');
+  if (fs.existsSync(circleciPath)) {
+    const cc = require(circleciPath);
+    const ccSrc = readSource(circleciPath);
+
+    check(cc['circleci.get_current_user'] && cc['circleci.get_current_user'].tier === 'T1a'
+      && cc['circleci.get_current_user'].sideEffectClass === 'read'
+      && typeof cc['circleci.get_current_user'].handle === 'function',
+      'circleci.get_current_user is a tier:T1a READ entry with an async handle');
+    check(cc['circleci.list_pipelines'] && cc['circleci.list_pipelines'].origin === 'https://app.circleci.com',
+      'circleci.list_pipelines targets the first-party origin https://app.circleci.com');
+    check(cc['circleci.list_pipelines'] && cc['circleci.list_pipelines'].params
+      && Array.isArray(cc['circleci.list_pipelines'].params.required)
+      && cc['circleci.list_pipelines'].params.required.indexOf('project_slug') !== -1,
+      'circleci.list_pipelines exposes a params schema requiring project_slug');
+    check(!/chrome\.(scripting|tabs)/.test(ccSrc),
+      'circleci.js references NO chrome.scripting/chrome.tabs');
+    check(!/\bfetch\s*\(/.test(ccSrc),
+      'circleci.js performs no direct network call');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf|authorization|bearer)\b/i.test(ccSrc),
+      'circleci.js does NOT console-log a secret-bearing variable');
+
+    const ccMe = makeCtx('https://app.circleci.com', 48);
+    const ccMeOut = await cc['circleci.get_current_user'].handle({}, ccMe.ctx);
+    check(ccMe.calls.length === 1 && ccMe.calls[0].spec.method === 'GET',
+      'circleci.get_current_user builds one GET spec');
+    check(ccMe.calls.length === 1 && ccMe.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/me',
+      'circleci.get_current_user targets /api/v2/me');
+    check(ccMeOut && ccMeOut.success === true,
+      'circleci.get_current_user accepts a logged-in user object');
+
+    const ccPipes = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.list_pipelines'].handle({
+      project_slug: 'gh/org/repo',
+      branch: 'main',
+      mine: true,
+      page_token: 'next-token'
+    }, ccPipes.ctx);
+    check(ccPipes.calls.length === 1 && ccPipes.calls[0].spec.origin === 'https://app.circleci.com',
+      'circleci.list_pipelines pins the spec to app.circleci.com');
+    check(ccPipes.calls.length === 1 && ccPipes.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/project/gh/org/repo/pipeline?branch=main&mine=true&page-token=next-token',
+      'circleci.list_pipelines preserves project_slug path segments and maps page_token to page-token');
+
+    const ccProject = makeCtx('https://app.circleci.com', 48);
+    await cc['circleci.get_project'].handle({ project_slug: 'gh/org/repo' }, ccProject.ctx);
+    check(ccProject.calls.length === 1 && ccProject.calls[0].spec.url ===
+      'https://app.circleci.com/api/v2/project/gh/org/repo',
+      'circleci.get_project targets /api/v2/project/:project_slug');
+
+    const ccNeg = makeCtx('https://app.circleci.com', 48, { readData: { message: 'not authenticated' } });
+    const ccNegOut = await cc['circleci.get_current_user'].handle({}, ccNeg.ctx);
+    check(ccNegOut && ccNegOut.success === false
+      && ccNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && ccNegOut.fellBackToDom === true,
+      'circleci.get_current_user rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
+  }
+
+  // =========================================================================
   // Phase 40 (DEPTH-01) -- Slack EXTEND -- catalog/handlers/slack.js
   // (3 new READ T1a slugs via callSlackMethod; token in BODY never logged).
   // Scaffolded in 40-01 so 40-03 edits ONLY catalog/handlers/slack.js. RED until
@@ -803,7 +1020,7 @@ const Schema = require(SCHEMA_PATH);
     }
   });
 
-  ['github.js', 'slack.js', 'notion.js'].forEach(function (name) {
+  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js'].forEach(function (name) {
     const src = path.join(HANDLERS_DIR, name);
     const ext = path.join(EXT_HANDLERS_DIR, name);
     check(fs.existsSync(ext), 'extension/catalog/handlers/' + name + ' exists for unpacked dev loads');

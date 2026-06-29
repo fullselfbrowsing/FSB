@@ -194,6 +194,9 @@ try { importScripts('catalog/handlers/notion.js'); } catch (e) { console.error('
 // Phase 40 (DEPTH-01): the GitLab READ head (gitlab.com/api/v4). Independent
 // try/catch so an absent handler degrades to RECIPE_NOT_FOUND, never a load crash.
 try { importScripts('catalog/handlers/gitlab.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gitlab.js:', e.message); }
+try { importScripts('catalog/handlers/netlify.js'); } catch (e) { console.error('[FSB] Failed to load handlers/netlify.js:', e.message); }
+try { importScripts('catalog/handlers/bitbucket.js'); } catch (e) { console.error('[FSB] Failed to load handlers/bitbucket.js:', e.message); }
+try { importScripts('catalog/handlers/circleci.js'); } catch (e) { console.error('[FSB] Failed to load handlers/circleci.js:', e.message); }
 try {
   if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
       && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {

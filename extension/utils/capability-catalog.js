@@ -269,9 +269,12 @@
     { global: 'FsbHandlerNotion', service: 'app.notion.com', origin: 'https://app.notion.com' },
     // Phase 40 (DEPTH-01): the GitLab READ head -- 5 same-origin gitlab.com/api/v4
     // reads, the same-origin replacement for the deferred linear (40-01 decision_note).
-    // 4th module, <=30. seedHeadHandlers() seeds its slugs from this manifest
-    // (defense-in-depth alongside the module self-register).
-    { global: 'FsbHandlerGitlab', service: 'gitlab.com', origin: 'https://gitlab.com' }
+    // The same-origin read heads stay within the <=30 cap. seedHeadHandlers() seeds
+    // slugs from this manifest (defense-in-depth alongside module self-register).
+    { global: 'FsbHandlerGitlab', service: 'gitlab.com', origin: 'https://gitlab.com' },
+    { global: 'FsbHandlerNetlify', service: 'app.netlify.com', origin: 'https://app.netlify.com' },
+    { global: 'FsbHandlerBitbucket', service: 'bitbucket.org', origin: 'https://bitbucket.org' },
+    { global: 'FsbHandlerCircleci', service: 'app.circleci.com', origin: 'https://app.circleci.com' }
   ];
 
   function _readGlobal(name) {

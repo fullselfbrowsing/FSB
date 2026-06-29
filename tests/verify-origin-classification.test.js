@@ -16,7 +16,7 @@
  *
  * This drives the REAL exports (NOT a re-implemented copy; mirrors
  * tests/no-duplicate-stem.test.js's real-export pattern):
- *   (a) parseHeadModules on the REAL catalog source -> exactly the 4 known head globals
+ *   (a) parseHeadModules on the REAL catalog source -> exactly the known head globals
  *       with their correct origins; PLUS a synthetic NESTED-brace entry parses whole
  *       (IN-01 hardening: origin is captured, not dropped to null).
  *   (b) the classifier returns sameOrigin:true for gitlab.com/api/v4,
@@ -67,8 +67,8 @@ function check(cond, msg) {
   check(fs.existsSync(CATALOG_PATH), '(a) capability-catalog.js exists (the head manifest source)');
   const catalogSrc = fs.existsSync(CATALOG_PATH) ? fs.readFileSync(CATALOG_PATH, 'utf8') : '';
   const realHeads = gate.parseHeadModules(catalogSrc) || [];
-  check(realHeads.length === 4,
-    '(a) parseHeadModules returns exactly 4 heads from the real catalog source; got ' + realHeads.length);
+  check(realHeads.length === 7,
+    '(a) parseHeadModules returns exactly 7 heads from the real catalog source; got ' + realHeads.length);
   const byGlobal = {};
   for (const h of realHeads) { byGlobal[h.global] = h.origin; }
   check(byGlobal.FsbHandlerGithub === 'https://github.com',
@@ -79,6 +79,12 @@ function check(cond, msg) {
     '(a) FsbHandlerNotion origin parsed as https://app.notion.com');
   check(byGlobal.FsbHandlerGitlab === 'https://gitlab.com',
     '(a) FsbHandlerGitlab origin parsed as https://gitlab.com');
+  check(byGlobal.FsbHandlerNetlify === 'https://app.netlify.com',
+    '(a) FsbHandlerNetlify origin parsed as https://app.netlify.com');
+  check(byGlobal.FsbHandlerBitbucket === 'https://bitbucket.org',
+    '(a) FsbHandlerBitbucket origin parsed as https://bitbucket.org');
+  check(byGlobal.FsbHandlerCircleci === 'https://app.circleci.com',
+    '(a) FsbHandlerCircleci origin parsed as https://app.circleci.com');
 
   // (a-IN01) a synthetic NESTED-brace entry parses WHOLE (origin not dropped to null).
   // The old /\{[^}]*\}/g entry regex would have truncated this entry at the inner `}` of
@@ -124,13 +130,16 @@ function check(cond, msg) {
   const slTeam = gate.classifyOriginPattern('https://app.slack.com', 'https://myteam.slack.com', { dynamicWorkspace: true });
   check(slTeam.sameOrigin === true,
     '(b) slack per-team classic-client subdomain (myteam.slack.com) -> sameOrigin:true (same registrable domain slack.com)');
+  const relativeApi = gate.classifyOriginPattern('https://app.netlify.com', 'https://app.netlify.com/access-control/bb-api/api/v1');
+  check(relativeApi.sameOrigin === true && relativeApi.separate === false,
+    '(b) same-origin relative vendored API bases classify as strict same-origin after joining with the handler origin');
 
   // (b) REAL end-to-end: checkOriginClassification() over the LIVE catalog + vendored
-  // slack-api.ts -- proves the 4 real heads all pass and slack rides the dynamic
+  // slack-api.ts -- proves the real heads all pass and slack rides the dynamic
   // accommodation against the genuinely-extracted vendored dynamic form (not a stub).
   const real = gate.checkOriginClassification();
   check(real && Array.isArray(real.failures) && real.failures.length === 0,
-    '(b) the REAL 4 heads over the live catalog + vendored source yield 0 failures ['
+    '(b) the REAL 7 heads over the live catalog + vendored source yield 0 failures ['
       + (real && real.failures && real.failures.length ? real.failures.join(' | ') : 'all same-origin') + ']');
   const realSlack = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerSlack') : null;
   check(!!realSlack && realSlack.classification.sameOrigin === true
@@ -144,6 +153,18 @@ function check(cond, msg) {
   check(!!realNotion && realNotion.apiBaseUrl === 'https://app.notion.com/api/v3'
     && realNotion.classification && realNotion.classification.sameOrigin === true,
     '(b) the REAL notion head uses the explicit observed runtime override app.notion.com/api/v3 and still classifies same-origin');
+  const realNetlify = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerNetlify') : null;
+  check(!!realNetlify && realNetlify.apiBaseUrl === 'https://app.netlify.com/access-control/bb-api/api/v1'
+    && realNetlify.classification && realNetlify.classification.sameOrigin === true,
+    '(b) the REAL netlify head joins the relative vendored base to app.netlify.com and classifies same-origin');
+  const realBitbucket = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerBitbucket') : null;
+  check(!!realBitbucket && realBitbucket.apiBaseUrl === 'https://bitbucket.org/!api/2.0'
+    && realBitbucket.classification && realBitbucket.classification.sameOrigin === true,
+    '(b) the REAL bitbucket head joins the relative vendored base to bitbucket.org and classifies same-origin');
+  const realCircleci = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerCircleci') : null;
+  check(!!realCircleci && realCircleci.apiBaseUrl === 'https://app.circleci.com/api/v2'
+    && realCircleci.classification && realCircleci.classification.sameOrigin === true,
+    '(b) the REAL circleci head joins the relative vendored base to app.circleci.com and classifies same-origin');
 
   const badNotionOverride = gate.checkOriginClassification(
     [{ global: 'FsbHandlerNotionBad', origin: 'https://app.notion.com' }],

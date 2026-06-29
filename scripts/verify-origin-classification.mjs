@@ -84,7 +84,10 @@ const HEAD_APP_MAP = {
     observedRuntimeBaseUrl: 'https://app.notion.com/api/v3',
     expectedStaleVendoredBaseUrl: 'https://www.notion.so/api/v3'
   },
-  FsbHandlerGitlab: { app: 'gitlab', fallbackBaseUrl: 'https://gitlab.com' }
+  FsbHandlerGitlab: { app: 'gitlab', fallbackBaseUrl: 'https://gitlab.com' },
+  FsbHandlerNetlify: { app: 'netlify', fallbackBaseUrl: 'https://app.netlify.com' },
+  FsbHandlerBitbucket: { app: 'bitbucket', fallbackBaseUrl: 'https://bitbucket.org' },
+  FsbHandlerCircleci: { app: 'circleci', fallbackBaseUrl: 'https://app.circleci.com' }
 };
 
 /**
@@ -272,6 +275,19 @@ function readApiBaseUrl(app) {
   return m ? m[0] : null;
 }
 
+// Some same-origin app runtimes declare only a relative API base in <app>-api.ts
+// (Netlify /access-control/..., Bitbucket /!api/2.0, CircleCI /api/v2). That is a
+// stronger same-origin signal, not an unresolvable base: combine the reviewed handler
+// fallback origin with the relative path and keep the normal strict same-origin check.
+function readRelativeApiBase(app) {
+  if (!app) { return null; }
+  const apiFile = join(VENDOR_PLUGINS, app, 'src', app + '-api.ts');
+  if (!existsSync(apiFile)) { return null; }
+  const text = readFileSync(apiFile, 'utf8');
+  const m = text.match(/const\s+API[A-Z0-9_]*\s*=\s*['"](\/[^'"]*)['"]/);
+  return m ? m[1] : null;
+}
+
 // ---- Detect a DYNAMIC per-workspace API base in a vendored <app>-api.ts (slack) -----
 // slack-api.ts has no static https:// base literal; the runtime base is built as
 // `${auth.workspaceUrl}/api/<method>` (slack-api.ts:431) where workspaceUrl is a
@@ -338,6 +354,7 @@ export function checkOriginClassification(headsOverride, opts) {
     // Prefer the vendored api.ts base-URL; fall back to the documented base for an app
     // with no vendored plugin (github).
     const vendored = readApiBaseUrl(mapping.app);
+    const relativeVendored = readRelativeApiBase(mapping.app);
     const hasVendoredFile = mapping.app
       && existsSync(join(VENDOR_PLUGINS, mapping.app, 'src', mapping.app + '-api.ts'));
 
@@ -378,6 +395,10 @@ export function checkOriginClassification(headsOverride, opts) {
       // registrable-domain comparison against the head's app.slack.com.
       apiBaseUrl = readDynamicWorkspaceBase(mapping.app);
       classifyOpts = { dynamicWorkspace: true };
+    } else if (hasVendoredFile && relativeVendored) {
+      const fallbackOrigin = originHost(mapping.fallbackBaseUrl);
+      apiBaseUrl = fallbackOrigin ? fallbackOrigin + relativeVendored : relativeVendored;
+      classifyOpts = undefined;
     } else if (hasVendoredFile) {
       // A MAPPED app WITH a vendored api.ts that yields NEITHER a literal base NOR (for a
       // dynamic-workspace app) the proven dynamic form -> do NOT silently fall back to the

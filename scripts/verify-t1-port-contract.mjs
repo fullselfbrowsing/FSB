@@ -28,8 +28,11 @@ const ROOT = resolve(__dirname, '..');
 const require = createRequire(import.meta.url);
 
 export const HANDLER_BY_APP = Object.freeze({
+  bitbucket: 'bitbucket.js',
+  circleci: 'circleci.js',
   github: 'github.js',
   gitlab: 'gitlab.js',
+  netlify: 'netlify.js',
   notion: 'notion.js',
   slack: 'slack.js',
 });
