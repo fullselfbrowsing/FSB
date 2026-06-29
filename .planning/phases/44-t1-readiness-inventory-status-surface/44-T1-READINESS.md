@@ -1,6 +1,6 @@
 # Phase 44 T1 Readiness Matrix
 
-**Generated:** 2026-06-29T21:34:34.899Z
+**Generated:** 2026-06-29T21:46:37.924Z
 
 This report is generated from `extension/catalog/recipe-index.generated.js` plus the live `capability-catalog.js` resolver. It is the v1.1.0 truth surface: catalog/search support means a capability is searchable and routable, not that every app has direct API execution today.
 

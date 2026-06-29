@@ -107,7 +107,7 @@ if (SKIP_BUILD) {
     buildResult.status === 0,
     buildErr.slice(-2000) || `exit ${buildResult.status}, no stderr`);
 
-  // hreflang verification (300 routes; /stats not in count).
+  // hreflang verification derives the route count from server prerender routes.
   console.log('  (running `npm --prefix showcase/angular run verify:hreflang` ...)');
   const hreflangResult = spawnSync('npm', ['--prefix', 'showcase/angular', 'run', 'verify:hreflang'], {
     cwd: ROOT,
@@ -115,7 +115,7 @@ if (SKIP_BUILD) {
     env: { ...process.env, CI: '1' },
   });
   const hreflangOut = (hreflangResult.stdout ? hreflangResult.stdout.toString() : '');
-  check('npm run verify:hreflang exits 0 (route count unchanged)',
+  check('npm run verify:hreflang exits 0 (route count matches prerender config)',
     hreflangResult.status === 0,
     (hreflangResult.stderr ? hreflangResult.stderr.toString().slice(-1000) : 'no stderr')
       + ' | stdout tail: ' + hreflangOut.slice(-500));

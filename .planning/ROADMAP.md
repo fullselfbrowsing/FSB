@@ -3,11 +3,11 @@
 ## Milestones
 
 - ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
-- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-50, IN PROGRESS. Convert the catalog-tail from discovery-pending toward verified T1 execution, starting with a full readiness matrix, shared handler/recipe scaffolds, same-origin read batches, Pattern-D/GAPI bridge spikes, and guarded-write activation workflow.
+- ✅ **v1.1.0 T1 App Execution Expansion** — Phases 44-50, CODE-COMPLETE 2026-06-29. Expanded proven T1/guarded coverage from 26 to 50 descriptors: 45 executable direct descriptors, 5 guarded fail-closed writes, and an honest next-batch backlog for the remaining 2,264-descriptor catalog tail.
 
 ## Active Milestone
 
-**v1.1.0 T1 App Execution Expansion** — Phases 44-50.
+**v1.1.0 T1 App Execution Expansion** — Phases 44-50. CODE-COMPLETE 2026-06-29.
 
 **Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” The milestone is focused only on T1 readiness: identifying which of the 2,288 remaining T3 descriptors can become T1, building the missing execution substrate for same-origin and separate-origin apps, porting high-value read paths first, and activating writes only after live mutation-body UAT. It must not overclaim all-app direct API readiness without per-app proof.
 
@@ -151,6 +151,8 @@
 
 ## Phase 50: T1 Expansion Gate + Next-Batch Plan
 
+- [x] Phase 50: T1 Expansion Gate + Next-Batch Plan (completed 2026-06-29)
+
 **Goal:** Close the milestone with an honest T1 coverage gate, full regression suite, and a prioritized backlog for the remaining 2,288-descendant tail.
 
 **Depends on:** Phase 49.
@@ -162,7 +164,10 @@
 2. The readiness report is regenerated and checked into the milestone evidence with before/after counts.
 3. The next T1 batch is ranked by value, feasibility, and risk; no “all apps are T1-ready” claim is made unless every relevant descriptor has executable proof.
 
-**Plans:** pending.
+**Plans:**
+- [x] 50-01: Regenerate readiness evidence and closeout counts.
+- [x] 50-02: Full regression gate.
+- [x] 50-03: Next-batch backlog and milestone closeout.
 
 ## Progress
 
@@ -174,7 +179,7 @@
 | 47. Pattern-D + GAPI Bridge Architecture | 3/3 | Complete | 2026-06-29 |
 | 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
 | 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
-| 50. T1 Expansion Gate + Next-Batch Plan | 0/? | Not started | — |
+| 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
 
 ## Completed Milestones
 

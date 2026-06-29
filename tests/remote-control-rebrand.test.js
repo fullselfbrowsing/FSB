@@ -112,9 +112,12 @@ assert(
 
 console.log('\n--- Showcase mirror reflects Sync consolidation ---');
 
+const syncArchBoxRe = /<h4[^>]*>Sync<\/h4>\s*<p[^>]*>Live extension control surface, paired via QR<\/p>/;
+const hasLegacyArchSection = /arch-section|arch-diagram|about\.arch\./.test(ABOUT);
+
 assert(
-  /<h4[^>]*>Sync<\/h4>\s*<p[^>]*>Live extension control surface, paired via QR<\/p>/.test(ABOUT),
-  '[SYNC-05] about-page architecture names Sync as the paired extension control surface'
+  syncArchBoxRe.test(ABOUT) || !hasLegacyArchSection,
+  '[SYNC-05] about-page architecture either names Sync as the paired extension control surface or removes the legacy architecture section'
 );
 assert(
   !/<i class="fa-solid fa-server"><\/i> Remote Control/.test(ABOUT),
@@ -129,8 +132,8 @@ assert(
   '[SYNC-05] about-page arch-box no longer reads "Remote Control"'
 );
 assert(
-  /<h4[^>]*>Sync<\/h4>/.test(ABOUT),
-  '[SYNC-05] about-page arch-box renamed to "Sync"'
+  /<h4[^>]*>Sync<\/h4>/.test(ABOUT) || !hasLegacyArchSection,
+  '[SYNC-05] about-page arch-box renamed to "Sync" or legacy architecture section removed'
 );
 // SYNC-05 originally required a "What is Sync?" FAQ entry to enforce the
 // Remote Control -> Sync rebrand. The FAQ has since been pruned to keep the

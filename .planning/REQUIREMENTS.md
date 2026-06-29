@@ -9,18 +9,18 @@ Requirements for the v1.1.0 milestone. Each maps to roadmap phases beginning at 
 
 ### T1R -- T1 Readiness, Porting, and Verification
 
-- [ ] **T1R-01**: Generate an authoritative T1 readiness matrix over all 2,314 descriptors, including app, slug, side-effect class, current tier/backing, origin class, suspected auth pattern, same-origin/separate-origin feasibility, and next action.
-- [ ] **T1R-02**: Update search/UI/docs language so catalog support, T1-ready execution, fail-closed guarded writes, T2 learn-pending, and T3 DOM/discovery-pending are visibly distinct and cannot be overclaimed.
-- [ ] **T1R-03**: Add a CI guard that prevents a descriptor from being marked T1-ready unless it has a registered handler or recipe plus required verification coverage.
-- [ ] **T1R-04**: Provide a reusable T1 port scaffold for same-origin reads, same-origin writes, and separate-origin candidates.
-- [ ] **T1R-05**: Every new T1 port must prove origin-pin, executeBoundSpec-only execution, logged-out/body shape guards, no-secret logging, consent compatibility, and router parity.
-- [ ] **T1R-06**: Port a first batch of high-value read descriptors to executable T1/T1b, selected by readiness feasibility, user value, and low side-effect risk.
-- [ ] **T1R-07**: Implement or explicitly reject a Pattern-D execution architecture for separate-origin/per-org-subdomain APIs, with negative-control tests proving unsafe ports fail closed.
-- [ ] **T1R-08**: Spike and decide the Google Workspace GAPI bridge handler family for Docs, Drive, and Calendar through a page-owned `window.gapi.client.request` trampoline.
-- [ ] **T1R-09**: Preserve all v1.0.0 security walls: no OpenTabs runtime/plugin code, no new MCP tool-per-app surface, no secret persistence, and denylist/sensitive-origin behavior unchanged unless deliberately re-scoped.
-- [ ] **T1R-10**: Generalize the live UAT template for guarded writes/destructive actions, recording method/path/body shape and CSRF/token location redacted to shape only.
-- [ ] **T1R-11**: Activate write/destructive T1 handlers only when live mutation-body UAT and consent/audit checks pass; otherwise keep them fail-closed with explicit reasons.
-- [ ] **T1R-12**: Close with a before/after T1 coverage report, full regression suite, validate:extension, and prioritized next-batch plan for the remaining tail.
+- [x] **T1R-01**: Generate an authoritative T1 readiness matrix over all 2,314 descriptors, including app, slug, side-effect class, current tier/backing, origin class, suspected auth pattern, same-origin/separate-origin feasibility, and next action.
+- [x] **T1R-02**: Update search/UI/docs language so catalog support, T1-ready execution, fail-closed guarded writes, T2 learn-pending, and T3 DOM/discovery-pending are visibly distinct and cannot be overclaimed.
+- [x] **T1R-03**: Add a CI guard that prevents a descriptor from being marked T1-ready unless it has a registered handler or recipe plus required verification coverage.
+- [x] **T1R-04**: Provide a reusable T1 port scaffold for same-origin reads, same-origin writes, and separate-origin candidates.
+- [x] **T1R-05**: Every new T1 port must prove origin-pin, executeBoundSpec-only execution, logged-out/body shape guards, no-secret logging, consent compatibility, and router parity.
+- [x] **T1R-06**: Port a first batch of high-value read descriptors to executable T1/T1b, selected by readiness feasibility, user value, and low side-effect risk.
+- [x] **T1R-07**: Implement or explicitly reject a Pattern-D execution architecture for separate-origin/per-org-subdomain APIs, with negative-control tests proving unsafe ports fail closed.
+- [x] **T1R-08**: Spike and decide the Google Workspace GAPI bridge handler family for Docs, Drive, and Calendar through a page-owned `window.gapi.client.request` trampoline.
+- [x] **T1R-09**: Preserve all v1.0.0 security walls: no OpenTabs runtime/plugin code, no new MCP tool-per-app surface, no secret persistence, and denylist/sensitive-origin behavior unchanged unless deliberately re-scoped.
+- [x] **T1R-10**: Generalize the live UAT template for guarded writes/destructive actions, recording method/path/body shape and CSRF/token location redacted to shape only.
+- [x] **T1R-11**: Activate write/destructive T1 handlers only when live mutation-body UAT and consent/audit checks pass; otherwise keep them fail-closed with explicit reasons.
+- [x] **T1R-12**: Close with a before/after T1 coverage report, full regression suite, validate:extension, and prioritized next-batch plan for the remaining tail.
 
 ## v2 Requirements
 
@@ -46,18 +46,18 @@ Acknowledged but deferred beyond v1.1.0 unless pulled into an approved phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| T1R-01 | Phase 44 | Pending |
-| T1R-02 | Phase 44 | Pending |
-| T1R-03 | Phase 44 | Pending |
-| T1R-04 | Phase 45 | Pending |
-| T1R-05 | Phase 45 | Pending |
-| T1R-06 | Phase 46, Phase 48 | Pending |
-| T1R-07 | Phase 47, Phase 48 | Pending |
-| T1R-08 | Phase 47, Phase 48 | Pending |
-| T1R-09 | Phase 45 | Pending |
-| T1R-10 | Phase 49 | Pending |
-| T1R-11 | Phase 49 | Pending |
-| T1R-12 | Phase 50 | Pending |
+| T1R-01 | Phase 44 | Complete |
+| T1R-02 | Phase 44 | Complete |
+| T1R-03 | Phase 44 | Complete |
+| T1R-04 | Phase 45 | Complete |
+| T1R-05 | Phase 45 | Complete |
+| T1R-06 | Phase 46, Phase 48 | Complete |
+| T1R-07 | Phase 47, Phase 48 | Complete |
+| T1R-08 | Phase 47, Phase 48 | Complete |
+| T1R-09 | Phase 45 | Complete |
+| T1R-10 | Phase 49 | Complete |
+| T1R-11 | Phase 49 | Complete |
+| T1R-12 | Phase 50 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
