@@ -1,6 +1,6 @@
 # Phase 51 T1 Tail Worklist
 
-**Generated:** 2026-06-30T05:06:59.260Z
+**Generated:** 2026-06-30T16:17:52.496Z
 
 This worklist is generated from the Phase 44 readiness report and covers every descriptor that is not currently executable T1 or guarded fail-closed. It is a migration target list, not an execution claim.
 
@@ -9,12 +9,12 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 | Metric | Count |
 |--------|------:|
 | Total descriptors | 2314 |
-| Current T1-ready descriptors | 69 |
+| Current T1-ready descriptors | 84 |
 | Current guarded fail-closed writes | 5 |
-| Tail rows in this worklist | 2240 |
-| Actionable non-denied tail rows | 2046 |
+| Tail rows in this worklist | 2225 |
+| Actionable non-denied tail rows | 2031 |
 | Blocked policy rows | 194 |
-| Read rows | 1566 |
+| Read rows | 1551 |
 | Write rows | 508 |
 | Destructive rows | 166 |
 
@@ -24,7 +24,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 |------|------:|
 | `same-origin-read` | 1096 |
 | `write-destructive-uat` | 638 |
-| `pattern-d` | 229 |
+| `pattern-d` | 214 |
 | `blocked-policy` | 194 |
 | `gapi-bridge` | 83 |
 
@@ -57,7 +57,6 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 | `meticulous` | 26 |
 | `powerpoint` | 26 |
 | `supabase` | 26 |
-| `asana` | 24 |
 | `outlook` | 24 |
 | `pinterest` | 24 |
 | `bitbucket` | 23 |
@@ -82,6 +81,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 | `stackoverflow` | 20 |
 | `starbucks` | 20 |
 | `gdocs` | 19 |
+| `notebooklm` | 19 |
 
 ## Route Feasibility
 
@@ -89,7 +89,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 |------|------:|
 | `same-origin-read-candidate` | 1096 |
 | `dom-discovery-only` | 480 |
-| `pattern-d-candidate` | 337 |
+| `pattern-d-candidate` | 322 |
 | `blocked` | 194 |
 | `gapi-bridge-candidate` | 133 |
 
@@ -97,7 +97,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 
 | Item | Count |
 |------|------:|
-| `standard` | 1312 |
+| `standard` | 1297 |
 | `sensitive` | 734 |
 | `denied` | 194 |
 

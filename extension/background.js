@@ -199,6 +199,7 @@ try { importScripts('catalog/handlers/bitbucket.js'); } catch (e) { console.erro
 try { importScripts('catalog/handlers/circleci.js'); } catch (e) { console.error('[FSB] Failed to load handlers/circleci.js:', e.message); }
 try { importScripts('catalog/handlers/vercel.js'); } catch (e) { console.error('[FSB] Failed to load handlers/vercel.js:', e.message); }
 try { importScripts('catalog/handlers/retool.js'); } catch (e) { console.error('[FSB] Failed to load handlers/retool.js:', e.message); }
+try { importScripts('catalog/handlers/asana.js'); } catch (e) { console.error('[FSB] Failed to load handlers/asana.js:', e.message); }
 try {
   if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
       && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {

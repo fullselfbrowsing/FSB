@@ -28,6 +28,7 @@ const ROOT = resolve(__dirname, '..');
 const require = createRequire(import.meta.url);
 
 export const HANDLER_BY_APP = Object.freeze({
+  asana: 'asana.js',
   bitbucket: 'bitbucket.js',
   circleci: 'circleci.js',
   github: 'github.js',

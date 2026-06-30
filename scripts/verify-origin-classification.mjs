@@ -93,7 +93,8 @@ const HEAD_APP_MAP = {
     app: 'retool',
     fallbackBaseUrl: 'https://retool.com',
     relativeRuntimeBaseUrl: '/api'
-  }
+  },
+  FsbHandlerAsana: { app: 'asana', fallbackBaseUrl: 'https://app.asana.com' }
 };
 
 /**

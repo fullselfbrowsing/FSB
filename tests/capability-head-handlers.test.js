@@ -130,7 +130,8 @@ function makeCtx(origin, tabId, opts) {
         const isCircleciRest = isGet && url.indexOf('https://app.circleci.com/api/v2') === 0;
         const isVercelRest = isGet && url.indexOf('https://vercel.com/api') === 0;
         const isRetoolRest = isGet && url.indexOf('https://retool.com/api') === 0;
-        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest && !isVercelRest && !isRetoolRest;
+        const isAsanaRest = isGet && url.indexOf('https://app.asana.com/api/1.0') === 0;
+        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest && !isVercelRest && !isRetoolRest && !isAsanaRest;
         let text = null;
         if (isProbe && url.indexOf('app.slack.com') !== -1) {
           text = Object.prototype.hasOwnProperty.call(options, 'slackProbeText')
@@ -280,6 +281,15 @@ function makeCtx(origin, tabId, opts) {
             data = { workflowsMetadata: [{ id: 'wf_1', name: 'Workflow' }], workflowFolders: [] };
           } else {
             data = { ok: true };
+          }
+        } else if (url.indexOf('https://app.asana.com/api/1.0') === 0) {
+          const pathOnly = url.split('?')[0];
+          if (pathOnly.indexOf('/users/me') !== -1) {
+            data = { data: { gid: 'user-test', name: 'Asana User', email: 'user@example.invalid', workspaces: [{ gid: 'workspace-test', name: 'Workspace' }] } };
+          } else if (/\/(projects|tasks|users)\/[^/]+$/.test(pathOnly)) {
+            data = { data: { gid: 'object-test', name: 'Asana Object' } };
+          } else {
+            data = { data: [{ gid: 'item-test', name: 'Asana Item' }], next_page: null };
           }
         } else {
           data = { ok: true };
@@ -1132,6 +1142,106 @@ const Schema = require(SCHEMA_PATH);
       'retool.list_apps rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
   }
 
+  const asanaPath = path.join(HANDLERS_DIR, 'asana.js');
+  check(fs.existsSync(asanaPath), 'catalog/handlers/asana.js exists (Phase 51)');
+  if (fs.existsSync(asanaPath)) {
+    const as = require(asanaPath);
+    const asSrc = readSource(asanaPath);
+    const expectedAsanaSlugs = [
+      'asana.get_current_user',
+      'asana.get_project',
+      'asana.get_stories_for_task',
+      'asana.get_subtasks',
+      'asana.get_task',
+      'asana.get_tasks_for_project',
+      'asana.get_tasks_for_section',
+      'asana.get_user',
+      'asana.list_projects',
+      'asana.list_sections',
+      'asana.list_tags',
+      'asana.list_teams',
+      'asana.list_users_for_workspace',
+      'asana.list_workspaces',
+      'asana.search_tasks'
+    ];
+
+    check(expectedAsanaSlugs.every(function (slug) {
+      return as[slug] && as[slug].tier === 'T1a'
+        && as[slug].sideEffectClass === 'read'
+        && as[slug].origin === 'https://app.asana.com'
+        && as[slug].params
+        && as[slug].params.type === 'object'
+        && typeof as[slug].handle === 'function';
+    }), 'all 15 Asana selected reads are tier:T1a READ entries pinned to https://app.asana.com');
+    check(!/chrome\.(scripting|tabs)/.test(asSrc),
+      'asana.js references NO chrome.scripting/chrome.tabs');
+    check(!/\bfetch\s*\(/.test(asSrc),
+      'asana.js performs no direct network call');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf|authorization|bearer|auth_token)\b/i.test(asSrc),
+      'asana.js does NOT console-log a secret-bearing variable');
+
+    const asUser = makeCtx('https://app.asana.com', 51);
+    const asUserOut = await as['asana.get_current_user'].handle({}, asUser.ctx);
+    check(asUser.calls.length === 1 && asUser.calls[0].spec.method === 'GET',
+      'asana.get_current_user builds one GET spec');
+    check(asUser.calls.length === 1 && asUser.calls[0].spec.origin === 'https://app.asana.com',
+      'asana.get_current_user pins the spec to app.asana.com');
+    check(asUser.calls.length === 1 && asUser.calls[0].spec.url.indexOf('https://app.asana.com/api/1.0/users/me?') === 0,
+      'asana.get_current_user targets /api/1.0/users/me');
+    check(asUserOut && asUserOut.success === true,
+      'asana.get_current_user accepts a logged-in Asana data envelope');
+
+    const asWorkspaces = makeCtx('https://app.asana.com', 51);
+    const asWorkspacesOut = await as['asana.list_workspaces'].handle({}, asWorkspaces.ctx);
+    check(asWorkspaces.calls.length === 1 && asWorkspaces.calls[0].spec.url === 'https://app.asana.com/api/1.0/workspaces',
+      'asana.list_workspaces targets /api/1.0/workspaces');
+    check(asWorkspacesOut && asWorkspacesOut.success === true,
+      'asana.list_workspaces accepts an array data envelope');
+
+    const asProjects = makeCtx('https://app.asana.com', 51);
+    await as['asana.list_projects'].handle({ workspace_gid: 'workspace-test', archived: false, limit: 10, offset: 'next-page' }, asProjects.ctx);
+    check(asProjects.calls.length === 1
+      && asProjects.calls[0].spec.url.indexOf('https://app.asana.com/api/1.0/projects?') === 0
+      && asProjects.calls[0].spec.url.indexOf('workspace=workspace-test') !== -1
+      && asProjects.calls[0].spec.url.indexOf('archived=false') !== -1
+      && asProjects.calls[0].spec.url.indexOf('limit=10') !== -1
+      && asProjects.calls[0].spec.url.indexOf('offset=next-page') !== -1,
+      'asana.list_projects maps workspace, archived, limit, and offset query params');
+
+    const asTask = makeCtx('https://app.asana.com', 51);
+    await as['asana.get_task'].handle({ task_gid: 'task test', opt_fields: 'gid,name' }, asTask.ctx);
+    check(asTask.calls.length === 1
+      && asTask.calls[0].spec.url.indexOf('https://app.asana.com/api/1.0/tasks/task%20test?') === 0
+      && asTask.calls[0].spec.url.indexOf('opt_fields=gid%2Cname') !== -1,
+      'asana.get_task encodes task_gid and caller opt_fields');
+
+    const asSearch = makeCtx('https://app.asana.com', 51);
+    await as['asana.search_tasks'].handle({
+      workspace_gid: 'workspace-test',
+      text: 'bug fix',
+      assignee_gid: 'user-test',
+      completed: false,
+      projects_any: 'project-a,project-b',
+      limit: 5
+    }, asSearch.ctx);
+    check(asSearch.calls.length === 1
+      && asSearch.calls[0].spec.url.indexOf('https://app.asana.com/api/1.0/workspaces/workspace-test/tasks/search?') === 0
+      && asSearch.calls[0].spec.url.indexOf('text=bug%20fix') !== -1
+      && asSearch.calls[0].spec.url.indexOf('assignee.any=user-test') !== -1
+      && asSearch.calls[0].spec.url.indexOf('completed=false') !== -1
+      && asSearch.calls[0].spec.url.indexOf('projects.any=project-a%2Cproject-b') !== -1,
+      'asana.search_tasks maps filtered search query params');
+
+    const asNeg = makeCtx('https://app.asana.com', 51, { readData: { errors: [{ message: 'not authenticated' }] } });
+    const asNegOut = await as['asana.list_workspaces'].handle({}, asNeg.ctx);
+    check(asNegOut && asNegOut.success === false
+      && asNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && asNegOut.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+      && asNegOut.error === 'RECIPE_DOM_FALLBACK_PENDING'
+      && asNegOut.fellBackToDom === true,
+      'asana.list_workspaces rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
+  }
+
   // =========================================================================
   // Phase 40 (DEPTH-01) -- Slack EXTEND -- catalog/handlers/slack.js
   // (3 new READ T1a slugs via callSlackMethod; token in BODY never logged).
@@ -1321,7 +1431,7 @@ const Schema = require(SCHEMA_PATH);
     }
   });
 
-  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js', 'vercel.js', 'retool.js'].forEach(function (name) {
+  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js', 'vercel.js', 'retool.js', 'asana.js'].forEach(function (name) {
     const src = path.join(HANDLERS_DIR, name);
     const ext = path.join(EXT_HANDLERS_DIR, name);
     check(fs.existsSync(ext), 'extension/catalog/handlers/' + name + ' exists for unpacked dev loads');

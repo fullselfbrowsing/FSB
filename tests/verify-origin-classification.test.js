@@ -67,8 +67,8 @@ function check(cond, msg) {
   check(fs.existsSync(CATALOG_PATH), '(a) capability-catalog.js exists (the head manifest source)');
   const catalogSrc = fs.existsSync(CATALOG_PATH) ? fs.readFileSync(CATALOG_PATH, 'utf8') : '';
   const realHeads = gate.parseHeadModules(catalogSrc) || [];
-  check(realHeads.length === 9,
-    '(a) parseHeadModules returns exactly 9 heads from the real catalog source; got ' + realHeads.length);
+  check(realHeads.length === 10,
+    '(a) parseHeadModules returns exactly 10 heads from the real catalog source; got ' + realHeads.length);
   const byGlobal = {};
   for (const h of realHeads) { byGlobal[h.global] = h.origin; }
   check(byGlobal.FsbHandlerGithub === 'https://github.com',
@@ -89,6 +89,8 @@ function check(cond, msg) {
     '(a) FsbHandlerVercel origin parsed as https://vercel.com');
   check(byGlobal.FsbHandlerRetool === 'https://retool.com',
     '(a) FsbHandlerRetool origin parsed as https://retool.com');
+  check(byGlobal.FsbHandlerAsana === 'https://app.asana.com',
+    '(a) FsbHandlerAsana origin parsed as https://app.asana.com');
 
   // (a-IN01) a synthetic NESTED-brace entry parses WHOLE (origin not dropped to null).
   // The old /\{[^}]*\}/g entry regex would have truncated this entry at the inner `}` of
@@ -143,7 +145,7 @@ function check(cond, msg) {
   // accommodation against the genuinely-extracted vendored dynamic form (not a stub).
   const real = gate.checkOriginClassification();
   check(real && Array.isArray(real.failures) && real.failures.length === 0,
-    '(b) the REAL 9 heads over the live catalog + vendored source yield 0 failures ['
+    '(b) the REAL 10 heads over the live catalog + vendored source yield 0 failures ['
       + (real && real.failures && real.failures.length ? real.failures.join(' | ') : 'all same-origin') + ']');
   const realSlack = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerSlack') : null;
   check(!!realSlack && realSlack.classification.sameOrigin === true
@@ -177,6 +179,10 @@ function check(cond, msg) {
   check(!!realRetool && realRetool.apiBaseUrl === 'https://retool.com/api'
     && realRetool.classification && realRetool.classification.sameOrigin === true,
     '(b) the REAL retool head uses the Retool-only relative /api runtime override and classifies same-origin');
+  const realAsana = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerAsana') : null;
+  check(!!realAsana && realAsana.apiBaseUrl === 'https://app.asana.com/api/1.0'
+    && realAsana.classification && realAsana.classification.sameOrigin === true,
+    '(b) the REAL asana head is verified against vendored app.asana.com/api/1.0 and classifies same-origin');
 
   const badRetoolOverride = gate.checkOriginClassification(
     [{ global: 'FsbHandlerRetoolBad', origin: 'https://retool.com' }],

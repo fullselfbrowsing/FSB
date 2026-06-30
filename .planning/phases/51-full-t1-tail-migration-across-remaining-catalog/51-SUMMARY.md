@@ -8,6 +8,8 @@ Plan 51-02 landed the first conservative bulk migration pass. It generated bundl
 
 Plan 51-03 landed the Retool CSRF same-origin read head. It promoted 16 no-parameter Retool GET reads to T1a using the existing bound same-origin fetch path and cookie-based `xsrfToken` CSRF source.
 
-Current state after 51-03: 69 executable T1-ready descriptors, 5 guarded fail-closed writes, and 2,240 catalog-tail descriptors still needing migration or explicit terminal-state evidence.
+Plan 51-04 landed the Asana same-origin Pattern-D carveout. It promoted 15 Asana read descriptors to T1a after verifying the vendored runtime uses `https://app.asana.com/api/1.0`, not a separate-origin bridge.
 
-Next workstreams remain Pattern-D/GAPI bridge implementation, sensitive/policy triage, and write/destructive UAT activation. The milestone must not claim "all apps are T1" until the readiness gate, port-contract gate, worklist, and full regression suite all agree there are no untriaged non-denied tail rows.
+Current state after 51-04: 84 executable T1-ready descriptors, 5 guarded fail-closed writes, and 2,225 catalog-tail descriptors still needing migration or explicit terminal-state evidence.
+
+Next workstreams remain true Pattern-D/GAPI bridge implementation, sensitive/policy triage, and write/destructive UAT activation. The milestone must not claim "all apps are T1" until the readiness gate, port-contract gate, worklist, and full regression suite all agree there are no untriaged non-denied tail rows.

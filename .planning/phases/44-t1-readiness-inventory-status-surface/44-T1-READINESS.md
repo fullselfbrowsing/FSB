@@ -1,6 +1,6 @@
 # Phase 44 T1 Readiness Matrix
 
-**Generated:** 2026-06-30T05:06:59.252Z
+**Generated:** 2026-06-30T16:17:52.465Z
 
 This report is generated from `extension/catalog/recipe-index.generated.js` plus the live `capability-catalog.js` resolver. It is the v1.1.0 truth surface: catalog/search support means a capability is searchable and routable, not that every app has direct API execution today.
 
@@ -11,17 +11,17 @@ This report is generated from `extension/catalog/recipe-index.generated.js` plus
 | Total descriptors | 2314 |
 | App stems | 128 |
 | Distinct service hosts | 129 |
-| T0/T1a/T1b resolved descriptors | 74 |
-| T1 ready executable descriptors | 69 |
+| T0/T1a/T1b resolved descriptors | 89 |
+| T1 ready executable descriptors | 84 |
 | T1 guarded fail-closed writes | 5 |
 | Learn-pending descriptors | 0 |
-| DOM/discovery-pending descriptors | 2046 |
+| DOM/discovery-pending descriptors | 2031 |
 | Blocked descriptors | 194 |
-| Catalog tail not direct API-ready | 2240 |
+| Catalog tail not direct API-ready | 2225 |
 
 ## What This Means
 
-The catalog spans 128 app stems. That 128-app breadth is catalog/search support, not direct API execution for every app. `invoke_capability` executes only proven T0/T1a/T1b handlers or recipes today; guarded writes return fail-closed pending UAT; the remaining 2240-descriptor tail stays DOM/discovery, learn-pending, or blocked by denylist.
+The catalog spans 128 app stems. That 128-app breadth is catalog/search support, not direct API execution for every app. `invoke_capability` executes only proven T0/T1a/T1b handlers or recipes today; guarded writes return fail-closed pending UAT; the remaining 2225-descriptor tail stays DOM/discovery, learn-pending, or blocked by denylist.
 
 Non-denied origins are allowed under Auto for ordinary capability invoke. Denylisted origins remain blocked. Sensitive origins are flagged in UI/audit records, while extra confirmation remains scoped to network-capture discovery.
 
@@ -29,10 +29,10 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 
 | Status | Count |
 |--------|------:|
-| t1-ready | 69 |
+| t1-ready | 84 |
 | t1-guarded-fail-closed | 5 |
 | learn-pending | 0 |
-| discovery-pending | 2046 |
+| discovery-pending | 2031 |
 | blocked | 194 |
 | unknown | 0 |
 
@@ -44,7 +44,7 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 | `airtable` | 8 | 0 | 0 | 0 | 8 | 0 |
 | `amazon` | 6 | 0 | 0 | 0 | 6 | 0 |
 | `amplitude` | 15 | 0 | 0 | 0 | 15 | 0 |
-| `asana` | 24 | 0 | 0 | 0 | 24 | 0 |
+| `asana` | 24 | 15 | 0 | 0 | 9 | 0 |
 | `aws` | 16 | 0 | 0 | 0 | 16 | 0 |
 | `azure` | 26 | 0 | 0 | 0 | 26 | 0 |
 | `bestbuy` | 11 | 2 | 0 | 0 | 9 | 0 |
@@ -219,21 +219,21 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 - `asana.create_story` (app.asana.com)
 - `asana.create_task` (app.asana.com)
 - `asana.delete_task` (app.asana.com)
-- `asana.get_current_user` (app.asana.com)
-- `asana.get_project` (app.asana.com)
-- `asana.get_stories_for_task` (app.asana.com)
-- `asana.get_subtasks` (app.asana.com)
-- `asana.get_task` (app.asana.com)
-- `asana.get_tasks_for_project` (app.asana.com)
-- `asana.get_tasks_for_section` (app.asana.com)
-- `asana.get_user` (app.asana.com)
-- `asana.list_projects` (app.asana.com)
-- `asana.list_sections` (app.asana.com)
-- `asana.list_tags` (app.asana.com)
-- `asana.list_teams` (app.asana.com)
-- `asana.list_users_for_workspace` (app.asana.com)
-- `asana.list_workspaces` (app.asana.com)
-- `asana.search_tasks` (app.asana.com)
+- `asana.update_project` (app.asana.com)
+- `asana.update_task` (app.asana.com)
+- `aws.describe_instance` (console.aws.amazon.com)
+- `aws.get_current_user` (console.aws.amazon.com)
+- `aws.get_function` (console.aws.amazon.com)
+- `aws.invoke_function` (console.aws.amazon.com)
+- `aws.list_alarms` (console.aws.amazon.com)
+- `aws.list_functions` (console.aws.amazon.com)
+- `aws.list_iam_roles` (console.aws.amazon.com)
+- `aws.list_iam_users` (console.aws.amazon.com)
+- `aws.list_instances` (console.aws.amazon.com)
+- `aws.list_log_groups` (console.aws.amazon.com)
+- `aws.list_regions` (console.aws.amazon.com)
+- `aws.list_security_groups` (console.aws.amazon.com)
+- `aws.list_subnets` (console.aws.amazon.com)
 
 ### GAPI Bridge Candidates
 - `ganalytics.check_compatibility` (analytics.google.com)

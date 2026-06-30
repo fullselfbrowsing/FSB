@@ -88,7 +88,7 @@ export function bucketOfBacking(backing) {
 // ---- Resolve()-cross-check seam: plant the catalog + seed the heads ----------
 // Plant global.FsbRecipeIndex = the committed catalog so capability-catalog.js's
 // _getDescriptor read path sees the SAME descriptor array capability-search.js
-// indexes (mirrors tests/no-dead-entry.test.js). Load the 3 head handler modules
+// indexes (mirrors tests/no-dead-entry.test.js). Load the head handler modules
 // (they self-register their FsbHandler* globals at require) THEN seedHeadHandlers()
 // so a 'handler' descriptor resolves to its real T1a tier (not the CGEN-03 T3
 // fallback). Returns the catalog module's resolve() bound to the planted index.
@@ -105,6 +105,13 @@ function buildResolver(catalog) {
     'github.js',
     'slack.js',
     'notion.js',
+    'gitlab.js',
+    'netlify.js',
+    'bitbucket.js',
+    'circleci.js',
+    'vercel.js',
+    'retool.js',
+    'asana.js',
   ];
   for (const mod of HANDLER_MODULES) {
     try {

@@ -44,6 +44,7 @@ const EXPECTED_HEAD_GLOBALS = [
   'FsbHandlerCircleci',
   'FsbHandlerVercel',
   'FsbHandlerRetool',
+  'FsbHandlerAsana',
 ];
 
 let passed = 0;
@@ -87,8 +88,8 @@ check(headEntryCount <= CAP,
   `HEAD_HANDLER_MODULES.length ${headEntryCount} <= CAP ${CAP} (the head stays descriptors-only; breadth never sprawls)`);
 
 // ---- Today's exact head -- breadth adds DATA, depth adds narrow same-origin heads --
-check(headEntryCount === 9,
-  `HEAD_HANDLER_MODULES has exactly 9 entries (Phase 51 adds the Retool read head; the head stays <=30); got ${headEntryCount}`);
+check(headEntryCount === 10,
+  `HEAD_HANDLER_MODULES has exactly 10 entries (Phase 51 adds the Retool and Asana read heads; the head stays <=30); got ${headEntryCount}`);
 const missingGlobals = EXPECTED_HEAD_GLOBALS.filter((g) => !foundGlobals.includes(g));
 check(missingGlobals.length === 0,
   `the expected head globals are present (missing: [${missingGlobals.join(', ') || 'none'}])`);

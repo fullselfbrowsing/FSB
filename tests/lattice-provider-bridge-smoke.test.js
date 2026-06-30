@@ -597,9 +597,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // coalescing/back-off scheduler wired additively after discovery-session.js, Plan 43-03).
   // Phase 46/48 (v1.1 T1 expansion): 192 mentions (+4 -- catalog/handlers/{netlify,
   // bitbucket,circleci,vercel}.js).
-  // Phase 51 (full-tail migration): 193 mentions (+1 -- catalog/handlers/retool.js).
+  // Phase 51 (full-tail migration): 194 mentions (+2 -- catalog/handlers/{retool,asana}.js).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 193, 'background.js importScripts count = 193 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js + Phase 46/48 +4 catalog handlers + Phase 51 +1 catalog/handlers/retool.js)');
+  passAssertEqual(importScriptsCount, 194, 'background.js importScripts count = 194 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js + Phase 46/48 +4 catalog handlers + Phase 51 +2 catalog/handlers/{retool,asana}.js)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -616,9 +616,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 40 adds 1 (catalog/handlers/gitlab.js, the 4th bundled-head handler) -> 183.
   // Phase 43 adds 1 (utils/relearn-scheduler.js, the SCALE-02 re-learn scheduler, Plan 43-03) -> 184.
   // Phase 46/48 adds 4 (catalog/handlers/{netlify,bitbucket,circleci,vercel}.js) -> 188.
-  // Phase 51 adds 1 (catalog/handlers/retool.js) -> 189.
+  // Phase 51 adds 2 (catalog/handlers/{retool,asana}.js) -> 190.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 189, 'background.js importScripts() call sites = 189 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js + Phase 46/48 +4 catalog handlers + Phase 51 +1 catalog/handlers/retool.js)');
+  passAssertEqual(importScriptsCallSites, 190, 'background.js importScripts() call sites = 190 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js + Phase 46/48 +4 catalog handlers + Phase 51 +2 catalog/handlers/{retool,asana}.js)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

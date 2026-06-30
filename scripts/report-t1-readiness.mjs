@@ -54,6 +54,7 @@ const HANDLER_MODULES = [
   'circleci.js',
   'vercel.js',
   'retool.js',
+  'asana.js',
 ];
 const EXECUTABLE_TIERS = new Set(['T0', 'T1a', 'T1b']);
 const GUARDED_SET = new Set(GUARDED_FAIL_CLOSED_SLUGS);

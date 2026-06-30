@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
-- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-51, EXTENDED 2026-06-29. Expanded proven T1/guarded coverage from 26 to 74 descriptors so far, then reopened with Phase 51 to drive the remaining catalog tail toward verified T1 execution or an explicit blocked/policy terminal state.
+- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-51, EXTENDED 2026-06-29. Expanded proven T1/guarded coverage from 26 to 89 descriptors so far, then reopened with Phase 51 to drive the remaining catalog tail toward verified T1 execution or an explicit blocked/policy terminal state.
 
 ## Active Milestone
 
@@ -20,13 +20,13 @@
 - Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
 - App stems with no direct T1 path: **123**.
 
-**Current Phase 51 state after plan 51-03:**
+**Current Phase 51 state after plan 51-04:**
 
 - Total descriptors: **2,314**.
-- T1-ready executable descriptors: **69**.
+- T1-ready executable descriptors: **84**.
 - T1 guarded fail-closed writes: **5**.
-- Catalog tail not direct API-ready: **2,240** (**2,046 discovery-pending**, **194 blocked**).
-- App stems with at least one direct T1/guarded row: **13**.
+- Catalog tail not direct API-ready: **2,225** (**2,031 discovery-pending**, **194 blocked**).
+- App stems with at least one direct T1/guarded row: **14**.
 
 **Hard invariants:**
 
@@ -198,10 +198,11 @@
 - [x] 51-01: Full-tail worklist generator, acceptance gate, and batch scheduler.
 - [x] 51-02: Existing-head and low-risk same-origin read bulk port.
 - [x] 51-03: Retool CSRF same-origin read head.
-- [ ] 51-04: Pattern-D and GAPI bridge implementation waves.
-- [ ] 51-05: Sensitive consumer/social and blocked-policy triage.
-- [ ] 51-06: Write/destructive live-UAT activation waves.
-- [ ] 51-07: Final all-tail regression, UAT ledger, and closeout.
+- [x] 51-04: Asana same-origin Pattern-D carveout.
+- [ ] 51-05: Pattern-D and GAPI bridge implementation waves.
+- [ ] 51-06: Sensitive consumer/social and blocked-policy triage.
+- [ ] 51-07: Write/destructive live-UAT activation waves.
+- [ ] 51-08: Final all-tail regression, UAT ledger, and closeout.
 
 ## Progress
 
@@ -214,7 +215,7 @@
 | 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
 | 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
 | 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
-| 51. Full T1 Tail Migration Across Remaining Catalog | 3/7 | Active | - |
+| 51. Full T1 Tail Migration Across Remaining Catalog | 4/8 | Active | - |
 
 ## Completed Milestones
 
