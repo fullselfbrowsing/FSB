@@ -3,24 +3,38 @@
     <div class="privacy-header">
       <div class="section-label" i18n="@@privacy.header.kicker">Legal</div>
       <h1 i18n="@@privacy.header.title">Privacy Policy</h1>
-      <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: March 2026</p>
+      <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: May 2026</p>
     </div>
 
     <div class="privacy-content">
 
       <!-- TLDR -->
       <div class="privacy-callout">
-        <p i18n="@@privacy.tldr.body"><strong>TLDR</strong> <span [attr.translate]="'no'">FSB</span> operates entirely within your browser. No browsing data is collected. API keys are encrypted locally with <span [attr.translate]="'no'">AES-GCM</span>. AI calls go directly from your browser to the provider you choose. The optional relay server for Background Agents stores only run metadata, never page content. Memory data stays on your device. Everything is open source and auditable.</p>
+        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> operates entirely within your browser. No browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers, and AI calls go directly from your browser to the provider you choose. API keys are encrypted locally with <span [attr.translate]="'no'">AES-GCM</span>, and memory data stays on your device. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a href="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
       </div>
 
       <!-- Data Collection -->
       <h2 i18n="@@privacy.section.dataCollection.title">Data Collection</h2>
-      <p i18n="@@privacy.section.dataCollection.body"><span [attr.translate]="'no'">FSB</span> operates entirely within your browser. The extension only accesses the DOM (Document Object Model) of the currently active tab when you initiate an automation task.</p>
+      <p i18n="@@privacy.section.dataCollection.body"><span [attr.translate]="'no'">FSB</span> operates entirely within your browser. When you initiate an automation task, the extension may inspect the active tab's <span [attr.translate]="'no'">DOM</span> (Document Object Model) and, when you invoke a capability, make same-origin site <span [attr.translate]="'no'">API</span> requests from your browser session.</p>
       <ul>
         <li i18n="@@privacy.section.dataCollection.li.1">No browsing history is collected or stored beyond the current session</li>
-        <li i18n="@@privacy.section.dataCollection.li.2">DOM data is analyzed locally and discarded after each automation step</li>
+        <li i18n="@@privacy.section.dataCollection.li.2"><span [attr.translate]="'no'">DOM</span> data and site <span [attr.translate]="'no'">API</span> results are analyzed locally and discarded after each automation step unless you explicitly save them in memory</li>
         <li i18n="@@privacy.section.dataCollection.li.3">No personal information is harvested from pages you visit</li>
       </ul>
+
+      <h3 i18n="@@privacy.section.siteApi.title">Site <span [attr.translate]="'no'">API</span> capabilities</h3>
+      <p i18n="@@privacy.section.siteApi.body"><span [attr.translate]="'no'">FSB</span>'s capability layer can call a site's own first-party <span [attr.translate]="'no'">API</span> from the page context, using your already-authenticated browser session. These requests run locally in <span [attr.translate]="'no'">Chrome</span>; first-party cookies or site auth may be attached by the browser for that target site, but <span [attr.translate]="'no'">FSB</span> does not return, store, log, or send cookies, tokens, <span [attr.translate]="'no'">CSRF</span> values, request bodies, or response bodies to <span [attr.translate]="'no'">FSB</span> servers.</p>
+      <p i18n="@@privacy.section.siteApi.audit">Capability invocations follow <span [attr.translate]="'no'">FSB</span>'s consent controls and are recorded only in the redacted local audit log: origin, capability slug, method, side-effect class, consent decision, and outcome. The audit log never stores invocation arguments, request bodies, response bodies, cookies, tokens, <span [attr.translate]="'no'">CSRF</span> values, or site response payloads.</p>
+
+      <h3 i18n="@@privacy.section.dataCollection.permissions.title"><span [attr.translate]="'no'">Chrome</span> permissions <span [attr.translate]="'no'">FSB</span> requests</h3>
+      <p i18n="@@privacy.section.dataCollection.permissions.body">To run web automation, <span [attr.translate]="'no'">FSB</span> declares the following permissions in its <span [attr.translate]="'no'">Chrome</span> manifest. Each is used only for the documented purpose; nothing is sent off-device on the strength of any of them.</p>
+      <ul>
+        <li i18n="@@privacy.section.dataCollection.permissions.li.1"><strong>DOM and tabs</strong>, <code [attr.translate]="'no'">activeTab</code>, <code [attr.translate]="'no'">scripting</code>, <code [attr.translate]="'no'">tabs</code>, <code [attr.translate]="'no'">windows</code>, <code [attr.translate]="'no'">sidePanel</code>, and host permission <code [attr.translate]="'no'">&lt;all_urls&gt;</code>: read and write the active tab, inject the automation content script, list and switch tabs, and render the side panel</li>
+        <li i18n="@@privacy.section.dataCollection.permissions.li.2"><strong>Advanced automation</strong>, <code [attr.translate]="'no'">debugger</code>: attach the <span [attr.translate]="'no'">Chrome DevTools Protocol</span> for coordinate-based clicks, drag, and key-hold actions that the regular <span [attr.translate]="'no'">DOM</span>&nbsp;<span [attr.translate]="'no'">API</span> cannot perform. <code [attr.translate]="'no'">webNavigation</code>: observe navigation start/finish events so automation waits for the right moment</li>
+        <li i18n="@@privacy.section.dataCollection.permissions.li.3"><strong>Local storage</strong>, <code [attr.translate]="'no'">storage</code>, <code [attr.translate]="'no'">unlimitedStorage</code>: store your settings, credentials, payment methods, and memory in <code [attr.translate]="'no'">chrome.storage.local</code> on your device. Unlimited storage lifts the default 10&nbsp;MB quota so memory and session logs can grow without hitting a wall</li>
+        <li i18n="@@privacy.section.dataCollection.permissions.li.4"><strong><span [attr.translate]="'no'">UX</span> helpers</strong>, <code [attr.translate]="'no'">clipboardWrite</code>: write copy-to-clipboard results from automation. <code [attr.translate]="'no'">alarms</code>: schedule background housekeeping. <code [attr.translate]="'no'">offscreen</code>: host the speech-to-text recorder in a hidden document because service workers cannot capture audio directly</li>
+      </ul>
+      <p i18n="@@privacy.section.dataCollection.permissions.note">Microphone access for speech-to-text is <em>not</em> declared in the manifest. <span [attr.translate]="'no'">Chrome</span> shows its own permission prompt the first time you use the mic button.</p>
 
       <!-- Data Storage -->
       <h2 i18n="@@privacy.section.dataStorage.title">Data Storage</h2>
@@ -38,14 +52,24 @@
       <ul>
         <li i18n="@@privacy.section.external.li.1">Hosted API calls are made only to the provider you select (<span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Google</span>, or <span [attr.translate]="'no'">OpenRouter</span>)</li>
         <li i18n="@@privacy.section.external.li.2"><span [attr.translate]="'no'">LM Studio</span> uses a local <span [attr.translate]="'no'">OpenAI</span>-compatible server on your device and does not require an API key</li>
-        <li i18n="@@privacy.section.external.li.3">Sent data includes: task description, DOM structure summary, and action context</li>
-        <li i18n="@@privacy.section.external.li.4">If you use the Remote Dashboard or Background Agents sync, an optional relay server handles WebSocket messages and stores agent run metadata (task name, cost, duration, success/fail). No page content, DOM data, or AI responses are stored on the server. This is opt-in only</li>
+        <li i18n="@@privacy.section.external.li.3">Sent data includes: task description, <span [attr.translate]="'no'">DOM</span> structure summary, and action context</li>
+        <li i18n="@@privacy.section.external.li.4">If you pair <span [attr.translate]="'no'">Remote Dashboard</span> or use legacy Background Agents sync, an optional relay server handles <span [attr.translate]="'no'">WebSocket</span> messages for that session. Live-preview frames may pass through the relay transiently, but page content, <span [attr.translate]="'no'">DOM</span> data, screenshots, AI prompts, AI responses, cookies, tokens, and site <span [attr.translate]="'no'">API</span> payloads are not persisted on the server. This is opt-in only</li>
         <li i18n="@@privacy.section.external.li.5">Each provider has their own privacy policy governing how they handle API requests</li>
       </ul>
 
-      <!-- No Tracking -->
-      <h2 i18n="@@privacy.section.noTracking.title">No Tracking</h2>
-      <p i18n="@@privacy.section.noTracking.body"><span [attr.translate]="'no'">FSB</span> does not include any analytics, telemetry, or tracking services. There are no cookies, no fingerprinting, and no third-party scripts beyond the AI provider APIs you explicitly configure.</p>
+      <!-- PhantomStream / Remote Dashboard -->
+      <h2 i18n="@@privacy.section.phantomStream.title"><span [attr.translate]="'no'">Remote Dashboard</span> and <span [attr.translate]="'no'">PhantomStream</span> Live Preview</h2>
+      <p i18n="@@privacy.section.phantomStream.body">When you pair <span [attr.translate]="'no'">Remote Dashboard</span>, <span [attr.translate]="'no'">FSB</span> can show a live preview of the active browser tab using <span [attr.translate]="'no'">PhantomStream</span>. The preview streams structured <span [attr.translate]="'no'">DOM</span> data instead of pixels: an initial snapshot, <span [attr.translate]="'no'">MutationObserver</span> diffs, scroll position, automation overlays, dialog state, media playback state, and remote-control messages over <span [attr.translate]="'no'">WebSocket</span>.</p>
+      <ul>
+        <li i18n="@@privacy.section.phantomStream.li.1">The relay forwards those live-preview frames only to the paired dashboard session. <span [attr.translate]="'no'">FSB</span> servers do not persist page <span [attr.translate]="'no'">DOM</span>, page content, screenshots, AI prompts, AI responses, cookies, tokens, or site <span [attr.translate]="'no'">API</span> payloads from the preview stream</li>
+        <li i18n="@@privacy.section.phantomStream.li.2"><span [attr.translate]="'no'">FSB</span> enables <span [attr.translate]="'no'">PhantomStream</span> input masking (<code [attr.translate]="'no'">maskInputs: true</code>), so passwords and form-control values are masked before they leave the captured page</li>
+        <li i18n="@@privacy.section.phantomStream.li.3">The dashboard viewer renders mirrored content in a scriptless sandbox and sanitizes mirrored <span [attr.translate]="'no'">DOM</span> and <span [attr.translate]="'no'">CSS</span> before display</li>
+        <li i18n="@@privacy.section.phantomStream.li.4">Images, video, and audio are mirrored by reference in current dashboard mode. Media bytes do not cross the relay; the viewer may fetch allowed public <span [attr.translate]="'no'">HTTPS</span> asset or media URLs directly, while private, internal, non-<span [attr.translate]="'no'">HTTPS</span>, or otherwise blocked origins are replaced with placeholders by <span [attr.translate]="'no'">PhantomStream</span>'s fail-closed fetch policy</li>
+      </ul>
+
+      <!-- No Third-Party Tracking -->
+      <h2 i18n="@@privacy.section.noTracking.title">No Third-Party Tracking</h2>
+      <p i18n="@@privacy.section.noTracking.body"><span [attr.translate]="'no'">FSB</span> does not include any third-party analytics, ad trackers, or cross-site fingerprinting. There are no cookies and no third-party scripts beyond the <span [attr.translate]="'no'">AI</span> provider <span [attr.translate]="'no'">APIs</span> you explicitly configure. The one piece of first-party data <span [attr.translate]="'no'">FSB</span> sends home is the opt-out Anonymous Usage Telemetry described below, used solely to power the public <a href="/stats">/stats</a> dashboard.</p>
 
       <!-- API Keys -->
       <h2 i18n="@@privacy.section.apiKeys.title">API Keys</h2>
@@ -62,9 +86,32 @@
       <ul>
         <li i18n="@@privacy.section.autoPasswords.li.1">Credentials are encrypted at rest using <span [attr.translate]="'no'">AES-GCM</span> with 256-bit keys and <span [attr.translate]="'no'">PBKDF2</span> key derivation</li>
         <li i18n="@@privacy.section.autoPasswords.li.2">When the AI analyzes a page, password field values are replaced with <code [attr.translate]="'no'">[hidden]</code>. The actual password is never included in any AI prompt</li>
-        <li i18n="@@privacy.section.autoPasswords.li.3">Auto-fill is performed by the content script injecting values directly into the DOM, with no AI involvement in the credential flow</li>
+        <li i18n="@@privacy.section.autoPasswords.li.3">Auto-fill is performed by the content script injecting values directly into the <span [attr.translate]="'no'">DOM</span>, with no AI involvement in the credential flow</li>
         <li i18n="@@privacy.section.autoPasswords.li.4">The credential list view only shows usernames and domains. Passwords are decrypted individually and only when needed for auto-fill</li>
         <li i18n="@@privacy.section.autoPasswords.li.5">Credentials are stored per-domain with parent domain fallback (e.g., <span [attr.translate]="'no'">accounts.google.com</span> inherits from <span [attr.translate]="'no'">google.com</span>)</li>
+      </ul>
+
+      <!-- Payment Methods -->
+      <h2 i18n="@@privacy.section.paymentMethods.title">Payment Methods</h2>
+      <p i18n="@@privacy.section.paymentMethods.body"><span [attr.translate]="'no'">FSB</span> includes an optional payment-method vault that stores card details on your device for checkout auto-fill. Cards are treated with the same encryption and AI isolation as login credentials, and the full card number is never sent to any AI model.</p>
+      <ul>
+        <li i18n="@@privacy.section.paymentMethods.li.1">Card details (number, expiry, cardholder, and zip) are encrypted at rest using <span [attr.translate]="'no'">AES-GCM</span> with the same vault-derived key used for credentials</li>
+        <li i18n="@@privacy.section.paymentMethods.li.2">When the AI analyzes a checkout page, any detected card-number field values are replaced with <code [attr.translate]="'no'">[hidden]</code> before the prompt is built. Card numbers, <span [attr.translate]="'no'">CVV</span>, and expiry are never included in any AI prompt</li>
+        <li i18n="@@privacy.section.paymentMethods.li.3">Auto-fill happens via the content script writing directly into the page's <span [attr.translate]="'no'">DOM</span> fields, bypassing the AI entirely</li>
+        <li i18n="@@privacy.section.paymentMethods.li.4">The list view shows only a card nickname and last-4 digits. Full numbers are decrypted in memory only at the moment of fill</li>
+        <li i18n="@@privacy.section.paymentMethods.li.5">An <span [attr.translate]="'no'">MCP</span> client can request a payment fill via <code [attr.translate]="'no'">use_payment_method</code>, but the user is shown an in-extension confirmation prompt before any card data is written into the page</li>
+        <li i18n="@@privacy.section.paymentMethods.li.6"><span [attr.translate]="'no'">CVV</span> is never persisted unless you opt in per-card, and even then it is encrypted alongside the rest of the record</li>
+      </ul>
+
+      <!-- Speech-to-Text -->
+      <h2 i18n="@@privacy.section.speechToText.title">Speech-to-Text</h2>
+      <p i18n="@@privacy.section.speechToText.body"><span [attr.translate]="'no'">FSB</span> includes an optional microphone input for the prompt box. The default provider runs entirely in your browser; an optional <span [attr.translate]="'no'">OpenAI</span> Whisper fallback can be enabled in settings if you want higher accuracy.</p>
+      <ul>
+        <li i18n="@@privacy.section.speechToText.li.1">Default provider: the browser's native <code [attr.translate]="'no'">SpeechRecognition</code>&nbsp;<span [attr.translate]="'no'">API</span>. Audio is processed by <span [attr.translate]="'no'">Chrome</span> and never leaves your device through <span [attr.translate]="'no'">FSB</span></li>
+        <li i18n="@@privacy.section.speechToText.li.2">Optional Whisper provider: when <code [attr.translate]="'no'">sttProvider</code> is set to <code [attr.translate]="'no'">whisper</code> and an <span [attr.translate]="'no'">OpenAI</span> key is configured, recorded audio chunks are uploaded directly from your browser to <span [attr.translate]="'no'">OpenAI</span>'s transcription endpoint. <span [attr.translate]="'no'">FSB</span> never sees or stores the audio</li>
+        <li i18n="@@privacy.section.speechToText.li.3">The microphone is only active while you are holding or have toggled the mic button. <span [attr.translate]="'no'">Chrome</span> prompts for permission the first time you use it; <span [attr.translate]="'no'">FSB</span> does not request microphone access in the extension manifest</li>
+        <li i18n="@@privacy.section.speechToText.li.4">Transcripts are inserted into the prompt textarea only and are never logged, persisted, or transmitted outside the active AI request you choose to send</li>
+        <li i18n="@@privacy.section.speechToText.li.5">Disable speech entirely by leaving the mic button untouched, or by clearing the optional Whisper provider in <span [attr.translate]="'no'">Chrome</span> extension storage</li>
       </ul>
 
       <!-- Prompt Injection Prevention -->
@@ -74,17 +121,18 @@
         <li i18n="@@privacy.section.promptInjection.li.1">All page content is wrapped in <code [attr.translate]="'no'">[PAGE_CONTENT]</code> boundary markers, and the AI is instructed to never follow instructions found within these markers</li>
         <li i18n="@@privacy.section.promptInjection.li.2">A sanitization engine strips known injection patterns (e.g., "ignore previous instructions", fake system prompts, override attempts) from all page content before it reaches the AI</li>
         <li i18n="@@privacy.section.promptInjection.li.3">AI-generated actions are validated before execution. Dangerous URLs (<code [attr.translate]="'no'">javascript:</code>, <code [attr.translate]="'no'">data:</code>) and script injection attempts are blocked</li>
-        <li i18n="@@privacy.section.promptInjection.li.4">Only a strict allowlist of 50+ known tools can be executed. The AI cannot invent or call arbitrary actions</li>
+        <li i18n="@@privacy.section.promptInjection.li.4">Only a strict, fixed allowlist of known tools can be executed. The AI cannot invent or call arbitrary actions</li>
         <li i18n="@@privacy.section.promptInjection.li.5">Content size is capped (500 chars per value, 15K total prompt cap) to limit payload delivery</li>
         <li i18n="@@privacy.section.promptInjection.li.6">Invisible Unicode control characters that websites embed are stripped before processing</li>
       </ul>
 
       <!-- Background Agents & Server Sync -->
       <h2 i18n="@@privacy.section.bgAgents.title">Background Agents and Server Sync</h2>
-      <p i18n="@@privacy.section.bgAgents.body">If you opt into Background Agents server sync or Remote Dashboard pairing, a relay server facilitates communication between your extension and the dashboard.</p>
+      <p i18n="@@privacy.section.bgAgents.deprecated"><strong>Deprecated in <span [attr.translate]="'no'">v0.9.45rc1</span>.</strong>&nbsp;<span [attr.translate]="'no'">FSB</span>'s built-in Background Agents have been superseded by <span [attr.translate]="'no'">OpenClaw</span> and Claude Routines, with remote control now handled by the Sync tab. The disclosures below are retained for users still running <span [attr.translate]="'no'">v0.9.44</span> or earlier; on current builds the relay server is only contacted when you pair a Sync session.</p>
+      <p i18n="@@privacy.section.bgAgents.body">If you opt into legacy Background Agents server sync or pair <span [attr.translate]="'no'">Remote Dashboard</span>, a relay server facilitates communication between your extension and the dashboard.</p>
       <ul>
         <li i18n="@@privacy.section.bgAgents.li.1">The server stores: agent definitions (name, schedule, target URL), run metrics (token count, cost, duration, success/fail status), and session pairing tokens</li>
-        <li i18n="@@privacy.section.bgAgents.li.2">The server does NOT store: page content, DOM data, browsing history, AI prompts, AI responses, or any data from the pages you visit</li>
+        <li i18n="@@privacy.section.bgAgents.li.2">The server does NOT persist: page content, <span [attr.translate]="'no'">DOM</span> data, browsing history, screenshots, AI prompts, AI responses, cookies, tokens, site <span [attr.translate]="'no'">API</span> payloads, or other data from the pages you visit</li>
         <li i18n="@@privacy.section.bgAgents.li.3">Authentication uses hash keys (generated locally) and session tokens that expire after 24 hours</li>
         <li i18n="@@privacy.section.bgAgents.li.4">One-time pairing tokens expire after 60 seconds and cannot be reused</li>
         <li i18n="@@privacy.section.bgAgents.li.5">Server sync is disabled by default. You must explicitly enable it in Options</li>
@@ -102,7 +150,7 @@
 
       <!-- Anonymous Usage Telemetry (v0.9.69 / Phase 275) -->
       <h2 id="telemetry-disclosure" i18n="@@PRIVACY_TELEMETRY_HEADING">Anonymous Usage Telemetry</h2>
-      <p i18n="@@PRIVACY_TELEMETRY_INTRO"><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced an opt-out anonymous usage telemetry pipeline so the project can publish aggregate adoption numbers (see <a href="/stats">/stats</a>) without ever touching the pages you browse. Telemetry is on by default but can be disabled with a single toggle, and the per-install data can be erased on request.</p>
+      <p i18n="@@PRIVACY_TELEMETRY_INTRO"><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced an opt-out anonymous usage telemetry pipeline so the project can publish aggregate adoption numbers (see <a href="/stats">/stats</a>) without ever touching the pages you browse. The only location signal is a coarse country/state label the server derives from your request <span [attr.translate]="'no'">IP</span> at ingest (never from page content), kept only in aggregate &mdash; see <a href="#telemetry-region">Region (state-level) metric</a> below. Telemetry is on by default but can be disabled with a single toggle, and the per-install data can be erased on request.</p>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_COLLECT_HEADING">What we collect</h3>
       <ul>
@@ -117,10 +165,17 @@
       <ul>
         <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_URLS">Page <span [attr.translate]="'no'">URLs</span>, hostnames, or browsing history.</li>
         <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_PROMPTS">Prompts, instructions, task descriptions, or any natural-language text you send to your model provider.</li>
-        <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_DOM">Page <span [attr.translate]="'no'">DOM</span>, screenshots, page content, or <span [attr.translate]="'no'">AI</span> responses.</li>
-        <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_IP">Plaintext <span [attr.translate]="'no'">IP</span> addresses. The server hashes the request <span [attr.translate]="'no'">IP</span> with a daily-rotating salt for rate limiting and discards it.</li>
+        <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_DOM">Page <span [attr.translate]="'no'">DOM</span>, screenshots, page content, site <span [attr.translate]="'no'">API</span> payloads, or <span [attr.translate]="'no'">AI</span> responses.</li>
+        <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_IP">Plaintext <span [attr.translate]="'no'">IP</span> addresses. The server uses the request <span [attr.translate]="'no'">IP</span> transiently and inline for exactly two purposes &mdash; a daily-rotating-salt hash for rate limiting, and deriving a coarse country/state label (see below) &mdash; then discards it immediately. The plaintext <span [attr.translate]="'no'">IP</span> is never stored or logged.</li>
         <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_NAMES">Names, usernames, account handles, or any free-form identity fields.</li>
         <li i18n="@@PRIVACY_TELEMETRY_NOT_COLLECT_EMAILS">Email addresses, phone numbers, or contact information.</li>
+      </ul>
+
+      <h3 id="telemetry-region" i18n="@@PRIVACY_TELEMETRY_REGION_HEADING">Region (state-level) metric</h3>
+      <ul>
+        <li i18n="@@PRIVACY_TELEMETRY_REGION_DERIVED">The server derives a coarse country and US-state (subdivision) label from your request <span [attr.translate]="'no'">IP</span> at ingest, using a self-hosted <span [attr.translate]="'no'">DB-IP</span> <span [attr.translate]="'no'">IP</span>-to-City Lite dataset and our own lookup &mdash; <strong>not</strong> a live third-party geolocation service, and never <span [attr.translate]="'no'">MaxMind</span>. The plaintext <span [attr.translate]="'no'">IP</span> is consumed inline and discarded; only the derived label is kept.</li>
+        <li i18n="@@PRIVACY_TELEMETRY_REGION_KFLOOR">Region is stored <strong>only</strong> in the daily aggregate, behind a k&ge;5 anonymity floor: any state with fewer than 5 distinct installs on a given day collapses into a single &ldquo;Other&rdquo; bucket (suppressed entirely when even that combined count is below 5). No individual state label ever represents fewer than 5 installs.</li>
+        <li i18n="@@PRIVACY_TELEMETRY_REGION_NOPROFILE">There is no per-install location profile. The coarse label lives only on the short-lived raw event (dropped by the 7-day retention) and in the k&ge;5-floored daily rollup; we never build or retain a durable mapping from your install to a place. Geolocation data is by <span [attr.translate]="'no'">DB-IP</span> (<a href="https://db-ip.com" rel="noopener" [attr.translate]="'no'">https://db-ip.com</a>).</li>
       </ul>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_RETENTION_HEADING">Retention</h3>
@@ -130,7 +185,7 @@
       <p i18n="@@PRIVACY_TELEMETRY_OPTOUT_TEXT">Open the <span [attr.translate]="'no'">FSB</span> Control Panel, scroll to Advanced Settings, and toggle <strong>Send anonymous usage data</strong> off. The change takes effect immediately; no further events will be sent from your install.</p>
 
       <h3 id="erase-data" i18n="@@PRIVACY_TELEMETRY_ERASE_HEADING">How to erase your data</h3>
-      <p i18n="@@PRIVACY_TELEMETRY_ERASE_TEXT">To request erasure of all telemetry rows associated with your install (<span [attr.translate]="'no'">GDPR</span> Article 17), look up your <code [attr.translate]="'no'">fsbInstallUuid</code> in <span [attr.translate]="'no'">Chrome</span> <span [attr.translate]="'no'">DevTools</span> &rarr; Application &rarr; Storage &rarr; Extension storage, then send a single <span [attr.translate]="'no'">HTTP</span> request:</p>
+      <p i18n="@@PRIVACY_TELEMETRY_ERASE_TEXT">To request erasure of all telemetry rows associated with your install (<span [attr.translate]="'no'">GDPR</span> Article 17), look up your <code [attr.translate]="'no'">fsbInstallUuid</code> in <span [attr.translate]="'no'">Chrome</span>&nbsp;<span [attr.translate]="'no'">DevTools</span> &rarr; Application &rarr; Storage &rarr; Extension storage, then send a single <span [attr.translate]="'no'">HTTP</span> request:</p>
       <pre i18n="@@PRIVACY_TELEMETRY_ERASE_CURL|GDPR Article 17 erasure curl command. Copy this command literally; do not translate."><code [attr.translate]="'no'">curl -X POST -H "Content-Type: application/json" \
   -d '{{ '{' }}"install_uuid":"&lt;your-uuid&gt;"{{ '}' }}' \
   https://full-selfbrowsing.com/api/telemetry/forget</code></pre>
@@ -141,19 +196,18 @@
       <h3 i18n="@@PRIVACY_TELEMETRY_AGGREGATED_HEADING">Aggregated public metrics</h3>
       <p i18n="@@PRIVACY_TELEMETRY_AGGREGATED_TEXT">We publish aggregated metrics derived from this telemetry pipeline at <a href="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
 
-      <!-- Legal Posture & Consent Model (Phase 30 / GOV-08, D-15) -->
-      <h2 id="legal-posture" i18n="@@PRIVACY_LEGAL_POSTURE_HEADING">Legal Posture and Consent Model</h2>
-      <p i18n="@@PRIVACY_LEGAL_POSTURE_BODY"><span [attr.translate]="'no'">FSB</span>'s automation posture, audit-log retention, and the per-origin consent model are documented in the project's <span [attr.translate]="'no'">LEGAL.md</span> policy file. <span [attr.translate]="'no'">FSB</span> does nothing on an origin until you explicitly allow it, automated read access never implies write access, and a conservative service denylist blocks automation on sensitive categories (financial and government services) outright.</p>
+      <!-- Consent and Audit Controls -->
+      <h2 id="legal-posture" i18n="@@PRIVACY_LEGAL_POSTURE_HEADING">Consent and Audit Controls</h2>
+      <p i18n="@@PRIVACY_LEGAL_POSTURE_BODY"><span [attr.translate]="'no'">FSB</span>'s automation posture is opt-out: non-denylisted origins inherit a user-configurable global default that currently ships as Auto, while explicit per-origin policies can set an origin to Off, Ask, or Auto. Audit-log retention is local and bounded, with export and clear controls available from the Control Panel.</p>
       <ul>
-        <li i18n="@@PRIVACY_LEGAL_POSTURE_CONSENT">Per-origin consent is default-off. Auto and write (mutating) access are separate, explicit opt-ins managed from the Control Panel's Consent &amp; Audit section.</li>
-        <li i18n="@@PRIVACY_LEGAL_POSTURE_AUDIT">Every capability call is recorded in a redacted, append-only local audit log. No arguments, tokens, cookies, or response bodies are ever stored.</li>
-        <li i18n="@@PRIVACY_LEGAL_POSTURE_DENYLIST">A service denylist renders sensitive origins non-enableable, enforced at the capability gate and not merely in the interface.</li>
+        <li i18n="@@PRIVACY_LEGAL_POSTURE_CONSENT">The service denylist is still a hard block. Denied origins are non-enableable regardless of the global default or any stored per-origin policy.</li>
+        <li i18n="@@PRIVACY_LEGAL_POSTURE_AUDIT">Sensitive origins can run reads under Auto, but writes re-enforce the per-origin mutating opt-in before execution. Non-sensitive origins can be opted out or moved to Ask from the Control Panel's Consent &amp; Audit section.</li>
+        <li i18n="@@PRIVACY_LEGAL_POSTURE_DENYLIST">Every capability call is recorded in a redacted, append-only local audit log. No arguments, tokens, cookies, or response bodies are ever stored.</li>
       </ul>
 
       <!-- Open Source -->
       <h2 i18n="@@privacy.section.openSource.title">Open Source</h2>
-       
-      <p i18n="@@privacy.section.openSource.body"><span [attr.translate]="'no'">FSB</span> is fully open source under the <span [attr.translate]="'no'">BSL 1.1</span> License. You can audit every line of code to verify these privacy claims. The source code is available on <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub</a>.</p>
+      <p i18n="@@privacy.section.openSource.body"><span [attr.translate]="'no'">FSB</span> is fully open source under the <span [attr.translate]="'no'">BSL 1.1</span> License. You can audit every line of code to verify these privacy claims. The source code is available on <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub</a>.</p>
 
       <!-- Changes -->
       <h2 i18n="@@privacy.section.changes.title">Changes to This Policy</h2>
@@ -161,29 +215,13 @@
 
       <!-- Contact -->
       <h2 i18n="@@privacy.contact.title">Contact</h2>
-       
-      <p i18n="@@privacy.contact.body">If you have questions about this privacy policy or <span [attr.translate]="'no'">FSB</span>'s data handling, please open an issue on <a href="https://github.com/lakshmanturlapati/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub Issues</a>.</p>
+      <p i18n="@@privacy.contact.body">If you have questions about this privacy policy or <span [attr.translate]="'no'">FSB</span>'s data handling, please open an issue on <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub Issues</a>.</p>
 
       <!-- Policy History -->
       <h2 i18n="@@privacy.history.title">Policy History</h2>
-      <details class="policy-version">
-        <summary>
-          <span class="policy-version-date" i18n="@@privacy.history.v902.date">March 2026</span>
-          <span i18n="@@privacy.history.v902.label"><span [attr.translate]="'no'">v9.0.2</span> &mdash; Background Agents, Memory System, Server Sync</span>
-        </summary>
-        <div class="policy-version-body">
-          <p i18n="@@privacy.history.v902.body">Added sections for Background Agents and Server Sync (optional relay server for dashboard pairing and agent run metadata). Added Memory System section (all local storage). Updated External Services to acknowledge optional server, <span [attr.translate]="'no'">OpenRouter</span>, and <span [attr.translate]="'no'">LM Studio</span> local-provider support. Updated action count to 50+.</p>
-        </div>
-      </details>
-      <details class="policy-version">
-        <summary>
-          <span class="policy-version-date" i18n="@@privacy.history.v09.date">February 2026</span>
-          <span i18n="@@privacy.history.v09.label"><span [attr.translate]="'no'">v0.9</span> &mdash; Initial privacy policy</span>
-        </summary>
-        <div class="policy-version-body">
-          <p i18n="@@privacy.history.v09.body">Initial privacy policy covering data collection, storage, external services, API key encryption, auto-passwords, prompt injection prevention, and open source transparency. Four AI providers supported (<span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Google Gemini</span>).</p>
-        </div>
-      </details>
+      <p i18n="@@privacy.history.intro" class="policy-version-intro">Each entry below is a complete snapshot of the privacy policy as it stood on the date shown. Older versions are kept so you can audit what we promised at any point in time.</p>
+
+      <app-privacy-history-archive />
 
     </div>
   </div>

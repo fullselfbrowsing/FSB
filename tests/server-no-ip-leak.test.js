@@ -92,6 +92,44 @@ for (const file of allFiles) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Quick task 260630-hct -- POSITIVE assertion on the ingest route's req.ip
+// touchpoints. The ban-list above is necessary but not sufficient: it does not
+// pin HOW MANY times req.ip is referenced or in what form. The privacy invariant
+// (CONTEXT D-09 + 260630-hct) is that req.ip is referenced EXACTLY TWICE in
+// routes/telemetry.js -- once as an inline arg to hashIp() and once as an inline
+// arg to deriveRegion() -- and never assigned to an escaping local. This block
+// fails if a third (or un-inlined) req.ip reference is introduced. It permits
+// the geo-derive call site EXACTLY as it permits the existing hashIp call site;
+// it does NOT weaken any ban above.
+const TELEMETRY_ROUTE = path.join(ROOT, 'routes', 'telemetry.js');
+const telemetrySrc = stripComments(fs.readFileSync(TELEMETRY_ROUTE, 'utf8'));
+const reqIpCount = (telemetrySrc.match(/req\.ip/g) || []).length;
+if (reqIpCount !== 2) {
+  console.error(`FAIL: routes/telemetry.js must reference req.ip EXACTLY TWICE (hashIp + deriveRegion); found ${reqIpCount}.`);
+  console.error('Each reference must be an inline argument; do NOT add a third touchpoint or an escaping local.');
+  process.exit(1);
+}
+// Each req.ip reference must be wrapped in ipKeyGenerator(req.ip) and passed
+// inline to hashIp( / deriveRegion(. Match the canonical inline forms.
+const HASHIP_INLINE = /hashIp\(\s*ipKeyGenerator\(\s*req\.ip\s*\)/;
+const DERIVE_INLINE = /deriveRegion\(\s*ipKeyGenerator\(\s*req\.ip\s*\)/;
+if (!HASHIP_INLINE.test(telemetrySrc)) {
+  console.error('FAIL: routes/telemetry.js -- expected inline hashIp(ipKeyGenerator(req.ip), ...) call site missing.');
+  process.exit(1);
+}
+if (!DERIVE_INLINE.test(telemetrySrc)) {
+  console.error('FAIL: routes/telemetry.js -- expected inline deriveRegion(ipKeyGenerator(req.ip)) call site missing.');
+  process.exit(1);
+}
+// Defensively reject an escaping plaintext-IP local even though the count==2
+// check already covers the common shapes (e.g. const ip = req.ip would push the
+// count to 3 if ip were reused, but a single-use alias would not).
+if (/\bconst\s+ip\s*=\s*req\.ip\b/.test(telemetrySrc)) {
+  console.error('FAIL: routes/telemetry.js introduces an escaping `const ip = req.ip` local; req.ip must stay inline.');
+  process.exit(1);
+}
+
 if (violations.length > 0) {
   console.error('FAIL: showcase/server/src/ contains IP-leak-prone patterns:');
   for (const v of violations) {
@@ -105,5 +143,6 @@ if (violations.length > 0) {
 console.log(`PASS: scanned ${allFiles.length} .js files under showcase/server/src/`);
 console.log(`  - 6 banned middleware patterns: morgan, winston, express-winston, express-logger, pino-http, express-pino-logger`);
 console.log(`  - 3 leak-pattern checks: fs.write/append + req.ip, fs.write/appendSync + req.ip, container.{push|set|add}(req.ip)`);
+console.log(`  - Positive assertion: routes/telemetry.js references req.ip EXACTLY TWICE, inline to hashIp() + deriveRegion(); no escaping local (260630-hct)`);
 console.log(`  - Files scanned: ${allFiles.map(f => path.relative(path.join(__dirname, '..'), f)).join(', ')}`);
 process.exit(0);
