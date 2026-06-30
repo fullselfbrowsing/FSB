@@ -1,6 +1,7 @@
 # Requirements: FSB (Full Self-Browsing) -- v1.1.0 T1 App Execution Expansion
 
 **Defined:** 2026-06-29
+**Extended:** 2026-06-29 with Phase 51 full-tail migration.
 **Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely. v1.1.0 focuses on converting the v1.0.0 catalog tail from search/discovery support into verified direct T1 execution where it is technically and safely provable.
 
 ## v1 Requirements
@@ -22,21 +23,30 @@ Requirements for the v1.1.0 milestone. Each maps to roadmap phases beginning at 
 - [x] **T1R-11**: Activate write/destructive T1 handlers only when live mutation-body UAT and consent/audit checks pass; otherwise keep them fail-closed with explicit reasons.
 - [x] **T1R-12**: Close with a before/after T1 coverage report, full regression suite, validate:extension, and prioritized next-batch plan for the remaining tail.
 
+### T1ALL -- Full Tail Migration Extension
+
+Phase 51 promotes the previously deferred full-tail work into the active milestone. These are intentionally stricter than "catalog searchable"; they require direct execution proof or an explicit terminal state.
+
+- [ ] **T1ALL-01**: Generate and maintain a Phase 51 worklist for every catalog-tail descriptor not currently T1-ready or guarded fail-closed, including app, slug, side-effect class, readiness, route feasibility, origin class, and required proof.
+- [ ] **T1ALL-02**: Make every safe, non-denied descriptor in the catalog executable as T1/T1b where technically possible, using verified same-origin handlers, declarative recipes, Pattern-D bridges, GAPI/page bridges, or live learned recipes.
+- [ ] **T1ALL-03**: Close all live UAT required for write/destructive actions before activating them; otherwise keep those rows guarded fail-closed with redacted evidence records.
+- [ ] **T1ALL-04**: Keep denied origins blocked and document any product/legal policy exception before changing denylist behavior.
+- [ ] **T1ALL-05**: Add or preserve user/developer readiness surfaces so app-level degraded, blocked, bridge-needed, UAT-needed, and T1-ready states cannot be confused.
+
 ## v2 Requirements
 
 Acknowledged but deferred beyond v1.1.0 unless pulled into an approved phase.
 
-### Full Tail Completion
+### Post-Full-Tail Hardening
 
-- **T1ALL-01**: Make every safe, non-denied descriptor in the 2,314-descriptor catalog executable as T1/T1b where technically possible.
-- **T1ALL-02**: Close all live UAT for write/destructive actions across supported apps.
-- **T1ALL-03**: Add user-facing health/readiness surfaces for app-level degraded and needs-re-port states.
+- **T1V2-01**: Optimize handler bundle size and cold-start after broad T1 coverage lands.
+- **T1V2-02**: Add richer product UI for app-level health, degraded execution, and re-port prompts beyond the minimum Phase 51 readiness surfaces.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Claiming all 2,288 remaining T3 descriptors are T1-ready without per-app proof | Unsafe and inaccurate; each app requires origin/auth/shape/UAT verification. |
+| Claiming catalog-tail descriptors are T1-ready without per-app proof | Unsafe and inaccurate; each app requires origin/auth/shape/UAT verification. |
 | Shipping OpenTabs plugin runtime code in the extension | Violates MV3 Wall 1; OpenTabs remains metadata/provenance input only. |
 | Activating finance/payment/social/destructive writes from guessed endpoints | Writes stay fail-closed until live request shape and consent/audit behavior are proven. |
 | Adding one MCP tool per app or per operation | Breaks the progressive-disclosure surface; the two capability tools remain the boundary. |
@@ -58,11 +68,16 @@ Acknowledged but deferred beyond v1.1.0 unless pulled into an approved phase.
 | T1R-10 | Phase 49 | Complete |
 | T1R-11 | Phase 49 | Complete |
 | T1R-12 | Phase 50 | Complete |
+| T1ALL-01 | Phase 51 | Active |
+| T1ALL-02 | Phase 51 | Active |
+| T1ALL-03 | Phase 51 | Active |
+| T1ALL-04 | Phase 51 | Active |
+| T1ALL-05 | Phase 51 | Active |
 
 **Coverage:**
-- v1 requirements: 12 total
-- Mapped to phases: 12
+- v1 requirements: 17 total
+- Mapped to phases: 17
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-06-29 -- v1.1.0 T1 App Execution Expansion milestone started after closing v1.0.0.*
+*Requirements defined: 2026-06-29 -- v1.1.0 T1 App Execution Expansion milestone started after closing v1.0.0 and was extended with Phase 51 full-tail migration on 2026-06-29.*

@@ -3,13 +3,13 @@
 ## Milestones
 
 - ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
-- ✅ **v1.1.0 T1 App Execution Expansion** — Phases 44-50, CODE-COMPLETE 2026-06-29. Expanded proven T1/guarded coverage from 26 to 50 descriptors: 45 executable direct descriptors, 5 guarded fail-closed writes, and an honest next-batch backlog for the remaining 2,264-descriptor catalog tail.
+- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-51, EXTENDED 2026-06-29. Expanded proven T1/guarded coverage from 26 to 50 descriptors in Phases 44-50, then reopened with Phase 51 to drive the remaining 2,264-descriptor catalog tail toward verified T1 execution or an explicit blocked/policy terminal state.
 
 ## Active Milestone
 
-**v1.1.0 T1 App Execution Expansion** — Phases 44-50. CODE-COMPLETE 2026-06-29.
+**v1.1.0 T1 App Execution Expansion** — Phases 44-51. EXTENDED 2026-06-29.
 
-**Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” The milestone is focused only on T1 readiness: identifying which of the 2,288 remaining T3 descriptors can become T1, building the missing execution substrate for same-origin and separate-origin apps, porting high-value read paths first, and activating writes only after live mutation-body UAT. It must not overclaim all-app direct API readiness without per-app proof.
+**Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” Phases 44-50 built the inventory, scaffolds, first T1 ports, bridge decisions, write evidence gate, and closeout backlog. Phase 51 extends the milestone to attack the full 2,264-descriptor remaining tail: every non-denied row must either become verified T1/T1b or carry explicit evidence that it is blocked by policy, unsafe cross-origin architecture, missing live UAT, or an accepted product/legal constraint. It must not mark any row T1-ready without handler/recipe proof.
 
 **Baseline entering this milestone:**
 
@@ -19,6 +19,14 @@
 - T1 fail-closed guarded writes today: **5 descriptors**.
 - Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
 - App stems with no direct T1 path: **123**.
+
+**Current Phase 51 baseline after Phases 44-50:**
+
+- Total descriptors: **2,314**.
+- T1-ready executable descriptors: **45**.
+- T1 guarded fail-closed writes: **5**.
+- Catalog tail not direct API-ready: **2,264** (**2,070 discovery-pending**, **194 blocked**).
+- App stems with at least one direct T1/guarded row: **9**.
 
 **Hard invariants:**
 
@@ -169,6 +177,31 @@
 - [x] 50-02: Full regression gate.
 - [x] 50-03: Next-batch backlog and milestone closeout.
 
+## Phase 51: Full T1 Tail Migration Across Remaining Catalog
+
+- [ ] Phase 51: Full T1 Tail Migration Across Remaining Catalog (active)
+
+**Goal:** Convert the remaining 2,264 catalog-tail descriptors to explicit terminal states: executable T1/T1b where safe and technically provable, guarded fail-closed where write/destructive UAT is still required, or blocked where denylist/product/legal policy says no.
+
+**Depends on:** Phase 50.
+
+**Requirements:** T1ALL-01, T1ALL-02, T1ALL-03, T1ALL-04, T1ALL-05.
+
+**Success Criteria:**
+1. A generated Phase 51 worklist covers every non-ready catalog-tail row and partitions it by app, side-effect class, route feasibility, origin class, and required proof.
+2. Every non-denied read descriptor is either backed by a verified handler/recipe or assigned to an approved bridge/UAT workstream with a concrete blocking reason.
+3. Every write/destructive descriptor remains fail-closed until live mutation-body evidence, consent/audit proof, and no-secret logging checks pass.
+4. Denied origins remain blocked; sensitive origins can be T1 only under the current audited invoke posture and any app-specific product/legal acceptance.
+5. Final closeout cannot claim “all apps are T1” unless `npm test`, `npm run validate:extension`, the T1 readiness gate, the port-contract gate, and the Phase 51 worklist all agree there are no untriaged non-denied tail rows.
+
+**Plans:**
+- [ ] 51-01: Full-tail worklist generator, acceptance gate, and batch scheduler.
+- [ ] 51-02: Existing-head and low-risk same-origin read bulk port.
+- [ ] 51-03: Pattern-D and GAPI bridge implementation waves.
+- [ ] 51-04: Sensitive consumer/social and blocked-policy triage.
+- [ ] 51-05: Write/destructive live-UAT activation waves.
+- [ ] 51-06: Final all-tail regression, UAT ledger, and closeout.
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -180,6 +213,7 @@
 | 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
 | 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
 | 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
+| 51. Full T1 Tail Migration Across Remaining Catalog | 0/6 | Active | - |
 
 ## Completed Milestones
 
