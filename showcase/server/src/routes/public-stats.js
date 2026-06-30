@@ -93,6 +93,10 @@ function buildHeadlineJson(queries) {
   // follows the same shape (housekeeper writes {agent, uniq} -> rename agent).
   const popularMcpRaw = safeParseArray(rows.latest_global.popular_mcp_json);
   const popularAgentRaw = safeParseArray(rows.latest_global.popular_agent_json);
+  // Quick task 260630-hct -- region breakdown. Stored as {region, uniq} (already
+  // k>=5-floored by the housekeeper; sub-floor regions folded into 'Other'); map
+  // region -> label for the public contract, mirroring the popular_mcp_clients shape.
+  const popularRegionRaw = safeParseArray(rows.latest_global.popular_region_json);
   const popular_mcp_clients = popularMcpRaw.map((r) => ({
     label: typeof r.label === 'string' ? r.label
          : typeof r.mcp_client === 'string' ? r.mcp_client
@@ -102,6 +106,12 @@ function buildHeadlineJson(queries) {
   const popular_agents = popularAgentRaw.map((r) => ({
     label: typeof r.label === 'string' ? r.label
          : typeof r.agent === 'string' ? r.agent
+         : 'unknown',
+    uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
+  }));
+  const popular_regions = popularRegionRaw.map((r) => ({
+    label: typeof r.label === 'string' ? r.label
+         : typeof r.region === 'string' ? r.region
          : 'unknown',
     uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
   }));
@@ -120,6 +130,7 @@ function buildHeadlineJson(queries) {
     tokens_24h: rows.tokens_24h,
     popular_mcp_clients,
     popular_agents,
+    popular_regions,
     avg_agents_per_user,
   };
 }

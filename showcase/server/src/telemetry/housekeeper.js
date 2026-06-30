@@ -29,6 +29,33 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const K_ANONYMITY_FLOOR = 2;
+// Quick task 260630-hct -- region anonymity floor. HARD-required at k>=5 by
+// CONTEXT (do NOT reuse the relaxed K_ANONYMITY_FLOOR=2 used for mcp_client).
+// Regions with fewer than 5 unique installs collapse into a single 'Other'
+// bucket; that bucket is suppressed entirely when its summed install count is
+// itself < 5. This guarantees no surfaced region label represents < 5 installs.
+const REGION_K_FLOOR = 5;
+
+/**
+ * Quick task 260630-hct -- apply a k-anonymity floor to a {label, uniq} list.
+ * Rows with uniq >= floor pass through unchanged (keyed under `key`); rows below
+ * the floor sum into a single { [key]: 'Other', uniq: <sum> } bucket, which is
+ * SUPPRESSED when that sum is itself < floor. Mirrors the popular_mcp logic.
+ *
+ * @param {Array<Object>} rows  rows from a selectPopular*ForDayRange query
+ * @param {string} key          the label field name on each row (e.g. 'region')
+ * @param {number} floor        the k-anonymity floor
+ * @returns {Array<Object>}
+ */
+function applyKFloor(rows, key, floor) {
+  const above = rows.filter((r) => (r.uniq || 0) >= floor);
+  const belowInstalls = rows
+    .filter((r) => (r.uniq || 0) < floor)
+    .reduce((sum, r) => sum + (r.uniq || 0), 0);
+  return belowInstalls >= floor
+    ? [...above, { [key]: 'Other', uniq: belowInstalls }]
+    : above; // suppress entirely when total below-floor installs is itself < floor
+}
 
 function floorToUtcDayMs(ms) {
   const d = new Date(ms);
@@ -107,14 +134,22 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
       // Phase 274 will source per-agent popularity from the rolled-up rows; v0.9.69 leaves this empty.
       const popularAgent = [];
 
-      queries.upsertGlobalAggregate.run(
+      // Quick task 260630-hct -- region rollup at the HARD k>=5 floor (NOT the
+      // relaxed mcp floor of 2). Rows are {region, uniq=COUNT(DISTINCT install_uuid)};
+      // below-5 regions (including 'unknown' if it does not clear k) collapse into a
+      // single {region:'Other', uniq:<sum>} bucket, suppressed when that sum < 5.
+      const popularRegionRaw = queries.selectPopularRegionForDayRange.all(dayStart, dayEnd);
+      const popularRegion = applyKFloor(popularRegionRaw, 'region', REGION_K_FLOOR);
+
+      queries.upsertGlobalAggregateWithRegion.run(
         dayKey,
         g.unique_installs || 0,
         g.tokens_in_sum || 0,
         g.tokens_out_sum || 0,
         g.agents_active_sum || 0,
         JSON.stringify(popularMcp),
-        JSON.stringify(popularAgent)
+        JSON.stringify(popularAgent),
+        JSON.stringify(popularRegion)
       );
     }
 
@@ -149,5 +184,6 @@ module.exports = {
   runHousekeeperTick,
   floorToUtcDayMs,
   K_ANONYMITY_FLOOR,
+  REGION_K_FLOOR,
   ONE_HOUR_MS,
 };
