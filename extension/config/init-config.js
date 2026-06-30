@@ -2,13 +2,22 @@
 // This script helps set up the extension with pre-configured values
 
 const defaultConfig = {
-  // AI Provider Configuration
-  aiProvider: 'xai',
-  apiKey: '', // Will be set from environment or user input
+  // Model configuration
+  modelProvider: 'xai',
+  modelName: 'grok-4-1-fast',
 
-  // Alternative providers
+  // API keys
+  apiKey: '', // Will be set from environment or user input
+  geminiApiKey: '',
   openaiApiKey: '',
-  customApiEndpoint: '',
+  anthropicApiKey: '',
+  openrouterApiKey: '',
+  customApiKey: '',
+  customEndpoint: '',
+  lmstudioBaseUrl: 'http://localhost:1234',
+
+  // Legacy support
+  speedMode: 'normal',
 
   // Automation Settings
   maxIterations: 100,
@@ -17,8 +26,23 @@ const defaultConfig = {
   // DOM Optimization Settings
   domOptimization: true,
   maxDOMElements: 2000,
+  elementCacheSize: 200,
   prioritizeViewport: true,
-  animatedActionHighlights: true
+  animatedActionHighlights: true,
+  showSidepanelProgress: false,
+
+  // Credential Manager (Beta)
+  enableLogin: false,
+  enableSavedPayments: false,
+
+  // CAPTCHA Solver
+  captchaSolverEnabled: false,
+  captchaApiKey: '',
+
+  // Background Agents Server
+  serverUrl: 'https://fsb-server.fly.dev',
+  serverHashKey: '',
+  serverSyncEnabled: false
 };
 
 // Function to initialize with test/development keys
@@ -27,7 +51,8 @@ async function initializeDevConfig() {
   // NEVER commit real API keys to the repository
   const devConfig = {
     ...defaultConfig,
-    aiProvider: 'xai',
+    modelProvider: 'xai',
+    modelName: 'grok-4-1-fast',
     // Example: apiKey: 'test-key-for-development',
     debugMode: true
   };
@@ -60,13 +85,31 @@ function isDevelopment() {
   return !chrome.runtime.getManifest().update_url;
 }
 
+async function openOnboardingPage() {
+  const onboardingUrl = chrome.runtime.getURL('ui/onboarding.html');
+  try {
+    await chrome.storage.local.set({ fsbOnboardingAutoOpenedAt: new Date().toISOString() });
+  } catch (error) {
+    console.warn('Failed to record onboarding open timestamp:', error && error.message);
+  }
+
+  if (chrome.tabs && typeof chrome.tabs.create === 'function') {
+    await chrome.tabs.create({ url: onboardingUrl, active: true });
+    return;
+  }
+
+  if (chrome.windows && typeof chrome.windows.create === 'function') {
+    await chrome.windows.create({ url: onboardingUrl, type: 'popup', width: 760, height: 860 });
+  }
+}
+
 // Auto-initialize on install
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     // Check if config already exists
-    const existing = await chrome.storage.local.get('aiProvider');
+    const existing = await chrome.storage.local.get('modelProvider');
     
-    if (!existing.aiProvider) {
+    if (!existing.modelProvider) {
       // First time installation
       if (isDevelopment()) {
         // Initialize with dev config
@@ -75,10 +118,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         // Initialize with defaults
         await chrome.storage.local.set(defaultConfig);
       }
-      
-      // Open options page for user to configure
-      chrome.runtime.openOptionsPage();
     }
+
+    await openOnboardingPage();
   }
 });
 
@@ -87,6 +129,7 @@ if (typeof window !== 'undefined') {
   window.initConfig = {
     initializeDevConfig,
     initializeFromFile,
-    defaultConfig
+    defaultConfig,
+    openOnboardingPage
   };
 }
