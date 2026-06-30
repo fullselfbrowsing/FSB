@@ -1,6 +1,6 @@
 # Phase 51 T1 Tail Worklist
 
-**Generated:** 2026-06-30T02:18:41.561Z
+**Generated:** 2026-06-30T05:06:59.260Z
 
 This worklist is generated from the Phase 44 readiness report and covers every descriptor that is not currently executable T1 or guarded fail-closed. It is a migration target list, not an execution claim.
 
@@ -9,12 +9,12 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 | Metric | Count |
 |--------|------:|
 | Total descriptors | 2314 |
-| Current T1-ready descriptors | 53 |
+| Current T1-ready descriptors | 69 |
 | Current guarded fail-closed writes | 5 |
-| Tail rows in this worklist | 2256 |
-| Actionable non-denied tail rows | 2062 |
+| Tail rows in this worklist | 2240 |
+| Actionable non-denied tail rows | 2046 |
 | Blocked policy rows | 194 |
-| Read rows | 1582 |
+| Read rows | 1566 |
 | Write rows | 508 |
 | Destructive rows | 166 |
 
@@ -22,7 +22,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 
 | Item | Count |
 |------|------:|
-| `same-origin-read` | 1112 |
+| `same-origin-read` | 1096 |
 | `write-destructive-uat` | 638 |
 | `pattern-d` | 229 |
 | `blocked-policy` | 194 |
@@ -34,12 +34,12 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 |------|------:|
 | `datadog` | 71 |
 | `linear` | 59 |
-| `retool` | 50 |
 | `bsky` | 38 |
 | `posthog` | 38 |
 | `terraform` | 38 |
 | `netlify` | 35 |
 | `twilio` | 35 |
+| `retool` | 34 |
 | `todoist` | 33 |
 | `tumblr` | 32 |
 | `minimax` | 31 |
@@ -87,7 +87,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 
 | Item | Count |
 |------|------:|
-| `same-origin-read-candidate` | 1112 |
+| `same-origin-read-candidate` | 1096 |
 | `dom-discovery-only` | 480 |
 | `pattern-d-candidate` | 337 |
 | `blocked` | 194 |
@@ -97,7 +97,7 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 
 | Item | Count |
 |------|------:|
-| `standard` | 1328 |
+| `standard` | 1312 |
 | `sensitive` | 734 |
 | `denied` | 194 |
 

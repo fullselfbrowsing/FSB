@@ -129,7 +129,8 @@ function makeCtx(origin, tabId, opts) {
         const isBitbucketRest = isGet && url.indexOf('https://bitbucket.org/!api/2.0') === 0;
         const isCircleciRest = isGet && url.indexOf('https://app.circleci.com/api/v2') === 0;
         const isVercelRest = isGet && url.indexOf('https://vercel.com/api') === 0;
-        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest && !isVercelRest;
+        const isRetoolRest = isGet && url.indexOf('https://retool.com/api') === 0;
+        const isProbe = isGet && !isGitlabRest && !isNetlifyRest && !isBitbucketRest && !isCircleciRest && !isVercelRest && !isRetoolRest;
         let text = null;
         if (isProbe && url.indexOf('app.slack.com') !== -1) {
           text = Object.prototype.hasOwnProperty.call(options, 'slackProbeText')
@@ -240,6 +241,43 @@ function makeCtx(origin, tabId, opts) {
             data = { deployments: [{ uid: 'dpl-test', name: 'project-test', url: 'project-test.vercel.app' }], pagination: { count: 1, next: null } };
           } else if (pathOnly.indexOf('/v13/deployments/') !== -1) {
             data = { uid: 'dpl-test', name: 'project-test', url: 'project-test.vercel.app' };
+          } else {
+            data = { ok: true };
+          }
+        } else if (url.indexOf('https://retool.com/api') === 0) {
+          const pathOnly = url.split('?')[0];
+          if (pathOnly.indexOf('/user') !== -1) {
+            data = { user: { id: 1, email: 'user@example.invalid', name: 'Retool User' } };
+          } else if (pathOnly.indexOf('/organization/userSpaces') !== -1) {
+            data = { userSpaces: [{ id: 1, name: 'Default space' }] };
+          } else if (pathOnly.indexOf('/organization') !== -1) {
+            data = { org: { id: 1, name: 'Retool Org', subdomain: 'fsb-test' } };
+          } else if (pathOnly.indexOf('/sourceControl/settings') !== -1) {
+            data = { settings: { enabled: false } };
+          } else if (pathOnly.indexOf('/workflowRun/getCountByWorkflow') !== -1) {
+            data = { workflowRunsCountByWorkflow: { wf_1: { workflowId: 'wf_1', count: 2 } } };
+          } else if (pathOnly.indexOf('/workflow/workflowsConfiguration') !== -1) {
+            data = { temporalEnabled: true, codeExecutorVersion: 'test' };
+          } else if (pathOnly.indexOf('/agents') !== -1) {
+            data = { agents: [{ id: 'agent-1', name: 'Agent' }] };
+          } else if (pathOnly.indexOf('/pages') !== -1) {
+            data = { pages: [{ uuid: 'page-1', name: 'App' }], folders: [] };
+          } else if (pathOnly.indexOf('/branches') !== -1) {
+            data = { branches: [{ name: 'main' }] };
+          } else if (pathOnly.indexOf('/environments') !== -1) {
+            data = { environments: [{ id: 1, name: 'production' }] };
+          } else if (pathOnly.indexOf('/experiments') !== -1) {
+            data = { featureA: true };
+          } else if (pathOnly.indexOf('/grid') !== -1) {
+            data = [{ id: 'grid-1', name: 'Grid' }];
+          } else if (pathOnly.indexOf('/editor/pageNames') !== -1) {
+            data = { pageNames: [{ uuid: 'page-1', name: 'App' }] };
+          } else if (pathOnly.indexOf('/playground') !== -1) {
+            data = { userQueries: [{ id: 'query-1', name: 'Query' }], orgQueries: [] };
+          } else if (pathOnly.indexOf('/resources') !== -1) {
+            data = { resources: [{ id: 1, name: 'Resource' }] };
+          } else if (pathOnly.indexOf('/workflow/') !== -1) {
+            data = { workflowsMetadata: [{ id: 'wf_1', name: 'Workflow' }], workflowFolders: [] };
           } else {
             data = { ok: true };
           }
@@ -1002,6 +1040,98 @@ const Schema = require(SCHEMA_PATH);
       'vercel.list_projects rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
   }
 
+  const retoolPath = path.join(HANDLERS_DIR, 'retool.js');
+  check(fs.existsSync(retoolPath), 'catalog/handlers/retool.js exists (Phase 51)');
+  if (fs.existsSync(retoolPath)) {
+    const rt = require(retoolPath);
+    const rtSrc = readSource(retoolPath);
+    const expectedRetoolSlugs = [
+      'retool.get_current_user',
+      'retool.get_organization',
+      'retool.get_source_control_settings',
+      'retool.get_workflow_run_count',
+      'retool.get_workflows_config',
+      'retool.list_agents',
+      'retool.list_apps',
+      'retool.list_branches',
+      'retool.list_environments',
+      'retool.list_experiments',
+      'retool.list_grids',
+      'retool.list_page_names',
+      'retool.list_playground_queries',
+      'retool.list_resources',
+      'retool.list_user_spaces',
+      'retool.list_workflows'
+    ];
+
+    check(expectedRetoolSlugs.every(function (slug) {
+      return rt[slug] && rt[slug].tier === 'T1a'
+        && rt[slug].sideEffectClass === 'read'
+        && rt[slug].origin === 'https://retool.com'
+        && rt[slug].params
+        && rt[slug].params.type === 'object'
+        && typeof rt[slug].handle === 'function';
+    }), 'all 16 Retool selected no-param reads are tier:T1a READ entries pinned to https://retool.com');
+    check(!/chrome\.(scripting|tabs)/.test(rtSrc),
+      'retool.js references NO chrome.scripting/chrome.tabs');
+    check(!/\bfetch\s*\(/.test(rtSrc),
+      'retool.js performs no direct network call');
+    check(!/console\.\w+\([^)]*\b(token|cookie|csrf|authorization|bearer|xsrf)\b/i.test(rtSrc),
+      'retool.js does NOT console-log a secret-bearing variable');
+
+    const rtUser = makeCtx('https://retool.com', 51);
+    const rtUserOut = await rt['retool.get_current_user'].handle({}, rtUser.ctx);
+    check(rtUser.calls.length === 1 && rtUser.calls[0].spec.method === 'GET',
+      'retool.get_current_user builds one GET spec');
+    check(rtUser.calls.length === 1 && rtUser.calls[0].spec.origin === 'https://retool.com',
+      'retool.get_current_user pins the spec to retool.com');
+    check(rtUser.calls.length === 1 && rtUser.calls[0].spec.url === 'https://retool.com/api/user',
+      'retool.get_current_user targets /api/user');
+    check(rtUser.calls.length === 1
+      && rtUser.calls[0].spec.csrfSource
+      && rtUser.calls[0].spec.csrfSource.from === 'cookie'
+      && rtUser.calls[0].spec.csrfSource.selector === 'xsrfToken'
+      && rtUser.calls[0].spec.csrfSource.header === 'X-Xsrf-Token',
+      'retool.get_current_user uses the cookie csrfSource for X-Xsrf-Token');
+    check(rtUserOut && rtUserOut.success === true,
+      'retool.get_current_user accepts a logged-in user envelope');
+
+    const rtApps = makeCtx('https://retool.com', 51);
+    const rtAppsOut = await rt['retool.list_apps'].handle({}, rtApps.ctx);
+    check(rtApps.calls.length === 1 && rtApps.calls[0].spec.url === 'https://retool.com/api/pages',
+      'retool.list_apps targets /api/pages');
+    check(rtAppsOut && rtAppsOut.success === true,
+      'retool.list_apps accepts a pages/folders envelope');
+
+    const rtGrids = makeCtx('https://retool.com', 51);
+    const rtGridsOut = await rt['retool.list_grids'].handle({}, rtGrids.ctx);
+    check(rtGrids.calls.length === 1 && rtGrids.calls[0].spec.url === 'https://retool.com/api/grid',
+      'retool.list_grids targets /api/grid');
+    check(rtGridsOut && rtGridsOut.success === true,
+      'retool.list_grids accepts an array body');
+
+    const rtWorkflows = makeCtx('https://retool.com', 51);
+    const rtWorkflowsOut = await rt['retool.list_workflows'].handle({}, rtWorkflows.ctx);
+    check(rtWorkflows.calls.length === 1 && rtWorkflows.calls[0].spec.url === 'https://retool.com/api/workflow/',
+      'retool.list_workflows targets /api/workflow/');
+    check(rtWorkflowsOut && rtWorkflowsOut.success === true,
+      'retool.list_workflows accepts a workflows/folders envelope');
+
+    const rtResources = makeCtx('https://retool.com', 51);
+    await rt['retool.list_resources'].handle({}, rtResources.ctx);
+    check(rtResources.calls.length === 1 && rtResources.calls[0].spec.url === 'https://retool.com/api/resources',
+      'retool.list_resources targets /api/resources');
+
+    const rtNeg = makeCtx('https://retool.com', 51, { readData: { error: 'not authenticated' } });
+    const rtNegOut = await rt['retool.list_apps'].handle({}, rtNeg.ctx);
+    check(rtNegOut && rtNegOut.success === false
+      && rtNegOut.code === 'RECIPE_DOM_FALLBACK_PENDING'
+      && rtNegOut.errorCode === 'RECIPE_DOM_FALLBACK_PENDING'
+      && rtNegOut.error === 'RECIPE_DOM_FALLBACK_PENDING'
+      && rtNegOut.fellBackToDom === true,
+      'retool.list_apps rejects an error envelope -> RECIPE_DOM_FALLBACK_PENDING');
+  }
+
   // =========================================================================
   // Phase 40 (DEPTH-01) -- Slack EXTEND -- catalog/handlers/slack.js
   // (3 new READ T1a slugs via callSlackMethod; token in BODY never logged).
@@ -1191,7 +1321,7 @@ const Schema = require(SCHEMA_PATH);
     }
   });
 
-  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js', 'vercel.js'].forEach(function (name) {
+  ['github.js', 'slack.js', 'notion.js', 'gitlab.js', 'netlify.js', 'bitbucket.js', 'circleci.js', 'vercel.js', 'retool.js'].forEach(function (name) {
     const src = path.join(HANDLERS_DIR, name);
     const ext = path.join(EXT_HANDLERS_DIR, name);
     check(fs.existsSync(ext), 'extension/catalog/handlers/' + name + ' exists for unpacked dev loads');

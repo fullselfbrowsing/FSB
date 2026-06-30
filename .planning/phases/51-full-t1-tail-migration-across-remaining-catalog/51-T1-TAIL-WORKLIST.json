@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-06-30T02:18:41.561Z",
+  "generatedAt": "2026-06-30T05:06:59.260Z",
   "source": "scripts/report-t1-readiness.mjs",
   "descriptorCount": 2314,
-  "currentReady": 53,
+  "currentReady": 69,
   "currentGuarded": 5,
   "rows": [
     {
@@ -15671,46 +15671,7 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "retool.get_current_user",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.get_organization",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "retool.get_resource",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.get_source_control_settings",
       "app": "retool",
       "service": "retool.com",
       "sideEffectClass": "read",
@@ -15762,46 +15723,7 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "retool.get_workflow_run_count",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "retool.get_workflow_run_log",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.get_workflows_config",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_agents",
       "app": "retool",
       "service": "retool.com",
       "sideEffectClass": "read",
@@ -15827,85 +15749,7 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "retool.list_apps",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_branches",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "retool.list_components",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_environments",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_experiments",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_grids",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_page_names",
       "app": "retool",
       "service": "retool.com",
       "sideEffectClass": "read",
@@ -15931,59 +15775,7 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "retool.list_playground_queries",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_resources",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_user_spaces",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "retool.list_workflow_triggers",
-      "app": "retool",
-      "service": "retool.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "retool.list_workflows",
       "app": "retool",
       "service": "retool.com",
       "sideEffectClass": "read",
@@ -29335,17 +29127,17 @@
     }
   ],
   "totals": {
-    "tail": 2256,
-    "actionable": 2062,
+    "tail": 2240,
+    "actionable": 2046,
     "blocked": 194,
-    "read": 1582,
+    "read": 1566,
     "write": 508,
     "destructive": 166,
     "byWorkstream": {
       "blocked-policy": 194,
       "gapi-bridge": 83,
       "pattern-d": 229,
-      "same-origin-read": 1112,
+      "same-origin-read": 1096,
       "write-destructive-uat": 638
     },
     "byApp": {
@@ -29444,7 +29236,7 @@
       "priceline": 18,
       "reddit": 23,
       "redfin": 11,
-      "retool": 50,
+      "retool": 34,
       "shortcut": 27,
       "slack": 18,
       "snowflake": 14,
@@ -29479,14 +29271,14 @@
     },
     "byOriginClass": {
       "denied": 194,
-      "standard": 1328,
+      "standard": 1312,
       "sensitive": 734
     },
     "byRouteFeasibility": {
       "blocked": 194,
       "gapi-bridge-candidate": 133,
       "pattern-d-candidate": 337,
-      "same-origin-read-candidate": 1112,
+      "same-origin-read-candidate": 1096,
       "dom-discovery-only": 480
     }
   }

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Phase 51 is active. Plans 51-01 and 51-02 are complete and verified against focused gates. Full-tail migration is not complete.
+Phase 51 is active. Plans 51-01, 51-02, and 51-03 are complete and verified against focused gates. Full-tail migration is not complete.
 
 ## 51-01 Worklist Controls
 
@@ -19,15 +19,27 @@ Phase 51 is active. Plans 51-01 and 51-02 are complete and verified against focu
 - `node scripts/verify-write-activation-evidence.mjs` -- passed.
 - `npm run validate:extension` -- passed.
 
+## 51-03 Retool Same-Origin Reads
+
+- `node tests/capability-head-handlers.test.js` -- passed.
+- `node tests/head-handler-upgrade.test.js` -- passed.
+- `node tests/head-handler-cap.test.js` -- passed.
+- `node tests/verify-origin-classification.test.js` -- passed.
+- `node scripts/report-t1-readiness.mjs` -- regenerated 69 ready / 5 guarded / 2,240 tail.
+- `node scripts/report-t1-tail-worklist.mjs` -- regenerated 2,240 tail rows.
+- `node scripts/verify-t1-readiness-gate.mjs` -- passed with 2,314 rows, 69 ready, 5 guarded fail-closed.
+- `node scripts/verify-t1-port-contract.mjs` -- passed with 74 T1 rows.
+- `npm run validate:extension` -- passed.
+
 ## Current Counts
 
 | Metric | Count |
 |--------|------:|
 | Total descriptors | 2,314 |
-| T1-ready executable descriptors | 53 |
+| T1-ready executable descriptors | 69 |
 | T1 guarded fail-closed writes | 5 |
-| Catalog tail not direct API-ready | 2,256 |
-| Actionable non-denied tail rows | 2,062 |
+| Catalog tail not direct API-ready | 2,240 |
+| Actionable non-denied tail rows | 2,046 |
 | Blocked policy rows | 194 |
 
 ## Remaining Verification Before Phase Close

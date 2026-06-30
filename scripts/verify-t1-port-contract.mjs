@@ -34,6 +34,7 @@ export const HANDLER_BY_APP = Object.freeze({
   gitlab: 'gitlab.js',
   netlify: 'netlify.js',
   notion: 'notion.js',
+  retool: 'retool.js',
   slack: 'slack.js',
   vercel: 'vercel.js',
 });

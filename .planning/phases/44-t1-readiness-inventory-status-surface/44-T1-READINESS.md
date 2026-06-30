@@ -1,6 +1,6 @@
 # Phase 44 T1 Readiness Matrix
 
-**Generated:** 2026-06-30T02:18:41.547Z
+**Generated:** 2026-06-30T05:06:59.252Z
 
 This report is generated from `extension/catalog/recipe-index.generated.js` plus the live `capability-catalog.js` resolver. It is the v1.1.0 truth surface: catalog/search support means a capability is searchable and routable, not that every app has direct API execution today.
 
@@ -11,17 +11,17 @@ This report is generated from `extension/catalog/recipe-index.generated.js` plus
 | Total descriptors | 2314 |
 | App stems | 128 |
 | Distinct service hosts | 129 |
-| T0/T1a/T1b resolved descriptors | 58 |
-| T1 ready executable descriptors | 53 |
+| T0/T1a/T1b resolved descriptors | 74 |
+| T1 ready executable descriptors | 69 |
 | T1 guarded fail-closed writes | 5 |
 | Learn-pending descriptors | 0 |
-| DOM/discovery-pending descriptors | 2062 |
+| DOM/discovery-pending descriptors | 2046 |
 | Blocked descriptors | 194 |
-| Catalog tail not direct API-ready | 2256 |
+| Catalog tail not direct API-ready | 2240 |
 
 ## What This Means
 
-The catalog spans 128 app stems. That 128-app breadth is catalog/search support, not direct API execution for every app. `invoke_capability` executes only proven T0/T1a/T1b handlers or recipes today; guarded writes return fail-closed pending UAT; the remaining 2256-descriptor tail stays DOM/discovery, learn-pending, or blocked by denylist.
+The catalog spans 128 app stems. That 128-app breadth is catalog/search support, not direct API execution for every app. `invoke_capability` executes only proven T0/T1a/T1b handlers or recipes today; guarded writes return fail-closed pending UAT; the remaining 2240-descriptor tail stays DOM/discovery, learn-pending, or blocked by denylist.
 
 Non-denied origins are allowed under Auto for ordinary capability invoke. Denylisted origins remain blocked. Sensitive origins are flagged in UI/audit records, while extra confirmation remains scoped to network-capture discovery.
 
@@ -29,10 +29,10 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 
 | Status | Count |
 |--------|------:|
-| t1-ready | 53 |
+| t1-ready | 69 |
 | t1-guarded-fail-closed | 5 |
 | learn-pending | 0 |
-| discovery-pending | 2062 |
+| discovery-pending | 2046 |
 | blocked | 194 |
 | unknown | 0 |
 
@@ -126,7 +126,7 @@ Non-denied origins are allowed under Auto for ordinary capability invoke. Denyli
 | `priceline` | 18 | 0 | 0 | 0 | 18 | 0 |
 | `reddit` | 24 | 1 | 0 | 0 | 23 | 0 |
 | `redfin` | 12 | 1 | 0 | 0 | 11 | 0 |
-| `retool` | 50 | 0 | 0 | 0 | 50 | 0 |
+| `retool` | 50 | 16 | 0 | 0 | 34 | 0 |
 | `robinhood` | 23 | 0 | 0 | 0 | 0 | 23 |
 | `sentry` | 21 | 0 | 0 | 0 | 21 | 0 |
 | `shopify` | 5 | 0 | 0 | 0 | 5 | 0 |

@@ -13,9 +13,9 @@
  * locks the SOURCE declaration the head is built against, immune to any runtime
  * registration path.
  *
- * Phase 36 adds ZERO head handlers (it is pipeline + descriptors only), so the count
- * is 3 today (github/slack/notion). A future breadth phase that sneaks an imperative
- * head handler in past the cap reds this gate.
+ * Phase 36 added ZERO head handlers (it was pipeline + descriptors only). Later
+ * depth phases may add reviewed heads, but this gate still locks the exact current
+ * globals and keeps the total under the cap.
  *
  * CAP = 30 (milestone "the head stays 15-30").
  *
@@ -43,6 +43,7 @@ const EXPECTED_HEAD_GLOBALS = [
   'FsbHandlerBitbucket',
   'FsbHandlerCircleci',
   'FsbHandlerVercel',
+  'FsbHandlerRetool',
 ];
 
 let passed = 0;
@@ -86,8 +87,8 @@ check(headEntryCount <= CAP,
   `HEAD_HANDLER_MODULES.length ${headEntryCount} <= CAP ${CAP} (the head stays descriptors-only; breadth never sprawls)`);
 
 // ---- Today's exact head -- breadth adds DATA, depth adds narrow same-origin heads --
-check(headEntryCount === 8,
-  `HEAD_HANDLER_MODULES has exactly 8 entries (Phase 48 adds the Vercel read head; the head stays <=30); got ${headEntryCount}`);
+check(headEntryCount === 9,
+  `HEAD_HANDLER_MODULES has exactly 9 entries (Phase 51 adds the Retool read head; the head stays <=30); got ${headEntryCount}`);
 const missingGlobals = EXPECTED_HEAD_GLOBALS.filter((g) => !foundGlobals.includes(g));
 check(missingGlobals.length === 0,
   `the expected head globals are present (missing: [${missingGlobals.join(', ') || 'none'}])`);

@@ -88,7 +88,12 @@ const HEAD_APP_MAP = {
   FsbHandlerNetlify: { app: 'netlify', fallbackBaseUrl: 'https://app.netlify.com' },
   FsbHandlerBitbucket: { app: 'bitbucket', fallbackBaseUrl: 'https://bitbucket.org' },
   FsbHandlerCircleci: { app: 'circleci', fallbackBaseUrl: 'https://app.circleci.com' },
-  FsbHandlerVercel: { app: 'vercel', fallbackBaseUrl: 'https://vercel.com' }
+  FsbHandlerVercel: { app: 'vercel', fallbackBaseUrl: 'https://vercel.com' },
+  FsbHandlerRetool: {
+    app: 'retool',
+    fallbackBaseUrl: 'https://retool.com',
+    relativeRuntimeBaseUrl: '/api'
+  }
 };
 
 /**
@@ -323,6 +328,22 @@ function readDynamicWorkspaceBase(app) {
   return null;
 }
 
+// Retool's vendored helper is intentionally relative: api(endpoint) accepts paths such
+// as /api/user and fetches them from the active Retool tab while adding X-Xsrf-Token
+// from the xsrfToken cookie. Keep that accommodation Retool-only and evidence-based so
+// a future app with an unextractable api.ts cannot silently ride the documented origin.
+function readRetoolRelativeRuntimeBase(app, relativeRuntimeBaseUrl) {
+  if (app !== 'retool' || relativeRuntimeBaseUrl !== '/api') { return null; }
+  const apiFile = join(VENDOR_PLUGINS, app, 'src', app + '-api.ts');
+  if (!existsSync(apiFile)) { return null; }
+  const text = readFileSync(apiFile, 'utf8');
+  const hasRelativeEndpoint = /api\s*=\s*async[\s\S]*endpoint\s*:\s*string/.test(text)
+    && /\$\{endpoint\}\?\$\{qs\}/.test(text);
+  const hasCookieCsrf = /getCookie\(['"]xsrfToken['"]\)/.test(text)
+    && /['"]X-Xsrf-Token['"]\s*:\s*xsrf/.test(text);
+  return hasRelativeEndpoint && hasCookieCsrf ? relativeRuntimeBaseUrl : null;
+}
+
 /**
  * checkOriginClassification(headsOverride, opts) -> { results, failures }
  *
@@ -402,6 +423,22 @@ export function checkOriginClassification(headsOverride, opts) {
     } else if (hasVendoredFile && relativeVendored) {
       const fallbackOrigin = originHost(mapping.fallbackBaseUrl);
       apiBaseUrl = fallbackOrigin ? fallbackOrigin + relativeVendored : relativeVendored;
+      classifyOpts = undefined;
+    } else if (mapping.relativeRuntimeBaseUrl) {
+      const relativeRuntimeBase = readRetoolRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl);
+      const fallbackOrigin = originHost(mapping.fallbackBaseUrl);
+      if (!relativeRuntimeBase || !fallbackOrigin) {
+        const reason = 'CORS_RELATIVE_RUNTIME_OVERRIDE_MISMATCH: head ' + head.global +
+          ' requested relative runtime base "' + String(mapping.relativeRuntimeBaseUrl) +
+          '" but the vendored helper did not match the reviewed Retool relative /api ' +
+          'cookie-CSRF pattern -- refusing a relative runtime override that is not ' +
+          'explicitly pinned to Retool';
+        results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: null,
+          classification: { sameOrigin: false, separate: true, reason: reason } });
+        failures.push(reason);
+        continue;
+      }
+      apiBaseUrl = fallbackOrigin + relativeRuntimeBase;
       classifyOpts = undefined;
     } else if (hasVendoredFile) {
       // A MAPPED app WITH a vendored api.ts that yields NEITHER a literal base NOR (for a

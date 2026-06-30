@@ -6,6 +6,8 @@ Phase 51 extends the v1.1.0 T1 App Execution Expansion milestone from a complete
 
 Plan 51-02 landed the first conservative bulk migration pass. It generated bundled T1b recipes for 8 low-risk same-origin no-param GET descriptors and added resolver/package/test coverage so generated recipes ship and resolve without per-slug registry edits.
 
-Current state after 51-02: 53 executable T1-ready descriptors, 5 guarded fail-closed writes, and 2,256 catalog-tail descriptors still needing migration or explicit terminal-state evidence.
+Plan 51-03 landed the Retool CSRF same-origin read head. It promoted 16 no-parameter Retool GET reads to T1a using the existing bound same-origin fetch path and cookie-based `xsrfToken` CSRF source.
+
+Current state after 51-03: 69 executable T1-ready descriptors, 5 guarded fail-closed writes, and 2,240 catalog-tail descriptors still needing migration or explicit terminal-state evidence.
 
 Next workstreams remain Pattern-D/GAPI bridge implementation, sensitive/policy triage, and write/destructive UAT activation. The milestone must not claim "all apps are T1" until the readiness gate, port-contract gate, worklist, and full regression suite all agree there are no untriaged non-denied tail rows.
