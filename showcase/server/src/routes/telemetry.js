@@ -27,6 +27,11 @@
 const express = require('express');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { isValidUuidV4 } = require('../utils/telemetry-hash');
+// Quick task 260630-hct -- coarse IP -> region derive. Required directly as a
+// sibling util (NOT passed through the router factory) so the factory signature
+// stays stable. Posture mirrors hashIp: req.ip is an inline argument, used once
+// then discarded; only the k>=5-floored aggregate region label is retained.
+const { deriveRegion } = require('../utils/ip-geo');
 const { createTelemetryRateLimiter, checkPerUuidBudget } = require('../middleware/telemetry-rate-limit');
 // Phase 274 / AGG-02 + AGG-03 -- in-memory liveness tracker. Hook fires AFTER
 // the SQLite insert succeeds; failure paths (validation, timestamp, budget
@@ -57,6 +62,51 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BATCH = 50;
 const MAX_MODEL_LEN = 128;
 const NUMERIC_CEILING = 1_000_000_000;
+
+// Quick task 260630-hct -- US state name -> USPS 2-letter code, so the stored
+// region label is compact (e.g. "US-CA") rather than a free-form state string.
+const US_STATE_CODES = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC',
+};
+
+/**
+ * Quick task 260630-hct -- normalise a deriveRegion() result into a compact,
+ * state-granularity STRING label for storage (never the raw IP).
+ *
+ *   { country: 'US', subdivision: 'California' } -> 'US-CA'
+ *   { country: 'AU', subdivision: 'Victoria' }   -> 'AU-Victoria' (slugged)
+ *   'unknown' / missing country                  -> 'unknown'
+ *
+ * @param {{country?:string, subdivision?:string}|string} region
+ * @returns {string}
+ */
+function regionLabel(region) {
+  if (!region || typeof region !== 'object' || typeof region.country !== 'string' || region.country === '') {
+    return 'unknown';
+  }
+  const country = region.country.trim().toUpperCase().slice(0, 8);
+  const sub = typeof region.subdivision === 'string' ? region.subdivision.trim() : '';
+  if (sub === '') return country;
+  if (country === 'US' && US_STATE_CODES[sub]) {
+    return `US-${US_STATE_CODES[sub]}`;
+  }
+  // Generic compact slug for non-US (or unknown US) subdivisions: collapse
+  // whitespace to single hyphens and cap length so labels stay bounded.
+  const slug = sub.replace(/\s+/g, '-').slice(0, 24);
+  return `${country}-${slug}`;
+}
 
 /**
  * Validate one event against the strict allowlist + shape rules.
@@ -125,13 +175,18 @@ function createTelemetryRouter(db, queries, hashIp) {
       return res.status(204).end();
     }
 
-    // PRIVACY INVARIANT -- Per CONTEXT D-09 + INGEST-13:
-    //   req.ip is read EXACTLY ONCE per request, on the next line, and immediately
-    //   funneled through ipKeyGenerator -> hashIp() in a single expression. It is
-    //   NEVER assigned to a local variable that escapes this scope, NEVER logged,
-    //   NEVER stored. Plaintext IP discarded at end-of-function. The canonical
-    //   form emitted by ipKeyGenerator is also short-lived (it is the argument of
-    //   the immediately-evaluated hashIp call). Test: tests/server-no-ip-leak.test.js.
+    // PRIVACY INVARIANT -- Per CONTEXT D-09 + INGEST-13 + quick task 260630-hct:
+    //   req.ip is referenced EXACTLY TWICE per request, on the next two lines:
+    //     1. hashIp(ipKeyGenerator(req.ip), db)      -- rate-limit/HMAC hash
+    //     2. deriveRegion(ipKeyGenerator(req.ip))    -- coarse country/US-state geo
+    //   BOTH references are inline arguments to an immediately-evaluated call. In
+    //   neither case is req.ip (or the canonical form ipKeyGenerator returns)
+    //   assigned to a local variable that escapes this scope, NEVER logged, NEVER
+    //   stored. Plaintext IP is discarded at end-of-function. Only the derived
+    //   ip_hash and the k>=5-floored AGGREGATE region label are retained; the raw
+    //   per-event region is rolled up daily and dropped by the 7-day retention --
+    //   there is no durable (install_uuid -> region) profile.
+    //   Test: tests/server-no-ip-leak.test.js (positively asserts the 2-inline count).
     //
     // WR-02 alignment (Phase 273 review): ipKeyGenerator is the CVE-2026-30827 fix
     // from express-rate-limit. It collapses IPv6 addresses to a /56 subnet and
@@ -144,6 +199,11 @@ function createTelemetryRouter(db, queries, hashIp) {
     // same stored hash); for IPv4 it is a no-op since ipKeyGenerator returns the
     // address unchanged.
     const clientHash = hashIp(ipKeyGenerator(req.ip), db);
+    // Second (and only other) inline req.ip touch: coarse geo derive. deriveRegion
+    // returns {country, subdivision} | 'unknown'; regionLabel() collapses it to a
+    // compact state-granularity STRING (e.g. 'US-CA' or 'unknown'). The plaintext
+    // IP is consumed inline here exactly as in the hashIp call above and discarded.
+    const regionTag = regionLabel(deriveRegion(ipKeyGenerator(req.ip)));
 
     const body = req.body;
     if (!body || !Array.isArray(body.events)) {
@@ -204,11 +264,14 @@ function createTelemetryRouter(db, queries, hashIp) {
       const tx = db.transaction((rows) => {
         let n = 0;
         for (const e of rows) {
-          const r = queries.insertTelemetryEvent.run(
+          // Quick task 260630-hct -- 12-arg region-bearing insert. The trailing
+          // regionTag is a coarse state-granularity label derived inline above,
+          // NEVER the raw IP. All other args + batching/budget logic unchanged.
+          const r = queries.insertTelemetryEventWithRegion.run(
             e.event_id, e.install_uuid, e.ts_minute,
             e.mcp_client, e.model || null,
             e.tokens_in, e.tokens_out, e.active_agent_count,
-            e.event_type, clientHash, now
+            e.event_type, clientHash, now, regionTag
           );
           n += r.changes;
         }
