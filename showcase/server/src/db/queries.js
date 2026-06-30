@@ -142,6 +142,14 @@ class Queries {
     this.insertTelemetryEvent = this.db.prepare(
       'INSERT OR IGNORE INTO telemetry_events (event_id, install_uuid, ts_minute, mcp_client, model, tokens_in, tokens_out, active_agent_count, event_type, ip_hash, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
+    // Quick task 260630-hct -- region-bearing variant (12 placeholders, trailing
+    // `region`). SEPARATE from the 11-arg insertTelemetryEvent above, whose arity
+    // the housekeeper/optout tests + insertTelemetryEventRow depend on. The ingest
+    // route (routes/telemetry.js) uses THIS statement; the daily rollup reads the
+    // region column back out via selectPopularRegionForDayRange.
+    this.insertTelemetryEventWithRegion = this.db.prepare(
+      'INSERT OR IGNORE INTO telemetry_events (event_id, install_uuid, ts_minute, mcp_client, model, tokens_in, tokens_out, active_agent_count, event_type, ip_hash, received_at, region) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
 
     this.upsertRollupDaily = this.db.prepare(`
       INSERT INTO telemetry_rollups_daily (install_uuid, day_utc, tokens_in, tokens_out, max_active_agents, event_count)
@@ -164,6 +172,23 @@ class Queries {
         popular_mcp_json = excluded.popular_mcp_json,
         popular_agent_json = excluded.popular_agent_json
     `);
+    // Quick task 260630-hct -- region-bearing upsert (8 placeholders, trailing
+    // popular_region_json). SEPARATE from the 7-arg upsertGlobalAggregate above so
+    // the existing housekeeper caller + housekeeper/headline tests keep working;
+    // the housekeeper switches to THIS statement in the region-rollup task. Mirrors
+    // the insertTelemetryEvent / insertTelemetryEventWithRegion split.
+    this.upsertGlobalAggregateWithRegion = this.db.prepare(`
+      INSERT INTO telemetry_global_aggregates (day_utc, unique_installs, tokens_in_sum, tokens_out_sum, agents_active_sum, popular_mcp_json, popular_agent_json, popular_region_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(day_utc) DO UPDATE SET
+        unique_installs = excluded.unique_installs,
+        tokens_in_sum = excluded.tokens_in_sum,
+        tokens_out_sum = excluded.tokens_out_sum,
+        agents_active_sum = excluded.agents_active_sum,
+        popular_mcp_json = excluded.popular_mcp_json,
+        popular_agent_json = excluded.popular_agent_json,
+        popular_region_json = excluded.popular_region_json
+    `);
 
     this.deleteEventsByUuid = this.db.prepare('DELETE FROM telemetry_events WHERE install_uuid = ?');
     this.deleteRollupsByUuid = this.db.prepare('DELETE FROM telemetry_rollups_daily WHERE install_uuid = ?');
@@ -183,6 +208,12 @@ class Queries {
     );
     this.selectPopularMcpForDayRange = this.db.prepare(
       'SELECT mcp_client, COUNT(DISTINCT install_uuid) AS uniq FROM telemetry_events WHERE ts_minute >= ? AND ts_minute < ? GROUP BY mcp_client ORDER BY uniq DESC'
+    );
+    // Quick task 260630-hct -- region popularity for the daily rollup, mirroring
+    // selectPopularMcpForDayRange exactly (GROUP BY region). uniq is
+    // COUNT(DISTINCT install_uuid) per region; the housekeeper applies the k>=5 floor.
+    this.selectPopularRegionForDayRange = this.db.prepare(
+      'SELECT region, COUNT(DISTINCT install_uuid) AS uniq FROM telemetry_events WHERE ts_minute >= ? AND ts_minute < ? GROUP BY region ORDER BY uniq DESC'
     );
 
     this.selectTodaySalt = this.db.prepare('SELECT salt_hex, minted_at FROM telemetry_daily_salt WHERE day_utc = ?');
@@ -207,7 +238,7 @@ class Queries {
       "SELECT COALESCE(SUM(tokens_in_sum + tokens_out_sum), 0) AS n FROM telemetry_global_aggregates WHERE day_utc >= date('now', '-1 day')"
     );
     this.selectLatestGlobalAggregate = this.db.prepare(
-      'SELECT popular_mcp_json, popular_agent_json FROM telemetry_global_aggregates ORDER BY day_utc DESC LIMIT 1'
+      'SELECT popular_mcp_json, popular_agent_json, popular_region_json FROM telemetry_global_aggregates ORDER BY day_utc DESC LIMIT 1'
     );
     this.selectSeriesForWindow = this.db.prepare(
       "SELECT day_utc, unique_installs, tokens_in_sum, tokens_out_sum, agents_active_sum FROM telemetry_global_aggregates WHERE day_utc >= date('now', ?) ORDER BY day_utc ASC"
@@ -414,10 +445,17 @@ class Queries {
     return this.selectPopularMcpForDayRange.all(startMs, endMs);
   }
 
-  upsertGlobalAggregateRow(dayUtc, uniqueInstalls, tokensInSum, tokensOutSum, agentsActiveSum, popularMcpJson, popularAgentJson) {
-    return this.upsertGlobalAggregate.run(
+  // Quick task 260630-hct -- region popularity wrapper (matches popularMcpForDayRange).
+  popularRegionForDayRange(startMs, endMs) {
+    return this.selectPopularRegionForDayRange.all(startMs, endMs);
+  }
+
+  upsertGlobalAggregateRow(dayUtc, uniqueInstalls, tokensInSum, tokensOutSum, agentsActiveSum, popularMcpJson, popularAgentJson, popularRegionJson) {
+    // Quick task 260630-hct -- route through the 8-arg region-bearing statement so
+    // the region breakdown round-trips; popularRegionJson defaults to '[]'.
+    return this.upsertGlobalAggregateWithRegion.run(
       dayUtc, uniqueInstalls || 0, tokensInSum || 0, tokensOutSum || 0, agentsActiveSum || 0,
-      popularMcpJson || '[]', popularAgentJson || '[]'
+      popularMcpJson || '[]', popularAgentJson || '[]', popularRegionJson || '[]'
     );
   }
 
@@ -433,7 +471,7 @@ class Queries {
       total_agents_lifetime: this.aggregateTotalAgentsLifetime.get()?.n || 0,
       tokens_total_lifetime: this.aggregateTokensLifetime.get()?.n || 0,
       tokens_24h:            this.aggregateTokens24h.get()?.n || 0,
-      latest_global:         this.selectLatestGlobalAggregate.get() || { popular_mcp_json: '[]', popular_agent_json: '[]' },
+      latest_global:         this.selectLatestGlobalAggregate.get() || { popular_mcp_json: '[]', popular_agent_json: '[]', popular_region_json: '[]' },
     };
   }
 

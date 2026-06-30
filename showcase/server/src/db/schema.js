@@ -85,6 +85,10 @@ function initializeDatabase(db) {
     -- telemetry_events: raw event log; 7-day retention enforced by housekeeper. event_id is PRIMARY KEY
     --   so INSERT OR IGNORE satisfies BEAT-04 (client-side replay-dedup). ip_hash stores ONLY the
     --   HMAC-SHA256(plaintext_ip, todays_salt); plaintext IP never persisted.
+    -- Quick task 260630-hct -- short-lived region column (coarse country/US-state
+    -- label, e.g. US-CA, DEFAULT 'unknown'). Derived from req.ip at ingest, rolled
+    -- up daily by the housekeeper behind a k>=5 floor, and dropped by the existing
+    -- 7-day retention. It is NOT a durable per-UUID location profile.
     CREATE TABLE IF NOT EXISTS telemetry_events (
       event_id TEXT PRIMARY KEY,
       install_uuid TEXT NOT NULL,
@@ -96,7 +100,8 @@ function initializeDatabase(db) {
       active_agent_count INTEGER NOT NULL DEFAULT 0,
       event_type TEXT NOT NULL,
       ip_hash TEXT NOT NULL,
-      received_at INTEGER NOT NULL
+      received_at INTEGER NOT NULL,
+      region TEXT NOT NULL DEFAULT 'unknown'
     );
 
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_uuid_ts ON telemetry_events(install_uuid, ts_minute);
@@ -118,6 +123,10 @@ function initializeDatabase(db) {
     -- telemetry_global_aggregates: one row per day; lifetime retention; powers /api/public-stats/global
     -- (Phase 274). popular_mcp_json and popular_agent_json apply a k>=5 anonymity floor at WRITE time
     -- in the housekeeper (per D-07); below-k labels bucket as "Other (N=<count>)".
+    -- popular_region_json (quick task 260630-hct) is the k>=5-floored daily region
+    -- breakdown, exactly mirroring popular_mcp_json. The floor is applied at WRITE
+    -- time in the housekeeper (REGION_K_FLOOR=5); below-k regions collapse to a
+    -- single 'Other' bucket (suppressed when that sum is itself < 5).
     CREATE TABLE IF NOT EXISTS telemetry_global_aggregates (
       day_utc TEXT PRIMARY KEY,
       unique_installs INTEGER NOT NULL DEFAULT 0,
@@ -125,7 +134,8 @@ function initializeDatabase(db) {
       tokens_out_sum INTEGER NOT NULL DEFAULT 0,
       agents_active_sum INTEGER NOT NULL DEFAULT 0,
       popular_mcp_json TEXT NOT NULL DEFAULT '[]',
-      popular_agent_json TEXT NOT NULL DEFAULT '[]'
+      popular_agent_json TEXT NOT NULL DEFAULT '[]',
+      popular_region_json TEXT NOT NULL DEFAULT '[]'
     );
 
     -- telemetry_daily_salt: daily-rotated HMAC-SHA256 salt for ip_hash. Lazy UTC-daily rotation in
@@ -163,6 +173,14 @@ function initializeDatabase(db) {
   } catch { /* column already exists */ }
   try {
     db.exec(`ALTER TABLE agents ADD COLUMN start_mode TEXT NOT NULL DEFAULT 'pinned'`);
+  } catch { /* column already exists */ }
+  // Quick task 260630-hct -- additive region columns so existing databases upgrade
+  // in place (fresh databases get them from the inline CREATE TABLE bodies above).
+  try {
+    db.exec(`ALTER TABLE telemetry_events ADD COLUMN region TEXT NOT NULL DEFAULT 'unknown'`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE telemetry_global_aggregates ADD COLUMN popular_region_json TEXT NOT NULL DEFAULT '[]'`);
   } catch { /* column already exists */ }
 
   console.log('[FSB Server] Database schema initialized');
