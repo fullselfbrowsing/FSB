@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "id": "netlify.get_current_user",
+  "origin": "https://app.netlify.com",
+  "endpoint": "/access-control/bb-api/api/v1/user",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "extract": "@",
+  "expectedShape": "@"
+}

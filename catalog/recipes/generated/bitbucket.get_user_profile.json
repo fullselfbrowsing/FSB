@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "id": "bitbucket.get_user_profile",
+  "origin": "https://bitbucket.org",
+  "endpoint": "/!api/2.0/user",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "extract": "@",
+  "expectedShape": "@"
+}

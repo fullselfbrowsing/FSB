@@ -7,6 +7,126 @@
   var DATA = {
   "recipes": [
     {
+      "schemaVersion": 2,
+      "id": "bestbuy.get_current_user",
+      "origin": "https://www.bestbuy.com",
+      "endpoint": "/profile/rest/customerprimaryinfo",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "bestbuy.get_customer_plans",
+      "origin": "https://www.bestbuy.com",
+      "endpoint": "/profile/rest/customerplans/carouselplans",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "bitbucket.get_user_profile",
+      "origin": "https://bitbucket.org",
+      "endpoint": "/!api/2.0/user",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "circleci.list_collaborations",
+      "origin": "https://app.circleci.com",
+      "endpoint": "/api/v2/me/collaborations",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "netlify.get_current_user",
+      "origin": "https://app.netlify.com",
+      "endpoint": "/access-control/bb-api/api/v1/user",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "redfin.get_current_user",
+      "origin": "https://www.redfin.com",
+      "endpoint": "/stingray/do/api-get-header-user-menu",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "webflow.get_current_user",
+      "origin": "https://webflow.com",
+      "endpoint": "/api/user",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
+      "schemaVersion": 2,
+      "id": "webflow.list_workspaces",
+      "origin": "https://webflow.com",
+      "endpoint": "/api/workspaces",
+      "method": "GET",
+      "authStrategy": "same-origin-cookie",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "extract": "@",
+      "expectedShape": "@"
+    },
+    {
       "schemaVersion": 1,
       "id": "github.notifications",
       "origin": "https://github.com",
@@ -845,56 +965,6 @@
       }
     },
     {
-      "slug": "airtable.get_record",
-      "service": "airtable.com",
-      "intentSynonyms": [
-        "get a record in airtable",
-        "look up a record in airtable",
-        "fetch a single record in airtable",
-        "view one specific record in airtable",
-        "get record in airtable",
-        "get a single record by id in airtable"
-      ],
-      "description": "Get a single record (row) by its ID. Returns all cell values for the record.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "base_id": {
-            "type": "string",
-            "description": "Base ID (app prefix)"
-          },
-          "table_id": {
-            "type": "string",
-            "description": "Table ID (tbl prefix)"
-          },
-          "record_id": {
-            "type": "string",
-            "description": "Record ID (rec prefix)"
-          }
-        },
-        "required": [
-          "base_id",
-          "table_id",
-          "record_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/airtable/src/tools/get-record.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "apiget",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "airtable.get_record_activity",
       "service": "airtable.com",
       "intentSynonyms": [
@@ -936,6 +1006,56 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/airtable/src/tools/get-record-activity.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apiget",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "airtable.get_record",
+      "service": "airtable.com",
+      "intentSynonyms": [
+        "get a record in airtable",
+        "look up a record in airtable",
+        "fetch a single record in airtable",
+        "view one specific record in airtable",
+        "get record in airtable",
+        "get a single record by id in airtable"
+      ],
+      "description": "Get a single record (row) by its ID. Returns all cell values for the record.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "base_id": {
+            "type": "string",
+            "description": "Base ID (app prefix)"
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Table ID (tbl prefix)"
+          },
+          "record_id": {
+            "type": "string",
+            "description": "Record ID (rec prefix)"
+          }
+        },
+        "required": [
+          "base_id",
+          "table_id",
+          "record_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/airtable/src/tools/get-record.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "apiget",
@@ -4139,50 +4259,6 @@
       }
     },
     {
-      "slug": "azure.delete_resource",
-      "service": "portal.azure.com",
-      "intentSynonyms": [
-        "delete a resource in azure",
-        "remove a resource in azure",
-        "trash a resource in azure",
-        "permanently delete a resource in azure",
-        "delete resource in azure",
-        "delete a resource by id in azure"
-      ],
-      "description": "Delete a specific Azure resource by its full resource ID. This is a destructive and irreversible operation.",
-      "actionVerb": "delete",
-      "sideEffectClass": "destructive",
-      "params": {
-        "type": "object",
-        "properties": {
-          "resource_id": {
-            "type": "string",
-            "description": "Full resource ID to delete"
-          },
-          "api_version": {
-            "description": "API version for the resource provider (default: 2021-04-01)",
-            "type": "string"
-          }
-        },
-        "required": [
-          "resource_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/azure/src/tools/delete-resource.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "delete"
-        }
-      }
-    },
-    {
       "slug": "azure.delete_resource_group",
       "service": "portal.azure.com",
       "intentSynonyms": [
@@ -4218,6 +4294,50 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/azure/src/tools/delete-resource-group.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "azure.delete_resource",
+      "service": "portal.azure.com",
+      "intentSynonyms": [
+        "delete a resource in azure",
+        "remove a resource in azure",
+        "trash a resource in azure",
+        "permanently delete a resource in azure",
+        "delete resource in azure",
+        "delete a resource by id in azure"
+      ],
+      "description": "Delete a specific Azure resource by its full resource ID. This is a destructive and irreversible operation.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "resource_id": {
+            "type": "string",
+            "description": "Full resource ID to delete"
+          },
+          "api_version": {
+            "description": "API version for the resource provider (default: 2021-04-01)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/azure/src/tools/delete-resource.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -4354,50 +4474,6 @@
       }
     },
     {
-      "slug": "azure.get_resource",
-      "service": "portal.azure.com",
-      "intentSynonyms": [
-        "get a resource in azure",
-        "look up a resource in azure",
-        "fetch a single resource in azure",
-        "view one specific resource in azure",
-        "get resource in azure",
-        "get a resource by id in azure"
-      ],
-      "description": "Get detailed information about a specific Azure resource by its full resource ID. The resource ID follows the format: /subscriptions/{sub}/resourceGroups/{rg}/providers/{provider}/{type}/{name}.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "resource_id": {
-            "type": "string",
-            "description": "Full resource ID (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.Compute/virtualMachines/myVM)"
-          },
-          "api_version": {
-            "description": "API version for the resource provider (default: 2021-04-01)",
-            "type": "string"
-          }
-        },
-        "required": [
-          "resource_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/azure/src/tools/get-resource.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "azure.get_resource_group",
       "service": "portal.azure.com",
       "intentSynonyms": [
@@ -4434,6 +4510,50 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/azure/src/tools/get-resource-group.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "azure.get_resource",
+      "service": "portal.azure.com",
+      "intentSynonyms": [
+        "get a resource in azure",
+        "look up a resource in azure",
+        "fetch a single resource in azure",
+        "view one specific resource in azure",
+        "get resource in azure",
+        "get a resource by id in azure"
+      ],
+      "description": "Get detailed information about a specific Azure resource by its full resource ID. The resource ID follows the format: /subscriptions/{sub}/resourceGroups/{rg}/providers/{provider}/{type}/{name}.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "resource_id": {
+            "type": "string",
+            "description": "Full resource ID (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.Compute/virtualMachines/myVM)"
+          },
+          "api_version": {
+            "description": "API version for the resource provider (default: 2021-04-01)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/azure/src/tools/get-resource.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -5163,46 +5283,6 @@
       }
     },
     {
-      "slug": "bestbuy.get_product",
-      "service": "bestbuy.com",
-      "intentSynonyms": [
-        "get a product in bestbuy",
-        "look up a product in bestbuy",
-        "fetch a single product in bestbuy",
-        "view one specific product in bestbuy",
-        "get product in bestbuy",
-        "get product details by sku id in bestbuy"
-      ],
-      "description": "Get detailed information about a Best Buy product by its SKU ID. Returns description, pricing, availability, fulfillment options, and reviews. Use search_products to find SKU IDs.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "sku_id": {
-            "type": "string",
-            "description": "Best Buy SKU ID (e.g., \"6612975\")"
-          }
-        },
-        "required": [
-          "sku_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/bestbuy/src/tools/get-product.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "bestbuy.get_product_reviews",
       "service": "bestbuy.com",
       "intentSynonyms": [
@@ -5255,6 +5335,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/bestbuy/src/tools/get-product-reviews.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "bestbuy.get_product",
+      "service": "bestbuy.com",
+      "intentSynonyms": [
+        "get a product in bestbuy",
+        "look up a product in bestbuy",
+        "fetch a single product in bestbuy",
+        "view one specific product in bestbuy",
+        "get product in bestbuy",
+        "get product details by sku id in bestbuy"
+      ],
+      "description": "Get detailed information about a Best Buy product by its SKU ID. Returns description, pricing, availability, fulfillment options, and reviews. Use search_products to find SKU IDs.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "sku_id": {
+            "type": "string",
+            "description": "Best Buy SKU ID (e.g., \"6612975\")"
+          }
+        },
+        "required": [
+          "sku_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bestbuy/src/tools/get-product.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -5996,6 +6116,57 @@
       }
     },
     {
+      "slug": "bitbucket.get_pull_request_diff",
+      "service": "bitbucket.org",
+      "intentSynonyms": [
+        "get a pull request diff in bitbucket",
+        "look up a pull request diff in bitbucket",
+        "fetch a single pull request diff in bitbucket",
+        "view one specific pull request diff in bitbucket",
+        "get pull request diff in bitbucket"
+      ],
+      "description": "Get the unified diff of all changed files in a pull request.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Workspace slug or UUID"
+          },
+          "repo_slug": {
+            "type": "string",
+            "description": "Repository slug"
+          },
+          "pull_request_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Pull request ID"
+          }
+        },
+        "required": [
+          "workspace",
+          "repo_slug",
+          "pull_request_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bitbucket/src/tools/get-pull-request-diff.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "bitbucket.get_pull_request",
       "service": "bitbucket.org",
       "intentSynonyms": [
@@ -6043,57 +6214,6 @@
         "signals": {
           "transportHelper": "api",
           "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "bitbucket.get_pull_request_diff",
-      "service": "bitbucket.org",
-      "intentSynonyms": [
-        "get a pull request diff in bitbucket",
-        "look up a pull request diff in bitbucket",
-        "fetch a single pull request diff in bitbucket",
-        "view one specific pull request diff in bitbucket",
-        "get pull request diff in bitbucket"
-      ],
-      "description": "Get the unified diff of all changed files in a pull request.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "workspace": {
-            "type": "string",
-            "description": "Workspace slug or UUID"
-          },
-          "repo_slug": {
-            "type": "string",
-            "description": "Repository slug"
-          },
-          "pull_request_id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Pull request ID"
-          }
-        },
-        "required": [
-          "workspace",
-          "repo_slug",
-          "pull_request_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/bitbucket/src/tools/get-pull-request-diff.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -7008,6 +7128,60 @@
       }
     },
     {
+      "slug": "booking.get_property_reviews",
+      "service": "booking.com",
+      "intentSynonyms": [
+        "get property reviews in booking",
+        "look up property reviews in booking",
+        "fetch a single property reviews in booking",
+        "view one specific property reviews in booking",
+        "get property review scores in booking"
+      ],
+      "description": "Get the review summary for a property on Booking.com by searching for it. Returns the overall score, score breakdown by category, and review count. For individual review text, use navigate_to_property to open the property page.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "property_name": {
+            "type": "string",
+            "description": "Property name to search for"
+          },
+          "city": {
+            "type": "string",
+            "description": "City where the property is located"
+          },
+          "checkin": {
+            "type": "string",
+            "description": "Check-in date in YYYY-MM-DD format"
+          },
+          "checkout": {
+            "type": "string",
+            "description": "Check-out date in YYYY-MM-DD format"
+          }
+        },
+        "required": [
+          "property_name",
+          "city",
+          "checkin",
+          "checkout"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/booking/src/tools/get-property-reviews.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "booking.get_property",
       "service": "booking.com",
       "intentSynonyms": [
@@ -7054,60 +7228,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/booking/src/tools/get-property.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "booking.get_property_reviews",
-      "service": "booking.com",
-      "intentSynonyms": [
-        "get property reviews in booking",
-        "look up property reviews in booking",
-        "fetch a single property reviews in booking",
-        "view one specific property reviews in booking",
-        "get property review scores in booking"
-      ],
-      "description": "Get the review summary for a property on Booking.com by searching for it. Returns the overall score, score breakdown by category, and review count. For individual review text, use navigate_to_property to open the property page.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "property_name": {
-            "type": "string",
-            "description": "Property name to search for"
-          },
-          "city": {
-            "type": "string",
-            "description": "City where the property is located"
-          },
-          "checkin": {
-            "type": "string",
-            "description": "Check-in date in YYYY-MM-DD format"
-          },
-          "checkout": {
-            "type": "string",
-            "description": "Check-out date in YYYY-MM-DD format"
-          }
-        },
-        "required": [
-          "property_name",
-          "city",
-          "checkin",
-          "checkout"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/booking/src/tools/get-property-reviews.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -8691,6 +8811,50 @@
       }
     },
     {
+      "slug": "bsky.search_users_typeahead",
+      "service": "bsky.app",
+      "intentSynonyms": [
+        "search an users typeahead in bsky",
+        "search users typeahead in bsky",
+        "search an users typeahead in bluesky",
+        "typeahead search for users in bsky"
+      ],
+      "description": "Typeahead search for users. Returns a quick list of matching users for autocomplete. Faster than full search but returns fewer results.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "limit": {
+            "description": "Maximum number of results to return (default 8, max 10)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/bluesky/src/tools/search-users-typeahead.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "bsky.search_users",
       "service": "bsky.app",
       "intentSynonyms": [
@@ -8729,50 +8893,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/bluesky/src/tools/search-users.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "search"
-        }
-      }
-    },
-    {
-      "slug": "bsky.search_users_typeahead",
-      "service": "bsky.app",
-      "intentSynonyms": [
-        "search an users typeahead in bsky",
-        "search users typeahead in bsky",
-        "search an users typeahead in bluesky",
-        "typeahead search for users in bsky"
-      ],
-      "description": "Typeahead search for users. Returns a quick list of matching users for autocomplete. Faster than full search but returns fewer results.",
-      "actionVerb": "search",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "q": {
-            "type": "string",
-            "description": "Search query"
-          },
-          "limit": {
-            "description": "Maximum number of results to return (default 8, max 10)",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10
-          }
-        },
-        "required": [
-          "q"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/bluesky/src/tools/search-users-typeahead.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -9344,6 +9464,37 @@
       }
     },
     {
+      "slug": "calendly.get_organization_statistics",
+      "service": "calendly.com",
+      "intentSynonyms": [
+        "get organization statistics in calendly",
+        "look up organization statistics in calendly",
+        "fetch a single organization statistics in calendly",
+        "view one specific organization statistics in calendly",
+        "get organization seat statistics in calendly"
+      ],
+      "description": "Get seat usage statistics for the current Calendly organization including available seats, active users, pending invitations, and occupancy ratio.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/calendly/src/tools/get-organization-statistics.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "calendly.get_organization",
       "service": "calendly.com",
       "intentSynonyms": [
@@ -9367,37 +9518,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/calendly/src/tools/get-organization.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "calendly.get_organization_statistics",
-      "service": "calendly.com",
-      "intentSynonyms": [
-        "get organization statistics in calendly",
-        "look up organization statistics in calendly",
-        "fetch a single organization statistics in calendly",
-        "view one specific organization statistics in calendly",
-        "get organization seat statistics in calendly"
-      ],
-      "description": "Get seat usage statistics for the current Calendly organization including available seats, active users, pending invitations, and occupancy ratio.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/calendly/src/tools/get-organization-statistics.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -11394,6 +11514,37 @@
       }
     },
     {
+      "slug": "chipotle.get_menu_groups",
+      "service": "chipotle.com",
+      "intentSynonyms": [
+        "get menu groups in chipotle",
+        "look up menu groups in chipotle",
+        "fetch a single menu groups in chipotle",
+        "view one specific menu groups in chipotle",
+        "get menu categories from local page state in chipotle"
+      ],
+      "description": "Get menu group categories (e.g. \"Burrito\", \"Bowl\", \"Tacos\") from the locally cached Vuex store. No API call is made — reads from the current page state.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/chipotle/src/tools/get-menu-groups.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "chipotle.get_menu",
       "service": "chipotle.com",
       "intentSynonyms": [
@@ -11431,37 +11582,6 @@
         "signals": {
           "transportHelper": "api",
           "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "chipotle.get_menu_groups",
-      "service": "chipotle.com",
-      "intentSynonyms": [
-        "get menu groups in chipotle",
-        "look up menu groups in chipotle",
-        "fetch a single menu groups in chipotle",
-        "view one specific menu groups in chipotle",
-        "get menu categories from local page state in chipotle"
-      ],
-      "description": "Get menu group categories (e.g. \"Burrito\", \"Bowl\", \"Tacos\") from the locally cached Vuex store. No API call is made — reads from the current page state.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/chipotle/src/tools/get-menu-groups.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -12359,53 +12479,6 @@
       }
     },
     {
-      "slug": "circleci.get_job",
-      "service": "app.circleci.com",
-      "intentSynonyms": [
-        "get a job in circleci",
-        "look up a job in circleci",
-        "fetch a single job in circleci",
-        "view one specific job in circleci",
-        "get job in circleci",
-        "get job details in circleci"
-      ],
-      "description": "Get detailed information about a job by project slug and job number. Returns status, timing, duration, parallelism, and web URL.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "project_slug": {
-            "type": "string",
-            "description": "Project slug e.g. \"gh/org/repo\""
-          },
-          "job_number": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Job number within the project"
-          }
-        },
-        "required": [
-          "project_slug",
-          "job_number"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/circleci/src/tools/get-job.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "circleci.get_job_artifacts",
       "service": "app.circleci.com",
       "intentSynonyms": [
@@ -12498,29 +12571,36 @@
       }
     },
     {
-      "slug": "circleci.get_pipeline",
+      "slug": "circleci.get_job",
       "service": "app.circleci.com",
       "intentSynonyms": [
-        "get a pipeline in circleci",
-        "look up a pipeline in circleci",
-        "fetch a single pipeline in circleci",
-        "view one specific pipeline in circleci",
-        "get pipeline in circleci",
-        "get a pipeline by id in circleci"
+        "get a job in circleci",
+        "look up a job in circleci",
+        "fetch a single job in circleci",
+        "view one specific job in circleci",
+        "get job in circleci",
+        "get job details in circleci"
       ],
-      "description": "Get a single pipeline by its UUID. Returns pipeline details including state, trigger info, and VCS data.",
+      "description": "Get detailed information about a job by project slug and job number. Returns status, timing, duration, parallelism, and web URL.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "pipeline_id": {
+          "project_slug": {
             "type": "string",
-            "description": "Pipeline UUID"
+            "description": "Project slug e.g. \"gh/org/repo\""
+          },
+          "job_number": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Job number within the project"
           }
         },
         "required": [
-          "pipeline_id"
+          "project_slug",
+          "job_number"
         ],
         "additionalProperties": false
       },
@@ -12528,7 +12608,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/circleci/src/tools/get-pipeline.ts",
+        "sourcePath": "plugins/circleci/src/tools/get-job.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -12621,29 +12701,29 @@
       }
     },
     {
-      "slug": "circleci.get_project",
+      "slug": "circleci.get_pipeline",
       "service": "app.circleci.com",
       "intentSynonyms": [
-        "get a project in circleci",
-        "look up a project in circleci",
-        "fetch a single project in circleci",
-        "view one specific project in circleci",
-        "get project in circleci",
-        "get project details by slug in circleci"
+        "get a pipeline in circleci",
+        "look up a pipeline in circleci",
+        "fetch a single pipeline in circleci",
+        "view one specific pipeline in circleci",
+        "get pipeline in circleci",
+        "get a pipeline by id in circleci"
       ],
-      "description": "Get project details by project slug. Returns project ID, name, organization, and VCS info.",
+      "description": "Get a single pipeline by its UUID. Returns pipeline details including state, trigger info, and VCS data.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "project_slug": {
+          "pipeline_id": {
             "type": "string",
-            "description": "Project slug (e.g., \"gh/org/repo\")"
+            "description": "Pipeline UUID"
           }
         },
         "required": [
-          "project_slug"
+          "pipeline_id"
         ],
         "additionalProperties": false
       },
@@ -12651,7 +12731,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/circleci/src/tools/get-project.ts",
+        "sourcePath": "plugins/circleci/src/tools/get-pipeline.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -12718,29 +12798,29 @@
       }
     },
     {
-      "slug": "circleci.get_workflow",
+      "slug": "circleci.get_project",
       "service": "app.circleci.com",
       "intentSynonyms": [
-        "get a workflow in circleci",
-        "look up a workflow in circleci",
-        "fetch a single workflow in circleci",
-        "view one specific workflow in circleci",
-        "get workflow in circleci",
-        "get a workflow by id in circleci"
+        "get a project in circleci",
+        "look up a project in circleci",
+        "fetch a single project in circleci",
+        "view one specific project in circleci",
+        "get project in circleci",
+        "get project details by slug in circleci"
       ],
-      "description": "Get a single workflow by its UUID. Returns status, timing, and pipeline info.",
+      "description": "Get project details by project slug. Returns project ID, name, organization, and VCS info.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "workflow_id": {
+          "project_slug": {
             "type": "string",
-            "description": "Workflow UUID"
+            "description": "Project slug (e.g., \"gh/org/repo\")"
           }
         },
         "required": [
-          "workflow_id"
+          "project_slug"
         ],
         "additionalProperties": false
       },
@@ -12748,7 +12828,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/circleci/src/tools/get-workflow.ts",
+        "sourcePath": "plugins/circleci/src/tools/get-project.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -12902,6 +12982,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/circleci/src/tools/get-workflow-runs.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "circleci.get_workflow",
+      "service": "app.circleci.com",
+      "intentSynonyms": [
+        "get a workflow in circleci",
+        "look up a workflow in circleci",
+        "fetch a single workflow in circleci",
+        "view one specific workflow in circleci",
+        "get workflow in circleci",
+        "get a workflow by id in circleci"
+      ],
+      "description": "Get a single workflow by its UUID. Returns status, timing, and pipeline info.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "description": "Workflow UUID"
+          }
+        },
+        "required": [
+          "workflow_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/circleci/src/tools/get-workflow.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -14641,6 +14761,42 @@
       }
     },
     {
+      "slug": "clickup.get_workspace_members",
+      "service": "app.clickup.com",
+      "intentSynonyms": [
+        "get workspace members in clickup",
+        "look up workspace members in clickup",
+        "fetch a single workspace members in clickup",
+        "view one specific workspace members in clickup",
+        "list workspace members in clickup"
+      ],
+      "description": "List all members in a ClickUp workspace including their name, email, role, and avatar. If no workspace_id is provided, uses the current workspace.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "description": "Workspace ID. Defaults to the current workspace.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/clickup/src/tools/get-workspace-members.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "clickup.get_workspace",
       "service": "app.clickup.com",
       "intentSynonyms": [
@@ -14669,42 +14825,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/clickup/src/tools/get-workspace.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "clickup.get_workspace_members",
-      "service": "app.clickup.com",
-      "intentSynonyms": [
-        "get workspace members in clickup",
-        "look up workspace members in clickup",
-        "fetch a single workspace members in clickup",
-        "view one specific workspace members in clickup",
-        "list workspace members in clickup"
-      ],
-      "description": "List all members in a ClickUp workspace including their name, email, role, and avatar. If no workspace_id is provided, uses the current workspace.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "workspace_id": {
-            "description": "Workspace ID. Defaults to the current workspace.",
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/clickup/src/tools/get-workspace-members.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -14909,6 +15029,45 @@
       }
     },
     {
+      "slug": "cloudflare.get_zone_settings",
+      "service": "dash.cloudflare.com",
+      "intentSynonyms": [
+        "get zone settings in cloudflare",
+        "look up zone settings in cloudflare",
+        "fetch a single zone settings in cloudflare",
+        "view one specific zone settings in cloudflare",
+        "get all zone settings in cloudflare"
+      ],
+      "description": "Get all settings for a zone. Returns ~56 settings including security level, SSL mode, cache TTL, minification, HTTP/2, Always Use HTTPS, Brotli compression, development mode, and more. Each setting shows its current value and whether it is editable on the current plan.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "description": "Zone ID (32-char hex string)"
+          }
+        },
+        "required": [
+          "zone_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/cloudflare/src/tools/get-zone-settings.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "cloudflare.get_zone",
       "service": "dash.cloudflare.com",
       "intentSynonyms": [
@@ -14940,45 +15099,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/cloudflare/src/tools/get-zone.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "cloudflare.get_zone_settings",
-      "service": "dash.cloudflare.com",
-      "intentSynonyms": [
-        "get zone settings in cloudflare",
-        "look up zone settings in cloudflare",
-        "fetch a single zone settings in cloudflare",
-        "view one specific zone settings in cloudflare",
-        "get all zone settings in cloudflare"
-      ],
-      "description": "Get all settings for a zone. Returns ~56 settings including security level, SSL mode, cache TTL, minification, HTTP/2, Always Use HTTPS, Brotli compression, development mode, and more. Each setting shows its current value and whether it is editable on the current plan.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "zone_id": {
-            "type": "string",
-            "description": "Zone ID (32-char hex string)"
-          }
-        },
-        "required": [
-          "zone_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/cloudflare/src/tools/get-zone-settings.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -16186,46 +16306,6 @@
       }
     },
     {
-      "slug": "cockroachdb.get_cluster",
-      "service": "cockroachlabs.cloud",
-      "intentSynonyms": [
-        "get a cluster in cockroachdb",
-        "look up a cluster in cockroachdb",
-        "fetch a single cluster in cockroachdb",
-        "view one specific cluster in cockroachdb",
-        "get cluster in cockroachdb",
-        "get cluster details by id in cockroachdb"
-      ],
-      "description": "Get detailed information about a specific CockroachDB cluster including regions, usage limits, billing plan, and connection endpoints.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "cluster_id": {
-            "type": "string",
-            "description": "Cluster UUID"
-          }
-        },
-        "required": [
-          "cluster_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/cockroachdb/src/tools/get-cluster.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "cockroachdb.get_cluster_usage",
       "service": "cockroachlabs.cloud",
       "intentSynonyms": [
@@ -16257,6 +16337,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/cockroachdb/src/tools/get-cluster-usage.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "cockroachdb.get_cluster",
+      "service": "cockroachlabs.cloud",
+      "intentSynonyms": [
+        "get a cluster in cockroachdb",
+        "look up a cluster in cockroachdb",
+        "fetch a single cluster in cockroachdb",
+        "view one specific cluster in cockroachdb",
+        "get cluster in cockroachdb",
+        "get cluster details by id in cockroachdb"
+      ],
+      "description": "Get detailed information about a specific CockroachDB cluster including regions, usage limits, billing plan, and connection endpoints.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "description": "Cluster UUID"
+          }
+        },
+        "required": [
+          "cluster_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/cockroachdb/src/tools/get-cluster.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -17676,51 +17796,6 @@
       }
     },
     {
-      "slug": "confluence.get_page",
-      "service": "atlassian.net",
-      "intentSynonyms": [
-        "get a page in confluence",
-        "look up a page in confluence",
-        "fetch a single page in confluence",
-        "view one specific page in confluence",
-        "get page in confluence",
-        "get a page by id in confluence"
-      ],
-      "description": "Get a Confluence page by its ID, including title, metadata, and optionally the page body content in storage format (HTML)",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "page_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Page ID to retrieve"
-          },
-          "include_body": {
-            "description": "Whether to include the page body content (default false — set to true to read page content)",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "page_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/confluence/src/tools/get-page.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "confluence.get_page_children",
       "service": "atlassian.net",
       "intentSynonyms": [
@@ -17763,6 +17838,51 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/confluence/src/tools/get-page-children.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "confluence.get_page",
+      "service": "atlassian.net",
+      "intentSynonyms": [
+        "get a page in confluence",
+        "look up a page in confluence",
+        "fetch a single page in confluence",
+        "view one specific page in confluence",
+        "get page in confluence",
+        "get a page by id in confluence"
+      ],
+      "description": "Get a Confluence page by its ID, including title, metadata, and optionally the page body content in storage format (HTML)",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Page ID to retrieve"
+          },
+          "include_body": {
+            "description": "Whether to include the page body content (default false — set to true to read page content)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "page_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/confluence/src/tools/get-page.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -18713,6 +18833,49 @@
       }
     },
     {
+      "slug": "costco.get_product_availability",
+      "service": "costco.com",
+      "intentSynonyms": [
+        "get a product availability in costco",
+        "look up a product availability in costco",
+        "fetch a single product availability in costco",
+        "view one specific product availability in costco",
+        "get product availability in costco",
+        "check product inventory and availability in costco"
+      ],
+      "description": "Check inventory availability for one or more Costco products. Returns online shipping availability, warehouse availability, pickup availability, and third-party delivery status.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "item_numbers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of item numbers to check (max 30)"
+          }
+        },
+        "required": [
+          "item_numbers"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/costco/src/tools/get-product-availability.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "costco.get_product",
       "service": "costco.com",
       "intentSynonyms": [
@@ -18748,49 +18911,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/costco/src/tools/get-product.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "costco.get_product_availability",
-      "service": "costco.com",
-      "intentSynonyms": [
-        "get a product availability in costco",
-        "look up a product availability in costco",
-        "fetch a single product availability in costco",
-        "view one specific product availability in costco",
-        "get product availability in costco",
-        "check product inventory and availability in costco"
-      ],
-      "description": "Check inventory availability for one or more Costco products. Returns online shipping availability, warehouse availability, pickup availability, and third-party delivery status.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "item_numbers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Array of item numbers to check (max 30)"
-          }
-        },
-        "required": [
-          "item_numbers"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/costco/src/tools/get-product-availability.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -20312,48 +20432,6 @@
       }
     },
     {
-      "slug": "datadog.get_monitor",
-      "service": "datadoghq.com",
-      "intentSynonyms": [
-        "get a monitor in datadog",
-        "look up a monitor in datadog",
-        "fetch a single monitor in datadog",
-        "view one specific monitor in datadog",
-        "get monitor in datadog",
-        "get a monitor by id in datadog"
-      ],
-      "description": "Get detailed information about a specific Datadog monitor by its ID.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "monitor_id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Monitor ID"
-          }
-        },
-        "required": [
-          "monitor_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/datadog/src/tools/get-monitor.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "apiget",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "datadog.get_monitor_groups",
       "service": "datadoghq.com",
       "intentSynonyms": [
@@ -20442,6 +20520,48 @@
         "signals": {
           "transportHelper": null,
           "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "datadog.get_monitor",
+      "service": "datadoghq.com",
+      "intentSynonyms": [
+        "get a monitor in datadog",
+        "look up a monitor in datadog",
+        "fetch a single monitor in datadog",
+        "view one specific monitor in datadog",
+        "get monitor in datadog",
+        "get a monitor by id in datadog"
+      ],
+      "description": "Get detailed information about a specific Datadog monitor by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Monitor ID"
+          }
+        },
+        "required": [
+          "monitor_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/get-monitor.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apiget",
+          "httpMethod": "GET",
           "opNameVerb": "get"
         }
       }
@@ -20643,46 +20763,6 @@
       }
     },
     {
-      "slug": "datadog.get_slo",
-      "service": "datadoghq.com",
-      "intentSynonyms": [
-        "get a slo in datadog",
-        "look up a slo in datadog",
-        "fetch a single slo in datadog",
-        "view one specific slo in datadog",
-        "get slo in datadog",
-        "get an slo by id in datadog"
-      ],
-      "description": "Get detailed information about a specific Service Level Objective (SLO) by ID.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "slo_id": {
-            "type": "string",
-            "description": "SLO ID"
-          }
-        },
-        "required": [
-          "slo_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/datadog/src/tools/get-slo.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "apiget",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "datadog.get_slo_history",
       "service": "datadoghq.com",
       "intentSynonyms": [
@@ -20724,6 +20804,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/datadog/src/tools/get-slo-history.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apiget",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "datadog.get_slo",
+      "service": "datadoghq.com",
+      "intentSynonyms": [
+        "get a slo in datadog",
+        "look up a slo in datadog",
+        "fetch a single slo in datadog",
+        "view one specific slo in datadog",
+        "get slo in datadog",
+        "get an slo by id in datadog"
+      ],
+      "description": "Get detailed information about a specific Service Level Objective (SLO) by ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "slo_id": {
+            "type": "string",
+            "description": "SLO ID"
+          }
+        },
+        "required": [
+          "slo_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/get-slo.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "apiget",
@@ -22006,49 +22126,6 @@
       }
     },
     {
-      "slug": "datadog.search_dashboards",
-      "service": "datadoghq.com",
-      "intentSynonyms": [
-        "search dashboards in datadog",
-        "search dashboards by name in datadog",
-        "search dashboards by title or description in datadog"
-      ],
-      "description": "Search dashboards by title or description. Performs a client-side substring match across all dashboards.",
-      "actionVerb": "search",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Search text to match against dashboard titles and descriptions"
-          },
-          "limit": {
-            "description": "Maximum results (default 25)",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/datadog/src/tools/search-dashboards.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "apiget",
-          "httpMethod": "GET",
-          "opNameVerb": "search"
-        }
-      }
-    },
-    {
       "slug": "datadog.search_dashboards_advanced",
       "service": "datadoghq.com",
       "intentSynonyms": [
@@ -22084,6 +22161,49 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/datadog/src/tools/search-dashboards-advanced.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "apiget",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "datadog.search_dashboards",
+      "service": "datadoghq.com",
+      "intentSynonyms": [
+        "search dashboards in datadog",
+        "search dashboards by name in datadog",
+        "search dashboards by title or description in datadog"
+      ],
+      "description": "Search dashboards by title or description. Performs a client-side substring match across all dashboards.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search text to match against dashboard titles and descriptions"
+          },
+          "limit": {
+            "description": "Maximum results (default 25)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/datadog/src/tools/search-dashboards.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "apiget",
@@ -27026,46 +27146,6 @@
       }
     },
     {
-      "slug": "excel.delete_table",
-      "service": "excel.cloud.microsoft",
-      "intentSynonyms": [
-        "delete a table in excel",
-        "remove a table in excel",
-        "trash a table in excel",
-        "permanently delete a table in excel",
-        "delete table in excel",
-        "delete a table in excel online"
-      ],
-      "description": "Delete a table by name or ID. This removes the table object but keeps the data in the cells. Use convert_table_to_range instead if you want to explicitly convert first.",
-      "actionVerb": "delete",
-      "sideEffectClass": "destructive",
-      "params": {
-        "type": "object",
-        "properties": {
-          "table": {
-            "type": "string",
-            "description": "Table name or ID"
-          }
-        },
-        "required": [
-          "table"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/excel-online/src/tools/delete-table.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": "DELETE",
-          "opNameVerb": "delete"
-        }
-      }
-    },
-    {
       "slug": "excel.delete_table_row",
       "service": "excel.cloud.microsoft",
       "intentSynonyms": [
@@ -27104,6 +27184,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/excel-online/src/tools/delete-table-row.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "excel.delete_table",
+      "service": "excel.cloud.microsoft",
+      "intentSynonyms": [
+        "delete a table in excel",
+        "remove a table in excel",
+        "trash a table in excel",
+        "permanently delete a table in excel",
+        "delete table in excel",
+        "delete a table in excel online"
+      ],
+      "description": "Delete a table by name or ID. This removes the table object but keeps the data in the cells. Use convert_table_to_range instead if you want to explicitly convert first.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table name or ID"
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/excel-online/src/tools/delete-table.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -28902,6 +29022,43 @@
       }
     },
     {
+      "slug": "facebook.search_marketplace",
+      "service": "facebook.com",
+      "intentSynonyms": [
+        "search a marketplace in facebook",
+        "search marketplace in facebook",
+        "search marketplace listings in facebook"
+      ],
+      "description": "Search Facebook Marketplace for items. Fetches the marketplace search page and extracts listing data from the server-rendered response. Returns listings with title, price, seller, location, and image.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search keywords (e.g., 'laptop', 'couch')"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/facebook/src/tools/search-marketplace.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
       "slug": "facebook.search",
       "service": "facebook.com",
       "intentSynonyms": [
@@ -28936,43 +29093,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/facebook/src/tools/search.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "search"
-        }
-      }
-    },
-    {
-      "slug": "facebook.search_marketplace",
-      "service": "facebook.com",
-      "intentSynonyms": [
-        "search a marketplace in facebook",
-        "search marketplace in facebook",
-        "search marketplace listings in facebook"
-      ],
-      "description": "Search Facebook Marketplace for items. Fetches the marketplace search page and extracts listing data from the server-rendered response. Returns listings with title, price, seller, location, and image.",
-      "actionVerb": "search",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Search keywords (e.g., 'laptop', 'couch')"
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/facebook/src/tools/search-marketplace.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -29551,6 +29671,46 @@
       }
     },
     {
+      "slug": "figma.get_file_components",
+      "service": "figma.com",
+      "intentSynonyms": [
+        "get file components in figma",
+        "look up file components in figma",
+        "fetch a single file components in figma",
+        "view one specific file components in figma",
+        "list components in a file in figma"
+      ],
+      "description": "List all published components in a Figma file. Returns component names, descriptions, and keys for use in design systems.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "file_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File key to list components for"
+          }
+        },
+        "required": [
+          "file_key"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/figma/src/tools/get-file-components.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "figma.get_file",
       "service": "figma.com",
       "intentSynonyms": [
@@ -29583,46 +29743,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/figma/src/tools/get-file.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "figma.get_file_components",
-      "service": "figma.com",
-      "intentSynonyms": [
-        "get file components in figma",
-        "look up file components in figma",
-        "fetch a single file components in figma",
-        "view one specific file components in figma",
-        "list components in a file in figma"
-      ],
-      "description": "List all published components in a Figma file. Returns component names, descriptions, and keys for use in design systems.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "file_key": {
-            "type": "string",
-            "minLength": 1,
-            "description": "File key to list components for"
-          }
-        },
-        "required": [
-          "file_key"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/figma/src/tools/get-file-components.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -33504,6 +33624,43 @@
       }
     },
     {
+      "slug": "gdocs.get_document_text",
+      "service": "docs.google.com",
+      "intentSynonyms": [
+        "get a document text in gdocs",
+        "look up a document text in gdocs",
+        "fetch a single document text in gdocs",
+        "view one specific document text in gdocs",
+        "get document text in gdocs",
+        "read the plain text of a document in gdocs"
+      ],
+      "description": "Get the plain-text content of a Google Doc. Fetches the latest saved document content from the server, including edits by other collaborators. Returns the full document text as paragraphs joined by newlines.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/google-docs/src/tools/get-document-text.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "gdocs.get_document",
       "service": "docs.google.com",
       "intentSynonyms": [
@@ -33536,43 +33693,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/google-docs/src/tools/get-document.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "gdocs.get_document_text",
-      "service": "docs.google.com",
-      "intentSynonyms": [
-        "get a document text in gdocs",
-        "look up a document text in gdocs",
-        "fetch a single document text in gdocs",
-        "view one specific document text in gdocs",
-        "get document text in gdocs",
-        "read the plain text of a document in gdocs"
-      ],
-      "description": "Get the plain-text content of a Google Doc. Fetches the latest saved document content from the server, including edits by other collaborators. Returns the full document text as paragraphs joined by newlines.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "document_id": {
-            "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/google-docs/src/tools/get-document-text.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -35359,54 +35479,6 @@
       }
     },
     {
-      "slug": "gitlab.get_merge_request",
-      "service": "gitlab.com",
-      "intentSynonyms": [
-        "get a merge request in gitlab",
-        "look up a merge request in gitlab",
-        "fetch a single merge request in gitlab",
-        "view one specific merge request in gitlab",
-        "get merge request in gitlab",
-        "get merge request details in gitlab"
-      ],
-      "description": "Get detailed information about a specific merge request.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "project": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Project path (e.g., \"group/project\") or numeric project ID"
-          },
-          "merge_request_iid": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991,
-            "description": "Merge request IID (project-scoped ID)"
-          }
-        },
-        "required": [
-          "project",
-          "merge_request_iid"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/gitlab/src/tools/get-merge-request.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "gitlab.get_merge_request_diff",
       "service": "gitlab.com",
       "intentSynonyms": [
@@ -35446,6 +35518,54 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/gitlab/src/tools/get-merge-request-diff.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "gitlab.get_merge_request",
+      "service": "gitlab.com",
+      "intentSynonyms": [
+        "get a merge request in gitlab",
+        "look up a merge request in gitlab",
+        "fetch a single merge request in gitlab",
+        "view one specific merge request in gitlab",
+        "get merge request in gitlab",
+        "get merge request details in gitlab"
+      ],
+      "description": "Get detailed information about a specific merge request.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project path (e.g., \"group/project\") or numeric project ID"
+          },
+          "merge_request_iid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Merge request IID (project-scoped ID)"
+          }
+        },
+        "required": [
+          "project",
+          "merge_request_iid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/gitlab/src/tools/get-merge-request.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -36544,51 +36664,6 @@
       }
     },
     {
-      "slug": "glama.get_server",
-      "service": "glama.ai",
-      "intentSynonyms": [
-        "get a server in glama",
-        "look up a server in glama",
-        "fetch a single server in glama",
-        "view one specific server in glama",
-        "get server in glama",
-        "get detailed information about an mcp server in glama"
-      ],
-      "description": "Get detailed information about a specific MCP server, including its description, scores, integrations, tools, and discussion comment count.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "namespace": {
-            "type": "string",
-            "description": "Owner/namespace slug of the server"
-          },
-          "slug": {
-            "type": "string",
-            "description": "Server slug"
-          }
-        },
-        "required": [
-          "namespace",
-          "slug"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/glama/src/tools/get-server.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "glama.get_server_score",
       "service": "glama.ai",
       "intentSynonyms": [
@@ -36625,6 +36700,51 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/glama/src/tools/get-server-score.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "glama.get_server",
+      "service": "glama.ai",
+      "intentSynonyms": [
+        "get a server in glama",
+        "look up a server in glama",
+        "fetch a single server in glama",
+        "view one specific server in glama",
+        "get server in glama",
+        "get detailed information about an mcp server in glama"
+      ],
+      "description": "Get detailed information about a specific MCP server, including its description, scores, integrations, tools, and discussion comment count.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "description": "Owner/namespace slug of the server"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Server slug"
+          }
+        },
+        "required": [
+          "namespace",
+          "slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/glama/src/tools/get-server.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -38333,46 +38453,6 @@
       }
     },
     {
-      "slug": "hack2hire.get_question",
-      "service": "hack2hire.com",
-      "intentSynonyms": [
-        "get a question in hack2hire",
-        "look up a question in hack2hire",
-        "fetch a single question in hack2hire",
-        "view one specific question in hack2hire",
-        "get question in hack2hire",
-        "get full detail of one question in hack2hire"
-      ],
-      "description": "Get the full detail of a single Hack2Hire interview question by its post ID, including the markdown content preview, company frequencies, algorithm tags, interview stages, difficulty, and the IDs of any associated coding questions (use those IDs with list_question_comments). For paid (locked) questions the contentPreview field returns a teaser only — full content requires a Hack2Hire premium subscription.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "postId": {
-            "type": "string",
-            "description": "Post ID — get this from list_questions."
-          }
-        },
-        "required": [
-          "postId"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/hack2hire/src/tools/get-question.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "hack2hire.get_question_neighbors",
       "service": "hack2hire.com",
       "intentSynonyms": [
@@ -38427,6 +38507,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/hack2hire/src/tools/get-question-neighbors.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "hack2hire.get_question",
+      "service": "hack2hire.com",
+      "intentSynonyms": [
+        "get a question in hack2hire",
+        "look up a question in hack2hire",
+        "fetch a single question in hack2hire",
+        "view one specific question in hack2hire",
+        "get question in hack2hire",
+        "get full detail of one question in hack2hire"
+      ],
+      "description": "Get the full detail of a single Hack2Hire interview question by its post ID, including the markdown content preview, company frequencies, algorithm tags, interview stages, difficulty, and the IDs of any associated coding questions (use those IDs with list_question_comments). For paid (locked) questions the contentPreview field returns a teaser only — full content requires a Hack2Hire premium subscription.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "description": "Post ID — get this from list_questions."
+          }
+        },
+        "required": [
+          "postId"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/hack2hire/src/tools/get-question.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -40407,46 +40527,6 @@
       }
     },
     {
-      "slug": "instagram.get_post",
-      "service": "instagram.com",
-      "intentSynonyms": [
-        "get a post in instagram",
-        "look up a post in instagram",
-        "fetch a single post in instagram",
-        "view one specific post in instagram",
-        "get post in instagram",
-        "get a post by media id in instagram"
-      ],
-      "description": "Get detailed information about a single Instagram post by its media ID. Returns caption, like/comment counts, author, and image URL.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "media_id": {
-            "type": "string",
-            "description": "Media ID (numeric string, e.g. \"3849123669892697076_25025320\" or just the numeric pk)"
-          }
-        },
-        "required": [
-          "media_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/instagram/src/tools/get-post.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "instagram.get_post_comments",
       "service": "instagram.com",
       "intentSynonyms": [
@@ -40520,6 +40600,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/instagram/src/tools/get-post-likers.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "instagram.get_post",
+      "service": "instagram.com",
+      "intentSynonyms": [
+        "get a post in instagram",
+        "look up a post in instagram",
+        "fetch a single post in instagram",
+        "view one specific post in instagram",
+        "get post in instagram",
+        "get a post by media id in instagram"
+      ],
+      "description": "Get detailed information about a single Instagram post by its media ID. Returns caption, like/comment counts, author, and image URL.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "description": "Media ID (numeric string, e.g. \"3849123669892697076_25025320\" or just the numeric pk)"
+          }
+        },
+        "required": [
+          "media_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instagram/src/tools/get-post.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -40903,43 +41023,6 @@
       }
     },
     {
-      "slug": "instagram.search",
-      "service": "instagram.com",
-      "intentSynonyms": [
-        "search in instagram",
-        "search users, hashtags, and places in instagram",
-        "search instagram for users, hashtags, and places in instagram"
-      ],
-      "description": "Search Instagram for users, hashtags, and places. Returns blended results ranked by relevance.",
-      "actionVerb": "search",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Search query text"
-          }
-        },
-        "required": [
-          "query"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/instagram/src/tools/search.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "search"
-        }
-      }
-    },
-    {
       "slug": "instagram.search_hashtags",
       "service": "instagram.com",
       "intentSynonyms": [
@@ -41011,6 +41094,43 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/instagram/src/tools/search-users.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "search"
+        }
+      }
+    },
+    {
+      "slug": "instagram.search",
+      "service": "instagram.com",
+      "intentSynonyms": [
+        "search in instagram",
+        "search users, hashtags, and places in instagram",
+        "search instagram for users, hashtags, and places in instagram"
+      ],
+      "description": "Search Instagram for users, hashtags, and places. Returns blended results ranked by relevance.",
+      "actionVerb": "search",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query text"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/instagram/src/tools/search.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -42462,46 +42582,6 @@
       }
     },
     {
-      "slug": "leetcode.get_problem",
-      "service": "leetcode.com",
-      "intentSynonyms": [
-        "get a problem in leetcode",
-        "look up a problem in leetcode",
-        "fetch a single problem in leetcode",
-        "view one specific problem in leetcode",
-        "get problem in leetcode",
-        "get a problem by slug in leetcode"
-      ],
-      "description": "Get full details for a LeetCode problem including description (HTML), difficulty, hints, starter code snippets for all languages, similar questions, and example test cases.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "titleSlug": {
-            "type": "string",
-            "description": "Problem URL slug (e.g., \"two-sum\", \"add-two-numbers\")"
-          }
-        },
-        "required": [
-          "titleSlug"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/leetcode/src/tools/get-problem.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "graphql",
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "leetcode.get_problem_hints",
       "service": "leetcode.com",
       "intentSynonyms": [
@@ -42611,6 +42691,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/leetcode/src/tools/get-problem-stats.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "leetcode.get_problem",
+      "service": "leetcode.com",
+      "intentSynonyms": [
+        "get a problem in leetcode",
+        "look up a problem in leetcode",
+        "fetch a single problem in leetcode",
+        "view one specific problem in leetcode",
+        "get problem in leetcode",
+        "get a problem by slug in leetcode"
+      ],
+      "description": "Get full details for a LeetCode problem including description (HTML), difficulty, hints, starter code snippets for all languages, similar questions, and example test cases.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "titleSlug": {
+            "type": "string",
+            "description": "Problem URL slug (e.g., \"two-sum\", \"add-two-numbers\")"
+          }
+        },
+        "required": [
+          "titleSlug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/leetcode/src/tools/get-problem.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -43789,6 +43909,61 @@
       }
     },
     {
+      "slug": "linear.create_issue_relation",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "create an issue relation in linear",
+        "add an issue relation in linear",
+        "make a new issue relation in linear",
+        "open a new issue relation in linear",
+        "create issue relation in linear"
+      ],
+      "description": "Create a relation between two Linear issues (blocks, is blocked by, relates to, or duplicate of).",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "UUID of the source issue"
+          },
+          "related_issue_id": {
+            "type": "string",
+            "description": "UUID of the target issue to relate to"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "blocks",
+              "blockedBy",
+              "related",
+              "duplicate"
+            ],
+            "description": "Relation type: blocks, blockedBy, related, or duplicate"
+          }
+        },
+        "required": [
+          "issue_id",
+          "related_issue_id",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/create-issue-relation.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
       "slug": "linear.create_issue",
       "service": "linear.app",
       "intentSynonyms": [
@@ -43868,61 +44043,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/linear/src/tools/create-issue.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "graphql",
-          "httpMethod": null,
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
-      "slug": "linear.create_issue_relation",
-      "service": "linear.app",
-      "intentSynonyms": [
-        "create an issue relation in linear",
-        "add an issue relation in linear",
-        "make a new issue relation in linear",
-        "open a new issue relation in linear",
-        "create issue relation in linear"
-      ],
-      "description": "Create a relation between two Linear issues (blocks, is blocked by, relates to, or duplicate of).",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "issue_id": {
-            "type": "string",
-            "description": "UUID of the source issue"
-          },
-          "related_issue_id": {
-            "type": "string",
-            "description": "UUID of the target issue to relate to"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "blocks",
-              "blockedBy",
-              "related",
-              "duplicate"
-            ],
-            "description": "Relation type: blocks, blockedBy, related, or duplicate"
-          }
-        },
-        "required": [
-          "issue_id",
-          "related_issue_id",
-          "type"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/linear/src/tools/create-issue-relation.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -44037,6 +44157,61 @@
       }
     },
     {
+      "slug": "linear.create_project_update",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "create a project update in linear",
+        "add a project update in linear",
+        "make a new project update in linear",
+        "open a new project update in linear",
+        "create project update in linear",
+        "post a project status update in linear"
+      ],
+      "description": "Post a status update (health report) on a Linear project.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project UUID to post the update on"
+          },
+          "body": {
+            "type": "string",
+            "description": "Status update body in markdown"
+          },
+          "health": {
+            "type": "string",
+            "enum": [
+              "onTrack",
+              "atRisk",
+              "offTrack"
+            ],
+            "description": "Project health status"
+          }
+        },
+        "required": [
+          "project_id",
+          "body",
+          "health"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/create-project-update.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
       "slug": "linear.create_project",
       "service": "linear.app",
       "intentSynonyms": [
@@ -44087,61 +44262,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/linear/src/tools/create-project.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "graphql",
-          "httpMethod": null,
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
-      "slug": "linear.create_project_update",
-      "service": "linear.app",
-      "intentSynonyms": [
-        "create a project update in linear",
-        "add a project update in linear",
-        "make a new project update in linear",
-        "open a new project update in linear",
-        "create project update in linear",
-        "post a project status update in linear"
-      ],
-      "description": "Post a status update (health report) on a Linear project.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "project_id": {
-            "type": "string",
-            "description": "Project UUID to post the update on"
-          },
-          "body": {
-            "type": "string",
-            "description": "Status update body in markdown"
-          },
-          "health": {
-            "type": "string",
-            "enum": [
-              "onTrack",
-              "atRisk",
-              "offTrack"
-            ],
-            "description": "Project health status"
-          }
-        },
-        "required": [
-          "project_id",
-          "body",
-          "health"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/linear/src/tools/create-project-update.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -44229,46 +44349,6 @@
       }
     },
     {
-      "slug": "linear.delete_issue",
-      "service": "linear.app",
-      "intentSynonyms": [
-        "delete an issue in linear",
-        "remove an issue in linear",
-        "trash an issue in linear",
-        "permanently delete an issue in linear",
-        "delete a ticket in linear",
-        "delete issue in linear"
-      ],
-      "description": "Move a Linear issue to the trash. Trashed issues can be restored within 30 days.",
-      "actionVerb": "delete",
-      "sideEffectClass": "destructive",
-      "params": {
-        "type": "object",
-        "properties": {
-          "issue_id": {
-            "type": "string",
-            "description": "Issue UUID to delete"
-          }
-        },
-        "required": [
-          "issue_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/linear/src/tools/delete-issue.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "graphql",
-          "httpMethod": null,
-          "opNameVerb": "delete"
-        }
-      }
-    },
-    {
       "slug": "linear.delete_issue_relation",
       "service": "linear.app",
       "intentSynonyms": [
@@ -44300,6 +44380,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/linear/src/tools/delete-issue-relation.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "linear.delete_issue",
+      "service": "linear.app",
+      "intentSynonyms": [
+        "delete an issue in linear",
+        "remove an issue in linear",
+        "trash an issue in linear",
+        "permanently delete an issue in linear",
+        "delete a ticket in linear",
+        "delete issue in linear"
+      ],
+      "description": "Move a Linear issue to the trash. Trashed issues can be restored within 30 days.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Issue UUID to delete"
+          }
+        },
+        "required": [
+          "issue_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/linear/src/tools/delete-issue.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -46563,46 +46683,6 @@
       }
     },
     {
-      "slug": "lucid.get_document",
-      "service": "lucid.app",
-      "intentSynonyms": [
-        "get a document in lucid",
-        "look up a document in lucid",
-        "fetch a single document in lucid",
-        "view one specific document in lucid",
-        "get document in lucid",
-        "get document details in lucid"
-      ],
-      "description": "Get detailed information about a specific Lucid document by its UUID, including title, product type, timestamps, size, and edit URL.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "document_id": {
-            "type": "string",
-            "description": "Document UUID"
-          }
-        },
-        "required": [
-          "document_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/lucid/src/tools/get-document.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "lucid.get_document_count",
       "service": "lucid.app",
       "intentSynonyms": [
@@ -46755,6 +46835,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/lucid/src/tools/get-document-status.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "lucid.get_document",
+      "service": "lucid.app",
+      "intentSynonyms": [
+        "get a document in lucid",
+        "look up a document in lucid",
+        "fetch a single document in lucid",
+        "view one specific document in lucid",
+        "get document in lucid",
+        "get document details in lucid"
+      ],
+      "description": "Get detailed information about a specific Lucid document by its UUID, including title, product type, timestamps, size, and edit URL.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "description": "Document UUID"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/lucid/src/tools/get-document.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -47798,46 +47918,6 @@
       }
     },
     {
-      "slug": "medium.get_post",
-      "service": "medium.com",
-      "intentSynonyms": [
-        "get a post in medium",
-        "look up a post in medium",
-        "fetch a single post in medium",
-        "view one specific post in medium",
-        "get post in medium",
-        "get a post by id in medium"
-      ],
-      "description": "Get detailed information about a Medium post by its ID. Returns title, author, clap count, tags, and more.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "post_id": {
-            "type": "string",
-            "description": "Medium post ID (e.g., \"978090b95f93\")"
-          }
-        },
-        "required": [
-          "post_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/medium/src/tools/get-post.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "gql",
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "medium.get_post_responses",
       "service": "medium.com",
       "intentSynonyms": [
@@ -47878,6 +47958,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/medium/src/tools/get-post-responses.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "gql",
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "medium.get_post",
+      "service": "medium.com",
+      "intentSynonyms": [
+        "get a post in medium",
+        "look up a post in medium",
+        "fetch a single post in medium",
+        "view one specific post in medium",
+        "get post in medium",
+        "get a post by id in medium"
+      ],
+      "description": "Get detailed information about a Medium post by its ID. Returns title, author, clap count, tags, and more.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "description": "Medium post ID (e.g., \"978090b95f93\")"
+          }
+        },
+        "required": [
+          "post_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/medium/src/tools/get-post.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "gql",
@@ -48602,51 +48722,6 @@
       }
     },
     {
-      "slug": "meticulous.get_project",
-      "service": "app.meticulous.ai",
-      "intentSynonyms": [
-        "get a project in meticulous",
-        "look up a project in meticulous",
-        "fetch a single project in meticulous",
-        "view one specific project in meticulous",
-        "get project in meticulous",
-        "get project details in meticulous"
-      ],
-      "description": "Get detailed information about a specific project including tokens, settings, and configuration.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "organization_name": {
-            "type": "string",
-            "description": "Organization name"
-          },
-          "project_name": {
-            "type": "string",
-            "description": "Project name"
-          }
-        },
-        "required": [
-          "organization_name",
-          "project_name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/meticulous/src/tools/get-project.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "graphql",
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "meticulous.get_project_pull_request",
       "service": "app.meticulous.ai",
       "intentSynonyms": [
@@ -48697,29 +48772,34 @@
       }
     },
     {
-      "slug": "meticulous.get_replay",
+      "slug": "meticulous.get_project",
       "service": "app.meticulous.ai",
       "intentSynonyms": [
-        "get a replay in meticulous",
-        "look up a replay in meticulous",
-        "fetch a single replay in meticulous",
-        "view one specific replay in meticulous",
-        "get replay in meticulous",
-        "get replay details in meticulous"
+        "get a project in meticulous",
+        "look up a project in meticulous",
+        "fetch a single project in meticulous",
+        "view one specific project in meticulous",
+        "get project in meticulous",
+        "get project details in meticulous"
       ],
-      "description": "Get detailed information about a specific replay including its status, accuracy, and associated session.",
+      "description": "Get detailed information about a specific project including tokens, settings, and configuration.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "replay_id": {
+          "organization_name": {
             "type": "string",
-            "description": "Replay ID"
+            "description": "Organization name"
+          },
+          "project_name": {
+            "type": "string",
+            "description": "Project name"
           }
         },
         "required": [
-          "replay_id"
+          "organization_name",
+          "project_name"
         ],
         "additionalProperties": false
       },
@@ -48727,7 +48807,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/meticulous/src/tools/get-replay.ts",
+        "sourcePath": "plugins/meticulous/src/tools/get-project.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -48776,29 +48856,29 @@
       }
     },
     {
-      "slug": "meticulous.get_session",
+      "slug": "meticulous.get_replay",
       "service": "app.meticulous.ai",
       "intentSynonyms": [
-        "get a session in meticulous",
-        "look up a session in meticulous",
-        "fetch a single session in meticulous",
-        "view one specific session in meticulous",
-        "get session in meticulous",
-        "get session details in meticulous"
+        "get a replay in meticulous",
+        "look up a replay in meticulous",
+        "fetch a single replay in meticulous",
+        "view one specific replay in meticulous",
+        "get replay in meticulous",
+        "get replay details in meticulous"
       ],
-      "description": "Get detailed information about a specific recorded user session.",
+      "description": "Get detailed information about a specific replay including its status, accuracy, and associated session.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "session_id": {
+          "replay_id": {
             "type": "string",
-            "description": "Session ID"
+            "description": "Replay ID"
           }
         },
         "required": [
-          "session_id"
+          "replay_id"
         ],
         "additionalProperties": false
       },
@@ -48806,7 +48886,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/meticulous/src/tools/get-session.ts",
+        "sourcePath": "plugins/meticulous/src/tools/get-replay.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -48855,29 +48935,29 @@
       }
     },
     {
-      "slug": "meticulous.get_test_run",
+      "slug": "meticulous.get_session",
       "service": "app.meticulous.ai",
       "intentSynonyms": [
-        "get a test run in meticulous",
-        "look up a test run in meticulous",
-        "fetch a single test run in meticulous",
-        "view one specific test run in meticulous",
-        "get test run in meticulous",
-        "get test run details in meticulous"
+        "get a session in meticulous",
+        "look up a session in meticulous",
+        "fetch a single session in meticulous",
+        "view one specific session in meticulous",
+        "get session in meticulous",
+        "get session details in meticulous"
       ],
-      "description": "Get detailed information about a test run including status, statistics, CI context, PR details, and a link to the Meticulous web UI for visual debugging. The test run ID can be found in the Meticulous URL or from project details.",
+      "description": "Get detailed information about a specific recorded user session.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "test_run_id": {
+          "session_id": {
             "type": "string",
-            "description": "Test run ID"
+            "description": "Session ID"
           }
         },
         "required": [
-          "test_run_id"
+          "session_id"
         ],
         "additionalProperties": false
       },
@@ -48885,7 +48965,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/meticulous/src/tools/get-test-run.ts",
+        "sourcePath": "plugins/meticulous/src/tools/get-session.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -49219,6 +49299,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/meticulous/src/tools/get-test-run-test-cases.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "meticulous.get_test_run",
+      "service": "app.meticulous.ai",
+      "intentSynonyms": [
+        "get a test run in meticulous",
+        "look up a test run in meticulous",
+        "fetch a single test run in meticulous",
+        "view one specific test run in meticulous",
+        "get test run in meticulous",
+        "get test run details in meticulous"
+      ],
+      "description": "Get detailed information about a test run including status, statistics, CI context, PR details, and a link to the Meticulous web UI for visual debugging. The test run ID can be found in the Meticulous URL or from project details.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "test_run_id": {
+            "type": "string",
+            "description": "Test run ID"
+          }
+        },
+        "required": [
+          "test_run_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/meticulous/src/tools/get-test-run.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
@@ -52858,6 +52978,47 @@
       }
     },
     {
+      "slug": "netflix.get_title_details",
+      "service": "netflix.com",
+      "intentSynonyms": [
+        "get title details in netflix",
+        "look up title details in netflix",
+        "fetch a single title details in netflix",
+        "view one specific title details in netflix",
+        "get full details including advisories and badges in netflix"
+      ],
+      "description": "Get comprehensive details about a Netflix title including content advisory, quality badges, and user rating. More detailed than get_title — use this when you need content advisories or playback badges.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "video_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Netflix video ID"
+          }
+        },
+        "required": [
+          "video_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/netflix/src/tools/get-title-details.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "netflix.get_title",
       "service": "netflix.com",
       "intentSynonyms": [
@@ -52891,47 +53052,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/netflix/src/tools/get-title.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "netflix.get_title_details",
-      "service": "netflix.com",
-      "intentSynonyms": [
-        "get title details in netflix",
-        "look up title details in netflix",
-        "fetch a single title details in netflix",
-        "view one specific title details in netflix",
-        "get full details including advisories and badges in netflix"
-      ],
-      "description": "Get comprehensive details about a Netflix title including content advisory, quality badges, and user rating. More detailed than get_title — use this when you need content advisories or playback badges.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "video_id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Netflix video ID"
-          }
-        },
-        "required": [
-          "video_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/netflix/src/tools/get-title-details.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -53466,46 +53586,6 @@
       }
     },
     {
-      "slug": "netlify.create_build",
-      "service": "app.netlify.com",
-      "intentSynonyms": [
-        "create a build in netlify",
-        "add a build in netlify",
-        "make a new build in netlify",
-        "open a new build in netlify",
-        "create build in netlify",
-        "trigger a new site build in netlify"
-      ],
-      "description": "Trigger a new build for a Netlify site. This starts a fresh build and deploy using the current site configuration and linked repository.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "site_id": {
-            "type": "string",
-            "description": "The site ID to trigger a build for"
-          }
-        },
-        "required": [
-          "site_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/netlify/src/tools/create-build.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "POST",
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
       "slug": "netlify.create_build_hook",
       "service": "app.netlify.com",
       "intentSynonyms": [
@@ -53546,6 +53626,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/netlify/src/tools/create-build-hook.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "netlify.create_build",
+      "service": "app.netlify.com",
+      "intentSynonyms": [
+        "create a build in netlify",
+        "add a build in netlify",
+        "make a new build in netlify",
+        "open a new build in netlify",
+        "create build in netlify",
+        "trigger a new site build in netlify"
+      ],
+      "description": "Trigger a new build for a Netlify site. This starts a fresh build and deploy using the current site configuration and linked repository.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "description": "The site ID to trigger a build for"
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/netlify/src/tools/create-build.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -56888,46 +57008,6 @@
       }
     },
     {
-      "slug": "notebooklm.get_notebook",
-      "service": "notebooklm.google.com",
-      "intentSynonyms": [
-        "get a notebook in notebooklm",
-        "look up a notebook in notebooklm",
-        "fetch a single notebook in notebooklm",
-        "view one specific notebook in notebooklm",
-        "get notebook in notebooklm",
-        "get notebook details in notebooklm"
-      ],
-      "description": "Get details of a specific notebook by ID, including title, source count, and timestamps.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "notebook_id": {
-            "type": "string",
-            "description": "Notebook UUID"
-          }
-        },
-        "required": [
-          "notebook_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/notebooklm/src/tools/get-notebook.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "notebooklm.get_notebook_guide",
       "service": "notebooklm.google.com",
       "intentSynonyms": [
@@ -56959,6 +57039,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/notebooklm/src/tools/get-notebook-guide.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "notebooklm.get_notebook",
+      "service": "notebooklm.google.com",
+      "intentSynonyms": [
+        "get a notebook in notebooklm",
+        "look up a notebook in notebooklm",
+        "fetch a single notebook in notebooklm",
+        "view one specific notebook in notebooklm",
+        "get notebook in notebooklm",
+        "get notebook details in notebooklm"
+      ],
+      "description": "Get details of a specific notebook by ID, including title, source count, and timestamps.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "notebook_id": {
+            "type": "string",
+            "description": "Notebook UUID"
+          }
+        },
+        "required": [
+          "notebook_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/notebooklm/src/tools/get-notebook.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -57354,63 +57474,6 @@
       }
     },
     {
-      "slug": "notion.create_database",
-      "service": "notion.so",
-      "intentSynonyms": [
-        "create a database in notion",
-        "add a database in notion",
-        "make a new database in notion",
-        "open a new database in notion",
-        "create database in notion",
-        "create a new database in notion"
-      ],
-      "description": "Create a new database in a Notion page. Creates a basic database with a title column.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "parent_page_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Page ID to create the database in"
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Database title"
-          },
-          "properties": {
-            "description": "Additional property names with types: \"text\", \"number\", \"select\", \"multi_select\", \"checkbox\", \"url\", \"email\", \"phone\"",
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "parent_page_id",
-          "title"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/notion/src/tools/create-database.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
       "slug": "notion.create_database_item",
       "service": "notion.so",
       "intentSynonyms": [
@@ -57459,6 +57522,63 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/notion/src/tools/create-database-item.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "notion.create_database",
+      "service": "notion.so",
+      "intentSynonyms": [
+        "create a database in notion",
+        "add a database in notion",
+        "make a new database in notion",
+        "open a new database in notion",
+        "create database in notion",
+        "create a new database in notion"
+      ],
+      "description": "Create a new database in a Notion page. Creates a basic database with a title column.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "parent_page_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Page ID to create the database in"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Database title"
+          },
+          "properties": {
+            "description": "Additional property names with types: \"text\", \"number\", \"select\", \"multi_select\", \"checkbox\", \"url\", \"email\", \"phone\"",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "parent_page_id",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/notion/src/tools/create-database.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -58193,46 +58313,6 @@
       }
     },
     {
-      "slug": "npm.get_package",
-      "service": "www.npmjs.com",
-      "intentSynonyms": [
-        "get a package in npm",
-        "look up a package in npm",
-        "fetch a single package in npm",
-        "view one specific package in npm",
-        "get package in npm",
-        "get npm package details in npm"
-      ],
-      "description": "Get detailed information about an npm package including version, description, maintainers, dist-tags, download stats, dependencies, and star status. Use the exact package name including scope (e.g., \"@types/node\").",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Package name (e.g., \"express\", \"@types/node\")"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/npm/src/tools/get-package.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "npm.get_package_dependencies",
       "service": "www.npmjs.com",
       "intentSynonyms": [
@@ -58465,6 +58545,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/npm/src/tools/get-package-versions.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "npm.get_package",
+      "service": "www.npmjs.com",
+      "intentSynonyms": [
+        "get a package in npm",
+        "look up a package in npm",
+        "fetch a single package in npm",
+        "view one specific package in npm",
+        "get package in npm",
+        "get npm package details in npm"
+      ],
+      "description": "Get detailed information about an npm package including version, description, maintainers, dist-tags, download stats, dependencies, and star status. Use the exact package name including scope (e.g., \"@types/node\").",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Package name (e.g., \"express\", \"@types/node\")"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/npm/src/tools/get-package.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -58759,53 +58879,6 @@
       }
     },
     {
-      "slug": "onenote.create_section",
-      "service": "onenote.cloud.microsoft",
-      "intentSynonyms": [
-        "create a section in onenote",
-        "add a section in onenote",
-        "make a new section in onenote",
-        "open a new section in onenote",
-        "create section in onenote",
-        "create a new section in a notebook in onenote"
-      ],
-      "description": "Create a new section in a OneNote notebook. Sections contain pages and are the primary organizational unit within a notebook.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "notebook_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Notebook ID to create the section in"
-          },
-          "display_name": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Name for the new section"
-          }
-        },
-        "required": [
-          "notebook_id",
-          "display_name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/onenote/src/tools/create-section.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "POST",
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
       "slug": "onenote.create_section_group",
       "service": "onenote.cloud.microsoft",
       "intentSynonyms": [
@@ -58844,6 +58917,53 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/onenote/src/tools/create-section-group.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "onenote.create_section",
+      "service": "onenote.cloud.microsoft",
+      "intentSynonyms": [
+        "create a section in onenote",
+        "add a section in onenote",
+        "make a new section in onenote",
+        "open a new section in onenote",
+        "create section in onenote",
+        "create a new section in a notebook in onenote"
+      ],
+      "description": "Create a new section in a OneNote notebook. Sections contain pages and are the primary organizational unit within a notebook.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "notebook_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notebook ID to create the section in"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name for the new section"
+          }
+        },
+        "required": [
+          "notebook_id",
+          "display_name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/onenote/src/tools/create-section.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -58962,47 +59082,6 @@
       }
     },
     {
-      "slug": "onenote.get_section",
-      "service": "onenote.cloud.microsoft",
-      "intentSynonyms": [
-        "get a section in onenote",
-        "look up a section in onenote",
-        "fetch a single section in onenote",
-        "view one specific section in onenote",
-        "get section in onenote",
-        "get a section by id in onenote"
-      ],
-      "description": "Get detailed information about a specific OneNote section by its ID. Returns section metadata including name, parent notebook, and creation date.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "section_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Section ID"
-          }
-        },
-        "required": [
-          "section_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/onenote/src/tools/get-section.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "onenote.get_section_group",
       "service": "onenote.cloud.microsoft",
       "intentSynonyms": [
@@ -59035,6 +59114,47 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/onenote/src/tools/get-section-group.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "onenote.get_section",
+      "service": "onenote.cloud.microsoft",
+      "intentSynonyms": [
+        "get a section in onenote",
+        "look up a section in onenote",
+        "fetch a single section in onenote",
+        "view one specific section in onenote",
+        "get section in onenote",
+        "get a section by id in onenote"
+      ],
+      "description": "Get detailed information about a specific OneNote section by its ID. Returns section metadata including name, parent notebook, and creation date.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "section_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Section ID"
+          }
+        },
+        "required": [
+          "section_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/onenote/src/tools/get-section.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -62186,47 +62306,6 @@
       }
     },
     {
-      "slug": "pandaexpress.get_restaurant",
-      "service": "pandaexpress.com",
-      "intentSynonyms": [
-        "get a restaurant in pandaexpress",
-        "look up a restaurant in pandaexpress",
-        "fetch a single restaurant in pandaexpress",
-        "view one specific restaurant in pandaexpress",
-        "get restaurant in pandaexpress",
-        "get restaurant details by slug or ref in pandaexpress"
-      ],
-      "description": "Get detailed information about a specific Panda Express restaurant by its URL slug or external reference number.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "slug": {
-            "description": "Restaurant URL slug (e.g., \"fillmore-geary-px\")",
-            "type": "string"
-          },
-          "ext_ref": {
-            "description": "External reference number (e.g., \"4226\")",
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/panda-express/src/tools/get-restaurant.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "pandaexpress.get_restaurant_menu",
       "service": "pandaexpress.com",
       "intentSynonyms": [
@@ -62260,6 +62339,47 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/panda-express/src/tools/get-restaurant-menu.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "pandaexpress.get_restaurant",
+      "service": "pandaexpress.com",
+      "intentSynonyms": [
+        "get a restaurant in pandaexpress",
+        "look up a restaurant in pandaexpress",
+        "fetch a single restaurant in pandaexpress",
+        "view one specific restaurant in pandaexpress",
+        "get restaurant in pandaexpress",
+        "get restaurant details by slug or ref in pandaexpress"
+      ],
+      "description": "Get detailed information about a specific Panda Express restaurant by its URL slug or external reference number.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "description": "Restaurant URL slug (e.g., \"fillmore-geary-px\")",
+            "type": "string"
+          },
+          "ext_ref": {
+            "description": "External reference number (e.g., \"4226\")",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/panda-express/src/tools/get-restaurant.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -62435,6 +62555,51 @@
       }
     },
     {
+      "slug": "pinterest.create_board_section",
+      "service": "pinterest.com",
+      "intentSynonyms": [
+        "create a board section in pinterest",
+        "add a board section in pinterest",
+        "make a new board section in pinterest",
+        "open a new board section in pinterest",
+        "create board section in pinterest",
+        "create a section in a board in pinterest"
+      ],
+      "description": "Create a new section within a board to organize pins into groups.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "description": "Board ID to create the section in"
+          },
+          "name": {
+            "type": "string",
+            "description": "Section name"
+          }
+        },
+        "required": [
+          "board_id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/pinterest/src/tools/create-board-section.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
       "slug": "pinterest.create_board",
       "service": "pinterest.com",
       "intentSynonyms": [
@@ -62478,51 +62643,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/pinterest/src/tools/create-board.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
-      "slug": "pinterest.create_board_section",
-      "service": "pinterest.com",
-      "intentSynonyms": [
-        "create a board section in pinterest",
-        "add a board section in pinterest",
-        "make a new board section in pinterest",
-        "open a new board section in pinterest",
-        "create board section in pinterest",
-        "create a section in a board in pinterest"
-      ],
-      "description": "Create a new section within a board to organize pins into groups.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "board_id": {
-            "type": "string",
-            "description": "Board ID to create the section in"
-          },
-          "name": {
-            "type": "string",
-            "description": "Section name"
-          }
-        },
-        "required": [
-          "board_id",
-          "name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/pinterest/src/tools/create-board-section.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -62593,45 +62713,6 @@
       }
     },
     {
-      "slug": "pinterest.delete_board",
-      "service": "pinterest.com",
-      "intentSynonyms": [
-        "delete a board in pinterest",
-        "remove a board in pinterest",
-        "trash a board in pinterest",
-        "permanently delete a board in pinterest",
-        "delete board in pinterest"
-      ],
-      "description": "Delete a board and all its pins. Only works for boards you own. This action cannot be undone.",
-      "actionVerb": "delete",
-      "sideEffectClass": "destructive",
-      "params": {
-        "type": "object",
-        "properties": {
-          "board_id": {
-            "type": "string",
-            "description": "Board ID to delete"
-          }
-        },
-        "required": [
-          "board_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/pinterest/src/tools/delete-board.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "delete"
-        }
-      }
-    },
-    {
       "slug": "pinterest.delete_board_section",
       "service": "pinterest.com",
       "intentSynonyms": [
@@ -62662,6 +62743,45 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/pinterest/src/tools/delete-board-section.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "pinterest.delete_board",
+      "service": "pinterest.com",
+      "intentSynonyms": [
+        "delete a board in pinterest",
+        "remove a board in pinterest",
+        "trash a board in pinterest",
+        "permanently delete a board in pinterest",
+        "delete board in pinterest"
+      ],
+      "description": "Delete a board and all its pins. Only works for boards you own. This action cannot be undone.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "board_id": {
+            "type": "string",
+            "description": "Board ID to delete"
+          }
+        },
+        "required": [
+          "board_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/pinterest/src/tools/delete-board.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -69348,59 +69468,6 @@
       }
     },
     {
-      "slug": "retool.create_app",
-      "service": "retool.com",
-      "intentSynonyms": [
-        "create an app in retool",
-        "add an app in retool",
-        "make a new app in retool",
-        "open a new app in retool",
-        "create app in retool",
-        "create a new retool web app in retool"
-      ],
-      "description": "Create a new Retool web app (page). The app is created in the specified folder. Returns the initial save record.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name for the new app"
-          },
-          "folder_id": {
-            "type": "number",
-            "description": "Folder ID to create the app in (use list_apps to find folder IDs)"
-          },
-          "is_mobile_app": {
-            "description": "Whether to create a mobile app (default false)",
-            "type": "boolean"
-          },
-          "is_global_widget": {
-            "description": "Whether to create a module/global widget (default false)",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "name",
-          "folder_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/retool/src/tools/create-app.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "POST",
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
       "slug": "retool.create_app_from_toolscript_archive",
       "service": "retool.com",
       "intentSynonyms": [
@@ -69455,6 +69522,59 @@
       }
     },
     {
+      "slug": "retool.create_app",
+      "service": "retool.com",
+      "intentSynonyms": [
+        "create an app in retool",
+        "add an app in retool",
+        "make a new app in retool",
+        "open a new app in retool",
+        "create app in retool",
+        "create a new retool web app in retool"
+      ],
+      "description": "Create a new Retool web app (page). The app is created in the specified folder. Returns the initial save record.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name for the new app"
+          },
+          "folder_id": {
+            "type": "number",
+            "description": "Folder ID to create the app in (use list_apps to find folder IDs)"
+          },
+          "is_mobile_app": {
+            "description": "Whether to create a mobile app (default false)",
+            "type": "boolean"
+          },
+          "is_global_widget": {
+            "description": "Whether to create a module/global widget (default false)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "folder_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/retool/src/tools/create-app.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
       "slug": "retool.create_folder",
       "service": "retool.com",
       "intentSynonyms": [
@@ -69499,6 +69619,51 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/retool/src/tools/create-folder.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "retool.create_resource_folder",
+      "service": "retool.com",
+      "intentSynonyms": [
+        "create a resource folder in retool",
+        "add a resource folder in retool",
+        "make a new resource folder in retool",
+        "open a new resource folder in retool",
+        "create resource folder in retool",
+        "create a new resource folder in retool"
+      ],
+      "description": "Create a new folder for organizing resources (data sources). Requires a parent resource folder ID.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name for the new resource folder"
+          },
+          "parent_resource_folder_id": {
+            "type": "number",
+            "description": "Parent resource folder ID"
+          }
+        },
+        "required": [
+          "name",
+          "parent_resource_folder_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/retool/src/tools/create-resource-folder.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -69568,51 +69733,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/retool/src/tools/create-resource.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "POST",
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
-      "slug": "retool.create_resource_folder",
-      "service": "retool.com",
-      "intentSynonyms": [
-        "create a resource folder in retool",
-        "add a resource folder in retool",
-        "make a new resource folder in retool",
-        "open a new resource folder in retool",
-        "create resource folder in retool",
-        "create a new resource folder in retool"
-      ],
-      "description": "Create a new folder for organizing resources (data sources). Requires a parent resource folder ID.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name for the new resource folder"
-          },
-          "parent_resource_folder_id": {
-            "type": "number",
-            "description": "Parent resource folder ID"
-          }
-        },
-        "required": [
-          "name",
-          "parent_resource_folder_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/retool/src/tools/create-resource-folder.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -69840,46 +69960,6 @@
       }
     },
     {
-      "slug": "retool.get_app",
-      "service": "retool.com",
-      "intentSynonyms": [
-        "get an app in retool",
-        "look up an app in retool",
-        "fetch a single app in retool",
-        "view one specific app in retool",
-        "get app in retool",
-        "get app details by uuid in retool"
-      ],
-      "description": "Get a Retool application by UUID. Returns the page save record including serialized app state, change history, and metadata. For a human-readable lookup by path, use lookup_app instead.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "page_uuid": {
-            "type": "string",
-            "description": "App UUID (from list_apps results)"
-          }
-        },
-        "required": [
-          "page_uuid"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/retool/src/tools/get-app.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "retool.get_app_docs",
       "service": "retool.com",
       "intentSynonyms": [
@@ -69950,6 +70030,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/retool/src/tools/get-app-state.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "retool.get_app",
+      "service": "retool.com",
+      "intentSynonyms": [
+        "get an app in retool",
+        "look up an app in retool",
+        "fetch a single app in retool",
+        "view one specific app in retool",
+        "get app in retool",
+        "get app details by uuid in retool"
+      ],
+      "description": "Get a Retool application by UUID. Returns the page save record including serialized app state, change history, and metadata. For a human-readable lookup by path, use lookup_app instead.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "page_uuid": {
+            "type": "string",
+            "description": "App UUID (from list_apps results)"
+          }
+        },
+        "required": [
+          "page_uuid"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/retool/src/tools/get-app.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -70094,50 +70214,6 @@
       }
     },
     {
-      "slug": "retool.get_workflow",
-      "service": "retool.com",
-      "intentSynonyms": [
-        "get a workflow in retool",
-        "look up a workflow in retool",
-        "fetch a single workflow in retool",
-        "view one specific workflow in retool",
-        "get workflow in retool",
-        "get workflow details by id in retool"
-      ],
-      "description": "Get the full definition of a Retool workflow including its blocks (steps), configuration, and trigger settings. Optionally specify a source control branch to view that version.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "workflow_id": {
-            "type": "string",
-            "description": "Workflow ID"
-          },
-          "branch_name": {
-            "description": "Source control branch name (for versioned workflows)",
-            "type": "string"
-          }
-        },
-        "required": [
-          "workflow_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/retool/src/tools/get-workflow.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "retool.get_workflow_releases",
       "service": "retool.com",
       "intentSynonyms": [
@@ -70168,46 +70244,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/retool/src/tools/get-workflow-releases.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "retool.get_workflow_run",
-      "service": "retool.com",
-      "intentSynonyms": [
-        "get a workflow run in retool",
-        "look up a workflow run in retool",
-        "fetch a single workflow run in retool",
-        "view one specific workflow run in retool",
-        "get workflow run in retool",
-        "get workflow run details in retool"
-      ],
-      "description": "Get detailed results for a specific workflow run, including status, timing, input/output sizes, and trigger type.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "run_id": {
-            "type": "string",
-            "description": "Workflow run ID"
-          }
-        },
-        "required": [
-          "run_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/retool/src/tools/get-workflow-run.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -70280,6 +70316,90 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/retool/src/tools/get-workflow-run-log.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "retool.get_workflow_run",
+      "service": "retool.com",
+      "intentSynonyms": [
+        "get a workflow run in retool",
+        "look up a workflow run in retool",
+        "fetch a single workflow run in retool",
+        "view one specific workflow run in retool",
+        "get workflow run in retool",
+        "get workflow run details in retool"
+      ],
+      "description": "Get detailed results for a specific workflow run, including status, timing, input/output sizes, and trigger type.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "Workflow run ID"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/retool/src/tools/get-workflow-run.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "retool.get_workflow",
+      "service": "retool.com",
+      "intentSynonyms": [
+        "get a workflow in retool",
+        "look up a workflow in retool",
+        "fetch a single workflow in retool",
+        "view one specific workflow in retool",
+        "get workflow in retool",
+        "get workflow details by id in retool"
+      ],
+      "description": "Get the full definition of a Retool workflow including its blocks (steps), configuration, and trigger settings. Optionally specify a source control branch to view that version.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "description": "Workflow ID"
+          },
+          "branch_name": {
+            "description": "Source control branch name (for versioned workflows)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/retool/src/tools/get-workflow.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -71610,38 +71730,6 @@
       }
     },
     {
-      "slug": "robinhood.get_portfolio",
-      "service": "robinhood.com",
-      "intentSynonyms": [
-        "get a portfolio in robinhood",
-        "look up a portfolio in robinhood",
-        "fetch a single portfolio in robinhood",
-        "view one specific portfolio in robinhood",
-        "get portfolio in robinhood",
-        "get portfolio summary in robinhood"
-      ],
-      "description": "Get the Robinhood portfolio summary including total equity, market value, extended hours values, and previous close equity.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/robinhood/src/tools/get-portfolio.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "robinhood.get_portfolio_historicals",
       "service": "robinhood.com",
       "intentSynonyms": [
@@ -71708,6 +71796,38 @@
         "signals": {
           "transportHelper": null,
           "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "robinhood.get_portfolio",
+      "service": "robinhood.com",
+      "intentSynonyms": [
+        "get a portfolio in robinhood",
+        "look up a portfolio in robinhood",
+        "fetch a single portfolio in robinhood",
+        "view one specific portfolio in robinhood",
+        "get portfolio in robinhood",
+        "get portfolio summary in robinhood"
+      ],
+      "description": "Get the Robinhood portfolio summary including total equity, market value, extended hours values, and previous close equity.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/robinhood/src/tools/get-portfolio.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
           "opNameVerb": "get"
         }
       }
@@ -72253,6 +72373,45 @@
       }
     },
     {
+      "slug": "sentry.get_project_keys",
+      "service": "sentry.io",
+      "intentSynonyms": [
+        "get project keys in sentry",
+        "look up project keys in sentry",
+        "fetch a single project keys in sentry",
+        "view one specific project keys in sentry",
+        "list dsn keys for a project in sentry"
+      ],
+      "description": "List client keys (DSNs) for a Sentry project. The DSN is needed to initialize the Sentry SDK in your application. Returns the public DSN, key name, and active status.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "project_slug": {
+            "type": "string",
+            "description": "Project slug to retrieve keys for"
+          }
+        },
+        "required": [
+          "project_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/sentry/src/tools/get-project-keys.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "sentry.get_project",
       "service": "sentry.io",
       "intentSynonyms": [
@@ -72284,45 +72443,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/sentry/src/tools/get-project.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "sentry.get_project_keys",
-      "service": "sentry.io",
-      "intentSynonyms": [
-        "get project keys in sentry",
-        "look up project keys in sentry",
-        "fetch a single project keys in sentry",
-        "view one specific project keys in sentry",
-        "list dsn keys for a project in sentry"
-      ],
-      "description": "List client keys (DSNs) for a Sentry project. The DSN is needed to initialize the Sentry SDK in your application. Returns the public DSN, key name, and active status.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "project_slug": {
-            "type": "string",
-            "description": "Project slug to retrieve keys for"
-          }
-        },
-        "required": [
-          "project_slug"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/sentry/src/tools/get-project-keys.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -73456,105 +73576,6 @@
       }
     },
     {
-      "slug": "shortcut.create_story",
-      "service": "app.shortcut.com",
-      "intentSynonyms": [
-        "create a story in shortcut",
-        "add a story in shortcut",
-        "make a new story in shortcut",
-        "open a new story in shortcut",
-        "create story in shortcut",
-        "create a new story in shortcut"
-      ],
-      "description": "Create a new story in Shortcut. Requires a name and story type. Optionally set description, workflow state, epic, iteration, owners, labels, estimate, and deadline.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Story title"
-          },
-          "story_type": {
-            "description": "Story type (default: feature)",
-            "type": "string",
-            "enum": [
-              "feature",
-              "bug",
-              "chore"
-            ]
-          },
-          "description": {
-            "description": "Story description in Markdown",
-            "type": "string"
-          },
-          "workflow_state_id": {
-            "description": "Workflow state ID to place the story in",
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "epic_id": {
-            "description": "Epic ID to associate",
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "iteration_id": {
-            "description": "Iteration ID to associate",
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "group_id": {
-            "description": "Team (group) UUID to assign",
-            "type": "string"
-          },
-          "owner_ids": {
-            "description": "Member UUIDs to set as owners",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "label_ids": {
-            "description": "Label IDs to attach",
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "estimate": {
-            "description": "Story point estimate",
-            "type": "number"
-          },
-          "deadline": {
-            "description": "Deadline in ISO 8601 format",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/shortcut/src/tools/create-story.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "POST",
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
       "slug": "shortcut.create_story_comment",
       "service": "app.shortcut.com",
       "intentSynonyms": [
@@ -73652,6 +73673,105 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/shortcut/src/tools/create-story-link.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
+      "slug": "shortcut.create_story",
+      "service": "app.shortcut.com",
+      "intentSynonyms": [
+        "create a story in shortcut",
+        "add a story in shortcut",
+        "make a new story in shortcut",
+        "open a new story in shortcut",
+        "create story in shortcut",
+        "create a new story in shortcut"
+      ],
+      "description": "Create a new story in Shortcut. Requires a name and story type. Optionally set description, workflow state, epic, iteration, owners, labels, estimate, and deadline.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Story title"
+          },
+          "story_type": {
+            "description": "Story type (default: feature)",
+            "type": "string",
+            "enum": [
+              "feature",
+              "bug",
+              "chore"
+            ]
+          },
+          "description": {
+            "description": "Story description in Markdown",
+            "type": "string"
+          },
+          "workflow_state_id": {
+            "description": "Workflow state ID to place the story in",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "epic_id": {
+            "description": "Epic ID to associate",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "iteration_id": {
+            "description": "Iteration ID to associate",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "group_id": {
+            "description": "Team (group) UUID to assign",
+            "type": "string"
+          },
+          "owner_ids": {
+            "description": "Member UUIDs to set as owners",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "label_ids": {
+            "description": "Label IDs to attach",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "estimate": {
+            "description": "Story point estimate",
+            "type": "number"
+          },
+          "deadline": {
+            "description": "Deadline in ISO 8601 format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/shortcut/src/tools/create-story.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -77128,48 +77248,6 @@
       }
     },
     {
-      "slug": "stackoverflow.get_answer",
-      "service": "stackoverflow.com",
-      "intentSynonyms": [
-        "get an answer in stackoverflow",
-        "look up an answer in stackoverflow",
-        "fetch a single answer in stackoverflow",
-        "view one specific answer in stackoverflow",
-        "get answer in stackoverflow",
-        "get answer details by id in stackoverflow"
-      ],
-      "description": "Get a specific Stack Overflow answer by its ID. Returns the full answer body, score, acceptance status, and author information.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "answer_id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Answer ID"
-          }
-        },
-        "required": [
-          "answer_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/stackoverflow/src/tools/get-answer.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "stackoverflow.get_answer_comments",
       "service": "stackoverflow.com",
       "intentSynonyms": [
@@ -77239,6 +77317,48 @@
       }
     },
     {
+      "slug": "stackoverflow.get_answer",
+      "service": "stackoverflow.com",
+      "intentSynonyms": [
+        "get an answer in stackoverflow",
+        "look up an answer in stackoverflow",
+        "fetch a single answer in stackoverflow",
+        "view one specific answer in stackoverflow",
+        "get answer in stackoverflow",
+        "get answer details by id in stackoverflow"
+      ],
+      "description": "Get a specific Stack Overflow answer by its ID. Returns the full answer body, score, acceptance status, and author information.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "answer_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Answer ID"
+          }
+        },
+        "required": [
+          "answer_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stackoverflow/src/tools/get-answer.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "stackoverflow.get_my_profile",
       "service": "stackoverflow.com",
       "intentSynonyms": [
@@ -77262,48 +77382,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/stackoverflow/src/tools/get-my-profile.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "stackoverflow.get_question",
-      "service": "stackoverflow.com",
-      "intentSynonyms": [
-        "get a question in stackoverflow",
-        "look up a question in stackoverflow",
-        "fetch a single question in stackoverflow",
-        "view one specific question in stackoverflow",
-        "get question in stackoverflow",
-        "get question details by id in stackoverflow"
-      ],
-      "description": "Get a specific Stack Overflow question by its ID. Returns the full question body, tags, score, answer count, and metadata. Use this to read the full content of a question.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "question_id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Question ID"
-          }
-        },
-        "required": [
-          "question_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/stackoverflow/src/tools/get-question.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -77452,6 +77530,48 @@
       }
     },
     {
+      "slug": "stackoverflow.get_question",
+      "service": "stackoverflow.com",
+      "intentSynonyms": [
+        "get a question in stackoverflow",
+        "look up a question in stackoverflow",
+        "fetch a single question in stackoverflow",
+        "view one specific question in stackoverflow",
+        "get question in stackoverflow",
+        "get question details by id in stackoverflow"
+      ],
+      "description": "Get a specific Stack Overflow question by its ID. Returns the full question body, tags, score, answer count, and metadata. Use this to read the full content of a question.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "question_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Question ID"
+          }
+        },
+        "required": [
+          "question_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stackoverflow/src/tools/get-question.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "stackoverflow.get_similar_questions",
       "service": "stackoverflow.com",
       "intentSynonyms": [
@@ -77560,48 +77680,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/stackoverflow/src/tools/get-tag-info.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "stackoverflow.get_user",
-      "service": "stackoverflow.com",
-      "intentSynonyms": [
-        "get an user in stackoverflow",
-        "look up an user in stackoverflow",
-        "fetch a single user in stackoverflow",
-        "view one specific user in stackoverflow",
-        "get user in stackoverflow",
-        "get user profile by id in stackoverflow"
-      ],
-      "description": "Get a Stack Overflow user profile by their user ID. Returns reputation, badge counts, question/answer counts, and profile information.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "user_id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "User ID"
-          }
-        },
-        "required": [
-          "user_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/stackoverflow/src/tools/get-user.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -77742,6 +77820,48 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/stackoverflow/src/tools/get-user-questions.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "stackoverflow.get_user",
+      "service": "stackoverflow.com",
+      "intentSynonyms": [
+        "get an user in stackoverflow",
+        "look up an user in stackoverflow",
+        "fetch a single user in stackoverflow",
+        "view one specific user in stackoverflow",
+        "get user in stackoverflow",
+        "get user profile by id in stackoverflow"
+      ],
+      "description": "Get a Stack Overflow user profile by their user ID. Returns reputation, badge counts, question/answer counts, and profile information.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "User ID"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/stackoverflow/src/tools/get-user.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -79500,6 +79620,37 @@
       }
     },
     {
+      "slug": "steam.get_featured_categories",
+      "service": "store.steampowered.com",
+      "intentSynonyms": [
+        "get featured categories in steam",
+        "look up featured categories in steam",
+        "fetch a single featured categories in steam",
+        "view one specific featured categories in steam",
+        "get specials, top sellers, new releases, coming soon in steam"
+      ],
+      "description": "Get games from featured store categories: specials (on sale), top sellers, new releases, and coming soon. Each category contains games with pricing info. Prices are in cents.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/steam/src/tools/get-featured-categories.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "steam.get_featured",
       "service": "store.steampowered.com",
       "intentSynonyms": [
@@ -79523,37 +79674,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/steam/src/tools/get-featured.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "steam.get_featured_categories",
-      "service": "store.steampowered.com",
-      "intentSynonyms": [
-        "get featured categories in steam",
-        "look up featured categories in steam",
-        "fetch a single featured categories in steam",
-        "view one specific featured categories in steam",
-        "get specials, top sellers, new releases, coming soon in steam"
-      ],
-      "description": "Get games from featured store categories: specials (on sale), top sellers, new releases, and coming soon. Each category contains games with pricing info. Prices are in cents.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/steam/src/tools/get-featured-categories.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -81802,47 +81922,6 @@
       }
     },
     {
-      "slug": "supabase.get_project",
-      "service": "supabase.com",
-      "intentSynonyms": [
-        "get a project in supabase",
-        "look up a project in supabase",
-        "fetch a single project in supabase",
-        "view one specific project in supabase",
-        "get project in supabase",
-        "get details of a specific project in supabase"
-      ],
-      "description": "Get detailed information about a specific Supabase project by its reference ID. Returns name, region, status, and organization.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "ref": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Project reference ID (e.g., \"abcdefghijklmnopqrst\")"
-          }
-        },
-        "required": [
-          "ref"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/supabase/src/tools/get-project.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "supabase.get_project_health",
       "service": "supabase.com",
       "intentSynonyms": [
@@ -81920,6 +81999,47 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/supabase/src/tools/get-project-logs.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "supabase.get_project",
+      "service": "supabase.com",
+      "intentSynonyms": [
+        "get a project in supabase",
+        "look up a project in supabase",
+        "fetch a single project in supabase",
+        "view one specific project in supabase",
+        "get project in supabase",
+        "get details of a specific project in supabase"
+      ],
+      "description": "Get detailed information about a specific Supabase project by its reference ID. Returns name, region, status, and organization.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project reference ID (e.g., \"abcdefghijklmnopqrst\")"
+          }
+        },
+        "required": [
+          "ref"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/supabase/src/tools/get-project.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -84164,46 +84284,6 @@
       }
     },
     {
-      "slug": "telegram.get_user",
-      "service": "web.telegram.org",
-      "intentSynonyms": [
-        "get an user in telegram",
-        "look up an user in telegram",
-        "fetch a single user in telegram",
-        "view one specific user in telegram",
-        "get user in telegram",
-        "get a user profile by id in telegram"
-      ],
-      "description": "Get basic profile information for a Telegram user by their numeric user ID. Returns name, username, phone, bot status, and online status.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "user_id": {
-            "type": "number",
-            "description": "Telegram user ID"
-          }
-        },
-        "required": [
-          "user_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/telegram/src/tools/get-user.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "telegram.get_user_profile",
       "service": "web.telegram.org",
       "intentSynonyms": [
@@ -84235,6 +84315,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/telegram/src/tools/get-user-profile.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "telegram.get_user",
+      "service": "web.telegram.org",
+      "intentSynonyms": [
+        "get an user in telegram",
+        "look up an user in telegram",
+        "fetch a single user in telegram",
+        "view one specific user in telegram",
+        "get user in telegram",
+        "get a user profile by id in telegram"
+      ],
+      "description": "Get basic profile information for a Telegram user by their numeric user ID. Returns name, username, phone, bot status, and online status.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "number",
+            "description": "Telegram user ID"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/telegram/src/tools/get-user.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -84844,54 +84964,6 @@
       }
     },
     {
-      "slug": "temporal.get_workflow",
-      "service": "cloud.temporal.io",
-      "intentSynonyms": [
-        "get a workflow in temporal",
-        "look up a workflow in temporal",
-        "fetch a single workflow in temporal",
-        "view one specific workflow in temporal",
-        "get workflow in temporal",
-        "get workflow execution details in temporal"
-      ],
-      "description": "Get detailed information about a specific workflow execution including configuration, status, history length, search attributes, and memo fields. Useful for debugging workflow state.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "namespace": {
-            "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
-            "type": "string"
-          },
-          "workflow_id": {
-            "type": "string",
-            "description": "Workflow ID"
-          },
-          "run_id": {
-            "description": "Run ID (optional — uses latest run if omitted)",
-            "type": "string"
-          }
-        },
-        "required": [
-          "workflow_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/temporal-cloud/src/tools/get-workflow.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "temporal.get_workflow_history",
       "service": "cloud.temporal.io",
       "intentSynonyms": [
@@ -84945,6 +85017,54 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/temporal-cloud/src/tools/get-workflow-history.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "temporal.get_workflow",
+      "service": "cloud.temporal.io",
+      "intentSynonyms": [
+        "get a workflow in temporal",
+        "look up a workflow in temporal",
+        "fetch a single workflow in temporal",
+        "view one specific workflow in temporal",
+        "get workflow in temporal",
+        "get workflow execution details in temporal"
+      ],
+      "description": "Get detailed information about a specific workflow execution including configuration, status, history length, search attributes, and memo fields. Useful for debugging workflow state.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+            "type": "string"
+          },
+          "workflow_id": {
+            "type": "string",
+            "description": "Workflow ID"
+          },
+          "run_id": {
+            "description": "Run ID (optional — uses latest run if omitted)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/temporal-cloud/src/tools/get-workflow.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -85239,6 +85359,62 @@
       }
     },
     {
+      "slug": "terraform.create_variable_set",
+      "service": "app.terraform.io",
+      "intentSynonyms": [
+        "create a variable set in terraform",
+        "add a variable set in terraform",
+        "make a new variable set in terraform",
+        "open a new variable set in terraform",
+        "create variable set in terraform"
+      ],
+      "description": "Create a new variable set in an organization. Set global to true to apply to all workspaces.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "string",
+            "description": "Organization name"
+          },
+          "name": {
+            "type": "string",
+            "description": "Variable set name"
+          },
+          "description": {
+            "description": "Variable set description",
+            "type": "string"
+          },
+          "global": {
+            "description": "Whether to apply to all workspaces (default false)",
+            "type": "boolean"
+          },
+          "priority": {
+            "description": "Whether this set takes priority over workspace variables (default false)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "organization",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/terraform-cloud/src/tools/create-variable-set.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "POST",
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
       "slug": "terraform.create_variable",
       "service": "app.terraform.io",
       "intentSynonyms": [
@@ -85300,62 +85476,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/terraform-cloud/src/tools/create-variable.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "POST",
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
-      "slug": "terraform.create_variable_set",
-      "service": "app.terraform.io",
-      "intentSynonyms": [
-        "create a variable set in terraform",
-        "add a variable set in terraform",
-        "make a new variable set in terraform",
-        "open a new variable set in terraform",
-        "create variable set in terraform"
-      ],
-      "description": "Create a new variable set in an organization. Set global to true to apply to all workspaces.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "organization": {
-            "type": "string",
-            "description": "Organization name"
-          },
-          "name": {
-            "type": "string",
-            "description": "Variable set name"
-          },
-          "description": {
-            "description": "Variable set description",
-            "type": "string"
-          },
-          "global": {
-            "description": "Whether to apply to all workspaces (default false)",
-            "type": "boolean"
-          },
-          "priority": {
-            "description": "Whether this set takes priority over workspace variables (default false)",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "organization",
-          "name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/terraform-cloud/src/tools/create-variable-set.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -85473,6 +85593,45 @@
       }
     },
     {
+      "slug": "terraform.delete_variable_set",
+      "service": "app.terraform.io",
+      "intentSynonyms": [
+        "delete a variable set in terraform",
+        "remove a variable set in terraform",
+        "trash a variable set in terraform",
+        "permanently delete a variable set in terraform",
+        "delete variable set in terraform"
+      ],
+      "description": "Delete a variable set.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "varset_id": {
+            "type": "string",
+            "description": "Variable set ID (e.g., \"varset-...\")"
+          }
+        },
+        "required": [
+          "varset_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/terraform-cloud/src/tools/delete-variable-set.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "DELETE",
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
       "slug": "terraform.delete_variable",
       "service": "app.terraform.io",
       "intentSynonyms": [
@@ -85504,45 +85663,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/terraform-cloud/src/tools/delete-variable.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "DELETE",
-          "opNameVerb": "delete"
-        }
-      }
-    },
-    {
-      "slug": "terraform.delete_variable_set",
-      "service": "app.terraform.io",
-      "intentSynonyms": [
-        "delete a variable set in terraform",
-        "remove a variable set in terraform",
-        "trash a variable set in terraform",
-        "permanently delete a variable set in terraform",
-        "delete variable set in terraform"
-      ],
-      "description": "Delete a variable set.",
-      "actionVerb": "delete",
-      "sideEffectClass": "destructive",
-      "params": {
-        "type": "object",
-        "properties": {
-          "varset_id": {
-            "type": "string",
-            "description": "Variable set ID (e.g., \"varset-...\")"
-          }
-        },
-        "required": [
-          "varset_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/terraform-cloud/src/tools/delete-variable-set.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -85783,46 +85903,6 @@
       }
     },
     {
-      "slug": "terraform.get_plan",
-      "service": "app.terraform.io",
-      "intentSynonyms": [
-        "get a plan in terraform",
-        "look up a plan in terraform",
-        "fetch a single plan in terraform",
-        "view one specific plan in terraform",
-        "get plan in terraform",
-        "get plan details in terraform"
-      ],
-      "description": "Get details about a plan including resource changes and status. Use the plan ID from a run's relationships.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "plan_id": {
-            "type": "string",
-            "description": "Plan ID (e.g., \"plan-...\")"
-          }
-        },
-        "required": [
-          "plan_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/terraform-cloud/src/tools/get-plan.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "terraform.get_plan_json_output",
       "service": "app.terraform.io",
       "intentSynonyms": [
@@ -85854,6 +85934,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/terraform-cloud/src/tools/get-plan-json-output.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "terraform.get_plan",
+      "service": "app.terraform.io",
+      "intentSynonyms": [
+        "get a plan in terraform",
+        "look up a plan in terraform",
+        "fetch a single plan in terraform",
+        "view one specific plan in terraform",
+        "get plan in terraform",
+        "get plan details in terraform"
+      ],
+      "description": "Get details about a plan including resource changes and status. Use the plan ID from a run's relationships.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "description": "Plan ID (e.g., \"plan-...\")"
+          }
+        },
+        "required": [
+          "plan_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/terraform-cloud/src/tools/get-plan.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -89855,46 +89975,6 @@
       }
     },
     {
-      "slug": "tripadvisor.get_restaurant",
-      "service": "tripadvisor.com",
-      "intentSynonyms": [
-        "get a restaurant in tripadvisor",
-        "look up a restaurant in tripadvisor",
-        "fetch a single restaurant in tripadvisor",
-        "view one specific restaurant in tripadvisor",
-        "get restaurant in tripadvisor",
-        "get restaurant details in tripadvisor"
-      ],
-      "description": "Get detailed information about a TripAdvisor restaurant including ratings, subratings, cuisine, address, hours, AI review summary, and price range. Provide the restaurant URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-...\").",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "description": "Restaurant page URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-Brenda_s_French_Soul_Food-San_Francisco_California.html\")"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/tripadvisor/src/tools/get-restaurant.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "tripadvisor.get_restaurant_awards",
       "service": "tripadvisor.com",
       "intentSynonyms": [
@@ -89930,6 +90010,46 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "graphql",
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "tripadvisor.get_restaurant",
+      "service": "tripadvisor.com",
+      "intentSynonyms": [
+        "get a restaurant in tripadvisor",
+        "look up a restaurant in tripadvisor",
+        "fetch a single restaurant in tripadvisor",
+        "view one specific restaurant in tripadvisor",
+        "get restaurant in tripadvisor",
+        "get restaurant details in tripadvisor"
+      ],
+      "description": "Get detailed information about a TripAdvisor restaurant including ratings, subratings, cuisine, address, hours, AI review summary, and price range. Provide the restaurant URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-...\").",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Restaurant page URL path (e.g., \"/Restaurant_Review-g60713-d480544-Reviews-Brenda_s_French_Soul_Food-San_Francisco_California.html\")"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/tripadvisor/src/tools/get-restaurant.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -90896,50 +91016,6 @@
       }
     },
     {
-      "slug": "tumblr.get_post",
-      "service": "tumblr.com",
-      "intentSynonyms": [
-        "get a post in tumblr",
-        "look up a post in tumblr",
-        "fetch a single post in tumblr",
-        "view one specific post in tumblr",
-        "get post in tumblr"
-      ],
-      "description": "Get detailed information about a specific Tumblr post by blog name and post ID.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "blog_name": {
-            "type": "string",
-            "description": "Blog name or URL (e.g. \"staff\" or \"staff.tumblr.com\")"
-          },
-          "post_id": {
-            "type": "string",
-            "description": "Post ID"
-          }
-        },
-        "required": [
-          "blog_name",
-          "post_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/tumblr/src/tools/get-post.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "tumblr.get_post_notes",
       "service": "tumblr.com",
       "intentSynonyms": [
@@ -90986,6 +91062,50 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/tumblr/src/tools/get-post-notes.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "tumblr.get_post",
+      "service": "tumblr.com",
+      "intentSynonyms": [
+        "get a post in tumblr",
+        "look up a post in tumblr",
+        "fetch a single post in tumblr",
+        "view one specific post in tumblr",
+        "get post in tumblr"
+      ],
+      "description": "Get detailed information about a specific Tumblr post by blog name and post ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "blog_name": {
+            "type": "string",
+            "description": "Blog name or URL (e.g. \"staff\" or \"staff.tumblr.com\")"
+          },
+          "post_id": {
+            "type": "string",
+            "description": "Post ID"
+          }
+        },
+        "required": [
+          "blog_name",
+          "post_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/tumblr/src/tools/get-post.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -93149,47 +93269,6 @@
       }
     },
     {
-      "slug": "twitch.get_game",
-      "service": "twitch.tv",
-      "intentSynonyms": [
-        "get a game in twitch",
-        "look up a game in twitch",
-        "fetch a single game in twitch",
-        "view one specific game in twitch",
-        "get game in twitch",
-        "get game/category details in twitch"
-      ],
-      "description": "Get details about a specific game/category on Twitch by name or ID. Returns viewer count, broadcaster count, and box art URL.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "Game name (e.g., \"Just Chatting\", \"Fortnite\")",
-            "type": "string"
-          },
-          "id": {
-            "description": "Game ID (alternative to name)",
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/twitch/src/tools/get-game.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "gql",
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "twitch.get_game_clips",
       "service": "twitch.tv",
       "intentSynonyms": [
@@ -93236,6 +93315,47 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/twitch/src/tools/get-game-clips.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "gql",
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "twitch.get_game",
+      "service": "twitch.tv",
+      "intentSynonyms": [
+        "get a game in twitch",
+        "look up a game in twitch",
+        "fetch a single game in twitch",
+        "view one specific game in twitch",
+        "get game in twitch",
+        "get game/category details in twitch"
+      ],
+      "description": "Get details about a specific game/category on Twitch by name or ID. Returns viewer count, broadcaster count, and box art URL.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Game name (e.g., \"Just Chatting\", \"Fortnite\")",
+            "type": "string"
+          },
+          "id": {
+            "description": "Game ID (alternative to name)",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/twitch/src/tools/get-game.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "gql",
@@ -94643,6 +94763,45 @@
       }
     },
     {
+      "slug": "walmart.get_product_reviews",
+      "service": "walmart.com",
+      "intentSynonyms": [
+        "get product reviews in walmart",
+        "look up product reviews in walmart",
+        "fetch a single product reviews in walmart",
+        "view one specific product reviews in walmart",
+        "get product reviews by item id in walmart"
+      ],
+      "description": "Get customer reviews for a Walmart product. Returns review summary and individual reviews with ratings and text.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "us_item_id": {
+            "type": "string",
+            "description": "Walmart US item ID"
+          }
+        },
+        "required": [
+          "us_item_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/walmart/src/tools/get-product-reviews.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "walmart.get_product",
       "service": "walmart.com",
       "intentSynonyms": [
@@ -94674,45 +94833,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/walmart/src/tools/get-product.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "walmart.get_product_reviews",
-      "service": "walmart.com",
-      "intentSynonyms": [
-        "get product reviews in walmart",
-        "look up product reviews in walmart",
-        "fetch a single product reviews in walmart",
-        "view one specific product reviews in walmart",
-        "get product reviews by item id in walmart"
-      ],
-      "description": "Get customer reviews for a Walmart product. Returns review summary and individual reviews with ratings and text.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "us_item_id": {
-            "type": "string",
-            "description": "Walmart US item ID"
-          }
-        },
-        "required": [
-          "us_item_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/walmart/src/tools/get-product-reviews.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -94995,46 +95115,6 @@
       }
     },
     {
-      "slug": "webflow.get_site",
-      "service": "webflow.com",
-      "intentSynonyms": [
-        "get a site in webflow",
-        "look up a site in webflow",
-        "fetch a single site in webflow",
-        "view one specific site in webflow",
-        "get site in webflow",
-        "get site details in webflow"
-      ],
-      "description": "Get detailed information about a specific Webflow site by its short name. Returns site metadata, publish status, timezone, SSL, and asset information.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "site_short_name": {
-            "type": "string",
-            "description": "Site short name / URL slug (e.g., \"my-site-abc123\")"
-          }
-        },
-        "required": [
-          "site_short_name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/webflow/src/tools/get-site.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "webflow.get_site_domains",
       "service": "webflow.com",
       "intentSynonyms": [
@@ -95192,29 +95272,29 @@
       }
     },
     {
-      "slug": "webflow.get_workspace",
+      "slug": "webflow.get_site",
       "service": "webflow.com",
       "intentSynonyms": [
-        "get a workspace in webflow",
-        "look up a workspace in webflow",
-        "fetch a single workspace in webflow",
-        "view one specific workspace in webflow",
-        "get workspace in webflow",
-        "get workspace details in webflow"
+        "get a site in webflow",
+        "look up a site in webflow",
+        "fetch a single site in webflow",
+        "view one specific site in webflow",
+        "get site in webflow",
+        "get site details in webflow"
       ],
-      "description": "Get detailed information about a specific Webflow workspace by its URL slug. Returns workspace name, seat usage, and billing details.",
+      "description": "Get detailed information about a specific Webflow site by its short name. Returns site metadata, publish status, timezone, SSL, and asset information.",
       "actionVerb": "get",
       "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
-          "workspace_slug": {
+          "site_short_name": {
             "type": "string",
-            "description": "Workspace URL slug (e.g., \"my-workspace-abc123\")"
+            "description": "Site short name / URL slug (e.g., \"my-site-abc123\")"
           }
         },
         "required": [
-          "workspace_slug"
+          "site_short_name"
         ],
         "additionalProperties": false
       },
@@ -95222,7 +95302,7 @@
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/webflow/src/tools/get-workspace.ts",
+        "sourcePath": "plugins/webflow/src/tools/get-site.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -95341,6 +95421,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/webflow/src/tools/get-workspace-permissions.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "webflow.get_workspace",
+      "service": "webflow.com",
+      "intentSynonyms": [
+        "get a workspace in webflow",
+        "look up a workspace in webflow",
+        "fetch a single workspace in webflow",
+        "view one specific workspace in webflow",
+        "get workspace in webflow",
+        "get workspace details in webflow"
+      ],
+      "description": "Get detailed information about a specific Webflow workspace by its URL slug. Returns workspace name, seat usage, and billing details.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "workspace_slug": {
+            "type": "string",
+            "description": "Workspace URL slug (e.g., \"my-workspace-abc123\")"
+          }
+        },
+        "required": [
+          "workspace_slug"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/webflow/src/tools/get-workspace.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -96479,46 +96599,6 @@
       }
     },
     {
-      "slug": "wikipedia.get_article",
-      "service": "wikipedia.org",
-      "intentSynonyms": [
-        "get an article in wikipedia",
-        "look up an article in wikipedia",
-        "fetch a single article in wikipedia",
-        "view one specific article in wikipedia",
-        "get article in wikipedia",
-        "get article summary and metadata in wikipedia"
-      ],
-      "description": "Get a Wikipedia article summary including the introduction extract, description, thumbnail, protection status, and URL. Use get_article_sections for the full table of contents, or get_section_content to read a specific section.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "Article title (e.g., \"JavaScript\", \"Albert Einstein\")"
-          }
-        },
-        "required": [
-          "title"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/wikipedia/src/tools/get-article.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "wikipedia.get_article_categories",
       "service": "wikipedia.org",
       "intentSynonyms": [
@@ -96684,6 +96764,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/wikipedia/src/tools/get-article-sections.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "wikipedia.get_article",
+      "service": "wikipedia.org",
+      "intentSynonyms": [
+        "get an article in wikipedia",
+        "look up an article in wikipedia",
+        "fetch a single article in wikipedia",
+        "view one specific article in wikipedia",
+        "get article in wikipedia",
+        "get article summary and metadata in wikipedia"
+      ],
+      "description": "Get a Wikipedia article summary including the introduction extract, description, thumbnail, protection status, and URL. Use get_article_sections for the full table of contents, or get_section_content to read a specific section.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Article title (e.g., \"JavaScript\", \"Albert Einstein\")"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/wikipedia/src/tools/get-article.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
@@ -97743,47 +97863,6 @@
       }
     },
     {
-      "slug": "x.get_list",
-      "service": "x.com",
-      "intentSynonyms": [
-        "get a list in x",
-        "look up a list in x",
-        "fetch a single list in x",
-        "view one specific list in x",
-        "get list in x",
-        "get list details in x"
-      ],
-      "description": "Get details about a list by its ID.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "list_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "List ID"
-          }
-        },
-        "required": [
-          "list_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/x/src/tools/get-list.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "x.get_list_tweets",
       "service": "x.com",
       "intentSynonyms": [
@@ -97825,6 +97904,47 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/x/src/tools/get-list-tweets.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "x.get_list",
+      "service": "x.com",
+      "intentSynonyms": [
+        "get a list in x",
+        "look up a list in x",
+        "fetch a single list in x",
+        "view one specific list in x",
+        "get list in x",
+        "get list details in x"
+      ],
+      "description": "Get details about a list by its ID.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List ID"
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/x/src/tools/get-list.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -97916,47 +98036,6 @@
       }
     },
     {
-      "slug": "x.get_tweet",
-      "service": "x.com",
-      "intentSynonyms": [
-        "get a tweet in x",
-        "look up a tweet in x",
-        "fetch a single tweet in x",
-        "view one specific tweet in x",
-        "get tweet in x",
-        "get tweet details by id in x"
-      ],
-      "description": "Get detailed information about a specific tweet by its ID. Returns the tweet with full engagement metrics, author details, and reply thread context.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "tweet_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Tweet ID"
-          }
-        },
-        "required": [
-          "tweet_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/x/src/tools/get-tweet.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
       "slug": "x.get_tweet_replies",
       "service": "x.com",
       "intentSynonyms": [
@@ -97992,6 +98071,47 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/x/src/tools/get-tweet-replies.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "x.get_tweet",
+      "service": "x.com",
+      "intentSynonyms": [
+        "get a tweet in x",
+        "look up a tweet in x",
+        "fetch a single tweet in x",
+        "view one specific tweet in x",
+        "get tweet in x",
+        "get tweet details by id in x"
+      ],
+      "description": "Get detailed information about a specific tweet by its ID. Returns the tweet with full engagement metrics, author details, and reply thread context.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "tweet_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tweet ID"
+          }
+        },
+        "required": [
+          "tweet_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/x/src/tools/get-tweet.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -98912,6 +99032,46 @@
       }
     },
     {
+      "slug": "ynab.create_category_group",
+      "service": "app.ynab.com",
+      "intentSynonyms": [
+        "create a category group in ynab",
+        "add a category group in ynab",
+        "make a new category group in ynab",
+        "open a new category group in ynab",
+        "create category group in ynab"
+      ],
+      "description": "Create a new category group in the active YNAB plan.",
+      "actionVerb": "create",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the new category group"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ynab/src/tools/create-category-group.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "create"
+        }
+      }
+    },
+    {
       "slug": "ynab.create_category",
       "service": "app.ynab.com",
       "intentSynonyms": [
@@ -99140,46 +99300,6 @@
       }
     },
     {
-      "slug": "ynab.create_category_group",
-      "service": "app.ynab.com",
-      "intentSynonyms": [
-        "create a category group in ynab",
-        "add a category group in ynab",
-        "make a new category group in ynab",
-        "open a new category group in ynab",
-        "create category group in ynab"
-      ],
-      "description": "Create a new category group in the active YNAB plan.",
-      "actionVerb": "create",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Name of the new category group"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/ynab/src/tools/create-category-group.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "create"
-        }
-      }
-    },
-    {
       "slug": "ynab.create_transaction",
       "service": "app.ynab.com",
       "intentSynonyms": [
@@ -99273,46 +99393,6 @@
       }
     },
     {
-      "slug": "ynab.delete_category",
-      "service": "app.ynab.com",
-      "intentSynonyms": [
-        "delete a category in ynab",
-        "remove a category in ynab",
-        "trash a category in ynab",
-        "permanently delete a category in ynab",
-        "delete category in ynab"
-      ],
-      "description": "Delete a category from the active YNAB plan. This is a soft delete (tombstone). Existing transactions assigned to this category remain in place but the category will no longer appear in budget views.",
-      "actionVerb": "delete",
-      "sideEffectClass": "destructive",
-      "params": {
-        "type": "object",
-        "properties": {
-          "category_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Category ID to delete"
-          }
-        },
-        "required": [
-          "category_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/ynab/src/tools/delete-category.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "delete"
-        }
-      }
-    },
-    {
       "slug": "ynab.delete_category_group",
       "service": "app.ynab.com",
       "intentSynonyms": [
@@ -99345,6 +99425,46 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/ynab/src/tools/delete-category-group.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "delete"
+        }
+      }
+    },
+    {
+      "slug": "ynab.delete_category",
+      "service": "app.ynab.com",
+      "intentSynonyms": [
+        "delete a category in ynab",
+        "remove a category in ynab",
+        "trash a category in ynab",
+        "permanently delete a category in ynab",
+        "delete category in ynab"
+      ],
+      "description": "Delete a category from the active YNAB plan. This is a soft delete (tombstone). Existing transactions assigned to this category remain in place but the category will no longer appear in budget views.",
+      "actionVerb": "delete",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Category ID to delete"
+          }
+        },
+        "required": [
+          "category_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ynab/src/tools/delete-category.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -99904,6 +100024,58 @@
       }
     },
     {
+      "slug": "ynab.update_category_budget",
+      "service": "app.ynab.com",
+      "intentSynonyms": [
+        "update a category budget in ynab",
+        "edit a category budget in ynab",
+        "change the details of category budget in ynab",
+        "modify a category budget in ynab",
+        "update category budget in ynab",
+        "set budgeted amount for a category in ynab"
+      ],
+      "description": "Set the budgeted amount for a category in a specific month. Amount is in currency units (e.g. 500 to budget $500). The month should be in YYYY-MM format (e.g. 2026-03 for March 2026).",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Category ID to budget"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
+            "description": "Month in YYYY-MM format (e.g. 2026-03)"
+          },
+          "budgeted": {
+            "type": "number",
+            "description": "Amount to budget in currency units (e.g. 500 for $500)"
+          }
+        },
+        "required": [
+          "category_id",
+          "month",
+          "budgeted"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/ynab/src/tools/update-category-budget.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": null,
+          "httpMethod": null,
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
       "slug": "ynab.update_category",
       "service": "app.ynab.com",
       "intentSynonyms": [
@@ -100130,58 +100302,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/ynab/src/tools/update-category.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": null,
-          "httpMethod": null,
-          "opNameVerb": "update"
-        }
-      }
-    },
-    {
-      "slug": "ynab.update_category_budget",
-      "service": "app.ynab.com",
-      "intentSynonyms": [
-        "update a category budget in ynab",
-        "edit a category budget in ynab",
-        "change the details of category budget in ynab",
-        "modify a category budget in ynab",
-        "update category budget in ynab",
-        "set budgeted amount for a category in ynab"
-      ],
-      "description": "Set the budgeted amount for a category in a specific month. Amount is in currency units (e.g. 500 to budget $500). The month should be in YYYY-MM format (e.g. 2026-03 for March 2026).",
-      "actionVerb": "update",
-      "sideEffectClass": "write",
-      "params": {
-        "type": "object",
-        "properties": {
-          "category_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Category ID to budget"
-          },
-          "month": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
-            "description": "Month in YYYY-MM format (e.g. 2026-03)"
-          },
-          "budgeted": {
-            "type": "number",
-            "description": "Amount to budget in currency units (e.g. 500 for $500)"
-          }
-        },
-        "required": [
-          "category_id",
-          "month",
-          "budgeted"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/ynab/src/tools/update-category-budget.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": null,
@@ -100637,6 +100757,45 @@
       }
     },
     {
+      "slug": "youtube.get_video_comments",
+      "service": "youtube.com",
+      "intentSynonyms": [
+        "get video comments in youtube",
+        "look up video comments in youtube",
+        "fetch a single video comments in youtube",
+        "view one specific video comments in youtube",
+        "get comments on a video in youtube"
+      ],
+      "description": "Get comments on a YouTube video. Returns the top-level comments with author, text, likes, and reply count.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "video_id": {
+            "type": "string",
+            "description": "YouTube video ID"
+          }
+        },
+        "required": [
+          "video_id"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "dom",
+      "provenance": {
+        "source": "opentabs",
+        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+        "sourcePath": "plugins/youtube/src/tools/get-video-comments.ts",
+        "license": "MIT",
+        "signals": {
+          "transportHelper": "api",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
       "slug": "youtube.get_video",
       "service": "youtube.com",
       "intentSynonyms": [
@@ -100668,45 +100827,6 @@
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
         "sourcePath": "plugins/youtube/src/tools/get-video.ts",
-        "license": "MIT",
-        "signals": {
-          "transportHelper": "api",
-          "httpMethod": "GET",
-          "opNameVerb": "get"
-        }
-      }
-    },
-    {
-      "slug": "youtube.get_video_comments",
-      "service": "youtube.com",
-      "intentSynonyms": [
-        "get video comments in youtube",
-        "look up video comments in youtube",
-        "fetch a single video comments in youtube",
-        "view one specific video comments in youtube",
-        "get comments on a video in youtube"
-      ],
-      "description": "Get comments on a YouTube video. Returns the top-level comments with author, text, likes, and reply count.",
-      "actionVerb": "get",
-      "sideEffectClass": "read",
-      "params": {
-        "type": "object",
-        "properties": {
-          "video_id": {
-            "type": "string",
-            "description": "YouTube video ID"
-          }
-        },
-        "required": [
-          "video_id"
-        ],
-        "additionalProperties": false
-      },
-      "backing": "dom",
-      "provenance": {
-        "source": "opentabs",
-        "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
-        "sourcePath": "plugins/youtube/src/tools/get-video-comments.ts",
         "license": "MIT",
         "signals": {
           "transportHelper": "api",

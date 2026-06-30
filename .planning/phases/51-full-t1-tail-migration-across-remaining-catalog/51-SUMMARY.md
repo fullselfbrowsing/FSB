@@ -2,6 +2,10 @@
 
 Status: active.
 
-Phase 51 extends the v1.1.0 T1 App Execution Expansion milestone from a completed first expansion pass into a full-tail migration target. The first patch establishes the control surface: roadmap/requirements scope, a generated worklist for every non-ready descriptor, and a test that keeps that worklist derived from the canonical readiness matrix.
+Phase 51 extends the v1.1.0 T1 App Execution Expansion milestone from a completed first expansion pass into a full-tail migration target. Plan 51-01 established the control surface: roadmap/requirements scope, a generated worklist for every non-ready descriptor, and a test that keeps that worklist derived from the canonical readiness matrix.
 
-Current baseline remains 45 executable T1-ready descriptors, 5 guarded fail-closed writes, and 2,264 catalog-tail descriptors still needing migration or explicit terminal-state evidence.
+Plan 51-02 landed the first conservative bulk migration pass. It generated bundled T1b recipes for 8 low-risk same-origin no-param GET descriptors and added resolver/package/test coverage so generated recipes ship and resolve without per-slug registry edits.
+
+Current state after 51-02: 53 executable T1-ready descriptors, 5 guarded fail-closed writes, and 2,256 catalog-tail descriptors still needing migration or explicit terminal-state evidence.
+
+Next workstreams remain Pattern-D/GAPI bridge implementation, sensitive/policy triage, and write/destructive UAT activation. The milestone must not claim "all apps are T1" until the readiness gate, port-contract gate, worklist, and full regression suite all agree there are no untriaged non-denied tail rows.

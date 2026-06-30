@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-06-30T01:53:58.235Z",
+  "generatedAt": "2026-06-30T02:18:41.561Z",
   "source": "scripts/report-t1-readiness.mjs",
   "descriptorCount": 2314,
-  "currentReady": 45,
+  "currentReady": 53,
   "currentGuarded": 5,
   "rows": [
     {
@@ -6987,32 +6987,6 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "bestbuy.get_current_user",
-      "app": "bestbuy",
-      "service": "bestbuy.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "bestbuy.get_customer_plans",
-      "app": "bestbuy",
-      "service": "bestbuy.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "bestbuy.get_product",
       "app": "bestbuy",
       "service": "bestbuy.com",
@@ -7157,19 +7131,6 @@
     },
     {
       "slug": "bitbucket.get_pull_request_diff",
-      "app": "bitbucket",
-      "service": "bitbucket.org",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "bitbucket.get_user_profile",
       "app": "bitbucket",
       "service": "bitbucket.org",
       "sideEffectClass": "read",
@@ -8236,19 +8197,6 @@
     },
     {
       "slug": "circleci.get_workflow_runs",
-      "app": "circleci",
-      "service": "app.circleci.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "circleci.list_collaborations",
       "app": "circleci",
       "service": "app.circleci.com",
       "sideEffectClass": "read",
@@ -13565,19 +13513,6 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "netlify.get_current_user",
-      "app": "netlify",
-      "service": "app.netlify.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "netlify.get_deploy",
       "app": "netlify",
       "service": "app.netlify.com",
@@ -15542,19 +15477,6 @@
     },
     {
       "slug": "redfin.get_comparable_rentals",
-      "app": "redfin",
-      "service": "redfin.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "redfin.get_current_user",
       "app": "redfin",
       "service": "redfin.com",
       "sideEffectClass": "read",
@@ -19792,19 +19714,6 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "webflow.get_current_user",
-      "app": "webflow",
-      "service": "webflow.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "webflow.get_site",
       "app": "webflow",
       "service": "webflow.com",
@@ -19962,19 +19871,6 @@
     },
     {
       "slug": "webflow.list_workspace_members",
-      "app": "webflow",
-      "service": "webflow.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "webflow.list_workspaces",
       "app": "webflow",
       "service": "webflow.com",
       "sideEffectClass": "read",
@@ -29439,17 +29335,17 @@
     }
   ],
   "totals": {
-    "tail": 2264,
-    "actionable": 2070,
+    "tail": 2256,
+    "actionable": 2062,
     "blocked": 194,
-    "read": 1590,
+    "read": 1582,
     "write": 508,
     "destructive": 166,
     "byWorkstream": {
       "blocked-policy": 194,
       "gapi-bridge": 83,
       "pattern-d": 229,
-      "same-origin-read": 1120,
+      "same-origin-read": 1112,
       "write-destructive-uat": 638
     },
     "byApp": {
@@ -29488,14 +29384,14 @@
       "airbnb": 14,
       "amazon": 6,
       "amplitude": 15,
-      "bestbuy": 11,
-      "bitbucket": 24,
+      "bestbuy": 9,
+      "bitbucket": 23,
       "booking": 10,
       "bsky": 38,
       "calendly": 15,
       "chatgpt": 20,
       "chipotle": 16,
-      "circleci": 23,
+      "circleci": 22,
       "claude": 14,
       "clickhouse": 9,
       "cloudflare": 30,
@@ -29535,7 +29431,7 @@
       "minimax": 31,
       "mongodb": 20,
       "msword": 27,
-      "netlify": 36,
+      "netlify": 35,
       "newrelic": 22,
       "notion": 12,
       "npm": 14,
@@ -29547,7 +29443,7 @@
       "powerpoint": 26,
       "priceline": 18,
       "reddit": 23,
-      "redfin": 12,
+      "redfin": 11,
       "retool": 50,
       "shortcut": 27,
       "slack": 18,
@@ -29573,7 +29469,7 @@
       "ubereats": 5,
       "vercel": 1,
       "walmart": 10,
-      "webflow": 15,
+      "webflow": 13,
       "whatsapp": 21,
       "wikipedia": 19,
       "x": 31,
@@ -29583,14 +29479,14 @@
     },
     "byOriginClass": {
       "denied": 194,
-      "standard": 1333,
-      "sensitive": 737
+      "standard": 1328,
+      "sensitive": 734
     },
     "byRouteFeasibility": {
       "blocked": 194,
       "gapi-bridge-candidate": 133,
       "pattern-d-candidate": 337,
-      "same-origin-read-candidate": 1120,
+      "same-origin-read-candidate": 1112,
       "dom-discovery-only": 480
     }
   }

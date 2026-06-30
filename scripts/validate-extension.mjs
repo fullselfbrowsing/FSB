@@ -79,10 +79,24 @@ try {
 // ---------- 3. Generated capability catalog snapshot ----------
 function readJsonDir(absDir) {
   if (!existsSync(absDir)) return [];
-  return readdirSync(absDir)
-    .filter((name) => name.endsWith('.json'))
-    .sort()
-    .map((name) => JSON.parse(readFileSync(join(absDir, name), 'utf8')));
+  const files = [];
+  function walk(dir, relPrefix = '') {
+    for (const name of readdirSync(dir).sort()) {
+      if (name === '_fixtures') continue;
+      const abs = join(dir, name);
+      const rel = relPrefix ? join(relPrefix, name) : name;
+      const st = statSync(abs);
+      if (st.isDirectory()) {
+        walk(abs, rel);
+      } else if (name.endsWith('.json')) {
+        files.push({ abs, rel });
+      }
+    }
+  }
+  walk(absDir);
+  return files
+    .sort((a, b) => a.rel.localeCompare(b.rel))
+    .map((file) => JSON.parse(readFileSync(file.abs, 'utf8')));
 }
 
 const catalogSnapshotPath = join(EXT_ROOT, 'catalog', 'recipe-index.generated.js');

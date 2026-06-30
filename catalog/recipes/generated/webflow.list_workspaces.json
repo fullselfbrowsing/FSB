@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "id": "webflow.list_workspaces",
+  "origin": "https://webflow.com",
+  "endpoint": "/api/workspaces",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "extract": "@",
+  "expectedShape": "@"
+}

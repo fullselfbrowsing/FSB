@@ -54,9 +54,12 @@
   function _getRecipeBySlug(slug) {
     var s = _search();
     if (s && typeof s.getRecipeBySlug === 'function') {
-      try { return s.getRecipeBySlug(slug) || null; } catch (e) { return null; }
+      try {
+        var hit = s.getRecipeBySlug(slug);
+        if (hit) { return hit; }
+      } catch (e) { /* fall through to the bundled index */ }
     }
-    return null;
+    return _getCatalogRecipeBySlug(slug);
   }
 
   // ---- CGEN-03 / Decision B: typeof-guarded descriptor accessor --------------
@@ -81,6 +84,16 @@
     for (var i = 0; i < idx.descriptors.length; i++) {
       var d = idx.descriptors[i];
       if (d && d.slug === slug) { return d; }
+    }
+    return null;
+  }
+
+  function _getCatalogRecipeBySlug(slug) {
+    var idx = _recipeIndex();
+    if (!idx || !Array.isArray(idx.recipes)) { return null; }
+    for (var i = 0; i < idx.recipes.length; i++) {
+      var r = idx.recipes[i];
+      if (r && (r.id === slug || r.slug === slug)) { return r; }
     }
     return null;
   }
@@ -380,6 +393,10 @@
     // backing:'dom' -> T3; a backing:'learn' descriptor exercises the T2 leg.)
     if (!entry) {
       var desc = _getDescriptor(slug);
+      var catalogRecipe = _getRecipeBySlug(slug);
+      if (catalogRecipe) {
+        return { tier: 'T1b', recipe: catalogRecipe, descriptor: desc || null };
+      }
       if (desc) {
         // The existing backing:'learn' -> T2 leg is UNCHANGED.
         if (desc.backing === 'learn') {

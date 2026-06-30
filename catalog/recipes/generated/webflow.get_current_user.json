@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "id": "webflow.get_current_user",
+  "origin": "https://webflow.com",
+  "endpoint": "/api/user",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "extract": "@",
+  "expectedShape": "@"
+}

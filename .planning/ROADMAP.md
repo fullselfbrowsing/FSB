@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
-- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-51, EXTENDED 2026-06-29. Expanded proven T1/guarded coverage from 26 to 50 descriptors in Phases 44-50, then reopened with Phase 51 to drive the remaining 2,264-descriptor catalog tail toward verified T1 execution or an explicit blocked/policy terminal state.
+- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-51, EXTENDED 2026-06-29. Expanded proven T1/guarded coverage from 26 to 58 descriptors so far, then reopened with Phase 51 to drive the remaining catalog tail toward verified T1 execution or an explicit blocked/policy terminal state.
 
 ## Active Milestone
 
@@ -20,12 +20,12 @@
 - Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
 - App stems with no direct T1 path: **123**.
 
-**Current Phase 51 baseline after Phases 44-50:**
+**Current Phase 51 state after plan 51-02:**
 
 - Total descriptors: **2,314**.
-- T1-ready executable descriptors: **45**.
+- T1-ready executable descriptors: **53**.
 - T1 guarded fail-closed writes: **5**.
-- Catalog tail not direct API-ready: **2,264** (**2,070 discovery-pending**, **194 blocked**).
+- Catalog tail not direct API-ready: **2,256** (**2,062 discovery-pending**, **194 blocked**).
 - App stems with at least one direct T1/guarded row: **9**.
 
 **Hard invariants:**
@@ -181,7 +181,7 @@
 
 - [ ] Phase 51: Full T1 Tail Migration Across Remaining Catalog (active)
 
-**Goal:** Convert the remaining 2,264 catalog-tail descriptors to explicit terminal states: executable T1/T1b where safe and technically provable, guarded fail-closed where write/destructive UAT is still required, or blocked where denylist/product/legal policy says no.
+**Goal:** Convert the Phase 51 catalog-tail descriptors to explicit terminal states: executable T1/T1b where safe and technically provable, guarded fail-closed where write/destructive UAT is still required, or blocked where denylist/product/legal policy says no.
 
 **Depends on:** Phase 50.
 
@@ -195,8 +195,8 @@
 5. Final closeout cannot claim “all apps are T1” unless `npm test`, `npm run validate:extension`, the T1 readiness gate, the port-contract gate, and the Phase 51 worklist all agree there are no untriaged non-denied tail rows.
 
 **Plans:**
-- [ ] 51-01: Full-tail worklist generator, acceptance gate, and batch scheduler.
-- [ ] 51-02: Existing-head and low-risk same-origin read bulk port.
+- [x] 51-01: Full-tail worklist generator, acceptance gate, and batch scheduler.
+- [x] 51-02: Existing-head and low-risk same-origin read bulk port.
 - [ ] 51-03: Pattern-D and GAPI bridge implementation waves.
 - [ ] 51-04: Sensitive consumer/social and blocked-policy triage.
 - [ ] 51-05: Write/destructive live-UAT activation waves.
@@ -213,7 +213,7 @@
 | 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
 | 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
 | 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
-| 51. Full T1 Tail Migration Across Remaining Catalog | 0/6 | Active | - |
+| 51. Full T1 Tail Migration Across Remaining Catalog | 2/6 | Active | - |
 
 ## Completed Milestones
 

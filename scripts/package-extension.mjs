@@ -2,7 +2,7 @@
 // Builds the Chrome Web Store-ready archive from extension/ only.
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,14 +50,28 @@ rmSync(zipPath, { force: true });
 // EXCLUDED. The generated source is pure data and free of dynamic-code constructs.
 function readJsonDir(absDir) {
   if (!existsSync(absDir)) return [];
-  return readdirSync(absDir)
-    .filter((name) => name.endsWith('.json')) // readdirSync is non-recursive -> _fixtures/ subdir is naturally excluded
-    .sort()
-    .map((name) => {
+  const files = [];
+  function walk(dir, relPrefix = '') {
+    for (const name of readdirSync(dir).sort()) {
+      if (name === '_fixtures') continue;
+      const abs = join(dir, name);
+      const rel = relPrefix ? join(relPrefix, name) : name;
+      const st = statSync(abs);
+      if (st.isDirectory()) {
+        walk(abs, rel);
+      } else if (name.endsWith('.json')) {
+        files.push({ abs, rel });
+      }
+    }
+  }
+  walk(absDir);
+  return files
+    .sort((a, b) => a.rel.localeCompare(b.rel))
+    .map((file) => {
       try {
-        return JSON.parse(readFileSync(join(absDir, name), 'utf8'));
+        return JSON.parse(readFileSync(file.abs, 'utf8'));
       } catch (error) {
-        fail(`catalog file ${name} is not valid JSON: ${error.message}`);
+        fail(`catalog file ${file.rel} is not valid JSON: ${error.message}`);
         return null;
       }
     });
