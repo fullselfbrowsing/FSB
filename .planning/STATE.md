@@ -201,7 +201,7 @@ None active.
 | 260701-2km | Implement Carta to be T1 ready | 2026-07-01 | working-tree | [260701-2km-implement-carta-to-be-t1-ready](./quick/260701-2km-implement-carta-to-be-t1-ready/) |
 | 260701-2m2 | Implement Temporal to be T1 ready | 2026-07-01 | working-tree | [260701-2m2-implement-this-temporal-to-be-t1-ready](./quick/260701-2m2-implement-this-temporal-to-be-t1-ready/) |
 | 260701-2ml | Implement YouTube Music to be T1 ready | 2026-07-01 | 51666789 | [260701-2ml-implement-youtube-music-to-be-t1-ready](./quick/260701-2ml-implement-youtube-music-to-be-t1-ready/) |
-| 260701-e78 | Repair YouTube Music blocked-policy T1 readiness | 2026-07-01 | working-tree | [260701-e78-implement-youtube-music-to-be-t1-ready](./quick/260701-e78-implement-youtube-music-to-be-t1-ready/) |
+| 260701-e78 | Repair YouTube Music blocked-policy T1 readiness | 2026-07-01 | ce60e8cb | [260701-e78-implement-youtube-music-to-be-t1-ready](./quick/260701-e78-implement-youtube-music-to-be-t1-ready/) |
 | 260701-2no | Make YouTube T1-ready | 2026-07-01 | working-tree | [260701-2no-make-youtube-t1-ready](./quick/260701-2no-make-youtube-t1-ready/) |
 | 260701-j08 | Implement this YouTube to be T1 ready | 2026-07-01 | ce10b54d | [260701-j08-implement-this-youtube-to-be-t1-ready](./quick/260701-j08-implement-this-youtube-to-be-t1-ready/) |
 | 260701-2lz | Make this app OnlyFans T1 ready | 2026-07-01 | working-tree | [260701-2lz-make-this-app-onlyfans-t1-ready](./quick/260701-2lz-make-this-app-onlyfans-t1-ready/) |
