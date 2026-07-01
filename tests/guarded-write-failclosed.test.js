@@ -77,7 +77,9 @@ const WRITE_HEADS = [
   { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
   // robinhood x2 -- brokerage watchlist mutations stay inert behind the denied-origin policy.
   { slug: 'robinhood.create_watchlist', origin: 'https://robinhood.com', handlerFile: 'robinhood.js' },
-  { slug: 'robinhood.delete_watchlist', origin: 'https://robinhood.com', handlerFile: 'robinhood.js' }
+  { slug: 'robinhood.delete_watchlist', origin: 'https://robinhood.com', handlerFile: 'robinhood.js' },
+  // Fiverr x1 -- message sending stays inert pending live mutation-body UAT.
+  { slug: 'fiverr.send_message', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' }
 ];
 
 // makeRecordingCtx(origin) -> { recorder, ctx }. The ctx.executeBoundSpec stub pushes

@@ -166,7 +166,17 @@ const PORTED = [
   { slug: 'notion.create_database_item', origin: 'https://app.notion.com', handlerFile: 'notion.js', expectWrite: true },
   // slack x1 -- EXTEND the existing module (41-04), origin https://app.slack.com
   // (slug-DISTINCT from the hand-only executable slack.chat.postMessage -- no collision.)
-  { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js', expectWrite: true }
+  { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js', expectWrite: true },
+  // Fiverr x7 same-origin marketplace/message reads + x1 guarded message write, origin https://www.fiverr.com
+  { slug: 'fiverr.draft_message', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.get_conversation', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.get_current_page_context', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.get_gig_details', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.get_seller_profile', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.list_conversations', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.search_gigs', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
+  { slug: 'fiverr.send_message', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js', expectWrite: true }
+
 ];
 
 // The descriptor whose backing:'dom' T3 resolution proves the BEFORE leg, and

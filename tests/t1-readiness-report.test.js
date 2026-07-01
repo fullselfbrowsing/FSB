@@ -69,6 +69,13 @@ function bySlug(rows, slug) {
     (missingRequired.length ? ' -- missing: ' + missingRequired.slice(0, 10).join(', ') : ''));
 
   const knownReady = [
+    'fiverr.draft_message',
+    'fiverr.get_conversation',
+    'fiverr.get_current_page_context',
+    'fiverr.get_gig_details',
+    'fiverr.get_seller_profile',
+    'fiverr.list_conversations',
+    'fiverr.search_gigs',
     'github.notifications',
     'reddit.inbox',
     'github.issues.list',
@@ -117,6 +124,7 @@ function bySlug(rows, slug) {
     'gitlab.create_issue',
     'gitlab.create_merge_request',
     'gitlab.create_note',
+    'fiverr.send_message',
     'slack.send_message',
   ];
   const guardedOffenders = [];
