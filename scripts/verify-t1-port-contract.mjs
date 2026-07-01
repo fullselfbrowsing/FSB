@@ -40,6 +40,7 @@ export const HANDLER_BY_APP = Object.freeze({
   vercel: 'vercel.js',
   robinhood: 'robinhood.js',
   doordash: 'doordash.js',
+  ubereats: 'ubereats.js',
 });
 
 export const ACTIVE_WRITE_UAT_SLUGS = Object.freeze([

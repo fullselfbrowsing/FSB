@@ -292,7 +292,8 @@
     { global: 'FsbHandlerRetool', service: 'retool.com', origin: 'https://retool.com' },
     { global: 'FsbHandlerAsana', service: 'app.asana.com', origin: 'https://app.asana.com' },
     { global: 'FsbHandlerRobinhood', service: 'robinhood.com', origin: 'https://robinhood.com' },
-    { global: 'FsbHandlerDoordash', service: 'doordash.com', origin: 'https://www.doordash.com' }
+    { global: 'FsbHandlerDoordash', service: 'doordash.com', origin: 'https://www.doordash.com' },
+    { global: 'FsbHandlerUbereats', service: 'www.ubereats.com', origin: 'https://www.ubereats.com' }
   ];
 
   function _readGlobal(name) {

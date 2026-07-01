@@ -172,14 +172,19 @@
     'doordash.get_order': true,
     'doordash.list_addresses': true,
     'doordash.list_orders': true,
-    'doordash.list_payment_methods': true
+    'doordash.list_payment_methods': true,
+    'ubereats.list_restaurants': true,
+    'ubereats.get_menu': true,
+    'ubereats.list_orders': true
   };
   var T1_GUARDED_FAIL_CLOSED_SLUGS = {
     'github.issues.create': true,
     'gitlab.create_issue': true,
     'gitlab.create_merge_request': true,
     'gitlab.create_note': true,
-    'slack.send_message': true
+    'slack.send_message': true,
+    'ubereats.place_order': true,
+    'ubereats.cancel_order': true
   };
 
   function normalizeBacking(value) {
