@@ -114,7 +114,13 @@
   // descriptors still carry backing:'dom' from the breadth import. This keeps
   // search_capabilities honest without changing invoke routing: proven handler/recipe
   // slugs display t1-ready, known guarded writes display t1-guarded-fail-closed, and
-  // the rest of the catalog tail remains learn-pending or discovery-pending.
+  // the rest of the catalog tail remains learn-pending or discovery-pending. Denied
+  // app slices that remain searchable for catalog completeness are explicitly labeled
+  // blocked so they are not mistaken for ordinary discovery work.
+  var BLOCKED_SERVICE_HOSTS = {
+    'music.youtube.com': true
+  };
+
   var T1_READY_SLUGS = {
     'github.issues.list': true,
     'github.notifications': true,
@@ -175,7 +181,21 @@
     if (b === 'recipe' || b === 'handler' || b === 'learn' || b === 'dom') { return b; }
     return 'dom'; // absent/unknown -> the DOM-fallback seam (resolve() else -> T3)
   }
-  function readinessStatus(slug, backing) {
+  function normalizeServiceHost(service) {
+    var text = String(service || '').toLowerCase().trim();
+    if (!text) { return ''; }
+    try {
+      return new URL(text.indexOf('://') === -1 ? 'https://' + text : text).hostname;
+    } catch (_e) {
+      return text.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    }
+  }
+  function isBlockedService(service) {
+    var host = normalizeServiceHost(service);
+    return !!(host && BLOCKED_SERVICE_HOSTS[host]);
+  }
+  function readinessStatus(slug, backing, service) {
+    if (isBlockedService(service)) { return 'blocked'; }
     if (T1_GUARDED_FAIL_CLOSED_SLUGS[slug]) { return 't1-guarded-fail-closed'; }
     if (T1_READY_SLUGS[slug]) { return 't1-ready'; }
     var b = normalizeBacking(backing);
@@ -185,11 +205,11 @@
   }
   // A descriptor is a confident invocable hit only when it is t1-ready. Guarded
   // fail-closed writes are searchable but should not be presented as executable yet.
-  function isInvocableBacking(slug, backing) {
-    return readinessStatus(slug, backing) === 't1-ready';
+  function isInvocableBacking(slug, backing, service) {
+    return readinessStatus(slug, backing, service) === 't1-ready';
   }
-  function backingDisplayLabel(slug, backing) {
-    return readinessStatus(slug, backing);
+  function backingDisplayLabel(slug, backing, service) {
+    return readinessStatus(slug, backing, service);
   }
 
   // ---- Pure index builder (the SINGLE source of truth the eval test reuses) ---
@@ -363,7 +383,7 @@
       // but are not presented as executable. A hit with a paired recipe in the
       // slug->recipe map is recipe-backed even if its stored backing differs.
       var backing = (_slugToRecipe[h.slug]) ? 'recipe' : normalizeBacking(h.backing);
-      var status = readinessStatus(h.slug, backing);
+      var status = readinessStatus(h.slug, backing, h.service);
       return {
         slug: h.slug,
         service: h.service,
@@ -374,7 +394,7 @@
         backing: backing,                                    // canonical seam enum
         backingStatus: status,                               // display label
         readinessStatus: status,                             // Phase 44 status label
-        invocable: isInvocableBacking(h.slug, backing)       // confident-invocable flag
+        invocable: isInvocableBacking(h.slug, backing, h.service) // confident-invocable flag
       };
     });
   }

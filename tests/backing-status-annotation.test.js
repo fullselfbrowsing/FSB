@@ -13,7 +13,7 @@
  * The annotation fields were added to extension/utils/capability-search.js:
  *   - backing       -- the canonical seam enum (recipe/handler/learn/dom)
  *   - backingStatus/readinessStatus -- the DISPLAY label (`t1-ready`,
- *                      `t1-guarded-fail-closed`, `discovery-pending`,
+ *                      `t1-guarded-fail-closed`, `blocked`, `discovery-pending`,
  *                      `learn-pending`)
  *   - invocable     -- a boolean, true IFF readinessStatus is `t1-ready`
  *
@@ -24,6 +24,8 @@
  *     readinessStatus === 't1-ready' (a confident invocable hit).
  *   - the guarded handler write hit -> invocable === false, backing === 'handler',
  *     readinessStatus === 't1-guarded-fail-closed'.
+ *   - the blocked YouTube Music hit RETURNS from search but -> invocable ===
+ *     false, backingStatus === 'blocked'.
  *   - the dom-backed hit RETURNS from search (discoverable) but -> invocable ===
  *     false, backing === 'dom', backingStatus === 'discovery-pending' (returned but
  *     NOT a confident invocable hit).
@@ -96,10 +98,26 @@ const DOM_DESCRIPTOR = {
   backing: 'dom'
 };
 
+// BLOCKED (a denylisted catalog slice remains searchable for completeness, but
+// must not look like ordinary discovery work or a confident invocable hit).
+const BLOCKED_DESCRIPTOR = {
+  slug: 'ytmusic.search',
+  service: 'music.youtube.com',
+  intentSynonyms: [
+    'search in ytmusic',
+    'search in youtube music',
+    'search youtube music for songs'
+  ],
+  description: 'Search YouTube Music for songs, albums, artists, playlists, or videos',
+  actionVerb: 'search',
+  sideEffectClass: 'read',
+  backing: 'dom'
+};
+
 // Plant the build-time catalog the module reads. NO recipes -> neither slug is
 // recipe-backed, so each descriptor's OWN backing enum drives the annotation (a
 // paired recipe would override to 'recipe' -- intentionally absent here).
-global.FsbRecipeIndex = { descriptors: [HANDLER_DESCRIPTOR, GUARDED_DESCRIPTOR, DOM_DESCRIPTOR], recipes: [] };
+global.FsbRecipeIndex = { descriptors: [HANDLER_DESCRIPTOR, GUARDED_DESCRIPTOR, DOM_DESCRIPTOR, BLOCKED_DESCRIPTOR], recipes: [] };
 
 const CapabilitySearch = require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-search.js'));
 const { search, buildOrRestore } = CapabilitySearch;
@@ -149,9 +167,24 @@ const { search, buildOrRestore } = CapabilitySearch;
   check(domHit && domHit.readinessStatus === 'discovery-pending',
     "the dom-backed hit's readinessStatus === 'discovery-pending'");
 
+  // ---- The blocked hit: searchable but explicitly non-invocable --------------
+  const blockedHits = search('search in youtube music', null, 5);
+  const blockedHit = blockedHits.find(function (h) { return h.slug === 'ytmusic.search'; });
+  check(!!blockedHit, 'the blocked YouTube Music descriptor returns from search');
+  check(blockedHit && blockedHit.invocable === false,
+    'the blocked YouTube Music hit is NOT a confident invocable hit');
+  check(blockedHit && blockedHit.backing === 'dom',
+    "the blocked YouTube Music hit keeps canonical backing === 'dom'");
+  check(blockedHit && blockedHit.backingStatus === 'blocked',
+    "the blocked YouTube Music hit's backingStatus DISPLAY label === 'blocked'");
+  check(blockedHit && blockedHit.readinessStatus === 'blocked',
+    "the blocked YouTube Music hit's readinessStatus === 'blocked'");
+
   // ---- The distinction is real: the two annotations differ ------------------
   check(handlerHit && domHit && handlerHit.invocable !== domHit.invocable,
     'the annotation DISTINGUISHES the two: handler invocable=true vs dom invocable=false');
+  check(blockedHit && domHit && blockedHit.readinessStatus !== domHit.readinessStatus,
+    'the annotation DISTINGUISHES blocked from ordinary discovery-pending');
 
   console.log('\nbacking-status-annotation: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);
