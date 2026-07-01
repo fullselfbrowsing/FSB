@@ -38,6 +38,7 @@ export const HANDLER_BY_APP = Object.freeze({
   retool: 'retool.js',
   slack: 'slack.js',
   vercel: 'vercel.js',
+  robinhood: 'robinhood.js',
 });
 
 export const ACTIVE_WRITE_UAT_SLUGS = Object.freeze([

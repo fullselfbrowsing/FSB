@@ -42,6 +42,8 @@ export const GUARDED_FAIL_CLOSED_SLUGS = [
   'gitlab.create_merge_request',
   'gitlab.create_note',
   'slack.send_message',
+  'robinhood.create_watchlist',
+  'robinhood.delete_watchlist',
 ];
 
 const HANDLER_MODULES = [
@@ -55,6 +57,7 @@ const HANDLER_MODULES = [
   'vercel.js',
   'retool.js',
   'asana.js',
+  'robinhood.js',
 ];
 const EXECUTABLE_TIERS = new Set(['T0', 'T1a', 'T1b']);
 const GUARDED_SET = new Set(GUARDED_FAIL_CLOSED_SLUGS);

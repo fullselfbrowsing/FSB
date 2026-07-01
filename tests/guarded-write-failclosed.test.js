@@ -74,7 +74,10 @@ const WRITE_HEADS = [
   { slug: 'gitlab.create_merge_request', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
   { slug: 'gitlab.create_note', origin: 'https://gitlab.com', handlerFile: 'gitlab.js' },
   // slack x1 -- EXTEND the existing module (41-04), origin https://app.slack.com
-  { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js' }
+  { slug: 'slack.send_message', origin: 'https://app.slack.com', handlerFile: 'slack.js' },
+  // robinhood x2 -- brokerage watchlist mutations stay inert behind the denied-origin policy.
+  { slug: 'robinhood.create_watchlist', origin: 'https://robinhood.com', handlerFile: 'robinhood.js' },
+  { slug: 'robinhood.delete_watchlist', origin: 'https://robinhood.com', handlerFile: 'robinhood.js' }
 ];
 
 // makeRecordingCtx(origin) -> { recorder, ctx }. The ctx.executeBoundSpec stub pushes

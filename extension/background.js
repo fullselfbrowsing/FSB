@@ -257,6 +257,7 @@ try { importScripts('catalog/handlers/todoist.js'); } catch (e) { console.error(
 try { importScripts('catalog/handlers/webflow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/webflow.js:', e.message); }
 try { importScripts('catalog/handlers/calendly.js'); } catch (e) { console.error('[FSB] Failed to load handlers/calendly.js:', e.message); }
 try { importScripts('catalog/handlers/dockerhub.js'); } catch (e) { console.error('[FSB] Failed to load handlers/dockerhub.js:', e.message); }
+try { importScripts('catalog/handlers/robinhood.js'); } catch (e) { console.error('[FSB] Failed to load handlers/robinhood.js:', e.message); }
 try {
   if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
       && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {
