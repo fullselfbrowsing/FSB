@@ -200,6 +200,63 @@ try { importScripts('catalog/handlers/circleci.js'); } catch (e) { console.error
 try { importScripts('catalog/handlers/vercel.js'); } catch (e) { console.error('[FSB] Failed to load handlers/vercel.js:', e.message); }
 try { importScripts('catalog/handlers/retool.js'); } catch (e) { console.error('[FSB] Failed to load handlers/retool.js:', e.message); }
 try { importScripts('catalog/handlers/asana.js'); } catch (e) { console.error('[FSB] Failed to load handlers/asana.js:', e.message); }
+try { importScripts('catalog/handlers/shortcut.js'); } catch (e) { console.error('[FSB] Failed to load handlers/shortcut.js:', e.message); }
+try { importScripts('catalog/handlers/leetcode.js'); } catch (e) { console.error('[FSB] Failed to load handlers/leetcode.js:', e.message); }
+try { importScripts('catalog/handlers/wikipedia.js'); } catch (e) { console.error('[FSB] Failed to load handlers/wikipedia.js:', e.message); }
+try { importScripts('catalog/handlers/hackernews.js'); } catch (e) { console.error('[FSB] Failed to load handlers/hackernews.js:', e.message); }
+try { importScripts('catalog/handlers/reddit.js'); } catch (e) { console.error('[FSB] Failed to load handlers/reddit.js:', e.message); }
+try { importScripts('catalog/handlers/npm.js'); } catch (e) { console.error('[FSB] Failed to load handlers/npm.js:', e.message); }
+try { importScripts('catalog/handlers/yelp.js'); } catch (e) { console.error('[FSB] Failed to load handlers/yelp.js:', e.message); }
+try { importScripts('catalog/handlers/tripadvisor.js'); } catch (e) { console.error('[FSB] Failed to load handlers/tripadvisor.js:', e.message); }
+try { importScripts('catalog/handlers/zillow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/zillow.js:', e.message); }
+try { importScripts('catalog/handlers/redfin.js'); } catch (e) { console.error('[FSB] Failed to load handlers/redfin.js:', e.message); }
+try { importScripts('catalog/handlers/bsky.js'); } catch (e) { console.error('[FSB] Failed to load handlers/bsky.js:', e.message); }
+try { importScripts('catalog/handlers/meticulous.js'); } catch (e) { console.error('[FSB] Failed to load handlers/meticulous.js:', e.message); }
+try { importScripts('catalog/handlers/stripe.js'); } catch (e) { console.error('[FSB] Failed to load handlers/stripe.js:', e.message); }
+try { importScripts('catalog/handlers/coinbase.js'); } catch (e) { console.error('[FSB] Failed to load handlers/coinbase.js:', e.message); }
+try { importScripts('catalog/handlers/x.js'); } catch (e) { console.error('[FSB] Failed to load handlers/x.js:', e.message); }
+try { importScripts('catalog/handlers/instagram.js'); } catch (e) { console.error('[FSB] Failed to load handlers/instagram.js:', e.message); }
+try { importScripts('catalog/handlers/facebook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/facebook.js:', e.message); }
+try { importScripts('catalog/handlers/stackoverflow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/stackoverflow.js:', e.message); }
+try { importScripts('catalog/handlers/cloudflare.js'); } catch (e) { console.error('[FSB] Failed to load handlers/cloudflare.js:', e.message); }
+try { importScripts('catalog/handlers/terraform.js'); } catch (e) { console.error('[FSB] Failed to load handlers/terraform.js:', e.message); }
+try { importScripts('catalog/handlers/twilio.js'); } catch (e) { console.error('[FSB] Failed to load handlers/twilio.js:', e.message); }
+try { importScripts('catalog/handlers/tumblr.js'); } catch (e) { console.error('[FSB] Failed to load handlers/tumblr.js:', e.message); }
+try { importScripts('catalog/handlers/priceline.js'); } catch (e) { console.error('[FSB] Failed to load handlers/priceline.js:', e.message); }
+try { importScripts('catalog/handlers/airbnb.js'); } catch (e) { console.error('[FSB] Failed to load handlers/airbnb.js:', e.message); }
+try { importScripts('catalog/handlers/expedia.js'); } catch (e) { console.error('[FSB] Failed to load handlers/expedia.js:', e.message); }
+try { importScripts('catalog/handlers/booking.js'); } catch (e) { console.error('[FSB] Failed to load handlers/booking.js:', e.message); }
+try { importScripts('catalog/handlers/mongodb.js'); } catch (e) { console.error('[FSB] Failed to load handlers/mongodb.js:', e.message); }
+try { importScripts('catalog/handlers/snowflake.js'); } catch (e) { console.error('[FSB] Failed to load handlers/snowflake.js:', e.message); }
+try { importScripts('catalog/handlers/cockroachdb.js'); } catch (e) { console.error('[FSB] Failed to load handlers/cockroachdb.js:', e.message); }
+try { importScripts('catalog/handlers/clickhouse.js'); } catch (e) { console.error('[FSB] Failed to load handlers/clickhouse.js:', e.message); }
+try { importScripts('catalog/handlers/msword.js'); } catch (e) { console.error('[FSB] Failed to load handlers/msword.js:', e.message); }
+try { importScripts('catalog/handlers/excel.js'); } catch (e) { console.error('[FSB] Failed to load handlers/excel.js:', e.message); }
+try { importScripts('catalog/handlers/pinterest.js'); } catch (e) { console.error('[FSB] Failed to load handlers/pinterest.js:', e.message); }
+try { importScripts('catalog/handlers/starbucks.js'); } catch (e) { console.error('[FSB] Failed to load handlers/starbucks.js:', e.message); }
+try { importScripts('catalog/handlers/medium.js'); } catch (e) { console.error('[FSB] Failed to load handlers/medium.js:', e.message); }
+try { importScripts('catalog/handlers/dominos.js'); } catch (e) { console.error('[FSB] Failed to load handlers/dominos.js:', e.message); }
+try { importScripts('catalog/handlers/whatsapp.js'); } catch (e) { console.error('[FSB] Failed to load handlers/whatsapp.js:', e.message); }
+try { importScripts('catalog/handlers/amplitude.js'); } catch (e) { console.error('[FSB] Failed to load handlers/amplitude.js:', e.message); }
+try { importScripts('catalog/handlers/newrelic.js'); } catch (e) { console.error('[FSB] Failed to load handlers/newrelic.js:', e.message); }
+try { importScripts('catalog/handlers/chipotle.js'); } catch (e) { console.error('[FSB] Failed to load handlers/chipotle.js:', e.message); }
+try { importScripts('catalog/handlers/pandaexpress.js'); } catch (e) { console.error('[FSB] Failed to load handlers/pandaexpress.js:', e.message); }
+try { importScripts('catalog/handlers/costco.js'); } catch (e) { console.error('[FSB] Failed to load handlers/costco.js:', e.message); }
+try { importScripts('catalog/handlers/instacart.js'); } catch (e) { console.error('[FSB] Failed to load handlers/instacart.js:', e.message); }
+try { importScripts('catalog/handlers/lucid.js'); } catch (e) { console.error('[FSB] Failed to load handlers/lucid.js:', e.message); }
+try { importScripts('catalog/handlers/discord.js'); } catch (e) { console.error('[FSB] Failed to load handlers/discord.js:', e.message); }
+try { importScripts('catalog/handlers/target.js'); } catch (e) { console.error('[FSB] Failed to load handlers/target.js:', e.message); }
+try { importScripts('catalog/handlers/walmart.js'); } catch (e) { console.error('[FSB] Failed to load handlers/walmart.js:', e.message); }
+try { importScripts('catalog/handlers/hack2hire.js'); } catch (e) { console.error('[FSB] Failed to load handlers/hack2hire.js:', e.message); }
+try { importScripts('catalog/handlers/chatgpt.js'); } catch (e) { console.error('[FSB] Failed to load handlers/chatgpt.js:', e.message); }
+try { importScripts('catalog/handlers/figma.js'); } catch (e) { console.error('[FSB] Failed to load handlers/figma.js:', e.message); }
+try { importScripts('catalog/handlers/powerpoint.js'); } catch (e) { console.error('[FSB] Failed to load handlers/powerpoint.js:', e.message); }
+try { importScripts('catalog/handlers/outlook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/outlook.js:', e.message); }
+try { importScripts('catalog/handlers/ynab.js'); } catch (e) { console.error('[FSB] Failed to load handlers/ynab.js:', e.message); }
+try { importScripts('catalog/handlers/todoist.js'); } catch (e) { console.error('[FSB] Failed to load handlers/todoist.js:', e.message); }
+try { importScripts('catalog/handlers/webflow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/webflow.js:', e.message); }
+try { importScripts('catalog/handlers/calendly.js'); } catch (e) { console.error('[FSB] Failed to load handlers/calendly.js:', e.message); }
+try { importScripts('catalog/handlers/dockerhub.js'); } catch (e) { console.error('[FSB] Failed to load handlers/dockerhub.js:', e.message); }
 try {
   if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
       && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {
@@ -15302,6 +15359,25 @@ function initializeKeyboardEmulator() {
     keyboardEmulator = new KeyboardEmulator();
   }
   return keyboardEmulator;
+}
+
+// Reconcile the KeyboardEmulator when Chrome initiates a debugger detach on its
+// attached tab (navigation, canceled_by_user banner dismissal, target crash/close).
+// Without this, a Chrome-side detach would leave the emulator's
+// debuggerAttached/attachedTabId/attachPromise stale and poison the next attach.
+// Mirrors the network-capture.js onDetach style; registered once at boot beside the
+// onRemoved/onSuspend cleanup. Guarded + non-throwing so a reconcile failure never
+// disrupts other onDetach concerns.
+if (chrome.debugger && chrome.debugger.onDetach && typeof chrome.debugger.onDetach.addListener === 'function') {
+  chrome.debugger.onDetach.addListener((source) => {
+    try {
+      if (keyboardEmulator && source && typeof keyboardEmulator.handleExternalDetach === 'function') {
+        keyboardEmulator.handleExternalDetach(source.tabId);
+      }
+    } catch (err) {
+      console.warn('[FSB KeyboardEmulator] onDetach reconcile failed (non-blocking):', err && err.message);
+    }
+  });
 }
 
 /**
