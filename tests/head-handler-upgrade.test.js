@@ -176,6 +176,29 @@ const PORTED = [
   { slug: 'fiverr.list_conversations', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
   { slug: 'fiverr.search_gigs', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js' },
   { slug: 'fiverr.send_message', origin: 'https://www.fiverr.com', handlerFile: 'fiverr.js', expectWrite: true }
+,
+  // confluence x13 reads + x8 guarded mutations, representative tenant origin https://example.atlassian.net
+  { slug: 'confluence.get_page', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.get_page_children', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.get_space', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.get_user_profile', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_comment_replies', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_comments', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_inline_comments', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_labels', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_page_attachments', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_page_versions', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_pages', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.list_spaces', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.search', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js' },
+  { slug: 'confluence.add_label', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.create_comment', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.create_inline_comment', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.create_page', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.delete_comment', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.delete_page', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.remove_label', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true },
+  { slug: 'confluence.update_page', origin: 'https://example.atlassian.net', handlerFile: 'confluence.js', expectWrite: true }
 
 ];
 
@@ -280,9 +303,9 @@ function freshCatalog(handlerFiles) {
     // descriptor.sideEffectClass === 'write' distinguishes a mutating head from a read
     // head (both upgrade dom->T1a; only the write is mutation-gated by consent).
     if (row.expectWrite) {
-      check(res && res.descriptor && res.descriptor.sideEffectClass === 'write',
-        'UPGRADE ' + row.slug + ' carries descriptor.sideEffectClass === write (the guarded-write class); got ' +
-        (res && res.descriptor ? res.descriptor.sideEffectClass : 'null'));
+      var sideEffectClass = res && res.descriptor ? res.descriptor.sideEffectClass : 'null';
+      check(sideEffectClass === 'write' || sideEffectClass === 'destructive',
+        'UPGRADE ' + row.slug + ' carries descriptor.sideEffectClass write-like (write/destructive); got ' + sideEffectClass);
     }
   });
 
