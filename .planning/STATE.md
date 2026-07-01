@@ -140,6 +140,12 @@ None active.
 
 - ~~39-03 cold-start circuit-breaker FLAG (the eval smoke index reached 93.3KB / 96KB after the retail/marketplace sub-batch)~~ **RESOLVED by 39-04** per the orchestrator decision: the smoke byte ceiling was widened 96KB->512KB (the 96KB ceiling was sized for a tiny corpus; 39-04 reached 108.6KB at a flat 570 bytes/descriptor -- legitimate linear corpus growth, NO params-leak/layout regression). The tight <10ms load-time assert (the real cold-start latency concern) is KEPT, and a NEW per-descriptor footprint flatness check (<700 bytes/descriptor -- the real params-leak regression signal) was ADDED. 512KB is well within the SCALE-01 ~1-2MB full-corpus target; the authoritative full-corpus SCALE-01 cold-start gate (size + load-time) remains Phase 43, kept separate. 39-05/06 have ample headroom under 512KB.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260701-2mc | Implement Robinhood to be T1 ready | 2026-07-01 | 1dcb49a | [260701-2mc-implement-robinhood-to-be-t1-ready](./quick/260701-2mc-implement-robinhood-to-be-t1-ready/) |
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). v1.1.0 tracks this debt separately from the T1 expansion work.
