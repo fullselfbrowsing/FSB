@@ -39,6 +39,7 @@ export const HANDLER_BY_APP = Object.freeze({
   slack: 'slack.js',
   vercel: 'vercel.js',
   robinhood: 'robinhood.js',
+  doordash: 'doordash.js',
 });
 
 export const ACTIVE_WRITE_UAT_SLUGS = Object.freeze([

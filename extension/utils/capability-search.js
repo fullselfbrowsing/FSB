@@ -166,7 +166,13 @@
     'slack.chat.postMessage': true,
     'slack.list_channels': true,
     'slack.list_members': true,
-    'slack.get_channel_info': true
+    'slack.get_channel_info': true,
+    'doordash.get_current_user': true,
+    'doordash.get_notifications': true,
+    'doordash.get_order': true,
+    'doordash.list_addresses': true,
+    'doordash.list_orders': true,
+    'doordash.list_payment_methods': true
   };
   var T1_GUARDED_FAIL_CLOSED_SLUGS = {
     'github.issues.create': true,

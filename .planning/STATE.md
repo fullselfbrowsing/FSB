@@ -4,7 +4,7 @@ milestone: v1.1.0
 milestone_name: T1 App Execution Expansion
 status: in_progress
 stopped_at: "Phase 44 complete and verified. Next step: plan Phase 45 (T1 Porting Scaffold + Handler Contract Hardening)."
-last_updated: "2026-06-29T15:38:28-05:00"
+last_updated: "2026-07-01T07:08:20.000Z"
 last_activity: 2026-06-29
 progress:
   total_phases: 7
@@ -32,7 +32,7 @@ See: .planning/milestones/v1.0.0-MILESTONE-AUDIT.md (audit passed; non-blocking 
 Phase: 45 (T1 Porting Scaffold + Handler Contract Hardening) -- NEXT
 Plan: pending
 Status: Phase 44 complete / ready to plan Phase 45
-Last activity: 2026-06-29 -- completed Phase 44 readiness inventory/status surface
+Last activity: 2026-07-01 - Completed quick task 260701-2lm: Make DoorDash T1-ready
 
 Progress: [#---------] 14%
 
@@ -144,6 +144,7 @@ None active.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260701-2lm | Make DoorDash T1-ready | 2026-07-01 | working-tree | [260701-2lm-make-doordash-t1-ready](./quick/260701-2lm-make-doordash-t1-ready/) |
 | 260701-2mc | Implement Robinhood to be T1 ready | 2026-07-01 | 1dcb49a | [260701-2mc-implement-robinhood-to-be-t1-ready](./quick/260701-2mc-implement-robinhood-to-be-t1-ready/) |
 
 ## Deferred Items

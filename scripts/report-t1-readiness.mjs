@@ -58,6 +58,7 @@ const HANDLER_MODULES = [
   'retool.js',
   'asana.js',
   'robinhood.js',
+  'doordash.js',
 ];
 const EXECUTABLE_TIERS = new Set(['T0', 'T1a', 'T1b']);
 const GUARDED_SET = new Set(GUARDED_FAIL_CLOSED_SLUGS);

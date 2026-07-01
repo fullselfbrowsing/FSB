@@ -243,6 +243,7 @@ try { importScripts('catalog/handlers/chipotle.js'); } catch (e) { console.error
 try { importScripts('catalog/handlers/pandaexpress.js'); } catch (e) { console.error('[FSB] Failed to load handlers/pandaexpress.js:', e.message); }
 try { importScripts('catalog/handlers/costco.js'); } catch (e) { console.error('[FSB] Failed to load handlers/costco.js:', e.message); }
 try { importScripts('catalog/handlers/instacart.js'); } catch (e) { console.error('[FSB] Failed to load handlers/instacart.js:', e.message); }
+try { importScripts('catalog/handlers/doordash.js'); } catch (e) { console.error('[FSB] Failed to load handlers/doordash.js:', e.message); }
 try { importScripts('catalog/handlers/lucid.js'); } catch (e) { console.error('[FSB] Failed to load handlers/lucid.js:', e.message); }
 try { importScripts('catalog/handlers/discord.js'); } catch (e) { console.error('[FSB] Failed to load handlers/discord.js:', e.message); }
 try { importScripts('catalog/handlers/target.js'); } catch (e) { console.error('[FSB] Failed to load handlers/target.js:', e.message); }
