@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: T1 App Execution Expansion
-status: in_progress
-stopped_at: "Phase 44 complete and verified. Next step: plan Phase 45 (T1 Porting Scaffold + Handler Contract Hardening)."
-last_updated: "2026-07-01T07:08:20.000Z"
-last_activity: 2026-06-29
+status: completed
+stopped_at: "v1.1.0 T1 App Execution Expansion complete, audited, and archived. No active milestone is currently defined."
+last_updated: "2026-07-01T10:28:09-05:00"
+last_activity: 2026-07-01
 progress:
-  total_phases: 7
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 14
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 29
+  completed_plans: 29
+  percent: 100
 ---
 
 # Project State
@@ -19,36 +19,38 @@ progress:
 ## Project Reference
 
 See: .planning/PROJECT.md (v1.1.0 T1 App Execution Expansion framing + v1.0.0 shipped baseline)
-See: .planning/ROADMAP.md (active milestone v1.1.0, Phases 44-50)
-See: .planning/REQUIREMENTS.md (12 v1.1.0 requirements: T1R-01..12)
+See: .planning/ROADMAP.md (v1.1.0 shipped; no active milestone currently defined)
+See: .planning/REQUIREMENTS.md (placeholder; fresh requirements start with the next milestone)
 See: .planning/milestones/v1.0.0-ROADMAP.md and .planning/milestones/v1.0.0-REQUIREMENTS.md (archived Full App Catalog milestone)
 See: .planning/milestones/v1.0.0-MILESTONE-AUDIT.md (audit passed; non-blocking T1/live-UAT debt recorded)
+See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIREMENTS.md, and .planning/milestones/v1.1.0-MILESTONE-AUDIT.md (archived T1 App Execution Expansion milestone)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.1.0 focuses on turning the v1.0.0 catalog tail into verified direct T1 execution where safe and technically provable.
-**Current focus:** v1.1.0 milestone execution -- Phase 44 is complete; next is Phase 45 planning for the reusable T1 porting scaffold and handler contract hardening.
+**Current focus:** no active milestone; choose the next product goal and run `$gsd-new-milestone` when ready.
 
 ## Current Position
 
-Phase: 45 (T1 Porting Scaffold + Handler Contract Hardening) -- NEXT
-Plan: pending
-Status: Phase 44 complete / ready to plan Phase 45
-Last activity: 2026-07-01 - Completed quick task 260701-e5m: Implement Fidelity to be T1 ready
+Phase: none active
+Plan: none active
+Status: v1.1.0 milestone complete, audited, and archived
+Last activity: 2026-07-01 - Completed quick task 260701-e6d: Implement Microsoft Teams to be T1 ready
 
-Progress: [#---------] 14%
+Progress: [##########] 100%
 
-## Roadmap At A Glance (v1.1.0, Phases 44-50)
+## Roadmap At A Glance (v1.1.0, Phases 44-51)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Complete; 3/3 plans verified |
-| 45 | T1 Porting Scaffold + Handler Contract Hardening | T1R-04/05/09 | Not started |
-| 46 | Same-Origin Read Ports -- First High-Value Batch | T1R-06 | Not started |
-| 47 | Pattern-D + GAPI Bridge Architecture | T1R-07/08 | Not started |
-| 48 | High-Value Read Ports -- Second Batch | T1R-06/07/08 | Not started |
-| 49 | Guarded Writes Activation Pipeline | T1R-10/11 | Not started |
-| 50 | T1 Expansion Gate + Next-Batch Plan | T1R-12 | Not started |
+| 45 | T1 Porting Scaffold + Handler Contract Hardening | T1R-04/05/09 | Complete; 3/3 plans verified |
+| 46 | Same-Origin Read Ports -- First High-Value Batch | T1R-06 | Complete; 3/3 plans verified |
+| 47 | Pattern-D + GAPI Bridge Architecture | T1R-07/08 | Complete; 3/3 plans verified |
+| 48 | High-Value Read Ports -- Second Batch | T1R-06/07/08 | Complete; 3/3 plans verified |
+| 49 | Guarded Writes Activation Pipeline | T1R-10/11 | Complete; 3/3 plans verified |
+| 50 | T1 Expansion Gate + Next-Batch Plan | T1R-12 | Complete; 3/3 plans verified |
+| 51 | Full T1 Tail Migration Across Remaining Catalog | T1ALL-01..05 | Complete; 8/8 plans verified |
 
-Coverage: 12/12 v1.1.0 requirements mapped, 0 orphaned.
+Coverage: 17/17 v1.1.0 requirements mapped and complete, 0 orphaned.
 
 ## v1.0.0 Shipped Baseline
 
@@ -71,10 +73,20 @@ Coverage: 12/12 v1.1.0 requirements mapped, 0 orphaned.
 ## Phase 44 Completion Snapshot
 
 - `scripts/report-t1-readiness.mjs` generated `44-T1-READINESS.md/json` from the committed catalog and live resolver.
-- Current readiness counts: 2,314 descriptors, 128 app stems, 21 T1-ready, 5 guarded fail-closed, 2,094 discovery-pending, 194 blocked.
+- Phase 44 baseline counts at closeout: 2,314 descriptors, 128 app stems, 21 T1-ready, 5 guarded fail-closed, 2,094 discovery-pending, 194 blocked.
 - `capability-search.js` now exposes `readinessStatus` and keeps catalog-tail hits from looking direct API-ready.
 - `scripts/verify-t1-readiness-gate.mjs` is wired into `npm run validate:extension`.
 - Verification passed: `node tests/t1-readiness-report.test.js`, `node tests/t1-readiness-gate.test.js`, `node tests/backing-status-annotation.test.js`, `node tests/breadth-search-return.test.js`, and `npm run validate:extension`.
+
+## Phase 51 Completion Snapshot
+
+- Phase 51 is complete and verified with 8/8 plans done.
+- Current readiness counts: 2,314 descriptors, 1,141 T1-ready, 529 guarded fail-closed, 644 catalog-tail rows.
+- Terminal-state accounting: 63 bridge-needed, 167 UAT-needed, 137 blocked, 277 degraded/discovery-pending.
+- `scripts/report-t1-terminal-states.mjs` generates `51-T1-TERMINAL-STATES.md/json` and `51-WRITE-UAT-LEDGER.md/json`.
+- `tests/t1-terminal-states.test.js` gates bridge-disabled, write-UAT, blocked-policy, app-rollup, and search readiness override coverage.
+- Focused readiness/evidence gates passed on 2026-07-01 after artifact refresh; full `npm run validate:extension` and `npm test` passed at milestone closeout on 2026-06-30.
+- Side phase 999.1 remains backlog and is not part of v1.1.0.
 
 ## Accumulated Context
 
@@ -138,16 +150,129 @@ None yet.
 
 None active.
 
-- ~~39-03 cold-start circuit-breaker FLAG (the eval smoke index reached 93.3KB / 96KB after the retail/marketplace sub-batch)~~ **RESOLVED by 39-04** per the orchestrator decision: the smoke byte ceiling was widened 96KB->512KB (the 96KB ceiling was sized for a tiny corpus; 39-04 reached 108.6KB at a flat 570 bytes/descriptor -- legitimate linear corpus growth, NO params-leak/layout regression). The tight <10ms load-time assert (the real cold-start latency concern) is KEPT, and a NEW per-descriptor footprint flatness check (<700 bytes/descriptor -- the real params-leak regression signal) was ADDED. 512KB is well within the SCALE-01 ~1-2MB full-corpus target; the authoritative full-corpus SCALE-01 cold-start gate (size + load-time) remains Phase 43, kept separate. 39-05/06 have ample headroom under 512KB.
-
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260701-e6c | Implement Supabase to be T1 ready | 2026-07-01 | 2619d949 | [260701-e6c-implement-this-supabase-to-be-t1-ready-u](./quick/260701-e6c-implement-this-supabase-to-be-t1-ready-u/) |
+| 260701-e6d | Implement Microsoft Teams to be T1 ready | 2026-07-01 | working-tree | [260701-e6d-implement-this-microsoft-teams-to-be-t1-](./quick/260701-e6d-implement-this-microsoft-teams-to-be-t1-/) |
+| 260701-e69 | Implement Steam T1 readiness as blocked-policy terminal coverage | 2026-07-01 | blocked-working-tree | [260701-e69-implement-steam-to-be-t1-ready-using-gsd](./quick/260701-e69-implement-steam-to-be-t1-ready-using-gsd/) |
+| 260701-e5j | Implement ClickUp to be T1 ready | 2026-07-01 | 999f07b0 | [260701-e5j-implement-this-clickup-to-be-t1-ready-wo](./quick/260701-e5j-implement-this-clickup-to-be-t1-ready-wo/) |
+| 260701-e5y | Implement Glama to be T1 ready | 2026-07-01 | working-tree | [260701-e5y-implement-glama-to-be-t1-ready](./quick/260701-e5y-implement-glama-to-be-t1-ready/) |
+| 260701-e60 | Implement LinkedIn to be T1 ready | 2026-07-01 | working-tree | [260701-e60-implement-this-linkedin-to-be-t1-ready](./quick/260701-e60-implement-this-linkedin-to-be-t1-ready/) |
+| 260701-e5v | Implement this Google Maps to be T1 ready | 2026-07-01 | working-tree | [260701-e5v-implement-this-google-maps-to-be-t1-read](./quick/260701-e5v-implement-this-google-maps-to-be-t1-read/) |
+| 260701-e5i | Implement Confluence to be T1 ready | 2026-07-01 | pending | [260701-e5i-implement-this-confluence-to-be-t1-ready](./quick/260701-e5i-implement-this-confluence-to-be-t1-ready/) |
+| 260701-e5j | Implement Fiverr to be T1 ready | 2026-07-01 | pending | [260701-e5j-implement-this-fiverr-to-be-t1-ready](./quick/260701-e5j-implement-this-fiverr-to-be-t1-ready/) |
+| 260701-e5y | Implement Microsoft Word to be T1 ready | 2026-07-01 | working-tree | [260701-e5y-implement-this-microsoft-word-to-be-t1-r](./quick/260701-e5y-implement-this-microsoft-word-to-be-t1-r/) |
 | 260701-e5m | Implement Fidelity to be T1 ready | 2026-07-01 | 72423b87 | [260701-e5m-implement-fidelity-to-be-t1-ready](./quick/260701-e5m-implement-fidelity-to-be-t1-ready/) |
+| 260701-e76 | Implement Uber rideshare to be T1 ready | 2026-07-01 | working-tree | [260701-e76-implement-uber-rideshare-to-be-t1-ready](./quick/260701-e76-implement-uber-rideshare-to-be-t1-ready/) |
+| 260701-e5v | Implement this Lyft to be T1 ready. | 2026-07-01 | working-tree | [260701-e5v-implement-this-lyft-to-be-t1-ready](./quick/260701-e5v-implement-this-lyft-to-be-t1-ready/) |
+| 260701-e6l | Implement Robinhood to be T1 ready | 2026-07-01 | working-tree | [260701-e6l-implement-robinhood-to-be-t1-ready](./quick/260701-e6l-implement-robinhood-to-be-t1-ready/) |
+| 260701-e74 | Fourth-agent T1 readiness integration pass for Uber, YouTube, and YouTube Music | 2026-07-01 | working-tree | [260701-e74-fourth-agent-t1-readiness-integration-pa](./quick/260701-e74-fourth-agent-t1-readiness-integration-pa/) |
+| 260701-e61 | Implement Netflix T1 readiness as blocked-policy terminal coverage | 2026-07-01 | working-tree | [260701-e61-implement-this-netflix-to-be-t1-ready-ow](./quick/260701-e61-implement-this-netflix-to-be-t1-ready-ow/) |
+| 260701-2m5 | Make Linear T1 ready | 2026-07-01 | working-tree | [260701-2m5-make-linear-t1-ready](./quick/260701-2m5-make-linear-t1-ready/) |
+| 260701-2m4 | Implement Sentry to be T1 ready | 2026-07-01 | working-tree | [260701-2m4-implement-sentry-to-be-t1-ready](./quick/260701-2m4-implement-sentry-to-be-t1-ready/) |
 | 260701-2mh | Make Uber Eats implementation T1 ready | 2026-07-01 | d4ab8789 | [260701-2mh-make-uber-eats-implementation-t1-ready](./quick/260701-2mh-make-uber-eats-implementation-t1-ready/) |
+| 260701-2sl | Implement PostHog to be T1 ready | 2026-07-01 | working-tree | [260701-2sl-implement-posthog-to-be-t1-ready](./quick/260701-2sl-implement-posthog-to-be-t1-ready/) |
+| 260701-2o4 | Implement Tinder to be T1 ready | 2026-07-01 | working-tree | [260701-2o4-implement-tinder-to-be-t1-ready](./quick/260701-2o4-implement-tinder-to-be-t1-ready/) |
+| 260701-2nw | Implement TikTok T1 readiness | 2026-07-01 | working-tree | [260701-2nw-implement-this-tiktok-to-be-t1-ready](./quick/260701-2nw-implement-this-tiktok-to-be-t1-ready/) |
+| 260701-2ln | Implement Eventbrite to be T1 ready | 2026-07-01 | working-tree | [260701-2ln-implement-eventbrite-to-be-t1-ready](./quick/260701-2ln-implement-eventbrite-to-be-t1-ready/) |
+| 260701-2lr | Implement Datadog to be T1 ready | 2026-07-01 | working-tree | [260701-2lr-implement-datadog-to-be-t1-ready](./quick/260701-2lr-implement-datadog-to-be-t1-ready/) |
+| 260701-2m8 | Make Kayak T1 ready | 2026-07-01 | working-tree | [260701-2m8-make-kayak-t1-ready](./quick/260701-2m8-make-kayak-t1-ready/) |
+| 260701-2mc | Implement Zendesk to be T1 ready | 2026-07-01 | working-tree | [260701-2mc-implement-zendesk-to-be-t1-ready](./quick/260701-2mc-implement-zendesk-to-be-t1-ready/) |
+| 260701-2ki | Implement AWS T1 readiness | 2026-07-01 | working-tree | [260701-2ki-implement-aws-to-be-t1-ready](./quick/260701-2ki-implement-aws-to-be-t1-ready/) |
+| 260701-2m5 | Implement Threads T1 readiness | 2026-07-01 | working-tree | [260701-2m5-implement-this-threads-to-be-t1-ready](./quick/260701-2m5-implement-this-threads-to-be-t1-ready/) |
+| 260701-2km | Implement Airtable to be T1 ready | 2026-07-01 | working-tree | [260701-2km-implement-airtable-to-be-t1-ready-using-](./quick/260701-2km-implement-airtable-to-be-t1-ready-using-/) |
+| 260701-2lo | Make OneNote T1-ready | 2026-07-01 | working-tree | [260701-2lo-make-onenote-t1-ready](./quick/260701-2lo-make-onenote-t1-ready/) |
+| 260701-2m6 | Implement Telegram to be T1 ready | 2026-07-01 | working-tree | [260701-2m6-implement-telegram-to-be-t1-ready](./quick/260701-2m6-implement-telegram-to-be-t1-ready/) |
+| 260701-2lx | Make Google Calendar T1 ready | 2026-07-01 | working-tree | [260701-2lx-make-google-calendar-t1-ready](./quick/260701-2lx-make-google-calendar-t1-ready/) |
+| 260701-2lw | Make this app Etsy T1-ready | 2026-07-01 | working-tree | [260701-2lw-make-this-app-etsy-t1-ready](./quick/260701-2lw-make-this-app-etsy-t1-ready/) |
+| 260701-2q3 | Implement OpenTable T1 readiness | 2026-07-01 | working-tree | [260701-2q3-implement-opentable-to-be-t1-ready](./quick/260701-2q3-implement-opentable-to-be-t1-ready/) |
+| 260701-2ll | Implement eBay to be T1 ready | 2026-07-01 | working-tree | [260701-2ll-implement-ebay-to-be-t1-ready](./quick/260701-2ll-implement-ebay-to-be-t1-ready/) |
+| 260701-2md | Make Mastodon T1-ready | 2026-07-01 | working-tree | [260701-2md-make-mastodon-t1-ready](./quick/260701-2md-make-mastodon-t1-ready/) |
+| 260701-2ku | Implement Claude T1 readiness | 2026-07-01 | working-tree | [260701-2ku-implement-claude-to-be-t1-ready-using-gs](./quick/260701-2ku-implement-claude-to-be-t1-ready-using-gs/) |
+| 260701-2lo | Implement Craigslist to be T1 ready | 2026-07-01 | working-tree | [260701-2lo-implement-craigslist-to-be-t1-ready](./quick/260701-2lo-implement-craigslist-to-be-t1-ready/) |
 | 260701-2lm | Make DoorDash T1-ready | 2026-07-01 | working-tree | [260701-2lm-make-doordash-t1-ready](./quick/260701-2lm-make-doordash-t1-ready/) |
+| 260701-2kj | Implement Amazon T1 readiness | 2026-07-01 | working-tree | [260701-2kj-implement-amazon-to-be-t1-ready](./quick/260701-2kj-implement-amazon-to-be-t1-ready/) |
+| 260701-2lr | Implement MiniMax T1 readiness | 2026-07-01 | working-tree | [260701-2lr-implement-this-minimax-to-be-t1-ready](./quick/260701-2lr-implement-this-minimax-to-be-t1-ready/) |
 | 260701-2mc | Implement Robinhood to be T1 ready | 2026-07-01 | 1dcb49a | [260701-2mc-implement-robinhood-to-be-t1-ready](./quick/260701-2mc-implement-robinhood-to-be-t1-ready/) |
+| 260701-2nu | Make this app Jira T1-ready | 2026-07-01 | working-tree | [260701-2nu-make-this-app-jira-t1-ready](./quick/260701-2nu-make-this-app-jira-t1-ready/) |
+| 260701-2km | Implement Carta to be T1 ready | 2026-07-01 | working-tree | [260701-2km-implement-carta-to-be-t1-ready](./quick/260701-2km-implement-carta-to-be-t1-ready/) |
+| 260701-2m2 | Implement Temporal to be T1 ready | 2026-07-01 | working-tree | [260701-2m2-implement-this-temporal-to-be-t1-ready](./quick/260701-2m2-implement-this-temporal-to-be-t1-ready/) |
+| 260701-2ml | Implement YouTube Music to be T1 ready | 2026-07-01 | 51666789 | [260701-2ml-implement-youtube-music-to-be-t1-ready](./quick/260701-2ml-implement-youtube-music-to-be-t1-ready/) |
+| 260701-e78 | Repair YouTube Music blocked-policy T1 readiness | 2026-07-01 | working-tree | [260701-e78-implement-youtube-music-to-be-t1-ready](./quick/260701-e78-implement-youtube-music-to-be-t1-ready/) |
+| 260701-2no | Make YouTube T1-ready | 2026-07-01 | working-tree | [260701-2no-make-youtube-t1-ready](./quick/260701-2no-make-youtube-t1-ready/) |
+| 260701-2lz | Make this app OnlyFans T1 ready | 2026-07-01 | working-tree | [260701-2lz-make-this-app-onlyfans-t1-ready](./quick/260701-2lz-make-this-app-onlyfans-t1-ready/) |
+| 260701-2du | Fix CDP keyboard attach degradation that silently drops trusted keystrokes into cross-origin iframes (Stripe CVC) | 2026-07-01 | 293162d9 | [260701-2du-fix-cdp-keyboard-attach-degradation-that](./quick/260701-2du-fix-cdp-keyboard-attach-degradation-that/) |
+| 260701-2lu | Implement Netflix to be T1 ready | 2026-07-01 | working-tree | [260701-2lu-implement-netflix-to-be-t1-ready](./quick/260701-2lu-implement-netflix-to-be-t1-ready/) |
+| 260701-1nd | Make this app Calendly T1-ready | 2026-07-01 | working-tree | [260701-1nd-make-this-app-calendly-t1-ready](./quick/260701-1nd-make-this-app-calendly-t1-ready/) |
+| 260701-1kg | Make this app Walmart T1-ready | 2026-07-01 | working-tree | [260701-1kg-make-this-app-walmart-t1-ready](./quick/260701-1kg-make-this-app-walmart-t1-ready/) |
+| 260701-1kv | Make this app DockerHub T1-ready | 2026-07-01 | working-tree | [260701-1kv-make-this-app-dockerhub-t1-ready](./quick/260701-1kv-make-this-app-dockerhub-t1-ready/) |
+| 260701-1ka | Make this app Figma T1-ready | 2026-07-01 | working-tree | [260701-1ka-make-this-app-figma-t1-ready](./quick/260701-1ka-make-this-app-figma-t1-ready/) |
+| 260701-1kj | Make this app Instacart T1-ready | 2026-07-01 | working-tree | [260701-1kj-make-this-app-instacart-t1-ready](./quick/260701-1kj-make-this-app-instacart-t1-ready/) |
+| 260701-1tu | Make this app ClickHouse T1-ready | 2026-07-01 | working-tree | [260701-1tu-make-this-app-clickhouse-t1-ready](./quick/260701-1tu-make-this-app-clickhouse-t1-ready/) |
+| 260701-1lj | Make this app Slack T1-ready | 2026-07-01 | working-tree | [260701-1lj-make-this-app-slack-t1-ready](./quick/260701-1lj-make-this-app-slack-t1-ready/) |
+| 260630-vog | Make this app Panda Express T1-ready | 2026-07-01 | working-tree | [260630-vog-make-this-app-pandaexpress-t1-ready](./quick/260630-vog-make-this-app-pandaexpress-t1-ready/) |
+| 260630-vnj | Make this app Facebook T1-ready | 2026-07-01 | working-tree | [260630-vnj-make-this-app-facebook-t1-ready](./quick/260630-vnj-make-this-app-facebook-t1-ready/) |
+| 260630-vnw | Make this app New Relic T1-ready | 2026-07-01 | working-tree | [260630-vnw-make-this-app-newrelic-t1-ready](./quick/260630-vnw-make-this-app-newrelic-t1-ready/) |
+| 260630-vop | Make this app Redfin T1-ready | 2026-07-01 | working-tree | [260630-vop-make-this-app-redfin-t1-ready](./quick/260630-vop-make-this-app-redfin-t1-ready/) |
+| 260630-vq5 | Make this app Coinbase T1-ready | 2026-07-01 | working-tree | [260630-vq5-make-this-app-coinbase-t1-ready](./quick/260630-vq5-make-this-app-coinbase-t1-ready/) |
+| 260630-vns | Make this app Booking T1-ready | 2026-07-01 | working-tree | [260630-vns-make-this-app-booking-t1-ready](./quick/260630-vns-make-this-app-booking-t1-ready/) |
+| 260630-vo5 | Make this app CircleCI T1-ready | 2026-07-01 | working-tree | [260630-vo5-make-this-app-circleci-t1-ready](./quick/260630-vo5-make-this-app-circleci-t1-ready/) |
+| 260630-vpd | Make this app GitLab T1-ready | 2026-07-01 | working-tree | [260630-vpd-make-this-app-gitlab-t1-ready](./quick/260630-vpd-make-this-app-gitlab-t1-ready/) |
+| 260630-u7d | Make this app Airbnb T1-ready | 2026-07-01 | working-tree | [260630-u7d-make-this-app-airbnb-t1-ready](./quick/260630-u7d-make-this-app-airbnb-t1-ready/) |
+| 260630-u64 | Make this app Outlook T1-ready | 2026-07-01 | working-tree | [260630-u64-make-this-app-outlook-t1-ready](./quick/260630-u64-make-this-app-outlook-t1-ready/) |
+| 260630-u5z | Make this app Retool T1-ready | 2026-07-01 | working-tree | [260630-u5z-make-this-app-retool-t1-ready](./quick/260630-u5z-make-this-app-retool-t1-ready/) |
+| 260630-u70 | Make this app Excel T1-ready | 2026-07-01 | working-tree | [260630-u70-make-this-app-excel-t1-ready](./quick/260630-u70-make-this-app-excel-t1-ready/) |
+| 260630-u62 | Make this app Costco T1-ready | 2026-07-01 | working-tree | [260630-u62-make-this-app-costco-t1-ready](./quick/260630-u62-make-this-app-costco-t1-ready/) |
+| 260630-u6d | Make this app YNAB T1-ready | 2026-07-01 | working-tree | [260630-u6d-make-this-app-ynab-t1-ready](./quick/260630-u6d-make-this-app-ynab-t1-ready/) |
+| 260630-u7s | Make this app Todoist T1-ready | 2026-07-01 | working-tree | [260630-u7s-make-this-app-todoist-t1-ready](./quick/260630-u7s-make-this-app-todoist-t1-ready/) |
+| 260630-u7q | Make this app Expedia T1-ready | 2026-07-01 | working-tree | [260630-u7q-make-this-app-expedia-t1-ready](./quick/260630-u7q-make-this-app-expedia-t1-ready/) |
+| 260630-u6s | Make this app Webflow T1-ready | 2026-07-01 | working-tree | [260630-u6s-make-this-app-webflow-t1-ready](./quick/260630-u6s-make-this-app-webflow-t1-ready/) |
+| 260630-qjb | Make this app PowerPoint T1-ready | 2026-07-01 | working-tree | [260630-qjb-make-this-app-powerpoint-t1-ready](./quick/260630-qjb-make-this-app-powerpoint-t1-ready/) |
+| 260630-qjb | Make this app Lucid T1-ready | 2026-07-01 | working-tree | [260630-qjb-make-this-app-lucid-t1-ready](./quick/260630-qjb-make-this-app-lucid-t1-ready/) |
+| 260630-qj8 | Make this app Target T1-ready | 2026-07-01 | working-tree | [260630-qj8-make-this-app-target-t1-ready](./quick/260630-qj8-make-this-app-target-t1-ready/) |
+| 260630-qjd | Make Discord app T1-ready | 2026-07-01 | working-tree | [260630-qjd-make-discord-app-t1-ready](./quick/260630-qjd-make-discord-app-t1-ready/) |
+| 260630-qj0 | Make this app Snowflake T1-ready | 2026-07-01 | working-tree | [260630-qj0-make-this-app-snowflake-t1-ready](./quick/260630-qj0-make-this-app-snowflake-t1-ready/) |
+| 260630-ql3 | Make this app ChatGPT T1-ready | 2026-07-01 | working-tree | [260630-ql3-make-this-app-chatgpt-t1-ready](./quick/260630-ql3-make-this-app-chatgpt-t1-ready/) |
+| 260630-qj4 | Make this app Hack2Hire T1-ready | 2026-07-01 | working-tree | [260630-qj4-make-this-app-hack2hire-t1-ready](./quick/260630-qj4-make-this-app-hack2hire-t1-ready/) |
+| 260630-qiu | Make this app CockroachDB T1-ready | 2026-07-01 | working-tree | [260630-qiu-make-this-app-cockroachdb-t1-ready](./quick/260630-qiu-make-this-app-cockroachdb-t1-ready/) |
+| 260630-qjh | Make this app MSWord T1-ready | 2026-06-30 | working-tree | [260630-qjh-make-this-app-msword-t1-ready](./quick/260630-qjh-make-this-app-msword-t1-ready/) |
+| 260630-nh1 | Make this app Chipotle T1-ready | 2026-06-30 | working-tree | [260630-nh1-make-this-app-chipotle-t1-ready](./quick/260630-nh1-make-this-app-chipotle-t1-ready/) |
+| 260630-nhs | Make this app amplitude T1-ready | 2026-06-30 | working-tree | [260630-nhs-make-this-app-amplitude-t1-ready](./quick/260630-nhs-make-this-app-amplitude-t1-ready/) |
+| 260630-nh1 | Make this app dominos T1-ready | 2026-06-30 | working-tree | [260630-nh1-make-this-app-dominos-t1-ready](./quick/260630-nh1-make-this-app-dominos-t1-ready/) |
+| 260630-njd | Make this app WhatsApp T1-ready | 2026-06-30 | working-tree | [260630-njd-make-this-app-whatsapp-t1-ready](./quick/260630-njd-make-this-app-whatsapp-t1-ready/) |
+| 260630-nk0 | Make Medium T1-ready | 2026-06-30 | working-tree | [260630-nk0-make-medium-t1-ready](./quick/260630-nk0-make-medium-t1-ready/) |
+| 260630-njd | Make this app Starbucks T1-ready | 2026-06-30 | working-tree | [260630-njd-make-this-app-starbucks-t1-ready](./quick/260630-njd-make-this-app-starbucks-t1-ready/) |
+| 260630-nh3 | Make this app Bitbucket T1-ready | 2026-06-30 | working-tree | [260630-nh3-make-this-app-bitbucket-t1-ready](./quick/260630-nh3-make-this-app-bitbucket-t1-ready/) |
+| 260630-mh2 | Make this app instagram T1-ready | 2026-06-30 | working-tree | [260630-mh2-make-this-app-instagram-t1-ready](./quick/260630-mh2-make-this-app-instagram-t1-ready/) |
+| 260630-mj0 | Make Pinterest T1-ready | 2026-06-30 | working-tree | [260630-mj0-make-this-app-pinterest-t1-ready](./quick/260630-mj0-make-this-app-pinterest-t1-ready/) |
+| 260630-mga | Make Instagram T1-ready | 2026-06-30 | working-tree | [260630-mga-make-instagram-t1-ready](./quick/260630-mga-make-instagram-t1-ready/) |
+| 260630-mjs | Make MongoDB Atlas T1-ready | 2026-06-30 | working-tree | [260630-mjs-make-this-app-mongodb-t1-ready](./quick/260630-mjs-make-this-app-mongodb-t1-ready/) |
+| 260630-mgp | Make Stack Overflow T1-ready | 2026-06-30 | working-tree | [260630-mgp-make-stack-overflow-t1-ready](./quick/260630-mgp-make-stack-overflow-t1-ready/) |
+| 260630-moa | Make this app Netlify T1-ready | 2026-06-30 | working-tree | [260630-moa-make-this-app-netlify-t1-ready](./quick/260630-moa-make-this-app-netlify-t1-ready/) |
+| 260630-mjd | Make Priceline T1-ready | 2026-06-30 | working-tree | [260630-mjd-make-this-app-priceline-t1-ready](./quick/260630-mjd-make-this-app-priceline-t1-ready/) |
+| 260630-mgf | Make this app Reddit T1-ready | 2026-06-30 | working-tree | [260630-mgf-make-this-app-reddit-t1-ready](./quick/260630-mgf-make-this-app-reddit-t1-ready/) |
+| 260630-mgf | Make Tumblr T1-ready | 2026-06-30 | working-tree | [260630-mgf-make-this-app-tumblr-t1-ready](./quick/260630-mgf-make-this-app-tumblr-t1-ready/) |
+| 260630-m4c | Promote bsky public AppView reads to T1-ready | 2026-06-30 | working-tree | [260630-m4c-promote-bsky-public-appview-reads-to-t1-](./quick/260630-m4c-promote-bsky-public-appview-reads-to-t1-/) |
+| 260630-m1q | Make this app Stripe T1-ready | 2026-06-30 | working-tree | [260630-m1q-make-this-app-stripe-t1-ready](./quick/260630-m1q-make-this-app-stripe-t1-ready/) |
+| 260630-m0u | Make Meticulous same-origin GraphQL reads T1-ready | 2026-06-30 | working-tree | [260630-m0u-make-this-app-meticulous-t1-ready](./quick/260630-m0u-make-this-app-meticulous-t1-ready/) |
+| 260630-m35 | Make this app twilio T1-ready | 2026-06-30 | working-tree | [260630-m35-make-this-app-twilio-t1-ready](./quick/260630-m35-make-this-app-twilio-t1-ready/) |
+| 260630-m1a | Make Cloudflare T1-ready with same-origin dashboard read handlers | 2026-06-30 | working-tree | [260630-m1a-make-cloudflare-app-t1-ready-by-adding-s](./quick/260630-m1a-make-cloudflare-app-t1-ready-by-adding-s/) |
+| 260630-m2u | Promote X public same-origin profile and tweet reads to T1-ready | 2026-06-30 | working-tree | [260630-m2u-promote-x-public-same-origin-profile-and](./quick/260630-m2u-promote-x-public-same-origin-profile-and/) |
+| 260630-m16 | Make Terraform Cloud T1-ready | 2026-06-30 | working-tree | [260630-m16-make-terraform-cloud-t1-ready](./quick/260630-m16-make-terraform-cloud-t1-ready/) |
+| 260630-lhy | Promote Zillow public same-origin search reads to T1-ready | 2026-06-30 | working-tree | [260630-lhy-promote-another-safe-same-origin-public-](./quick/260630-lhy-promote-another-safe-same-origin-public-/) |
+| 260630-l0o | Promote TripAdvisor public same-origin reads to T1-ready | 2026-06-30 | working-tree | [260630-l0o-promote-another-safe-same-origin-public-](./quick/260630-l0o-promote-another-safe-same-origin-public-/) |
+| 260630-kqt | Promote Yelp public same-origin reads to T1-ready | 2026-06-30 | working-tree | [260630-kqt-promote-one-more-safe-same-origin-public](./quick/260630-kqt-promote-one-more-safe-same-origin-public/) |
+| 260630-kg0 | Promote npm public same-origin Spiferack reads to T1-ready | 2026-06-30 | working-tree | [260630-kg0-promote-npm-public-same-origin-read-hand](./quick/260630-kg0-promote-npm-public-same-origin-read-hand/) |
+| 260630-hct | Anonymous aggregate state-level region telemetry (IP-derived at ingest, k≥5 floor, self-hosted DB-IP, graceful "unknown" until dataset present) | 2026-06-30 | e2a1b67a..8edf3525 | [260630-hct-anon-region-telemetry](./quick/260630-hct-anon-region-telemetry/) |
+| 260630-k18 | Promote Hacker News public same-origin HTML reads to T1-ready | 2026-06-30 | working-tree | [260630-k18-promote-hacker-news-public-same-origin-h](./quick/260630-k18-promote-hacker-news-public-same-origin-h/) |
+| 260630-hgl | Promote Wikipedia public same-origin reads to T1-ready | 2026-06-30 | working-tree | [260630-hgl-promote-wikipedia-public-same-origin-rea](./quick/260630-hgl-promote-wikipedia-public-same-origin-rea/) |
+| 260630-ha5 | Promote LeetCode query-only same-origin reads to T1-ready | 2026-06-30 | working-tree | [260630-ha5-promote-leetcode-query-only-same-origin-](./quick/260630-ha5-promote-leetcode-query-only-same-origin-/) |
+| 260630-gry | Promote Shortcut no-param same-origin reads to app-specific T1a handler proof | 2026-06-30 | working-tree | [260630-gry-promote-next-safe-same-origin-read-recip](./quick/260630-gry-promote-next-safe-same-origin-read-recip/) |
+| 260629-ksj | Support i18n internationalization for latest updated showcase content | 2026-06-29 | working-tree | [260629-ksj-support-i18n-internationalization-for-la](./quick/260629-ksj-support-i18n-internationalization-for-la/) |
+
+- ~~39-03 cold-start circuit-breaker FLAG (the eval smoke index reached 93.3KB / 96KB after the retail/marketplace sub-batch)~~ **RESOLVED by 39-04** per the orchestrator decision: the smoke byte ceiling was widened 96KB->512KB (the 96KB ceiling was sized for a tiny corpus; 39-04 reached 108.6KB at a flat 570 bytes/descriptor -- legitimate linear corpus growth, NO params-leak/layout regression). The tight <10ms load-time assert (the real cold-start latency concern) is KEPT, and a NEW per-descriptor footprint flatness check (<700 bytes/descriptor -- the real params-leak regression signal) was ADDED. 512KB is well within the SCALE-01 ~1-2MB full-corpus target; the authoritative full-corpus SCALE-01 cold-start gate (size + load-time) remains Phase 43, kept separate. 39-05/06 have ample headroom under 512KB.
 
 ## Deferred Items
 
