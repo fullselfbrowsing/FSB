@@ -40,6 +40,21 @@ function check(cond, msg) {
   check(current.counts.patternD > 0 && current.counts.gapi > 0,
     'gate is non-vacuous: Pattern-D and GAPI candidate rows both exist');
 
+  const supabaseRows = current.report.rows.filter(function(row) { return row && row.app === 'supabase'; });
+  const supabaseReadyRows = supabaseRows.filter(function(row) { return row.readiness === 't1-ready'; });
+  const supabaseGuardedRows = supabaseRows.filter(function(row) { return row.readiness === 't1-guarded-fail-closed'; });
+  check(supabaseRows.length === 26 &&
+      supabaseReadyRows.length === 19 &&
+      supabaseGuardedRows.length === 7 &&
+      supabaseRows.every(function(row) {
+        return row.routeFeasibility === 'same-origin-proven' &&
+          row.resolvedTier === 'T1a' &&
+          row.proof === 'handler' &&
+          row.hasHandlerProof === true &&
+          row.hasRecipeProof === false;
+      }),
+    'Supabase rows are approved T1a page-read/guarded handlers, not pending Pattern-D candidates');
+
   const patternDecision = gate.bridgeDecisionFor({ routeFeasibility: 'pattern-d-candidate' });
   check(patternDecision.executionEnabled === false &&
     patternDecision.status === 'rejected-pending-explicit-bridge',
