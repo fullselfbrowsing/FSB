@@ -196,14 +196,13 @@ function installChromeStorageStub() {
 
   // DENY-01 -- categorically prohibited. Each CONCRETE origin must classify
   // denied:true. Brokerage/trading (robinhood/fidelity/carta) + ToS-hostile
-  // media/social (netflix/spotify/twitch/steam/youtube-music/tinder/onlyfans).
+  // media/social (netflix/spotify/steam/youtube-music/tinder/onlyfans).
   const deniedRoster = [
     'https://robinhood.com',             // via https://*.robinhood.com (suffix; apex)
     'https://digital.fidelity.com',      // exact -- NOT *.fidelity.com
     'https://app.carta.com',             // exact
     'https://www.netflix.com',           // via https://*.netflix.com (suffix)
     'https://open.spotify.com',          // exact
-    'https://www.twitch.tv',             // via https://*.twitch.tv (suffix)
     'https://store.steampowered.com',    // exact
     'https://music.youtube.com',         // exact (the YouTube Music ToS-hostile media origin)
     'https://youtube.com',               // exact (Phase 39.5-03: the bare apex, media/ToS axis)
@@ -232,6 +231,7 @@ function installChromeStorageStub() {
     'https://x.com',                     // via https://*.x.com (suffix; apex)
     'https://web.whatsapp.com',          // exact
     'https://web.telegram.org',          // exact
+    'https://www.twitch.tv',             // via https://*.twitch.tv -- media app reads allowed; GraphQL reads origin-pinned
     'https://www.slack.com',             // via https://*.slack.com (suffix)
     'https://discord.com',               // exact
     'https://teams.microsoft.com',       // exact (one of the three teams origins)
