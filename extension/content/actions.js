@@ -4092,7 +4092,15 @@ const tools = {
   keyPress: async (params) => {
     const { key, ctrlKey = false, shiftKey = false, altKey = false, metaKey = false, selector, useDebuggerAPI = true } = params;
 
+    // Track whether the trusted CDP path was attempted and, if so, why it failed.
+    // These surface on the synthetic domEvents fallback below so a no-op untrusted
+    // dispatch (e.g. inside a cross-origin payment/OAuth iframe) is not masked as a
+    // plain success.
+    let cdpAttempted = false;
+    let cdpError = null;
+
     if (useDebuggerAPI) {
+      cdpAttempted = true;
       try {
         const response = await chrome.runtime.sendMessage({
           action: 'keyboardDebuggerAction',
@@ -4104,9 +4112,11 @@ const tools = {
         if (response.success) {
           return { success: true, key, method: 'debuggerAPI', target: selector || 'activeElement', result: response.result };
         } else {
+          cdpError = (response && response.error) || 'debugger API returned failure';
           logger.logRecovery(FSB.sessionId, 'debugger_api_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {
+        cdpError = error.message || 'debugger API unavailable';
         logger.logRecovery(FSB.sessionId, 'debugger_api_unavailable', 'dom_events_fallback', 'started', { error: error.message });
       }
     }
@@ -4128,7 +4138,33 @@ const tools = {
     });
     target.dispatchEvent(keyUpEvent);
 
-    return { success: true, key, method: 'domEvents', target: selector || 'activeElement', modifiers: { ctrlKey, shiftKey, altKey, metaKey } };
+    // Synthetic KeyboardEvents are untrusted (isTrusted:false) and are a NO-OP inside
+    // cross-origin iframes (e.g. the Stripe CVC frame). Surface honest signals so the
+    // caller/operator can see a degraded untrusted dispatch instead of an unqualified
+    // success. `success:true` is preserved for existing same-origin callers.
+    // TODO(260701-2du): reliably detect "focus is inside a cross-origin iframe" from the
+    // content script and, in that specific case, return success:false rather than only
+    // flagging degraded -- fuller cross-origin-iframe detection is a follow-up.
+    const degraded = cdpAttempted && cdpError !== null;
+    if (degraded) {
+      logger.warn('keyPress fell back to untrusted domEvents dispatch (no-op inside cross-origin iframes)', {
+        sessionId: FSB.sessionId, key, cdpError, target: selector || 'activeElement'
+      });
+    }
+
+    const result = {
+      success: true,
+      key,
+      method: 'domEvents',
+      trusted: false,
+      target: selector || 'activeElement',
+      modifiers: { ctrlKey, shiftKey, altKey, metaKey }
+    };
+    if (degraded) {
+      result.degraded = true;
+      result.cdpError = cdpError;
+    }
+    return result;
   },
 
   // Press a sequence of keys
