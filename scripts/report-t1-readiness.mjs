@@ -60,6 +60,7 @@ const HANDLER_MODULES = [
   'retool.js',
   'asana.js',
   'robinhood.js',
+  'fidelity.js',
   'doordash.js',
   'ubereats.js',
 ];

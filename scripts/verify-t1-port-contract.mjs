@@ -39,6 +39,7 @@ export const HANDLER_BY_APP = Object.freeze({
   slack: 'slack.js',
   vercel: 'vercel.js',
   robinhood: 'robinhood.js',
+  fidelity: 'fidelity.js',
   doordash: 'doordash.js',
   ubereats: 'ubereats.js',
 });
