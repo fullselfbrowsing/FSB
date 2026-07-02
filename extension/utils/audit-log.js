@@ -222,9 +222,34 @@
     });
   }
 
+  // Realm detection: the SW loads this via importScripts (no `document`); the
+  // control panel + sidepanel load it via <script src> in a page realm (has
+  // `document`). Only the SW's _storageChain can serialize append vs clear --
+  // the page realm holds a separate mutex instance, so a page-side clear must
+  // delegate to the SW.
+  function _isPageRealm() {
+    return typeof document !== 'undefined'
+      && typeof chrome !== 'undefined'
+      && chrome.runtime
+      && typeof chrome.runtime.sendMessage === 'function';
+  }
+
+  // The bridge action the page realm sends to the SW to request a race-safe
+  // clear-and-export. The SW-side listener in background.js must recognize
+  // this exact action string and reply with { entries, clearedAt }.
+  var AUDIT_CLEAR_BRIDGE_TYPE = 'fsbAuditLogClearAndExport';
+
   // ---- getEntries(opts) -> Promise<{ entries, clearedAt? }> ----------------
   // Returns the ring newest-last. opts.clear === true returns then empties the
   // ring and stamps clearedAt (the D-12 user export/clear).
+  //
+  // The clear path is routed under _withStorageLock so it serializes against
+  // in-flight appends (an unlocked clear-then-append could resurrect the just-
+  // cleared entry, contradicting the "permanently deletes all local audit
+  // entries" contract shown to the user). When called from a page realm
+  // (control panel / sidepanel), the clear delegates to the SW so it runs on
+  // the SAME _storageChain instance that append() uses; a page-realm chain
+  // would be a distinct mutex and could not serialize against the SW.
   function getEntries(opts) {
     var shouldClear = !!(opts && opts.clear === true);
     if (!_hasChromeStorage()) {
@@ -235,24 +260,66 @@
       }
       return Promise.resolve({ entries: snap });
     }
-    return new Promise(function(resolve) {
-      try {
-        chrome.storage.local.get([STORAGE_KEY], function(stored) {
-          var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
-          if (!shouldClear) {
-            resolve({ entries: ring });
-            return;
-          }
-          var update = {};
-          update[STORAGE_KEY] = [];
-          chrome.storage.local.set(update, function() {
-            _inMemoryRing = [];
-            resolve({ entries: ring, clearedAt: Date.now() });
+    if (shouldClear && _isPageRealm()) {
+      return new Promise(function(resolve) {
+        try {
+          chrome.runtime.sendMessage({ action: AUDIT_CLEAR_BRIDGE_TYPE }, function(response) {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              // SW unreachable (very rare); fall back to a best-effort local
+              // clear so the user's action does not silently no-op. This can
+              // still race with a concurrent SW append, but the SW would be
+              // dead in that scenario so no append would land anyway.
+              _localClear().then(resolve, function() { resolve({ entries: _inMemoryRing.slice() }); });
+              return;
+            }
+            if (response && Array.isArray(response.entries)) {
+              _inMemoryRing = [];
+              resolve({ entries: response.entries, clearedAt: response.clearedAt || Date.now() });
+            } else {
+              _localClear().then(resolve, function() { resolve({ entries: _inMemoryRing.slice() }); });
+            }
           });
-        });
-      } catch (_e) {
-        resolve({ entries: _inMemoryRing.slice() });
-      }
+        } catch (_e) {
+          _localClear().then(resolve, function() { resolve({ entries: _inMemoryRing.slice() }); });
+        }
+      });
+    }
+    if (!shouldClear) {
+      return new Promise(function(resolve) {
+        try {
+          chrome.storage.local.get([STORAGE_KEY], function(stored) {
+            var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
+            resolve({ entries: ring });
+          });
+        } catch (_e) {
+          resolve({ entries: _inMemoryRing.slice() });
+        }
+      });
+    }
+    return _localClear();
+  }
+
+  // Race-safe clear-and-export against chrome.storage.local, serialized on
+  // the local _storageChain so it cannot interleave with an append(). Called
+  // directly in the SW realm and by the bridge handler in background.js;
+  // page-realm callers reach it via chrome.runtime.sendMessage instead.
+  function _localClear() {
+    return _withStorageLock(function() {
+      return new Promise(function(resolve) {
+        try {
+          chrome.storage.local.get([STORAGE_KEY], function(stored) {
+            var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
+            var update = {};
+            update[STORAGE_KEY] = [];
+            chrome.storage.local.set(update, function() {
+              _inMemoryRing = [];
+              resolve({ entries: ring, clearedAt: Date.now() });
+            });
+          });
+        } catch (_e) {
+          resolve({ entries: _inMemoryRing.slice() });
+        }
+      });
     });
   }
 
@@ -287,9 +354,14 @@
     STORAGE_KEY: STORAGE_KEY,
     PAYLOAD_VERSION: PAYLOAD_VERSION,
     MAX_ENTRIES: MAX_ENTRIES,
+    AUDIT_CLEAR_BRIDGE_TYPE: AUDIT_CLEAR_BRIDGE_TYPE,
     append: append,
     getEntries: getEntries,
     getDistinctOrigins: getDistinctOrigins,
+    // Exposed for the SW-side bridge handler in background.js so it can run
+    // the same race-safe clear that a same-realm call would, without the
+    // page-realm bridge round-trip.
+    _localClear: _localClear,
     _reset: _reset
   };
 

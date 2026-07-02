@@ -7612,6 +7612,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   automationLogger.logComm(null, 'receive', request.action || 'unknown', true, { tabId: sender.tab?.id });
 
   switch (request.action) {
+    case 'fsbAuditLogClearAndExport': {
+      // Race-safe clear-and-export delegated from a page realm (control
+      // panel / sidepanel). Running the read/set here serializes it against
+      // in-flight append() calls on the SW's own _withStorageLock chain; a
+      // page-realm chain is a separate mutex instance that could not
+      // synchronize against the SW's writer. Falls back to signalling
+      // failure via the sendResponse envelope so the caller's local best-
+      // effort branch can take over.
+      try {
+        var auditStore = globalThis && globalThis.FsbAuditLog;
+        if (auditStore && typeof auditStore._localClear === 'function') {
+          Promise.resolve(auditStore._localClear()).then(function(result) {
+            sendResponse({
+              entries: (result && Array.isArray(result.entries)) ? result.entries : [],
+              clearedAt: (result && result.clearedAt) || Date.now()
+            });
+          }, function() {
+            sendResponse({ entries: [], clearedAt: Date.now(), error: 'clear-failed' });
+          });
+          return true; // keep the channel open until _localClear settles
+        }
+      } catch (_e) { /* swallow -- fall through to failure envelope */ }
+      sendResponse({ entries: [], clearedAt: Date.now(), error: 'audit-log-unavailable' });
+      return false;
+    }
+
     case 'ensureLegacyAgent': {
       // Phase 240 D-02: legacy surfaces (popup, sidepanel, autopilot)
       // synthesize a constant agentId via Plan 01's getOrRegisterLegacyAgent
