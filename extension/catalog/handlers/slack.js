@@ -121,6 +121,79 @@
     required: ['channel', 'text'],
     additionalProperties: false
   };
+  var STRING = { type: 'string' };
+  var STRING_ID = { type: 'string', minLength: 1 };
+  var BOOLEAN = { type: 'boolean' };
+  var LIMIT_100 = { type: 'integer', minimum: 1, maximum: 100 };
+  var LIMIT_1000 = { type: 'integer', minimum: 1, maximum: 1000 };
+  var POSITIVE_INTEGER = { type: 'integer', minimum: 1, maximum: 9007199254740991 };
+
+  function slackSchema(properties, required) {
+    var out = {
+      type: 'object',
+      properties: properties || {},
+      additionalProperties: false
+    };
+    if (required && required.length) { out.required = required; }
+    return out;
+  }
+
+  var USER_PROFILE_PARAMS = slackSchema({ user: STRING_ID }, ['user']);
+  var LIST_USERS_PARAMS = slackSchema({ limit: LIMIT_1000, cursor: STRING }, []);
+  var LIST_FILES_PARAMS = slackSchema({
+    channel: STRING,
+    count: LIMIT_100,
+    page: POSITIVE_INTEGER,
+    types: STRING,
+    user: STRING
+  }, []);
+  var READ_MESSAGES_PARAMS = slackSchema({
+    channel: STRING_ID,
+    limit: LIMIT_1000,
+    oldest: STRING,
+    latest: STRING,
+    cursor: STRING
+  }, ['channel']);
+  var READ_THREAD_PARAMS = slackSchema({
+    channel: STRING_ID,
+    ts: STRING_ID,
+    limit: LIMIT_1000,
+    cursor: STRING
+  }, ['channel', 'ts']);
+  var SEARCH_MESSAGES_PARAMS = slackSchema({
+    query: STRING_ID,
+    count: POSITIVE_INTEGER,
+    page: POSITIVE_INTEGER,
+    sort: { type: 'string', enum: ['score', 'timestamp'] },
+    sort_dir: { type: 'string', enum: ['asc', 'desc'] }
+  }, ['query']);
+  var REACTION_PARAMS = slackSchema({ channel: STRING_ID, ts: STRING_ID, name: STRING_ID }, ['channel', 'ts', 'name']);
+  var CREATE_CHANNEL_PARAMS = slackSchema({
+    name: { type: 'string', minLength: 1, maxLength: 80, pattern: '^[a-z0-9][a-z0-9_-]*$' },
+    is_private: BOOLEAN,
+    topic: { type: 'string', minLength: 1, maxLength: 250 }
+  }, ['name']);
+  var MESSAGE_TS_PARAMS = slackSchema({ channel: STRING_ID, ts: STRING_ID }, ['channel', 'ts']);
+  var EDIT_MESSAGE_PARAMS = slackSchema({ channel: STRING_ID, ts: STRING_ID, text: STRING_ID }, ['channel', 'ts', 'text']);
+  var INVITE_TO_CHANNEL_PARAMS = slackSchema({ channel: STRING_ID, user: STRING_ID }, ['channel', 'user']);
+  var OPEN_DM_PARAMS = slackSchema({ users: STRING_ID }, ['users']);
+  var SET_CHANNEL_PURPOSE_PARAMS = slackSchema({
+    channel: STRING_ID,
+    purpose: { type: 'string', minLength: 1, maxLength: 250 }
+  }, ['channel', 'purpose']);
+  var SET_CHANNEL_TOPIC_PARAMS = slackSchema({
+    channel: STRING_ID,
+    topic: { type: 'string', minLength: 1, maxLength: 250 }
+  }, ['channel', 'topic']);
+  var UPLOAD_FILE_PARAMS = slackSchema({
+    channel: STRING_ID,
+    content: { type: 'string', minLength: 1, maxLength: 20000000 },
+    is_base64: BOOLEAN,
+    filename: STRING_ID,
+    title: STRING,
+    initial_comment: STRING,
+    filetype: STRING
+  }, ['channel', 'content', 'filename']);
 
   // A read-only same-origin GET the handler issues first to obtain the xoxc token
   // from the page response (from:'response'). The token extraction is [ASSUMED] --
@@ -257,6 +330,22 @@
     return await ctx.executeBoundSpec(spec, ctx.tabId);
   }
 
+  function guardedSlackMutation(slug, sideEffectClass, params, reason) {
+    return {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: sideEffectClass,
+      params: params,
+      async handle(args, ctx) {
+        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
+          slug: slug,
+          reason: reason || 'unverified-slack-mutation',
+          fellBackToDom: true
+        });
+      }
+    };
+  }
+
   var handlers = {
     // ---- slack.conversations.list (read) -----------------------------------
     'slack.conversations.list': {
@@ -332,9 +421,113 @@
       }
     },
 
+    // ---- Slack breadth reads promoted to same-origin T1a -------------------
+    'slack.get_user_profile': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: USER_PROFILE_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var res = await callSlackMethod('slack.get_user_profile', 'users.profile.get', {
+          user: a.user
+        }, ctx);
+        return guardSlackShape(res, 'slack.get_user_profile');
+      }
+    },
+
+    'slack.list_users': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: LIST_USERS_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var res = await callSlackMethod('slack.list_users', 'users.list', {
+          limit: a.limit || 100,
+          cursor: a.cursor
+        }, ctx);
+        return guardSlackShape(res, 'slack.list_users');
+      }
+    },
+
+    'slack.list_files': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: LIST_FILES_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var res = await callSlackMethod('slack.list_files', 'files.list', {
+          channel: a.channel,
+          count: a.count || 20,
+          page: a.page || 1,
+          types: a.types,
+          user: a.user
+        }, ctx);
+        return guardSlackShape(res, 'slack.list_files');
+      }
+    },
+
+    'slack.read_messages': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: READ_MESSAGES_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var res = await callSlackMethod('slack.read_messages', 'conversations.history', {
+          channel: a.channel,
+          limit: a.limit || 20,
+          oldest: a.oldest,
+          latest: a.latest,
+          cursor: a.cursor
+        }, ctx);
+        return guardSlackShape(res, 'slack.read_messages');
+      }
+    },
+
+    'slack.read_thread': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: READ_THREAD_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var res = await callSlackMethod('slack.read_thread', 'conversations.replies', {
+          channel: a.channel,
+          ts: a.ts,
+          limit: a.limit || 20,
+          cursor: a.cursor
+        }, ctx);
+        return guardSlackShape(res, 'slack.read_thread');
+      }
+    },
+
+    'slack.search_messages': {
+      tier: 'T1a',
+      origin: SLACK_ORIGIN,
+      sideEffectClass: 'read',
+      params: SEARCH_MESSAGES_PARAMS,
+      async handle(args, ctx) {
+        var a = args || {};
+        var res = await callSlackMethod('slack.search_messages', 'search.messages', {
+          query: a.query,
+          count: a.count || 20,
+          page: a.page || 1,
+          sort: a.sort || 'score',
+          sort_dir: a.sort_dir || 'desc'
+        }, ctx);
+        return guardSlackShape(res, 'slack.search_messages');
+      }
+    },
+
     // ---- slack.chat.postMessage (write) ------------------------------------
     // A mutating call -- inherits the resume-sidecar + RECOVERY_AMBIGUOUS
     // classification inside executeBoundSpec (T-29-10); never blind-retried here.
+    // guardSlackShape applies like every read op: Slack wraps auth failures in
+    // an HTTP-200 {ok:false} envelope, which would otherwise report the send
+    // as a success even though nothing was posted.
     'slack.chat.postMessage': {
       tier: 'T1a',
       origin: SLACK_ORIGIN,
@@ -342,10 +535,11 @@
       params: POST_MESSAGE_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        return await callSlackMethod('slack.chat.postMessage', 'chat.postMessage', {
+        var res = await callSlackMethod('slack.chat.postMessage', 'chat.postMessage', {
           channel: a.channel,
           text: a.text
         }, ctx);
+        return guardSlackShape(res, 'slack.chat.postMessage');
       }
     },
 
@@ -374,20 +568,20 @@
     // are DISTINCT concerns (the gate proves consent posture; the handler proves
     // no-mutation-without-capture).
 
-    // ---- slack.send_message (write -- fail-closed) -------------------------
-    'slack.send_message': {
-      tier: 'T1a',
-      origin: SLACK_ORIGIN,
-      sideEffectClass: 'write',
-      params: SEND_MESSAGE_PARAMS,
-      async handle(args, ctx) {
-        return typedRecipeError('RECIPE_DOM_FALLBACK_PENDING', {
-          slug: 'slack.send_message',
-          reason: 'unverified-slack-send-message-mutation',
-          fellBackToDom: true
-        });
-      }
-    }
+    // ---- Slack mutation/destructive breadth slugs (fail-closed) ------------
+    'slack.add_reaction': guardedSlackMutation('slack.add_reaction', 'write', REACTION_PARAMS, 'unverified-slack-add-reaction-mutation'),
+    'slack.create_channel': guardedSlackMutation('slack.create_channel', 'write', CREATE_CHANNEL_PARAMS, 'unverified-slack-create-channel-mutation'),
+    'slack.delete_message': guardedSlackMutation('slack.delete_message', 'destructive', MESSAGE_TS_PARAMS, 'unverified-slack-delete-message-mutation'),
+    'slack.edit_message': guardedSlackMutation('slack.edit_message', 'write', EDIT_MESSAGE_PARAMS, 'unverified-slack-edit-message-mutation'),
+    'slack.invite_to_channel': guardedSlackMutation('slack.invite_to_channel', 'write', INVITE_TO_CHANNEL_PARAMS, 'unverified-slack-invite-to-channel-mutation'),
+    'slack.open_dm': guardedSlackMutation('slack.open_dm', 'write', OPEN_DM_PARAMS, 'unverified-slack-open-dm-mutation'),
+    'slack.pin_message': guardedSlackMutation('slack.pin_message', 'write', MESSAGE_TS_PARAMS, 'unverified-slack-pin-message-mutation'),
+    'slack.remove_reaction': guardedSlackMutation('slack.remove_reaction', 'destructive', REACTION_PARAMS, 'unverified-slack-remove-reaction-mutation'),
+    'slack.send_message': guardedSlackMutation('slack.send_message', 'write', SEND_MESSAGE_PARAMS, 'unverified-slack-send-message-mutation'),
+    'slack.set_channel_purpose': guardedSlackMutation('slack.set_channel_purpose', 'write', SET_CHANNEL_PURPOSE_PARAMS, 'unverified-slack-set-channel-purpose-mutation'),
+    'slack.set_channel_topic': guardedSlackMutation('slack.set_channel_topic', 'write', SET_CHANNEL_TOPIC_PARAMS, 'unverified-slack-set-channel-topic-mutation'),
+    'slack.unpin_message': guardedSlackMutation('slack.unpin_message', 'destructive', MESSAGE_TS_PARAMS, 'unverified-slack-unpin-message-mutation'),
+    'slack.upload_file': guardedSlackMutation('slack.upload_file', 'write', UPLOAD_FILE_PARAMS, 'unverified-slack-upload-file-mutation')
   };
 
   // ---- Self-registration into the catalog (shipped SW path) ----------------

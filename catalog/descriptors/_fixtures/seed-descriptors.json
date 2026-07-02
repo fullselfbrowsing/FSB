@@ -23941,7 +23941,7 @@
     "description": "Create a new custom watchlist with the specified display name.",
     "actionVerb": "create",
     "sideEffectClass": "write",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.delete_watchlist",
@@ -23957,7 +23957,7 @@
     "description": "Permanently delete a custom watchlist by its ID. This action cannot be undone.",
     "actionVerb": "delete",
     "sideEffectClass": "destructive",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_account",
@@ -23973,7 +23973,7 @@
     "description": "Get the Robinhood brokerage account details including account number, type, buying power, cash balance, and withdrawal availability.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_current_user",
@@ -23989,7 +23989,7 @@
     "description": "Get the authenticated Robinhood user profile including username, email, name, and account creation date.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_earnings",
@@ -24004,7 +24004,7 @@
     "description": "Get earnings history and estimates for a stock. Returns EPS estimates vs actuals, report dates, and report timing (before/after market).",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_fundamentals",
@@ -24019,7 +24019,7 @@
     "description": "Get fundamental financial data for a stock including market cap, P/E ratio, dividend yield, 52-week range, volume, and company description.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_historicals",
@@ -24034,7 +24034,7 @@
     "description": "Get historical OHLCV price data for one or more stocks. Supports multiple intervals (5min to weekly) and spans (day to all-time). Use bounds to include extended hours data.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_instrument",
@@ -24050,7 +24050,7 @@
     "description": "Get detailed instrument information by UUID including ticker symbol, company name, type, country, tradeability, and listing date.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_market_hours",
@@ -24065,7 +24065,7 @@
     "description": "Get market trading hours for a specific date including open/close times and extended hours windows.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_news_feed",
@@ -24081,7 +24081,7 @@
     "description": "Get the news and market feed. Optionally filter by instrument ID.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_portfolio",
@@ -24097,7 +24097,7 @@
     "description": "Get the Robinhood portfolio summary including total equity, market value, extended hours values, and previous close equity.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_portfolio_historicals",
@@ -24112,7 +24112,7 @@
     "description": "Get historical portfolio performance data points over a configurable time span and interval. Returns a series of value snapshots useful for charting portfolio growth.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_quote",
@@ -24128,7 +24128,7 @@
     "description": "Get real-time stock quotes for one or more ticker symbols. Returns bid/ask prices, last trade price, previous close, and trading halt status.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_ratings",
@@ -24143,7 +24143,7 @@
     "description": "Get analyst ratings for a stock by instrument UUID. Returns a summary of buy/hold/sell counts and individual analyst ratings with commentary. Use search_instruments to find the instrument ID.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.get_watchlist",
@@ -24159,7 +24159,7 @@
     "description": "Get a specific watchlist by its ID including display name, item count, and all items with their instrument IDs. Use list_watchlists to find available list IDs.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_crypto_holdings",
@@ -24174,7 +24174,7 @@
     "description": "List all cryptocurrency holdings with nonzero quantity including currency code, total quantity, cost basis, and available quantity for trading.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_dividends",
@@ -24189,7 +24189,7 @@
     "description": "List dividend payments received on the Robinhood account including amount, rate, state, and payment dates.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_notifications",
@@ -24204,7 +24204,7 @@
     "description": "List recent account notifications including alerts, updates, and system messages.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_orders",
@@ -24219,7 +24219,7 @@
     "description": "List recent stock orders. Returns order history including filled, cancelled, and pending orders. Does not place or modify orders.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_positions",
@@ -24234,7 +24234,7 @@
     "description": "List all nonzero stock positions in the Robinhood portfolio including instrument ID, ticker symbol, quantity, average buy price, and shares available for sale.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_transfers",
@@ -24249,7 +24249,7 @@
     "description": "List ACH bank transfers including deposits and withdrawals with their amounts, directions, states, and expected landing dates.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.list_watchlists",
@@ -24264,7 +24264,7 @@
     "description": "List all watchlists (discovery lists) including default and custom lists with their display names, item counts, and emoji icons.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "robinhood.search_instruments",
@@ -24277,7 +24277,7 @@
     "description": "Search for stocks and other instruments by company name or ticker symbol. Returns matching instruments with UUID, symbol, name, type, and tradeability.",
     "actionVerb": "search",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "sentry.create_comment",

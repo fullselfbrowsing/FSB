@@ -20425,7 +20425,7 @@
       ],
       "description": "Preview the evaluation results of a monitor over a time range. Shows the timeseries data that the monitor evaluates against.",
       "actionVerb": "get",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -20458,7 +20458,7 @@
         "sourcePath": "plugins/datadog/src/tools/get-monitor-state-history.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "apiuipost",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -21982,7 +21982,7 @@
       ],
       "description": "Execute a multi-query timeseries request using the Datadog internal query engine. Supports metrics, logs, spans, and other data sources with formula support.",
       "actionVerb": "query",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -22059,7 +22059,7 @@
         "sourcePath": "plugins/datadog/src/tools/query-timeseries.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "apiuipost",
           "httpMethod": null,
           "opNameVerb": "query"
         }
@@ -60630,7 +60630,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "POST",
+          "httpMethod": "DELETE",
           "opNameVerb": "delete"
         }
       }
@@ -62533,7 +62533,7 @@
         "sourcePath": "plugins/pinterest/src/tools/create-board-section.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": null,
           "opNameVerb": "create"
         }
@@ -62585,7 +62585,7 @@
         "sourcePath": "plugins/pinterest/src/tools/create-board.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": null,
           "opNameVerb": "create"
         }
@@ -62646,7 +62646,7 @@
         "sourcePath": "plugins/pinterest/src/tools/create-pin.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": "SCRAPED",
           "opNameVerb": "create"
         }
@@ -62800,7 +62800,7 @@
         "sourcePath": "plugins/pinterest/src/tools/follow-user.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": null,
           "opNameVerb": "follow"
         }
@@ -62854,7 +62854,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-board-pins.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -62897,7 +62897,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-board-sections.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -62916,7 +62916,7 @@
       ],
       "description": "Get the profile of the currently authenticated Pinterest user, including email, name, follower counts, board count, and account details.",
       "actionVerb": "get",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {},
@@ -62929,7 +62929,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-current-user.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -62966,7 +62966,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-home-feed.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -62997,7 +62997,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-notification-counts.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -63037,7 +63037,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-pin.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -63086,7 +63086,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-related-pins.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -63135,7 +63135,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-user-pins.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -63175,7 +63175,7 @@
         "sourcePath": "plugins/pinterest/src/tools/get-user-profile.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -63224,7 +63224,7 @@
         "sourcePath": "plugins/pinterest/src/tools/list-boards.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -63273,7 +63273,7 @@
         "sourcePath": "plugins/pinterest/src/tools/list-followers.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -63323,7 +63323,7 @@
         "sourcePath": "plugins/pinterest/src/tools/list-following.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -63369,7 +63369,7 @@
         "sourcePath": "plugins/pinterest/src/tools/save-pin.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": null,
           "opNameVerb": "save"
         }
@@ -63416,7 +63416,7 @@
         "sourcePath": "plugins/pinterest/src/tools/search-boards.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "search"
         }
@@ -63463,7 +63463,7 @@
         "sourcePath": "plugins/pinterest/src/tools/search-pins.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourceget",
           "httpMethod": null,
           "opNameVerb": "search"
         }
@@ -63555,7 +63555,7 @@
         "sourcePath": "plugins/pinterest/src/tools/update-board.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "resourcepost",
           "httpMethod": null,
           "opNameVerb": "update"
         }
@@ -67486,7 +67486,7 @@
         "sourcePath": "plugins/reddit/src/tools/edit-text.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "edit"
         }
@@ -67551,7 +67551,7 @@
         "sourcePath": "plugins/reddit/src/tools/get-comment-thread.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -67583,7 +67583,7 @@
         "sourcePath": "plugins/reddit/src/tools/get-me.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -67654,7 +67654,7 @@
         "sourcePath": "plugins/reddit/src/tools/get-post.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -67695,7 +67695,7 @@
         "sourcePath": "plugins/reddit/src/tools/get-subreddit.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -67736,7 +67736,7 @@
         "sourcePath": "plugins/reddit/src/tools/get-user.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -67752,7 +67752,7 @@
       ],
       "description": "Hide or unhide a post from your feed. Hidden posts no longer appear in listings but can be viewed directly.",
       "actionVerb": "hide",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -67778,7 +67778,7 @@
         "sourcePath": "plugins/reddit/src/tools/hide.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "hide"
         }
@@ -67818,7 +67818,7 @@
         "sourcePath": "plugins/reddit/src/tools/list-flairs.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -67868,7 +67868,7 @@
         "sourcePath": "plugins/reddit/src/tools/list-popular-subreddits.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -67941,7 +67941,7 @@
         "sourcePath": "plugins/reddit/src/tools/list-posts.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -67983,7 +67983,7 @@
         "sourcePath": "plugins/reddit/src/tools/list-subscriptions.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -68075,7 +68075,7 @@
         "sourcePath": "plugins/reddit/src/tools/list-user-content.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "list"
         }
@@ -68115,7 +68115,7 @@
         "sourcePath": "plugins/reddit/src/tools/read-inbox.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "read"
         }
@@ -68131,7 +68131,7 @@
       ],
       "description": "Report a post or comment to the subreddit moderators for rule violations.",
       "actionVerb": "report",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -68159,7 +68159,7 @@
         "sourcePath": "plugins/reddit/src/tools/report.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "report"
         }
@@ -68201,7 +68201,7 @@
         "sourcePath": "plugins/reddit/src/tools/save.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "save"
         }
@@ -68280,7 +68280,7 @@
         "sourcePath": "plugins/reddit/src/tools/search-posts.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "search"
         }
@@ -68329,7 +68329,7 @@
         "sourcePath": "plugins/reddit/src/tools/search-subreddits.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditget",
           "httpMethod": null,
           "opNameVerb": "search"
         }
@@ -68381,7 +68381,7 @@
         "sourcePath": "plugins/reddit/src/tools/send-message.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditoauthpost",
           "httpMethod": null,
           "opNameVerb": "send"
         }
@@ -68425,7 +68425,7 @@
         "sourcePath": "plugins/reddit/src/tools/submit-comment.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "submit"
         }
@@ -68502,7 +68502,7 @@
         "sourcePath": "plugins/reddit/src/tools/submit-post.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "submit"
         }
@@ -68518,7 +68518,7 @@
       ],
       "description": "Subscribe to or unsubscribe from a subreddit",
       "actionVerb": "subscribe",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -68549,7 +68549,7 @@
         "sourcePath": "plugins/reddit/src/tools/subscribe.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "subscribe"
         }
@@ -68594,7 +68594,7 @@
         "sourcePath": "plugins/reddit/src/tools/vote.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "redditpost",
           "httpMethod": null,
           "opNameVerb": "vote"
         }
@@ -71278,7 +71278,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71318,7 +71318,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71350,7 +71350,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71382,7 +71382,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71421,7 +71421,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71460,7 +71460,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71536,7 +71536,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71576,7 +71576,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71619,7 +71619,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71656,7 +71656,7 @@
         },
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71727,7 +71727,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71759,7 +71759,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71799,7 +71799,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71838,7 +71838,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71878,7 +71878,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71909,7 +71909,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71940,7 +71940,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -71971,7 +71971,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -72007,7 +72007,7 @@
         },
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -72038,7 +72038,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -72069,7 +72069,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -72100,7 +72100,7 @@
         "properties": {},
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -72137,7 +72137,7 @@
         ],
         "additionalProperties": false
       },
-      "backing": "dom",
+      "backing": "handler",
       "provenance": {
         "source": "opentabs",
         "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
@@ -79179,7 +79179,7 @@
       ],
       "description": "Add or remove a Starbucks store from your favorites list. Use find_stores to discover store IDs.",
       "actionVerb": "toggle",
-      "sideEffectClass": "write",
+      "sideEffectClass": "destructive",
       "params": {
         "type": "object",
         "properties": {
@@ -79206,7 +79206,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "POST",
+          "httpMethod": "DELETE",
           "opNameVerb": "toggle"
         }
       }
@@ -79291,7 +79291,7 @@
         "sourcePath": "plugins/steam/src/tools/add-to-wishlist.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storepost",
           "httpMethod": null,
           "opNameVerb": "add"
         }
@@ -79346,7 +79346,7 @@
       ],
       "description": "Generate a new personalized discovery queue of game recommendations. Returns a list of app IDs tailored to the user's preferences and library. Use get_app_details to look up each app.",
       "actionVerb": "generate",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -79366,7 +79366,7 @@
         "sourcePath": "plugins/steam/src/tools/generate-discovery-queue.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storepost",
           "httpMethod": null,
           "opNameVerb": "generate"
         }
@@ -79407,7 +79407,7 @@
         "sourcePath": "plugins/steam/src/tools/get-app-details.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79480,7 +79480,7 @@
         "sourcePath": "plugins/steam/src/tools/get-app-reviews.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79521,7 +79521,7 @@
         "sourcePath": "plugins/steam/src/tools/get-app-user-details.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79584,7 +79584,7 @@
         "sourcePath": "plugins/steam/src/tools/get-featured-categories.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79616,7 +79616,7 @@
         "sourcePath": "plugins/steam/src/tools/get-featured.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79647,7 +79647,7 @@
         "sourcePath": "plugins/steam/src/tools/get-popular-tags.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79679,7 +79679,7 @@
         "sourcePath": "plugins/steam/src/tools/get-user-data.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -79695,7 +79695,7 @@
       ],
       "description": "Mark an app as ignored so it no longer appears in recommendations and discovery queues. The app can be unignored later with unignore_app.",
       "actionVerb": "ignore",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -79718,7 +79718,7 @@
         "sourcePath": "plugins/steam/src/tools/ignore-app.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storepost",
           "httpMethod": null,
           "opNameVerb": "ignore"
         }
@@ -79757,7 +79757,7 @@
         "sourcePath": "plugins/steam/src/tools/remove-from-wishlist.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storepost",
           "httpMethod": null,
           "opNameVerb": "remove"
         }
@@ -79800,7 +79800,7 @@
         "sourcePath": "plugins/steam/src/tools/search-store.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storeget",
           "httpMethod": null,
           "opNameVerb": "search"
         }
@@ -79816,7 +79816,7 @@
       ],
       "description": "Remove an app from the ignored list so it appears in recommendations and discovery queues again.",
       "actionVerb": "unignore",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -79839,7 +79839,7 @@
         "sourcePath": "plugins/steam/src/tools/unignore-app.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "storepost",
           "httpMethod": null,
           "opNameVerb": "unignore"
         }
@@ -93766,7 +93766,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -93797,7 +93797,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -93829,7 +93829,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -93865,7 +93865,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -93905,7 +93905,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -93946,7 +93946,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -93977,7 +93977,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -94032,7 +94032,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "search"
         }
       }
@@ -100383,7 +100383,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "add"
         }
       }
@@ -100428,7 +100428,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "create"
         }
       }
@@ -100477,7 +100477,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "create"
         }
       }
@@ -100516,7 +100516,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "delete"
         }
       }
@@ -100556,7 +100556,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100588,7 +100588,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100619,7 +100619,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100659,7 +100659,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100691,7 +100691,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100730,7 +100730,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100770,7 +100770,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100802,7 +100802,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "get"
         }
       }
@@ -100839,7 +100839,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "like"
         }
       }
@@ -100870,7 +100870,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "list"
         }
       }
@@ -100907,7 +100907,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "search"
         }
       }
@@ -100922,7 +100922,7 @@
       ],
       "description": "Subscribe to a YouTube channel. The channel will appear in the subscriptions feed.",
       "actionVerb": "subscribe",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -100944,7 +100944,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "subscribe"
         }
       }
@@ -100959,7 +100959,7 @@
       ],
       "description": "Remove a like from a YouTube video.",
       "actionVerb": "unlike",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -100981,7 +100981,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "unlike"
         }
       }
@@ -100996,7 +100996,7 @@
       ],
       "description": "Unsubscribe from a YouTube channel.",
       "actionVerb": "unsubscribe",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -101018,7 +101018,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "unsubscribe"
         }
       }
@@ -101591,7 +101591,7 @@
         "license": "MIT",
         "signals": {
           "transportHelper": "api",
-          "httpMethod": "GET",
+          "httpMethod": null,
           "opNameVerb": "search"
         }
       }
