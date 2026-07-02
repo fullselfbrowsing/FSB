@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { WebSocketBridge } from '../bridge.js';
+import { isBridgeDisconnectError, type WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import type { MCPMessageType, MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
@@ -251,8 +251,13 @@ export function registerTriggerTools(
             },
           );
         } catch (sendErr) {
-          const errMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
-          if (errMsg !== 'Bridge disconnected' || detached) {
+          // sw_evicted recovery arms on ANY bridge-disconnect message, not
+          // only the 'Bridge disconnected' string. bridge.ts rejects
+          // in-flight pending requests with 'Extension disconnected' on
+          // MV3 SW eviction (hub mode) and 'Lost connection to hub' on
+          // relay-mode hub loss; treating only the shutdown string as
+          // sw_evicted would leave real eviction to surface as a raw error.
+          if (!isBridgeDisconnectError(sendErr) || detached) {
             throw sendErr;
           }
 

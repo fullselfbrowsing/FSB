@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { WebSocketBridge } from '../bridge.js';
+import { isBridgeDisconnectError, type WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import type { MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
@@ -133,15 +133,18 @@ export function registerAutopilotTools(
             },
           );
         } catch (sendErr) {
-          const errMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
-
           // Phase 239 plan 03 -- D-05 sw_evicted detection. mcp/src/bridge.ts
-          // disconnect() rejects pendingRequests with new Error('Bridge
-          // disconnected') when the WebSocket disconnects (which happens on
-          // SW eviction). Catch that specific error string and resolve the
-          // tool with the documented D-05 shape rather than letting the
-          // error propagate as a tool failure.
-          if (errMsg === 'Bridge disconnected') {
+          // rejects in-flight pendingRequests on three disconnect paths:
+          //   - 'Bridge disconnected'    (server shutdown; disconnect())
+          //   - 'Extension disconnected' (MV3 SW eviction, hub mode)
+          //   - 'Lost connection to hub' (relay-mode hub loss)
+          // Treat ALL three as sw_evicted -- previously this branch tested
+          // only the shutdown string, leaving real eviction to surface as a
+          // raw tool failure. isBridgeDisconnectError is the single source
+          // of truth kept next to the rejection sites in bridge.ts so a
+          // future disconnect path added there has one place to be wired
+          // through here.
+          if (isBridgeDisconnectError(sendErr)) {
             // After the bridge reconnects (which the bridge client handles
             // via its existing reconnect logic), ask the extension for the
             // persisted snapshot via a new mcp:get-task-snapshot bridge
