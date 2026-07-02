@@ -618,10 +618,16 @@
       params: GET_DATABASE_PARAMS,
       async handle(args, ctx) {
         var a = args || {};
-        // [ASSUMED] the /api/v3 record-fetch RPC op + body keyed by database_id --
-        // carried-forward live UAT debt, exactly like notion.getSpaces/loadPage.
+        // Database (collection) records live in the `collection` table -- the
+        // schema (properties/columns) that this op is documented to return is
+        // only present on collection records; a `block` lookup returns a role-
+        // only/empty envelope that guardRpcShape passes through as (empty)
+        // success. Matches sibling ops in this file: create_database verifies
+        // against `[{ id: collectionId, table: 'collection' }]` and
+        // create_database_item resolves the same database_id via the
+        // collection table too.
         var res = await ctx.executeBoundSpec(buildRpcSpec('getRecordValues', {
-          requests: [{ id: a.database_id, table: 'block' }]
+          requests: [{ id: a.database_id, table: 'collection' }]
         }), ctx.tabId);
         return guardRpcShape(res, 'notion.get_database');
       }
