@@ -465,7 +465,7 @@
 
     'steam.generate_discovery_queue': guarded(
       'steam.generate_discovery_queue',
-      'read',
+      'write',
       DISCOVERY_PARAMS,
       'unverified-steam-generate-discovery-queue-mutation'
     ),
@@ -483,13 +483,13 @@
     ),
     'steam.ignore_app': guarded(
       'steam.ignore_app',
-      'read',
+      'write',
       APP_PARAMS,
       'unverified-steam-ignore-app-mutation'
     ),
     'steam.unignore_app': guarded(
       'steam.unignore_app',
-      'read',
+      'write',
       APP_PARAMS,
       'unverified-steam-unignore-app-mutation'
     ),
