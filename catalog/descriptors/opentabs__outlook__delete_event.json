@@ -37,7 +37,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "POST",
+      "httpMethod": "DELETE",
       "opNameVerb": "delete"
     }
   }

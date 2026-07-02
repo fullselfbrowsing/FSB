@@ -33,7 +33,7 @@
     "sourcePath": "plugins/reddit/src/tools/get-user.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

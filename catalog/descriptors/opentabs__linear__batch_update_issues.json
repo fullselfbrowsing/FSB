@@ -19,7 +19,7 @@
         "items": {
           "type": "string"
         },
-        "description": "Array of issue UUIDs to update (1\u201325)"
+        "description": "Array of issue UUIDs to update (1–25)"
       },
       "state_id": {
         "description": "New workflow state UUID",

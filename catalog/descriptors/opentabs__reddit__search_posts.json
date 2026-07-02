@@ -55,7 +55,7 @@
         "type": "string"
       },
       "include_body": {
-        "description": "Whether to include post body text (selftext) and external URL. Defaults to false \u2014 titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
+        "description": "Whether to include post body text (selftext) and external URL. Defaults to false — titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
         "type": "boolean"
       }
     },
@@ -71,7 +71,7 @@
     "sourcePath": "plugins/reddit/src/tools/search-posts.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "search"
     }

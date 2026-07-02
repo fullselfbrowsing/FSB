@@ -9,7 +9,7 @@
     "delete file in gdrive",
     "delete a file in google drive"
   ],
-  "description": "Permanently delete a file or folder. This bypasses the trash \u2014 the file cannot be recovered. For a safer alternative, use trash_file to move it to trash first.",
+  "description": "Permanently delete a file or folder. This bypasses the trash — the file cannot be recovered. For a safer alternative, use trash_file to move it to trash first.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {

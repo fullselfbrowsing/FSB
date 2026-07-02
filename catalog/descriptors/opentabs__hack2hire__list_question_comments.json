@@ -8,18 +8,18 @@
     "see all my question comments in hack2hire",
     "list comments on a question in hack2hire"
   ],
-  "description": "List comments on a Hack2Hire interview question or coding question. Provide either `postId` (top-level discussion on the post) or `codingQuestionId` (comments anchored to a specific coding question \u2014 get this ID from `get_question`'s `codingQuestionIds` field). Each comment includes the body, language label for code snippets, vote scores, view count, reply count, and author identity.",
+  "description": "List comments on a Hack2Hire interview question or coding question. Provide either `postId` (top-level discussion on the post) or `codingQuestionId` (comments anchored to a specific coding question — get this ID from `get_question`'s `codingQuestionIds` field). Each comment includes the body, language label for code snippets, vote scores, view count, reply count, and author identity.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
       "postId": {
-        "description": "Post ID \u2014 list discussion comments on the post itself.",
+        "description": "Post ID — list discussion comments on the post itself.",
         "type": "string"
       },
       "codingQuestionId": {
-        "description": "Coding question ID \u2014 list comments anchored to a specific coding question. Get this from get_question's codingQuestionIds field.",
+        "description": "Coding question ID — list comments anchored to a specific coding question. Get this from get_question's codingQuestionIds field.",
         "type": "string"
       },
       "page": {

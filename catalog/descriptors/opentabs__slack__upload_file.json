@@ -41,7 +41,7 @@
         "type": "string"
       },
       "filetype": {
-        "description": "Slack file type identifier (e.g., txt, png, pdf) \u2014 auto-detected if omitted",
+        "description": "Slack file type identifier (e.g., txt, png, pdf) — auto-detected if omitted",
         "type": "string"
       }
     },

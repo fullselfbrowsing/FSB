@@ -21,7 +21,7 @@
         "maximum": 100
       },
       "starting_after": {
-        "description": "Product ID cursor \u2014 fetch products created after this ID",
+        "description": "Product ID cursor — fetch products created after this ID",
         "type": "string"
       },
       "active": {

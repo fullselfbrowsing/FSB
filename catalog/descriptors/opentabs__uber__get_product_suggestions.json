@@ -15,7 +15,7 @@
     "type": "object",
     "properties": {
       "type": {
-        "description": "Suggestion type \u2014 DEFAULT shows all products, CUSTOM shows personalized order. Default DEFAULT.",
+        "description": "Suggestion type — DEFAULT shows all products, CUSTOM shows personalized order. Default DEFAULT.",
         "type": "string",
         "enum": [
           "DEFAULT",
@@ -33,7 +33,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "GET",
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

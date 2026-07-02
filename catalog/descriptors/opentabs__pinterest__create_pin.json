@@ -53,7 +53,7 @@
     "sourcePath": "plugins/pinterest/src/tools/create-pin.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourcepost",
       "httpMethod": "SCRAPED",
       "opNameVerb": "create"
     }

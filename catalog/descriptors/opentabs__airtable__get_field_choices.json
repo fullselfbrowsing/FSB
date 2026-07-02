@@ -24,7 +24,7 @@
       },
       "field_id": {
         "type": "string",
-        "description": "Field/column ID (fld prefix) \u2014 must be a select or multiSelect type"
+        "description": "Field/column ID (fld prefix) — must be a select or multiSelect type"
       }
     },
     "required": [

@@ -8,7 +8,7 @@
   ],
   "description": "Subscribe to a YouTube channel. The channel will appear in the subscriptions feed.",
   "actionVerb": "subscribe",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -30,7 +30,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "GET",
+      "httpMethod": null,
       "opNameVerb": "subscribe"
     }
   }

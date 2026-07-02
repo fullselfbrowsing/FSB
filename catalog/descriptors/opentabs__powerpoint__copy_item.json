@@ -21,7 +21,7 @@
         "type": "string"
       },
       "destination_folder_id": {
-        "description": "Destination folder item ID \u2014 defaults to same folder",
+        "description": "Destination folder item ID — defaults to same folder",
         "type": "string"
       }
     },

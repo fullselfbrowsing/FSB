@@ -26,10 +26,10 @@
           "edit",
           "embed"
         ],
-        "description": "Link type \u2014 view (read-only), edit (read-write), or embed"
+        "description": "Link type — view (read-only), edit (read-write), or embed"
       },
       "scope": {
-        "description": "Link scope \u2014 anonymous (anyone) or organization (org members only). Default: anonymous",
+        "description": "Link scope — anonymous (anyone) or organization (org members only). Default: anonymous",
         "type": "string",
         "enum": [
           "anonymous",

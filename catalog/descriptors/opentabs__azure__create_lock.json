@@ -33,7 +33,7 @@
           "CanNotDelete",
           "ReadOnly"
         ],
-        "description": "Lock level \u2014 CanNotDelete or ReadOnly"
+        "description": "Lock level — CanNotDelete or ReadOnly"
       },
       "notes": {
         "description": "Notes about the lock",

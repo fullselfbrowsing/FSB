@@ -27,10 +27,10 @@
       },
       "body": {
         "type": "string",
-        "description": "Page body in storage format (HTML) \u2014 e.g., \"<p>Hello world</p>\""
+        "description": "Page body in storage format (HTML) — e.g., \"<p>Hello world</p>\""
       },
       "parent_id": {
-        "description": "Parent page ID \u2014 omit to create at the space root",
+        "description": "Parent page ID — omit to create at the space root",
         "type": "string"
       },
       "status": {

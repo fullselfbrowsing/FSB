@@ -47,7 +47,7 @@
     "sourcePath": "plugins/pinterest/src/tools/update-board.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourcepost",
       "httpMethod": null,
       "opNameVerb": "update"
     }

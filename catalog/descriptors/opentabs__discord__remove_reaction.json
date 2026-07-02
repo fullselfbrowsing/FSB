@@ -25,7 +25,7 @@
       "emoji": {
         "type": "string",
         "minLength": 1,
-        "description": "Emoji to remove \u2014 use Unicode emoji (e.g., \"\ud83d\udc4d\") or custom emoji format \"name:id\""
+        "description": "Emoji to remove — use Unicode emoji (e.g., \"👍\") or custom emoji format \"name:id\""
       }
     },
     "required": [

@@ -8,7 +8,7 @@
   ],
   "description": "Remove an app from the ignored list so it appears in recommendations and discovery queues again.",
   "actionVerb": "unignore",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -31,7 +31,7 @@
     "sourcePath": "plugins/steam/src/tools/unignore-app.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storepost",
       "httpMethod": null,
       "opNameVerb": "unignore"
     }

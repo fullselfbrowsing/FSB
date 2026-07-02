@@ -8,7 +8,7 @@
     "view one specific company question stats in hack2hire",
     "question count breakdown for a company in hack2hire"
   ],
-  "description": "Get the breakdown of tracked questions for a specific company \u2014 the total count plus a count per question type (ALGORITHM, SD, ML_SD, BLOG). Also returns the count for every curated collection. Useful for showing how many questions are available before drilling into a list.",
+  "description": "Get the breakdown of tracked questions for a specific company — the total count plus a count per question type (ALGORITHM, SD, ML_SD, BLOG). Also returns the count for every curated collection. Useful for showing how many questions are available before drilling into a list.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {

@@ -9,7 +9,7 @@
     "get prompt library in chatgpt",
     "get prompt library templates in chatgpt"
   ],
-  "description": "Get the ChatGPT prompt library \u2014 a collection of suggested prompt templates organized by category.",
+  "description": "Get the ChatGPT prompt library — a collection of suggested prompt templates organized by category.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {

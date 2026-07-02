@@ -36,7 +36,7 @@
     "sourcePath": "plugins/reddit/src/tools/submit-comment.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "submit"
     }

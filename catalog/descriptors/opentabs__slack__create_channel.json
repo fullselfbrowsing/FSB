@@ -20,10 +20,10 @@
         "minLength": 1,
         "maxLength": 80,
         "pattern": "^[a-z0-9][a-z0-9_-]*$",
-        "description": "Name for the new channel \u2014 must be lowercase, no spaces, max 80 chars (e.g., \"project-updates\")"
+        "description": "Name for the new channel — must be lowercase, no spaces, max 80 chars (e.g., \"project-updates\")"
       },
       "is_private": {
-        "description": "Whether to create a private channel (default false \u2014 creates public channel)",
+        "description": "Whether to create a private channel (default false — creates public channel)",
         "type": "boolean"
       },
       "topic": {

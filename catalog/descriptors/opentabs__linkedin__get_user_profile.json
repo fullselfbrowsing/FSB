@@ -17,7 +17,7 @@
     "properties": {
       "public_identifier": {
         "type": "string",
-        "description": "Public profile identifier \u2014 the slug from the LinkedIn profile URL (e.g., \"williamhgates\")"
+        "description": "Public profile identifier — the slug from the LinkedIn profile URL (e.g., \"williamhgates\")"
       }
     },
     "required": [

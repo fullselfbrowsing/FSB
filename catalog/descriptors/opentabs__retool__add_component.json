@@ -6,7 +6,7 @@
     "add component in retool",
     "add a ui widget to an app in retool"
   ],
-  "description": "Add a UI widget component to a Retool app. Handles Transit JSON manipulation internally \u2014 you only need to specify the component type, properties, and position. Common types: TextWidget (markdown text), ButtonWidget2 (button), TextInputWidget (input field), TableWidget2 (data table), SelectWidget (dropdown), NumberInputWidget (number input), CheckboxWidget (checkbox), ContainerWidget (container/frame).",
+  "description": "Add a UI widget component to a Retool app. Handles Transit JSON manipulation internally — you only need to specify the component type, properties, and position. Common types: TextWidget (markdown text), ButtonWidget2 (button), TextInputWidget (input field), TableWidget2 (data table), SelectWidget (dropdown), NumberInputWidget (number input), CheckboxWidget (checkbox), ContainerWidget (container/frame).",
   "actionVerb": "add",
   "sideEffectClass": "write",
   "params": {

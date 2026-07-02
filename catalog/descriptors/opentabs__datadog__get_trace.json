@@ -17,7 +17,7 @@
     "properties": {
       "trace_id": {
         "type": "string",
-        "description": "Trace ID \u2014 accepts 32 hex characters (e.g., \"abcdef1234567890abcdef1234567890\") or decimal digits"
+        "description": "Trace ID — accepts 32 hex characters (e.g., \"abcdef1234567890abcdef1234567890\") or decimal digits"
       }
     },
     "required": [

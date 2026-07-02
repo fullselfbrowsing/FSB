@@ -8,7 +8,7 @@
     "see all my events in outlook",
     "list calendar events in outlook"
   ],
-  "description": "List calendar events from a calendar (defaults to the primary calendar). Returns events as stored \u2014 recurring series appear as a single series master, not expanded into occurrences. To see what actually falls within a date range (with recurrences expanded), use get_calendar_view instead.",
+  "description": "List calendar events from a calendar (defaults to the primary calendar). Returns events as stored — recurring series appear as a single series master, not expanded into occurrences. To see what actually falls within a date range (with recurrences expanded), use get_calendar_view instead.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {

@@ -8,7 +8,7 @@
   ],
   "description": "Execute a multi-query timeseries request using the Datadog internal query engine. Supports metrics, logs, spans, and other data sources with formula support.",
   "actionVerb": "query",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -85,7 +85,7 @@
     "sourcePath": "plugins/datadog/src/tools/query-timeseries.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "apiuipost",
       "httpMethod": null,
       "opNameVerb": "query"
     }

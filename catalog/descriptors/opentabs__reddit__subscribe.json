@@ -8,7 +8,7 @@
   ],
   "description": "Subscribe to or unsubscribe from a subreddit",
   "actionVerb": "subscribe",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -39,7 +39,7 @@
     "sourcePath": "plugins/reddit/src/tools/subscribe.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "subscribe"
     }

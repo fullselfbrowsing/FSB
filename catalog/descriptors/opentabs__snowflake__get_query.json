@@ -9,7 +9,7 @@
     "get query in snowflake",
     "fetch additional result chunks for a query in snowflake"
   ],
-  "description": "Fetch a specific result chunk from a previously executed query by its query ID and chunk index. Use this when run_query indicates hasMoreChunks=true. Chunk index 0 is the first chunk (already returned by run_query), so start from index 1. Returns raw row arrays \u2014 use the column metadata from the original run_query response to interpret values.",
+  "description": "Fetch a specific result chunk from a previously executed query by its query ID and chunk index. Use this when run_query indicates hasMoreChunks=true. Chunk index 0 is the first chunk (already returned by run_query), so start from index 1. Returns raw row arrays — use the column metadata from the original run_query response to interpret values.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {

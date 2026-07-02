@@ -16,7 +16,7 @@
     "type": "object",
     "properties": {
       "folder_id": {
-        "description": "Folder item ID \u2014 defaults to root",
+        "description": "Folder item ID — defaults to root",
         "type": "string"
       },
       "top": {

@@ -38,7 +38,7 @@
     "sourcePath": "plugins/pinterest/src/tools/save-pin.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourcepost",
       "httpMethod": null,
       "opNameVerb": "save"
     }

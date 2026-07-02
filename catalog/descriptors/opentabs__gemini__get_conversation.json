@@ -9,7 +9,7 @@
     "open a conversation in gemini",
     "get conversation in gemini"
   ],
-  "description": "Get the messages of the currently active Gemini conversation. Returns the conversation ID and all visible message turns (prompt/response pairs). If a conversation_id is provided and it does not match the current URL, the browser navigates to that conversation first. Note: only messages visible on screen are returned \u2014 very long conversations may be truncated.",
+  "description": "Get the messages of the currently active Gemini conversation. Returns the conversation ID and all visible message turns (prompt/response pairs). If a conversation_id is provided and it does not match the current URL, the browser navigates to that conversation first. Note: only messages visible on screen are returned — very long conversations may be truncated.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {

@@ -15,7 +15,7 @@
     "type": "object",
     "properties": {
       "space_id": {
-        "description": "Filter pages by space ID \u2014 omit to list pages across all spaces",
+        "description": "Filter pages by space ID — omit to list pages across all spaces",
         "type": "string"
       },
       "limit": {

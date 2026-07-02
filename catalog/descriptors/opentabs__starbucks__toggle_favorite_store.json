@@ -8,7 +8,7 @@
   ],
   "description": "Add or remove a Starbucks store from your favorites list. Use find_stores to discover store IDs.",
   "actionVerb": "toggle",
-  "sideEffectClass": "write",
+  "sideEffectClass": "destructive",
   "params": {
     "type": "object",
     "properties": {
@@ -35,7 +35,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "POST",
+      "httpMethod": "DELETE",
       "opNameVerb": "toggle"
     }
   }

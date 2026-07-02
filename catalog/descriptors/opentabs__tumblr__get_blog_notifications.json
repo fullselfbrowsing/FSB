@@ -19,7 +19,7 @@
         "description": "Blog name or identifier (e.g., \"staff\" or \"staff.tumblr.com\")"
       },
       "before": {
-        "description": "Unix timestamp for pagination \u2014 return notifications before this time",
+        "description": "Unix timestamp for pagination — return notifications before this time",
         "type": "number"
       }
     },

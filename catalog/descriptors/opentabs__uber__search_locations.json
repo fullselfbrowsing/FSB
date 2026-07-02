@@ -25,7 +25,7 @@
         "description": "Longitude for the search center (e.g., -122.4194 for San Francisco)"
       },
       "type": {
-        "description": "Search type \u2014 PICKUP or DROPOFF. Default PICKUP.",
+        "description": "Search type — PICKUP or DROPOFF. Default PICKUP.",
         "type": "string",
         "enum": [
           "PICKUP",
@@ -48,7 +48,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "GET",
+      "httpMethod": null,
       "opNameVerb": "search"
     }
   }

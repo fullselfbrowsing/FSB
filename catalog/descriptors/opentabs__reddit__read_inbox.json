@@ -32,7 +32,7 @@
     "sourcePath": "plugins/reddit/src/tools/read-inbox.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "read"
     }

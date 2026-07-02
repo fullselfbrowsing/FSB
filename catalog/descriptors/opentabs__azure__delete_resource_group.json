@@ -8,7 +8,7 @@
     "permanently delete a resource group in azure",
     "delete resource group in azure"
   ],
-  "description": "Delete a resource group and all resources within it. This is a destructive operation that cannot be undone. The operation is asynchronous \u2014 Azure begins deletion and returns immediately.",
+  "description": "Delete a resource group and all resources within it. This is a destructive operation that cannot be undone. The operation is asynchronous — Azure begins deletion and returns immediately.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {

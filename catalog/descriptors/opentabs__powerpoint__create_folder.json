@@ -20,7 +20,7 @@
         "description": "Folder name"
       },
       "parent_folder_id": {
-        "description": "Parent folder item ID \u2014 defaults to root",
+        "description": "Parent folder item ID — defaults to root",
         "type": "string"
       }
     },

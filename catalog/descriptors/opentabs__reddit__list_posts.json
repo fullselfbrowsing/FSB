@@ -48,11 +48,11 @@
         "maximum": 100
       },
       "after": {
-        "description": "Pagination cursor \u2014 fullname of the last item (e.g., \"t3_abc123\")",
+        "description": "Pagination cursor — fullname of the last item (e.g., \"t3_abc123\")",
         "type": "string"
       },
       "include_body": {
-        "description": "Whether to include post body text (selftext) and external URL. Defaults to false \u2014 titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
+        "description": "Whether to include post body text (selftext) and external URL. Defaults to false — titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
         "type": "boolean"
       }
     },
@@ -65,7 +65,7 @@
     "sourcePath": "plugins/reddit/src/tools/list-posts.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "list"
     }

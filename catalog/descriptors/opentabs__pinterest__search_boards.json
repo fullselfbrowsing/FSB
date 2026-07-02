@@ -39,7 +39,7 @@
     "sourcePath": "plugins/pinterest/src/tools/search-boards.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "search"
     }

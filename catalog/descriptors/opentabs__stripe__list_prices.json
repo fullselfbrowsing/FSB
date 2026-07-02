@@ -21,7 +21,7 @@
         "maximum": 100
       },
       "starting_after": {
-        "description": "Price ID cursor \u2014 fetch prices created after this ID",
+        "description": "Price ID cursor — fetch prices created after this ID",
         "type": "string"
       },
       "product": {

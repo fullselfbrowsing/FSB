@@ -9,7 +9,7 @@
     "get comment in hack2hire",
     "get the full content of a comment in hack2hire"
   ],
-  "description": "Get the full content of a single comment by ID, including its source code body (for code-snippet comments) or markdown text body (for prose comments). The list endpoints (`list_question_comments`, `list_comment_replies`) only return metadata \u2014 call this to read the actual content.",
+  "description": "Get the full content of a single comment by ID, including its source code body (for code-snippet comments) or markdown text body (for prose comments). The list endpoints (`list_question_comments`, `list_comment_replies`) only return metadata — call this to read the actual content.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,7 +17,7 @@
     "properties": {
       "commentId": {
         "type": "string",
-        "description": "Comment ID \u2014 get this from list_question_comments or list_comment_replies."
+        "description": "Comment ID — get this from list_question_comments or list_comment_replies."
       }
     },
     "required": [

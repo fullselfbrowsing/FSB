@@ -23,7 +23,7 @@
     "sourcePath": "plugins/steam/src/tools/get-popular-tags.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storeget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

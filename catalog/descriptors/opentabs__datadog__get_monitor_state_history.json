@@ -11,7 +11,7 @@
   ],
   "description": "Preview the evaluation results of a monitor over a time range. Shows the timeseries data that the monitor evaluates against.",
   "actionVerb": "get",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -44,7 +44,7 @@
     "sourcePath": "plugins/datadog/src/tools/get-monitor-state-history.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "apiuipost",
       "httpMethod": null,
       "opNameVerb": "get"
     }

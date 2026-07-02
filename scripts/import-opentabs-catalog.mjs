@@ -47,13 +47,13 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSy
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import { classifyGate } from './verify-classification-gate.mjs';
+import { classifyGate, SCREEN_SAFE_ALLOWLIST } from './verify-classification-gate.mjs';
 // THE single shared side-effect derivation (HI-02). The importer stamps the class
 // with the SAME verb-map + GraphQL/RPC carve-out + override table + fail-safe-high
 // floor the cross-check gate (scripts/verify-catalog-crosscheck.mjs) re-derives with
 // -- imported from one module so the two can never diverge. verbPrefix is camelCase-
 // aware here too (it is the importer's actionVerb + synonym seed).
-import { verbPrefix, deriveClass, helperClass, rankOf } from './lib/side-effect-class.mjs';
+import { verbPrefix, deriveClass, helperClass, methodClass, rankOf } from './lib/side-effect-class.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -473,14 +473,56 @@ export function inferSideEffect(tool, signals, serviceStem) {
 // {method:'...'} literal -- WITHOUT executing the handle body (Wall 1). This is a
 // static string scan, not code execution.
 // ---------------------------------------------------------------------------
-function extractTransportSignals(app, opFileBase) {
-  const srcPath = join(VENDOR_ROOT, app, 'src', 'tools', `${opFileBase}.ts`);
-  let text = '';
-  try {
-    text = readFileSync(srcPath, 'utf8');
-  } catch (_e) {
-    text = '';
+
+/**
+ * pluginApiDefaultMethodFromText(apiText) -> 'GET'|'POST'|...|null
+ *
+ * The per-plugin generic api() helper's EFFECTIVE default method, recovered from
+ * the plugin's <app>-api.ts source text. The generic-`api` fallback below must not
+ * blindly assume GET: a plugin whose api() hardcodes (or defaults) POST would have
+ * every generic-api op under-stated as a GET read. Recognized forms, scanned ONLY
+ * inside the generic api definition (from `export const api =` / `export function
+ * api` up to the next export):
+ *   - destructured/param default:  method = 'POST'
+ *   - defaulted option:            method: options.method || 'POST'  (also ??)
+ *   - unconditional literal:       method: 'POST'   (no option passthrough at all)
+ * A passthrough with a GET default (or no recognizable form) returns null -> the
+ * caller keeps the documented GET default. Static string scan; never executed.
+ */
+export function pluginApiDefaultMethodFromText(apiText) {
+  const src = String(apiText || '');
+  const defMatch = src.match(/export\s+(?:const\s+api\s*=|(?:async\s+)?function\s+api\b)[\s\S]*?(?=\nexport\s|$)/);
+  if (!defMatch) return null;
+  const body = defMatch[0];
+  // Defaulted caller option, either as an assignment or an init property:
+  //   const method = options?.method ?? 'X';   (wikipedia/starbucks form)
+  //   method: options.method || 'X'            (chipotle form)
+  const defaulted = body.match(/\bmethod\s*[=:]\s*[\w$]+(?:\?*\.[\w$]+)*\s*(?:\|\||\?\?)\s*['"]([A-Za-z]+)['"]/);
+  if (defaulted) return defaulted[1].toUpperCase();
+  // Param/destructure default: `method = 'X'` (a bare literal default).
+  const paramDefault = body.match(/\bmethod\s*=\s*['"]([A-Za-z]+)['"]/);
+  if (paramDefault) return paramDefault[1].toUpperCase();
+  // Unconditional literal -- but ONLY when the api() takes no caller method at
+  // all (an internal branch like wikipedia's POST leg, or a shorthand
+  // passthrough, must not be mistaken for the default).
+  const passesCallerMethod = /\bmethod\s*[,}]|\bmethod\s*[=:]\s*[\w$]+(?:\?*\.[\w$]+)+/.test(body);
+  if (!passesCallerMethod) {
+    const literal = body.match(/\bmethod\s*:\s*['"]([A-Za-z]+)['"]/);
+    if (literal) return literal[1].toUpperCase();
+    // No method token anywhere in the definition: the underlying fetch/XHR
+    // platform default is GET (amazon/etsy-style bare-fetch helpers).
+    if (!/\bmethod\b/.test(body)) return 'GET';
   }
+  return null;
+}
+
+/**
+ * extractTransportSignalsFromText(text, pluginApiText) -> { transportHelper, httpMethod }
+ *
+ * The pure text scan (exported for the extraction unit tests; the file-reading
+ * wrapper below feeds it the vendored sources).
+ */
+export function extractTransportSignalsFromText(text, pluginApiText) {
   // transport helper: the imported helper actually called in handle (api / apiVoid /
   // apiGet / apiPost / graphql / graphqlMutation / graphqlQuery / ...). We MAX-merge
   // across every helper occurrence in the file (matchAll, not .match) so an op that
@@ -489,10 +531,29 @@ function extractTransportSignals(app, opFileBase) {
   // widen the pattern to catch per-plugin *Mutation/*Query wrappers so ops like
   // x.like_tweet (uses graphqlMutation) get real provenance instead of null signals.
   let transportHelper = null;
-  const helperRe = /\b(apiGet|apiPost|apiPut|apiPatch|apiDelete|apiVoid|graphqlMutation|graphqlQuery|graphql|gqlRequest|gql|api)\b\s*[<(]/g;
+  // The canonical airtable-convention names PLUS the per-plugin verb-suffix
+  // convention (redditPost/storePost/redditGet/etc.) that most opentabs plugins
+  // actually use. helperClass() knows how to classify either shape; helperRe just
+  // needs to surface the identifier as a candidate so the scan does not silently
+  // skip a real POST mutation.
+  //
+  // The two alternatives use DIFFERENT call-site lookaheads on purpose:
+  //   - airtable convention (apiGet/api/graphql/...): [<(] -- either typed
+  //     `apiGet<T>(...)` or untyped `api(...)`; both are transport calls.
+  //   - per-plugin verb-suffix (redditPost/storePost/...): REQUIRE `<` -- the
+  //     HTTP transport helpers are always invoked with an explicit generic type
+  //     parameter (`redditPost<Record<string, never>>('/api/...', {...})`),
+  //     while non-transport map helpers with matching suffixes (bluesky's
+  //     `mapPost(item.post)`, schema builders, etc.) never take a type
+  //     parameter. Requiring `<` filters out the false positives without
+  //     losing any real transport call.
+  const helperRe = /\b(?:(apiGet|apiPost|apiPut|apiPatch|apiDelete|apiVoid|graphqlMutation|graphqlQuery|graphql|gqlRequest|gql|api)\s*[<(]|([a-z][a-zA-Z0-9_]*?(?:Get|Post|Put|Patch|Delete|Void))\s*<)/g;
   let mostSevereClass = null;
   for (const m of text.matchAll(helperRe)) {
-    const candidate = m[1];
+    // Group 1 = airtable-convention helper (apiGet/api/graphql/...);
+    // Group 2 = per-plugin verb-suffix helper (redditPost/storePost/...).
+    // Exactly one is set per match; the other is undefined.
+    const candidate = m[1] || m[2];
     const candCls = helperClass(candidate);
     if (!transportHelper) transportHelper = candidate;
     if (candCls && (!mostSevereClass || rankOf(candCls) > rankOf(mostSevereClass))) {
@@ -500,18 +561,42 @@ function extractTransportSignals(app, opFileBase) {
       transportHelper = candidate;
     }
   }
-  // method literal: {method:'POST'} / { method: "DELETE" }
+  // method literal: {method:'POST'} / { method: "DELETE" }. MAX-merge across EVERY
+  // literal (matchAll, mirroring the helper loop above) so an op that POSTs on one
+  // leg and DELETEs on another -- e.g. starbucks.toggle_favorite_store (favorite:
+  // POST, unfavorite: DELETE) -- persists the MOST-SEVERE method, not whichever
+  // literal appears first (methodClass: GET<POST/PUT/PATCH<DELETE lattice).
   let httpMethod = null;
-  const methodMatch = text.match(/method\s*:\s*['"]([A-Za-z]+)['"]/);
-  if (methodMatch) {
-    httpMethod = methodMatch[1].toUpperCase();
-  } else if (transportHelper) {
+  let mostSevereMethodClass = null;
+  for (const m of text.matchAll(/method\s*:\s*['"]([A-Za-z]+)['"]/g)) {
+    const candidate = m[1].toUpperCase();
+    const candCls = methodClass(candidate);
+    if (!httpMethod) httpMethod = candidate;
+    if (candCls && (!mostSevereMethodClass || rankOf(candCls) > rankOf(mostSevereMethodClass))) {
+      mostSevereMethodClass = candCls;
+      httpMethod = candidate;
+    }
+  }
+  if (!httpMethod && transportHelper) {
     // No literal: infer the helper's documented DEFAULT method.
-    //   api (generic)    -> default GET
+    //   api (generic)    -> GET when the per-plugin api() source confirms a GET
+    //                       default (or is undeterminable -- the audited corpus
+    //                       default). A MUTATING per-plugin default (uber/youtube
+    //                       innertube-style POST-RPC, where reads POST too) means
+    //                       the wire method is UNINFORMATIVE for classification:
+    //                       stamp NO method -- mirroring the GraphQL carve-out --
+    //                       so the op-name verb classifies and deriveClass's
+    //                       isApiHelper floor catches ambiguous verbs. Blindly
+    //                       stamping GET here was the headline false-negative
+    //                       (youtube.subscribe classed read); stamping POST would
+    //                       flip every RPC READ to write.
     //   apiVoid          -> default POST
     //   apiGet           -> GET ; apiPost/apiPut/apiPatch -> their verb ; apiDelete -> DELETE
     const h = transportHelper.toLowerCase();
-    if (h === 'api') httpMethod = 'GET';
+    if (h === 'api') {
+      const pluginDefault = pluginApiDefaultMethodFromText(pluginApiText);
+      httpMethod = (pluginDefault === null || methodClass(pluginDefault) === 'read') ? 'GET' : null;
+    }
     else if (h === 'apivoid') httpMethod = 'POST';
     else if (h === 'apiget') httpMethod = 'GET';
     else if (h === 'apipost') httpMethod = 'POST';
@@ -520,6 +605,32 @@ function extractTransportSignals(app, opFileBase) {
     else if (h === 'apidelete') httpMethod = 'DELETE';
   }
   return { transportHelper, httpMethod };
+}
+
+// Per-app cache of the plugin's <app>-api.ts source (read once per app; '' when
+// the plugin has no shared api helper file).
+const _pluginApiTextCache = new Map();
+function _pluginApiText(app) {
+  if (_pluginApiTextCache.has(app)) return _pluginApiTextCache.get(app);
+  let apiText = '';
+  try {
+    apiText = readFileSync(join(VENDOR_ROOT, app, 'src', `${app}-api.ts`), 'utf8');
+  } catch (_e) {
+    apiText = '';
+  }
+  _pluginApiTextCache.set(app, apiText);
+  return apiText;
+}
+
+function extractTransportSignals(app, opFileBase) {
+  const srcPath = join(VENDOR_ROOT, app, 'src', 'tools', `${opFileBase}.ts`);
+  let text = '';
+  try {
+    text = readFileSync(srcPath, 'utf8');
+  } catch (_e) {
+    text = '';
+  }
+  return extractTransportSignalsFromText(text, _pluginApiText(app));
 }
 
 // op name (snake_case) -> op file base (kebab-case), matching the vendored layout.
@@ -1153,7 +1264,7 @@ export function readPluginMeta(app) {
 // ---------------------------------------------------------------------------
 export async function gateItems(items) {
   await Denylist.load();
-  return classifyGate(items);
+  return classifyGate(items, { safeAllowlist: SCREEN_SAFE_ALLOWLIST });
 }
 
 // ---------------------------------------------------------------------------
@@ -1272,13 +1383,18 @@ export async function runImport() {
     const rows = await extractDescriptors(app);
     for (const { serviceStem, descriptor } of rows) {
       const origin = `https://${descriptor.service}`;
-      // One screen item per ORIGIN: host + the canonical slug (a payment-verb op-name
-      // like place_order still trips the heuristic), NO op-prose description. The first
-      // op for an origin seeds the item; a later op for the same origin re-keys the slug
-      // (any of the origin's slugs is a valid screen signal). The op-prose description is
-      // deliberately omitted (DEF-39.5-03-A) so a benign axis token in dev/infra op prose
-      // cannot false-trip the origin's classification.
-      gateItemsByOrigin.set(origin, { origin, service: descriptor.service, slug: descriptor.slug });
+      // One screen item per ORIGIN: host + ALL of the origin's slugs space-joined
+      // (a payment-verb op-name like place_order or withdraw_funds trips the
+      // heuristic no matter where it sorts -- keeping only one slug per origin
+      // silently skipped every other slug's screen). The op-prose description is
+      // deliberately omitted (DEF-39.5-03-A) so a benign axis token in dev/infra
+      // op prose cannot false-trip the origin's classification.
+      const prior = gateItemsByOrigin.get(origin);
+      gateItemsByOrigin.set(origin, {
+        origin,
+        service: descriptor.service,
+        slug: prior && prior.slug ? prior.slug + ' ' + descriptor.slug : descriptor.slug,
+      });
       const opName = descriptor.slug.slice(serviceStem.length + 1);
       const fileName = `opentabs__${serviceStem}__${opName}.json`;
       toWrite.push({ path: join(DESCRIPTORS_DIR, fileName), json: descriptor });
@@ -1297,7 +1413,7 @@ export async function runImport() {
   // coverage assertion the breadth contract requires). Screened per ORIGIN on host +
   // slug (NO op prose) -- see the gateItemsByOrigin construction above (DEF-39.5-03-A).
   const gateItemsList = [...gateItemsByOrigin.values()];
-  const { failures } = classifyGate(gateItemsList);
+  const { failures } = classifyGate(gateItemsList, { safeAllowlist: SCREEN_SAFE_ALLOWLIST });
   if (failures.length) {
     throw new Error(
       'classifyGate ABORTED the batch import -- an unclassified denied/sensitive batch ' +
@@ -1345,6 +1461,13 @@ export async function runImport() {
   const fixturesDir = resolve(DESCRIPTORS_DIR, '_fixtures');
   if (!existsSync(fixturesDir)) mkdirSync(fixturesDir, { recursive: true });
 
+  // The set of descriptors as ACTUALLY WRITTEN (with hand-edit preservation applied)
+  // is what downstream consumers -- notably feedSeedDescriptors below -- must see, so
+  // the seed index stays in lockstep with the on-disk corpus (SEEDFEED-01: previously
+  // the seed feed consumed the raw pre-preservation objects, silently reverting every
+  // hand-promoted backing:'handler' slug to 'dom' in _fixtures/seed-descriptors.json
+  // even though the descriptor file itself preserved the promotion).
+  const writtenDescriptors = [];
   for (const { path, json } of toWrite) {
     // Preserve a hand-edited backing promotion. The importer's backingFor() always
     // returns 'dom' by policy (a shipped op is DOM-backed until a handler is ported
@@ -1361,6 +1484,7 @@ export async function runImport() {
       } catch (_e) { /* prior file unreadable/malformed -> emit fresh */ }
     }
     writeFileSync(path, JSON.stringify(toEmit, null, 2) + '\n', 'utf8');
+    writtenDescriptors.push(toEmit);
   }
 
   // Fill catalog/descriptors/_fixtures/_provenance.json apps[] with per-app provenance.
@@ -1377,7 +1501,7 @@ export async function runImport() {
   // Passes the emitted slug set so feedSeedDescriptors can DROP stale opentabs seed
   // slugs no longer emitted (HI-02: the review found all 94 orphan slugs were ALSO in
   // the seed index, polluting the shipped capability search -- they must be pruned too).
-  feedSeedDescriptors(emittedDescriptors);
+  feedSeedDescriptors(writtenDescriptors);
 
   return { emitted: toWrite.length, pruned: prunedFiles.length, apps: [...emittedByApp.keys()] };
 }

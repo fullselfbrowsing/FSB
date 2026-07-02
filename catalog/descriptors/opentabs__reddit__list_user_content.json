@@ -67,7 +67,7 @@
         "type": "string"
       },
       "include_body": {
-        "description": "Whether to include post/comment body text (selftext/body). Defaults to false \u2014 titles, link_ids, and metadata only. Set true when you need to read item contents.",
+        "description": "Whether to include post/comment body text (selftext/body). Defaults to false — titles, link_ids, and metadata only. Set true when you need to read item contents.",
         "type": "boolean"
       }
     },
@@ -84,7 +84,7 @@
     "sourcePath": "plugins/reddit/src/tools/list-user-content.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "list"
     }

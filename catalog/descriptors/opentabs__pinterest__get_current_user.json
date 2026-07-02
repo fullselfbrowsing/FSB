@@ -11,7 +11,7 @@
   ],
   "description": "Get the profile of the currently authenticated Pinterest user, including email, name, follower counts, board count, and account details.",
   "actionVerb": "get",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {},
@@ -24,7 +24,7 @@
     "sourcePath": "plugins/pinterest/src/tools/get-current-user.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourcepost",
       "httpMethod": null,
       "opNameVerb": "get"
     }

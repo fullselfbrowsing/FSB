@@ -8,7 +8,7 @@
   ],
   "description": "Mark an app as ignored so it no longer appears in recommendations and discovery queues. The app can be unignored later with unignore_app.",
   "actionVerb": "ignore",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -31,7 +31,7 @@
     "sourcePath": "plugins/steam/src/tools/ignore-app.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storepost",
       "httpMethod": null,
       "opNameVerb": "ignore"
     }

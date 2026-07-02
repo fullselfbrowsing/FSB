@@ -14,7 +14,7 @@
     "properties": {
       "query": {
         "type": "string",
-        "description": "Search query \u2014 name or username"
+        "description": "Search query — name or username"
       },
       "count": {
         "description": "Number of results to return (default 10, max 20)",

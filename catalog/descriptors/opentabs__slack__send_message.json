@@ -22,10 +22,10 @@
       "text": {
         "type": "string",
         "minLength": 1,
-        "description": "Message text to send \u2014 supports Slack mrkdwn formatting"
+        "description": "Message text to send — supports Slack mrkdwn formatting"
       },
       "thread_ts": {
-        "description": "Thread timestamp to reply in a thread \u2014 pass the ts of the parent message",
+        "description": "Thread timestamp to reply in a thread — pass the ts of the parent message",
         "type": "string"
       }
     },

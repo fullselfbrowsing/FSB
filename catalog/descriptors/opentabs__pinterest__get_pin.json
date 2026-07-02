@@ -32,7 +32,7 @@
     "sourcePath": "plugins/pinterest/src/tools/get-pin.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

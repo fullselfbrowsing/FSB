@@ -23,7 +23,7 @@
     "sourcePath": "plugins/pinterest/src/tools/get-notification-counts.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

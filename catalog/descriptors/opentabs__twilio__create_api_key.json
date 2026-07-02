@@ -8,7 +8,7 @@
     "open a new api key in twilio",
     "create api key in twilio"
   ],
-  "description": "Create a new API key. The secret is only returned once at creation time \u2014 store it securely.",
+  "description": "Create a new API key. The secret is only returned once at creation time — store it securely.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {

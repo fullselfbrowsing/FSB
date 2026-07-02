@@ -8,7 +8,7 @@
   ],
   "description": "Unsubscribe from a YouTube channel.",
   "actionVerb": "unsubscribe",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -30,7 +30,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "GET",
+      "httpMethod": null,
       "opNameVerb": "unsubscribe"
     }
   }

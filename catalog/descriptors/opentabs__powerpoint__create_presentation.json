@@ -17,10 +17,10 @@
     "properties": {
       "name": {
         "type": "string",
-        "description": "File name without extension \u2014 .pptx is appended automatically"
+        "description": "File name without extension — .pptx is appended automatically"
       },
       "folder_id": {
-        "description": "Parent folder item ID \u2014 defaults to root",
+        "description": "Parent folder item ID — defaults to root",
         "type": "string"
       }
     },

@@ -17,7 +17,7 @@
     "properties": {
       "tcin": {
         "type": "string",
-        "description": "Target item number (TCIN) \u2014 e.g., \"85978618\""
+        "description": "Target item number (TCIN) — e.g., \"85978618\""
       }
     },
     "required": [

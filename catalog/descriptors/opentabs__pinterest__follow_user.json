@@ -29,7 +29,7 @@
     "sourcePath": "plugins/pinterest/src/tools/follow-user.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourcepost",
       "httpMethod": null,
       "opNameVerb": "follow"
     }

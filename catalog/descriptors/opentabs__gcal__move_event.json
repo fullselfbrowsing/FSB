@@ -7,7 +7,7 @@
     "move an event in google calendar",
     "move an event to another calendar in gcal"
   ],
-  "description": "Move an event to another calendar. This changes the event organizer. Only default events can be moved \u2014 birthday, focusTime, fromGmail, outOfOffice, and workingLocation events cannot be moved.",
+  "description": "Move an event to another calendar. This changes the event organizer. Only default events can be moved — birthday, focusTime, fromGmail, outOfOffice, and workingLocation events cannot be moved.",
   "actionVerb": "move",
   "sideEffectClass": "write",
   "params": {

@@ -8,7 +8,7 @@
     "permanently delete a deployment in azure",
     "delete deployment in azure"
   ],
-  "description": "Delete a template deployment from a resource group. This removes the deployment history \u2014 it does not delete the deployed resources.",
+  "description": "Delete a template deployment from a resource group. This removes the deployment history — it does not delete the deployed resources.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {

@@ -44,7 +44,7 @@
     "sourcePath": "plugins/reddit/src/tools/send-message.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditoauthpost",
       "httpMethod": null,
       "opNameVerb": "send"
     }

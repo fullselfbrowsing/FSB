@@ -24,7 +24,7 @@
         "description": "Workflow ID"
       },
       "run_id": {
-        "description": "Run ID (optional \u2014 uses latest run if omitted)",
+        "description": "Run ID (optional — uses latest run if omitted)",
         "type": "string"
       }
     },

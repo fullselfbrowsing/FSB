@@ -35,7 +35,7 @@
     "sourcePath": "plugins/pinterest/src/tools/get-board-sections.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

@@ -8,7 +8,7 @@
   ],
   "description": "Generate a new personalized discovery queue of game recommendations. Returns a list of app IDs tailored to the user's preferences and library. Use get_app_details to look up each app.",
   "actionVerb": "generate",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -28,7 +28,7 @@
     "sourcePath": "plugins/steam/src/tools/generate-discovery-queue.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storepost",
       "httpMethod": null,
       "opNameVerb": "generate"
     }

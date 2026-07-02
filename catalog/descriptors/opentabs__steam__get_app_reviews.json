@@ -65,7 +65,7 @@
     "sourcePath": "plugins/steam/src/tools/get-app-reviews.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storeget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

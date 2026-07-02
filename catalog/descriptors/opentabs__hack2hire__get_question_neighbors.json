@@ -33,7 +33,7 @@
         ]
       },
       "sortedBy": {
-        "description": "Sort order. Defaults to \"isLocked\" \u2014 match the list_questions sortBy you used.",
+        "description": "Sort order. Defaults to \"isLocked\" — match the list_questions sortBy you used.",
         "type": "string",
         "enum": [
           "isLocked",

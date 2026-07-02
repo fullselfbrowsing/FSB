@@ -16,7 +16,7 @@
     "type": "object",
     "properties": {
       "account_id": {
-        "description": "Atlassian account ID \u2014 omit to get the current user profile",
+        "description": "Atlassian account ID — omit to get the current user profile",
         "type": "string"
       }
     },

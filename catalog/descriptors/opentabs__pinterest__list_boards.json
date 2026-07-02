@@ -41,7 +41,7 @@
     "sourcePath": "plugins/pinterest/src/tools/list-boards.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "list"
     }

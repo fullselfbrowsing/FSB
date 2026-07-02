@@ -24,7 +24,7 @@
     "sourcePath": "plugins/reddit/src/tools/get-me.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

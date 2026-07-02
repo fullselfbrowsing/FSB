@@ -6,7 +6,7 @@
     "run query in snowflake",
     "execute a sql query and return results in snowflake"
   ],
-  "description": "Execute a SQL query in Snowflake via the web application session. Returns parsed results with columns and rows as named objects. For large results (multiple chunks), all chunks are automatically fetched and combined \u2014 no need to call get_query separately. Results are capped at maxRows (default 100). All row values are strings (including numbers and timestamps) per Snowflake JSON format.",
+  "description": "Execute a SQL query in Snowflake via the web application session. Returns parsed results with columns and rows as named objects. For large results (multiple chunks), all chunks are automatically fetched and combined — no need to call get_query separately. Results are capped at maxRows (default 100). All row values are strings (including numbers and timestamps) per Snowflake JSON format.",
   "actionVerb": "run",
   "sideEffectClass": "read",
   "params": {

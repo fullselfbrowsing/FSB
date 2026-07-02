@@ -9,7 +9,7 @@
     "update document in msword",
     "update a document in microsoft word"
   ],
-  "description": "Replace the entire text content of an existing Word document (.docx). Downloads the document, replaces all body content with the new paragraphs, and re-uploads. WARNING: This removes all existing formatting (bold, italic, headings, etc.) \u2014 use replace_text_in_document for formatting-safe edits.",
+  "description": "Replace the entire text content of an existing Word document (.docx). Downloads the document, replaces all body content with the new paragraphs, and re-uploads. WARNING: This removes all existing formatting (bold, italic, headings, etc.) — use replace_text_in_document for formatting-safe edits.",
   "actionVerb": "update",
   "sideEffectClass": "write",
   "params": {

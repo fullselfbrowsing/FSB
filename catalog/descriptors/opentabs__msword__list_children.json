@@ -16,7 +16,7 @@
     "type": "object",
     "properties": {
       "item_id": {
-        "description": "Folder ID \u2014 omit for drive root",
+        "description": "Folder ID — omit for drive root",
         "type": "string"
       },
       "top": {

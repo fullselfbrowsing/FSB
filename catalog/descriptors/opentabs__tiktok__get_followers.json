@@ -19,7 +19,7 @@
         "type": "string"
       },
       "sec_uid": {
-        "description": "Secure user ID (secUid) \u2014 use get_user_profile to find this",
+        "description": "Secure user ID (secUid) — use get_user_profile to find this",
         "type": "string"
       },
       "count": {

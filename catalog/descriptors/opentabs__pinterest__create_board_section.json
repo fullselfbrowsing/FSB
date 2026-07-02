@@ -37,7 +37,7 @@
     "sourcePath": "plugins/pinterest/src/tools/create-board-section.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourcepost",
       "httpMethod": null,
       "opNameVerb": "create"
     }

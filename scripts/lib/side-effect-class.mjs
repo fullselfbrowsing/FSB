@@ -189,6 +189,15 @@ export function helperClass(transportHelper) {
   // the importer's helper extractor so provenance carries the specific helper token.
   if (/mutation$/.test(h)) return 'write';
   if (/query$/.test(h)) return 'read';
+  // Per-plugin verb-suffix helpers (redditPost/storePost/redditGet/etc.): the
+  // authoring convention across the opentabs corpus is `<plugin><Verb>` where
+  // <Verb> is the HTTP-method-shaped suffix. Fall back to the suffix so real
+  // POST mutations classify as write even when the helper is not `apiPost`.
+  // Suffix `_` check kept in step with the api-prefixed forms above.
+  if (/(?:^|[a-z0-9_])delete$/.test(h)) return 'destructive';
+  if (/(?:^|[a-z0-9_])(?:post|put|patch)$/.test(h)) return 'write';
+  if (/(?:^|[a-z0-9_])void$/.test(h)) return 'write';
+  if (/(?:^|[a-z0-9_])get$/.test(h)) return 'read';
   return null;
 }
 

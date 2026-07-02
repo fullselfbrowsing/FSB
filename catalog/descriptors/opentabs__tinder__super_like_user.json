@@ -6,7 +6,7 @@
     "super like user in tinder",
     "super like a user in tinder"
   ],
-  "description": "Super Like a user (swipe up). Limited availability \u2014 check remaining super likes in get_metadata. Returns whether the super like resulted in a match.",
+  "description": "Super Like a user (swipe up). Limited availability — check remaining super likes in get_metadata. Returns whether the super like resulted in a match.",
   "actionVerb": "super",
   "sideEffectClass": "write",
   "params": {

@@ -34,7 +34,7 @@
     "sourcePath": "plugins/reddit/src/tools/save.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "save"
     }

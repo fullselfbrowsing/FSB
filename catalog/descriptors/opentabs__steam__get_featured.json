@@ -24,7 +24,7 @@
     "sourcePath": "plugins/steam/src/tools/get-featured.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storeget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

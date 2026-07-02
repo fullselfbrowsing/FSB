@@ -33,7 +33,7 @@
     "license": "MIT",
     "signals": {
       "transportHelper": "api",
-      "httpMethod": "GET",
+      "httpMethod": null,
       "opNameVerb": "get"
     }
   }

@@ -9,7 +9,7 @@
     "list comments in google docs",
     "list comments on a document in gdocs"
   ],
-  "description": "List comment threads on a Google Doc, including replies, resolution status, and the quoted document text each comment is anchored to. Returns comments ordered by creation time. By default, only open (unresolved) comments are returned \u2014 use the status parameter to include resolved or all comments. Orphaned comments (anchored to text that was deleted from the document) are excluded by default.",
+  "description": "List comment threads on a Google Doc, including replies, resolution status, and the quoted document text each comment is anchored to. Returns comments ordered by creation time. By default, only open (unresolved) comments are returned — use the status parameter to include resolved or all comments. Orphaned comments (anchored to text that was deleted from the document) are excluded by default.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {

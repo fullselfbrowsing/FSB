@@ -6,7 +6,7 @@
     "run read only query in supabase",
     "execute a read-only sql query in supabase"
   ],
-  "description": "Run a read-only SQL query as the supabase_read_only_user role. Safer for SELECT queries \u2014 cannot modify data.",
+  "description": "Run a read-only SQL query as the supabase_read_only_user role. Safer for SELECT queries — cannot modify data.",
   "actionVerb": "run",
   "sideEffectClass": "write",
   "params": {

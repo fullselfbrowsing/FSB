@@ -32,7 +32,7 @@
     "sourcePath": "plugins/reddit/src/tools/list-flairs.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "list"
     }

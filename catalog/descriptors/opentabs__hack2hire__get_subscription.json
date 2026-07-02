@@ -9,7 +9,7 @@
     "get subscription in hack2hire",
     "get the current subscription details in hack2hire"
   ],
-  "description": "Get the authenticated user's subscription details \u2014 status (ACTIVE, CANCELED, EXPIRED, PENDING, TRIALING), payment method, plan duration code, current billing period start/end, and price.",
+  "description": "Get the authenticated user's subscription details — status (ACTIVE, CANCELED, EXPIRED, PENDING, TRIALING), payment method, plan duration code, current billing period start/end, and price.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {

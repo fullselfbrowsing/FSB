@@ -19,7 +19,7 @@
         "description": "Blog name or URL"
       },
       "before_id": {
-        "description": "Post ID cursor for pagination \u2014 returns drafts before this ID",
+        "description": "Post ID cursor for pagination — returns drafts before this ID",
         "type": "string"
       }
     },

@@ -9,7 +9,7 @@
     "create project in todoist",
     "create a new project in todoist"
   ],
-  "description": "Create a new project in Todoist. Only the name is required \u2014 all other fields are optional.",
+  "description": "Create a new project in Todoist. Only the name is required — all other fields are optional.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {

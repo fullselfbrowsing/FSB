@@ -42,7 +42,7 @@
     "sourcePath": "plugins/pinterest/src/tools/list-following.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "list"
     }

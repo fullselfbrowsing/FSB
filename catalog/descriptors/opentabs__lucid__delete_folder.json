@@ -8,7 +8,7 @@
     "permanently delete a folder in lucid",
     "delete folder in lucid"
   ],
-  "description": "Permanently delete a folder entry. Documents inside the folder are not deleted \u2014 they are moved to the root level.",
+  "description": "Permanently delete a folder entry. Documents inside the folder are not deleted — they are moved to the root level.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {

@@ -8,7 +8,7 @@
   ],
   "description": "Report a post or comment to the subreddit moderators for rule violations.",
   "actionVerb": "report",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -36,7 +36,7 @@
     "sourcePath": "plugins/reddit/src/tools/report.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "report"
     }

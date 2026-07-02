@@ -29,7 +29,7 @@
     "sourcePath": "plugins/pinterest/src/tools/get-home-feed.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "resourceget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

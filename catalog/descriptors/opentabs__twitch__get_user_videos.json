@@ -29,7 +29,7 @@
         ]
       },
       "sort": {
-        "description": "Sort order (default TIME \u2014 most recent first)",
+        "description": "Sort order (default TIME — most recent first)",
         "type": "string",
         "enum": [
           "TIME",

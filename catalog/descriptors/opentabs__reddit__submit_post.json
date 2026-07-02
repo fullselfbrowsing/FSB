@@ -69,7 +69,7 @@
     "sourcePath": "plugins/reddit/src/tools/submit-post.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "submit"
     }

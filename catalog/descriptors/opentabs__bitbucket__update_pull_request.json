@@ -45,7 +45,7 @@
         "type": "boolean"
       },
       "reviewers": {
-        "description": "Array of reviewer UUIDs \u2014 replaces the existing reviewer list",
+        "description": "Array of reviewer UUIDs — replaces the existing reviewer list",
         "type": "array",
         "items": {
           "type": "string"

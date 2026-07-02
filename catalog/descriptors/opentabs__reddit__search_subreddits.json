@@ -41,7 +41,7 @@
     "sourcePath": "plugins/reddit/src/tools/search-subreddits.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "search"
     }

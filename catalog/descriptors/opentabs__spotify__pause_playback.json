@@ -4,9 +4,9 @@
   "intentSynonyms": [
     "pause a playback in spotify",
     "pause playback in spotify",
-    "pause the current playback on the user\u2019s active device in spotify"
+    "pause the current playback on the user’s active device in spotify"
   ],
-  "description": "Pause the current playback on the user\u2019s active device.",
+  "description": "Pause the current playback on the user’s active device.",
   "actionVerb": "pause",
   "sideEffectClass": "write",
   "params": {

@@ -9,7 +9,7 @@
     "delete worksheet in excel",
     "delete a worksheet in excel online"
   ],
-  "description": "Delete a worksheet from the currently open Excel workbook by name. The workbook must have at least two worksheets \u2014 you cannot delete the last one.",
+  "description": "Delete a worksheet from the currently open Excel workbook by name. The workbook must have at least two worksheets — you cannot delete the last one.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {

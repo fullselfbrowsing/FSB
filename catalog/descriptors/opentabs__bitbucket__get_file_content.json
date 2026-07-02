@@ -28,7 +28,7 @@
         "description": "File path relative to repository root"
       },
       "ref": {
-        "description": "Branch name, tag, or commit SHA \u2014 defaults to the repository default branch",
+        "description": "Branch name, tag, or commit SHA — defaults to the repository default branch",
         "type": "string"
       }
     },

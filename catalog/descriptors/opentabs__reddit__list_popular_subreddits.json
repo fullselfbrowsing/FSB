@@ -42,7 +42,7 @@
     "sourcePath": "plugins/reddit/src/tools/list-popular-subreddits.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditget",
       "httpMethod": null,
       "opNameVerb": "list"
     }

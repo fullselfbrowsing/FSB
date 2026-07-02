@@ -7,7 +7,7 @@
     "copy an item in microsoft word",
     "copy a file or folder in msword"
   ],
-  "description": "Copy a file or folder. The copy operation is asynchronous \u2014 returns success immediately. The new copy appears in the destination folder shortly after.",
+  "description": "Copy a file or folder. The copy operation is asynchronous — returns success immediately. The new copy appears in the destination folder shortly after.",
   "actionVerb": "copy",
   "sideEffectClass": "write",
   "params": {
@@ -22,7 +22,7 @@
         "description": "ID of the destination folder"
       },
       "name": {
-        "description": "New name for the copy \u2014 defaults to original name",
+        "description": "New name for the copy — defaults to original name",
         "type": "string"
       }
     },

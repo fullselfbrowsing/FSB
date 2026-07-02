@@ -8,7 +8,7 @@
     "see all my question coding problems in hack2hire",
     "list coding problems for a post in hack2hire"
   ],
-  "description": "List the coding problems associated with a post. Each post can have one or more coding problems \u2014 for example a multi-part interview question. Returns each coding problem ID and its type (SINGLE_STEP or MULTI_STEP). Use the returned IDs with `list_question_comments` to read comments anchored to the coding problem itself.",
+  "description": "List the coding problems associated with a post. Each post can have one or more coding problems — for example a multi-part interview question. Returns each coding problem ID and its type (SINGLE_STEP or MULTI_STEP). Use the returned IDs with `list_question_comments` to read comments anchored to the coding problem itself.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -16,7 +16,7 @@
     "properties": {
       "postId": {
         "type": "string",
-        "description": "Post ID \u2014 get this from list_questions or get_question."
+        "description": "Post ID — get this from list_questions or get_question."
       }
     },
     "required": [

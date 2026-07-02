@@ -37,7 +37,7 @@
     "sourcePath": "plugins/reddit/src/tools/vote.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "vote"
     }

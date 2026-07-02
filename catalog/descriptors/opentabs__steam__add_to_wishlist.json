@@ -31,7 +31,7 @@
     "sourcePath": "plugins/steam/src/tools/add-to-wishlist.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storepost",
       "httpMethod": null,
       "opNameVerb": "add"
     }

@@ -16,7 +16,7 @@
     "properties": {
       "commentId": {
         "type": "string",
-        "description": "Parent comment ID \u2014 get this from list_question_comments."
+        "description": "Parent comment ID — get this from list_question_comments."
       },
       "page": {
         "description": "Page number (default 1).",

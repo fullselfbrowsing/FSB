@@ -8,7 +8,7 @@
   ],
   "description": "Hide or unhide a post from your feed. Hidden posts no longer appear in listings but can be viewed directly.",
   "actionVerb": "hide",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -34,7 +34,7 @@
     "sourcePath": "plugins/reddit/src/tools/hide.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "redditpost",
       "httpMethod": null,
       "opNameVerb": "hide"
     }

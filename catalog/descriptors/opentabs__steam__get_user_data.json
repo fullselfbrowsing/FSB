@@ -9,7 +9,7 @@
     "get user data in steam",
     "get wishlist, owned games, and preferences in steam"
   ],
-  "description": "Get the current user's Steam store data including wishlisted app IDs, owned app IDs, owned package IDs, followed apps, ignored apps, recommended tags, and cart item count. Returns ID arrays \u2014 use get_app_details to resolve app names.",
+  "description": "Get the current user's Steam store data including wishlisted app IDs, owned app IDs, owned package IDs, followed apps, ignored apps, recommended tags, and cart item count. Returns ID arrays — use get_app_details to resolve app names.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -24,7 +24,7 @@
     "sourcePath": "plugins/steam/src/tools/get-user-data.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "storeget",
       "httpMethod": null,
       "opNameVerb": "get"
     }

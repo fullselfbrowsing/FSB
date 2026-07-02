@@ -21,7 +21,7 @@
         "description": "Folder name"
       },
       "parent_id": {
-        "description": "Parent folder ID \u2014 omit for drive root",
+        "description": "Parent folder ID — omit for drive root",
         "type": "string"
       }
     },

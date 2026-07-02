@@ -35,7 +35,7 @@
         "maximum": 9007199254740991
       },
       "branch": {
-        "description": "Branch or tag name to filter commits by \u2014 pass as the include query param",
+        "description": "Branch or tag name to filter commits by — pass as the include query param",
         "type": "string"
       }
     },

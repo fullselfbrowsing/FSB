@@ -20,7 +20,7 @@
         "description": "Chat or channel numeric ID"
       },
       "is_channel": {
-        "description": "Whether this is a channel/supergroup (default false \u2014 regular group)",
+        "description": "Whether this is a channel/supergroup (default false — regular group)",
         "type": "boolean"
       }
     },

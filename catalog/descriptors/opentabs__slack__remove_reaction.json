@@ -20,7 +20,7 @@
       "ts": {
         "type": "string",
         "minLength": 1,
-        "description": "Timestamp of the message to remove the reaction from \u2014 serves as the unique message ID (e.g., 1234567890.123456)"
+        "description": "Timestamp of the message to remove the reaction from — serves as the unique message ID (e.g., 1234567890.123456)"
       },
       "name": {
         "type": "string",

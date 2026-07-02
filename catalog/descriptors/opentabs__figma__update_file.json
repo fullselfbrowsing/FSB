@@ -9,7 +9,7 @@
     "update file in figma",
     "update a file name or description in figma"
   ],
-  "description": "Update a Figma file \u2014 currently supports renaming and updating the description",
+  "description": "Update a Figma file — currently supports renaming and updating the description",
   "actionVerb": "update",
   "sideEffectClass": "write",
   "params": {
