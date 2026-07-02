@@ -41,8 +41,8 @@ function clone(value) {
   const rows = gate.writeRowsFromReport(report);
   check(rows.activeWrites.length === 5,
     'current readiness report has exactly 5 active write rows');
-  check(rows.guardedWrites.length === 5,
-    'current readiness report has exactly 5 guarded fail-closed write rows');
+  check(rows.guardedWrites.length === 557,
+    'current readiness report has exactly 557 guarded fail-closed write rows');
 
   const current = gate.validateWriteActivationEvidence(evidence, report);
   check(current.failures.length === 0,

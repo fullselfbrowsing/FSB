@@ -286,6 +286,13 @@ export const SIDE_EFFECT_READ_CONFIRMED = new Set([
   'coinbase.compare_asset_prices',
   'newrelic.run_nrql_query',
   'tripadvisor.check_saved',
+  // pinterest.get_current_user uses `resourcePost('ApiSResource', 'create',
+  // {source, stats, keepAlive})` which the per-plugin verb-suffix classifier
+  // rule now surfaces as `write`. In this specific op the POST is Pinterest's
+  // API convention for fetching a data envelope (returns client_context.user
+  // without mutating server state), not a real write. Confirmed against
+  // vendor/opentabs-snapshot/plugins/pinterest/src/tools/get-current-user.ts.
+  'pinterest.get_current_user',
 ]);
 
 /**
@@ -385,6 +392,18 @@ export function deriveClass(signals, slug) {
     // otherwise PASS. Derive at least WRITE so the gate FAILS a declared-read.
     if (!hCls && !mCls && !nameVerbCls && isApiHelper(transportHelper)) {
       derived = maxClass(derived, 'write');
+    }
+
+    // Confirmed-read downgrade: EXTREMELY narrow -- applies ONLY when (a) the
+    // full slug is in SIDE_EFFECT_READ_CONFIRMED (each entry manually source-
+    // audited against the vendored handler), (b) the op-name verb is itself a
+    // clear read verb (get/list/search/etc.), and (c) no method literal fired.
+    // This is the escape hatch for POST-shaped read transports (Pinterest's
+    // `resourcePost('ApiSResource', 'create', ...)` returning user data) --
+    // NOT a general "trust the verb" downgrade. Real writes stay write: a
+    // method literal or a write-verb op-name blocks the downgrade.
+    if (nameVerbCls === 'read' && !mCls && isConfirmedRead(slug)) {
+      derived = 'read';
     }
   }
 

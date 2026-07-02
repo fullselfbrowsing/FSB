@@ -6407,6 +6407,51 @@
       ]
     },
     {
+      "slug": "steam.generate_discovery_queue",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-steam-generate-discovery-queue-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ]
+    },
+    {
+      "slug": "steam.ignore_app",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-steam-ignore-app-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ]
+    },
+    {
+      "slug": "steam.unignore_app",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-steam-unignore-app-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ]
+    },
+    {
       "slug": "steam.follow_app",
       "status": "guarded-fail-closed",
       "failClosedReason": "unverified-steam-follow-app-mutation",

@@ -62916,7 +62916,7 @@
       ],
       "description": "Get the profile of the currently authenticated Pinterest user, including email, name, follower counts, board count, and account details.",
       "actionVerb": "get",
-      "sideEffectClass": "write",
+      "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {},

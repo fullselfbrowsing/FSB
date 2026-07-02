@@ -1231,7 +1231,7 @@ function bySlug(rows, slug) {
       row.hasRecipeProof !== false;
   });
   check(steamRows.length === 15 &&
-      steamWriteRows.length === 3 &&
+      steamWriteRows.length === 6 &&
       steamGuardedRows.length === 6 &&
       steamReadyRows.length === 9 &&
       steamStatusOffenders.length === 0,
