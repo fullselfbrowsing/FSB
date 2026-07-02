@@ -74,6 +74,61 @@
   const ADAPTER_TAG = '[FSB lattice-runtime-adapter]';
   const STORAGE_KEY_PREFIX = 'fsb_lattice_snapshot_';
   const DEFAULT_LRU_CAP = 50; // JSDoc-documented contract; enforced in Phase 9 (FINT-15)
+  const REDACTED_SENTINEL = '[REDACTED_BY_LATTICE_ADAPTER]';
+  // Keys whose values are auth material or session-bound secrets that must
+  // never land in chrome.storage.session. Match is case-insensitive on the
+  // full key name; conservative allowlist over broad regex to keep the walk
+  // predictable. `apiKey`/`openaiApiKey`/`geminiApiKey`/... all end in
+  // `apikey` after lower-casing; `providerInstance` is a live provider that
+  // itself carries the raw settings bag, so we drop it whole rather than
+  // trying to walk into it.
+  const REDACT_KEYS_LOWER = new Set([
+    'apikey', 'openaiapikey', 'anthropicapikey', 'geminiapikey',
+    'openrouterapikey', 'xaiapikey', 'customapikey',
+    'authorization', 'cookie', 'cookies', 'setcookie',
+    'token', 'accesstoken', 'refreshtoken', 'bearer', 'bearertoken',
+    'secret', 'clientsecret', 'apisecret',
+    'password', 'passphrase',
+    'providerinstance'
+  ]);
+
+  // Walk `state`, returning a structurally-identical value with any secret-
+  // named key replaced by REDACTED_SENTINEL. Non-plain objects (functions,
+  // WebSocket handles, DOM refs) are dropped. Arrays and plain objects are
+  // recursed. Primitives pass through unchanged.
+  function _redactSecrets(state) {
+    return _redactWalk(state, new Set());
+  }
+
+  function _redactWalk(value, seen) {
+    if (value === null) return null;
+    if (typeof value !== 'object') {
+      return (typeof value === 'function') ? undefined : value;
+    }
+    if (seen.has(value)) return undefined; // cycle guard
+    seen.add(value);
+    if (Array.isArray(value)) {
+      const out = [];
+      for (let i = 0; i < value.length; i++) {
+        const v = _redactWalk(value[i], seen);
+        // preserve indices even when a slot redacts to undefined; JSON.stringify
+        // will render undefined as null which matches the caller expectation
+        // that array positions stay stable.
+        out.push(v === undefined ? null : v);
+      }
+      return out;
+    }
+    const out = {};
+    for (const key of Object.keys(value)) {
+      if (REDACT_KEYS_LOWER.has(String(key).toLowerCase())) {
+        out[key] = REDACTED_SENTINEL;
+        continue;
+      }
+      const v = _redactWalk(value[key], seen);
+      if (v !== undefined) out[key] = v;
+    }
+    return out;
+  }
 
   /**
    * Build an FSB MV3-survivability adapter backed by chrome.storage.session.
@@ -200,12 +255,24 @@
        * SerializedSnapshot envelope per Lattice Plan 05-02 contract.
        * Also writes the snapshot to chrome.storage.session when the
        * feature flag is on (best-effort persistence; D-20).
+       *
+       * Defense-in-depth: before stringify, walk the state tree and
+       * redact any key whose name looks like an auth material (apiKey,
+       * openaiApiKey, authorization, cookie, token, secret, ...). The
+       * adapter contract asks callers to pass stable identifiers only
+       * (threat-model row 5), but the FSB session object as-invoked by
+       * agent-loop.js carries `providerConfig.apiKey` and the whole
+       * spread-in provider settings bag, so an unsanitized serialize
+       * would land plaintext keys in chrome.storage.session under an
+       * LRU of 50 snapshots per session. Redacting inside the adapter
+       * keeps the never-persist-keys posture true regardless of caller
+       * hygiene.
        */
       serialize: function serialize(state) {
         const snapshot = {
           kind: 'survivability-snapshot',
           version: 'lattice-survivability/v1',
-          payload: JSON.stringify(state === undefined ? null : state),
+          payload: JSON.stringify(_redactSecrets(state === undefined ? null : state)),
           capturedAt: new Date().toISOString()
         };
         persistInternal(snapshot);

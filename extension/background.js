@@ -16,11 +16,19 @@ importScripts('ai/lattice-step-emitter.js');
 // pre-Phase-7). Code-only activation; options-page exposure deferred per 09-CONTEXT.md
 // deferred ideas. Set BEFORE chrome.runtime.onInstalled at line 13142+ so the flag is
 // observable from the first runAgentLoop invocation.
+//
+// The adapter module MUST be loaded here too -- setting the flag alone is a
+// no-op unless globalThis.FsbLatticeRuntimeAdapter has been populated, which
+// happens as a side effect of importing lattice-runtime-adapter.js. Kept
+// alongside its sibling lattice-* imports so both live in one dependency
+// group at SW top.
+importScripts('ai/lattice-runtime-adapter.js');
 globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;
 importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
 importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
+try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
 // globalThis.fsbAgentRegistryInstance via getAgentTabs(agentId). Loaded
@@ -2829,6 +2837,18 @@ async function restoreSessionsFromStorage() {
         });
     }
 
+    // Hydrate the operator-configured trigger cap (fsbTriggerCap in
+    // chrome.storage.local) so armTrigger enforces the configured value, not
+    // the static default. Best-effort + non-blocking, mirroring the restore
+    // above; live changes are picked up by the storage.onChanged listener.
+    if (typeof FsbTriggerManager !== 'undefined'
+        && typeof FsbTriggerManager.loadCapFromStorage === 'function') {
+      FsbTriggerManager.loadCapFromStorage()
+        .catch((err) => {
+          console.warn('[FSB TRG] loadCapFromStorage failed (non-blocking):', err && err.message);
+        });
+    }
+
     automationLogger.logServiceWorker('sessions_restored', { count: activeSessions.size, conversationSessions: conversationSessions.size });
   } catch (error) {
     automationLogger.warn('Failed to restore sessions from storage', { error: error.message });
@@ -4656,6 +4676,9 @@ function fsbTriggerFirstString() {
 
 function fsbTriggerFirstFiniteTabId() {
   for (let i = 0; i < arguments.length; i++) {
+    // Number(null) === 0 and Number('') === 0: an absent candidate must never
+    // coerce into tab id 0. Skip nullish/empty candidates before coercion.
+    if (arguments[i] == null || arguments[i] === '') continue;
     const value = Number(arguments[i]);
     if (Number.isFinite(value)) return value;
   }
@@ -4677,7 +4700,7 @@ function fsbTriggerReadSnapshotOwnershipToken(snap) {
 }
 
 function fsbTriggerReadRegistryOwner(registry, tabId) {
-  if (!registry || !Number.isFinite(Number(tabId))) return null;
+  if (!registry || tabId == null || !Number.isFinite(Number(tabId))) return null;
   try {
     if (typeof registry.findAgentByTabId === 'function') {
       const found = registry.findAgentByTabId(Number(tabId));
@@ -4697,7 +4720,7 @@ function fsbTriggerReadRegistryOwner(registry, tabId) {
 }
 
 function fsbTriggerReadRegistryOwnershipToken(registry, tabId) {
-  if (!registry || !Number.isFinite(Number(tabId)) || typeof registry.getTabMetadata !== 'function') return null;
+  if (!registry || tabId == null || !Number.isFinite(Number(tabId)) || typeof registry.getTabMetadata !== 'function') return null;
   try {
     const meta = registry.getTabMetadata(Number(tabId));
     return fsbTriggerFirstString(meta && meta.ownershipToken, meta && meta.ownership_token);
@@ -4729,7 +4752,7 @@ async function fsbTriggerOwnerContext(payload, sender) {
 
   if (source === 'autopilot') {
     const base = { source, tabId, agentId: null, ownershipToken: null };
-    if (!Number.isFinite(Number(tabId))) return base;
+    if (tabId === null) return base;
 
     const registry = globalThis && globalThis.fsbAgentRegistryInstance;
     if (!registry) return Object.assign(base, { registry: null });
@@ -5322,7 +5345,10 @@ async function fsbTriggerHandleToolArm(params, context) {
   if (!selector) {
     return { success: false, errorCode: 'TRIGGER_SELECTOR_INVALID' };
   }
-  if (!Number.isFinite(Number(tabId))) {
+  // fsbTriggerFirstFiniteTabId returns a finite number or null; the old
+  // Number.isFinite(Number(tabId)) guard was unreachable for null because
+  // Number(null) === 0 is finite.
+  if (tabId === null) {
     return { success: false, errorCode: 'INVALID_TAB_ID' };
   }
 
@@ -5409,6 +5435,11 @@ async function fsbTriggerHandleToolArm(params, context) {
   const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
   if (attrs) spec.reported_attributes = attrs;
   fsbTriggerCopyIntervalAliases(safeParams, spec);
+  // Thread the tool's rearm_on_fire opt-in into the spec; copyArmMetadata
+  // (trigger-manager.js) persists it onto the snapshot and the fire path keeps
+  // watching instead of terminally disarming. Without this copy every trigger
+  // disarmed on first fire regardless of the caller's parameter.
+  if (safeParams.rearm_on_fire === true) spec.rearm_on_fire = true;
 
   const triggerManager = (typeof FsbTriggerManager !== 'undefined') ? FsbTriggerManager : null;
   if (!triggerManager || typeof triggerManager.armTrigger !== 'function') {
@@ -5777,6 +5808,11 @@ async function executeReplaySequence(replaySessionId) {
         sessionId: replaySessionId,
         // QT-uof-2 (BROADCAST-tabId-THREAD)
         tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+        // Thread the originating conversation (null for a conversation-less
+        // replay) so the sidepanel never mispersists this completion into
+        // whatever conversation happens to be visible.
+        conversationId: (session && session.conversationId) || null,
+        historySessionId: (session && session.historySessionId) || replaySessionId,
         result: `Replay complete: ${successCount}/${session.totalSteps} steps executed successfully.${failedCount > 0 ? ` ${failedCount} steps skipped.` : ''}`
       });
     } catch (e) { /* UI may not be listening */ }
@@ -9464,6 +9500,10 @@ async function handleStopAutomation(request, sender, sendResponse) {
         sessionId: sessionId,
         // QT-uof-2 (BROADCAST-tabId-THREAD)
         tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+        // QT-7bi-02 parity: thread the originating conversation so the sidepanel
+        // fallback never targets the currently-visible one.
+        conversationId: (session && session.conversationId) || null,
+        historySessionId: (session && session.historySessionId) || sessionId,
         outcome: 'stopped',
         reason: 'user_stopped',
         stopped: true,
@@ -11761,6 +11801,10 @@ async function startAutomationLoop(sessionId) {
       sessionId,
       // QT-uof-2 (BROADCAST-tabId-THREAD)
       tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+      // QT-7bi-02 parity: thread the originating conversation so the sidepanel
+      // fallback never targets the currently-visible one.
+      conversationId: (session && session.conversationId) || null,
+      historySessionId: (session && session.historySessionId) || sessionId,
       result: finalResult,
       partial: true,
       reason: 'max_iterations',
@@ -11798,6 +11842,10 @@ async function startAutomationLoop(sessionId) {
       sessionId,
       // QT-uof-2 (BROADCAST-tabId-THREAD)
       tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+      // QT-7bi-02 parity: thread the originating conversation so the sidepanel
+      // fallback never targets the currently-visible one.
+      conversationId: (session && session.conversationId) || null,
+      historySessionId: (session && session.historySessionId) || sessionId,
       result: finalResult,
       partial: true,
       reason: 'timeout',
@@ -16000,6 +16048,15 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && changes.debugMode) {
     fsbDebugMode = changes.debugMode.newValue === true;
     console.log('[FSB] Debug mode ' + (fsbDebugMode ? 'enabled' : 'disabled'));
+  }
+
+  // React to the options-page trigger cap immediately (the cached cap in
+  // trigger-manager.js otherwise only refreshes on SW wake). setCap clamps and
+  // re-writes the same value, which Chrome does not re-fire onChanged for.
+  if (namespace === 'local' && changes.fsbTriggerCap
+      && typeof FsbTriggerManager !== 'undefined'
+      && typeof FsbTriggerManager.setCap === 'function') {
+    FsbTriggerManager.setCap(changes.fsbTriggerCap.newValue);
   }
 
   // React to dashboard sync toggle -- connect/disconnect relay WebSocket immediately
