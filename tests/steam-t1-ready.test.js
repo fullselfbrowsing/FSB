@@ -16,7 +16,10 @@ const SERVICE = 'store.steampowered.com';
 const EXPECTED_CLASSES = {
   'steam.add_to_wishlist': 'write',
   'steam.follow_app': 'write',
-  'steam.generate_discovery_queue': 'read',
+  // generate_discovery_queue / ignore_app / unignore_app all POST to
+  // store.steampowered.com and mutate account state; the importer now
+  // classifies them as write.
+  'steam.generate_discovery_queue': 'write',
   'steam.get_app_details': 'read',
   'steam.get_app_reviews': 'read',
   'steam.get_app_user_details': 'read',
@@ -25,10 +28,10 @@ const EXPECTED_CLASSES = {
   'steam.get_featured_categories': 'read',
   'steam.get_popular_tags': 'read',
   'steam.get_user_data': 'read',
-  'steam.ignore_app': 'read',
+  'steam.ignore_app': 'write',
   'steam.remove_from_wishlist': 'destructive',
   'steam.search_store': 'read',
-  'steam.unignore_app': 'read'
+  'steam.unignore_app': 'write'
 };
 
 let passed = 0;
@@ -78,7 +81,7 @@ async function main() {
     const handler = handlers[slug];
     check(!!handler, slug + ' has a handler');
     check(descriptor.slug === slug && descriptor.service === SERVICE, slug + ' matches the Steam descriptor service');
-    check(descriptor.backing === 'dom', slug + ' upgrades an existing DOM-backed descriptor');
+    check(descriptor.backing === 'handler', slug + ' is a handler-backed descriptor');
     check(descriptor.sideEffectClass === EXPECTED_CLASSES[slug], slug + ' expected sideEffectClass matches descriptor');
     check(handler && handler.tier === 'T1a', slug + ' is registered as T1a');
     check(handler && handler.origin === ORIGIN, slug + ' is pinned to store.steampowered.com');
