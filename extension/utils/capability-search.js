@@ -118,10 +118,10 @@
   // app slices that remain searchable for catalog completeness are explicitly labeled
   // blocked so they are not mistaken for ordinary discovery work.
   var BLOCKED_SERVICE_HOSTS = {
-    'youtube.com': true,
-    'www.youtube.com': true,
-    'music.youtube.com': true,
-    'robinhood.com': true
+    'netflix.com': true,
+    'www.netflix.com': true,
+    'onlyfans.com': true,
+    'www.onlyfans.com': true
   };
 
   var T1_READY_SLUGS = {
@@ -376,6 +376,17 @@
     'clickhouse.list_organization_members': true,
     'clickhouse.list_services': true,
     'clickhouse.query_metrics': true,
+    'clickup.get_current_user': true,
+    'clickup.get_custom_fields': true,
+    'clickup.get_folder': true,
+    'clickup.get_folders': true,
+    'clickup.get_goals': true,
+    'clickup.get_list': true,
+    'clickup.get_lists': true,
+    'clickup.get_space': true,
+    'clickup.get_spaces': true,
+    'clickup.get_workspace': true,
+    'clickup.get_workspace_members': true,
     'cloudflare.get_ruleset': true,
     'cloudflare.get_user': true,
     'cloudflare.get_zone': true,
@@ -425,6 +436,19 @@
     'coinbase.list_portfolios': true,
     'coinbase.list_price_alerts': true,
     'coinbase.list_watchlists': true,
+    'confluence.get_page': true,
+    'confluence.get_page_children': true,
+    'confluence.get_space': true,
+    'confluence.get_user_profile': true,
+    'confluence.list_comment_replies': true,
+    'confluence.list_comments': true,
+    'confluence.list_inline_comments': true,
+    'confluence.list_labels': true,
+    'confluence.list_page_attachments': true,
+    'confluence.list_page_versions': true,
+    'confluence.list_pages': true,
+    'confluence.list_spaces': true,
+    'confluence.search': true,
     'costco.get_product': true,
     'costco.get_product_availability': true,
     'costco.get_products': true,
@@ -546,6 +570,19 @@
     'expedia.search_packages': true,
     'facebook.get_current_user': true,
     'facebook.search_marketplace': true,
+    'fidelity.get_advisor_info': true,
+    'fidelity.get_balance_history': true,
+    'fidelity.get_contribution_data': true,
+    'fidelity.get_customer_orders': true,
+    'fidelity.get_investment_news': true,
+    'fidelity.get_market_movers': true,
+    'fidelity.get_portfolio_events': true,
+    'fidelity.get_portfolio_summary': true,
+    'fidelity.get_positions': true,
+    'fidelity.get_quotes': true,
+    'fidelity.get_service_messages': true,
+    'fidelity.get_top_news': true,
+    'fidelity.list_accounts': true,
     'figma.get_current_user': true,
     'figma.get_file': true,
     'figma.get_file_components': true,
@@ -612,6 +649,21 @@
     'gcloud.list_projects': true,
     'gcloud.list_service_accounts': true,
     'gcloud.list_sql_instances': true,
+    'gmaps.get_current_view': true,
+    'gmaps.get_directions_info': true,
+    'gmaps.get_directions_url': true,
+    'gmaps.get_map_url': true,
+    'gmaps.get_place_details': true,
+    'gmaps.get_place_url': true,
+    'gmaps.navigate_to_directions': true,
+    'gmaps.navigate_to_location': true,
+    'gmaps.navigate_to_place': true,
+    'gmaps.navigate_to_search': true,
+    'gmaps.search_nearby': true,
+    'gmaps.search_places': true,
+    'gmaps.share_location': true,
+    'gmaps.toggle_layer': true,
+    'gmaps.zoom_map': true,
     'gdocs.get_current_document': true,
     'gdocs.get_current_user': true,
     'gdocs.get_document': true,
@@ -753,6 +805,11 @@
     'linear.list_users': true,
     'linear.list_workflow_states': true,
     'linear.search_issues': true,
+    'linkedin.get_conversation_messages': true,
+    'linkedin.get_current_user': true,
+    'linkedin.get_mailbox_counts': true,
+    'linkedin.get_user_profile': true,
+    'linkedin.list_conversations': true,
     'lucid.get_account': true,
     'lucid.get_current_user': true,
     'lucid.get_document': true,
@@ -767,6 +824,9 @@
     'lucid.list_folder_entries': true,
     'lucid.list_groups': true,
     'lucid.search_documents': true,
+    'lyft.get_ride_estimate': true,
+    'lyft.list_ride_types': true,
+    'lyft.list_rides': true,
     'mastodon.get_status': true,
     'mastodon.list_timeline': true,
     'medium.get_collection': true,
@@ -822,6 +882,18 @@
     'mongodb.list_organization_members': true,
     'mongodb.list_organization_projects': true,
     'mongodb.list_organization_teams': true,
+    'msword.get_active_document': true,
+    'msword.get_current_user': true,
+    'msword.get_document_text': true,
+    'msword.get_drive': true,
+    'msword.get_file_content': true,
+    'msword.get_item': true,
+    'msword.list_children': true,
+    'msword.list_permissions': true,
+    'msword.list_recent_documents': true,
+    'msword.list_shared_with_me': true,
+    'msword.list_versions': true,
+    'msword.search_files': true,
     'netlify.get_account': true,
     'netlify.get_deploy': true,
     'netlify.get_dns_zone': true,
@@ -965,6 +1037,27 @@
     'reddit.read_inbox': true,
     'reddit.search_posts': true,
     'reddit.search_subreddits': true,
+    'robinhood.get_account': true,
+    'robinhood.get_current_user': true,
+    'robinhood.get_earnings': true,
+    'robinhood.get_fundamentals': true,
+    'robinhood.get_historicals': true,
+    'robinhood.get_instrument': true,
+    'robinhood.get_market_hours': true,
+    'robinhood.get_news_feed': true,
+    'robinhood.get_portfolio': true,
+    'robinhood.get_portfolio_historicals': true,
+    'robinhood.get_quote': true,
+    'robinhood.get_ratings': true,
+    'robinhood.get_watchlist': true,
+    'robinhood.list_crypto_holdings': true,
+    'robinhood.list_dividends': true,
+    'robinhood.list_notifications': true,
+    'robinhood.list_orders': true,
+    'robinhood.list_positions': true,
+    'robinhood.list_transfers': true,
+    'robinhood.list_watchlists': true,
+    'robinhood.search_instruments': true,
     'redfin.get_comparable_rentals': true,
     'redfin.get_current_user': true,
     'redfin.get_favorites': true,
@@ -1066,6 +1159,15 @@
     'spotify.get_recently_played': true,
     'spotify.get_saved_tracks': true,
     'spotify.search': true,
+    'steam.get_app_details': true,
+    'steam.get_app_reviews': true,
+    'steam.get_app_user_details': true,
+    'steam.get_current_user': true,
+    'steam.get_featured': true,
+    'steam.get_featured_categories': true,
+    'steam.get_popular_tags': true,
+    'steam.get_user_data': true,
+    'steam.search_store': true,
     'twitch.get_channel_emotes': true,
     'twitch.get_current_user': true,
     'twitch.get_game': true,
@@ -1345,7 +1447,15 @@
     'supabase.run_read_only_query': true,
     'ubereats.place_order': true,
     'ubereats.cancel_order': true,
-    'fiverr.send_message': true
+    'fiverr.send_message': true,
+    'robinhood.create_watchlist': true,
+    'robinhood.delete_watchlist': true,
+    'steam.add_to_wishlist': true,
+    'steam.follow_app': true,
+    'steam.generate_discovery_queue': true,
+    'steam.ignore_app': true,
+    'steam.remove_from_wishlist': true,
+    'steam.unignore_app': true
   };
 
   function normalizeBacking(value) {
@@ -1528,8 +1638,14 @@
       boost: { intentSynonyms: 3, description: 1 },
       // D-11 origin bias. minisearch 7.2.0 invokes boostDocument(id, term, stored)
       // (confirmed: boostDocument(id, '', this._storedFields.get(shortId))).
+      // Exact-or-subdomain match (mirrors capability-catalog.js:biasByOwnedOrigin's
+      // strict-equality bias): substring containment would let unrelated services
+      // whose name happens to contain the active host receive the same 4x boost
+      // -- 'x.com' is a substring of 'netflix.com' in the shipped catalog, and
+      // 'slack.com' is a substring of 'app.slack.com'. Only true same-service or
+      // apex-vs-subdomain matches should ride the bias.
       boostDocument: function(id, term, stored) {
-        return (ownedService && stored && stored.service && stored.service.indexOf(ownedService) !== -1)
+        return (ownedService && stored && stored.service && _serviceMatchesOwned(stored.service, ownedService))
           ? ORIGIN_BOOST : 1;
       }
     });
@@ -1537,10 +1653,12 @@
     // Defensive fallback (Open Question 1): if the boostDocument signature ever
     // drifts and the owned service did NOT float to the top, re-rank by an
     // owned-service match. A stable sort keeps minisearch's relevance order
-    // within each bias bucket.
+    // within each bias bucket. Uses the same exact-or-subdomain match as the
+    // boost above -- both paths must agree on what "owned" means or the
+    // fallback would falsely conclude an unrelated top hit was already-owned.
     if (ownedService && hits.length > 1) {
       var topService = hits[0] && hits[0].service;
-      var ownedTopAlready = topService && topService.indexOf(ownedService) !== -1;
+      var ownedTopAlready = topService && _serviceMatchesOwned(topService, ownedService);
       if (!ownedTopAlready) {
         hits = _stableSortByOwnedService(hits, ownedService);
       }
@@ -1577,10 +1695,24 @@
     var rest = [];
     for (var i = 0; i < hits.length; i++) {
       var svc = hits[i] && hits[i].service;
-      if (svc && svc.indexOf(ownedService) !== -1) { owned.push(hits[i]); }
+      if (svc && _serviceMatchesOwned(svc, ownedService)) { owned.push(hits[i]); }
       else { rest.push(hits[i]); }
     }
     return owned.concat(rest);
+  }
+
+  // Returns true iff `service` refers to the same site as `ownedService`.
+  // Match rule: exact hostname equality OR `service` is a subdomain of the
+  // owned host (`.<owned>` suffix). This is the same shape used by
+  // capability-catalog.js's biasByOwnedOrigin. Substring containment is
+  // deliberately rejected because it produces false positives across
+  // unrelated first-party services (e.g. 'x.com' as a substring of
+  // 'netflix.com').
+  function _serviceMatchesOwned(service, ownedService) {
+    if (!service || !ownedService) return false;
+    if (service === ownedService) return true;
+    return service.length > ownedService.length + 1
+      && service.slice(service.length - ownedService.length - 1) === '.' + ownedService;
   }
 
   // ---- invoke lookup (used by Plan 03) ---------------------------------------
