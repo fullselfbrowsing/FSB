@@ -148,8 +148,20 @@ function disconnectedTriggerResult(
   triggerId: string,
   lookup: Record<string, unknown> | null,
 ): Record<string, unknown> {
+  // The extension's get-trigger-status (background.js fsbTriggerHandleToolStatus)
+  // returns { success:true, status: <projected-object> } where the projected
+  // object has its own `status: 'fired' | 'armed' | ...` string field. The old
+  // reader assumed lookup.snapshot or a flat lookup with a string .status --
+  // neither matches, so the 'fired' / 'timed_out' recovery branches below were
+  // unreachable and every fired-after-drop trigger reported as outcome:'detached'.
+  // Unwrap in priority order: (1) explicit lookup.status object (current shape),
+  // (2) legacy lookup.snapshot object, (3) flat lookup.
   const partialState = lookup && typeof lookup === 'object'
-    ? ((lookup.snapshot && typeof lookup.snapshot === 'object') ? lookup.snapshot as Record<string, unknown> : lookup)
+    ? ((lookup.status && typeof lookup.status === 'object')
+        ? lookup.status as Record<string, unknown>
+        : (lookup.snapshot && typeof lookup.snapshot === 'object')
+          ? lookup.snapshot as Record<string, unknown>
+          : lookup)
     : null;
   const status = partialState && typeof partialState.status === 'string' ? partialState.status : 'unknown';
 

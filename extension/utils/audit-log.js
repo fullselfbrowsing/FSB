@@ -151,6 +151,24 @@
     return 'error';
   }
 
+  // ---- Storage write serialization -----------------------------------------
+  //
+  // Every storage-set path chains through this promise-chain mutex so two
+  // concurrent append() calls cannot race:
+  //   A: get -> push -> set
+  //   B: get -> push -> set
+  // Without the lock, B's get reads A's pre-append ring, B's set overwrites A's
+  // set, and A's entry is silently dropped from the persisted trail. The router
+  // audits every allow/block outcome (capability-router.js:786/792/796/864 plus
+  // upload-file), so overlapping invokes hit this fast. In-memory reads stay
+  // unlocked -- _inMemoryRing is the authoritative shadow.
+  var _storageChain = Promise.resolve();
+  function _withStorageLock(fn) {
+    var run = _storageChain.then(fn, fn);
+    _storageChain = run.catch(function() { /* swallow so a rejection cannot poison the chain */ });
+    return run;
+  }
+
   // ---- append(entry) -> Promise<void> --------------------------------------
   // Builds the safe record by the strict field whitelist (D-10), routes each
   // field through redaction (D-11), pushes to the in-memory shadow + persists to
@@ -181,24 +199,26 @@
     if (!_hasChromeStorage()) {
       return Promise.resolve();
     }
-    return new Promise(function(resolve) {
-      try {
-        chrome.storage.local.get([STORAGE_KEY], function(stored) {
-          var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
-          ring.push(safe);
-          if (ring.length > MAX_ENTRIES) {
-            ring = ring.slice(ring.length - MAX_ENTRIES);
-          }
-          var update = {};
-          update[STORAGE_KEY] = ring;
-          chrome.storage.local.set(update, function() {
-            // chrome.runtime.lastError is best-effort; no throw, no log spam.
-            resolve();
+    return _withStorageLock(function() {
+      return new Promise(function(resolve) {
+        try {
+          chrome.storage.local.get([STORAGE_KEY], function(stored) {
+            var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
+            ring.push(safe);
+            if (ring.length > MAX_ENTRIES) {
+              ring = ring.slice(ring.length - MAX_ENTRIES);
+            }
+            var update = {};
+            update[STORAGE_KEY] = ring;
+            chrome.storage.local.set(update, function() {
+              // chrome.runtime.lastError is best-effort; no throw, no log spam.
+              resolve();
+            });
           });
-        });
-      } catch (_e) {
-        resolve();
-      }
+        } catch (_e) {
+          resolve();
+        }
+      });
     });
   }
 

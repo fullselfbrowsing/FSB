@@ -125,6 +125,24 @@
     }
   }
 
+  // ---- Envelope RMW serialization -----------------------------------------
+  //
+  // Every full-envelope writer routes through this promise-chain mutex so two
+  // concurrent snapshot writes on different triggerIds cannot race
+  // (_readEnvelope -> mutate -> _writeEnvelope) and clobber each other's
+  // status changes. Background dispatches two DOM-debounce triggerValueChanged
+  // reports as parallel async IIFEs and each ends up calling writeSnapshot
+  // through handleTriggerAlarm, so this race is real. Same shape as
+  // learned-recipe-store.js _withLock. Reads stay unlocked -- MV3 is single
+  // threaded per turn and the race is only between the read-mutate-write
+  // sequences on the write path.
+  var _envelopeChain = Promise.resolve();
+  function _withEnvelopeLock(fn) {
+    var run = _envelopeChain.then(fn, fn);
+    _envelopeChain = run.catch(function() { /* swallow so a rejection does not poison the chain */ });
+    return run;
+  }
+
   // ---- Public API ---------------------------------------------------------
 
   /**
@@ -134,9 +152,11 @@
   async function writeSnapshot(triggerId, snapshot) {
     if (!triggerId || typeof triggerId !== 'string') return;
     if (!snapshot || typeof snapshot !== 'object') return;
-    var envelope = await _readEnvelope();
-    envelope.records[triggerId] = snapshot;
-    await _writeEnvelope(envelope);
+    return _withEnvelopeLock(async function() {
+      var envelope = await _readEnvelope();
+      envelope.records[triggerId] = snapshot;
+      await _writeEnvelope(envelope);
+    });
   }
 
   /**
@@ -154,10 +174,12 @@
    */
   async function deleteSnapshot(triggerId) {
     if (!triggerId || typeof triggerId !== 'string') return;
-    var envelope = await _readEnvelope();
-    if (!envelope.records[triggerId]) return;
-    delete envelope.records[triggerId];
-    await _writeEnvelope(envelope);
+    return _withEnvelopeLock(async function() {
+      var envelope = await _readEnvelope();
+      if (!envelope.records[triggerId]) return;
+      delete envelope.records[triggerId];
+      await _writeEnvelope(envelope);
+    });
   }
 
   /**

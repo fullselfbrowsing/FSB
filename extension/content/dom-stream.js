@@ -373,6 +373,13 @@
     pause: pauseCapture,
     resume: resumeWithFreshSnapshot,
     requestOverlay: sendOverlayNow,
+    // broadcastOverlayState is the legacy alias visual-feedback.js:824/1867/2011/
+    // 2042 still calls when a show/hide/update fires during active streaming.
+    // Removing it left every overlay update on a streaming tab throwing
+    // TypeError inside ActionGlowOverlay.show() -> destroy(), which then skipped
+    // demoteFromTopLayer + host.remove and stranded the old overlay host.
+    // Points at sendOverlayNow (same shape: read overlay state, send to background).
+    broadcastOverlayState: sendOverlayNow,
     getStaleFlushCount: function() { return lastStaleFlushCount; },
     isStreaming: function() { return streaming; },
     isPaused: function() { return paused; },

@@ -5306,6 +5306,40 @@
         return typedError('RECIPE_NOT_FOUND', { reason: 'unsupported-gmaps-page-read-action' });
       }
 
+      function steamRead(action) {
+        // Steam auth lives in page globals set by the store.steampowered.com shell:
+        //   g_AccountID: number (Steam32 account id, 0 when logged out)
+        //   g_sessionID: string (session token, also mirrored in the `sessionid` cookie)
+        // steam.get_current_user reads these directly rather than issuing an HTTP
+        // request -- the classic user-identity primitive matches the vendored
+        // getCurrentUser tool at vendor/opentabs-snapshot/plugins/steam/src/tools/
+        // get-current-user.ts (returns { account_id, steam_id64 } derived from
+        // accountId + Steam's SteamID64 constant offset 76561197960265728).
+        if (action === 'get_current_user') {
+          var g = globalThis || {};
+          var accountId = Number(g.g_AccountID);
+          if (!Number.isFinite(accountId) || accountId <= 0) {
+            return typedError('RECIPE_DOM_FALLBACK_PENDING', { reason: 'steam-not-authenticated' });
+          }
+          var sessionId = g.g_sessionID;
+          if (!sessionId) {
+            var m = String(document && document.cookie || '').match(/(?:^|;\s*)sessionid=([^;]+)/);
+            if (m) sessionId = m[1];
+          }
+          if (!sessionId) {
+            return typedError('RECIPE_DOM_FALLBACK_PENDING', { reason: 'steam-not-authenticated' });
+          }
+          // Steam32 -> Steam64 conversion: fixed offset 76561197960265728.
+          var steamId64 = (BigInt(accountId) + 76561197960265728n).toString();
+          return {
+            success: true,
+            status: 200,
+            data: { account_id: accountId, steam_id64: steamId64 }
+          };
+        }
+        return typedError('RECIPE_NOT_FOUND', { reason: 'unsupported-steam-page-read-action' });
+      }
+
       try {
         if (!request || (request.namespace !== 'whatsapp'
             && request.namespace !== 'cockroachdb'
@@ -5331,7 +5365,8 @@
             && request.namespace !== 'spotify'
             && request.namespace !== 'twitch'
             && request.namespace !== 'gmaps'
-            && request.namespace !== 'snowflake')) {
+            && request.namespace !== 'snowflake'
+            && request.namespace !== 'steam')) {
           return typedError('RECIPE_NOT_FOUND', { reason: 'unsupported-page-read-namespace' });
         }
         if (request.origin && globalThis.location && globalThis.location.origin !== request.origin) {
@@ -5414,6 +5449,9 @@
         }
         if (request.namespace === 'gmaps') {
           return gmapsRead(action, args);
+        }
+        if (request.namespace === 'steam') {
+          return await steamRead(action, args);
         }
         var chats;
         var contacts;

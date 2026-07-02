@@ -472,6 +472,20 @@
 
       // Mirror the demotion synchronously so getLearnedSync stops surfacing it (D-16).
       _mirrorQuarantine(origin, slug);
+
+      // D-16 completion: also clear the search module's _slugToRecipe entry so the
+      // catalog resolve() no-entry fallback (capability-catalog.js) cannot re-surface
+      // the quarantined recipe via _getRecipeBySlug -> FsbCapabilitySearch.getRecipeBySlug.
+      // Without this, resolve()'s catalogRecipe branch returns { tier:'T1b', recipe }
+      // for a quarantined slug and the router re-fires the broken request every invoke.
+      // Mirrors the evict() cleanup above; snapshot restore re-runs addLearnedRecipe
+      // from the persisted envelope, so an un-quarantined re-promotion is unaffected.
+      var search = _search();
+      if (search && typeof search.removeLearnedRecipe === 'function') {
+        try {
+          Promise.resolve(search.removeLearnedRecipe(slug)).catch(function() { /* best-effort */ });
+        } catch (_idxErr) { /* best-effort -- store/index parity is non-critical */ }
+      }
     });
   }
 
