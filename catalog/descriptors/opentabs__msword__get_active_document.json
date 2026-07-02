@@ -9,7 +9,7 @@
     "get active document in msword",
     "get the currently open document in msword"
   ],
-  "description": "Get information about the document currently open in the Word Online editor. Returns the document ID, name, and metadata. The document ID can then be used with get_document_text, update_document, append_to_document, replace_text_in_document, and other tools. This is the recommended first step — call this to discover the active document before reading or editing it.",
+  "description": "Get information about the document currently open in the Word Online editor. Returns the document ID, name, and metadata. The document ID can then be used with get_document_text, update_document, append_to_document, replace_text_in_document, and other tools. This is the recommended first step \u2014 call this to discover the active document before reading or editing it.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,7 +17,7 @@
     "properties": {},
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

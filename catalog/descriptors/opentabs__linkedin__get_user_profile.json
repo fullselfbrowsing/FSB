@@ -17,7 +17,7 @@
     "properties": {
       "public_identifier": {
         "type": "string",
-        "description": "Public profile identifier — the slug from the LinkedIn profile URL (e.g., \"williamhgates\")"
+        "description": "Public profile identifier \u2014 the slug from the LinkedIn profile URL (e.g., \"williamhgates\")"
       }
     },
     "required": [
@@ -25,7 +25,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

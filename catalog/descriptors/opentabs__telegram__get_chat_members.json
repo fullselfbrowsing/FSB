@@ -19,7 +19,7 @@
         "description": "Chat or channel numeric ID"
       },
       "is_channel": {
-        "description": "Whether this is a channel/supergroup (default false — regular group)",
+        "description": "Whether this is a channel/supergroup (default false \u2014 regular group)",
         "type": "boolean"
       },
       "query": {
@@ -44,7 +44,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

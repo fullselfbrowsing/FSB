@@ -20,12 +20,12 @@
       "ts": {
         "type": "string",
         "minLength": 1,
-        "description": "Timestamp of the message to edit — serves as the unique message ID (e.g., 1234567890.123456)"
+        "description": "Timestamp of the message to edit \u2014 serves as the unique message ID (e.g., 1234567890.123456)"
       },
       "text": {
         "type": "string",
         "minLength": 1,
-        "description": "New message text — replaces the entire message content. Supports Slack mrkdwn formatting."
+        "description": "New message text \u2014 replaces the entire message content. Supports Slack mrkdwn formatting."
       }
     },
     "required": [
@@ -35,7 +35,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

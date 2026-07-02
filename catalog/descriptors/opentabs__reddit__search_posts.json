@@ -55,7 +55,7 @@
         "type": "string"
       },
       "include_body": {
-        "description": "Whether to include post body text (selftext) and external URL. Defaults to false — titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
+        "description": "Whether to include post body text (selftext) and external URL. Defaults to false \u2014 titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
         "type": "boolean"
       }
     },
@@ -64,7 +64,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

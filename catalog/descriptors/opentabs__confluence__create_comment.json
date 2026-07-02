@@ -16,19 +16,19 @@
     "type": "object",
     "properties": {
       "page_id": {
-        "description": "Page ID to comment on — required for new top-level comments, omit when replying",
+        "description": "Page ID to comment on \u2014 required for new top-level comments, omit when replying",
         "type": "string",
         "minLength": 1
       },
       "parent_comment_id": {
-        "description": "Parent footer comment ID to reply to — omit for new top-level comments",
+        "description": "Parent footer comment ID to reply to \u2014 omit for new top-level comments",
         "type": "string",
         "minLength": 1
       },
       "body": {
         "type": "string",
         "minLength": 1,
-        "description": "Comment body in storage format (HTML) — e.g., \"<p>Great work!</p>\""
+        "description": "Comment body in storage format (HTML) \u2014 e.g., \"<p>Great work!</p>\""
       }
     },
     "required": [
@@ -36,7 +36,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

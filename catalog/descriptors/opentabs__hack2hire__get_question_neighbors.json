@@ -33,7 +33,7 @@
         ]
       },
       "sortedBy": {
-        "description": "Sort order. Defaults to \"isLocked\" — match the list_questions sortBy you used.",
+        "description": "Sort order. Defaults to \"isLocked\" \u2014 match the list_questions sortBy you used.",
         "type": "string",
         "enum": [
           "isLocked",
@@ -48,7 +48,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

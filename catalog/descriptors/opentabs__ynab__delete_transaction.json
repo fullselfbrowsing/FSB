@@ -8,7 +8,7 @@
     "permanently delete a transaction in ynab",
     "delete transaction in ynab"
   ],
-  "description": "Delete a transaction from the active YNAB plan. This marks the transaction as deleted (soft delete). Transfer transactions cannot be deleted through this tool — delete them directly in YNAB.",
+  "description": "Delete a transaction from the active YNAB plan. This marks the transaction as deleted (soft delete). Transfer transactions cannot be deleted through this tool \u2014 delete them directly in YNAB.",
   "actionVerb": "delete",
   "sideEffectClass": "destructive",
   "params": {
@@ -31,7 +31,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

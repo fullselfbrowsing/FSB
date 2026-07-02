@@ -29,7 +29,7 @@
           "ABOVE",
           "BELOW"
         ],
-        "description": "Alert direction — ABOVE to notify when price rises above target, BELOW when it drops below"
+        "description": "Alert direction \u2014 ABOVE to notify when price rises above target, BELOW when it drops below"
       }
     },
     "required": [
@@ -39,7 +39,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

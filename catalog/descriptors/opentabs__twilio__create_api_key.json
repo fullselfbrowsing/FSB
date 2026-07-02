@@ -8,7 +8,7 @@
     "open a new api key in twilio",
     "create api key in twilio"
   ],
-  "description": "Create a new API key. The secret is only returned once at creation time — store it securely.",
+  "description": "Create a new API key. The secret is only returned once at creation time \u2014 store it securely.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -24,7 +24,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

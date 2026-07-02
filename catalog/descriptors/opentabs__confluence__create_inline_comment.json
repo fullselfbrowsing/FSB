@@ -22,7 +22,7 @@
       "body": {
         "type": "string",
         "minLength": 1,
-        "description": "Comment body in storage format (HTML) — e.g., \"<p>This needs clarification</p>\""
+        "description": "Comment body in storage format (HTML) \u2014 e.g., \"<p>This needs clarification</p>\""
       },
       "text_selection": {
         "type": "string",
@@ -51,7 +51,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

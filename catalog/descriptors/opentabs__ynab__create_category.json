@@ -9,7 +9,7 @@
     "create category in ynab",
     "create a new budget category in ynab"
   ],
-  "description": "Create a new category in an existing category group. Optionally set an initial goal: \"set_aside\" (set aside X per cadence), \"refill\" (refill the balance up to X per cadence), \"target_balance\" (have a balance of X), or \"target_by_date\" (have a balance of X by a specific date). NEED-style goals (set_aside, refill) accept weekly/monthly/yearly cadence. Debt goals are not supported for new categories — they only apply to existing debt-account categories.",
+  "description": "Create a new category in an existing category group. Optionally set an initial goal: \"set_aside\" (set aside X per cadence), \"refill\" (refill the balance up to X per cadence), \"target_balance\" (have a balance of X), or \"target_by_date\" (have a balance of X by a specific date). NEED-style goals (set_aside, refill) accept weekly/monthly/yearly cadence. Debt goals are not supported for new categories \u2014 they only apply to existing debt-account categories.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -213,7 +213,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

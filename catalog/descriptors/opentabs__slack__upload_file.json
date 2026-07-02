@@ -41,7 +41,7 @@
         "type": "string"
       },
       "filetype": {
-        "description": "Slack file type identifier (e.g., txt, png, pdf) — auto-detected if omitted",
+        "description": "Slack file type identifier (e.g., txt, png, pdf) \u2014 auto-detected if omitted",
         "type": "string"
       }
     },
@@ -52,7 +52,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

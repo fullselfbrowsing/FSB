@@ -9,7 +9,7 @@
     "get currently playing in spotify",
     "get the currently playing track in spotify"
   ],
-  "description": "Get the track that is currently playing on the user’s active device.",
+  "description": "Get the track that is currently playing on the user\u2019s active device.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -17,7 +17,7 @@
     "properties": {},
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

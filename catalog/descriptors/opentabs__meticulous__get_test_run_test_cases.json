@@ -8,7 +8,7 @@
     "view one specific test run test cases in meticulous",
     "get test case results in meticulous"
   ],
-  "description": "Get test case results for a test run. Each test case has a head replay with status and accuracy info. A replay with is_accurate=false means the replay diverged from the original session (non-deterministic behavior, flaky). Note: test cases do not have a base replay — they represent individual session replays, not diff comparisons. For visual diffs, use get_test_run_diffs instead.",
+  "description": "Get test case results for a test run. Each test case has a head replay with status and accuracy info. A replay with is_accurate=false means the replay diverged from the original session (non-deterministic behavior, flaky). Note: test cases do not have a base replay \u2014 they represent individual session replays, not diff comparisons. For visual diffs, use get_test_run_diffs instead.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -42,7 +42,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

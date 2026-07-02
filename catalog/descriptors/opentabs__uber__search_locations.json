@@ -25,7 +25,7 @@
         "description": "Longitude for the search center (e.g., -122.4194 for San Francisco)"
       },
       "type": {
-        "description": "Search type — PICKUP or DROPOFF. Default PICKUP.",
+        "description": "Search type \u2014 PICKUP or DROPOFF. Default PICKUP.",
         "type": "string",
         "enum": [
           "PICKUP",
@@ -40,7 +40,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

@@ -1,8 +1,16 @@
+---
+status: passed
+verified_at: 2026-06-30
+refreshed_at: 2026-07-01
+---
+
 # Phase 51 Verification
 
 ## Current Status
 
-Phase 51 is active. Plans 51-01, 51-02, 51-03, and 51-04 are complete and verified against focused gates. Full-tail migration is not complete.
+Phase 51 is complete as a conservative full-tail migration closeout. It does not claim every catalog row is directly executable T1. It does prove every descriptor is either current T1/guarded or explicitly accounted for with the required proof still needed before direct execution.
+
+The generated readiness, terminal-state, and write-ledger artifacts were refreshed on 2026-07-01 after post-closeout T1 ports. The current source-of-truth counts below supersede the earlier per-plan snapshots recorded in sections 51-02 through 51-04.
 
 ## 51-01 Worklist Controls
 
@@ -52,14 +60,46 @@ Phase 51 is active. Plans 51-01, 51-02, 51-03, and 51-04 are complete and verifi
 | Metric | Count |
 |--------|------:|
 | Total descriptors | 2,314 |
-| T1-ready executable descriptors | 84 |
-| T1 guarded fail-closed writes | 5 |
-| Catalog tail not direct API-ready | 2,225 |
-| Actionable non-denied tail rows | 2,031 |
-| Blocked policy rows | 194 |
+| T1-ready executable descriptors | 1,267 |
+| T1 guarded fail-closed rows | 556 |
+| Catalog tail not direct API-ready | 491 |
+| Actionable non-denied tail rows | 368 |
+| Blocked policy rows | 123 |
 
-## Remaining Verification Before Phase Close
+## 51-05 through 51-08 Terminal-State Closeout
 
-- `npm test`
-- Live UAT evidence for any newly activated write/destructive rows.
-- Final Phase 51 worklist showing no untriaged non-denied tail rows, or explicit accepted blockers for each row that remains non-T1.
+- `node tests/t1-terminal-states.test.js` -- passed with 16 checks.
+- `node scripts/report-t1-terminal-states.mjs` -- regenerated terminal-state and write/destructive UAT ledger artifacts.
+- `npm run validate:extension` -- passed with the new terminal-state gate included.
+- `npm test` -- passed after updating `tests/catalog-inline-shape.test.js` to mirror the recursive catalog reader used by `scripts/package-extension.mjs`.
+- `npm run package:extension` -- regenerated `extension/catalog/recipe-index.generated.js` with 10 recipes and 2,314 descriptors.
+
+## Terminal-State Counts
+
+| Surface Status | Count |
+|----------------|------:|
+| T1-ready | 1,267 |
+| Guarded fail-closed | 556 |
+| Bridge-needed | 5 |
+| UAT-needed | 141 |
+| Blocked | 123 |
+| Degraded/discovery-pending | 222 |
+
+## Write/Destructive Ledger Counts
+
+| Status | Count |
+|--------|------:|
+| Active with evidence | 5 |
+| Guarded fail-closed | 549 |
+| Live UAT required | 141 |
+| Blocked policy | 19 |
+
+## Final Closeout
+
+Phase 51 closes with no untriaged descriptor rows:
+
+- Pattern-D and GAPI rows are explicit `bridge-needed` terminal states with execution disabled.
+- Denied rows remain `blocked-policy`.
+- Write/destructive tail rows remain non-activated until live UAT evidence exists.
+- All current handler-backed T1 rows are included in search readiness overrides so they are no longer surfaced as discovery-pending.
+- Remaining same-origin/discovery rows keep explicit proof requirements and are not marked T1-ready.

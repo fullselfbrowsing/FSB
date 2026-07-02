@@ -21,7 +21,7 @@
         "maximum": 100
       },
       "folder_id": {
-        "description": "Folder/filter ID — 0 for main list (default), 1 for archive",
+        "description": "Folder/filter ID \u2014 0 for main list (default), 1 for archive",
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
@@ -29,7 +29,7 @@
     },
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

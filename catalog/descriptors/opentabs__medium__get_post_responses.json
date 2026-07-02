@@ -8,7 +8,7 @@
     "view one specific post responses in medium",
     "get comments on a post in medium"
   ],
-  "description": "Get responses (comments) on a Medium post. Returns the response count, response posts, and an opaque next_cursor. Pass next_cursor back as cursor to fetch the next page — this is the only way to retrieve responses past the first page.",
+  "description": "Get responses (comments) on a Medium post. Returns the response count, response posts, and an opaque next_cursor. Pass next_cursor back as cursor to fetch the next page \u2014 this is the only way to retrieve responses past the first page.",
   "actionVerb": "get",
   "sideEffectClass": "read",
   "params": {
@@ -34,7 +34,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

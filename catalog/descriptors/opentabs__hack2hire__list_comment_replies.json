@@ -16,7 +16,7 @@
     "properties": {
       "commentId": {
         "type": "string",
-        "description": "Parent comment ID — get this from list_question_comments."
+        "description": "Parent comment ID \u2014 get this from list_question_comments."
       },
       "page": {
         "description": "Page number (default 1).",
@@ -36,7 +36,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

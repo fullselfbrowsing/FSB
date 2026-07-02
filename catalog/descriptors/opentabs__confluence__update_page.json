@@ -33,7 +33,7 @@
         "type": "integer",
         "minimum": 1,
         "maximum": 9007199254740991,
-        "description": "Current version number of the page — the update increments this by 1"
+        "description": "Current version number of the page \u2014 the update increments this by 1"
       },
       "version_message": {
         "description": "Optional message describing the changes",
@@ -52,7 +52,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

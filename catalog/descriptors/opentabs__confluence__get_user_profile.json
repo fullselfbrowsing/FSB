@@ -16,13 +16,13 @@
     "type": "object",
     "properties": {
       "account_id": {
-        "description": "Atlassian account ID — omit to get the current user profile",
+        "description": "Atlassian account ID \u2014 omit to get the current user profile",
         "type": "string"
       }
     },
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

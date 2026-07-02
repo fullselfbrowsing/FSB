@@ -8,7 +8,7 @@
     "see all my page names in retool",
     "list all app names and uuids (lightweight) in retool"
   ],
-  "description": "Get a lightweight list of all app names and UUIDs. Faster and smaller than list_apps — use this when you only need names and UUIDs, not full metadata.",
+  "description": "Get a lightweight list of all app names and UUIDs. Faster and smaller than list_apps \u2014 use this when you only need names and UUIDs, not full metadata.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -16,7 +16,7 @@
     "properties": {},
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

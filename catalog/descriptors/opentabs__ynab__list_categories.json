@@ -8,7 +8,7 @@
     "see all my categories in ynab",
     "list budget categories with balances in ynab"
   ],
-  "description": "List category groups and categories in the active YNAB plan. Returns budgeted amounts, activity, and available balances for the current month. Hidden and deleted categories are excluded by default — pass include_hidden=true to also see hidden categories (useful for editing budgets on hidden categories).",
+  "description": "List category groups and categories in the active YNAB plan. Returns budgeted amounts, activity, and available balances for the current month. Hidden and deleted categories are excluded by default \u2014 pass include_hidden=true to also see hidden categories (useful for editing budgets on hidden categories).",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -21,7 +21,7 @@
     },
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

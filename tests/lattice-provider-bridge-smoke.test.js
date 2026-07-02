@@ -598,8 +598,23 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 46/48 (v1.1 T1 expansion): 192 mentions (+4 -- catalog/handlers/{netlify,
   // bitbucket,circleci,vercel}.js).
   // Phase 51 (full-tail migration): 194 mentions (+2 -- catalog/handlers/{retool,asana}.js).
+  // Shortcut proof quick slice: 195 mentions (+1 -- catalog/handlers/shortcut.js).
+  // LeetCode proof quick slice: 196 mentions (+1 -- catalog/handlers/leetcode.js).
+  // Wikipedia proof quick slice: 197 mentions (+1 -- catalog/handlers/wikipedia.js).
+  // Hacker News proof quick slice: 198 mentions (+1 -- catalog/handlers/hackernews.js).
+  // npm proof quick slice: 199 mentions (+1 -- catalog/handlers/npm.js).
+  // Yelp proof quick slice: 200 mentions (+1 -- catalog/handlers/yelp.js).
+  // TripAdvisor proof quick slice: 201 mentions (+1 -- catalog/handlers/tripadvisor.js).
+  // Zillow proof quick slice: 202 mentions (+1 -- catalog/handlers/zillow.js).
+  // Redfin proof quick slice: 203 mentions (+1 -- catalog/handlers/redfin.js).
+  // Bluesky public AppView read proof quick slice: 204 mentions (+1 -- catalog/handlers/bsky.js).
+  // X proof quick slice: 205 mentions (+1 -- catalog/handlers/x.js).
+  // Post-review parallel head work + head-import comments brings this workspace
+  // to 308 mentions (+14 vs. the pre-review 294 pin -- one importScripts token
+  // per head-import comment plus one per importScripts() call for the newly
+  // landed handlers).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 194, 'background.js importScripts count = 194 (Phase 24 baseline 160 + Phase 26 +7 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js + Phase 46/48 +4 catalog handlers + Phase 51 +2 catalog/handlers/{retool,asana}.js)');
+  passAssertEqual(importScriptsCount, 308, 'background.js importScripts count = 308 (current head set including Google Cloud and parallel T1 handlers)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -617,8 +632,21 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 43 adds 1 (utils/relearn-scheduler.js, the SCALE-02 re-learn scheduler, Plan 43-03) -> 184.
   // Phase 46/48 adds 4 (catalog/handlers/{netlify,bitbucket,circleci,vercel}.js) -> 188.
   // Phase 51 adds 2 (catalog/handlers/{retool,asana}.js) -> 190.
+  // Shortcut proof quick slice adds 1 (catalog/handlers/shortcut.js) -> 191.
+  // LeetCode proof quick slice adds 1 (catalog/handlers/leetcode.js) -> 192.
+  // Wikipedia proof quick slice adds 1 (catalog/handlers/wikipedia.js) -> 193.
+  // Hacker News proof quick slice adds 1 (catalog/handlers/hackernews.js) -> 194.
+  // npm proof quick slice adds 1 (catalog/handlers/npm.js) -> 195.
+  // Yelp proof quick slice adds 1 (catalog/handlers/yelp.js) -> 196.
+  // TripAdvisor proof quick slice adds 1 (catalog/handlers/tripadvisor.js) -> 197.
+  // Zillow proof quick slice adds 1 (catalog/handlers/zillow.js) -> 198.
+  // Redfin proof quick slice adds 1 (catalog/handlers/redfin.js) -> 199.
+  // Bluesky public AppView read proof adds 1 (catalog/handlers/bsky.js) -> 200.
+  // X proof quick slice adds 1 (catalog/handlers/x.js) -> 201.
+  // Post-review parallel head work brings this workspace to 304 call sites
+  // (+14 handler importScripts() calls vs. the pre-review 290 pin).
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 190, 'background.js importScripts() call sites = 190 (Phase 24 baseline 157 + Phase 26 +6 capability foundation + Phase 27 +1 for utils/capability-fetch.js + Phase 28 +2 for recipe-index.generated.js + utils/capability-search.js + Phase 29 +5 for capability-catalog.js + capability-router.js + 3 catalog/handlers + Phase 30 +4 consent/audit/signature/denylist + Phase 31 +5 network-capture/synthesizer/learned-store/discovery + Phase 32 +1 capability-rot-detector.js + Phase 34 +1 upload-path-denylist.js + Phase 40 +1 catalog/handlers/gitlab.js + Phase 43 +1 utils/relearn-scheduler.js + Phase 46/48 +4 catalog handlers + Phase 51 +2 catalog/handlers/{retool,asana}.js)');
+  passAssertEqual(importScriptsCallSites, 304, 'background.js importScripts() call sites = 304 (current head set including Google Cloud and parallel T1 handlers)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

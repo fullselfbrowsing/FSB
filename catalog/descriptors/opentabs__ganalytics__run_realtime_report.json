@@ -7,7 +7,7 @@
     "run a realtime report in google analytics",
     "get realtime analytics data (last 30 minutes) in ganalytics"
   ],
-  "description": "Run a realtime analytics report showing data from the last 30 minutes. Useful for monitoring live traffic, active users, current page views, and event activity. Common realtime dimensions: \"country\", \"city\", \"unifiedScreenName\", \"eventName\", \"platform\", \"deviceCategory\". Common realtime metrics: \"activeUsers\", \"eventCount\", \"screenPageViews\", \"conversions\". Not all standard dimensions/metrics are available in realtime — use get_metadata with the property ID to check availability.",
+  "description": "Run a realtime analytics report showing data from the last 30 minutes. Useful for monitoring live traffic, active users, current page views, and event activity. Common realtime dimensions: \"country\", \"city\", \"unifiedScreenName\", \"eventName\", \"platform\", \"deviceCategory\". Common realtime metrics: \"activeUsers\", \"eventCount\", \"screenPageViews\", \"conversions\". Not all standard dimensions/metrics are available in realtime \u2014 use get_metadata with the property ID to check availability.",
   "actionVerb": "run",
   "sideEffectClass": "read",
   "params": {
@@ -52,7 +52,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

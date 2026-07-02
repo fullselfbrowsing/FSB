@@ -14,7 +14,7 @@
     "properties": {
       "query": {
         "type": "string",
-        "description": "Search query — name or username"
+        "description": "Search query \u2014 name or username"
       },
       "count": {
         "description": "Number of results to return (default 10, max 20)",
@@ -34,7 +34,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

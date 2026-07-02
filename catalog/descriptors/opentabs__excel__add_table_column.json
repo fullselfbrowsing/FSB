@@ -23,7 +23,7 @@
           "type": "array",
           "items": {}
         },
-        "description": "2D column values — first entry is the header, rest are data rows"
+        "description": "2D column values \u2014 first entry is the header, rest are data rows"
       },
       "index": {
         "description": "Zero-based column insertion index. Appends at end if omitted.",
@@ -38,7 +38,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

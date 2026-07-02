@@ -29,7 +29,7 @@
         ]
       },
       "sort": {
-        "description": "Sort order (default TIME — most recent first)",
+        "description": "Sort order (default TIME \u2014 most recent first)",
         "type": "string",
         "enum": [
           "TIME",
@@ -48,7 +48,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

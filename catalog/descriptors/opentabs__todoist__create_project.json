@@ -9,7 +9,7 @@
     "create project in todoist",
     "create a new project in todoist"
   ],
-  "description": "Create a new project in Todoist. Only the name is required — all other fields are optional.",
+  "description": "Create a new project in Todoist. Only the name is required \u2014 all other fields are optional.",
   "actionVerb": "create",
   "sideEffectClass": "write",
   "params": {
@@ -41,7 +41,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

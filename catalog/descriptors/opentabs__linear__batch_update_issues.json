@@ -19,7 +19,7 @@
         "items": {
           "type": "string"
         },
-        "description": "Array of issue UUIDs to update (1–25)"
+        "description": "Array of issue UUIDs to update (1\u201325)"
       },
       "state_id": {
         "description": "New workflow state UUID",
@@ -58,7 +58,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

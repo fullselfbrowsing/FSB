@@ -19,7 +19,7 @@
         "type": "string"
       },
       "type": {
-        "description": "Filter by question type — ALGORITHM (coding), SD (system design), ML_SD (ML system design), or BLOG.",
+        "description": "Filter by question type \u2014 ALGORITHM (coding), SD (system design), ML_SD (ML system design), or BLOG.",
         "type": "string",
         "enum": [
           "ALGORITHM",
@@ -43,7 +43,7 @@
         ]
       },
       "difficulty": {
-        "description": "Filter by difficulty — 1 (Easy), 2 (Medium), or 3 (Hard).",
+        "description": "Filter by difficulty \u2014 1 (Easy), 2 (Medium), or 3 (Hard).",
         "type": "integer",
         "minimum": 1,
         "maximum": 3
@@ -77,7 +77,7 @@
     },
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

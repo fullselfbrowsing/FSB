@@ -1,6 +1,6 @@
 # Phase 51 T1 Tail Worklist
 
-**Generated:** 2026-07-02T07:14:28.218Z
+**Generated:** 2026-07-02T07:29:03.908Z
 
 This worklist is generated from the Phase 44 readiness report and covers every descriptor that is not currently executable T1 or guarded fail-closed. It is a migration target list, not an execution claim.
 

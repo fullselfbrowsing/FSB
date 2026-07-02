@@ -8,7 +8,7 @@
     "see all my watchlists in coinbase",
     "list all watchlists in coinbase"
   ],
-  "description": "List all watchlists for the authenticated user. Each watchlist contains items (assets) the user is tracking. Items include their UUID and type but not full asset details — use get_asset_by_uuid for that.",
+  "description": "List all watchlists for the authenticated user. Each watchlist contains items (assets) the user is tracking. Items include their UUID and type but not full asset details \u2014 use get_asset_by_uuid for that.",
   "actionVerb": "list",
   "sideEffectClass": "read",
   "params": {
@@ -16,7 +16,7 @@
     "properties": {},
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

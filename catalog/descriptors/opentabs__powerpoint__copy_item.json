@@ -21,7 +21,7 @@
         "type": "string"
       },
       "destination_folder_id": {
-        "description": "Destination folder item ID — defaults to same folder",
+        "description": "Destination folder item ID \u2014 defaults to same folder",
         "type": "string"
       }
     },
@@ -30,7 +30,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

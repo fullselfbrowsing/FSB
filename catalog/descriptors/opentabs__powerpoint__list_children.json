@@ -16,7 +16,7 @@
     "type": "object",
     "properties": {
       "folder_id": {
-        "description": "Folder item ID — defaults to root",
+        "description": "Folder item ID \u2014 defaults to root",
         "type": "string"
       },
       "top": {
@@ -28,7 +28,7 @@
     },
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

@@ -28,7 +28,7 @@
       "comment_id": {
         "type": "string",
         "minLength": 1,
-        "description": "Comment ID without t1_ prefix (e.g., \"o9z5cx1\") — the comment to focus on"
+        "description": "Comment ID without t1_ prefix (e.g., \"o9z5cx1\") \u2014 the comment to focus on"
       },
       "depth": {
         "description": "Max reply nesting depth below the target comment (default 8)",
@@ -50,7 +50,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

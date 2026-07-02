@@ -6,7 +6,7 @@
     "set volume in spotify",
     "set playback volume in spotify"
   ],
-  "description": "Set the playback volume on the user’s active device.",
+  "description": "Set the playback volume on the user\u2019s active device.",
   "actionVerb": "set",
   "sideEffectClass": "write",
   "params": {
@@ -28,7 +28,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

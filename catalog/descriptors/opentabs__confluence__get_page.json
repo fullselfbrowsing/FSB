@@ -21,7 +21,7 @@
         "description": "Page ID to retrieve"
       },
       "include_body": {
-        "description": "Whether to include the page body content (default false — set to true to read page content)",
+        "description": "Whether to include the page body content (default false \u2014 set to true to read page content)",
         "type": "boolean"
       }
     },
@@ -30,7 +30,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

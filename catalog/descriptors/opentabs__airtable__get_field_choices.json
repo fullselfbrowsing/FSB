@@ -24,7 +24,7 @@
       },
       "field_id": {
         "type": "string",
-        "description": "Field/column ID (fld prefix) — must be a select or multiSelect type"
+        "description": "Field/column ID (fld prefix) \u2014 must be a select or multiSelect type"
       }
     },
     "required": [
@@ -34,7 +34,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",

@@ -18,6 +18,22 @@ Source of truth: `.planning/phases/44-t1-readiness-inventory-status-surface/44-T
 | Blocked tail rows | 194 |
 | App stems with at least one direct T1/guarded row | 9 |
 
+## Current Refreshed State
+
+Source of truth after the 2026-07-01 artifact refresh: `44-T1-READINESS.md`, `51-T1-TAIL-WORKLIST.md`, `51-T1-TERMINAL-STATES.md`, and `51-WRITE-UAT-LEDGER.md`.
+
+| Metric | Count |
+|--------|------:|
+| Total descriptors | 2,314 |
+| T1-ready executable descriptors | 1,267 |
+| T1 guarded fail-closed rows | 556 |
+| Catalog tail not direct API-ready | 491 |
+| Bridge-needed rows | 5 |
+| UAT-needed rows | 141 |
+| Blocked rows | 123 |
+| Degraded/discovery-pending rows | 222 |
+| App stems with at least one direct T1/guarded row | 121 |
+
 ## Operating Rule
 
 "All 2,264 T1" cannot mean marking rows ready by metadata. A row becomes T1 only with executable handler/recipe proof through the existing gates. Denied rows remain blocked unless denylist/product/legal policy changes. Write and destructive rows remain guarded fail-closed until live mutation-body UAT evidence exists.

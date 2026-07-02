@@ -40,11 +40,11 @@
         "type": "string"
       },
       "date_from": {
-        "description": "Start date — relative (\"-7d\", \"-30d\", \"-1mStart\") or ISO 8601. Default: \"-7d\"",
+        "description": "Start date \u2014 relative (\"-7d\", \"-30d\", \"-1mStart\") or ISO 8601. Default: \"-7d\"",
         "type": "string"
       },
       "date_to": {
-        "description": "End date — relative or ISO 8601. Default: now",
+        "description": "End date \u2014 relative or ISO 8601. Default: now",
         "type": "string"
       },
       "interval": {
@@ -78,7 +78,7 @@
     ],
     "additionalProperties": false
   },
-  "backing": "dom",
+  "backing": "handler",
   "provenance": {
     "source": "opentabs",
     "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
