@@ -479,68 +479,6 @@ function instagramMedia() {
   };
 }
 
-function defaultInstagramApiData(url) {
-  if (url.indexOf('/accounts/edit/web_form_data/') !== -1) {
-    return { form_data: { username: 'fsb_test', first_name: 'FSB Test', biography: 'Current user bio' } };
-  }
-  if (url.indexOf('/users/web_profile_info/') !== -1) {
-    return { data: { user: instagramUser() } };
-  }
-  if (url.indexOf('/media/') !== -1 && url.indexOf('/info/') !== -1) {
-    return { items: [instagramMedia()] };
-  }
-  if (url.indexOf('/media/') !== -1 && url.indexOf('/comments/') !== -1) {
-    return {
-      comments: [{ pk: 'comment-test', text: 'Fixture comment', created_at: 1782864100, user: instagramUserSummary(), comment_like_count: 3, child_comment_count: 1 }],
-      comment_count: 1,
-      has_more_comments: false,
-      next_min_id: ''
-    };
-  }
-  if (url.indexOf('/media/') !== -1 && url.indexOf('/likers/') !== -1) {
-    return { users: [instagramUserSummary()], user_count: 1 };
-  }
-  if (url.indexOf('/friendships/') !== -1 && (url.indexOf('/followers/') !== -1 || url.indexOf('/following/') !== -1)) {
-    return { users: [instagramUserSummary()], big_list: false, next_max_id: '' };
-  }
-  if (url.indexOf('/friendships/show/') !== -1) {
-    return { following: true, followed_by: false, blocking: false, muting: false, is_private: false, outgoing_request: false, incoming_request: false, is_restricted: false };
-  }
-  if (url.indexOf('/feed/reels_tray/') !== -1) {
-    return { tray: [{ user: instagramUserSummary(), latest_reel_media: 1782864200 }] };
-  }
-  if (url.indexOf('/feed/user/') !== -1 && url.indexOf('/story/') !== -1) {
-    return {
-      reel: {
-        user: instagramUserSummary(),
-        items: [{ id: 'story-test', media_type: 1, taken_at: 1782864300, image_versions2: { candidates: [{ url: 'https://instagram.com/story.jpg' }] }, expiring_at: 1782950700 }]
-      }
-    };
-  }
-  if (url.indexOf('/feed/user/') !== -1) {
-    return { items: [instagramMedia()], more_available: false, next_max_id: '' };
-  }
-  if (url.indexOf('/collections/list/') !== -1) {
-    return { items: [{ collection_id: 'collection-test', collection_name: 'Travel', collection_type: 'MEDIA', collection_media_count: 2 }] };
-  }
-  if (url.indexOf('/direct_v2/inbox/') !== -1) {
-    return { inbox: { threads: [{ thread_id: 'thread-test', thread_title: 'Fixture DM', is_group: false, users: [instagramUserSummary()], last_activity_at: 1782864400 }], unseen_count: 0, has_older: false, oldest_cursor: '' } };
-  }
-  if (url.indexOf('/direct_v2/threads/') !== -1) {
-    return { thread: { items: [{ item_id: 'message-test', item_type: 'text', text: 'Fixture message', user_id: '100', timestamp: '1782864500000000' }], has_older: false, oldest_cursor: '' } };
-  }
-  if (url.indexOf('/feed/saved/posts/') !== -1) {
-    return { items: [{ media: instagramMedia() }], more_available: false, next_max_id: '' };
-  }
-  if (url.indexOf('/tags/search/') !== -1) {
-    return { results: [{ id: 'tag-test', name: 'fsb', media_count: 1234 }] };
-  }
-  if (url.indexOf('/web/search/topsearch/') !== -1) {
-    return instagramTopsearchData();
-  }
-  return { ok: true };
-}
-
 function facebookHomePageHtml() {
   return [
     '<html><head><title>Test User | Facebook</title></head><body>',
