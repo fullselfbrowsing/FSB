@@ -69,14 +69,20 @@ const OPENTABS_SHA = '4b17021637d2cac12b8d84d21c40e765aa7b85e9';
 const OPENTABS_LICENSE = 'MIT';
 
 const VENDOR_ROOT = resolve(ROOT, 'vendor/opentabs-snapshot/plugins');
-const DESCRIPTORS_DIR = resolve(ROOT, 'catalog/descriptors');
-const PROVENANCE_PATH = resolve(ROOT, 'catalog/descriptors/_fixtures/_provenance.json');
+// FSB_OUTPUT_DIR env-var seam: tests spawn the importer against a tmpdir so
+// npm test never rewrites the tracked catalog/descriptors tree. Default resolves
+// to the real catalog dir.
+const OUTPUT_DIR = process.env.FSB_OUTPUT_DIR
+  ? resolve(process.env.FSB_OUTPUT_DIR)
+  : resolve(ROOT, 'catalog/descriptors');
+const DESCRIPTORS_DIR = OUTPUT_DIR;
+const PROVENANCE_PATH = resolve(OUTPUT_DIR, '_fixtures', '_provenance.json');
 // The eval-indexed seed set (capability-search-eval.test.js buildIndexes this file
 // but iterates intent-cases.json). feedSeedDescriptors() mirrors each emitted
 // descriptor's searchable shape here so every intent-case expectedSlug the later
 // plans add HAS an indexed descriptor (the eval recall/wrong-invoke gate stays
 // satisfiable across 02/03/04). BRDTH-01 eval-gate fix (37-01).
-const SEED_DESCRIPTORS_PATH = resolve(ROOT, 'catalog/descriptors/_fixtures/seed-descriptors.json');
+const SEED_DESCRIPTORS_PATH = resolve(OUTPUT_DIR, '_fixtures', 'seed-descriptors.json');
 
 // ---------------------------------------------------------------------------
 // Batch enumeration (BRDTH-01) -- replaces the hardcoded Phase-36 smoke list.
@@ -1318,8 +1324,29 @@ export async function runImport() {
     }
   }
 
+  // Ensure the output dirs exist. When the importer runs against a fresh
+  // FSB_OUTPUT_DIR tmpdir (test isolation), catalog/descriptors and
+  // catalog/descriptors/_fixtures don't exist yet.
+  if (!existsSync(DESCRIPTORS_DIR)) mkdirSync(DESCRIPTORS_DIR, { recursive: true });
+  const fixturesDir = resolve(DESCRIPTORS_DIR, '_fixtures');
+  if (!existsSync(fixturesDir)) mkdirSync(fixturesDir, { recursive: true });
+
   for (const { path, json } of toWrite) {
-    writeFileSync(path, JSON.stringify(json, null, 2) + '\n', 'utf8');
+    // Preserve a hand-edited backing promotion. The importer's backingFor() always
+    // returns 'dom' by policy (a shipped op is DOM-backed until a handler is ported
+    // and its descriptor is hand-flipped to backing:'handler'). Re-running the
+    // importer must NOT clobber that promotion or an npm-test-triggered re-import
+    // silently reverts every hand-ported T1a descriptor to backing:'dom'.
+    let toEmit = json;
+    if (json && json.backing === 'dom' && existsSync(path)) {
+      try {
+        const prior = JSON.parse(readFileSync(path, 'utf8'));
+        if (prior && prior.backing === 'handler') {
+          toEmit = { ...json, backing: 'handler' };
+        }
+      } catch (_e) { /* prior file unreadable/malformed -> emit fresh */ }
+    }
+    writeFileSync(path, JSON.stringify(toEmit, null, 2) + '\n', 'utf8');
   }
 
   // Fill catalog/descriptors/_fixtures/_provenance.json apps[] with per-app provenance.

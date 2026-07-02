@@ -24,6 +24,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
@@ -76,16 +77,26 @@ async function main() {
   check(Array.isArray(benign.failures) && benign.failures.length === 0, 'gate PASSES the benign todoist origin');
 
   // ---- (c) end-to-end: the benign path actually emits (run under tsx) --------
-  const run = spawnSync(process.execPath, ['--import', 'tsx', importerPath], {
-    cwd: ROOT,
-    encoding: 'utf8',
-  });
-  check(run.status === 0, 'importer (node --import tsx) exits 0');
-  const descDir = path.resolve(ROOT, 'catalog', 'descriptors');
-  const emitted = fs
-    .readdirSync(descDir)
-    .filter((n) => n.startsWith('opentabs__todoist__') && n.endsWith('.json'));
-  check(emitted.length > 0, 'runImport emitted >=1 flat todoist descriptor (gate wired BEFORE emit, benign path writes)');
+  // Spawn against an isolated FSB_OUTPUT_DIR tmpdir so npm test never rewrites the
+  // tracked catalog/descriptors tree (the importer's backingFor() would otherwise
+  // revert every hand-edited backing:'handler' to 'dom'). The importer's env-var
+  // seam resolves DESCRIPTORS_DIR/PROVENANCE_PATH/SEED_DESCRIPTORS_PATH from
+  // FSB_OUTPUT_DIR when it is set; here we point it at a fresh tmp tree.
+  const tmpOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-importer-'));
+  try {
+    const run = spawnSync(process.execPath, ['--import', 'tsx', importerPath], {
+      cwd: ROOT,
+      env: { ...process.env, FSB_OUTPUT_DIR: tmpOutDir },
+      encoding: 'utf8',
+    });
+    check(run.status === 0, 'importer (node --import tsx) exits 0');
+    const emitted = fs.existsSync(tmpOutDir)
+      ? fs.readdirSync(tmpOutDir).filter((n) => n.startsWith('opentabs__todoist__') && n.endsWith('.json'))
+      : [];
+    check(emitted.length > 0, 'runImport emitted >=1 flat todoist descriptor (gate wired BEFORE emit, benign path writes)');
+  } finally {
+    try { fs.rmSync(tmpOutDir, { recursive: true, force: true }); } catch (_e) { /* best-effort */ }
+  }
 
   // ---- report ---------------------------------------------------------------
   if (failed > 0) {
