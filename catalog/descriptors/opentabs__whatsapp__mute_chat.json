@@ -8,7 +8,7 @@
   ],
   "description": "Mute or unmute a WhatsApp chat. Muted chats do not send notifications. Provide a duration in hours, or 0 to unmute.",
   "actionVerb": "mute",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

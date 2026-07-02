@@ -8,7 +8,7 @@
   ],
   "description": "Stop a running EC2 instance. The instance must be in the \"running\" state. Returns the previous and current state of the instance.",
   "actionVerb": "stop",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

@@ -34,7 +34,7 @@
     "sourcePath": "plugins/x/src/tools/get-bookmarks.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlquery",
       "httpMethod": null,
       "opNameVerb": "get"
     }

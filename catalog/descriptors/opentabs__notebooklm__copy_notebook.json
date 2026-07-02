@@ -8,7 +8,7 @@
   ],
   "description": "Create a copy of an existing notebook, including all sources, notes, and artifacts.",
   "actionVerb": "copy",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

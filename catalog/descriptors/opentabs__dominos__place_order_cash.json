@@ -8,7 +8,7 @@
   ],
   "description": "Place the current order with Cash payment (pay at pickup). This navigates to checkout, selects Cash, and submits the order. The AI should always confirm with the user before calling this tool.",
   "actionVerb": "place",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {},

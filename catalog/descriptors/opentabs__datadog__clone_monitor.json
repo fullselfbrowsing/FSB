@@ -8,7 +8,7 @@
   ],
   "description": "Clone an existing monitor to create a copy. Optionally override the name, query, message, or tags on the clone. The original monitor is not modified.",
   "actionVerb": "clone",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -50,8 +50,8 @@
     "sourcePath": "plugins/datadog/src/tools/clone-monitor.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "apiget",
-      "httpMethod": "GET",
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
       "opNameVerb": "clone"
     }
   }

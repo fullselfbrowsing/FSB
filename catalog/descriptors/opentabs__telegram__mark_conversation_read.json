@@ -8,7 +8,7 @@
   ],
   "description": "Mark all messages in a conversation as read up to the specified message ID. This clears the unread count for the conversation.",
   "actionVerb": "mark",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

@@ -8,7 +8,7 @@
   ],
   "description": "Unfollow a Pinterest user by their user ID.",
   "actionVerb": "unfollow",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

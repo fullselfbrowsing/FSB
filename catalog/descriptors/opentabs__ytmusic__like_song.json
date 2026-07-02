@@ -9,7 +9,7 @@
   ],
   "description": "Like a song on YouTube Music",
   "actionVerb": "like",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

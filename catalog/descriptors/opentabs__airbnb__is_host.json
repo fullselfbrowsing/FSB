@@ -8,7 +8,7 @@
   ],
   "description": "Check whether the current user is an Airbnb home host.",
   "actionVerb": "is",
-  "sideEffectClass": "write",
+  "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {},

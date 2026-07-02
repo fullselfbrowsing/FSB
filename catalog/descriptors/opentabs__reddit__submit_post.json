@@ -8,7 +8,7 @@
   ],
   "description": "Submit a new text or link post to a subreddit. Note: some subreddits may require captcha for new or low-karma accounts.",
   "actionVerb": "submit",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

@@ -8,7 +8,7 @@
   ],
   "description": "Save or unsave a post or comment to your saved items",
   "actionVerb": "save",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

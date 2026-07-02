@@ -38,21 +38,6 @@
     },
     {
       "schemaVersion": 2,
-      "id": "bitbucket.get_user_profile",
-      "origin": "https://bitbucket.org",
-      "endpoint": "/!api/2.0/user",
-      "method": "GET",
-      "authStrategy": "same-origin-cookie",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "extract": "@",
-      "expectedShape": "@"
-    },
-    {
-      "schemaVersion": 2,
       "id": "circleci.list_collaborations",
       "origin": "https://app.circleci.com",
       "endpoint": "/api/v2/me/collaborations",
@@ -71,51 +56,6 @@
       "id": "netlify.get_current_user",
       "origin": "https://app.netlify.com",
       "endpoint": "/access-control/bb-api/api/v1/user",
-      "method": "GET",
-      "authStrategy": "same-origin-cookie",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "extract": "@",
-      "expectedShape": "@"
-    },
-    {
-      "schemaVersion": 2,
-      "id": "redfin.get_current_user",
-      "origin": "https://www.redfin.com",
-      "endpoint": "/stingray/do/api-get-header-user-menu",
-      "method": "GET",
-      "authStrategy": "same-origin-cookie",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "extract": "@",
-      "expectedShape": "@"
-    },
-    {
-      "schemaVersion": 2,
-      "id": "webflow.get_current_user",
-      "origin": "https://webflow.com",
-      "endpoint": "/api/user",
-      "method": "GET",
-      "authStrategy": "same-origin-cookie",
-      "params": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      },
-      "extract": "@",
-      "expectedShape": "@"
-    },
-    {
-      "schemaVersion": 2,
-      "id": "webflow.list_workspaces",
-      "origin": "https://webflow.com",
-      "endpoint": "/api/workspaces",
       "method": "GET",
       "authStrategy": "same-origin-cookie",
       "params": {
@@ -630,7 +570,7 @@
       ],
       "description": "Check whether the current user is an Airbnb home host.",
       "actionVerb": "is",
-      "sideEffectClass": "write",
+      "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {},
@@ -776,7 +716,7 @@
         "sourcePath": "plugins/airbnb/src/tools/remove-from-wishlist.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "remove"
         }
@@ -3896,7 +3836,7 @@
       ],
       "description": "Start a stopped EC2 instance. The instance must be in the \"stopped\" state. Returns the previous and current state of the instance.",
       "actionVerb": "start",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -3934,7 +3874,7 @@
       ],
       "description": "Stop a running EC2 instance. The instance must be in the \"running\" state. Returns the previous and current state of the instance.",
       "actionVerb": "stop",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -16266,7 +16206,7 @@
       ],
       "description": "Execute one or more SQL statements against a CockroachDB cluster. Returns column names and row data for each statement. The cluster must be in CREATED state and have available capacity.",
       "actionVerb": "execute",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -16856,7 +16796,7 @@
       ],
       "description": "Get current prices for multiple assets in a single request. Provide up to 10 asset UUIDs and receive all their latest prices at once. Useful for comparing prices across assets.",
       "actionVerb": "compare",
-      "sideEffectClass": "write",
+      "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
@@ -19756,7 +19696,7 @@
       ],
       "description": "Clone an existing dashboard to create a copy. Optionally override the title or description. The original dashboard is not modified.",
       "actionVerb": "clone",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -19785,8 +19725,8 @@
         "sourcePath": "plugins/datadog/src/tools/clone-dashboard.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": "apiget",
-          "httpMethod": "GET",
+          "transportHelper": "apipost",
+          "httpMethod": "POST",
           "opNameVerb": "clone"
         }
       }
@@ -19801,7 +19741,7 @@
       ],
       "description": "Clone an existing monitor to create a copy. Optionally override the name, query, message, or tags on the clone. The original monitor is not modified.",
       "actionVerb": "clone",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -19843,8 +19783,8 @@
         "sourcePath": "plugins/datadog/src/tools/clone-monitor.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": "apiget",
-          "httpMethod": "GET",
+          "transportHelper": "apipost",
+          "httpMethod": "POST",
           "opNameVerb": "clone"
         }
       }
@@ -25338,7 +25278,7 @@
       ],
       "description": "Place the current order with Cash payment (pay at pickup). This navigates to checkout, selects Cash, and submits the order. The AI should always confirm with the user before calling this tool.",
       "actionVerb": "place",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {},
@@ -26209,7 +26149,7 @@
       ],
       "description": "Add an item to the authenticated user's eBay watchlist. Requires the item ID. The tool fetches the item page to extract the required CSRF token, then calls the watch API.",
       "actionVerb": "watch",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -27745,7 +27685,7 @@
       ],
       "description": "Clear cached MSAL state and reload the SharePoint/OneDrive tab to force a fresh Microsoft Graph token. Use this when another Excel tool returns an authentication error pointing at this tool. After invoking, wait ~5 seconds for the tab to finish reloading, then retry the original operation.",
       "actionVerb": "reauthenticate",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {},
@@ -39316,7 +39256,7 @@
       ],
       "description": "Submit a comment on a Hacker News story or reply to an existing comment. Requires being logged in. The parent_id can be a story ID (to post a top-level comment) or a comment ID (to reply to that comment).",
       "actionVerb": "submit",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -43461,7 +43401,7 @@
       ],
       "description": "Submit a solution for a LeetCode problem. Runs against all test cases and returns the verdict including status, runtime/memory percentiles, and any errors. Use run_code first to test your solution.",
       "actionVerb": "submit",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -51716,7 +51656,7 @@
       ],
       "description": "Append paragraphs to the end of an existing Word document (.docx). Downloads the document, adds the new paragraphs after all existing content, and re-uploads. Existing content is preserved.",
       "actionVerb": "append",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -53463,7 +53403,7 @@
       ],
       "description": "Rate a Netflix movie or TV show using the thumbs rating system. Netflix uses three rating levels: thumbs up, thumbs way up (love it), and thumbs down. Pass \"THUMBS_UP\", \"THUMBS_WAY_UP\", \"THUMBS_DOWN\", or \"THUMBS_UNRATED\" to clear a rating.",
       "actionVerb": "rate",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -56310,7 +56250,7 @@
       ],
       "description": "Execute a NRQL (New Relic Query Language) query against an account. Returns raw query results. Examples: \"SELECT count(*) FROM Transaction SINCE 1 hour ago\", \"SELECT average(duration) FROM Transaction FACET appName SINCE 1 day ago\", \"SHOW EVENT TYPES\".",
       "actionVerb": "run",
-      "sideEffectClass": "write",
+      "sideEffectClass": "read",
       "params": {
         "type": "object",
         "properties": {
@@ -56729,7 +56669,7 @@
       ],
       "description": "Create a copy of an existing notebook, including all sources, notes, and artifacts.",
       "actionVerb": "copy",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -57417,7 +57357,7 @@
       ],
       "description": "Append a content block (text, heading, list item, quote, code, etc.) to a page or block. Use this to add content to existing pages.",
       "actionVerb": "append",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -62839,7 +62779,7 @@
       ],
       "description": "Follow a Pinterest user by their user ID. Use get_user_profile to find the user ID from a username.",
       "actionVerb": "follow",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -63399,7 +63339,7 @@
       ],
       "description": "Save (repin) an existing pin to one of your boards. This creates a copy of the pin on your board. Optionally specify a board section.",
       "actionVerb": "save",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -63539,7 +63479,7 @@
       ],
       "description": "Unfollow a Pinterest user by their user ID.",
       "actionVerb": "unfollow",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -68235,7 +68175,7 @@
       ],
       "description": "Save or unsave a post or comment to your saved items",
       "actionVerb": "save",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -68457,7 +68397,7 @@
       ],
       "description": "Post a comment on a Reddit post or reply to an existing comment",
       "actionVerb": "submit",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -68501,7 +68441,7 @@
       ],
       "description": "Submit a new text or link post to a subreddit. Note: some subreddits may require captcha for new or low-karma accounts.",
       "actionVerb": "submit",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -68625,7 +68565,7 @@
       ],
       "description": "Upvote, downvote, or remove a vote on a post or comment",
       "actionVerb": "vote",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -69923,7 +69863,7 @@
       ],
       "description": "Trigger Retool's own editor save pipeline for the currently targeted editor tab. Use this after a Toolscript import or backend app-state update has been loaded in the editor and you need Retool to reconcile editor-only/server-side state without making a manual dummy edit. Requires targeting an open editor tab for the requested page UUID with tabId.",
       "actionVerb": "force",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -75048,7 +74988,7 @@
       ],
       "description": "Invite a user to a Slack channel",
       "actionVerb": "invite",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -75290,7 +75230,7 @@
       ],
       "description": "Open a direct message conversation with one or more users. Returns an existing DM channel if one already exists, or creates a new one. For multi-person DMs (group DMs), pass multiple comma-separated user IDs.",
       "actionVerb": "open",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -75328,7 +75268,7 @@
       ],
       "description": "Pin a message to a Slack channel",
       "actionVerb": "pin",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -75738,7 +75678,7 @@
       ],
       "description": "Unpin a message from a Slack channel",
       "actionVerb": "unpin",
-      "sideEffectClass": "read",
+      "sideEffectClass": "destructive",
       "params": {
         "type": "object",
         "properties": {
@@ -83510,7 +83450,7 @@
       ],
       "description": "Add a user to a Teams group chat by their MRI identifier (e.g., \"8:live:username\").",
       "actionVerb": "invite",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -84014,7 +83954,7 @@
       ],
       "description": "Forward one or more messages from one conversation to another. The forwarded messages show the original sender attribution.",
       "actionVerb": "forward",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -84448,7 +84388,7 @@
       ],
       "description": "Mark all messages in a conversation as read up to the specified message ID. This clears the unread count for the conversation.",
       "actionVerb": "mark",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -84491,7 +84431,7 @@
       ],
       "description": "Pin a message in a conversation. Pinned messages are highlighted and easily accessible. Set silent=true to pin without sending a notification to chat members.",
       "actionVerb": "pin",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -84767,7 +84707,7 @@
       ],
       "description": "Unpin a previously pinned message in a conversation.",
       "actionVerb": "unpin",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -87910,7 +87850,7 @@
       ],
       "description": "Like (swipe right on) a user. Returns whether the like resulted in a match. Pass the content_hash and s_number from get_recommendations for best results.",
       "actionVerb": "like",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -87997,7 +87937,7 @@
       ],
       "description": "Pass (swipe left on) a user, skipping them from recommendations.",
       "actionVerb": "pass",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -95714,7 +95654,7 @@
       ],
       "description": "Block a WhatsApp contact. Blocked contacts cannot send you messages or see your profile information.",
       "actionVerb": "block",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -95752,7 +95692,7 @@
       ],
       "description": "Clear all messages from a WhatsApp chat. The chat remains in the list but all messages are removed locally.",
       "actionVerb": "clear",
-      "sideEffectClass": "read",
+      "sideEffectClass": "destructive",
       "params": {
         "type": "object",
         "properties": {
@@ -96208,7 +96148,7 @@
       ],
       "description": "Mark a WhatsApp chat as read or unread. Marking as read clears the unread badge; marking as unread highlights the chat.",
       "actionVerb": "mark",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -96251,7 +96191,7 @@
       ],
       "description": "Mute or unmute a WhatsApp chat. Muted chats do not send notifications. Provide a duration in hours, or 0 to unmute.",
       "actionVerb": "mute",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -96296,7 +96236,7 @@
       ],
       "description": "Pin or unpin a WhatsApp chat. Pinned chats appear at the top of the chat list. Maximum 3 pinned chats.",
       "actionVerb": "pin",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -96339,7 +96279,7 @@
       ],
       "description": "Revoke the current invite link for a WhatsApp group, generating a new one. The old link will no longer work. Only group admins can revoke invite links.",
       "actionVerb": "revoke",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -96377,7 +96317,7 @@
       ],
       "description": "Revoke (unsend) messages in a WhatsApp chat. Revoked messages are deleted for everyone in the chat. Only messages sent by the current user can be revoked.",
       "actionVerb": "revoke",
-      "sideEffectClass": "read",
+      "sideEffectClass": "destructive",
       "params": {
         "type": "object",
         "properties": {
@@ -96471,7 +96411,7 @@
       ],
       "description": "Star or unstar messages in a WhatsApp chat. Starred messages can be accessed later via the starred messages list.",
       "actionVerb": "star",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -96524,7 +96464,7 @@
       ],
       "description": "Unblock a previously blocked WhatsApp contact. The contact will be able to send you messages again.",
       "actionVerb": "unblock",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -97412,7 +97352,7 @@
         "sourcePath": "plugins/x/src/tools/add-list-member.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "add"
         }
@@ -97428,7 +97368,7 @@
       ],
       "description": "Add a tweet to your bookmarks.",
       "actionVerb": "bookmark",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -97450,7 +97390,7 @@
         "sourcePath": "plugins/x/src/tools/bookmark-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "bookmark"
         }
@@ -97501,7 +97441,7 @@
         "sourcePath": "plugins/x/src/tools/create-list.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "create"
         }
@@ -97547,7 +97487,7 @@
         "sourcePath": "plugins/x/src/tools/create-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "create"
         }
@@ -97587,7 +97527,7 @@
         "sourcePath": "plugins/x/src/tools/delete-list.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "delete"
         }
@@ -97627,7 +97567,7 @@
         "sourcePath": "plugins/x/src/tools/delete-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "delete"
         }
@@ -97669,7 +97609,7 @@
         "sourcePath": "plugins/x/src/tools/get-bookmarks.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97720,7 +97660,7 @@
         "sourcePath": "plugins/x/src/tools/get-following.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97763,7 +97703,7 @@
         "sourcePath": "plugins/x/src/tools/get-home-timeline.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97806,7 +97746,7 @@
         "sourcePath": "plugins/x/src/tools/get-latest-timeline.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97856,7 +97796,7 @@
         "sourcePath": "plugins/x/src/tools/get-likers.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97906,7 +97846,7 @@
         "sourcePath": "plugins/x/src/tools/get-list-tweets.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97947,7 +97887,7 @@
         "sourcePath": "plugins/x/src/tools/get-list.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -97997,7 +97937,7 @@
         "sourcePath": "plugins/x/src/tools/get-retweeters.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98029,7 +97969,7 @@
         "sourcePath": "plugins/x/src/tools/get-trending.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98073,7 +98013,7 @@
         "sourcePath": "plugins/x/src/tools/get-tweet-replies.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98114,7 +98054,7 @@
         "sourcePath": "plugins/x/src/tools/get-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98155,7 +98095,7 @@
         "sourcePath": "plugins/x/src/tools/get-user-by-id.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98205,7 +98145,7 @@
         "sourcePath": "plugins/x/src/tools/get-user-likes.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98246,7 +98186,7 @@
         "sourcePath": "plugins/x/src/tools/get-user-profile.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98296,7 +98236,7 @@
         "sourcePath": "plugins/x/src/tools/get-user-tweets.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "get"
         }
@@ -98312,7 +98252,7 @@
       ],
       "description": "Like (favorite) a tweet.",
       "actionVerb": "like",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -98334,7 +98274,7 @@
         "sourcePath": "plugins/x/src/tools/like-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "like"
         }
@@ -98350,7 +98290,7 @@
       ],
       "description": "Pin a tweet to your profile.",
       "actionVerb": "pin",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -98372,7 +98312,7 @@
         "sourcePath": "plugins/x/src/tools/pin-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "pin"
         }
@@ -98388,7 +98328,7 @@
       ],
       "description": "Post a quote tweet — a top-level post that embeds and comments on another tweet. Unlike a reply (which lives inside the original thread) or a plain retweet (which adds no commentary), a quote tweet appears on your own profile with your text plus the referenced tweet.",
       "actionVerb": "quote",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -98417,7 +98357,7 @@
         "sourcePath": "plugins/x/src/tools/quote-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "quote"
         }
@@ -98455,7 +98395,7 @@
         "sourcePath": "plugins/x/src/tools/remove-bookmark.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "remove"
         }
@@ -98499,7 +98439,7 @@
         "sourcePath": "plugins/x/src/tools/remove-list-member.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "remove"
         }
@@ -98515,7 +98455,7 @@
       ],
       "description": "Retweet (repost) a tweet.",
       "actionVerb": "retweet",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -98537,7 +98477,7 @@
         "sourcePath": "plugins/x/src/tools/retweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "retweet"
         }
@@ -98593,7 +98533,7 @@
         "sourcePath": "plugins/x/src/tools/search-tweets.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlquery",
           "httpMethod": null,
           "opNameVerb": "search"
         }
@@ -98609,7 +98549,7 @@
       ],
       "description": "Remove a like from a tweet.",
       "actionVerb": "unlike",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -98631,7 +98571,7 @@
         "sourcePath": "plugins/x/src/tools/unlike-tweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "unlike"
         }
@@ -98647,7 +98587,7 @@
       ],
       "description": "Remove a retweet.",
       "actionVerb": "unretweet",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -98669,7 +98609,7 @@
         "sourcePath": "plugins/x/src/tools/unretweet.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "unretweet"
         }
@@ -98725,7 +98665,7 @@
         "sourcePath": "plugins/x/src/tools/update-list.ts",
         "license": "MIT",
         "signals": {
-          "transportHelper": null,
+          "transportHelper": "graphqlmutation",
           "httpMethod": null,
           "opNameVerb": "update"
         }
@@ -99985,7 +99925,7 @@
       ],
       "description": "Snooze a category goal for a specific month so it does not appear as needing funding for that month. Pass snooze=false to un-snooze.",
       "actionVerb": "snooze",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -100877,7 +100817,7 @@
       ],
       "description": "Like a YouTube video. The video will be added to the \"Liked videos\" playlist.",
       "actionVerb": "like",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {
@@ -101496,7 +101436,7 @@
       ],
       "description": "Like a song on YouTube Music",
       "actionVerb": "like",
-      "sideEffectClass": "read",
+      "sideEffectClass": "write",
       "params": {
         "type": "object",
         "properties": {

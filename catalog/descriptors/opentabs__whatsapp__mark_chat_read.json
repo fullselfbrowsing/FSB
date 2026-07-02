@@ -8,7 +8,7 @@
   ],
   "description": "Mark a WhatsApp chat as read or unread. Marking as read clears the unread badge; marking as unread highlights the chat.",
   "actionVerb": "mark",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

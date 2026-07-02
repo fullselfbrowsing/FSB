@@ -8,7 +8,7 @@
   ],
   "description": "Add a tweet to your bookmarks.",
   "actionVerb": "bookmark",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -30,7 +30,7 @@
     "sourcePath": "plugins/x/src/tools/bookmark-tweet.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "bookmark"
     }

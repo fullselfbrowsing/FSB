@@ -8,7 +8,7 @@
   ],
   "description": "Execute one or more SQL statements against a CockroachDB cluster. Returns column names and row data for each statement. The cluster must be in CREATED state and have available capacity.",
   "actionVerb": "execute",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

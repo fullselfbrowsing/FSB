@@ -8,7 +8,7 @@
   ],
   "description": "Add an item to the authenticated user's eBay watchlist. Requires the item ID. The tool fetches the item page to extract the required CSRF token, then calls the watch API.",
   "actionVerb": "watch",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

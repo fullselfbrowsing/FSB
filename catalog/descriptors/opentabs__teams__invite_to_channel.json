@@ -8,7 +8,7 @@
   ],
   "description": "Add a user to a Teams group chat by their MRI identifier (e.g., \"8:live:username\").",
   "actionVerb": "invite",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

@@ -48,7 +48,7 @@
     "sourcePath": "plugins/x/src/tools/search-tweets.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlquery",
       "httpMethod": null,
       "opNameVerb": "search"
     }

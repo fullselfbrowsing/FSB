@@ -9,7 +9,7 @@
   ],
   "description": "Append paragraphs to the end of an existing Word document (.docx). Downloads the document, adds the new paragraphs after all existing content, and re-uploads. Existing content is preserved.",
   "actionVerb": "append",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

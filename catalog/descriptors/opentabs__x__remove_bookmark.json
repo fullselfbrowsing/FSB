@@ -30,7 +30,7 @@
     "sourcePath": "plugins/x/src/tools/remove-bookmark.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "remove"
     }

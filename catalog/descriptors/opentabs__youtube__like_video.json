@@ -8,7 +8,7 @@
   ],
   "description": "Like a YouTube video. The video will be added to the \"Liked videos\" playlist.",
   "actionVerb": "like",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

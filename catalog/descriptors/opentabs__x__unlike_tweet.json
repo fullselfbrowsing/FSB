@@ -8,7 +8,7 @@
   ],
   "description": "Remove a like from a tweet.",
   "actionVerb": "unlike",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -30,7 +30,7 @@
     "sourcePath": "plugins/x/src/tools/unlike-tweet.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "unlike"
     }

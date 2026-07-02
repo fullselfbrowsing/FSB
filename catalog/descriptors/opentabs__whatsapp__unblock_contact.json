@@ -8,7 +8,7 @@
   ],
   "description": "Unblock a previously blocked WhatsApp contact. The contact will be able to send you messages again.",
   "actionVerb": "unblock",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

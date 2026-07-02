@@ -8,7 +8,7 @@
   ],
   "description": "Pin or unpin a WhatsApp chat. Pinned chats appear at the top of the chat list. Maximum 3 pinned chats.",
   "actionVerb": "pin",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

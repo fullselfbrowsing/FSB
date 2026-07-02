@@ -8,7 +8,7 @@
   ],
   "description": "Snooze a category goal for a specific month so it does not appear as needing funding for that month. Pass snooze=false to un-snooze.",
   "actionVerb": "snooze",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

@@ -8,7 +8,7 @@
   ],
   "description": "Pass (swipe left on) a user, skipping them from recommendations.",
   "actionVerb": "pass",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

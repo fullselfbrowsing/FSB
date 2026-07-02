@@ -1,6 +1,6 @@
 # Phase 51 T1 Tail Worklist
 
-**Generated:** 2026-06-30T16:17:52.496Z
+**Generated:** 2026-07-02T07:14:28.218Z
 
 This worklist is generated from the Phase 44 readiness report and covers every descriptor that is not currently executable T1 or guarded fail-closed. It is a migration target list, not an execution claim.
 
@@ -9,97 +9,90 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 | Metric | Count |
 |--------|------:|
 | Total descriptors | 2314 |
-| Current T1-ready descriptors | 84 |
-| Current guarded fail-closed writes | 5 |
-| Tail rows in this worklist | 2225 |
-| Actionable non-denied tail rows | 2031 |
-| Blocked policy rows | 194 |
-| Read rows | 1551 |
-| Write rows | 508 |
-| Destructive rows | 166 |
+| Current T1-ready descriptors | 1310 |
+| Current guarded fail-closed rows | 564 |
+| Tail rows in this worklist | 440 |
+| Actionable non-denied tail rows | 401 |
+| Blocked policy rows | 39 |
+| Read rows | 266 |
+| Write rows | 135 |
+| Destructive rows | 39 |
 
 ## Workstreams
 
 | Item | Count |
 |------|------:|
-| `same-origin-read` | 1096 |
-| `write-destructive-uat` | 638 |
-| `pattern-d` | 214 |
-| `blocked-policy` | 194 |
-| `gapi-bridge` | 83 |
+| `same-origin-read` | 230 |
+| `write-destructive-uat` | 168 |
+| `blocked-policy` | 39 |
+| `pattern-d` | 3 |
 
 ## Largest App Buckets
 
 | Item | Count |
 |------|------:|
-| `datadog` | 71 |
-| `linear` | 59 |
-| `bsky` | 38 |
-| `posthog` | 38 |
-| `terraform` | 38 |
-| `netlify` | 35 |
-| `twilio` | 35 |
-| `retool` | 34 |
-| `todoist` | 33 |
-| `tumblr` | 32 |
-| `minimax` | 31 |
-| `x` | 31 |
-| `cloudflare` | 30 |
-| `gcloud` | 30 |
-| `stripe` | 30 |
-| `excel` | 29 |
-| `instagram` | 28 |
-| `msword` | 27 |
-| `shortcut` | 27 |
-| `azure` | 26 |
-| `discord` | 26 |
-| `leetcode` | 26 |
-| `meticulous` | 26 |
-| `powerpoint` | 26 |
-| `supabase` | 26 |
-| `outlook` | 24 |
-| `pinterest` | 24 |
-| `bitbucket` | 23 |
-| `reddit` | 23 |
-| `robinhood` | 23 |
-| `telegram` | 23 |
-| `circleci` | 22 |
-| `newrelic` | 22 |
-| `ynab` | 22 |
-| `confluence` | 21 |
+| `x` | 29 |
+| `bsky` | 26 |
+| `datadog` | 25 |
+| `twilio` | 23 |
 | `onlyfans` | 21 |
-| `sentry` | 21 |
-| `spotify` | 21 |
-| `whatsapp` | 21 |
-| `carta` | 20 |
-| `chatgpt` | 20 |
-| `dominos` | 20 |
-| `jira` | 20 |
-| `lucid` | 20 |
-| `medium` | 20 |
-| `mongodb` | 20 |
-| `stackoverflow` | 20 |
-| `starbucks` | 20 |
-| `gdocs` | 19 |
-| `notebooklm` | 19 |
+| `shortcut` | 19 |
+| `netflix` | 18 |
+| `youtube` | 18 |
+| `target` | 16 |
+| `priceline` | 15 |
+| `ytmusic` | 15 |
+| `dominos` | 14 |
+| `pandaexpress` | 14 |
+| `costco` | 13 |
+| `instagram` | 13 |
+| `chipotle` | 12 |
+| `notion` | 12 |
+| `stackoverflow` | 11 |
+| `newrelic` | 10 |
+| `reddit` | 10 |
+| `asana` | 9 |
+| `bestbuy` | 9 |
+| `facebook` | 9 |
+| `stripe` | 9 |
+| `chatgpt` | 7 |
+| `expedia` | 6 |
+| `instacart` | 6 |
+| `walmart` | 6 |
+| `cloudflare` | 5 |
+| `doordash` | 5 |
+| `meticulous` | 5 |
+| `booking` | 4 |
+| `yelp` | 4 |
+| `zillow` | 4 |
+| `homedepot` | 3 |
+| `npm` | 3 |
+| `leetcode` | 2 |
+| `tripadvisor` | 2 |
+| `wikipedia` | 2 |
+| `airbnb` | 1 |
+| `amplitude` | 1 |
+| `hackernews` | 1 |
+| `stubhub` | 1 |
+| `threads` | 1 |
+| `vercel` | 1 |
 
 ## Route Feasibility
 
 | Item | Count |
 |------|------:|
-| `same-origin-read-candidate` | 1096 |
-| `dom-discovery-only` | 480 |
-| `pattern-d-candidate` | 322 |
-| `blocked` | 194 |
-| `gapi-bridge-candidate` | 133 |
+| `same-origin-read-candidate` | 230 |
+| `dom-discovery-only` | 137 |
+| `blocked` | 39 |
+| `pattern-d-candidate` | 34 |
 
 ## Origin Class
 
 | Item | Count |
 |------|------:|
-| `standard` | 1297 |
-| `sensitive` | 734 |
-| `denied` | 194 |
+| `sensitive` | 285 |
+| `standard` | 116 |
+| `denied` | 39 |
 
 ## Machine-Readable Rows
 

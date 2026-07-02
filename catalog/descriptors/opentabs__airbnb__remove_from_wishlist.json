@@ -34,7 +34,7 @@
     "sourcePath": "plugins/airbnb/src/tools/remove-from-wishlist.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "remove"
     }

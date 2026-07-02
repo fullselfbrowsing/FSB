@@ -8,7 +8,7 @@
   ],
   "description": "Like (favorite) a tweet.",
   "actionVerb": "like",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -30,7 +30,7 @@
     "sourcePath": "plugins/x/src/tools/like-tweet.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "like"
     }

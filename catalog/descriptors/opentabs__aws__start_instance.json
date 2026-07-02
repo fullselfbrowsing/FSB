@@ -8,7 +8,7 @@
   ],
   "description": "Start a stopped EC2 instance. The instance must be in the \"stopped\" state. Returns the previous and current state of the instance.",
   "actionVerb": "start",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

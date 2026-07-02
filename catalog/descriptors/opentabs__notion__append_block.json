@@ -8,7 +8,7 @@
   ],
   "description": "Append a content block (text, heading, list item, quote, code, etc.) to a page or block. Use this to add content to existing pages.",
   "actionVerb": "append",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

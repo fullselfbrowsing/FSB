@@ -150,7 +150,7 @@
     ],
     "description": "Check whether the current user is an Airbnb home host.",
     "actionVerb": "is",
-    "sideEffectClass": "write",
+    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -1232,7 +1232,7 @@
     ],
     "description": "Start a stopped EC2 instance. The instance must be in the \"stopped\" state. Returns the previous and current state of the instance.",
     "actionVerb": "start",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -1245,7 +1245,7 @@
     ],
     "description": "Stop a running EC2 instance. The instance must be in the \"running\" state. Returns the previous and current state of the instance.",
     "actionVerb": "stop",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -5520,7 +5520,7 @@
     ],
     "description": "Execute one or more SQL statements against a CockroachDB cluster. Returns column names and row data for each statement. The cluster must be in CREATED state and have available capacity.",
     "actionVerb": "execute",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -5760,7 +5760,7 @@
     ],
     "description": "Get current prices for multiple assets in a single request. Provide up to 10 asset UUIDs and receive all their latest prices at once. Useful for comparing prices across assets.",
     "actionVerb": "compare",
-    "sideEffectClass": "write",
+    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -6721,7 +6721,7 @@
     ],
     "description": "Clone an existing dashboard to create a copy. Optionally override the title or description. The original dashboard is not modified.",
     "actionVerb": "clone",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -6734,7 +6734,7 @@
     ],
     "description": "Clone an existing monitor to create a copy. Optionally override the name, query, message, or tags on the clone. The original monitor is not modified.",
     "actionVerb": "clone",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -8537,7 +8537,7 @@
     ],
     "description": "Place the current order with Cash payment (pay at pickup). This navigates to checkout, selects Cash, and submits the order. The AI should always confirm with the user before calling this tool.",
     "actionVerb": "place",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -8874,7 +8874,7 @@
     ],
     "description": "Add an item to the authenticated user's eBay watchlist. Requires the item ID. The tool fetches the item page to extract the required CSRF token, then calls the watch API.",
     "actionVerb": "watch",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -9410,7 +9410,7 @@
     ],
     "description": "Clear cached MSAL state and reload the SharePoint/OneDrive tab to force a fresh Microsoft Graph token. Use this when another Excel tool returns an authentication error pointing at this tool. After invoking, wait ~5 seconds for the tab to finish reloading, then retry the original operation.",
     "actionVerb": "reauthenticate",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -10247,7 +10247,7 @@
     "description": "Prepare a Fiverr message to a recipient without sending it. Validates the recipient and body and returns a structured preview (sender, recipient, body, character count). Use this to compose and confirm a message before calling `send_message`. Makes no network request and sends nothing.",
     "actionVerb": "draft",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.get_conversation",
@@ -10263,7 +10263,7 @@
     "description": "Read the full message thread of a Fiverr conversation with a specific user. Returns messages (oldest first) with sender, recipient, text, timestamp, and attachment count, plus the unread count and whether the oldest page has been reached. Pass the other participant’s username, as returned by `list_conversations`.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.get_current_page_context",
@@ -10279,7 +10279,7 @@
     "description": "Get the logged-in Fiverr account identity and the page currently open in the browser tab. Returns the username, numeric user ID, account currency/country/locale, Pro status, and the current page URL and title. Use this to confirm who is logged in and what they are looking at before taking further actions. Reads page state only — makes no network request.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.get_gig_details",
@@ -10294,7 +10294,7 @@
     "description": "Get full details for a single Fiverr gig: title, description, category, packages (with prices, delivery times, revisions, and features), rating, orders in queue, seller summary, and recent reviews. Pass the gig path from a `search_gigs` result (e.g., \"/username/gig-slug\"). Reads the gig’s server-rendered page.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.get_seller_profile",
@@ -10310,7 +10310,7 @@
     "description": "Get a Fiverr seller’s public profile: display name, level, Pro status, country, join date, bio, overall rating, review count, and the gigs listed on their profile. Pass the seller’s username (the first path segment of a gig URL, or the value of `seller_name` from a search result).",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.list_conversations",
@@ -10325,7 +10325,7 @@
     "description": "List the logged-in user’s Fiverr inbox conversations, most recent first. Each entry includes the other participant’s username, unread count, a preview of the latest message, and the timestamp. Pass a username from a result to `get_conversation` to read the full thread.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.search_gigs",
@@ -10338,7 +10338,7 @@
     "description": "Search Fiverr for gigs (services) matching a query. Returns a ranked page of gigs with title, seller, level, rating, starting price, and a link to each gig page. Use the `page` parameter to paginate. Pass a gig URL from a result to `get_gig_details` for full information. Reads Fiverr’s server-rendered search page — the most reliable source given Fiverr’s bot protection.",
     "actionVerb": "search",
     "sideEffectClass": "read",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "fiverr.send_message",
@@ -10353,7 +10353,7 @@
     "description": "Send a message to another Fiverr user’s inbox. Provide the recipient username and the message text. This is a write action — it delivers a real message immediately. Compose with `draft_message` first to review the content before sending. Note: if a Fiverr AI assistant currently manages the conversation, the first manual message takes over the thread from the assistant.",
     "actionVerb": "send",
     "sideEffectClass": "write",
-    "backing": "handler"
+    "backing": "dom"
   },
   {
     "slug": "ganalytics.check_compatibility",
@@ -13164,7 +13164,7 @@
     ],
     "description": "Submit a comment on a Hacker News story or reply to an existing comment. Requires being logged in. The parent_id can be a story ID (to post a top-level comment) or a comment ID (to reply to that comment).",
     "actionVerb": "submit",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -14649,7 +14649,7 @@
     ],
     "description": "Submit a solution for a LeetCode problem. Runs against all test cases and returns the verdict including status, runtime/memory percentiles, and any errors. Use run_code first to test your solution.",
     "actionVerb": "submit",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -17525,7 +17525,7 @@
     ],
     "description": "Append paragraphs to the end of an existing Word document (.docx). Downloads the document, adds the new paragraphs after all existing content, and re-uploads. Existing content is preserved.",
     "actionVerb": "append",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -18162,7 +18162,7 @@
     ],
     "description": "Rate a Netflix movie or TV show using the thumbs rating system. Netflix uses three rating levels: thumbs up, thumbs way up (love it), and thumbs down. Pass \"THUMBS_UP\", \"THUMBS_WAY_UP\", \"THUMBS_DOWN\", or \"THUMBS_UNRATED\" to clear a rating.",
     "actionVerb": "rate",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -19081,7 +19081,7 @@
     ],
     "description": "Execute a NRQL (New Relic Query Language) query against an account. Returns raw query results. Examples: \"SELECT count(*) FROM Transaction SINCE 1 hour ago\", \"SELECT average(duration) FROM Transaction FACET appName SINCE 1 day ago\", \"SHOW EVENT TYPES\".",
     "actionVerb": "run",
-    "sideEffectClass": "write",
+    "sideEffectClass": "read",
     "backing": "dom"
   },
   {
@@ -19165,7 +19165,7 @@
     ],
     "description": "Create a copy of an existing notebook, including all sources, notes, and artifacts.",
     "actionVerb": "copy",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -19416,7 +19416,7 @@
     ],
     "description": "Append a content block (text, heading, list item, quote, code, etc.) to a page or block. Use this to add content to existing pages.",
     "actionVerb": "append",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -21188,7 +21188,7 @@
     ],
     "description": "Follow a Pinterest user by their user ID. Use get_user_profile to find the user ID from a username.",
     "actionVerb": "follow",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -21386,7 +21386,7 @@
     ],
     "description": "Save (repin) an existing pin to one of your boards. This creates a copy of the pin on your board. Optionally specify a board section.",
     "actionVerb": "save",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -21425,7 +21425,7 @@
     ],
     "description": "Unfollow a Pinterest user by their user ID.",
     "actionVerb": "unfollow",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -22906,7 +22906,7 @@
     ],
     "description": "Save or unsave a post or comment to your saved items",
     "actionVerb": "save",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -22961,7 +22961,7 @@
     ],
     "description": "Post a comment on a Reddit post or reply to an existing comment",
     "actionVerb": "submit",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -22974,7 +22974,7 @@
     ],
     "description": "Submit a new text or link post to a subreddit. Note: some subreddits may require captcha for new or low-karma accounts.",
     "actionVerb": "submit",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -23000,7 +23000,7 @@
     ],
     "description": "Upvote, downvote, or remove a vote on a post or comment",
     "actionVerb": "vote",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -23385,7 +23385,7 @@
     ],
     "description": "Trigger Retool's own editor save pipeline for the currently targeted editor tab. Use this after a Toolscript import or backend app-state update has been loaded in the editor and you need Retool to reconcile editor-only/server-side state without making a manual dummy edit. Requires targeting an open editor tab for the requested page UUID with tabId.",
     "actionVerb": "force",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -25184,7 +25184,7 @@
     ],
     "description": "Invite a user to a Slack channel",
     "actionVerb": "invite",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -25257,7 +25257,7 @@
     ],
     "description": "Open a direct message conversation with one or more users. Returns an existing DM channel if one already exists, or creates a new one. For multi-person DMs (group DMs), pass multiple comma-separated user IDs.",
     "actionVerb": "open",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -25270,7 +25270,7 @@
     ],
     "description": "Pin a message to a Slack channel",
     "actionVerb": "pin",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -25390,7 +25390,7 @@
     ],
     "description": "Unpin a message from a Slack channel",
     "actionVerb": "unpin",
-    "sideEffectClass": "read",
+    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -27978,7 +27978,7 @@
     ],
     "description": "Add a user to a Teams group chat by their MRI identifier (e.g., \"8:live:username\").",
     "actionVerb": "invite",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -28132,7 +28132,7 @@
     ],
     "description": "Forward one or more messages from one conversation to another. The forwarded messages show the original sender attribution.",
     "actionVerb": "forward",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -28285,7 +28285,7 @@
     ],
     "description": "Mark all messages in a conversation as read up to the specified message ID. This clears the unread count for the conversation.",
     "actionVerb": "mark",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -28298,7 +28298,7 @@
     ],
     "description": "Pin a message in a conversation. Pinned messages are highlighted and easily accessible. Set silent=true to pin without sending a notification to chat members.",
     "actionVerb": "pin",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -28378,7 +28378,7 @@
     ],
     "description": "Unpin a previously pinned message in a conversation.",
     "actionVerb": "unpin",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -29453,7 +29453,7 @@
     ],
     "description": "Like (swipe right on) a user. Returns whether the like resulted in a match. Pass the content_hash and s_number from get_recommendations for best results.",
     "actionVerb": "like",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -29481,7 +29481,7 @@
     ],
     "description": "Pass (swipe left on) a user, skipping them from recommendations.",
     "actionVerb": "pass",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32188,7 +32188,7 @@
     ],
     "description": "Block a WhatsApp contact. Blocked contacts cannot send you messages or see your profile information.",
     "actionVerb": "block",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32201,7 +32201,7 @@
     ],
     "description": "Clear all messages from a WhatsApp chat. The chat remains in the list but all messages are removed locally.",
     "actionVerb": "clear",
-    "sideEffectClass": "read",
+    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -32369,7 +32369,7 @@
     ],
     "description": "Mark a WhatsApp chat as read or unread. Marking as read clears the unread badge; marking as unread highlights the chat.",
     "actionVerb": "mark",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32382,7 +32382,7 @@
     ],
     "description": "Mute or unmute a WhatsApp chat. Muted chats do not send notifications. Provide a duration in hours, or 0 to unmute.",
     "actionVerb": "mute",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32395,7 +32395,7 @@
     ],
     "description": "Pin or unpin a WhatsApp chat. Pinned chats appear at the top of the chat list. Maximum 3 pinned chats.",
     "actionVerb": "pin",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32408,7 +32408,7 @@
     ],
     "description": "Revoke the current invite link for a WhatsApp group, generating a new one. The old link will no longer work. Only group admins can revoke invite links.",
     "actionVerb": "revoke",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32421,7 +32421,7 @@
     ],
     "description": "Revoke (unsend) messages in a WhatsApp chat. Revoked messages are deleted for everyone in the chat. Only messages sent by the current user can be revoked.",
     "actionVerb": "revoke",
-    "sideEffectClass": "read",
+    "sideEffectClass": "destructive",
     "backing": "dom"
   },
   {
@@ -32449,7 +32449,7 @@
     ],
     "description": "Star or unstar messages in a WhatsApp chat. Starred messages can be accessed later via the starred messages list.",
     "actionVerb": "star",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32462,7 +32462,7 @@
     ],
     "description": "Unblock a previously blocked WhatsApp contact. The contact will be able to send you messages again.",
     "actionVerb": "unblock",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -32772,7 +32772,7 @@
     ],
     "description": "Add a tweet to your bookmarks.",
     "actionVerb": "bookmark",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33080,7 +33080,7 @@
     ],
     "description": "Like (favorite) a tweet.",
     "actionVerb": "like",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33093,7 +33093,7 @@
     ],
     "description": "Pin a tweet to your profile.",
     "actionVerb": "pin",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33106,7 +33106,7 @@
     ],
     "description": "Post a quote tweet — a top-level post that embeds and comments on another tweet. Unlike a reply (which lives inside the original thread) or a plain retweet (which adds no commentary), a quote tweet appears on your own profile with your text plus the referenced tweet.",
     "actionVerb": "quote",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33145,7 +33145,7 @@
     ],
     "description": "Retweet (repost) a tweet.",
     "actionVerb": "retweet",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33171,7 +33171,7 @@
     ],
     "description": "Remove a like from a tweet.",
     "actionVerb": "unlike",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33184,7 +33184,7 @@
     ],
     "description": "Remove a retweet.",
     "actionVerb": "unretweet",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33589,7 +33589,7 @@
     ],
     "description": "Snooze a category goal for a specific month so it does not appear as needing funding for that month. Pass snooze=false to un-snooze.",
     "actionVerb": "snooze",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -33834,7 +33834,7 @@
     ],
     "description": "Like a YouTube video. The video will be added to the \"Liked videos\" playlist.",
     "actionVerb": "like",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {
@@ -34072,7 +34072,7 @@
     ],
     "description": "Like a song on YouTube Music",
     "actionVerb": "like",
-    "sideEffectClass": "read",
+    "sideEffectClass": "write",
     "backing": "dom"
   },
   {

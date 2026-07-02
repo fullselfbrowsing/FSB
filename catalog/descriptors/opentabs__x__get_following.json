@@ -43,7 +43,7 @@
     "sourcePath": "plugins/x/src/tools/get-following.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlquery",
       "httpMethod": null,
       "opNameVerb": "get"
     }

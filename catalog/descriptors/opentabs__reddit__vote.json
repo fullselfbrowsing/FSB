@@ -8,7 +8,7 @@
   ],
   "description": "Upvote, downvote, or remove a vote on a post or comment",
   "actionVerb": "vote",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

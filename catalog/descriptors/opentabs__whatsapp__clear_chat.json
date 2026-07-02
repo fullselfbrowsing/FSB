@@ -8,7 +8,7 @@
   ],
   "description": "Clear all messages from a WhatsApp chat. The chat remains in the list but all messages are removed locally.",
   "actionVerb": "clear",
-  "sideEffectClass": "read",
+  "sideEffectClass": "destructive",
   "params": {
     "type": "object",
     "properties": {

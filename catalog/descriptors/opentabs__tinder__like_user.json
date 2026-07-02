@@ -8,7 +8,7 @@
   ],
   "description": "Like (swipe right on) a user. Returns whether the like resulted in a match. Pass the content_hash and s_number from get_recommendations for best results.",
   "actionVerb": "like",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

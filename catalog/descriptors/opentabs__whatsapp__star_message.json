@@ -8,7 +8,7 @@
   ],
   "description": "Star or unstar messages in a WhatsApp chat. Starred messages can be accessed later via the starred messages list.",
   "actionVerb": "star",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

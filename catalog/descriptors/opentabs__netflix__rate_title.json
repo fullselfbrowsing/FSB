@@ -8,7 +8,7 @@
   ],
   "description": "Rate a Netflix movie or TV show using the thumbs rating system. Netflix uses three rating levels: thumbs up, thumbs way up (love it), and thumbs down. Pass \"THUMBS_UP\", \"THUMBS_WAY_UP\", \"THUMBS_DOWN\", or \"THUMBS_UNRATED\" to clear a rating.",
   "actionVerb": "rate",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

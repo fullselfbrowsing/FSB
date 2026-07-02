@@ -53,7 +53,7 @@ import { classifyGate } from './verify-classification-gate.mjs';
 // floor the cross-check gate (scripts/verify-catalog-crosscheck.mjs) re-derives with
 // -- imported from one module so the two can never diverge. verbPrefix is camelCase-
 // aware here too (it is the importer's actionVerb + synonym seed).
-import { verbPrefix, deriveClass } from './lib/side-effect-class.mjs';
+import { verbPrefix, deriveClass, helperClass, rankOf } from './lib/side-effect-class.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -482,10 +482,24 @@ function extractTransportSignals(app, opFileBase) {
     text = '';
   }
   // transport helper: the imported helper actually called in handle (api / apiVoid /
-  // apiGet / apiPost / graphql / ...). Prefer the most specific named-verb helper.
+  // apiGet / apiPost / graphql / graphqlMutation / graphqlQuery / ...). We MAX-merge
+  // across every helper occurrence in the file (matchAll, not .match) so an op that
+  // reads with apiGet before mutating with apiPost -- e.g. datadog.clone_dashboard --
+  // classifies by the more-severe helper, not by whichever appears first. We also
+  // widen the pattern to catch per-plugin *Mutation/*Query wrappers so ops like
+  // x.like_tweet (uses graphqlMutation) get real provenance instead of null signals.
   let transportHelper = null;
-  const helperMatch = text.match(/\b(apiGet|apiPost|apiPut|apiPatch|apiDelete|apiVoid|graphql|gql|gqlRequest|api)\b\s*[<(]/);
-  if (helperMatch) transportHelper = helperMatch[1];
+  const helperRe = /\b(apiGet|apiPost|apiPut|apiPatch|apiDelete|apiVoid|graphqlMutation|graphqlQuery|graphql|gqlRequest|gql|api)\b\s*[<(]/g;
+  let mostSevereClass = null;
+  for (const m of text.matchAll(helperRe)) {
+    const candidate = m[1];
+    const candCls = helperClass(candidate);
+    if (!transportHelper) transportHelper = candidate;
+    if (candCls && (!mostSevereClass || rankOf(candCls) > rankOf(mostSevereClass))) {
+      mostSevereClass = candCls;
+      transportHelper = candidate;
+    }
+  }
   // method literal: {method:'POST'} / { method: "DELETE" }
   let httpMethod = null;
   const methodMatch = text.match(/method\s*:\s*['"]([A-Za-z]+)['"]/);

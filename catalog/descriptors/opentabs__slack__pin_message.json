@@ -8,7 +8,7 @@
   ],
   "description": "Pin a message to a Slack channel",
   "actionVerb": "pin",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

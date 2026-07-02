@@ -8,7 +8,7 @@
   ],
   "description": "Pin a message in a conversation. Pinned messages are highlighted and easily accessible. Set silent=true to pin without sending a notification to chat members.",
   "actionVerb": "pin",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

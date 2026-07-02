@@ -8,7 +8,7 @@
   ],
   "description": "Follow a Pinterest user by their user ID. Use get_user_profile to find the user ID from a username.",
   "actionVerb": "follow",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

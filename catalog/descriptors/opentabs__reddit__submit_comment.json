@@ -8,7 +8,7 @@
   ],
   "description": "Post a comment on a Reddit post or reply to an existing comment",
   "actionVerb": "submit",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

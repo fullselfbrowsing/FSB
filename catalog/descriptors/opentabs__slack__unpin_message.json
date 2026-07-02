@@ -8,7 +8,7 @@
   ],
   "description": "Unpin a message from a Slack channel",
   "actionVerb": "unpin",
-  "sideEffectClass": "read",
+  "sideEffectClass": "destructive",
   "params": {
     "type": "object",
     "properties": {

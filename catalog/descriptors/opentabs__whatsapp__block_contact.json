@@ -8,7 +8,7 @@
   ],
   "description": "Block a WhatsApp contact. Blocked contacts cannot send you messages or see your profile information.",
   "actionVerb": "block",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

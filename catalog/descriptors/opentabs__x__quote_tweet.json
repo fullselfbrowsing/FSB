@@ -8,7 +8,7 @@
   ],
   "description": "Post a quote tweet — a top-level post that embeds and comments on another tweet. Unlike a reply (which lives inside the original thread) or a plain retweet (which adds no commentary), a quote tweet appears on your own profile with your text plus the referenced tweet.",
   "actionVerb": "quote",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -37,7 +37,7 @@
     "sourcePath": "plugins/x/src/tools/quote-tweet.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "quote"
     }

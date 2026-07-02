@@ -8,7 +8,7 @@
   ],
   "description": "Submit a comment on a Hacker News story or reply to an existing comment. Requires being logged in. The parent_id can be a story ID (to post a top-level comment) or a comment ID (to reply to that comment).",
   "actionVerb": "submit",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

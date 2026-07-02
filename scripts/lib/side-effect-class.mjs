@@ -68,11 +68,37 @@ export const READ_VERBS = new Set(['list', 'get', 'search', 'read', 'fetch', 'fi
 // user's seat, so the gate floors them destructive everywhere.
 export const DESTRUCTIVE_VERBS = new Set(['delete', 'remove', 'destroy', 'purge', 'drop', 'void', 'cancel', 'archive']);
 // Write verbs: a reversible / additive mutation.
+// Chunk B (Finding #2) additions: real mutation verbs the corpus uses that were
+// missing from the original set. `like`/`retweet`/`vote` are social-media
+// engagement writes (x.like_tweet uses graphqlMutation('FavoriteTweet'));
+// `place`/`submit`/`append` are commerce/content submissions
+// (dominos.place_order_cash, reddit.submit_post, notion.append_block,
+// hackernews.submit_comment, leetcode.submit_code); `navigate` mutates browser
+// state (window.location.href = X), so any navigate_to_* op flips to write.
 export const WRITE_VERBS = new Set([
   'create', 'update', 'add', 'set', 'merge', 'move', 'finalize',
   'edit', 'patch', 'put', 'post', 'refund', 'send', 'close', 'reopen',
   'complete', 'assign', 'upload', 'write', 'insert', 'replace', 'enable', 'disable',
-  'rename', 'unarchive',
+  'rename', 'unarchive', 'rate',
+  // Chunk B additions: real mutation verbs the corpus already ships hand-guarded
+  // as writes but which the classifier missed. Adding them here brings descriptors
+  // in line with the handler-declared classes and stops the port-contract mismatch.
+  // Coverage:
+  //   'like'/'retweet'/'vote' -- x.like_tweet (graphqlMutation FavoriteTweet),
+  //     reddit.vote / reddit.submit_post.
+  //   'place'/'submit'/'append' -- dominos.place_order_cash, hackernews.submit_comment,
+  //     leetcode.submit_code, notion.append_block.
+  //   'star' -- whatsapp.star_message.
+  //   'unblock' -- whatsapp.unblock_contact.
+  //   'snooze' -- ynab.snooze_category_goal.
+  // NOT included: 'navigate' (client-side URL change, no server mutation, routes via
+  // DOM fallback) and 'autocomplete' (a suggestion lookup, a genuine read).
+  'like', 'retweet', 'vote', 'place', 'submit', 'append',
+  'star', 'unblock', 'snooze',
+  'pin', 'revoke', 'mute', 'mark', 'forward', 'follow', 'unfollow', 'save',
+  'invite', 'block', 'force', 'unpin', 'reauthenticate',
+  'open', 'pass', 'copy',
+  'start', 'stop', 'watch',
 ]);
 
 /**
@@ -158,6 +184,11 @@ export function helperClass(transportHelper) {
   // the helper name alone -- placed BEFORE the get check so "apivoid" is not missed.
   if (/api[_-]?void/.test(h)) return 'write';
   if (/api[_-]?get/.test(h)) return 'read';
+  // GraphQL/RPC helper name signals. A `*Mutation` helper is always mutating (POST +
+  // side effect by name); a `*Query` helper is always a read. Both are captured by
+  // the importer's helper extractor so provenance carries the specific helper token.
+  if (/mutation$/.test(h)) return 'write';
+  if (/query$/.test(h)) return 'read';
   return null;
 }
 
@@ -181,7 +212,17 @@ export const SIDE_EFFECT_OVERRIDES = {
   refund_charge: 'destructive',
   delete_record: 'destructive',
   archive_project: 'destructive',
+  execute_sql: 'write',
   merge_pull_request: 'write',
+  // Chunk B: op-name-specific escalations for verbs whose default class is write
+  // but which act destructively for one specific op-name.
+  clear_chat: 'destructive',       // whatsapp.clear_chat wipes the message history
+  revoke_message: 'destructive',   // whatsapp.revoke_message un-sends (deletes) a message
+  // Per-slug (not per-verb) escalations: overrideFloor matches slug.endsWith('.'+key).
+  // telegram.unpin_message stays a 'write' because its op-name is not in the table
+  // and no per-slug key matches it -- verb 'unpin' -> WRITE_VERBS provides the base.
+  'slack.unpin_message': 'destructive',    // deletes the pin from the channel
+  'discord.unpin_message': 'destructive',  // deletes the pin from the channel
 };
 
 /**
@@ -232,6 +273,9 @@ export function overrideFloor(opName, slug) {
 // any future real write. Adding an entry here REQUIRES verifying the op's handle is a pure
 // read against the vendored source. The same op-name on a DIFFERENT app is unaffected.
 export const SIDE_EFFECT_READ_CONFIRMED = new Set([
+  'airbnb.is_host',
+  'coinbase.compare_asset_prices',
+  'newrelic.run_nrql_query',
   'tripadvisor.check_saved',
 ]);
 

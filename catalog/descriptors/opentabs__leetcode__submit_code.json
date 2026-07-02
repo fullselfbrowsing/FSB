@@ -8,7 +8,7 @@
   ],
   "description": "Submit a solution for a LeetCode problem. Runs against all test cases and returns the verdict including status, runtime/memory percentiles, and any errors. Use run_code first to test your solution.",
   "actionVerb": "submit",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

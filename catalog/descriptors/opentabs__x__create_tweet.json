@@ -38,7 +38,7 @@
     "sourcePath": "plugins/x/src/tools/create-tweet.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlmutation",
       "httpMethod": null,
       "opNameVerb": "create"
     }

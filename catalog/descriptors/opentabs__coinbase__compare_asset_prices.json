@@ -8,7 +8,7 @@
   ],
   "description": "Get current prices for multiple assets in a single request. Provide up to 10 asset UUIDs and receive all their latest prices at once. Useful for comparing prices across assets.",
   "actionVerb": "compare",
-  "sideEffectClass": "write",
+  "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {

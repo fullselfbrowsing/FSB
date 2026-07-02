@@ -8,7 +8,7 @@
   ],
   "description": "Revoke (unsend) messages in a WhatsApp chat. Revoked messages are deleted for everyone in the chat. Only messages sent by the current user can be revoked.",
   "actionVerb": "revoke",
-  "sideEffectClass": "read",
+  "sideEffectClass": "destructive",
   "params": {
     "type": "object",
     "properties": {

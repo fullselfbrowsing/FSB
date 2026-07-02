@@ -8,7 +8,7 @@
   ],
   "description": "Clone an existing dashboard to create a copy. Optionally override the title or description. The original dashboard is not modified.",
   "actionVerb": "clone",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {
@@ -37,8 +37,8 @@
     "sourcePath": "plugins/datadog/src/tools/clone-dashboard.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": "apiget",
-      "httpMethod": "GET",
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
       "opNameVerb": "clone"
     }
   }

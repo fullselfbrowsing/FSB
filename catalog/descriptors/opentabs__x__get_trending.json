@@ -24,7 +24,7 @@
     "sourcePath": "plugins/x/src/tools/get-trending.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlquery",
       "httpMethod": null,
       "opNameVerb": "get"
     }

@@ -33,7 +33,7 @@
     "sourcePath": "plugins/x/src/tools/get-user-profile.ts",
     "license": "MIT",
     "signals": {
-      "transportHelper": null,
+      "transportHelper": "graphqlquery",
       "httpMethod": null,
       "opNameVerb": "get"
     }

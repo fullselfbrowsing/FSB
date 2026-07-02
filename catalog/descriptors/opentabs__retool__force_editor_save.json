@@ -8,7 +8,7 @@
   ],
   "description": "Trigger Retool's own editor save pipeline for the currently targeted editor tab. Use this after a Toolscript import or backend app-state update has been loaded in the editor and you need Retool to reconcile editor-only/server-side state without making a manual dummy edit. Requires targeting an open editor tab for the requested page UUID with tabId.",
   "actionVerb": "force",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

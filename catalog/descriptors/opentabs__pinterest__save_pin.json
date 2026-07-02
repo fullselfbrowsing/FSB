@@ -8,7 +8,7 @@
   ],
   "description": "Save (repin) an existing pin to one of your boards. This creates a copy of the pin on your board. Optionally specify a board section.",
   "actionVerb": "save",
-  "sideEffectClass": "read",
+  "sideEffectClass": "write",
   "params": {
     "type": "object",
     "properties": {

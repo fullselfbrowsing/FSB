@@ -8,7 +8,7 @@
   ],
   "description": "Execute a NRQL (New Relic Query Language) query against an account. Returns raw query results. Examples: \"SELECT count(*) FROM Transaction SINCE 1 hour ago\", \"SELECT average(duration) FROM Transaction FACET appName SINCE 1 day ago\", \"SHOW EVENT TYPES\".",
   "actionVerb": "run",
-  "sideEffectClass": "write",
+  "sideEffectClass": "read",
   "params": {
     "type": "object",
     "properties": {
