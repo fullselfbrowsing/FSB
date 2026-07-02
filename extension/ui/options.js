@@ -28,7 +28,7 @@ const defaultSettings = {
   captchaSolverEnabled: false,
   captchaApiKey: '',
   autoRefineSiteMaps: true,
-  // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, default 8).
+  // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, fallback 8).
   fsbAgentCap: 8,
   // Max simultaneous trigger watches (range 1-64, default 8).
   fsbTriggerCap: 8,
@@ -37,6 +37,62 @@ const defaultSettings = {
   // overhead) and action tool responses revert to pre-Phase-245 shape.
   fsbChangeReportsEnabled: true
 };
+
+let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
+
+function getAgentCapRecommendationModule() {
+  return (typeof globalThis !== 'undefined' && globalThis.FsbAgentCapRecommendation)
+    ? globalThis.FsbAgentCapRecommendation
+    : null;
+}
+
+function clampAgentCapValue(value, fallbackValue) {
+  const helper = getAgentCapRecommendationModule();
+  if (helper && typeof helper.clampAgentCap === 'function') {
+    return helper.clampAgentCap(value, fallbackValue);
+  }
+  let raw = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(raw)) raw = Number.isFinite(fallbackValue) ? fallbackValue : defaultSettings.fsbAgentCap;
+  raw = Math.floor(raw);
+  if (raw < 1) return 1;
+  if (raw > 64) return 64;
+  return raw;
+}
+
+async function resolveRecommendedAgentCap() {
+  const helper = getAgentCapRecommendationModule();
+  if (helper && typeof helper.getRecommendedAgentCap === 'function') {
+    try {
+      return clampAgentCapValue(await helper.getRecommendedAgentCap(), defaultSettings.fsbAgentCap);
+    } catch (_e) {
+      return defaultSettings.fsbAgentCap;
+    }
+  }
+  return defaultSettings.fsbAgentCap;
+}
+
+function updateAgentCapResetLabel() {
+  if (!elements.fsbAgentCapReset) return;
+  const text = 'Reset to recommended (' + fsbRecommendedAgentCap + ')';
+  // The button carries a leading <i> icon -- write into the inner label span
+  // so re-renders don't wipe it out via a bare .textContent = on the button.
+  const label = elements.fsbAgentCapReset.querySelector('.form-secondary-btn__label');
+  if (label) {
+    label.textContent = text;
+  } else {
+    elements.fsbAgentCapReset.textContent = text;
+  }
+}
+
+function setAgentCapControlValue(value) {
+  const capValue = clampAgentCapValue(value, fsbRecommendedAgentCap);
+  if (elements.fsbAgentCap) {
+    elements.fsbAgentCap.value = String(capValue);
+    refreshStepper(elements.fsbAgentCap);
+  }
+  if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = String(capValue);
+  updateAgentCapResetLabel();
+}
 
 // Available models - sourced from config.js (loaded before this script) with custom provider added
 const availableModels = {
@@ -82,10 +138,21 @@ function initializeDashboard() {
   
   // Setup event listeners
   setupEventListeners();
-  
+
+  // Wire up minus/value/plus numeric steppers
+  initFsbSteppers();
+
+  // Wire up sidebar magnetic-dock hover
+  initSidebarProximity();
+
   // Load saved settings
   loadSettings();
-  
+
+  // Replace native <select>s with the custom dropdown widget. Runs after
+  // loadSettings() so each select's current .value/.selected already
+  // reflects the persisted setting when the widget reads its initial state.
+  initFsbSelects();
+
   // Initialize sections
   initializeSections();
 
@@ -127,10 +194,10 @@ function initializeDashboard() {
 function cacheElements() {
   // Header elements
   elements.connectionStatus = document.getElementById('connectionStatus');
-  elements.testApiBtn = document.getElementById('testApiBtn');
-  elements.exportBtn = document.getElementById('exportBtn');
-  elements.themeToggle = document.getElementById('themeToggle');
-  
+
+  // Theme mode (System/Dark/Light segmented control, Advanced Settings)
+  elements.themeModeToggle = document.getElementById('themeModeToggle');
+
   // Navigation
   elements.navItems = document.querySelectorAll('.nav-item');
   elements.contentSections = document.querySelectorAll('.content-section');
@@ -155,6 +222,7 @@ function cacheElements() {
   elements.elementCacheSize = document.getElementById('elementCacheSize');
   elements.elementCacheSizePreset = document.getElementById('elementCacheSizePreset');
   elements.elementCacheSizeCustom = document.getElementById('elementCacheSizeCustom');
+  elements.elementCacheSizeCustomWrap = document.getElementById('elementCacheSizeCustomWrap');
   elements.elementCacheSizeDisplay = document.getElementById('elementCacheSizeDisplay');
   // Phase 241 D-05 / POOL-05: Agent Concurrency cap card.
   elements.fsbAgentCap = document.getElementById('fsbAgentCap');
@@ -242,11 +310,19 @@ function setupEventListeners() {
     item.addEventListener('click', () => switchSection(item.dataset.section));
   });
   
-  // Header buttons
-  elements.testApiBtn.addEventListener('click', testApiConnection);
-  elements.exportBtn.addEventListener('click', exportSettings);
-  elements.themeToggle.addEventListener('click', toggleTheme);
-  
+  // Theme mode segmented control (System/Dark/Light). Delegated click, same
+  // shape as the consentDefaultModeToggle wiring below.
+  if (elements.themeModeToggle) {
+    elements.themeModeToggle.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.detail-btn[data-theme-mode]') : null;
+      if (!btn) return;
+      const mode = btn.dataset.themeMode;
+      if (!mode) return;
+      setThemePreference(mode);
+      showToast(`${mode} theme`, 'info');
+    });
+  }
+
   // Form inputs change detection
   const formInputs = [
     elements.apiKey,
@@ -300,10 +376,10 @@ function setupEventListeners() {
     elements.elementCacheSizePreset.addEventListener('change', (e) => {
       const value = e.target.value;
       if (value === 'custom') {
-        elements.elementCacheSizeCustom.style.display = 'block';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = '';
         elements.elementCacheSizeCustom.focus();
       } else {
-        elements.elementCacheSizeCustom.style.display = 'none';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = 'none';
         elements.elementCacheSize.value = value;
         if (elements.elementCacheSizeDisplay) {
           elements.elementCacheSizeDisplay.textContent = value;
@@ -329,7 +405,7 @@ function setupEventListeners() {
   }
 
   // Phase 241 D-05 / POOL-05 / POOL-06: Agent Concurrency cap input + reset.
-  // Real-time clamp: parseInt -> 1..64 integer; non-numeric -> default 8.
+  // Real-time clamp: parseInt -> 1..64 integer; non-numeric -> recommended default.
   // Defense-in-depth layer 2 (HTML min/max is layer 1; SW setCap is layer 3).
   if (elements.fsbAgentCap) {
     elements.fsbAgentCap.addEventListener('input', (e) => {
@@ -344,9 +420,7 @@ function setupEventListeners() {
       }
 
       let raw = parseInt(rawValue, 10);
-      if (!Number.isFinite(raw)) raw = 8;
-      if (raw < 1) raw = 1;
-      if (raw > 64) raw = 64;
+      raw = clampAgentCapValue(raw, fsbRecommendedAgentCap);
       if (e.target.value !== String(raw)) e.target.value = String(raw);
       if (elements.fsbAgentCapDisplay) {
         elements.fsbAgentCapDisplay.textContent = String(raw);
@@ -361,8 +435,7 @@ function setupEventListeners() {
   }
   if (elements.fsbAgentCapReset) {
     elements.fsbAgentCapReset.addEventListener('click', () => {
-      if (elements.fsbAgentCap) elements.fsbAgentCap.value = '8';
-      if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = '8';
+      setAgentCapControlValue(fsbRecommendedAgentCap);
       // Phase 243 Plan 04 / UI-03: hide validation + refresh counter on reset.
       if (elements.fsbAgentCapValidation) {
         elements.fsbAgentCapValidation.style.display = 'none';
@@ -400,7 +473,10 @@ function setupEventListeners() {
   }
   if (elements.fsbTriggerCapReset) {
     elements.fsbTriggerCapReset.addEventListener('click', () => {
-      if (elements.fsbTriggerCap) elements.fsbTriggerCap.value = '8';
+      if (elements.fsbTriggerCap) {
+        elements.fsbTriggerCap.value = '8';
+        refreshStepper(elements.fsbTriggerCap);
+      }
       if (elements.fsbTriggerCapDisplay) elements.fsbTriggerCapDisplay.textContent = '8';
       if (elements.fsbTriggerCapValidation) {
         elements.fsbTriggerCapValidation.style.display = 'none';
@@ -769,6 +845,316 @@ function setupEventListeners() {
   });
 }
 
+// Wires every minus/value/plus numeric stepper (.fsb-stepper) on the page.
+// Each wrapper's data-min/data-max/data-step drive clamping; committing a
+// value dispatches a real bubbling 'input' event on the inner
+// .fsb-stepper__input so it flows through that field's own pre-existing
+// per-field listener exactly as native typing/dragging did before -- this
+// function never touches per-field save/validation logic directly.
+// Disables a stepper's -/+ buttons exactly at its data-min/data-max. Standalone
+// (not nested in initFsbSteppers()) so external code that sets a stepper's
+// value directly -- e.g. the Agent/Trigger Cap reset buttons -- can re-sync
+// the disabled state after bypassing nudge()/apply().
+function refreshStepper(input) {
+  const box = input.closest('.fsb-stepper');
+  if (!box) return;
+  const min = parseFloat(box.getAttribute('data-min'));
+  const max = parseFloat(box.getAttribute('data-max'));
+  const n = parseFloat(input.value);
+  const dec = box.querySelector('.fsb-stepper__btn--dec');
+  const inc = box.querySelector('.fsb-stepper__btn--inc');
+  if (dec) dec.disabled = !Number.isNaN(n) && !Number.isNaN(min) && n <= min;
+  if (inc) inc.disabled = !Number.isNaN(n) && !Number.isNaN(max) && n >= max;
+}
+
+function initFsbSteppers() {
+  document.querySelectorAll('.fsb-stepper').forEach((box) => {
+    const input = box.querySelector('.fsb-stepper__input');
+    if (!input) return;
+    const decBtn = box.querySelector('.fsb-stepper__btn--dec');
+    const incBtn = box.querySelector('.fsb-stepper__btn--inc');
+    let min = parseFloat(box.getAttribute('data-min')); if (Number.isNaN(min)) min = -Infinity;
+    let max = parseFloat(box.getAttribute('data-max')); if (Number.isNaN(max)) max = Infinity;
+    const step = parseFloat(box.getAttribute('data-step')) || 1;
+    let holdTimeout = null, holdInterval = null;
+
+    function clamp(v) {
+      if (Number.isNaN(v)) v = (min === -Infinity ? 0 : min);
+      return Math.min(max, Math.max(min, v));
+    }
+    function apply(v) {
+      input.value = String(clamp(v));
+      refreshStepper(input);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function stop() {
+      clearTimeout(holdTimeout); clearInterval(holdInterval);
+      holdTimeout = null; holdInterval = null;
+    }
+    function nudge(dir) {
+      let n = parseFloat(input.value); if (Number.isNaN(n)) n = (min === -Infinity ? 0 : min);
+      const next = clamp(n + dir * step);
+      apply(next);
+      if (next === n) stop();
+    }
+    function press(dir) {
+      return (e) => {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        e.preventDefault();
+        nudge(dir);
+        stop();
+        holdTimeout = setTimeout(() => {
+          holdInterval = setInterval(() => { nudge(dir); }, 90);
+        }, 420);
+      };
+    }
+    function key(dir) {
+      return (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); nudge(dir); }
+      };
+    }
+
+    if (decBtn) {
+      decBtn.addEventListener('mousedown', press(-1));
+      decBtn.addEventListener('touchstart', press(-1), { passive: false });
+      decBtn.addEventListener('keydown', key(-1));
+    }
+    if (incBtn) {
+      incBtn.addEventListener('mousedown', press(1));
+      incBtn.addEventListener('touchstart', press(1), { passive: false });
+      incBtn.addEventListener('keydown', key(1));
+    }
+    [decBtn, incBtn].forEach((b) => {
+      if (!b) return;
+      ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach((ev) => b.addEventListener(ev, stop));
+    });
+
+    // ArrowUp/ArrowDown on the input itself, digit-only filtering on every
+    // keystroke, and clamp-on-blur (not every keystroke, so the user can
+    // freely pass through intermediate values like "5" on the way to "50").
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); nudge(1); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); nudge(-1); }
+    });
+    input.addEventListener('input', () => {
+      const v = input.value.replace(/[^0-9]/g, '');
+      if (v !== input.value) input.value = v;
+      refreshStepper(input);
+    });
+    input.addEventListener('blur', () => {
+      const n = parseFloat(input.value);
+      if (input.value === '' || n !== clamp(n)) {
+        apply(Number.isNaN(n) ? (min === -Infinity ? 0 : min) : n);
+      } else {
+        refreshStepper(input);
+      }
+    });
+
+    refreshStepper(input);
+  });
+}
+
+// Magnetic-dock hover for the sidebar rail: the item under the cursor expands
+// fully, immediate neighbors partially expand, falling off with a Gaussian
+// curve. Inline styles are written with 'important' so they reliably win over
+// the resting :hover CSS while active, and are cleared on mouseleave so CSS
+// regains control of the (already-correct) resting/simple-hover states.
+function initSidebarProximity() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+  const items = Array.prototype.slice.call(document.querySelectorAll('.nav-item'));
+  if (!items.length) return;
+
+  // Wrap each label's own content so the text can fade on a stricter
+  // threshold than the pill it lives in (only the truly-hovered item should
+  // ever reveal readable text).
+  items.forEach((it) => {
+    const sp = it.querySelector('span');
+    if (!sp || sp.querySelector('.nav-label')) return;
+    const lab = document.createElement('span');
+    lab.className = 'nav-label';
+    while (sp.firstChild) { lab.appendChild(sp.firstChild); }
+    sp.appendChild(lab);
+  });
+
+  const COMPACT = 56, FULL = 232, SIGMA = 42, STEEP = 5;
+  let centers = [];
+  let raf = null;
+  let curY = null;
+
+  function measure() {
+    centers = items.map((it) => {
+      const r = it.getBoundingClientRect();
+      return { c: r.top + r.height / 2, top: r.top, bottom: r.bottom };
+    });
+  }
+
+  function render() {
+    raf = null;
+    if (curY == null) return;
+    measure();
+    let hi = -1;
+    for (let k = 0; k < centers.length; k++) {
+      if (curY >= centers[k].top && curY <= centers[k].bottom) { hi = k; break; }
+    }
+    items.forEach((it, i) => {
+      const d = Math.abs(curY - centers[i].c);
+      let f = Math.exp(-(d * d) / (2 * SIGMA * SIGMA));
+      if (i === hi) f = 1;
+      const w = COMPACT + Math.pow(f, STEEP) * (FULL - COMPACT);
+      const sp = it.querySelector('span');
+      const lab = sp && sp.querySelector('.nav-label');
+      if (sp) {
+        sp.style.setProperty('width', w.toFixed(1) + 'px', 'important');
+        sp.style.setProperty('opacity', (i === hi ? 1 : Math.min(1, f * 1.55)).toFixed(3), 'important');
+      }
+      if (lab) {
+        const lo = (i === hi) ? 1 : Math.max(0, (f - 0.86) / 0.14);
+        lab.style.setProperty('opacity', Math.min(1, lo).toFixed(3), 'important');
+      }
+      it.style.setProperty('z-index', String(100 + Math.round(f * 100)), 'important');
+    });
+  }
+
+  nav.addEventListener('mouseenter', measure);
+  nav.addEventListener('mousemove', (e) => {
+    if (!centers.length) measure();
+    curY = e.clientY;
+    if (raf == null) raf = requestAnimationFrame(render);
+  });
+  window.addEventListener('resize', () => { centers = []; });
+  nav.addEventListener('mouseleave', () => {
+    curY = null;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    items.forEach((it) => {
+      const sp = it.querySelector('span');
+      const lab = sp && sp.querySelector('.nav-label');
+      if (sp) { sp.style.removeProperty('width'); sp.style.removeProperty('opacity'); }
+      if (lab) lab.style.removeProperty('opacity');
+      it.style.removeProperty('z-index');
+    });
+  });
+}
+
+// Guards the single document-level "close on outside click" listener below so
+// it's attached at most once, no matter how many times initFsbSelects() runs.
+let _fsbSelectOutsideClickBound = false;
+
+// Progressively enhances every native <select class="form-select">/
+// .chart-select> into a custom .fsb-select dropdown (styled button + custom
+// listbox). The native <select> stays in the DOM, hidden, as the source of
+// truth -- picking a custom option sets its .value and redispatches a real
+// 'change' event, so every existing change-listener elsewhere keeps working
+// untouched. modelName is excluded (it's the model-combobox's own hidden
+// native select, already driven by a separate custom combobox).
+// After loadSettings' async storage callback assigns `.value` on the underlying
+// native <select>s, call this to bring the wrapped custom-select labels back
+// into sync. Uses each select's already-attached `sync()` (stashed on the DOM
+// via `sel._fsbSyncLabel`), so no new listeners fire -- the alternative,
+// dispatching a synthetic `change` event, would also trigger the app-level
+// change handler at line ~607 which calls `markUnsavedChanges()`, incorrectly
+// dirtying the settings form on page load.
+function syncFsbSelectLabels() {
+  document.querySelectorAll('.form-select[data-enh="1"], .chart-select[data-enh="1"]').forEach((sel) => {
+    if (typeof sel._fsbSyncLabel === 'function') sel._fsbSyncLabel();
+  });
+}
+
+function initFsbSelects() {
+  document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
+    if (sel.getAttribute('data-enh') === '1' || sel.classList.contains('model-combobox__native')) return;
+    sel.setAttribute('data-enh', '1');
+    sel.style.display = 'none';
+
+    const small = sel.classList.contains('small') || sel.classList.contains('chart-select');
+    const wrap = document.createElement('div');
+    wrap.className = 'fsb-select' + (small ? ' fsb-select--sm' : '');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fsb-select__btn';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    const lbl = document.createElement('span');
+    lbl.className = 'fsb-select__label';
+    const chev = document.createElement('i');
+    chev.className = 'fas fa-chevron-down fsb-select__chev';
+    btn.appendChild(lbl);
+    btn.appendChild(chev);
+    const menu = document.createElement('ul');
+    menu.className = 'fsb-select__menu';
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+
+    function setOpen(open) {
+      menu.hidden = !open;
+      btn.classList.toggle('is-open', open);
+      chev.classList.toggle('fa-chevron-up', open);
+      chev.classList.toggle('fa-chevron-down', !open);
+    }
+    function sync() {
+      const v = sel.value;
+      Array.prototype.slice.call(menu.children).forEach((li) => {
+        li.classList.toggle('is-selected', li.getAttribute('data-value') === v);
+      });
+      const sl = menu.querySelector('.is-selected');
+      if (sl) lbl.textContent = sl.textContent;
+    }
+    // Stash sync() on the native <select> DOM node so an external caller
+    // (see syncFsbSelectLabels above) can re-run label reconciliation after
+    // an async `.value =` assignment without dispatching a `change` event.
+    sel._fsbSyncLabel = sync;
+    function pick(val) {
+      sel.value = val;
+      sync();
+      setOpen(false);
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    Array.prototype.slice.call(sel.options).forEach((o) => {
+      const li = document.createElement('li');
+      li.className = 'fsb-select__opt';
+      li.setAttribute('role', 'option');
+      li.textContent = o.textContent;
+      li.setAttribute('data-value', o.value);
+      if (o.disabled) li.classList.add('is-disabled');
+      if (o.selected) { li.classList.add('is-selected'); lbl.textContent = o.textContent; }
+      li.addEventListener('click', () => { if (o.disabled) return; pick(o.value); });
+      menu.appendChild(li);
+    });
+    if (!lbl.textContent && sel.options[0]) lbl.textContent = sel.options[0].textContent;
+
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    wrap.appendChild(sel);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = menu.hidden;
+      document.querySelectorAll('.fsb-select__menu').forEach((m) => { if (m !== menu) m.hidden = true; });
+      document.querySelectorAll('.fsb-select__btn').forEach((b) => { if (b !== btn) b.classList.remove('is-open'); });
+      setOpen(willOpen);
+    });
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); }
+      else if (e.key === 'Escape') { setOpen(false); }
+    });
+    sel.addEventListener('change', sync);
+  });
+
+  if (!_fsbSelectOutsideClickBound) {
+    _fsbSelectOutsideClickBound = true;
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.fsb-select').forEach((w) => {
+        if (w.contains(e.target)) return;
+        const m = w.querySelector('.fsb-select__menu'); if (m) m.hidden = true;
+        const b = w.querySelector('.fsb-select__btn'); if (b) b.classList.remove('is-open');
+        const c = w.querySelector('.fsb-select__chev');
+        if (c) { c.classList.add('fa-chevron-down'); c.classList.remove('fa-chevron-up'); }
+      });
+    });
+  }
+}
+
 function switchSection(sectionId) {
   // Update navigation
   elements.navItems.forEach(item => {
@@ -929,8 +1315,16 @@ function updateApiKeyVisibility(provider) {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(Object.keys(defaultSettings), (data) => {
+  chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
+    data = data || {};
+    fsbRecommendedAgentCap = await resolveRecommendedAgentCap();
+    const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
+      && typeof data.fsbAgentCap === 'number'
+      && Number.isFinite(data.fsbAgentCap);
     const settings = { ...defaultSettings, ...data };
+    if (!hasStoredAgentCap) {
+      settings.fsbAgentCap = fsbRecommendedAgentCap;
+    }
     
     // Handle legacy speedMode to new model format
     if (!settings.modelProvider && settings.speedMode) {
@@ -1024,11 +1418,11 @@ function loadSettings() {
       const presetOption = elements.elementCacheSizePreset.querySelector(`option[value="${cacheSize}"]`);
       if (presetOption && cacheSize !== 'custom') {
         elements.elementCacheSizePreset.value = cacheSize;
-        if (elements.elementCacheSizeCustom) elements.elementCacheSizeCustom.style.display = 'none';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = 'none';
       } else {
         elements.elementCacheSizePreset.value = 'custom';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = '';
         if (elements.elementCacheSizeCustom) {
-          elements.elementCacheSizeCustom.style.display = 'block';
           elements.elementCacheSizeCustom.value = cacheSize;
         }
       }
@@ -1036,17 +1430,12 @@ function loadSettings() {
 
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Re-clamp on read in
     // case storage was tampered with (T-241-11) or set by an older build.
+    // If the key is absent, show the RAM-based recommendation.
     if (elements.fsbAgentCap) {
-      let capValue = (typeof settings.fsbAgentCap === 'number' && Number.isFinite(settings.fsbAgentCap))
+      const capValue = (typeof settings.fsbAgentCap === 'number' && Number.isFinite(settings.fsbAgentCap))
         ? settings.fsbAgentCap
-        : 8;
-      if (capValue < 1) capValue = 1;
-      if (capValue > 64) capValue = 64;
-      capValue = Math.floor(capValue);
-      elements.fsbAgentCap.value = String(capValue);
-      if (elements.fsbAgentCapDisplay) {
-        elements.fsbAgentCapDisplay.textContent = String(capValue);
-      }
+        : fsbRecommendedAgentCap;
+      setAgentCapControlValue(capValue);
     }
 
     // Phase 243 Plan 04 / UI-03: initial paint of the "X of M active" counter.
@@ -1106,6 +1495,17 @@ function loadSettings() {
     if (elements.autoRefineSiteMaps) {
       elements.autoRefineSiteMaps.checked = settings.autoRefineSiteMaps ?? true;
     }
+
+    // Bring the custom-select widgets' visible labels back into sync with the
+    // now-populated native <select> values. initFsbSelects() runs synchronously
+    // at page init (before this async callback fires), so at wrap time the
+    // <select>s still hold their default first option and the widget labels
+    // freeze to that -- leaving e.g. modelProvider showing "xAI (Grok)" while
+    // the saved value has been quietly updated to gemini/openai/etc. This runs
+    // sync() on every enhanced select without dispatching a synthetic `change`
+    // event, so app-level change listeners (markUnsavedChanges + discovery)
+    // do not fire on page load.
+    if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
 
     addLog('info', 'Settings loaded successfully');
   });
@@ -1241,10 +1641,7 @@ function saveSettings() {
     // persist out-of-range cap values to chrome.storage.local.
     fsbAgentCap: (function() {
       var raw = parseInt(elements.fsbAgentCap?.value, 10);
-      if (!Number.isFinite(raw)) return 8;
-      if (raw < 1) return 1;
-      if (raw > 64) return 64;
-      return raw;
+      return clampAgentCapValue(raw, fsbRecommendedAgentCap);
     })(),
     fsbTriggerCap: (function() {
       var raw = parseInt(elements.fsbTriggerCap?.value, 10);
@@ -1360,7 +1757,13 @@ async function checkApiConnection() {
       apiKey: apiKey,
       model: modelName,
       baseUrl: provider === 'custom' ? (document.getElementById('customEndpoint')?.value || '').trim()
-             : provider === 'lmstudio' ? ((document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim().replace(/\/+$/, '') + '/v1')
+             // Strip a pasted /v1 or /v1/chat/completions suffix (the model-discovery
+             // normalization idiom above) before re-appending /v1, so the documented
+             // http://localhost:1234/v1 setting never becomes /v1/v1.
+             : provider === 'lmstudio' ? ((document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim()
+                 .replace(/\/v1\/chat\/completions\/?$/, '')
+                 .replace(/\/v1\/?$/, '')
+                 .replace(/\/+$/, '') + '/v1')
              : provider === 'openai' ? 'https://api.openai.com/v1'
              : undefined
     };
@@ -1438,11 +1841,15 @@ function updateApiStatusCard(status, title, detail) {
 
 async function testApiConnection() {
   if (dashboardState.isApiTesting) return;
-  
+
   dashboardState.isApiTesting = true;
-  elements.testApiBtn.disabled = true;
-  elements.testApiBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-  
+  // No header button in the current layout (reachable via Ctrl/Cmd+T only) --
+  // elements.testApiBtn is intentionally uncached, guard its UI updates.
+  if (elements.testApiBtn) {
+    elements.testApiBtn.disabled = true;
+    elements.testApiBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+  }
+
   try {
     await checkApiConnection();
     showToast('API test completed', 'success');
@@ -1450,8 +1857,10 @@ async function testApiConnection() {
     showToast('API test failed', 'error');
   } finally {
     dashboardState.isApiTesting = false;
-    elements.testApiBtn.disabled = false;
-    elements.testApiBtn.innerHTML = '<i class="fas fa-plug"></i> Test API';
+    if (elements.testApiBtn) {
+      elements.testApiBtn.disabled = false;
+      elements.testApiBtn.innerHTML = '<i class="fas fa-plug"></i> Test API';
+    }
   }
 }
 
@@ -1533,75 +1942,66 @@ async function runFullApiTest() {
   }
 }
 
-function exportSettings() {
-  chrome.storage.local.get(Object.keys(defaultSettings), (data) => {
-    const settings = { ...defaultSettings, ...data };
+// Theme mode: 'system' | 'dark' | 'light', persisted under the same
+// localStorage key the old binary toggle used. 'system' resolves live from
+// the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
+let _systemThemeMediaQuery = null;
+let _systemThemeChangeHandler = null;
 
-    // Remove sensitive data
-    const exportData = {
-      ...settings,
-      apiKey: settings.apiKey ? '[CONFIGURED]' : '',
-      geminiApiKey: settings.geminiApiKey ? '[CONFIGURED]' : '',
-      openaiApiKey: settings.openaiApiKey ? '[CONFIGURED]' : '',
-      anthropicApiKey: settings.anthropicApiKey ? '[CONFIGURED]' : '',
-      customApiKey: settings.customApiKey ? '[CONFIGURED]' : ''
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fsb-settings-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    showToast('Settings exported successfully', 'success');
-    addLog('info', 'Settings exported to file');
+function resolveEffectiveTheme(preference) {
+  if (preference === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  return preference;
+}
+
+function renderThemeModeToggle(preference) {
+  const tg = elements.themeModeToggle;
+  if (!tg) return;
+  const btns = tg.querySelectorAll('.detail-btn[data-theme-mode]');
+  btns.forEach((btn) => {
+    const active = btn.dataset.themeMode === preference;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
   });
 }
 
+function updateSystemThemeListener(preference) {
+  if (_systemThemeMediaQuery) {
+    _systemThemeMediaQuery.removeEventListener('change', _systemThemeChangeHandler);
+    _systemThemeMediaQuery = null;
+    _systemThemeChangeHandler = null;
+  }
+  if (preference === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+    _systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    _systemThemeChangeHandler = () => applyTheme('system');
+    _systemThemeMediaQuery.addEventListener('change', _systemThemeChangeHandler);
+  }
+}
+
+function applyTheme(preference) {
+  const effective = resolveEffectiveTheme(preference);
+  document.documentElement.setAttribute('data-theme', effective);
+  renderThemeModeToggle(preference);
+  // No-ops naturally on the initial load's applyTheme() call, since the chart
+  // isn't created until analytics.initPromise resolves, later in startup.
+  if (window.analytics && window.analytics.chart) {
+    window.analytics.updateChartTheme();
+  }
+}
+
+function setThemePreference(preference) {
+  localStorage.setItem('fsb-theme', preference);
+  applyTheme(preference);
+  updateSystemThemeListener(preference);
+}
+
 function setupTheme() {
-  let savedTheme = localStorage.getItem('fsb-theme');
-  if (!savedTheme) {
-    savedTheme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-    localStorage.setItem('fsb-theme', savedTheme);
+  let preference = localStorage.getItem('fsb-theme');
+  if (!['system', 'dark', 'light'].includes(preference)) {
+    preference = 'system';
   }
-  applyTheme(savedTheme);
-}
-
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-  applyTheme(newTheme);
-  localStorage.setItem('fsb-theme', newTheme);
-  showToast(`Switched to ${newTheme} theme`, 'info');
-}
-
-function updateFooterLogo(theme) {
-  const footerLogo = document.getElementById('footer-logo-img');
-  if (footerLogo) {
-    const logoSrc = theme === 'light'
-      ? '../assets/fsb_logo_light_footer.png'
-      : '../assets/fsb_logo_dark_footer.png';
-    footerLogo.src = logoSrc;
-  }
-}
-
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-
-  if (elements.themeToggle) {
-    const icon = elements.themeToggle.querySelector('i');
-    if (icon) {
-      icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-    }
-  }
-
-  // Update footer logo based on theme
-  updateFooterLogo(theme);
+  setThemePreference(preference);
 }
 
 function initializeLogs() {
