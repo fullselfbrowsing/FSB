@@ -65,8 +65,11 @@
 
   // ---- per-origin scheduler state -------------------------------------------
   // Null-proto map (learned-recipe-store ME-03 idiom) so a __proto__ origin survives as
-  // own data. Each record: { fn, pending, timer, attempt, nextEligibleAt, touchedAt }.
+  // own data. Each record: { fn, pending, running, timer, attempt, nextEligibleAt,
+  // touchedAt }.
   //   - pending: there is a coalesced re-learn awaiting the window/flush.
+  //   - running: the fn is IN FLIGHT (a re-entrant schedule parks pending with no
+  //     timer; settle() arms it against the freshly-computed back-off).
   //   - attempt: consecutive failed-attempt count (drives the exponential back-off).
   //   - nextEligibleAt: ms before which a re-schedule is deferred (back-off window).
   //   - touchedAt: last scheduleRelearn time (for LRU eviction past the cap).
@@ -133,25 +136,51 @@
     if (!rec || !rec.pending || typeof rec.fn !== 'function') {
       return Promise.resolve();
     }
+    // Already mid-fn for this origin: never start a concurrent second run (the
+    // thundering-herd this module exists to prevent). The caller's request is
+    // already parked as pending; settle() below arms its timer with the fresh
+    // back-off once the in-flight fn finishes.
+    if (rec.running === true) {
+      return Promise.resolve();
+    }
     // Clear any armed timer + mark not-pending BEFORE invoking (so a re-entrant
-    // scheduleRelearn during the fn coalesces into a fresh cycle, not this one).
+    // scheduleRelearn during the fn parks a fresh cycle instead of coalescing
+    // into this one).
     if (rec.timer != null && rec._clearTimer) {
       try { rec._clearTimer(rec.timer); } catch (_e) { /* best-effort */ }
     }
     rec.timer = null;
     rec.pending = false;
+    rec.running = true;
     var fn = rec.fn;
     var now = rec._now || Date.now;
     var settle = function(ok) {
       // Re-read the record (it may have been evicted/reset during the async fn).
       var cur = _map()[origin];
       if (!cur) { return; }
+      cur.running = false;
       if (ok === true) {
         cur.attempt = 0;             // recovered -> reset back-off
         cur.nextEligibleAt = 0;
       } else {
         cur.attempt = (typeof cur.attempt === 'number' ? cur.attempt : 0) + 1;
         cur.nextEligibleAt = now() + _backoffFor(cur.attempt);
+      }
+      // A re-entrant scheduleRelearn during the fn parked itself pending with NO
+      // timer (arming then would have used the STALE pre-settle back-off). Arm it
+      // now against the just-computed schedule so the fresh cycle honors the
+      // back-off instead of bypassing it.
+      if (cur.pending === true && cur.timer == null) {
+        var nowMs = now();
+        var dueAt = (cur.nextEligibleAt && cur.nextEligibleAt > nowMs)
+          ? cur.nextEligibleAt
+          : (nowMs + COALESCE_WINDOW_MS);
+        cur._dueAt = dueAt;
+        try {
+          cur.timer = cur._setTimer(function() { _runOrigin(origin); }, dueAt - nowMs);
+        } catch (_e) {
+          cur.timer = null; // best-effort; flush() is still the deterministic path
+        }
       }
     };
     var p;
@@ -189,6 +218,7 @@
       rec = {
         fn: fn,
         pending: false,
+        running: false,
         timer: null,
         attempt: 0,
         nextEligibleAt: 0,
@@ -210,6 +240,17 @@
     // Already a coalesced re-learn pending for this origin -> COALESCE (do NOT schedule
     // a second fn invocation; the N-th call collapses into the one already pending).
     if (rec.pending) {
+      _evictIfOverCap(origin);
+      return;
+    }
+
+    // The fn is IN FLIGHT for this origin: PARK the request (pending, no timer)
+    // instead of arming now. Arming here would use the STALE pre-settle
+    // nextEligibleAt (typically 0), bypassing the back-off the in-flight failure
+    // is about to compute. settle() arms the parked cycle against the fresh
+    // schedule when the fn finishes.
+    if (rec.running === true) {
+      rec.pending = true;
       _evictIfOverCap(origin);
       return;
     }

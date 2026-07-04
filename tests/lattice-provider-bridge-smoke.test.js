@@ -613,8 +613,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // to 308 mentions (+14 vs. the pre-review 294 pin -- one importScripts token
   // per head-import comment plus one per importScripts() call for the newly
   // landed handlers).
+  // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 mention
+  // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 308, 'background.js importScripts count = 308 (current head set including Google Cloud and parallel T1 handlers)');
+  passAssertEqual(importScriptsCount, 309, 'background.js importScripts count = 309 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -645,8 +647,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // X proof quick slice adds 1 (catalog/handlers/x.js) -> 201.
   // Post-review parallel head work brings this workspace to 304 call sites
   // (+14 handler importScripts() calls vs. the pre-review 290 pin).
+  // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
+  // (ai/lattice-runtime-adapter.js) -> 305.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 304, 'background.js importScripts() call sites = 304 (current head set including Google Cloud and parallel T1 handlers)');
+  passAssertEqual(importScriptsCallSites, 305, 'background.js importScripts() call sites = 305 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
@@ -658,16 +662,19 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 8 Plan 08-01 update: lattice-step-emitter.js now sits between
   // lattice-provider-bridge.js and ai-integration.js (alphabetical cluster
   // lattice-p < lattice-s).
-  // Phase 9 Plan 09-01 update (FINT-13): the lattice-runtime-adapter activation
-  // flag flip lands as a `globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;`
-  // assignment immediately after lattice-step-emitter (with a FINT-13 comment
-  // block). This grows the bridge -> ai-integration gap from 2 -> up to 8
-  // (1 emitter importScripts + N comment lines + 1 flag assignment + ai-integration).
+  // Phase 9 Plan 09-01 update (FINT-13): the lattice-runtime-adapter is activated
+  // in the SW here -- BOTH the `importScripts('ai/lattice-runtime-adapter.js')`
+  // module load (commit a3c03e6a "actually load the adapter in SW") AND the
+  // `globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;` flag assignment land
+  // immediately after lattice-step-emitter, preceded by a FINT-13 comment block.
+  // This grows the bridge -> ai-integration gap to 15 (1 emitter importScripts +
+  // ~11-line FINT-13 comment block + 1 adapter importScripts + 1 flag assignment +
+  // ai-integration).
   // The Phase 5 D-17 ethos becomes: every line in the gap MUST be one of
   // (a) importScripts() call, (b) Phase 9 FINT-13 comment line, or
   // (c) the FSB_LATTICE_RUNTIME_ADAPTER_ENABLED flag assignment.
   const gap = lineAiIntegration - lineBridge;
-  passAssert(gap >= 1 && gap <= 8, 'gap between bridge and ai-integration is 1..8 (pre-Phase-8 = 1; Phase 8 = 2; Phase 9 grows to <= 8 with FINT-13 flag flip + comment block)');
+  passAssert(gap >= 1 && gap <= 16, 'gap between bridge and ai-integration is 1..16 (pre-Phase-8 = 1; Phase 8 = 2; Phase 9 FINT-13 loads the adapter module + flag + comment block -> 15)');
   for (let i = lineBridge + 1; i < lineAiIntegration; i++) {
     var ln = bgLines[i];
     var isImport = /^\s*importScripts\(/.test(ln);
@@ -789,6 +796,16 @@ async function loadOffscreenHandlerSource(chromeMock) {
 
   // getStoredSettings declaration preserved elsewhere in options.js
   passAssert(/function\s+getStoredSettings/.test(optionsSrc) || /async\s+function\s+getStoredSettings/.test(optionsSrc), 'getStoredSettings declaration preserved (used by other call sites; not removed by Phase 6)');
+
+  // Load-order fix: checkApiConnection reads DOM inputs, but the premature page-init
+  // call ran BEFORE loadSettings' async chrome.storage.local.get callback populated
+  // them, so it read empty fields and falsely showed 'No API Key'. The call is removed
+  // from init and now runs as the last statement of loadSettings' model-name setTimeout
+  // (after apiKey + provider + modelName are all populated).
+  passAssertEqual((optionsSrc.match(/\/\/ Check API connection/g) || []).length, 0,
+    "options.js dropped the premature page-init '// Check API connection' call (load-order fix)");
+  passAssert(/checkApiConnection\(\);\s*\}, 100\);/.test(optionsSrc),
+    'checkApiConnection() now runs as the last statement of the loadSettings model-name setTimeout (inputs populated first)');
 
   // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');

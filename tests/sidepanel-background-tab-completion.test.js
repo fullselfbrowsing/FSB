@@ -669,6 +669,158 @@ ok(inj4.state.setErrorCalls.length === 1,
    'Part 4.8 -- duplicate background-tab automationError is ignored after the tab is no longer running');
 
 // =====================================================================
+// Part 6 -- conv-less completion routing (replay/legacy-loop fallback)
+// =====================================================================
+//
+// A session-matched automationComplete that carries NO conversationId must
+// resolve the module-scope fallback ONLY when the completed session IS the
+// visible conversation's session. For any OTHER session (a conversation-less
+// replay or a legacy path), the completion must NOT be persisted into the
+// currently-visible conversation -- while the per-tab idle flip still runs.
+
+console.log('\nPart 6 -- conv-less completion never persists into the visible conversation:');
+
+var inj6 = makeInjection({
+  tabEntries: [
+    { tabId: 100, isRunning: true, sessionId: 'sess_A' },
+    { tabId: 200, isRunning: true, sessionId: 'sess_B' }
+  ],
+  activeTabId: 100,
+  moduleIsRunning: true,
+  moduleCurrentSessionId: 'sess_A',
+  moduleConversationId: 'conv_A',
+  sendBtnDisabled: true,
+  currentStatusMessage: true,
+  currentActionGroup: { fake: 'group' }
+});
+
+var dispatch6 = buildDispatcher(inj6);
+try {
+  dispatch6({
+    action: 'automationComplete',
+    sessionId: 'sess_B',
+    tabId: 200,
+    result: 'replay done',
+    partial: false
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: Part 6 dispatch threw:', err && err.message);
+}
+
+ok(inj6.state.persistCalls.length === 0,
+   'Part 6.1 -- a conv-less completion for a NON-current session persists NOTHING (never into the visible conv_A)');
+var tabB6 = inj6.tabRunningMap.get(200);
+ok(tabB6 && tabB6.isRunning === false && tabB6.sessionId === null,
+   'Part 6.2 -- the per-tab idle flip still runs for the originating tab');
+ok(inj6.state.renderCalls.length === 0,
+   'Part 6.3 -- no completion bubble rendered into the visible conversation');
+
+// The module-scope fallback stays valid for the VISIBLE session: a conv-less
+// completion for the current session still persists into the active conv.
+var inj6b = makeInjection({
+  tabEntries: [
+    { tabId: 100, isRunning: true, sessionId: 'sess_A' }
+  ],
+  activeTabId: 100,
+  moduleIsRunning: true,
+  moduleCurrentSessionId: 'sess_A',
+  moduleConversationId: 'conv_A',
+  sendBtnDisabled: true,
+  currentStatusMessage: false,
+  currentActionGroup: null
+});
+
+var dispatch6b = buildDispatcher(inj6b);
+try {
+  dispatch6b({
+    action: 'automationComplete',
+    sessionId: 'sess_A',
+    tabId: 100,
+    result: 'A done (legacy broadcast, no convId)',
+    partial: false
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: Part 6b dispatch threw:', err && err.message);
+}
+
+ok(inj6b.state.persistCalls.length === 1 && inj6b.state.persistCalls[0].convId === 'conv_A',
+   'Part 6.4 -- a conv-less completion for the CURRENT session still falls back to the visible conv (module-scope fallback preserved)');
+
+// Review finding #2: when the visible tab is UNMINTED (module conv is null), a
+// FOREIGN background session's conv-less completion must NOT render into it.
+// Pre-fix, originatingConvId (null) === conversationId (null) made
+// isOriginatingActive true and painted another session's bubble into the
+// current tab. The identity guard (originatingConvId !== null ||
+// request.sessionId === currentSessionId) closes it.
+var inj6c = makeInjection({
+  tabEntries: [
+    { tabId: 100, isRunning: true, sessionId: 'sess_A' },
+    { tabId: 200, isRunning: true, sessionId: 'sess_B' }
+  ],
+  activeTabId: 100,
+  moduleIsRunning: true,
+  moduleCurrentSessionId: 'sess_A',
+  moduleConversationId: null,
+  sendBtnDisabled: true,
+  currentStatusMessage: true,
+  currentActionGroup: { fake: 'group' }
+});
+
+var dispatch6c = buildDispatcher(inj6c);
+try {
+  dispatch6c({
+    action: 'automationComplete',
+    sessionId: 'sess_B',
+    tabId: 200,
+    result: 'background done, no convId',
+    partial: false
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: Part 6c dispatch threw:', err && err.message);
+}
+
+ok(inj6c.state.renderCalls.length === 0,
+   'Part 6.5 -- foreign conv-less completion does NOT render into an UNMINTED visible tab (null===null guard)');
+ok(inj6c.state.persistCalls.length === 0,
+   'Part 6.6 -- foreign conv-less completion persists nothing when the visible tab is unminted');
+
+// The guard must PRESERVE the legitimate case: the CURRENT session completing
+// in an unminted tab still renders its bubble (both convIds null, but the
+// session IS the visible one).
+var inj6d = makeInjection({
+  tabEntries: [
+    { tabId: 100, isRunning: true, sessionId: 'sess_A' }
+  ],
+  activeTabId: 100,
+  moduleIsRunning: true,
+  moduleCurrentSessionId: 'sess_A',
+  moduleConversationId: null,
+  sendBtnDisabled: true,
+  currentStatusMessage: true,
+  currentActionGroup: { fake: 'group' }
+});
+
+var dispatch6d = buildDispatcher(inj6d);
+try {
+  dispatch6d({
+    action: 'automationComplete',
+    sessionId: 'sess_A',
+    tabId: 100,
+    result: 'current session done in unminted tab',
+    partial: false
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: Part 6d dispatch threw:', err && err.message);
+}
+
+ok(inj6d.state.renderCalls.length === 1,
+   'Part 6.7 -- the CURRENT session still renders its completion in an unminted visible tab (guard preserves it)');
+
+// =====================================================================
 // Part 5 -- pre-Task-1 regression sanity (informational comment)
 // =====================================================================
 //

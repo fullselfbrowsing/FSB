@@ -509,6 +509,14 @@
     if (!entry) {
       var desc = _getDescriptor(slug);
       var catalogRecipe = _getRecipeBySlug(slug);
+      // HEAL-03 / D-11: a SESSION-quarantined bundled slug sourced from the generated
+      // index (no REGISTRY entry) must ALSO demote to the T3 DOM-fallback seam. The
+      // entry-truthy quarantine skip below is unreachable on this no-entry path, so
+      // without this check resolve() would keep re-attaching the rotted T1b recipe
+      // and the router would re-fire it on every invoke instead of falling back.
+      if (Object.prototype.hasOwnProperty.call(quarantinedBundledSlugs, slug)) {
+        return { tier: 'T3', descriptor: desc || null };
+      }
       if (catalogRecipe) {
         return { tier: 'T1b', recipe: catalogRecipe, descriptor: desc || null };
       }
@@ -535,14 +543,18 @@
       return null;   // genuinely-unknown slug ONLY (not in REGISTRY, not in descriptors) -> RECIPE_NOT_FOUND (correct)
     }
 
-    // HEAL-03 / D-11: a SESSION-quarantined bundled slug is SKIPPED -> return null so
-    // the router falls through to the next tier / the DOM fallback. This sits AFTER
-    // the learned-first check above (a fresh re-learned recipe already returned its T2
-    // hit and is never demoted here -- the bundled skip applies ONLY to the REGISTRY
-    // entry) and BEFORE any T1a/T1b/T0/seam return, so it demotes the bundled recipe
-    // regardless of its declared tier. The REGISTRY object is NEVER mutated (D-09).
+    // HEAL-03 / D-11: a SESSION-quarantined bundled slug is SKIPPED -> resolve to the
+    // T3 DOM-fallback SEAM so the router yields RECIPE_DOM_FALLBACK_PENDING (the
+    // promised fallback). A bare null here would hit the router's default leg ->
+    // RECIPE_NOT_FOUND for a slug that IS known, just demoted. Deliberately NOT the
+    // no-entry catalogRecipe/T1b re-attach (that would resurrect the rotted recipe).
+    // This sits AFTER the learned-first check above (a fresh re-learned recipe already
+    // returned its T2 hit and is never demoted here -- the bundled skip applies ONLY
+    // to the REGISTRY entry) and BEFORE any T1a/T1b/T0/seam return, so it demotes the
+    // bundled recipe regardless of its declared tier. The REGISTRY object is NEVER
+    // mutated (D-09).
     if (Object.prototype.hasOwnProperty.call(quarantinedBundledSlugs, slug)) {
-      return null;
+      return { tier: 'T3', descriptor: _getDescriptor(slug) || null };
     }
 
     // Multiple same-class candidates -> owned-origin-first bias picks one. The tier

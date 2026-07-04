@@ -734,9 +734,9 @@ function heldOutParaphrase(d) {
   const airbnbHit = (search('get airbnb search results', null, 5) || []).find(function (h) {
     return h.slug === 'airbnb.get_search_results';
   });
-  check(airbnbHit && airbnbHit.backing === 'dom' && airbnbHit.invocable === false &&
-      airbnbHit.readinessStatus === 'discovery-pending',
-    'Phase 44: a DOM-only Airbnb catalog hit returns for discovery but is NOT direct API-ready');
+  check(airbnbHit && airbnbHit.backing === 'dom' && airbnbHit.invocable === true &&
+      airbnbHit.readinessStatus === 't1-ready',
+    'Phase 44: Airbnb search results remain corpus-backed but are now T1-ready and invocable');
 
   const githubHeadHit = (search('list my github issues', null, 5) || []).find(function (h) {
     return h.slug === 'github.issues.list';

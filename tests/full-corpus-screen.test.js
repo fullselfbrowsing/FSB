@@ -122,11 +122,12 @@ function originFromService(service) {
   check(seenOrigins.has('https://youtube.com'),
     'TEST 1: the enumerated corpus includes youtube.com (the emitted apex, the media-axis classifyGate failure now governed)');
 
-  // ---- TEST 2: linkedin sensitive + youtube denied (the 2 surfaced origins) -------
+  // ---- TEST 2: linkedin + youtube governed as sensitive (the 2 surfaced origins) --
   check(Denylist.classify('https://linkedin.com').sensitive === true,
     'TEST 2: classify(https://linkedin.com).sensitive === true (the social-axis origin governed)');
-  check(Denylist.classify('https://youtube.com').denied === true,
-    'TEST 2: classify(https://youtube.com).denied === true (the media/ToS-axis origin governed -- the bare apex, not just music.youtube.com)');
+  check(Denylist.classify('https://youtube.com').sensitive === true &&
+        Denylist.classify('https://youtube.com').denied === false,
+    'TEST 2: classify(https://youtube.com) -> { sensitive:true, denied:false } (the media-axis origin governed without hard block)');
 
   // ---- TEST 3: a representative commerce/payment/travel brand set classifies sensitive --
   // The curated set + the spike-named NET-NEW homedepot/priceline/redfin/starbucks/

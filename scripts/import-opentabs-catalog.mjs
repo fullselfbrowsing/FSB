@@ -1442,6 +1442,9 @@ export async function runImport() {
   // hand-only apps + the hand-authored grafana slice are PRESERVED automatically: they
   // are re-emitted by enumerateBatchApps (their hand-authored src/tools/*.ts ARE valid
   // backing), so their filenames are IN toWrite and are never pruned.
+  if (toWrite.length === 0) {
+    throw new Error('import-opentabs-catalog: empty emit set (VENDOR_ROOT missing/empty or all apps filtered) -- aborting before prune to avoid deleting the committed opentabs__*.json corpus');
+  }
   const emittedFileNames = new Set(toWrite.map((w) => w.path.slice(DESCRIPTORS_DIR.length + 1)));
   const existingOpentabsFiles = existsSync(DESCRIPTORS_DIR)
     ? readdirSync(DESCRIPTORS_DIR).filter((n) => /^opentabs__.*\.json$/.test(n))

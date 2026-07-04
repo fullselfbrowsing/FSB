@@ -1638,6 +1638,26 @@ function bySlug(rows, slug) {
     'no t1-ready row lacks T0/T1a/T1b handler/recipe proof' +
     (badReady.length ? ' -- ' + badReady.map(function(row) { return row.slug; }).join(', ') : ''));
 
+  // An empty/non-array catalog must fail closed, not pass vacuously. `expected`
+  // derives from the same descriptors the rows are built from, so without the
+  // floor an empty catalog yields zero rows and zero failures -- a false PASS on
+  // the exact codegen regression this report exists to catch.
+  const emptyCatalogValidation = mod.validateReadinessReport(report, { descriptors: [] });
+  check(emptyCatalogValidation.failures.length > 0,
+    'validateReadinessReport() fails closed on an empty catalog (got ' + emptyCatalogValidation.failures.length + ' failures)');
+  const missingDescValidation = mod.validateReadinessReport(report, {});
+  check(missingDescValidation.failures.length > 0,
+    'validateReadinessReport() fails closed on a non-array catalog.descriptors');
+
+  let emptyReportThrew = false;
+  try { mod.reportReadiness({ descriptors: [] }); } catch (_e) { emptyReportThrew = true; }
+  check(emptyReportThrew,
+    'reportReadiness() throws on an empty descriptor set (refuses to emit an empty readiness matrix)');
+  let nonArrayReportThrew = false;
+  try { mod.reportReadiness({ recipes: {} }); } catch (_e) { nonArrayReportThrew = true; }
+  check(nonArrayReportThrew,
+    'reportReadiness() throws on a non-array catalog.descriptors');
+
   console.log('\nt1-readiness-report: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);
 })().catch(function(err) {

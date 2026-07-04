@@ -7,11 +7,11 @@
  * Validates:
  *   - control_panel.html contains the new Agent Concurrency card with the
  *     expected ids, attributes, and helper text.
- *   - options.js defaultSettings.fsbAgentCap === 8.
+ *   - options.js retains fallback defaultSettings.fsbAgentCap === 8.
  *   - options.js setupEventListeners attaches an 'input' handler to the cap
  *     input that clamps to 1..64 integer (decimals floored, non-numeric
- *     reverts to 8).
- *   - The reset-to-default button restores 8 and triggers markUnsavedChanges.
+ *     reverts to the RAM recommendation fallback).
+ *   - The reset-to-recommended button restores the recommendation and triggers markUnsavedChanges.
  *   - saveSettings() includes fsbAgentCap in the chrome.storage.local.set
  *     payload.
  *   - loadSettings() populates the input + display from chrome.storage.local.
@@ -52,6 +52,15 @@ console.log('--- Test 1: control_panel.html contains Agent Concurrency card mark
   assert.ok(/id="fsbAgentCap"[^>]*value="8"|value="8"[^>]*id="fsbAgentCap"/.test(html),
     'fsbAgentCap input has default value="8"');
   assert.ok(html.indexOf('Agent Concurrency') !== -1, 'card heading text "Agent Concurrency"');
+  const helperIdx = html.indexOf('../utils/agent-cap-recommendation.js');
+  const optionsIdx = html.indexOf('src="options.js"');
+  assert.ok(helperIdx !== -1, 'loads agent-cap-recommendation helper');
+  assert.ok(optionsIdx !== -1, 'loads options.js');
+  assert.ok(helperIdx < optionsIdx, 'loads agent-cap-recommendation helper before options.js');
+  assert.ok(/Reset to recommended/i.test(html),
+    'reset button text uses recommended copy');
+  assert.ok(/floor\(total GiB \/ 3\)|total RAM/i.test(html),
+    'helper text describes RAM-based recommendation');
   assert.ok(/1\s*(?:to|-)\s*64/i.test(html),
     'helper text mentions range 1-64 or 1 to 64');
   assert.ok(/grandfather|active agents|do(?:es)? not evict|not evict/i.test(html),
@@ -60,16 +69,20 @@ console.log('--- Test 1: control_panel.html contains Agent Concurrency card mark
 console.log('  PASS: HTML card markup');
 
 // ---------------------------------------------------------------------------
-// Test 2 -- options.js defaultSettings.fsbAgentCap = 8
+// Test 2 -- options.js fallback defaultSettings.fsbAgentCap = 8
 // ---------------------------------------------------------------------------
-console.log('--- Test 2: defaultSettings.fsbAgentCap === 8 ---');
+console.log('--- Test 2: defaultSettings.fsbAgentCap fallback === 8 ---');
 {
   const src = readFile(OPTIONS_JS_PATH);
   // Grep for the literal field. Both `fsbAgentCap: 8` and `fsbAgentCap: 8,` valid.
   assert.ok(/fsbAgentCap\s*:\s*8\b/.test(src),
     'options.js defaultSettings contains fsbAgentCap: 8');
+  assert.ok(/resolveRecommendedAgentCap/.test(src),
+    'options.js resolves RAM-based recommended cap');
+  assert.ok(/fsbRecommendedAgentCap/.test(src),
+    'options.js stores current recommended cap');
 }
-console.log('  PASS: defaultSettings.fsbAgentCap === 8');
+console.log('  PASS: fallback default + recommendation helpers');
 
 // ---------------------------------------------------------------------------
 // Test 3-7 -- DOM-stub clamp + reset behavior
@@ -113,6 +126,23 @@ function makeDisplayStub() {
   return { textContent: '' };
 }
 
+const fsbRecommendedAgentCap = 21;
+
+function clampAgentCapValue(value, fallbackValue) {
+  let raw = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(raw)) raw = fallbackValue;
+  raw = Math.floor(raw);
+  if (raw < 1) return 1;
+  if (raw > 64) return 64;
+  return raw;
+}
+
+function setAgentCapControlValue(elements, value) {
+  const capValue = clampAgentCapValue(value, fsbRecommendedAgentCap);
+  if (elements.fsbAgentCap) elements.fsbAgentCap.value = String(capValue);
+  if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = String(capValue);
+}
+
 // Mirror the production handlers from options.js. The same clamp logic is
 // applied here so that a regression in options.js (which IS verified by
 // Test 8 grep below) cannot silently bypass these behavior tests.
@@ -120,9 +150,7 @@ function attachHandlers(elements, markUnsavedChanges) {
   if (elements.fsbAgentCap) {
     elements.fsbAgentCap.addEventListener('input', function(e) {
       let raw = parseInt(e.target.value, 10);
-      if (!Number.isFinite(raw)) raw = 8;
-      if (raw < 1) raw = 1;
-      if (raw > 64) raw = 64;
+      raw = clampAgentCapValue(raw, fsbRecommendedAgentCap);
       if (e.target.value !== String(raw)) e.target.value = String(raw);
       if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = String(raw);
       markUnsavedChanges();
@@ -130,8 +158,7 @@ function attachHandlers(elements, markUnsavedChanges) {
   }
   if (elements.fsbAgentCapReset) {
     elements.fsbAgentCapReset.addEventListener('click', function() {
-      if (elements.fsbAgentCap) elements.fsbAgentCap.value = '8';
-      if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = '8';
+      setAgentCapControlValue(elements, fsbRecommendedAgentCap);
       markUnsavedChanges();
     });
   }
@@ -183,7 +210,7 @@ console.log('--- Test 5: non-integer floor (3.7 -> 3) ---');
 }
 console.log('  PASS: 3.7 -> 3');
 
-console.log('--- Test 6: non-numeric reverts to default 8 ---');
+console.log('--- Test 6: non-numeric reverts to recommended default ---');
 {
   const elements = {
     fsbAgentCap: makeInputStub('8'),
@@ -193,12 +220,12 @@ console.log('--- Test 6: non-numeric reverts to default 8 ---');
   attachHandlers(elements, function() {});
   elements.fsbAgentCap.value = 'foo';
   elements.fsbAgentCap.fire('input');
-  assert.strictEqual(elements.fsbAgentCap.value, '8', '"foo" reverts to 8');
-  assert.strictEqual(elements.fsbAgentCapDisplay.textContent, '8', 'display updated to 8');
+  assert.strictEqual(elements.fsbAgentCap.value, '21', '"foo" reverts to recommended cap');
+  assert.strictEqual(elements.fsbAgentCapDisplay.textContent, '21', 'display updated to recommended cap');
 }
-console.log('  PASS: "foo" -> 8');
+console.log('  PASS: "foo" -> recommended');
 
-console.log('--- Test 7: reset button restores 8 + calls markUnsavedChanges ---');
+console.log('--- Test 7: reset button restores recommended cap + calls markUnsavedChanges ---');
 {
   const elements = {
     fsbAgentCap: makeInputStub('20'),
@@ -208,8 +235,8 @@ console.log('--- Test 7: reset button restores 8 + calls markUnsavedChanges ---'
   let markedUnsaved = 0;
   attachHandlers(elements, function() { markedUnsaved++; });
   elements.fsbAgentCapReset.click();
-  assert.strictEqual(elements.fsbAgentCap.value, '8', 'reset button -> 8');
-  assert.strictEqual(elements.fsbAgentCapDisplay.textContent, '8', 'display -> 8');
+  assert.strictEqual(elements.fsbAgentCap.value, '21', 'reset button -> recommended cap');
+  assert.strictEqual(elements.fsbAgentCapDisplay.textContent, '21', 'display -> recommended cap');
   assert.strictEqual(markedUnsaved, 1, 'markUnsavedChanges fired on reset');
 }
 console.log('  PASS: reset button');
@@ -247,6 +274,10 @@ console.log('--- Test 8: options.js wiring patterns present ---');
   // loadSettings: reads data.fsbAgentCap (or settings.fsbAgentCap).
   assert.ok(/(?:data|settings)\.fsbAgentCap/.test(src),
     'loadSettings reads fsbAgentCap from chrome.storage.local data');
+  assert.ok(/hasStoredAgentCap/.test(src),
+    'loadSettings distinguishes missing cap from stored cap');
+  assert.ok(/setAgentCapControlValue\(fsbRecommendedAgentCap\)/.test(src),
+    'reset handler uses recommended cap value');
 
   // Aggregate count: defaultSettings + 3x getElementById + listener attachments
   // + saveSettings + loadSettings >= 4 occurrences of "fsbAgentCap".

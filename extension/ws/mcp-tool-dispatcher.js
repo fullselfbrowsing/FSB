@@ -2344,7 +2344,70 @@ async function handleCapabilitiesInvokeMessageRoute({ payload, client }) {
       reason: 'supplied origin does not match the target tab origin'
     });
   }
-  return await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, { origin, tabId });
+  // Capability-call overlay treatment: emit a distinct "calling" status
+  // before dispatch and a "guarded" status on a typed pending/blocked
+  // result, so the on-page overlay shows something other than the generic
+  // DOM-action phases for a first-party API call. capability-router.js
+  // itself stays untouched (pure module, no chrome.* access by charter) --
+  // this is presentation-layer instrumentation at the front door only.
+  // A cheap, side-effect-free resolve() preview (the same pure lookup
+  // invoke() performs internally) gives us descriptor/tier for the chip,
+  // without duplicating router dispatch logic.
+  if (tabId !== null) {
+    try {
+      var previewEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+        && typeof FsbCapabilityCatalog.resolve === 'function')
+        ? FsbCapabilityCatalog.resolve(payload.slug, origin)
+        : null;
+      var previewService = (previewEntry && previewEntry.descriptor && previewEntry.descriptor.service) || origin || '';
+      var previewReady = !!(previewEntry && (previewEntry.tier === 'T1a' || previewEntry.tier === 'T1b' || previewEntry.tier === 'T0'));
+      var previewStoppable = Array.from(getActiveSessionsMap().values()).some(function(s) { return s && s.tabId === tabId && s.status === 'running'; });
+      sendSessionStatus(tabId, {
+        phase: 'calling',
+        guarded: false,
+        capability: {
+          chipText: previewService + ' · ' + String(payload.slug || ''),
+          guarded: false,
+          readinessLabel: previewReady ? 'T1 ready' : 'Guarded',
+          readinessClass: previewReady ? 'ready' : 'guarded',
+          noteText: null
+        },
+        stoppable: previewStoppable
+      });
+    } catch (_previewErr) {
+      // Non-blocking: overlay preview is best-effort, never gates the real invoke.
+    }
+  }
+
+  var invokeResult = await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, {
+    origin,
+    tabId,
+    url: (tab && typeof tab.url === 'string') ? tab.url : ''
+  });
+
+  if (tabId !== null && invokeResult && invokeResult.success === false && invokeResult.code) {
+    try {
+      var guardedNoteText = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.mapCapabilityErrorToNote)
+        ? FSBOverlayStateUtils.mapCapabilityErrorToNote(invokeResult.code)
+        : null;
+      if (guardedNoteText) {
+        sendSessionStatus(tabId, {
+          phase: 'calling',
+          guarded: true,
+          capability: {
+            chipText: (origin || '') + ' · ' + String(payload.slug || ''),
+            guarded: true,
+            noteText: guardedNoteText
+          },
+          stoppable: false
+        });
+      }
+    } catch (_guardedErr) {
+      // Non-blocking: overlay status is best-effort, never alters the real result.
+    }
+  }
+
+  return invokeResult;
 }
 
 // Phase 31 DISC-01 / D-01: the user-initiated, time-boxed discovery trigger. This

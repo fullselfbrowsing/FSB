@@ -309,8 +309,16 @@
       });
     }
 
-    // 4c. additionalProperties failure (unknown field) -> RECIPE_UNKNOWN_FIELD.
-    var addlErr = errors.find(function(e) {
+    // 4c. additionalProperties failure (out-of-vocabulary field) -> RECIPE_UNKNOWN_FIELD.
+    //     cfworker ALSO emits the root additionalProperties error ALONGSIDE a value-level
+    //     failure on a KNOWN field (e.g. a bad `origin` pattern or `endpoint` `..`-traversal),
+    //     so a property-subschema failure means this is NOT an unknown field -- let it fall
+    //     through to 4d (RECIPE_SCHEMA_INVALID) rather than mis-naming an existing field.
+    var propertyViolation = errors.some(function(e) {
+      return e && typeof e.keywordLocation === 'string' &&
+        e.keywordLocation.indexOf('/properties/') !== -1;
+    });
+    var addlErr = !propertyViolation && errors.find(function(e) {
       return e && typeof e.keywordLocation === 'string' &&
         /additionalProperties/.test(e.keywordLocation);
     });

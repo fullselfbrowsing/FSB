@@ -128,6 +128,18 @@ function mkDesc(slug, service) {
   const qSlot = envQ && envQ.recipes && envQ.recipes[ORIGIN_B] && envQ.recipes[ORIGIN_B]['q'];
   check(qSlot && qSlot.quarantined === true, 'quarantine sets quarantined:true on the slot (NOT deleted -- kept for Phase-32, D-16)');
 
+  // ---- re-promotion CLEARS the quarantine (the Phase-32 heal loop closes) ----
+  // promote() is only reached after a verified clean replay, so a re-promoted
+  // recipe is healed: the flag clears and the slug is routable again.
+  await Learned.promote(ORIGIN_B, mkRecipe('q', ORIGIN_B, '/api/q'), mkDesc('q', 'b.example.com'), { lastSuccessAt: 6 });
+  const envHealed = await Learned.readAll();
+  const healedSlot = envHealed && envHealed.recipes && envHealed.recipes[ORIGIN_B] && envHealed.recipes[ORIGIN_B]['q'];
+  check(healedSlot && healedSlot.quarantined === false,
+    're-promotion after a clean replay clears quarantined (heal loop closes; no permanent demotion)');
+  const healedGet = await Learned.getLearned('q', ORIGIN_B);
+  check(healedGet !== null && healedGet.recipe,
+    'a re-promoted (healed) entry is routable again via getLearned');
+
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);
 })().catch((err) => {

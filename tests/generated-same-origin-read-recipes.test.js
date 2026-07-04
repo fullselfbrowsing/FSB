@@ -39,10 +39,12 @@ function check(cond, msg) {
   const recipes = built.recipes.map((item) => item.recipe);
   const slugs = recipes.map((recipe) => recipe.id).sort();
 
-  check(recipes.length >= 8, 'generator finds the conservative same-origin read batch');
-  check(slugs.includes('bitbucket.get_user_profile'), 'batch includes Bitbucket current-user profile');
+  check(recipes.length >= 4, 'generator finds the conservative same-origin read batch');
+  check(!slugs.includes('bitbucket.get_user_profile'), 'batch excludes Bitbucket profile because it is already covered by a T1a handler');
   check(slugs.includes('netlify.get_current_user'), 'batch includes Netlify current-user profile');
-  check(slugs.includes('webflow.list_workspaces'), 'batch includes Webflow workspace listing');
+  check(slugs.includes('circleci.list_collaborations'), 'batch includes CircleCI collaboration listing');
+  check(!slugs.includes('redfin.get_current_user'), 'batch excludes Redfin current-user profile because it is already covered by a T1a handler');
+  check(!slugs.includes('webflow.list_workspaces'), 'batch excludes Webflow workspace listing because it is already covered by a T1a handler');
   check(!slugs.includes('circleci.get_current_user'), 'batch excludes slugs already covered by a T1a handler');
   check(!slugs.includes('bestbuy.get_saved_cards'), 'batch excludes saved-card/payment-style reads');
   check(!slugs.includes('chatgpt.get_current_user'), 'batch excludes bearer-token helpers');
@@ -51,8 +53,6 @@ function check(cond, msg) {
   const bySlug = new Map(recipes.map((recipe) => [recipe.id, recipe]));
   check(bySlug.get('bestbuy.get_current_user').origin === 'https://www.bestbuy.com',
     'Best Buy generated recipes pin to the vendored www runtime origin');
-  check(bySlug.get('redfin.get_current_user').origin === 'https://www.redfin.com',
-    'Redfin generated recipes pin to the vendored www runtime origin');
 
   const invalid = [];
   for (const recipe of recipes) {

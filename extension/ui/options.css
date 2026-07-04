@@ -5508,7 +5508,8 @@ textarea.form-input {
   color: var(--success, #22c55e);
 }
 
-/* Sync tab layout: key-generation row, action row, and the inline deprecation
+/* DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
+   Sync tab layout: key-generation row, action row, and the inline deprecation
    notice for the retired remote-control sync feature. */
 .sync-key-row {
   display: flex;

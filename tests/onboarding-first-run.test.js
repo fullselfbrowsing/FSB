@@ -138,6 +138,26 @@ async function loadInitConfigHarness() {
     assert(js.includes("url: chrome.runtime.getURL('ui/popup.html')"), 'Open FSB has popup fallback');
   }
 
+  console.log('--- onboarding input focus preservation ---');
+  {
+    const js = fs.readFileSync(onboardingJsPath, 'utf8');
+    // The key/URL input handlers must NOT full-render per keystroke: render()
+    // rebuilds els.screen.innerHTML, destroying the focused input (the caret
+    // jumped out after every character). They reset the status area in place.
+    assert(js.includes('function resetKeyStatusIdle()'), 'in-place status reset helper exists');
+    const keyHandlerStart = js.indexOf("bind('#obKeyInput', 'input'");
+    const localHandlerStart = js.indexOf("bind('#obLocalUrlInput', 'input'");
+    const revealStart = js.indexOf("bind('#obRevealKey'");
+    assert(keyHandlerStart !== -1 && localHandlerStart !== -1 && revealStart !== -1,
+      'apikey screen binds key input, local URL input, and reveal button');
+    const keyHandler = js.slice(keyHandlerStart, localHandlerStart);
+    assert(keyHandler.includes('resetKeyStatusIdle()') && !keyHandler.includes('render()'),
+      '#obKeyInput input handler resets status in place (no focus-destroying render)');
+    const localHandler = js.slice(localHandlerStart, revealStart);
+    assert(localHandler.includes('resetKeyStatusIdle()') && !localHandler.includes('render()'),
+      '#obLocalUrlInput input handler resets status in place (no focus-destroying render)');
+  }
+
   console.log('PASS onboarding-first-run.test.js');
 })().catch((error) => {
   console.error(error);

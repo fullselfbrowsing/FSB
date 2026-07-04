@@ -8,29 +8,29 @@
  * The most-sensitive batch's SECURITY CONTRACT: a payment-bearing op
  * (place_order / checkout / charge / complete_booking / buy_tickets / book_flight /
  * request_ride / place_bid / create_order / ...) that is ever classified
- * safe-AND-API-invocable would run under the shipped opt-out Auto default = MONEY
- * MOVED without consent. The third leg of the triple mitigation (the frozen
- * backing:'dom' default + payment origins sensitive/denied are the other two) is the
- * checkPaymentOpsNotSafeInvocable guard in verify-catalog-crosscheck.mjs, which FAILS
- * THE BUILD on any payment-safe-invocable op.
+ * on an ungated origin would run under the shipped opt-out Auto default = MONEY
+ * MOVED without consent. The payment-origin gate is the mitigation boundary:
+ * checkPaymentOpsNotSafeInvocable in verify-catalog-crosscheck.mjs FAILS THE BUILD
+ * on any payment op whose service is not sensitive/denied.
  *
  * This test drives the REAL checkPaymentOpsNotSafeInvocable export (NOT a
  * re-implemented copy; mirrors tests/catalog-crosscheck.test.js's real-export
  * pattern) and proves:
- *   (a) the payment-op-safe-invocable.fixture.json (a payment op on a SAFE origin AND
- *       promoted to backing handler) FAILS the guard.
+ *   (a) the payment-op-safe-invocable.fixture.json (a payment op on a SAFE origin)
+ *       FAILS the guard even when promoted to backing handler.
  *   (b) PER-VERB-FAMILY COVERAGE (the blocker proof): EACH of buy_tickets /
  *       book_flight / request_ride / place_bid / create_order / place_order on a SAFE
  *       origin FAILS -- so all 12 phase-39 payment op-names are detected (the
  *       payment-VERB set AND the literal op-name set), not just the literal keys.
- *   (c) a DOM-only payment op on a SENSITIVE origin (reserve_table / opentable)
- *       PASSES (DOM-only on a gated origin = no money movement under Auto).
+ *   (c) a payment op on a SENSITIVE origin PASSES regardless of backing (posture-B
+ *       origin gating is the consent boundary).
  *   (d) a READ-only-safe op (yelp.search_businesses / calendly.get_availability)
  *       carries NO payment verb -> PASSES (the guard is payment-op-scoped, not a
  *       blanket safe-write ban -- it must not false-fail a benign commerce read).
  *   (e) over the REAL committed Denylist, opentable is sensitive (per 39-01) so a
- *       DOM-only reserve op on it PASSES, while the same op on a safe origin FAILS --
- *       the live-roster classification drives the verdict.
+ *       reserve op on it PASSES, live handler-backed etsy.checkout and
+ *       lyft.request_ride PASS because their origins are gated, while the same op on
+ *       a safe origin FAILS -- the live-roster classification drives the verdict.
  *
  * Zero-framework node test: a check(cond,msg) counter, PASS=/FAIL= summary,
  * process.exit(failed>0?1:0). ASCII-only, NO emojis.
@@ -56,7 +56,7 @@ const SAFE_INVOCABLE_FIXTURE = path.join(ROOT, 'catalog', 'descriptors', '_fixtu
 
 // A stub classify() returning a SAFE origin (the verdict the guard fails on, leg ii).
 const safeClassify = () => ({ sensitive: false, denied: false });
-// A stub classify() returning a SENSITIVE origin (the verdict the guard passes on a DOM op).
+// A stub classify() returning a SENSITIVE origin (the verdict the guard passes).
 const sensClassify = () => ({ sensitive: true, denied: false });
 
 // Does the guard flag a specific slug? (failures embed the slug.)
@@ -77,12 +77,21 @@ function flags(result, slug) {
     '(a) the payment-op-safe-invocable fixture exists on disk');
   const safeInvocableFixture = JSON.parse(fs.readFileSync(SAFE_INVOCABLE_FIXTURE, 'utf8'));
   check(safeInvocableFixture.service === 'shopcorp.example' && safeInvocableFixture.backing === 'handler',
-    '(a) the fixture is a payment op on a SAFE origin (shopcorp.example) AND backing handler (both failure legs)');
+    '(a) the fixture is a payment op on a SAFE origin (shopcorp.example) with backing handler');
   const aFail = gate.checkPaymentOpsNotSafeInvocable([safeInvocableFixture], safeClassify);
   check(Array.isArray(aFail.failures) && aFail.failures.length > 0,
-    '(a) checkPaymentOpsNotSafeInvocable([payment-op-safe-invocable fixture]) yields > 0 failures -> the build ABORTS');
+    '(a) checkPaymentOpsNotSafeInvocable([payment-op-safe-invocable fixture]) yields > 0 failures because the origin is ungated -> the build ABORTS');
   check(flags(aFail, 'shopcorp.place_order'),
     '(a) the failure NAMES the offending slug shopcorp.place_order');
+
+  for (const backing of ['dom', 'handler', 'recipe']) {
+    const safeAnyBacking = gate.checkPaymentOpsNotSafeInvocable(
+      [{ slug: 'shopcorp.checkout', service: 'shopcorp.example', sideEffectClass: 'write', backing }],
+      safeClassify
+    );
+    check(Array.isArray(safeAnyBacking.failures) && safeAnyBacking.failures.length > 0 && flags(safeAnyBacking, 'shopcorp.checkout'),
+      '(a) a payment op on a SAFE origin FAILS regardless of backing:' + backing);
+  }
 
   // ---- (b) PER-VERB-FAMILY COVERAGE: each family on a SAFE origin FAILS -------
   // buy_tickets/book_flight/request_ride/place_bid -> PATH 1 payment verbs;
@@ -108,25 +117,23 @@ function flags(result, slug) {
   check(createOrder.failures.length > 0 && /payment OP-NAME/.test(createOrder.failures.join('|')),
     '(b) create_order is caught via the literal PAYMENT_OP op-name set (its verb "create" is benign -- PATH 1 alone would miss it)');
 
-  // ---- (b2) a payment op PROMOTED to recipe/handler FAILS even on a SENSITIVE origin -
-  // backing recipe/handler = API-invocable, which a payment op must NEVER be from
-  // breadth -- so it fails the build regardless of origin sensitivity.
+  // ---- (b2) a payment op PROMOTED to recipe/handler PASSES on a SENSITIVE origin -
+  // backing recipe/handler is allowed when posture-B origin gating supplies consent.
   const promotedOnSensitive = gate.checkPaymentOpsNotSafeInvocable(
     [{ slug: 'shopco.checkout', service: 'shopco.example', sideEffectClass: 'write', backing: 'handler' }],
     sensClassify
   );
-  check(promotedOnSensitive.failures.length > 0,
-    '(b2) a payment op promoted to backing handler FAILS even on a SENSITIVE origin (API-invocable is forbidden for a payment op)');
+  check(promotedOnSensitive.failures.length === 0,
+    '(b2) a payment op promoted to backing handler PASSES on a SENSITIVE origin (origin gating is the consent boundary)');
 
   // ---- (c) a DOM-only payment op on a SENSITIVE origin PASSES -----------------
-  // reserve_table on opentable: opentable is sensitive per 39-01, backing:'dom' ->
-  // DOM-only on a gated origin = no money movement under Auto -> PASSES.
+  // reserve_table on opentable: opentable is sensitive per 39-01 -> PASSES.
   const cPass = gate.checkPaymentOpsNotSafeInvocable(
     [{ slug: 'opentable.reserve_table', service: 'www.opentable.com', sideEffectClass: 'write', backing: 'dom' }],
     sensClassify
   );
   check(Array.isArray(cPass.failures) && cPass.failures.length === 0,
-    '(c) a backing:"dom" payment op (reserve_table) on a SENSITIVE origin (opentable) PASSES (DOM-only on a gated origin = no money movement under Auto)');
+    '(c) a backing:"dom" payment op (reserve_table) on a SENSITIVE origin (opentable) PASSES');
 
   // ---- (d) a READ-only-safe op carries NO payment verb -> PASSES --------------
   // yelp.search_businesses / calendly.get_availability: search/get are NOT payment
@@ -140,8 +147,8 @@ function flags(result, slug) {
     '(d) read-only-safe ops (yelp.search_businesses, calendly.get_availability) PASS -- they carry no payment verb/op-name, the guard never keys on them');
 
   // ---- (e) over the REAL committed Denylist the live classification drives it -
-  // opentable is sensitive per 39-01 (the committed roster), so reserve_table
-  // DOM-only-on-opentable PASSES; the SAME op on a genuinely safe origin FAILS.
+  // opentable, etsy, and lyft are gated in the committed roster, so payment ops on
+  // them PASS; the SAME op on a genuinely safe origin FAILS.
   const Denylist = require(DENYLIST_MODULE);
   await Denylist.load();
   check(Denylist.isLoaded() === true, '(e) service-denylist loaded (the REAL committed roster drives classify())');
@@ -153,7 +160,17 @@ function flags(result, slug) {
     Denylist.classify
   );
   check(Array.isArray(eOpentable.failures) && eOpentable.failures.length === 0,
-    '(e) reserve_table DOM-only on opentable PASSES against the LIVE committed roster (opentable is sensitive -> the DOM-path write is posture-B gated)');
+    '(e) reserve_table on opentable PASSES against the LIVE committed roster (opentable is sensitive -> posture-B gated)');
+
+  const livePaymentDescriptors = [
+    JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'descriptors', 'opentabs__etsy__checkout.json'), 'utf8')),
+    JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog', 'descriptors', 'opentabs__lyft__request_ride.json'), 'utf8')),
+  ];
+  check(livePaymentDescriptors.every((d) => d && d.backing === 'handler'),
+    '(e) live etsy.checkout and lyft.request_ride remain backing:"handler" by design');
+  const eLiveHandlerBacked = gate.checkPaymentOpsNotSafeInvocable(livePaymentDescriptors, Denylist.classify);
+  check(Array.isArray(eLiveHandlerBacked.failures) && eLiveHandlerBacked.failures.length === 0,
+    '(e) live handler-backed etsy.checkout and lyft.request_ride PASS because their origins are gated in the committed roster');
 
   const eSafeHost = gate.checkPaymentOpsNotSafeInvocable(
     [{ slug: 'shopco.place_order', service: 'shopco.example', sideEffectClass: 'write', backing: 'dom' }],

@@ -702,7 +702,9 @@
     var handlerCtx = {
       origin: ctx && ctx.origin,
       tabId: ctx && ctx.tabId,
+      url: ctx && ctx.url,
       executeBoundSpec: primitive ? primitive.executeBoundSpec : undefined,
+      executeBoundPageRead: primitive ? primitive.executeBoundPageRead : undefined,
       interpretRecipe: interp ? interp.interpretRecipe : undefined
     };
     var out = await handler.handle(args || {}, handlerCtx);

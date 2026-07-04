@@ -89,8 +89,12 @@ function makeElement(tag, opts) {
     set innerHTML(v) {
       this._innerHTML = String(v);
       const childClasses = [
-        'fsb-header','fsb-logo','fsb-title','fsb-client-badge',
-        'fsb-task','fsb-summary','fsb-step','fsb-step-number','fsb-step-text',
+        'fsb-header','fsb-logo','fsb-title','fsb-client-badge','fsb-stop',
+        'fsb-task','fsb-summary',
+        'fsb-chip','fsb-chip-lock','fsb-chip-txt','fsb-chip-rdy',
+        'fsb-note','fsb-note-icon','fsb-note-text',
+        'fsb-step','fsb-step-number','fsb-step-text',
+        'fsb-log','fsb-log-line','fsb-log-line',
         'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
       ];
       this.children = childClasses.map(c => {
@@ -287,7 +291,10 @@ function makeState(opts) {
     },
     actionCount: opts.actionCount,
     clientLabel: '',
-    result: opts.result
+    result: opts.result,
+    guarded: opts.guarded,
+    capability: opts.capability,
+    stoppable: opts.stoppable
   };
 }
 
@@ -423,8 +430,12 @@ console.log('\n--- Test: ProgressOverlay shadow CSS has reduced-motion block cov
   assert(blocks.length >= 2,
     'at least 2 @media (prefers-reduced-motion: reduce) blocks present (ProgressOverlay + ActionGlowOverlay); got ' + blocks.length);
 
-  // The first block (ProgressOverlay) must contain ALL five text-surface selectors.
-  const textSurfaces = ['.fsb-task', '.fsb-summary', '.fsb-step-text', '.fsb-step-number', '.fsb-eta'];
+  // The first block (ProgressOverlay) must contain ALL text-surface selectors,
+  // including the capability-call chip/note/log surfaces added alongside them.
+  const textSurfaces = [
+    '.fsb-task', '.fsb-summary', '.fsb-step-text', '.fsb-step-number', '.fsb-eta',
+    '.fsb-chip-txt', '.fsb-chip-rdy', '.fsb-note', '.fsb-log-line'
+  ];
   const progressBlock = blocks[0] || '';
   textSurfaces.forEach(sel => {
     assert(progressBlock.indexOf(sel) >= 0,
@@ -480,6 +491,86 @@ console.log('\n--- Test: ActionGlowOverlay reduced-motion block still present (r
     'ActionGlowOverlay reduced-motion block has transition: none');
   assert(glowBlock.indexOf('animation: none') >= 0,
     'ActionGlowOverlay reduced-motion block has animation: none');
+}
+
+// ---------------------------------------------------------------------------
+// Capability-call overlay: violet "calling" mode + amber "guarded" state
+// ---------------------------------------------------------------------------
+console.log('\n=== describe: capability/guarded visual states ===');
+
+console.log('\n--- Test: phase=calling + ready capability shows chip, no note, card.capability class ---');
+{
+  setNow(80000);
+  const o = buildOverlay();
+  o.update(makeState({
+    phase: 'calling',
+    detail: 'Checking existing escalation issues',
+    guarded: false,
+    capability: {
+      chipText: 'github.com · github.issues.list',
+      readinessLabel: 'T1 ready',
+      readinessClass: 'ready',
+      noteText: null
+    },
+    stoppable: true
+  }));
+  assert(o.container.classList.contains('capability'), 'card root has .capability class');
+  assert(!o.container.classList.contains('guarded'), 'card root does NOT have .guarded class');
+  const chipEl = o.container.querySelector('.fsb-chip');
+  assert(chipEl.classList.contains('show'), '.fsb-chip has .show class');
+  assertEq(o.container.querySelector('.fsb-chip-txt').textContent, 'github.com · github.issues.list', 'chip text set');
+  assertEq(o.container.querySelector('.fsb-chip-rdy').textContent, 'T1 ready', 'chip readiness label set');
+  assert(o.container.querySelector('.fsb-chip-rdy').classList.contains('ready'), 'chip readiness pill has .ready class');
+  const noteEl = o.container.querySelector('.fsb-note');
+  assert(!noteEl.classList.contains('show'), '.fsb-note stays hidden when not guarded');
+  const stopEl = o.container.querySelector('.fsb-stop');
+  assert(!stopEl.classList.contains('hidden'), '.fsb-stop is visible when stoppable=true');
+  assert(o.container.querySelector('.fsb-step-number').classList.contains('calling'), 'step-number pill has .calling class');
+  o.destroy();
+}
+
+console.log('\n--- Test: phase=calling + guarded=true shows amber note, card.guarded class ---');
+{
+  setNow(90000);
+  const o = buildOverlay();
+  o.update(makeState({
+    phase: 'calling',
+    detail: 'Filing new escalation issue',
+    guarded: true,
+    capability: {
+      chipText: 'github.com · github.issues.create',
+      readinessLabel: 'Guarded',
+      readinessClass: 'guarded',
+      noteText: 'Blocked — nothing was created. Needs your approval to run write actions.'
+    },
+    stoppable: false
+  }));
+  assert(o.container.classList.contains('guarded'), 'card root has .guarded class');
+  assert(!o.container.classList.contains('capability'), 'guarded wins over .capability (mockup precedence)');
+  const noteEl = o.container.querySelector('.fsb-note');
+  assert(noteEl.classList.contains('show'), '.fsb-note has .show class when guarded with noteText');
+  assertEq(o.container.querySelector('.fsb-note-text').textContent,
+    'Blocked — nothing was created. Needs your approval to run write actions.', 'note text set');
+  assert(o.container.querySelector('.fsb-step-number').classList.contains('guarded'), 'step-number pill has .guarded class');
+  assert(o.container.querySelector('.fsb-progress-fill').classList.contains('guarded'), 'progress fill has .guarded class');
+  const stopEl = o.container.querySelector('.fsb-stop');
+  assert(stopEl.classList.contains('hidden'), '.fsb-stop stays hidden when stoppable=false');
+  o.destroy();
+}
+
+console.log('\n--- Test: ordinary non-capability update leaves every new element hidden/inert (regression guard) ---');
+{
+  setNow(100000);
+  const o = buildOverlay();
+  o.update(makeState({ phase: 'acting', detail: 'Clicking submit' }));
+  assert(!o.container.classList.contains('capability'), 'ordinary update: no .capability class');
+  assert(!o.container.classList.contains('guarded'), 'ordinary update: no .guarded class');
+  assert(!o.container.querySelector('.fsb-chip').classList.contains('show'), 'ordinary update: .fsb-chip stays hidden');
+  assert(!o.container.querySelector('.fsb-note').classList.contains('show'), 'ordinary update: .fsb-note stays hidden');
+  assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'), 'ordinary update: .fsb-stop stays hidden');
+  assert(!o.container.querySelector('.fsb-step-number').classList.contains('calling'), 'ordinary update: pill has no .calling class');
+  assert(!o.container.querySelector('.fsb-progress-fill').classList.contains('guarded'), 'ordinary update: fill has no .guarded class');
+  o.destroy();
 }
 
 // ---------------------------------------------------------------------------

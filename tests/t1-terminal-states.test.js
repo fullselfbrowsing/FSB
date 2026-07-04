@@ -116,22 +116,26 @@ function readinessOverrideSlugs() {
   const youtubeLedgerRows = ledger.rows.filter(function(row) { return row && row.app === 'youtube'; });
   const youtubeWriteRows = youtubeRows.filter(function(row) { return row.workstream === 'write-destructive-uat'; });
   const youtubeReadRows = youtubeRows.filter(function(row) { return row.workstream === 'same-origin-read'; });
+  // 8 write rows / 10 read rows: subscribe, unsubscribe, and unlike_video are
+  // real mutations the importer formerly under-stated as reads (the generic-api
+  // GET default on youtube's POST-RPC transport defeated the ambiguous-verb
+  // write floor).
   check(!!youtubeApp &&
       youtubeApp.appStatus === 'uat-needed' &&
       youtubeRows.length === 18 &&
-      youtubeWriteRows.length === 5 &&
+      youtubeWriteRows.length === 8 &&
       youtubeWriteRows.every(function(row) {
         return row.surfaceStatus === 'uat-needed' &&
           row.terminalState === 'live-uat-required' &&
           row.executionEnabled === false;
       }) &&
-      youtubeReadRows.length === 13 &&
+      youtubeReadRows.length === 10 &&
       youtubeReadRows.every(function(row) {
         return row.surfaceStatus === 'degraded-discovery-pending' &&
           row.terminalState === 'same-origin-proof-required' &&
           row.executionEnabled === false;
       }) &&
-      youtubeLedgerRows.length === 5 &&
+      youtubeLedgerRows.length === 8 &&
       youtubeLedgerRows.every(function(row) {
         return row.status === 'not-activated-live-uat-required' && row.activationAllowed === false;
       }),

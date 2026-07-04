@@ -1,9 +1,9 @@
 /**
  * Phase 212-02 regression tests
  *
- * Verifies the deprecation card, sunset notice, and slash-command commenting:
- *   - AGENTS-01: deprecation card with both CTAs (target=_blank rel=noopener noreferrer)
- *                and the "Retired in v0.9.45rc1 (April 2026)" footer.
+ * Verifies the deprecation notice, sunset notice, and slash-command commenting:
+ *   - AGENTS-01: deprecation notice with both CTAs (target=_blank rel=noopener noreferrer)
+ *                and a footer naming v0.9.45rc1 plus April 2026.
  *   - AGENTS-02 (UI portion): canonical annotations on every commented agent code path;
  *                Server Sync + pairing wiring at ui/options.js:4189-4205 stays LIVE
  *                because Phase 213 relocates it.
@@ -36,6 +36,16 @@ function countSubstring(haystack, needle) {
   return count;
 }
 
+function extractDeprecationFooterTexts(source) {
+  const footers = [];
+  const footerRegex = /<small[^>]*class="[^"]*(?:sync-deprecation-foot|fsb-deprecation-footer)[^"]*"[^>]*>([\s\S]*?)<\/small>/g;
+  let match;
+  while ((match = footerRegex.exec(source)) !== null) {
+    footers.push(match[1].replace(/\s+/g, ' ').trim());
+  }
+  return footers;
+}
+
 /** Returns the substring of source between the line that opens `signature` and its matching closing brace. */
 function extractFunctionBody(source, signature) {
   const startIdx = source.indexOf(signature);
@@ -61,18 +71,22 @@ function fail(label, detail) {
   if (detail) console.log('       ' + detail);
 }
 
-// ---- Section 1: AGENTS-01 deprecation card present in control_panel.html ----
+// ---- Section 1: AGENTS-01 deprecation notice present in control_panel.html ----
 
 {
   const src = read('extension/ui/control_panel.html');
   const tryOpenClaw = countSubstring(src, 'Try OpenClaw') === 1;
   const tryRoutines = countSubstring(src, 'Try Claude Routines') === 1;
   const noNoopener = (src.match(/rel="noopener noreferrer"/g) || []).length;
-  const footer = countSubstring(src, 'Retired in v0.9.45rc1 (April 2026)') === 1;
+  const footerTexts = extractDeprecationFooterTexts(src);
+  const footer = footerTexts.filter(text => (
+    text.includes('Retired in v0.9.45rc1') &&
+    text.includes('April 2026')
+  )).length === 1;
   if (tryOpenClaw && tryRoutines && noNoopener >= 2 && footer) {
-    pass('AGENTS-01 deprecation card present (CTAs + footer; rel=noopener noreferrer count=' + noNoopener + ')');
+    pass('AGENTS-01 deprecation notice present (CTAs + semantic footer; rel=noopener noreferrer count=' + noNoopener + ')');
   } else {
-    fail('AGENTS-01 deprecation card incomplete', 'tryOpenClaw=' + tryOpenClaw + ' tryRoutines=' + tryRoutines + ' noopener=' + noNoopener + ' footer=' + footer);
+    fail('AGENTS-01 deprecation notice incomplete', 'tryOpenClaw=' + tryOpenClaw + ' tryRoutines=' + tryRoutines + ' noopener=' + noNoopener + ' footer=' + footer + ' footerTexts=' + JSON.stringify(footerTexts));
   }
 }
 

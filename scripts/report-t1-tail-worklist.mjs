@@ -15,6 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 import {
+  loadCatalog,
   reportReadiness,
   validateReadinessReport,
 } from './report-t1-readiness.mjs';
@@ -229,7 +230,7 @@ export function renderMarkdown(worklist) {
     '|--------|------:|',
     '| Total descriptors | ' + worklist.descriptorCount + ' |',
     '| Current T1-ready descriptors | ' + worklist.currentReady + ' |',
-    '| Current guarded fail-closed writes | ' + worklist.currentGuarded + ' |',
+    '| Current guarded fail-closed rows | ' + worklist.currentGuarded + ' |',
     '| Tail rows in this worklist | ' + totals.tail + ' |',
     '| Actionable non-denied tail rows | ' + totals.actionable + ' |',
     '| Blocked policy rows | ' + totals.blocked + ' |',
@@ -270,7 +271,7 @@ export function writeTailWorklist(worklist, paths) {
 
 function runCli() {
   const readiness = reportReadiness();
-  const readinessValidation = validateReadinessReport(readiness);
+  const readinessValidation = validateReadinessReport(readiness, loadCatalog());
   if (readinessValidation.failures.length) {
     console.error('t1-tail-worklist: readiness FAIL (' + readinessValidation.failures.length + ' failure' +
       (readinessValidation.failures.length === 1 ? '' : 's') + ')');

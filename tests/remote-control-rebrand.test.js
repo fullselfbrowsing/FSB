@@ -3,7 +3,7 @@
  *
  * Phase 223 originally renamed "Agents" -> "Remote Control (Beta)". The
  * follow-up consolidation removes the standalone "Remote Control" tab and
- * folds the Beta badge + deprecation card + sunset notice INTO the existing
+ * folds the Beta badge + deprecation notice + sunset notice INTO the existing
  * Sync section. This test asserts the consolidated state.
  *
  * Static-analysis only. Plain Node + fs reads + string .includes() / RegExp
@@ -81,15 +81,15 @@ assert(
   '[SYNC-03] no standalone "<h2>Remote Control</h2>" section header remains'
 );
 
-console.log('\n--- Deprecation card lives inside Sync section ---');
+console.log('\n--- Deprecation notice lives inside Sync section ---');
 
 const syncSectionMatch = CP.match(/<section[^>]*id="sync"[\s\S]*?<\/section>/);
 assert(!!syncSectionMatch, '[SYNC-04] <section id="sync"> ... </section> exists');
 
 const syncBody = syncSectionMatch ? syncSectionMatch[0] : '';
 assert(
-  /Background agents have left the building\./.test(syncBody),
-  '[SYNC-04] deprecation headline "Background agents have left the building." lives inside #sync'
+  /Background agents have left the building/.test(syncBody),
+  '[SYNC-04] deprecation headline "Background agents have left the building" lives inside #sync'
 );
 assert(
   /href="https:\/\/github\.com\/openclaw\/openclaw"[^>]*rel="noopener noreferrer"/.test(syncBody),
@@ -100,8 +100,8 @@ assert(
   '[SYNC-04] Claude Routines CTA (rel="noopener noreferrer") lives inside #sync'
 );
 assert(
-  /Retired in v0\.9\.45rc1/.test(syncBody),
-  '[SYNC-04] deprecation footer "Retired in v0.9.45rc1 (April 2026)" preserved inside #sync'
+  /Retired in v0\.9\.45rc1/.test(syncBody) && /April 2026/.test(syncBody),
+  '[SYNC-04] deprecation footer names v0.9.45rc1 plus April 2026 inside #sync'
 );
 assert(
   /id="fsbSunsetNotice"/.test(syncBody) &&

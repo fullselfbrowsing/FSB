@@ -447,11 +447,13 @@ const GITHUB_RECIPE = {
   // declared origin. We stub ctx.executeBoundSpec and record the spec it receives.
   // -----------------------------------------------------------------------
   const boundSpecCalls = [];
+  let handlerCtxUrl = null;
   const t1aHandler = {
     tier: 'T1a',
     origin: 'https://github.com',
     sideEffectClass: 'read',
     async handle(args, ctx) {
+      handlerCtxUrl = ctx && ctx.url;
       const spec = {
         url: 'https://github.com/notifications', method: 'GET',
         headers: { Accept: 'application/json' }, body: null, query: {},
@@ -468,7 +470,11 @@ const GITHUB_RECIPE = {
     }
   };
   installCatalog({ 'github.notifications.t1a': { tier: 'T1a', handler: t1aHandler } });
-  const t1a = await ROUTER.invoke('github.notifications.t1a', { query: 'is:unread' }, { origin: 'https://github.com', tabId: 11 });
+  const t1a = await ROUTER.invoke('github.notifications.t1a', { query: 'is:unread' }, {
+    origin: 'https://github.com',
+    tabId: 11,
+    url: 'https://github.com/notifications?query=is%3Aunread'
+  });
   check(t1a && t1a.success === true && t1a.tier === 'T1a',
     "CAT-02: a tier:T1a slug routes to its handler and the result is stamped tier:'T1a'");
   check(boundSpecCalls.length === 1,
@@ -477,6 +483,8 @@ const GITHUB_RECIPE = {
     && boundSpecCalls[0].spec.origin === t1aHandler.origin,
     "CAT-02: the spec passed to ctx.executeBoundSpec has origin == the handler's declared origin ("
     + JSON.stringify(boundSpecCalls[0] && boundSpecCalls[0].spec && boundSpecCalls[0].spec.origin) + ')');
+  check(handlerCtxUrl === 'https://github.com/notifications?query=is%3Aunread',
+    'CAT-02: the T1a handler context receives the authoritative active-tab URL');
   clearCatalog();
   delete globalThis.FsbCapabilityFetch;
 

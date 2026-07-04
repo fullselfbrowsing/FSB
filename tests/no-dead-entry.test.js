@@ -149,6 +149,61 @@ const unknown = CATALOG.resolve('nonexistent.slug', 'https://x.com');
 check(unknown === null,
   'NEGATIVE CONTROL: an out-of-corpus slug (nonexistent.slug) -> null (the genuinely-unknown -> correct RECIPE_NOT_FOUND, NOT masked as a seam tier)');
 
+// ===========================================================================
+// HEAL-03 / D-11: a SESSION-quarantined REGISTRY slug resolves to the T3 seam
+// (the promised DOM fallback), NOT null (which the router maps to the
+// RECIPE_NOT_FOUND default -- the bug this guards against).
+// ===========================================================================
+const Q_SLUG = 'todoist.__synthetic_head__';
+CATALOG.registerHandler(Q_SLUG, {
+  tier: 'T1a',
+  handler: { handle: function () { return { success: true }; } },
+  origin: 'https://app.todoist.com'
+});
+const preQuarantine = CATALOG.resolve(Q_SLUG, 'https://app.todoist.com');
+check(preQuarantine && preQuarantine.tier === 'T1a',
+  'quarantine fixture: a registered bundled head slug resolves T1a before quarantine');
+
+CATALOG.quarantineBundled(Q_SLUG);
+const quarantined = CATALOG.resolve(Q_SLUG, 'https://app.todoist.com');
+check(quarantined !== null && quarantined !== undefined,
+  'a session-quarantined REGISTRY slug resolves NON-NULL (never falls into the router RECIPE_NOT_FOUND default)');
+check(quarantined && quarantined.tier === 'T3' && !quarantined.recipe && !quarantined.handler,
+  "a session-quarantined REGISTRY slug resolves {tier:'T3'} with NO recipe/handler (the DOM-fallback seam, D-11)");
+
+CATALOG.clearBundledQuarantine(Q_SLUG);
+const healed = CATALOG.resolve(Q_SLUG, 'https://app.todoist.com');
+check(healed && healed.tier === 'T1a',
+  'clearing the session quarantine restores the original bundled tier (heal loop closes)');
+
+// ===========================================================================
+// HEAL-03 / D-11 (index-sourced no-REGISTRY path): a SESSION-quarantined bundled
+// slug that resolves via the generated-index fallback must ALSO demote to the T3
+// seam. The entry-truthy skip never runs on this !entry path, so a missing guard
+// would keep re-attaching the rotted T1b recipe (re-fired on every invoke).
+// ===========================================================================
+const IDX_SLUG = '__synthetic_index_head__.get_thing';
+globalThis.FsbRecipeIndex.recipes.push({
+  id: IDX_SLUG,
+  origin: 'https://example.com',
+  endpoint: '/api/thing',
+  method: 'GET',
+  authStrategy: 'cookie'
+});
+const preIdxQ = CATALOG.resolve(IDX_SLUG, 'https://example.com');
+check(preIdxQ && preIdxQ.tier === 'T1b' && !!preIdxQ.recipe,
+  'index-sourced (no-REGISTRY) bundled slug resolves T1b WITH a recipe before quarantine');
+
+CATALOG.quarantineBundled(IDX_SLUG);
+const idxQuarantined = CATALOG.resolve(IDX_SLUG, 'https://example.com');
+check(idxQuarantined && idxQuarantined.tier === 'T3' && !idxQuarantined.recipe,
+  "a session-quarantined index-sourced slug resolves {tier:'T3'} with NO recipe (DOM-fallback seam, D-11) -- not the rotted T1b re-attach");
+
+CATALOG.clearBundledQuarantine(IDX_SLUG);
+const idxHealed = CATALOG.resolve(IDX_SLUG, 'https://example.com');
+check(idxHealed && idxHealed.tier === 'T1b' && !!idxHealed.recipe,
+  'clearing the quarantine restores the index-sourced T1b recipe (heal loop closes on the no-entry path)');
+
 console.log('  passed:', passed);
 console.log('  failed:', failed);
 process.exit(failed > 0 ? 1 : 0);

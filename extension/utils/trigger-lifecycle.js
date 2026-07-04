@@ -430,7 +430,7 @@
     if (Number.isFinite(Number(snap.deadline_at)) && now >= Number(snap.deadline_at)) {
       await store.deleteSnapshot(triggerId);
       await clearAlarm(alarm.name);
-      return { ok: true, action: 'reaped_ttl' };
+      return { ok: true, action: 'reaped_ttl', trigger_id: triggerId, snapshot: snap };
     }
 
     // ----------------------------------------------------------------------
@@ -601,8 +601,13 @@
    * For each persisted snapshot:
    *   - malformed (missing / non-object / non-finite deadline_at)
    *       -> deleteSnapshot + clearAlarm, dropped++.
-   *   - terminal or expired (status !== 'armed' || now >= deadline_at)
-   *       -> deleteSnapshot + clearAlarm, reaped++ (drop fired/stopped/expired).
+   *   - expired (now >= deadline_at, ANY status)
+   *       -> deleteSnapshot + clearAlarm, reaped++ (the TTL is the retention
+   *          window for every state).
+   *   - terminal inside the TTL (fired/stopped/timed_out, now < deadline_at)
+   *       -> clearAlarm only, retained++ (the snapshot is KEPT so
+   *          get_trigger_status stays answerable across SW wakes -- parity
+   *          with handleTriggerAlarm's noop_terminal, which never deletes).
    *   - else (armed + not elapsed)
    *       -> createAlarm({ when: deadline_at }) re-arming the ORIGINAL deadline,
    *          restored++ (SURV-03: deadline arithmetic does NOT silently reset).
@@ -615,10 +620,10 @@
    *
    * Called once at SW startup from the background.js bootstrap (Plan 14-03).
    *
-   * @returns {Promise<{ok, restored, reaped, dropped, orphans_cleared}>}
+   * @returns {Promise<{ok, restored, reaped, retained, dropped, orphans_cleared}>}
    */
   async function restoreTriggersFromStorage() {
-    var counters = { restored: 0, reaped: 0, dropped: 0, orphans_cleared: 0 };
+    var counters = { restored: 0, reaped: 0, retained: 0, dropped: 0, orphans_cleared: 0 };
 
     var store = _getStore();
     if (!store) {
@@ -666,11 +671,19 @@
         continue;
       }
 
-      if (snap.status !== 'armed' || now >= Number(snap.deadline_at)) {
-        // Drop fired/stopped/expired (delete entry + clear alarm).
+      if (now >= Number(snap.deadline_at)) {
+        // TTL elapsed -> reap (delete entry + clear alarm), whatever the status.
         await store.deleteSnapshot(id);
         await clearAlarm(alarmName);
         counters.reaped++;
+      } else if (snap.status !== 'armed') {
+        // Terminal (fired/stopped/timed_out) but still inside the TTL window:
+        // KEEP the snapshot so get_trigger_status stays answerable after an SW
+        // wake (parity with handleTriggerAlarm's noop_terminal, which never
+        // deletes a terminal snapshot). No future fire is scheduled -- clear
+        // any alarm a mid-fire SW death may have left behind.
+        await clearAlarm(alarmName);
+        counters.retained++;
       } else {
         if (isRefreshPollSnapshot(snap)) {
           if (!isUsableRefreshPollNextAt(snap, now)) {

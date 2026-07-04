@@ -32,13 +32,21 @@ function check(cond, msg) {
     'validateBridgeRows() is exported');
   check(typeof gate.validateSeparateOriginNegativeControls === 'function',
     'validateSeparateOriginNegativeControls() is exported');
+  check(typeof gate.isApprovedGapiBridgeRow === 'function',
+    'isApprovedGapiBridgeRow() is exported for the approved Google Analytics bridge contract');
 
   const current = gate.validateCurrentPatternDGate(catalog);
   check(current.failures.length === 0,
     'current catalog keeps Pattern-D/GAPI candidates disabled' +
     (current.failures.length ? ': ' + current.failures.join(' | ') : ''));
-  check(current.counts.patternD > 0 && current.counts.gapi > 0,
-    'gate is non-vacuous: Pattern-D and GAPI candidate rows both exist');
+  check(current.counts.patternD > 0 && (current.counts.gapi > 0 || current.counts.approvedGapi > 0),
+    'gate is non-vacuous: Pattern-D rows exist and GAPI is represented by pending candidates or approved bridge rows');
+  check(current.counts.gapi === 0 && current.counts.approvedGapi === 8,
+    'Google Analytics is represented as 8 approved read-only GAPI bridge rows, not pending GAPI candidates');
+
+  const ganalyticsRows = current.report.rows.filter(function(row) { return row && row.app === 'ganalytics'; });
+  check(ganalyticsRows.length === 8 && ganalyticsRows.every(gate.isApprovedGapiBridgeRow),
+    'all Google Analytics rows match the approved read-only T1a handler-backed GAPI bridge contract');
 
   const supabaseRows = current.report.rows.filter(function(row) { return row && row.app === 'supabase'; });
   const supabaseReadyRows = supabaseRows.filter(function(row) { return row.readiness === 't1-ready'; });
@@ -62,7 +70,7 @@ function check(cond, msg) {
   const gapiDecision = gate.bridgeDecisionFor({ routeFeasibility: 'gapi-bridge-candidate' });
   check(gapiDecision.executionEnabled === false &&
     gapiDecision.status === 'rejected-pending-gapi-consent-bridge',
-    'GAPI decision explicitly keeps execution disabled');
+    'unapproved pending GAPI decision explicitly keeps execution disabled');
 
   const fakeReady = gate.validateBridgeRows([{
     slug: 'linear.synthetic_ready',
@@ -87,6 +95,21 @@ function check(cond, msg) {
   }]);
   check(fakeGapi.failures.some(function(f) { return f.indexOf('gmail.synthetic_recipe') !== -1; }),
     'synthetic GAPI recipe-backed row fails before bridge approval');
+
+  const malformedApproved = gate.validateApprovedGapiBridgeRows([{
+    slug: 'ganalytics.synthetic_write',
+    app: 'ganalytics',
+    service: 'analytics.google.com',
+    sideEffectClass: 'write',
+    readiness: 't1-ready',
+    resolvedTier: 'T1a',
+    routeFeasibility: 'same-origin-proven',
+    proof: 'handler',
+    hasHandlerProof: true,
+    hasRecipeProof: false,
+  }]);
+  check(malformedApproved.failures.some(function(f) { return f.indexOf('ganalytics.synthetic_write') !== -1; }),
+    'malformed Google Analytics approved-bridge row fails unless it is read-only and handler-backed');
 
   const negative = gate.validateSeparateOriginNegativeControls();
   check(negative.failures.length === 0,

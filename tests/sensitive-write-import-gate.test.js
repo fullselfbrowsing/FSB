@@ -145,8 +145,8 @@ const MUTATING_REQUIRED = 'RECIPE_CONSENT_MUTATING_REQUIRED';
     'send descriptor service is discord.com (the SENSITIVE screened origin)');
   check(sendDescriptor.sideEffectClass === 'write',
     'send descriptor sideEffectClass is write (the emitted class crosscheck verified -- drives the re-gate)');
-  check(sendDescriptor.backing === 'dom',
-    'send descriptor backing is dom (BRDTH-03: DOM-only, invocable=false -- AND its write is posture-B gated)');
+  check(sendDescriptor.backing === 'handler',
+    'send descriptor backing is handler (promoted to handler in 742796ed; invocable at T1a but its write is STILL posture-B re-gated -- proven by the gate checks below, mirroring the T1a slack canary)');
   check(readDescriptor.service === 'discord.com' && readDescriptor.sideEffectClass === 'read',
     'read descriptor (read_messages) is service discord.com + sideEffectClass read (the emitted read op)');
 

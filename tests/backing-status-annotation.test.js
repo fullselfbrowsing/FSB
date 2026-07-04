@@ -24,8 +24,10 @@
  *     readinessStatus === 't1-ready' (a confident invocable hit).
  *   - the guarded handler write hit -> invocable === false, backing === 'handler',
  *     readinessStatus === 't1-guarded-fail-closed'.
- *   - the blocked YouTube Music hit RETURNS from search but -> invocable ===
- *     false, backingStatus === 'blocked'.
+ *   - YouTube and YouTube Music hits RETURN from search but -> invocable
+ *     === false, backingStatus === 'discovery-pending'.
+ *   - blocked Netflix hits RETURN from search but -> invocable === false,
+ *     backingStatus === 'blocked'.
  *   - the dom-backed hit RETURNS from search (discoverable) but -> invocable ===
  *     false, backing === 'dom', backingStatus === 'discovery-pending' (returned but
  *     NOT a confident invocable hit).
@@ -98,9 +100,21 @@ const DOM_DESCRIPTOR = {
   backing: 'dom'
 };
 
-// BLOCKED (a denylisted catalog slice remains searchable for completeness, but
-// must not look like ordinary discovery work or a confident invocable hit).
-const BLOCKED_DESCRIPTOR = {
+const YOUTUBE_DESCRIPTOR = {
+  slug: 'youtube.search_videos',
+  service: 'youtube.com',
+  intentSynonyms: [
+    'search in youtube',
+    'search youtube videos',
+    'find videos on youtube'
+  ],
+  description: 'Search YouTube for videos',
+  actionVerb: 'search',
+  sideEffectClass: 'read',
+  backing: 'dom'
+};
+
+const YTMUSIC_DESCRIPTOR = {
   slug: 'ytmusic.search',
   service: 'music.youtube.com',
   intentSynonyms: [
@@ -114,10 +128,36 @@ const BLOCKED_DESCRIPTOR = {
   backing: 'dom'
 };
 
+// BLOCKED (denylisted catalog slices remain searchable for completeness, but
+// must not look like ordinary discovery work or a confident invocable hit).
+const BLOCKED_NETFLIX_DESCRIPTOR = {
+  slug: 'netflix.search_titles',
+  service: 'netflix.com',
+  intentSynonyms: [
+    'search netflix titles',
+    'find movies on netflix',
+    'search shows on netflix'
+  ],
+  description: 'Search Netflix titles',
+  actionVerb: 'search',
+  sideEffectClass: 'read',
+  backing: 'dom'
+};
+
 // Plant the build-time catalog the module reads. NO recipes -> neither slug is
 // recipe-backed, so each descriptor's OWN backing enum drives the annotation (a
 // paired recipe would override to 'recipe' -- intentionally absent here).
-global.FsbRecipeIndex = { descriptors: [HANDLER_DESCRIPTOR, GUARDED_DESCRIPTOR, DOM_DESCRIPTOR, BLOCKED_DESCRIPTOR], recipes: [] };
+global.FsbRecipeIndex = {
+  descriptors: [
+    HANDLER_DESCRIPTOR,
+    GUARDED_DESCRIPTOR,
+    DOM_DESCRIPTOR,
+    YOUTUBE_DESCRIPTOR,
+    YTMUSIC_DESCRIPTOR,
+    BLOCKED_NETFLIX_DESCRIPTOR
+  ],
+  recipes: []
+};
 
 const CapabilitySearch = require(path.join(REPO_ROOT, 'extension', 'utils', 'capability-search.js'));
 const { search, buildOrRestore } = CapabilitySearch;
@@ -167,23 +207,48 @@ const { search, buildOrRestore } = CapabilitySearch;
   check(domHit && domHit.readinessStatus === 'discovery-pending',
     "the dom-backed hit's readinessStatus === 'discovery-pending'");
 
-  // ---- The blocked hit: searchable but explicitly non-invocable --------------
-  const blockedHits = search('search in youtube music', null, 5);
-  const blockedHit = blockedHits.find(function (h) { return h.slug === 'ytmusic.search'; });
-  check(!!blockedHit, 'the blocked YouTube Music descriptor returns from search');
-  check(blockedHit && blockedHit.invocable === false,
-    'the blocked YouTube Music hit is NOT a confident invocable hit');
-  check(blockedHit && blockedHit.backing === 'dom',
-    "the blocked YouTube Music hit keeps canonical backing === 'dom'");
-  check(blockedHit && blockedHit.backingStatus === 'blocked',
-    "the blocked YouTube Music hit's backingStatus DISPLAY label === 'blocked'");
-  check(blockedHit && blockedHit.readinessStatus === 'blocked',
-    "the blocked YouTube Music hit's readinessStatus === 'blocked'");
+  // ---- YouTube hits: searchable discovery-pending, not hard-blocked ----------
+  const youtubeHits = search('search youtube videos', null, 5);
+  const youtubeHit = youtubeHits.find(function (h) { return h.slug === 'youtube.search_videos'; });
+  check(!!youtubeHit, 'the YouTube descriptor returns from search');
+  check(youtubeHit && youtubeHit.invocable === false,
+    'the YouTube hit is NOT a confident invocable hit');
+  check(youtubeHit && youtubeHit.backing === 'dom',
+    "the YouTube hit keeps canonical backing === 'dom'");
+  check(youtubeHit && youtubeHit.backingStatus === 'discovery-pending',
+    "the YouTube hit's backingStatus DISPLAY label === 'discovery-pending'");
+  check(youtubeHit && youtubeHit.readinessStatus === 'discovery-pending',
+    "the YouTube hit's readinessStatus === 'discovery-pending'");
+
+  const ytmusicHits = search('search in youtube music', null, 5);
+  const ytmusicHit = ytmusicHits.find(function (h) { return h.slug === 'ytmusic.search'; });
+  check(!!ytmusicHit, 'the YouTube Music descriptor returns from search');
+  check(ytmusicHit && ytmusicHit.invocable === false,
+    'the YouTube Music hit is NOT a confident invocable hit');
+  check(ytmusicHit && ytmusicHit.backing === 'dom',
+    "the YouTube Music hit keeps canonical backing === 'dom'");
+  check(ytmusicHit && ytmusicHit.backingStatus === 'discovery-pending',
+    "the YouTube Music hit's backingStatus DISPLAY label === 'discovery-pending'");
+  check(ytmusicHit && ytmusicHit.readinessStatus === 'discovery-pending',
+    "the YouTube Music hit's readinessStatus === 'discovery-pending'");
+
+  // ---- The blocked hit: searchable but explicitly non-invocable -------------
+  const blockedNetflixHits = search('search netflix titles', null, 5);
+  const blockedNetflixHit = blockedNetflixHits.find(function (h) { return h.slug === 'netflix.search_titles'; });
+  check(!!blockedNetflixHit, 'the blocked Netflix descriptor returns from search');
+  check(blockedNetflixHit && blockedNetflixHit.invocable === false,
+    'the blocked Netflix hit is NOT a confident invocable hit');
+  check(blockedNetflixHit && blockedNetflixHit.backing === 'dom',
+    "the blocked Netflix hit keeps canonical backing === 'dom'");
+  check(blockedNetflixHit && blockedNetflixHit.backingStatus === 'blocked',
+    "the blocked Netflix hit's backingStatus DISPLAY label === 'blocked'");
+  check(blockedNetflixHit && blockedNetflixHit.readinessStatus === 'blocked',
+    "the blocked Netflix hit's readinessStatus === 'blocked'");
 
   // ---- The distinction is real: the two annotations differ ------------------
   check(handlerHit && domHit && handlerHit.invocable !== domHit.invocable,
     'the annotation DISTINGUISHES the two: handler invocable=true vs dom invocable=false');
-  check(blockedHit && domHit && blockedHit.readinessStatus !== domHit.readinessStatus,
+  check(blockedNetflixHit && domHit && blockedNetflixHit.readinessStatus !== domHit.readinessStatus,
     'the annotation DISTINGUISHES blocked from ordinary discovery-pending');
 
   console.log('\nbacking-status-annotation: ' + passed + ' passed, ' + failed + ' failed');

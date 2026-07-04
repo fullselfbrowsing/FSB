@@ -15,7 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 import { reportReadiness } from './report-t1-readiness.mjs';
-import { classifyOriginPattern } from './verify-origin-classification.mjs';
+import { checkOriginClassification, classifyOriginPattern } from './verify-origin-classification.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,6 +36,8 @@ export const BRIDGE_DECISIONS = Object.freeze({
 });
 
 const BRIDGE_ROUTES = new Set(['pattern-d-candidate', 'gapi-bridge-candidate']);
+const APPROVED_GAPI_BRIDGE_APPS = new Set(['ganalytics']);
+const APPROVED_GAPI_HEAD_GLOBAL = 'FsbHandlerGanalytics';
 
 function loadCatalog() {
   return require(join(ROOT, 'extension', 'catalog', 'recipe-index.generated.js'));
@@ -43,6 +45,19 @@ function loadCatalog() {
 
 function isBridgeCandidate(row) {
   return !!row && BRIDGE_ROUTES.has(row.routeFeasibility);
+}
+
+export function isApprovedGapiBridgeRow(row) {
+  return !!row &&
+    APPROVED_GAPI_BRIDGE_APPS.has(row.app) &&
+    row.service === 'analytics.google.com' &&
+    row.sideEffectClass === 'read' &&
+    row.readiness === 't1-ready' &&
+    row.resolvedTier === 'T1a' &&
+    row.routeFeasibility === 'same-origin-proven' &&
+    row.proof === 'handler' &&
+    row.hasHandlerProof === true &&
+    row.hasRecipeProof === false;
 }
 
 export function bridgeDecisionFor(row) {
@@ -85,12 +100,47 @@ export function validateBridgeRows(rows) {
   return { failures, counts: { patternD, gapi, total: patternD + gapi } };
 }
 
+export function validateApprovedGapiBridgeRows(rows, opts = {}) {
+  const failures = [];
+  const list = Array.isArray(rows) ? rows : [];
+  const approvedRows = list.filter(isApprovedGapiBridgeRow);
+  const malformedApprovedCandidates = list.filter(function(row) {
+    return row && APPROVED_GAPI_BRIDGE_APPS.has(row.app) && !isApprovedGapiBridgeRow(row);
+  });
+
+  for (const row of malformedApprovedCandidates) {
+    failures.push(row.slug + ' is in an approved GAPI bridge app but does not match the read-only T1a handler contract');
+  }
+
+  if (approvedRows.length > 0) {
+    const originReport = opts.originReport || checkOriginClassification();
+    const analyticsHead = originReport.results.find(function(row) {
+      return row && row.global === APPROVED_GAPI_HEAD_GLOBAL;
+    });
+    const reason = analyticsHead && analyticsHead.classification && analyticsHead.classification.reason;
+    if (!analyticsHead || !analyticsHead.classification || analyticsHead.classification.sameOrigin !== true ||
+        typeof reason !== 'string' || reason.indexOf('PAGE_GAPI_CLIENT_READ') !== 0) {
+      failures.push('Google Analytics approved GAPI bridge rows require the origin gate PAGE_GAPI_CLIENT_READ proof');
+    }
+  }
+
+  return {
+    failures,
+    rows: approvedRows,
+    counts: {
+      approvedGapi: approvedRows.length,
+      approvedGapiApps: new Set(approvedRows.map(function(row) { return row.app; })).size
+    }
+  };
+}
+
 export function validateSeparateOriginNegativeControls() {
   const failures = [];
   const controls = [
     ['linear', 'https://linear.app', 'https://client-api.linear.app/graphql'],
     ['datadog', 'https://app.datadoghq.com', 'https://api.datadoghq.com/api/v1'],
     ['jira', 'https://example.atlassian.net', 'https://api.atlassian.com/ex/jira/example'],
+    ['supabase', 'https://supabase.com', 'https://api.supabase.com/v1'],
   ];
 
   for (const row of controls) {
@@ -110,13 +160,29 @@ export function validateCurrentPatternDGate(catalog, opts = {}) {
   const idx = catalog || loadCatalog();
   const report = opts.report || reportReadiness(idx);
   const bridge = validateBridgeRows(report.rows);
+  const approvedGapi = validateApprovedGapiBridgeRows(report.rows, opts);
   const negative = validateSeparateOriginNegativeControls();
-  const failures = bridge.failures.concat(negative.failures);
+  const failures = bridge.failures.concat(approvedGapi.failures, negative.failures);
 
   if (bridge.counts.patternD === 0) failures.push('no Pattern-D candidates found; gate is vacuous');
-  if (bridge.counts.gapi === 0) failures.push('no GAPI bridge candidates found; gate is vacuous');
+  if (bridge.counts.gapi === 0 && approvedGapi.counts.approvedGapi === 0) {
+    failures.push('no pending or approved GAPI bridge rows found; gate is vacuous');
+  }
+  if (approvedGapi.counts.approvedGapi > 0 &&
+      !approvedGapi.rows.some(function(row) { return row.app === 'ganalytics'; })) {
+    failures.push('approved GAPI bridge rows must include Google Analytics (ganalytics)');
+  }
 
-  return { failures, report, counts: bridge.counts };
+  return {
+    failures,
+    report,
+    counts: {
+      patternD: bridge.counts.patternD,
+      gapi: bridge.counts.gapi,
+      approvedGapi: approvedGapi.counts.approvedGapi,
+      total: bridge.counts.total + approvedGapi.counts.approvedGapi
+    }
+  };
 }
 
 function runCli() {
@@ -129,7 +195,9 @@ function runCli() {
   }
   console.log('verify-pattern-d-gapi-gate: PASS (' +
     result.counts.patternD + ' Pattern-D candidate rows; ' +
-    result.counts.gapi + ' GAPI candidate rows; execution disabled; negative controls fail closed)');
+    result.counts.gapi + ' pending GAPI candidate rows; ' +
+    result.counts.approvedGapi + ' approved Google Analytics GAPI bridge rows; ' +
+    'execution disabled for pending bridge candidates; negative controls fail closed)');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {

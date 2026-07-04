@@ -105,6 +105,16 @@ const HEAD_APP_MAP = {
     relativeRuntimeBaseUrl: '/api'
   },
   FsbHandlerAsana: { app: 'asana', fallbackBaseUrl: 'https://app.asana.com' },
+  FsbHandlerRobinhood: {
+    app: 'robinhood',
+    fallbackBaseUrl: 'https://robinhood.com',
+    guardedOnlyHandlerFile: 'robinhood.js'
+  },
+  FsbHandlerFidelity: {
+    app: 'fidelity',
+    fallbackBaseUrl: 'https://digital.fidelity.com',
+    guardedOnlyHandlerFile: 'fidelity.js'
+  },
   FsbHandlerShortcut: {
     app: 'shortcut',
     fallbackBaseUrl: 'https://app.shortcut.com',
@@ -186,6 +196,11 @@ const HEAD_APP_MAP = {
     relativeRuntimeBaseUrl: '/',
     ignoreVendoredBaseUrl: true
   },
+  FsbHandlerThreads: {
+    app: 'threads',
+    fallbackBaseUrl: 'https://www.threads.net',
+    relativeRuntimeBaseUrl: '/'
+  },
   FsbHandlerStackoverflow: {
     app: 'stackoverflow',
     fallbackBaseUrl: 'https://stackoverflow.com',
@@ -225,6 +240,12 @@ const HEAD_APP_MAP = {
     relativeRuntimeBaseUrl: '/v0.3'
   },
   FsbHandlerAws: { app: 'aws-console', fallbackBaseUrl: 'https://console.aws.amazon.com' },
+  FsbHandlerGcloud: {
+    app: 'google-cloud',
+    fallbackBaseUrl: 'https://console.cloud.google.com',
+    sameOriginPageReadHandlerFile: 'gcloud.js',
+    pageReadNamespace: 'gcloud'
+  },
   FsbHandlerEtsy: {
     app: 'etsy',
     fallbackBaseUrl: 'https://www.etsy.com',
@@ -270,6 +291,12 @@ const HEAD_APP_MAP = {
     app: 'clickhouse',
     fallbackBaseUrl: 'https://console.clickhouse.cloud',
     storageBearerReadBaseUrl: 'https://control-plane-internal.clickhouse.cloud'
+  },
+  FsbHandlerTemporal: {
+    app: 'temporal',
+    fallbackBaseUrl: 'https://cloud.temporal.io',
+    sameOriginPageReadHandlerFile: 'temporal.js',
+    pageReadNamespace: 'temporal'
   },
   FsbHandlerMsword: {
     app: 'microsoft-word',
@@ -329,6 +356,12 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://web.whatsapp.com',
     pageStateRuntime: true
   },
+  FsbHandlerTelegram: {
+    app: 'telegram',
+    fallbackBaseUrl: 'https://web.telegram.org',
+    sameOriginPageReadHandlerFile: 'telegram.js',
+    pageReadNamespace: 'telegram'
+  },
   FsbHandlerAmplitude: {
     app: 'amplitude',
     fallbackBaseUrl: 'https://app.amplitude.com',
@@ -340,11 +373,21 @@ const HEAD_APP_MAP = {
     relativeRuntimeBaseUrl: '/graphql',
     ignoreVendoredBaseUrl: true
   },
+  FsbHandlerGrafana: {
+    app: 'grafana',
+    fallbackBaseUrl: 'https://grafana.com',
+    relativeRuntimeBaseUrl: '/api'
+  },
   FsbHandlerDatadog: {
     app: 'datadog',
     fallbackBaseUrl: 'https://app.datadoghq.com',
     relativeRuntimeBaseUrl: '/api',
     ignoreVendoredBaseUrl: true
+  },
+  FsbHandlerPosthog: {
+    app: 'posthog',
+    fallbackBaseUrl: 'https://us.posthog.com',
+    relativeRuntimeBaseUrl: '/api'
   },
   FsbHandlerChipotle: {
     app: 'chipotle',
@@ -371,6 +414,26 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://www.instacart.com',
     relativeRuntimeBaseUrl: '/graphql'
   },
+  FsbHandlerUbereats: {
+    app: 'ubereats',
+    fallbackBaseUrl: 'https://www.ubereats.com',
+    relativeRuntimeBaseUrl: '/eats/v1'
+  },
+  FsbHandlerUber: {
+    app: 'uber',
+    fallbackBaseUrl: 'https://www.uber.com',
+    relativeRuntimeBaseUrl: '/api'
+  },
+  FsbHandlerDoordash: {
+    app: 'doordash',
+    fallbackBaseUrl: 'https://www.doordash.com',
+    relativeRuntimeBaseUrl: '/graphql'
+  },
+  FsbHandlerLyft: {
+    app: 'lyft',
+    fallbackBaseUrl: 'https://www.lyft.com',
+    relativeRuntimeBaseUrl: '/v1'
+  },
   FsbHandlerLucid: {
     app: 'lucid',
     fallbackBaseUrl: 'https://lucid.app',
@@ -386,6 +449,11 @@ const HEAD_APP_MAP = {
     firstPartyAuthReadBaseUrls: [
       'https://client-api.linear.app'
     ]
+  },
+  FsbHandlerLinkedin: {
+    app: 'linkedin',
+    fallbackBaseUrl: 'https://www.linkedin.com',
+    relativeRuntimeBaseUrl: '/voyager/api'
   },
   FsbHandlerClickup: {
     app: 'clickup',
@@ -403,6 +471,16 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://www.walmart.com',
     relativeRuntimeBaseUrl: '/',
     ignoreVendoredBaseUrl: true
+  },
+  FsbHandlerAmazon: {
+    app: 'amazon',
+    fallbackBaseUrl: 'https://www.amazon.com',
+    relativeRuntimeBaseUrl: '/'
+  },
+  FsbHandlerEbay: {
+    app: 'ebay',
+    fallbackBaseUrl: 'https://www.ebay.com',
+    relativeRuntimeBaseUrl: '/'
   },
   FsbHandlerHomedepot: {
     app: 'homedepot',
@@ -432,6 +510,12 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://claude.ai',
     relativeRuntimeBaseUrl: '/api'
   },
+  FsbHandlerMinimax: {
+    app: 'minimax',
+    fallbackBaseUrl: 'https://agent.minimax.io',
+    sameOriginPageReadHandlerFile: 'minimax.js',
+    pageReadNamespace: 'minimax'
+  },
   FsbHandlerGemini: {
     app: 'gemini',
     fallbackBaseUrl: 'https://gemini.google.com',
@@ -455,6 +539,11 @@ const HEAD_APP_MAP = {
     app: 'google-drive',
     fallbackBaseUrl: 'https://drive.google.com',
     gapiPageReadBaseUrl: 'https://content.googleapis.com/drive/v3'
+  },
+  FsbHandlerGdocs: {
+    app: 'google-docs',
+    fallbackBaseUrl: 'https://docs.google.com',
+    relativeRuntimeBaseUrl: '/drive/v3'
   },
   FsbHandlerWebflow: {
     app: 'webflow',
@@ -486,6 +575,11 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://portal.azure.com',
     storageBearerReadBaseUrl: 'https://management.azure.com'
   },
+  FsbHandlerShopify: {
+    app: 'shopify',
+    fallbackBaseUrl: 'https://admin.shopify.com',
+    relativeRuntimeBaseUrl: '/admin/api'
+  },
   FsbHandlerEventbrite: {
     app: 'eventbrite',
     fallbackBaseUrl: 'https://www.eventbrite.com',
@@ -507,11 +601,17 @@ const HEAD_APP_MAP = {
   FsbHandlerTicketmaster: {
     app: 'ticketmaster',
     fallbackBaseUrl: 'https://www.ticketmaster.com',
+    relativeRuntimeBaseUrl: '/',
     ignoreVendoredBaseUrl: true
   },
   FsbHandlerGcal: {
     app: 'google-calendar',
     fallbackBaseUrl: 'https://calendar.google.com'
+  },
+  FsbHandlerGmaps: {
+    app: 'google-maps',
+    fallbackBaseUrl: 'https://www.google.com',
+    relativeRuntimeBaseUrl: '/'
   },
   FsbHandlerZendesk: {
     app: 'zendesk',
@@ -536,6 +636,11 @@ const HEAD_APP_MAP = {
   FsbHandlerSteam: {
     app: 'steam',
     fallbackBaseUrl: 'https://store.steampowered.com'
+  },
+  FsbHandlerFiverr: {
+    app: 'fiverr',
+    fallbackBaseUrl: 'https://www.fiverr.com',
+    relativeRuntimeBaseUrl: '/'
   },
   FsbHandlerGlama: {
     app: 'glama',
@@ -2619,12 +2724,248 @@ function readGuardedOnlyHead(mapping) {
   const handlerFile = join(ROOT, 'catalog', 'handlers', mapping.guardedOnlyHandlerFile);
   if (!existsSync(handlerFile)) { return null; }
   const text = readFileSync(handlerFile, 'utf8');
+  const executableText = text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n\r]*/g, '');
   const hasFallback = /RECIPE_DOM_FALLBACK_PENDING/.test(text)
     && /fellBackToDom\s*:\s*true/.test(text);
-  const hasGuardedEntries = /function\s+guarded\s*\(/.test(text)
+  const hasGuardedEntries = (/function\s+guarded\s*\(/.test(text) || /function\s+inert\s*\(/.test(text))
     && /async\s+handle\s*\(\)\s*\{[\s\S]*return\s+fallback\(/.test(text);
-  const avoidsExecution = !/executeBoundSpec|executeBoundPageRead|\bfetch\s*\(|\bnew\s+XMLHttpRequest\b|\bXMLHttpRequest\s*\(|chrome\.(?:scripting|tabs|cookies|webRequest)|document\.cookie|localStorage|sessionStorage|getGraphToken|Authorization|Bearer/i.test(text);
+  const avoidsExecution = !/executeBoundSpec|executeBoundPageRead|\bfetch\s*\(|\bnew\s+XMLHttpRequest\b|\bXMLHttpRequest\s*\(|chrome\.(?:scripting|tabs|cookies|webRequest)|document\.cookie|localStorage|sessionStorage|getGraphToken|Authorization|Bearer/i.test(executableText);
   return hasFallback && hasGuardedEntries && avoidsExecution ? mapping.fallbackBaseUrl : null;
+}
+
+function readSameOriginPageReadHead(mapping) {
+  if (!mapping || !mapping.sameOriginPageReadHandlerFile || !mapping.pageReadNamespace) { return null; }
+  const handlerFile = join(ROOT, 'catalog', 'handlers', mapping.sameOriginPageReadHandlerFile);
+  if (!existsSync(handlerFile)) { return null; }
+  const text = readFileSync(handlerFile, 'utf8');
+  const origin = String(mapping.fallbackBaseUrl || '');
+  const namespace = String(mapping.pageReadNamespace || '');
+  const hasOrigin = text.indexOf("var ORIGIN = '" + origin + "'") !== -1
+    || text.indexOf('var ORIGIN = "' + origin + '"') !== -1;
+  const hasFallback = /RECIPE_DOM_FALLBACK_PENDING/.test(text)
+    && /fellBackToDom\s*:\s*true/.test(text);
+  const hasPageRead = /function\s+readHandler\s*\(/.test(text)
+    && /executeBoundPageRead/.test(text)
+    && (text.indexOf("namespace: '" + namespace + "'") !== -1
+      || text.indexOf('namespace: "' + namespace + '"') !== -1)
+    && /action\s*:\s*action/.test(text);
+  const hasNoDirectCredentialPath = !/\bfetch\s*\(|\bnew\s+XMLHttpRequest\b|\bXMLHttpRequest\s*\(|chrome\.(?:scripting|tabs|cookies|webRequest)|document\.cookie|localStorage|sessionStorage|Authorization|Bearer/i.test(text);
+  const hasNoBoundSpec = !/executeBoundSpec/.test(text);
+  return hasOrigin && hasFallback && hasPageRead && hasNoDirectCredentialPath && hasNoBoundSpec
+    ? origin
+    : null;
+}
+
+const REVIEWED_SAME_ORIGIN_RELATIVE_HEADS = {
+  threads: {
+    handlerFile: 'threads.js',
+    origin: 'https://www.threads.net',
+    base: '/',
+    required: [
+      /function\s+getSpec\s*\(/,
+      /url\s*:\s*ORIGIN\s*\+\s*path/,
+      /\/threads\//,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerThreads\s*=\s*handlers/
+    ]
+  },
+  grafana: {
+    handlerFile: 'grafana.js',
+    origin: 'https://grafana.com',
+    base: '/api',
+    required: [
+      /var\s+API_BASE\s*=\s*ORIGIN\s*\+\s*['"]\/api['"]/,
+      /url\s*:\s*API_BASE\s*\+\s*path/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerGrafana\s*=\s*handlers/
+    ]
+  },
+  posthog: {
+    handlerFile: 'posthog.js',
+    origin: 'https://us.posthog.com',
+    base: '/api',
+    required: [
+      /function\s+buildSpec\s*\(\s*path\s*,\s*query\s*\)/,
+      /url\s*:\s*ORIGIN\s*\+\s*path/,
+      /\/api\/users\/@me\//,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerPosthog\s*=\s*handlers/
+    ]
+  },
+  ubereats: {
+    handlerFile: 'ubereats.js',
+    origin: 'https://www.ubereats.com',
+    base: '/eats/v1',
+    required: [
+      /var\s+UBEREATS_ORIGIN\s*=\s*['"]https:\/\/www\.ubereats\.com['"]/,
+      /url\s*:\s*UBEREATS_ORIGIN\s*\+\s*path/,
+      /\/eats\/v1\/restaurants/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerUbereats\s*=\s*handlers/
+    ]
+  },
+  uber: {
+    handlerFile: 'uber.js',
+    origin: 'https://www.uber.com',
+    base: '/api',
+    required: [
+      /var\s+UBER_ORIGIN\s*=\s*['"]https:\/\/www\.uber\.com['"]/,
+      /url\s*:\s*UBER_ORIGIN\s*\+\s*['"]\/api['"]\s*\+\s*endpoint/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerUber\s*=\s*handlers/
+    ]
+  },
+  doordash: {
+    handlerFile: 'doordash.js',
+    origin: 'https://www.doordash.com',
+    base: '/graphql',
+    required: [
+      /var\s+DOORDASH_ORIGIN\s*=\s*['"]https:\/\/www\.doordash\.com['"]/,
+      /url\s*:\s*DOORDASH_ORIGIN\s*\+\s*['"]\/graphql\//,
+      /csrfSource\s*:\s*\{\s*from\s*:\s*['"]cookie['"]/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerDoordash\s*=\s*handlers/
+    ]
+  },
+  lyft: {
+    handlerFile: 'lyft.js',
+    origin: 'https://www.lyft.com',
+    base: '/v1',
+    required: [
+      /var\s+API_BASE\s*=\s*LYFT_ORIGIN\s*\+\s*['"]\/v1['"]/,
+      /url\s*:\s*API_BASE\s*\+\s*path/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerLyft\s*=\s*handlers/
+    ]
+  },
+  linkedin: {
+    handlerFile: 'linkedin.js',
+    origin: 'https://www.linkedin.com',
+    base: '/voyager/api',
+    required: [
+      /var\s+VOYAGER\s*=\s*['"]\/voyager\/api['"]/,
+      /url\s*:\s*ORIGIN\s*\+\s*VOYAGER\s*\+\s*endpoint/,
+      /csrfSource\s*:\s*\{\s*from\s*:\s*['"]cookie['"]/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerLinkedin\s*=\s*handlers/
+    ]
+  },
+  amazon: {
+    handlerFile: 'amazon.js',
+    origin: 'https://www.amazon.com',
+    base: '/',
+    required: [
+      /var\s+AMAZON_ORIGIN\s*=\s*['"]https:\/\/www\.amazon\.com['"]/,
+      /url\s*:\s*AMAZON_ORIGIN\s*\+\s*path/,
+      /\/gp\/your-account\/order-details/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerAmazon\s*=\s*handlers/
+    ]
+  },
+  ebay: {
+    handlerFile: 'ebay.js',
+    origin: 'https://www.ebay.com',
+    base: '/',
+    required: [
+      /var\s+EBAY_ORIGIN\s*=\s*['"]https:\/\/www\.ebay\.com['"]/,
+      /url\s*:\s*EBAY_ORIGIN\s*\+\s*path/,
+      /\/itm\//,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerEbay\s*=\s*handlers/
+    ]
+  },
+  'google-docs': {
+    handlerFile: 'gdocs.js',
+    origin: 'https://docs.google.com',
+    base: '/drive/v3',
+    required: [
+      /var\s+DRIVE_BASE\s*=\s*ORIGIN\s*\+\s*['"]\/drive\/v3['"]/,
+      /return\s+spec\(DRIVE_BASE\s*\+\s*path/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerGdocs\s*=\s*handlers/
+    ]
+  },
+  shopify: {
+    handlerFile: 'shopify.js',
+    origin: 'https://admin.shopify.com',
+    base: '/admin/api',
+    required: [
+      /var\s+API_BASE\s*=\s*ORIGIN\s*\+\s*['"]\/admin\/api['"]/,
+      /url\s*:\s*API_BASE\s*\+\s*path/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerShopify\s*=\s*handlers/
+    ]
+  },
+  'google-maps': {
+    handlerFile: 'gmaps.js',
+    origin: 'https://www.google.com',
+    base: '/',
+    required: [
+      /var\s+ORIGIN\s*=\s*['"]https:\/\/www\.google\.com['"]/,
+      /executeBoundPageRead/,
+      /namespace\s*:\s*['"]gmaps['"]/,
+      /executeBoundSpec/,
+      /htmlSpec\(ORIGIN\s*\+\s*['"]\/search\?/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerGmaps\s*=\s*handlers/
+    ]
+  },
+  ticketmaster: {
+    handlerFile: 'ticketmaster.js',
+    origin: 'https://www.ticketmaster.com',
+    base: '/',
+    required: [
+      /var\s+TICKETMASTER_ORIGIN\s*=\s*['"]https:\/\/www\.ticketmaster\.com['"]/,
+      /url\s*:\s*TICKETMASTER_ORIGIN\s*\+\s*path/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerTicketmaster\s*=\s*handlers/
+    ]
+  },
+  fiverr: {
+    handlerFile: 'fiverr.js',
+    origin: 'https://www.fiverr.com',
+    base: '/',
+    required: [
+      /var\s+FIVERR_ORIGIN\s*=\s*['"]https:\/\/www\.fiverr\.com['"]/,
+      /url\s*:\s*FIVERR_ORIGIN\s*\+\s*path/,
+      /executeBoundSpec/,
+      /authStrategy\s*:\s*['"]same-origin-cookie['"]/,
+      /global\.FsbHandlerFiverr\s*=\s*handlers/
+    ]
+  }
+};
+
+function readReviewedSameOriginRelativeRuntimeBase(app, relativeRuntimeBaseUrl) {
+  const spec = REVIEWED_SAME_ORIGIN_RELATIVE_HEADS[app];
+  if (!spec || spec.base !== relativeRuntimeBaseUrl) { return null; }
+  const handlerFile = join(ROOT, 'catalog', 'handlers', spec.handlerFile);
+  if (!existsSync(handlerFile)) { return null; }
+  const text = readFileSync(handlerFile, 'utf8');
+  const hasFallback = /RECIPE_DOM_FALLBACK_PENDING/.test(text)
+    && /fellBackToDom\s*:\s*true/.test(text);
+  const hasOriginLiteral = text.indexOf("'" + spec.origin + "'") !== -1
+    || text.indexOf('"' + spec.origin + '"') !== -1;
+  const hasAllRequired = spec.required.every(function(pattern) { return pattern.test(text); });
+  const avoidsDirectCredentialApis = !/\bfetch\s*\(|\bnew\s+XMLHttpRequest\b|\bXMLHttpRequest\s*\(|chrome\.(?:scripting|tabs|cookies|webRequest)|document\.cookie|localStorage|sessionStorage|Authorization|Bearer/i.test(text);
+  const avoidsSecretLogging = !/console\.\w+\([^)]*\b(token|secret|cookie|csrf|authorization|bearer|session)\b/i.test(text);
+  return hasFallback && hasOriginLiteral && hasAllRequired && avoidsDirectCredentialApis && avoidsSecretLogging
+    ? relativeRuntimeBaseUrl
+    : null;
 }
 
 function readPowerPointGraphBearerRuntimeBase(app, graphBearerRuntimeBaseUrl) {
@@ -4270,6 +4611,20 @@ export function checkOriginClassification(headsOverride, opts) {
       }
       apiBaseUrl = glamaBase;
       classifyOpts = { glamaPageStateRuntimeRead: true };
+    } else if (mapping.sameOriginPageReadHandlerFile) {
+      const pageReadBase = readSameOriginPageReadHead(mapping);
+      if (!pageReadBase) {
+        const reason = 'CORS_SAME_ORIGIN_PAGE_READ_MISMATCH: head ' + head.global +
+          ' requested same-origin page-read status, but its handler source did not ' +
+          'match the reviewed bounded executeBoundPageRead contract -- refusing an ' +
+          'unproven page-read override';
+        results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: null,
+          classification: { sameOrigin: false, separate: true, reason: reason } });
+        failures.push(reason);
+        continue;
+      }
+      apiBaseUrl = pageReadBase;
+      classifyOpts = undefined;
     } else if (mapping.pageStateRuntime) {
       apiBaseUrl = mapping.fallbackBaseUrl;
       classifyOpts = undefined;
@@ -4455,7 +4810,8 @@ export function checkOriginClassification(headsOverride, opts) {
         || readAirtableRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl)
         || readSentryRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl)
         || readZendeskRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl)
-        || readEventbriteRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl);
+        || readEventbriteRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl)
+        || readReviewedSameOriginRelativeRuntimeBase(mapping.app, mapping.relativeRuntimeBaseUrl);
       const fallbackOrigin = originHost(mapping.fallbackBaseUrl);
       if (!relativeRuntimeBase || !fallbackOrigin) {
         const reason = 'CORS_RELATIVE_RUNTIME_OVERRIDE_MISMATCH: head ' + head.global +

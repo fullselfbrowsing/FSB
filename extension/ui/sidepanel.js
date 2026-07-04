@@ -656,14 +656,22 @@ function hideAutomationRunner() {
   setAutomationRunnerText('Ready');
 }
 
-// Apply theme based on settings
-function applyTheme() {
-  let savedTheme = localStorage.getItem('fsb-theme');
-  if (!savedTheme) {
-    savedTheme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-    localStorage.setItem('fsb-theme', savedTheme);
+// Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
+// (set by the options page's Advanced Settings); 'system' resolves live from
+// the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
+function resolveEffectiveTheme(preference) {
+  if (preference === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   }
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  return preference;
+}
+
+function applyTheme() {
+  let preference = localStorage.getItem('fsb-theme');
+  if (!['system', 'dark', 'light'].includes(preference)) {
+    preference = 'system';
+  }
+  document.documentElement.setAttribute('data-theme', resolveEffectiveTheme(preference));
 }
 
 // Listen for theme changes from options page
@@ -672,6 +680,11 @@ window.addEventListener('storage', (e) => {
     applyTheme();
   }
 });
+
+// Live-follow OS theme changes while the preference is 'system'
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+}
 
 // Initialize analytics for sidepanel context
 let sidepanelAnalytics = null;
@@ -2629,12 +2642,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       var completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
       var isPartial = request.partial === true;
 
-      // Resolve the originating conv from the broadcast (falls back to
-      // module-scope only when the broadcast omitted it; agent-loop +
-      // background.js both supply it per QT-7bi-02 + QT-uof-2).
+      // Resolve the originating conv from the broadcast. When the broadcast
+      // omits it, the module-scope conversationId is correct ONLY when the
+      // completed session IS the visible conversation's session; for any other
+      // session (a replay or another conversation-less path) resolve to null so
+      // the completion is NEVER persisted into whatever conversation happens to
+      // be visible (agent-loop + background.js supply the id per QT-7bi-02 +
+      // QT-uof-2; a null here means the session genuinely has no conversation).
       var originatingConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
         ? request.conversationId
-        : conversationId;
+        : (request.sessionId === currentSessionId ? conversationId : null);
 
       // QT-wnz Codex-4 -- dedupe guard. Background C3 already persisted the
       // terminal entry BEFORE this broadcast fired. Check fsbConversationMessages
@@ -2685,13 +2702,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
       }
 
-      // D-FIX: persistence runs UNCONDITIONALLY for any session-matched
-      // message. Absence of this call on the background-tab path was the
-      // primary D root cause -- conv_B's message log stayed empty so
-      // hydrate-on-swap rendered nothing for the missing-second-completion.
-      // QT-wnz Codex-4 -- now gated on the dedupe-flag + carries the
+      // D-FIX: persistence runs for any session-matched message that RESOLVED
+      // an originating conversation. Absence of this call on the background-tab
+      // path was the primary D root cause -- conv_B's message log stayed empty
+      // so hydrate-on-swap rendered nothing for the missing-second-completion.
+      // A null originatingConvId (conversation-less replay/legacy session) is
+      // NOT persisted anywhere -- the per-tab state update below still runs.
+      // QT-wnz Codex-4 -- also gated on the dedupe-flag + carries the
       // sessionId + terminal:true markers so future fanouts can dedupe.
-      if (!_wnzTerminalDedupe) {
+      if (!_wnzTerminalDedupe && originatingConvId) {
         _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId, request.sessionId, true);
       }
 
@@ -2713,7 +2732,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // QT-wnz Codex-4 -- DOM render is now also gated on the dedupe-flag;
       // if a prior context already rendered, hydrate-on-swap from storage
       // will surface the message instead.
-      var isOriginatingActive = (originatingConvId === conversationId);
+      var isOriginatingActive = (originatingConvId === conversationId) &&
+        (originatingConvId !== null || request.sessionId === currentSessionId);
       if (!_wnzTerminalDedupe && isOriginatingActive) {
         if (currentStatusMessage) {
           try { currentStatusMessage.remove(); } catch (_e) {}
@@ -2906,7 +2926,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // is currentSessionId-shaped, not conv-shaped.
           var iterConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
             ? request.conversationId
-            : conversationId;
+            : (request.sessionId === currentSessionId ? conversationId : null);
           _persistMessageToConversation('assistant', 'Step ' + request.iteration + ' complete', 'progress', iterConvId);
           // DOM render: only for the active session AND only when running.
           if (request.sessionId === currentSessionId && currentStatusMessage && isRunning) {

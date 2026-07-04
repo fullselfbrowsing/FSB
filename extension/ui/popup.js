@@ -64,14 +64,22 @@ const chatMessages = document.getElementById('chatMessages');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
 
-// Apply theme based on settings
-function applyTheme() {
-  let savedTheme = localStorage.getItem('fsb-theme');
-  if (!savedTheme) {
-    savedTheme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-    localStorage.setItem('fsb-theme', savedTheme);
+// Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
+// (set by the options page's Advanced Settings); 'system' resolves live from
+// the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
+function resolveEffectiveTheme(preference) {
+  if (preference === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   }
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  return preference;
+}
+
+function applyTheme() {
+  let preference = localStorage.getItem('fsb-theme');
+  if (!['system', 'dark', 'light'].includes(preference)) {
+    preference = 'system';
+  }
+  document.documentElement.setAttribute('data-theme', resolveEffectiveTheme(preference));
 }
 
 // Listen for theme changes from options page
@@ -80,6 +88,11 @@ window.addEventListener('storage', (e) => {
     applyTheme();
   }
 });
+
+// Live-follow OS theme changes while the preference is 'system'
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+}
 
 // Initialize analytics for popup context
 let popupAnalytics = null;

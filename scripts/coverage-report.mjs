@@ -19,8 +19,7 @@
  *        - 'learn'               -> learn (T2-seeded; discovery is Phase 42, so this
  *                                   bucket is ~0 in breadth today, reported for
  *                                   completeness)
- *        - 'dom' | absent        -> dom   (T3 DOM-only: the entire breadth corpus
- *                                   incl. the commerce/travel/misc batch, invocable=false)
+ *        - 'dom' | absent        -> dom   (T3 DOM-only descriptors)
  *
  *   2. CROSS-CHECKS each slug through the LIVE capability-catalog.js resolve() -- the
  *      SAME tier lookup the router drives at invoke. We plant global.FsbRecipeIndex =
@@ -44,7 +43,7 @@
  *     reportCoverage() over the committed catalog (not a stand-in).
  *   - CLI on direct invocation (the import.meta.url pathToFileURL(process.argv[1])
  *     guard) -- reads the committed catalog, prints the per-app table + the totals +
- *     the realAppCount vs ~117 + the commerce/travel/misc DOM-only confirmation, and
+ *     the realAppCount vs ~117 + the commerce/travel/misc seam-bucket summary, and
  *     process.exit(1) iff deadSlugs.length > 0 (zero-dead-entry is a hard assertion).
  *
  * Wall-1 discipline: build tooling (NOT shipped to the browser); kept FREE of
@@ -81,7 +80,7 @@ const MILESTONE_APP_TARGET = 117;
 export function bucketOfBacking(backing) {
   if (backing === 'handler' || backing === 'recipe') { return 'head'; }
   if (backing === 'learn') { return 'learn'; }
-  // 'dom' or absent (the breadth default; the importer freezes DOM-only).
+  // 'dom' or absent maps to the DOM-only bucket.
   return 'dom';
 }
 
@@ -295,10 +294,10 @@ function printReport(report) {
   }
   console.log('');
 
-  // The commerce/travel/misc (Phase-39) batch DOM-only confirmation.
-  console.log('Commerce/travel/misc batch: every Phase-39 descriptor is backing:dom ' +
-    '(DOM-only, invocable=false) -> the dom bucket. No payment op is API-invocable ' +
-    '(head bucket carries NO payment op -- cross-confirmed by the payment-op CI guard).');
+  // The commerce/travel/misc (Phase-39) batch seam-bucket summary.
+  console.log('Commerce/travel/misc batch: descriptors may be DOM-only or T1 head entries. ' +
+    'Payment-bearing ops must be on sensitive/denied origins; handler-backed payment ' +
+    'ops are validated by the payment-op CI guard.');
   console.log('');
 
   if (report.deadSlugs.length > 0) {

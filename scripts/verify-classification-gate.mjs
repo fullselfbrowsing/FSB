@@ -127,7 +127,7 @@ const AXES = [
     // false-positive is fixed via SAFE_ALLOWLIST). slack.chat.postMessage is already
     // classified sensitive, so the gate continues past it before the heuristic runs.
     axis: 'social/messaging',
-    re: /\b(instagram|facebook|tiktok|twitter|whatsapp|telegram|messenger|snapchat|discord|linkedin|direct-message|slack|signal|chatgpt|claude|ai-assistant|bluesky|bsky|mastodon|threads|fediverse|microblog)\b/i,
+    re: /\b(instagram|facebook|tiktok|twitter|whatsapp|telegram|messenger|snapchat|discord|linkedin|direct-message|slack|signal|chatgpt|claude|gemini|ai-assistant|bluesky|bsky|mastodon|threads|fediverse|microblog)\b/i,
   },
   {
     axis: 'media',
@@ -143,6 +143,21 @@ const AXES = [
   },
 ];
 
+// ---- The curated benign-origin allowlist (the module's stated false-positive
+// policy: a benign false-positive is fixed HERE or by classifying the origin,
+// NEVER by weakening the heuristic). These are dev/infra consoles whose READ
+// slugs carry an axis token in passing once slug tokens are normalized
+// (billing-info / project-health reads) -- they are not finance/health BRANDS.
+// Their mutating ops remain governed by sideEffectClass, the payment-op guard,
+// and the guarded-write pipeline like every other origin; this allowlist only
+// skips the ORIGIN-classification screen.
+export const SCREEN_SAFE_ALLOWLIST = new Set([
+  'https://console.cloud.google.com', // gcloud.get_billing_info / list_billing_accounts: billing READS on a dev console
+  'https://cloud.mongodb.com',        // mongodb.get_billing_plan: a billing-plan READ
+  'https://supabase.com',             // supabase.get_project_health: infra health READ (not medical)
+  'https://webflow.com',              // webflow.get_workspace_billing: a billing READ
+]);
+
 /**
  * sensitivityHeuristic(host, slug, description) -> { suspect, axis, keyword } | { suspect:false }
  *
@@ -153,7 +168,14 @@ const AXES = [
  */
 export function sensitivityHeuristic(host, slug, description) {
   const h = String(host || '').toLowerCase();
-  const haystack = h + ' ' + String(slug || '').toLowerCase() + ' ' + String(description || '').toLowerCase();
+  // The slug contributes with its ./_ separators normalized to spaces: the axis
+  // tokens are \b-anchored, and an underscore is a WORD character -- so
+  // `\bwithdraw\b` can never match inside `acme.withdraw_funds` un-normalized
+  // (the payment-verb screen was blind to every snake_case slug token). The
+  // compound tokens (`place[-_ ]order`) accept a space, so normalization
+  // preserves their matches.
+  const slugTokens = String(slug || '').toLowerCase().replace(/[._]/g, ' ');
+  const haystack = h + ' ' + slugTokens + ' ' + String(description || '').toLowerCase();
   // Host-suffix government signal (no keyword captures a bare .gov TLD).
   if (h.endsWith('.gov')) {
     return { suspect: true, axis: 'government', keyword: '.gov' };
@@ -247,7 +269,7 @@ export function classifyGate(items, opts) {
 //
 // LO-01: this sweep proves CLASSIFICATION, not heuristic-coverage of every host.
 // With slug/description empty (as these roster items are), the HOST alone does
-// NOT trip any axis for 4 of the 23 entries -- store.steampowered.com
+// NOT trip any axis for 4 of the 25 entries -- store.steampowered.com
 // ("steampowered" is not "steam" under \bsteam\b), console.twilio.com ("twilio"
 // is in no axis), x.com (the social axis has "twitter", not "x"), and
 // teams.microsoft.com ("teams" is no token). They pass today ONLY because they
@@ -265,6 +287,8 @@ const ROSTER_ITEMS = [
   { origin: 'https://www.twitch.tv', service: 'twitch' },
   { origin: 'https://store.steampowered.com', service: 'steam' },
   { origin: 'https://music.youtube.com', service: 'youtube-music' },
+  { origin: 'https://youtube.com', service: 'youtube' },
+  { origin: 'https://www.youtube.com', service: 'youtube' },
   { origin: 'https://www.tinder.com', service: 'tinder' },
   { origin: 'https://www.onlyfans.com', service: 'onlyfans' },
   // DENY-02 sensitive (payments/budgeting + IG/FB/TikTok/X + messaging)
@@ -331,11 +355,20 @@ function readCorpusItems() {
     }
     const origin = originFromService(d && d.service);
     if (!origin) continue;
-    // First descriptor for an origin seeds the screen item; a later one re-keys the slug
-    // (any of the origin's slugs is a valid host-level screen signal). No op-prose
-    // description is carried (DEF-39.5-03-A) -- only host + slug screen the origin.
+    // First descriptor for an origin seeds the screen item; every later one
+    // APPENDS its slug (space-joined) so the ONE screen item carries ALL of the
+    // origin's slugs as the slug signal. The old first-only keep meant a later
+    // withdraw/deposit slug on an origin whose alphabetically-first slug was
+    // benign never reached the heuristic -- the payment-verb screen silently
+    // skipped it. sensitivityHeuristic scans a joined haystack, so the
+    // space-joined form trips on a keyword in ANY of the origin's slugs while
+    // keeping one-failure-per-origin. No op-prose description is carried
+    // (DEF-39.5-03-A) -- only host + slugs screen the origin.
     if (!byOrigin.has(origin)) {
       byOrigin.set(origin, { origin: origin, service: d.service, slug: d.slug });
+    } else if (d.slug) {
+      const cur = byOrigin.get(origin);
+      cur.slug = cur.slug ? cur.slug + ' ' + d.slug : d.slug;
     }
   }
   return [...byOrigin.values()];
@@ -346,7 +379,7 @@ async function runCli() {
   await Denylist.load(); // populate classify() from the committed roster
   const corpus = readCorpusItems();
   const items = corpus.concat(ROSTER_ITEMS);
-  const { failures } = classifyGate(items);
+  const { failures } = classifyGate(items, { safeAllowlist: SCREEN_SAFE_ALLOWLIST });
   if (failures.length > 0) {
     console.error('verify-classification-gate: FAIL (fail-closed: an unclassified sensitivity-suspect origin was found)');
     for (const f of failures) {

@@ -352,5 +352,94 @@ const sheetsCounter = overlayStateUtils.buildOverlayState({
 });
 assertEqual(sheetsCounter.progress.label, '3/10 rows', 'sheets counter preserved');
 
+console.log('\n--- capability-call overlay: phase/label/ellipsis ---');
+
+assertEqual(overlayStateUtils.normalizeOverlayPhase('calling'), 'calling', "normalizeOverlayPhase('calling') passes through");
+assertEqual(overlayStateUtils.humanizeOverlayPhase('calling'), 'Calling API', "humanizeOverlayPhase('calling') === 'Calling API'");
+
+const callingProgress = overlayStateUtils.buildOverlayState({ phase: 'calling' }, null);
+assertEqual(callingProgress.progress.label, 'Calling API…', "'calling' is an ellipsis phase -> 'Calling API…'");
+
+console.log('\n--- capability-call overlay: isThinkingPhase must exclude calling ---');
+
+assertEqual(overlayStateUtils.isThinkingPhase('calling'), false, "isThinkingPhase('calling') === false (regression guard)");
+assertEqual(overlayStateUtils.isThinkingPhase('planning'), true, "isThinkingPhase('planning') still true (baseline unchanged)");
+
+console.log('\n--- capability-call overlay: mapCapabilityErrorToNote ---');
+
+assertEqual(
+  overlayStateUtils.mapCapabilityErrorToNote('RECIPE_CONSENT_MUTATING_REQUIRED'),
+  'Blocked — nothing was created. Needs your approval to run write actions.',
+  'RECIPE_CONSENT_MUTATING_REQUIRED maps to the mutating-consent note'
+);
+assertEqual(
+  overlayStateUtils.mapCapabilityErrorToNote('RECIPE_CONSENT_REQUIRED'),
+  'Blocked — this site needs your approval before FSB can act here.',
+  'RECIPE_CONSENT_REQUIRED maps to the consent-required note'
+);
+assertEqual(
+  overlayStateUtils.mapCapabilityErrorToNote('RECIPE_CONSENT_BLOCKED'),
+  'Blocked — this site is on the do-not-automate list.',
+  'RECIPE_CONSENT_BLOCKED maps to the blocked note'
+);
+assert(
+  overlayStateUtils.mapCapabilityErrorToNote('RECIPE_LEARN_PENDING').indexOf('learned yet') !== -1,
+  'RECIPE_LEARN_PENDING maps to a learn-pending note'
+);
+assert(
+  overlayStateUtils.mapCapabilityErrorToNote('RECIPE_DOM_FALLBACK_PENDING').indexOf('falling back') !== -1,
+  'RECIPE_DOM_FALLBACK_PENDING maps to a fallback note'
+);
+assertEqual(overlayStateUtils.mapCapabilityErrorToNote('RECIPE_NOT_FOUND'), null, 'RECIPE_NOT_FOUND deliberately excluded -> null (unknown slug is not a guarded state)');
+assertEqual(overlayStateUtils.mapCapabilityErrorToNote('SOME_UNKNOWN_CODE'), null, 'unmapped code -> null');
+
+console.log('\n--- capability-call overlay: buildOverlayState passthrough ---');
+
+const readyCapabilityState = overlayStateUtils.buildOverlayState({
+  phase: 'calling',
+  guarded: false,
+  capability: {
+    chipText: 'github.com · github.issues.list',
+    guarded: false,
+    readinessLabel: 'T1 ready',
+    readinessClass: 'ready'
+  },
+  stoppable: true
+}, null);
+assertEqual(readyCapabilityState.phase, 'calling', 'ready capability state: phase is calling');
+assertEqual(readyCapabilityState.guarded, false, 'ready capability state: guarded is false');
+assertEqual(readyCapabilityState.capability.chipText, 'github.com · github.issues.list', 'ready capability state: chipText round-trips');
+assertEqual(readyCapabilityState.capability.readinessLabel, 'T1 ready', 'ready capability state: readinessLabel round-trips');
+assertEqual(readyCapabilityState.capability.readinessClass, 'ready', 'ready capability state: readinessClass round-trips');
+assertEqual(readyCapabilityState.capability.noteText, null, 'ready capability state: noteText is null when not guarded');
+assertEqual(readyCapabilityState.stoppable, true, 'ready capability state: stoppable round-trips');
+
+const guardedCapabilityState = overlayStateUtils.buildOverlayState({
+  phase: 'calling',
+  guarded: true,
+  capability: {
+    chipText: 'github.com · github.issues.create',
+    guarded: true,
+    noteText: 'Blocked — nothing was created. Needs your approval to run write actions.'
+  },
+  stoppable: false
+}, null);
+assertEqual(guardedCapabilityState.guarded, true, 'guarded capability state: guarded is true');
+assertEqual(guardedCapabilityState.capability.readinessLabel, 'Guarded', 'guarded capability state: readinessLabel defaults to Guarded');
+assertEqual(guardedCapabilityState.capability.readinessClass, 'guarded', 'guarded capability state: readinessClass defaults to guarded');
+assertEqual(guardedCapabilityState.capability.noteText, 'Blocked — nothing was created. Needs your approval to run write actions.', 'guarded capability state: noteText round-trips');
+
+console.log('\n--- capability-call overlay: absence/default backward-compatibility ---');
+
+const ordinaryState = overlayStateUtils.buildOverlayState({ phase: 'acting' }, null);
+assertEqual(ordinaryState.guarded, false, 'ordinary (non-capability) state: guarded defaults to false');
+assertEqual(ordinaryState.stoppable, false, 'ordinary (non-capability) state: stoppable defaults to false');
+assert(!Object.prototype.hasOwnProperty.call(ordinaryState, 'capability'), 'ordinary (non-capability) state: no capability key at all (matches existing conditional-spread idiom)');
+
+const emptyState = overlayStateUtils.buildOverlayState({}, null);
+assertEqual(emptyState.guarded, false, 'buildOverlayState({}): guarded defaults to false');
+assertEqual(emptyState.stoppable, false, 'buildOverlayState({}): stoppable defaults to false');
+assert(!Object.prototype.hasOwnProperty.call(emptyState, 'capability'), 'buildOverlayState({}): no capability key at all');
+
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
 process.exit(failed > 0 ? 1 : 0);

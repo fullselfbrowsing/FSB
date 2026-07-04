@@ -105,6 +105,64 @@ async function main() {
   check(importer.isOverClaim('linear.create_issue', 'tweet a status update') === false,
     'isOverClaim: a slug with no OVER_CLAIM_GUARD entry drops nothing (the guard is per-slug)');
 
+  // ---- transport-signal extraction (method max-merge + plugin-api default) ----
+  check(typeof importer.extractTransportSignalsFromText === 'function',
+    'importer exports extractTransportSignalsFromText (the pure text scan)');
+  check(typeof importer.pluginApiDefaultMethodFromText === 'function',
+    'importer exports pluginApiDefaultMethodFromText');
+
+  // (t1) Method literals MAX-merge: an op that POSTs on one leg and DELETEs on
+  // another persists the MOST-SEVERE method, not the first literal (the
+  // starbucks.toggle_favorite_store shape: favorite POST, unfavorite DELETE).
+  const toggleShape =
+    "if (params.favorite) {\n  await api('/stores/favorites', {\n    method: 'POST',\n    body: { storeNumber: params.store_number },\n  });\n} else {\n  await api(`/stores/favorites/${params.store_number}`, {\n    method: 'DELETE',\n  });\n}";
+  const t1 = importer.extractTransportSignalsFromText(toggleShape, '');
+  check(t1.httpMethod === 'DELETE',
+    '(t1) POST-then-DELETE literals max-merge to DELETE (was first-literal POST)');
+  const t1b = importer.extractTransportSignalsFromText(
+    "await api('/x', { method: 'DELETE' });\nawait api('/y', { method: 'POST' });", '');
+  check(t1b.httpMethod === 'DELETE',
+    '(t1) DELETE-then-POST also yields DELETE (order-independent, severity-keyed)');
+
+  // (t2) Helper max-merge stays intact: apiGet before apiPost -> apiPost/POST
+  // (the datadog.clone_dashboard shape).
+  const t2 = importer.extractTransportSignalsFromText(
+    'const original = await apiGet<Rec>(`/api/v1/dashboard/${id}`);\nconst created = await apiPost<Rec>(`/api/v1/dashboard`, body);', '');
+  check(t2.transportHelper === 'apiPost' && t2.httpMethod === 'POST',
+    '(t2) apiGet-then-apiPost max-merges to apiPost/POST (clone_dashboard unchanged)');
+
+  // (t3) Generic api + no literal + plugin api() defaulting GET -> GET.
+  const getApi = "export const api = async (endpoint, options = {}) => {\n  const method = options.method ?? 'GET';\n  return fetchJSON(endpoint, { method });\n};\nexport const other = 1;";
+  const t3 = importer.extractTransportSignalsFromText('const d = await api(`/x`);', getApi);
+  check(t3.transportHelper === 'api' && t3.httpMethod === 'GET',
+    '(t3) generic api with a confirmed per-plugin GET default stamps GET');
+  check(importer.pluginApiDefaultMethodFromText(getApi) === 'GET',
+    '(t3) pluginApiDefaultMethodFromText reads the ?? GET default');
+
+  // (t4) Generic api + a MUTATING per-plugin default (POST-RPC innertube/uber
+  // shape) -> NO method stamped (the wire method is uninformative; the op-name
+  // verb classifies, and deriveClass floors ambiguous verbs to write). Blindly
+  // stamping GET was the youtube.subscribe-classed-read false-negative;
+  // stamping POST would flip every RPC READ to write.
+  const postApi = "export const api = async (endpoint, body) => {\n  const method = body === undefined ? 'GET' : 'POST';\n  return fetchJSON(endpoint, { method: options.method ?? 'POST' });\n};\nexport const other = 1;";
+  const t4 = importer.extractTransportSignalsFromText('const d = await api(`/x`, payload);', postApi);
+  check(t4.transportHelper === 'api' && t4.httpMethod === null,
+    '(t4) generic api with a mutating per-plugin default stamps NO method (RPC carve-out)');
+
+  // (t5) An UNCONDITIONALLY hardcoded POST api() (no caller method at all) is
+  // recognized as a POST default -> RPC carve-out (no GET understatement).
+  const hardcodedApi = "export const api = async (endpoint, body) => {\n  const init = { method: 'POST', headers: {} };\n  return fetchJSON(endpoint, init);\n};\nexport const other = 1;";
+  check(importer.pluginApiDefaultMethodFromText(hardcodedApi) === 'POST',
+    '(t5) an unconditionally-POST api() reads as a POST default');
+  const t5 = importer.extractTransportSignalsFromText('const d = await api(`/x`);', hardcodedApi);
+  check(t5.httpMethod === null,
+    '(t5) generic api over a hardcoded-POST helper stamps NO method (never a fabricated GET)');
+
+  // (t6) No plugin api source at all -> the documented GET default stands.
+  const t6 = importer.extractTransportSignalsFromText('const d = await api(`/x`);', '');
+  check(t6.transportHelper === 'api' && t6.httpMethod === 'GET',
+    '(t6) generic api with no plugin source keeps the documented GET default');
+
   // ---- report ---------------------------------------------------------------
   if (failed > 0) {
     console.error('import-extraction.test: FAIL (' + failed + ' failure(s), ' + passed + ' passed)');

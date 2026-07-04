@@ -214,6 +214,34 @@ check(sample && sample.code === sample.errorCode && typeof sample.errorCode === 
     'endpoint "' + badEndpoint + '" (' + desc + ') -> REJECTED (got ' + JSON.stringify(r && r.code) + ')');
 });
 
+// ---- 13. A value violation on a KNOWN field classifies as RECIPE_SCHEMA_INVALID,
+//          NOT RECIPE_UNKNOWN_FIELD. cfworker emits the root additionalProperties
+//          error ALONGSIDE the property-subschema failure, so the classifier must
+//          not mistake a bad origin/endpoint/id VALUE for an out-of-vocabulary
+//          field (step 4c falls through to 4d when a property subschema failed). --
+[
+  ['bad origin pattern', { origin: 'javascript:alert(1)' }],
+  ['endpoint traversal', { endpoint: '/a/../b' }],
+  ['protocol-relative endpoint', { endpoint: '//evil.com/x' }],
+  ['wrong-typed id (number)', { id: 123 }],
+  ['empty id (minLength)', { id: '' }]
+].forEach(function(entry) {
+  const label = entry[0];
+  const patch = entry[1];
+  const r = M.validateRecipe(Object.assign({}, valid, patch));
+  check(r && r.success === false && r.code === 'RECIPE_SCHEMA_INVALID',
+    'value violation on known field (' + label + ') -> RECIPE_SCHEMA_INVALID (got ' + (r && r.code) + ')');
+});
+
+// ---- 14. A genuinely out-of-vocabulary field STILL classifies as
+//          RECIPE_UNKNOWN_FIELD and names the offending key -- the 4c guard did
+//          not over-reach and swallow real unknown-field detection. ------------
+const stillUnknown = M.validateRecipe(Object.assign({}, valid, { notAField: 1 }));
+check(stillUnknown && stillUnknown.success === false && stillUnknown.code === 'RECIPE_UNKNOWN_FIELD',
+  'out-of-vocabulary field notAField -> RECIPE_UNKNOWN_FIELD (got ' + (stillUnknown && stillUnknown.code) + ')');
+check(stillUnknown && stillUnknown.field === 'notAField',
+  'RECIPE_UNKNOWN_FIELD names the offending field "notAField" (got ' + (stillUnknown && stillUnknown.field) + ')');
+
 // ---- report ----------------------------------------------------------------
 console.log('  passed:', passed);
 console.log('  failed:', failed);

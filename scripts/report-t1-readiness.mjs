@@ -776,7 +776,7 @@ function sameSiteHost(a, b) {
   return ah === bh || ah.endsWith('.' + bh) || bh.endsWith('.' + ah);
 }
 
-function loadCatalog() {
+export function loadCatalog() {
   return require(join(ROOT, 'extension', 'catalog', 'recipe-index.generated.js'));
 }
 
@@ -989,6 +989,13 @@ function buildCandidates(rows) {
 export function reportReadiness(catalog, opts) {
   const idx = catalog && typeof catalog === 'object' ? catalog : loadCatalog();
   const descriptors = Array.isArray(idx.descriptors) ? idx.descriptors : [];
+  if (descriptors.length === 0) {
+    // Fail closed: an empty/non-array descriptor set means the catalog failed to
+    // generate. Refuse to emit an empty readiness matrix, which would otherwise
+    // pass every downstream gate vacuously (this report backs the readiness gate,
+    // write-activation-evidence, t1-port-contract, and pattern-d gates).
+    throw new Error('report-t1-readiness: catalog.descriptors is empty or not an array -- refusing to emit an empty readiness matrix');
+  }
   const resolveFn = (opts && opts.resolveFn) || buildResolver(idx);
   const classifyFn = (opts && opts.classifyOrigin) || buildOriginClassifier();
 
@@ -1119,8 +1126,15 @@ export function validateReadinessRows(rows, opts) {
 }
 
 export function validateReadinessReport(report, catalog) {
-  const expected = catalog && Array.isArray(catalog.descriptors) ? catalog.descriptors.length : null;
   const failures = [];
+  // Fail closed on an empty/non-array catalog: `expected` derives from the same
+  // descriptors the rows are built from, so without this floor an empty catalog
+  // yields zero rows and zero failures -- a false PASS on the exact codegen
+  // regression this report exists to catch.
+  if (!catalog || !Array.isArray(catalog.descriptors) || catalog.descriptors.length === 0) {
+    return { failures: ['catalog.descriptors is missing, not an array, or empty'] };
+  }
+  const expected = catalog.descriptors.length;
   if (!report || typeof report !== 'object') {
     return { failures: ['report is not an object'] };
   }
@@ -1131,7 +1145,7 @@ export function validateReadinessReport(report, catalog) {
   if (report.rowCount !== report.rows.length) {
     failures.push('report.rowCount ' + report.rowCount + ' does not match rows length ' + report.rows.length);
   }
-  if (expected !== null && report.descriptorCount !== expected) {
+  if (report.descriptorCount !== expected) {
     failures.push('report.descriptorCount ' + report.descriptorCount + ' does not match catalog descriptors ' + expected);
   }
   return { failures };

@@ -16,7 +16,8 @@
     "webNavigation",
     "alarms",
     "clipboardWrite",
-    "offscreen"
+    "offscreen",
+    "system.memory"
   ],
   "host_permissions": [
     "<all_urls>"

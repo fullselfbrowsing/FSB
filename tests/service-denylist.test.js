@@ -122,6 +122,21 @@ function installChromeStorageStub() {
   check(cSafe && cSafe.sensitive === false && cSafe.denied === false,
     "classify('https://github.com') -> { sensitive:false, denied:false } (the D-14 source-of-truth)");
 
+  // ---- REGRESSION: a fully-qualified trailing-dot host must NOT bypass the match.
+  //      new URL('https://netflix.com.').hostname keeps the dot; the seed patterns are
+  //      dot-free, so _parseOrigin canonicalizes it away before matching. ----
+  check(Denylist.isDenied(deniedSeed + '.').denied === true,
+    'isDenied(a denied origin WITH a trailing dot) -> denied true (' + deniedSeed + '.)');
+  const cDeniedDot = Denylist.classify(deniedSeed + '.');
+  check(cDeniedDot && cDeniedDot.sensitive === true && cDeniedDot.denied === true,
+    'classify(a trailing-dot denied origin) -> { sensitive:true, denied:true }');
+  const cSensitiveDot = Denylist.classify(sensitiveSeed + '.');
+  check(cSensitiveDot && cSensitiveDot.sensitive === true && cSensitiveDot.denied === false,
+    'classify(a trailing-dot sensitive-not-denied origin) -> { sensitive:true, denied:false } (' + sensitiveSeed + '.)');
+  const cSafeDot = Denylist.classify('https://github.com.');
+  check(cSafeDot && cSafeDot.sensitive === false && cSafeDot.denied === false,
+    "classify('https://github.com.') (benign trailing-dot) -> { sensitive:false, denied:false } (no over-broadening)");
+
   // ---- the gate returns RECIPE_CONSENT_BLOCKED for a denylisted origin BEFORE
   //      any per-origin policy (GOV-08, checked-first) ----
   // Wire the (Plan-02) consent store + gate. The denylist global is the real
@@ -195,19 +210,10 @@ function installChromeStorageStub() {
   // ======================================================================
 
   // DENY-01 -- categorically prohibited. Each CONCRETE origin must classify
-  // denied:true. Brokerage/trading (robinhood/fidelity/carta) + ToS-hostile
-  // media/social (netflix/spotify/steam/youtube-music/tinder/onlyfans).
+  // denied:true. The hard denylist is intentionally narrow: only Netflix and
+  // OnlyFans remain non-executable by policy.
   const deniedRoster = [
-    'https://robinhood.com',             // via https://*.robinhood.com (suffix; apex)
-    'https://digital.fidelity.com',      // exact -- NOT *.fidelity.com
-    'https://app.carta.com',             // exact
     'https://www.netflix.com',           // via https://*.netflix.com (suffix)
-    'https://open.spotify.com',          // exact
-    'https://store.steampowered.com',    // exact
-    'https://music.youtube.com',         // exact (the YouTube Music ToS-hostile media origin)
-    'https://youtube.com',               // exact (Phase 39.5-03: the bare apex, media/ToS axis)
-    'https://www.youtube.com',           // exact (Phase 39.5-03: www; NOT *.youtube.com)
-    'https://www.tinder.com',            // via https://*.tinder.com (suffix)
     'https://www.onlyfans.com'           // via https://*.onlyfans.com (suffix)
   ];
   for (const origin of deniedRoster) {
@@ -223,15 +229,30 @@ function installChromeStorageStub() {
   const sensitiveRoster = [
     'https://dashboard.stripe.com',      // exact -- the dashboard origin, NOT api.stripe.com
     'https://www.coinbase.com',          // via https://*.coinbase.com (suffix)
+    'https://app.carta.com',             // exact -- Carta reads are allowed but finance-sensitive
     'https://console.twilio.com',        // exact
+    'https://www.twilio.com',            // exact -- Twilio project-info origin
     'https://app.ynab.com',              // exact
     'https://www.instagram.com',         // via https://*.instagram.com (suffix)
     'https://www.facebook.com',          // via https://*.facebook.com (suffix)
     'https://www.tiktok.com',            // via https://*.tiktok.com (suffix)
     'https://x.com',                     // via https://*.x.com (suffix; apex)
+    'https://www.tinder.com',            // via https://*.tinder.com (suffix; social/dating, sensitive not denied)
     'https://web.whatsapp.com',          // exact
     'https://web.telegram.org',          // exact
+    'https://robinhood.com',             // via https://*.robinhood.com (suffix; apex)
+    'https://digital.fidelity.com',      // exact -- NOT *.fidelity.com
+    'https://open.spotify.com',          // exact -- media app reads allowed; playback writes guarded
+    'https://store.steampowered.com',    // exact -- media app reads allowed; writes guarded
+    'https://music.youtube.com',         // exact -- sensitive media origin
+    'https://youtube.com',               // exact -- bare apex, NOT *.youtube.com
+    'https://www.youtube.com',           // exact -- www, NOT *.youtube.com
     'https://www.twitch.tv',             // via https://*.twitch.tv -- media app reads allowed; GraphQL reads origin-pinned
+    'https://www.paypal.com',            // exact -- money movement, sensitive
+    'https://venmo.com',                 // via https://*.venmo.com (suffix; apex)
+    'https://cash.app',                  // exact
+    'https://wise.com',                  // exact
+    'https://www.westernunion.com',      // exact
     'https://www.slack.com',             // via https://*.slack.com (suffix)
     'https://discord.com',               // exact
     'https://teams.microsoft.com',       // exact (one of the three teams origins)
@@ -240,6 +261,8 @@ function installChromeStorageStub() {
     'https://chatgpt.com',               // exact -- AI-chat
     'https://claude.ai',                 // exact -- AI-chat
     'https://bsky.app',                  // exact -- microblog social
+    'https://api.bsky.app',              // exact -- Bluesky AppView
+    'https://public.api.bsky.app',       // exact -- cached public Bluesky AppView
     'https://mastodon.social',           // exact -- fediverse social
     'https://www.threads.net'            // via https://*.threads.net (suffix; LOW-01) -- microblog social
   ];
@@ -253,25 +276,24 @@ function installChromeStorageStub() {
   // forms must NOT collapse to whole-domain wildcards.
   check(Denylist.classify('https://api.stripe.com').sensitive === false,
     "exact-host: classify('https://api.stripe.com').sensitive === false (dashboard.stripe.com did NOT over-broaden to *.stripe.com)");
-  // Phase 39.5-03: youtube.com + www.youtube.com are now EXPLICITLY denied (the bare
-  // apex the real youtube plugin emits, media/ToS axis). They are added as EXACT-host
-  // entries (NOT '*.youtube.com'), so the anti-over-broadening discipline still holds:
-  // an UNRELATED youtube subdomain that is NOT a denylist entry (e.g. studio.youtube.com)
-  // stays non-denied -- the denied set is the exact youtube.com / www.youtube.com /
-  // music.youtube.com hosts, not a whole-domain wildcard.
-  check(Denylist.classify('https://www.youtube.com').denied === true,
-    "exact-host: classify('https://www.youtube.com').denied === true (Phase 39.5-03: the youtube app origin is explicitly denied)");
-  check(Denylist.classify('https://youtube.com').denied === true,
-    "exact-host: classify('https://youtube.com').denied === true (Phase 39.5-03: the bare apex is explicitly denied)");
+  // YouTube exact hosts are governed as sensitive, not denied. They are exact
+  // entries (NOT '*.youtube.com'), so unrelated subdomains remain non-denied.
+  check(Denylist.classify('https://www.youtube.com').sensitive === true &&
+      Denylist.classify('https://www.youtube.com').denied === false,
+    "exact-host: classify('https://www.youtube.com') -> { sensitive:true, denied:false }");
+  check(Denylist.classify('https://youtube.com').sensitive === true &&
+      Denylist.classify('https://youtube.com').denied === false,
+    "exact-host: classify('https://youtube.com') -> { sensitive:true, denied:false }");
   check(Denylist.classify('https://studio.youtube.com').denied === false,
     "exact-host: classify('https://studio.youtube.com').denied === false (the youtube entries are EXACT-host, NOT *.youtube.com -- an unrelated subdomain is not over-broadened)");
-  check(Denylist.classify('https://digital.fidelity.com').denied === true,
-    "exact-host: classify('https://digital.fidelity.com').denied === true (fidelity is exact digital.fidelity.com only)");
+  check(Denylist.classify('https://digital.fidelity.com').sensitive === true &&
+      Denylist.classify('https://digital.fidelity.com').denied === false,
+    "exact-host: classify('https://digital.fidelity.com') -> { sensitive:true, denied:false }");
 
   // Negative controls: fidelity is exact-host, so a different fidelity subdomain
-  // is allowed to be non-denied; a benign non-roster origin stays fully clean.
+  // is allowed to be non-sensitive; a benign non-roster origin stays fully clean.
   check(Denylist.classify('https://www.fidelity.com').denied === false,
-    "negative control: classify('https://www.fidelity.com').denied === false (only digital.fidelity.com is denied)");
+    "negative control: classify('https://www.fidelity.com').denied === false (digital.fidelity.com is sensitive-only)");
   const cBenign = Denylist.classify('https://github.com');
   check(cBenign && cBenign.sensitive === false && cBenign.denied === false,
     "negative control: a benign non-roster origin (github.com) stays { sensitive:false, denied:false }");
@@ -292,9 +314,10 @@ function installChromeStorageStub() {
   check(Denylist.classify('https://threads.net').denied === false,
     "LOW-01: classify('https://threads.net') -> denied:false (sensitive, not denied -- reads under Auto, writes posture-B gated)");
 
-  // Regression guard: the existing FSB seed survived the expansion.
-  check(Denylist.classify('https://www.chase.com').denied === true,
-    'seed regression: classify(a concrete chase origin) -> denied:true (the FSB seed was not dropped)');
+  // Regression guard: the existing FSB seed survived as governed sensitive.
+  check(Denylist.classify('https://www.chase.com').sensitive === true &&
+      Denylist.classify('https://www.chase.com').denied === false,
+    'seed regression: classify(a concrete chase origin) -> { sensitive:true, denied:false }');
 
   console.log('\nPASS=' + passed + ' FAIL=' + failed);
   if (failed > 0) process.exit(1);

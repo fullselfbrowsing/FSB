@@ -17,10 +17,16 @@
 
 const assert = require('assert');
 const REGISTRY_MODULE_PATH = require.resolve('../extension/utils/agent-registry.js');
+const RECOMMENDATION_MODULE_PATH = require.resolve('../extension/utils/agent-cap-recommendation.js');
 
 function freshRequireRegistry() {
   delete require.cache[REGISTRY_MODULE_PATH];
   return require(REGISTRY_MODULE_PATH);
+}
+
+function loadRecommendationHelper() {
+  delete require.cache[RECOMMENDATION_MODULE_PATH];
+  return require(RECOMMENDATION_MODULE_PATH);
 }
 
 function createStorageArea(initial) {
@@ -67,7 +73,7 @@ function setupChromeMock(opts) {
   const session = createStorageArea(opts.session || {});
   const local = createStorageArea(opts.local || {});
   const onChangedListeners = [];
-  globalThis.chrome = {
+  const chromeMock = {
     runtime: { id: 'phase-241-test', lastError: null },
     storage: {
       session: session,
@@ -85,6 +91,23 @@ function setupChromeMock(opts) {
       onRemoved: { addListener() {} }
     }
   };
+
+  if (opts.memoryInfo || opts.memoryError) {
+    chromeMock.system = {
+      memory: {
+        getInfo(cb) {
+          if (opts.memoryError) throw opts.memoryError;
+          if (typeof cb === 'function') {
+            cb(opts.memoryInfo);
+            return undefined;
+          }
+          return Promise.resolve(opts.memoryInfo);
+        }
+      }
+    };
+  }
+
+  globalThis.chrome = chromeMock;
   return { session: session, local: local, onChangedListeners: onChangedListeners };
 }
 
@@ -218,6 +241,71 @@ function teardownDiagnosticCapture() {
     }
   }
   console.log('  PASS: chrome.storage.onChanged cross-context propagation');
+
+  console.log('--- Test 8: missing stored cap seeds RAM-based recommendation ---');
+  {
+    const mock = setupChromeMock({ memoryInfo: { capacity: 64 * 1024 * 1024 * 1024 } });
+    setupDiagnosticCapture();
+    try {
+      loadRecommendationHelper();
+      const fresh = freshRequireRegistry();
+      const reg = new fresh.AgentRegistry();
+      assert.strictEqual(reg.getCap(), 8, 'fresh registry starts at fallback before storage load');
+      await reg._loadCapFromStorage();
+      assert.strictEqual(reg.getCap(), 21, 'missing fsbAgentCap hydrates to 64 GiB recommendation');
+      assert.strictEqual(mock.local._dump().fsbAgentCap, 21, 'recommended cap persisted to chrome.storage.local');
+    } finally {
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: missing cap seeds recommendation');
+
+  console.log('--- Test 9: saved cap is never overwritten by RAM recommendation ---');
+  {
+    const mock = setupChromeMock({
+      local: { fsbAgentCap: 12 },
+      memoryInfo: { capacity: 64 * 1024 * 1024 * 1024 }
+    });
+    setupDiagnosticCapture();
+    try {
+      loadRecommendationHelper();
+      const fresh = freshRequireRegistry();
+      const reg = new fresh.AgentRegistry();
+      await reg._loadCapFromStorage();
+      assert.strictEqual(reg.getCap(), 12, 'saved cap wins over recommendation');
+      assert.strictEqual(mock.local._dump().fsbAgentCap, 12, 'saved cap remains unchanged');
+    } finally {
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: saved cap preserved');
+
+  console.log('--- Test 10: registerAgent uses hydrated recommended cap ---');
+  {
+    const mock = setupChromeMock({ memoryInfo: { capacity: 8 * 1024 * 1024 * 1024 } });
+    setupDiagnosticCapture();
+    try {
+      loadRecommendationHelper();
+      const fresh = freshRequireRegistry();
+      const reg = new fresh.AgentRegistry();
+      await reg._loadCapFromStorage();
+      assert.strictEqual(reg.getCap(), 2, '8 GiB recommendation hydrates to cap=2');
+      const a = await reg.registerAgent();
+      const b = await reg.registerAgent();
+      const c = await reg.registerAgent();
+      assert.ok(a.agentId, 'first agent succeeds');
+      assert.ok(b.agentId, 'second agent succeeds');
+      assert.strictEqual(c.code, 'AGENT_CAP_REACHED', 'third agent rejects under recommended cap');
+      assert.strictEqual(c.cap, 2, 'rejection reports hydrated recommended cap');
+      assert.strictEqual(mock.local._dump().fsbAgentCap, 2, 'recommended cap persisted');
+    } finally {
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: hydrated recommendation gates claims');
 
   console.log('PASS agent-cap-storage');
 })().catch(err => {

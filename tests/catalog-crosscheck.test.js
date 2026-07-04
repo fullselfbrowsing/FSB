@@ -221,6 +221,31 @@ async function main() {
   check(Array.isArray(jIgnored.failures) && jIgnored.failures.length === 0,
     '(j) a write under a NON-read-only-safe origin (discord.com, sensitive) is NOT flagged by this invariant (scoped to the curated safe set)');
 
+  // ---- (k) hand-authored (signal-less) descriptors are checked too ------------
+  // A descriptor with NO provenance.signals still derives the slug-keyed floor
+  // (verb class + override table) inside crossCheck, so a hand-authored `read`
+  // on a destructive-verb slug FAILS instead of shipping silently.
+  const kUnder = gate.crossCheck([
+    { slug: 'acme.delete_custom_branch', sideEffectClass: 'read' },
+  ]);
+  check(Array.isArray(kUnder.failures) && kUnder.failures.length === 1,
+    '(k) a signal-less hand-authored descriptor with a destructive verb declared read FAILS');
+  check(isFlagged(kUnder, 'acme.delete_custom_branch'),
+    '(k) the failure names the hand-authored slug');
+  const kOk = gate.crossCheck([
+    { slug: 'acme.delete_custom_branch', sideEffectClass: 'destructive' },
+    { slug: 'acme.get_user_profile', sideEffectClass: 'read' },
+  ]);
+  check(Array.isArray(kOk.failures) && kOk.failures.length === 0,
+    '(k) correctly-stated signal-less descriptors PASS (floor semantics, no false-fail)');
+
+  // The CLI must feed hand-authored descriptors INTO crossCheck: the old
+  // provenance.signals filter silently dropped them from the check.
+  const cliSrc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'verify-catalog-crosscheck.mjs'), 'utf8');
+  const runCliBlock = cliSrc.slice(cliSrc.indexOf('async function runCli()'));
+  check(!/checked\s*=[\s\S]{0,200}provenance\.signals/.test(runCliBlock),
+    '(k) runCli no longer filters the crossCheck corpus to provenance.signals-bearing descriptors');
+
   // ---- report ---------------------------------------------------------------
   if (failed > 0) {
     console.error('catalog-crosscheck.test: FAIL (' + failed + ' failure(s), ' + passed + ' passed)');

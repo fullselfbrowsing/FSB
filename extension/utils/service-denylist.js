@@ -71,7 +71,10 @@
     try {
       var u = new URL(origin);
       // Normalize to scheme + host (lowercased host; URL already lowercases it).
-      return { scheme: u.protocol.replace(/:$/, ''), host: u.hostname };
+      // Strip a single trailing FQDN dot ('netflix.com.' -> 'netflix.com') so a
+      // trailing-dot origin cannot bypass the denied/sensitive match -- the seed
+      // patterns are always dot-free, so only the parsed host needs canonicalizing.
+      return { scheme: u.protocol.replace(/:$/, ''), host: u.hostname.replace(/\.$/, '') };
     } catch (_e) {
       return null;
     }

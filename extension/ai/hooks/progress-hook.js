@@ -100,6 +100,11 @@ function createIterationProgressHook(emitter) {
         cost: context.totalCost,
         inputTokens: context.inputTokens,
         outputTokens: context.outputTokens,
+        // Route persistence to the originating conversation/tab so a
+        // background-tab session's progress rows land in its own log rather
+        // than the conversation currently shown in the side panel.
+        tabId: (context.session && typeof context.session.tabId === 'number') ? context.session.tabId : null,
+        conversationId: (context.session && context.session.conversationId) ? context.session.conversationId : null,
         timestamp: Date.now()
       });
     } catch (err) {

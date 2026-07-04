@@ -83,10 +83,15 @@ function makeElement(tag, opts) {
       // Parse a tiny subset: any class="..." attribute creates a child stub
       // Sufficient for ProgressOverlay's container.innerHTML which sets up
       // .fsb-task, .fsb-summary, .fsb-step-text, .fsb-step-number, .fsb-eta,
-      // .fsb-phase, .fsb-progress-bar, .fsb-progress-fill, .fsb-client-badge.
+      // .fsb-phase, .fsb-progress-bar, .fsb-progress-fill, .fsb-client-badge,
+      // .fsb-stop, .fsb-chip*, .fsb-note*, .fsb-log*.
       const childClasses = [
-        'fsb-header','fsb-logo','fsb-title','fsb-client-badge',
-        'fsb-task','fsb-summary','fsb-step','fsb-step-number','fsb-step-text',
+        'fsb-header','fsb-logo','fsb-title','fsb-client-badge','fsb-stop',
+        'fsb-task','fsb-summary',
+        'fsb-chip','fsb-chip-lock','fsb-chip-txt','fsb-chip-rdy',
+        'fsb-note','fsb-note-icon','fsb-note-text',
+        'fsb-step','fsb-step-number','fsb-step-text',
+        'fsb-log','fsb-log-line','fsb-log-line',
         'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
       ];
       this.children = childClasses.map(c => {
@@ -607,6 +612,89 @@ console.log('\n--- Test 13: show() marking _rectDirty=true then false leaves cac
   // (in real code: this._updatePosition() is called sync here)
   glow._rectDirty = false;
   assertEq(glow._rectDirty, false, 'show() leaves rect cache clean after initial sync compute');
+}
+
+// ===========================================================================
+// describe('capability-call scrollback log (_logBuffer)')
+// ===========================================================================
+
+console.log('\n--- Test 14: _logBuffer accumulates, dedupes consecutive repeats, caps at 3 entries ---');
+{
+  setNow(50000);
+  const o = buildOverlay();
+  o.update(makeState({ detail: 'D1' })); // cold path -- flushes immediately
+  assertEq(o._logBuffer.length, 1, 'buffer has 1 entry after first flush');
+  assertEq(JSON.stringify(o._logBuffer), JSON.stringify(['D1']), 'buffer contents after D1');
+
+  advanceNow(1300); // clears both the 400ms debounce and the 1200ms dwell floor
+  o.update(makeState({ detail: 'D1' })); // identical detail -- dedup guard, no push
+  assertEq(o._logBuffer.length, 1, 'identical consecutive detail does not push a duplicate');
+
+  advanceNow(1300);
+  o.update(makeState({ detail: 'D2' }));
+  assertEq(o._logBuffer.length, 2, 'distinct detail pushes a new entry');
+
+  advanceNow(1300);
+  o.update(makeState({ detail: 'D3' }));
+  assertEq(o._logBuffer.length, 3, 'buffer grows to 3');
+
+  advanceNow(1300);
+  o.update(makeState({ detail: 'D4' }));
+  assertEq(o._logBuffer.length, 3, 'buffer caps at 3 entries (oldest shifted out)');
+  assertEq(JSON.stringify(o._logBuffer), JSON.stringify(['D2', 'D3', 'D4']), 'D1 shifted out; most recent 3 kept, oldest-first');
+
+  // One more settling update (duplicate detail, no new push) so the DOM render
+  // reflects the buffer as it stood AFTER the D4 push (render reads the buffer
+  // at the START of update(), one call before its own flush lands).
+  advanceNow(1300);
+  o.update(makeState({ detail: 'D4' }));
+  const logLines = o.container.querySelectorAll('.fsb-log-line');
+  assertEq(logLines[0].textContent, 'D3', '.fsb-log-line[0] shows the most recent PRIOR step (D3), excluding current (D4)');
+  assertEq(logLines[1].textContent, 'D2', '.fsb-log-line[1] shows the step before that (D2)');
+
+  o.destroy();
+}
+
+console.log('\n--- Test 15: destroy() resets _logBuffer to empty ---');
+{
+  setNow(60000);
+  const o = buildOverlay();
+  o.update(makeState({ detail: 'D1' }));
+  advanceNow(1300);
+  o.update(makeState({ detail: 'D2' }));
+  assert(o._logBuffer.length > 0, 'buffer is non-empty before destroy()');
+  o.destroy();
+  assertEq(o._logBuffer.length, 0, 'destroy() resets _logBuffer to empty (per-session state, mirrors _lastActionCount reset)');
+}
+
+// ===========================================================================
+// describe('capability-call step-number pill: immediate class, debounced text')
+// ===========================================================================
+
+console.log('\n--- Test 16: step-number pill CLASS updates immediately on update(), independent of the text debounce ---');
+{
+  // Matches the EXISTING precedent for .fsb-progress-bar's indeterminate/hidden
+  // classes, which also update immediately on every update() call while the
+  // step TEXT is debounced -- capability/guarded pill coloring follows the
+  // same established split between structural state (immediate) and
+  // human-readable text (debounced for readability).
+  setNow(70000);
+  const o = buildOverlay();
+  o.update(makeState({ detail: 'first' })); // cold path, settles the debounce state
+  const stepNumberEl = o.container.querySelector('.fsb-step-number');
+  assert(!stepNumberEl.classList.contains('calling'), 'no .calling class before any capability update');
+
+  // Immediately queue another update inside the debounce/dwell window --
+  // the TEXT should NOT flush yet, but the pill CLASS should update right away.
+  o.update(makeState({
+    phase: 'calling', detail: 'second', guarded: false,
+    capability: { chipText: 'x', readinessLabel: 'T1 ready', readinessClass: 'ready', noteText: null }
+  }));
+  assert(stepNumberEl.classList.contains('calling'), 'pill CLASS is .calling immediately, even inside the debounce window');
+  const stepTextEl = o.container.querySelector('.fsb-step-text');
+  assertEq(stepTextEl.textContent, 'first', 'pill TEXT still shows the prior value -- held by the dwell floor (unchanged behavior)');
+
+  o.destroy();
 }
 
 // ---------------------------------------------------------------------------

@@ -39,6 +39,17 @@ async function loadModule(relPath) {
   assert.ok(blocked.length > 0, 'expected blocked policy rows to stay represented');
   assert.ok(blocked.every((row) => row.workstream === 'blocked-policy'));
 
+  const netflixRows = worklist.rows.filter((row) => row.app === 'netflix');
+  assert.equal(netflixRows.length, 18, 'Netflix blocked-policy coverage should account for all descriptors');
+  assert.ok(netflixRows.every((row) =>
+    row.readiness === 'blocked' &&
+    row.originClass === 'denied' &&
+    row.routeFeasibility === 'blocked' &&
+    row.nextAction === 'keep blocked' &&
+    row.workstream === 'blocked-policy' &&
+    row.terminalTarget === 'blocked'
+  ), 'Netflix rows stay non-actionable blocked-policy terminal rows');
+
   const actionable = worklist.rows.filter((row) => row.workstream !== 'blocked-policy');
   assert.ok(actionable.length > 0, 'expected actionable non-denied tail rows');
   assert.ok(actionable.every((row) => row.terminalTarget !== 'blocked'));

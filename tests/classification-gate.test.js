@@ -150,6 +150,7 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
   const socialWriteDescriptors = [
     'opentabs__chatgpt__rename_conversation.json',
     'opentabs__claude__send_message.json',
+    'opentabs__gemini__send_message.json',
     'opentabs__bsky__create_post.json',
     'opentabs__mastodon__create_status.json',
     'opentabs__threads__create_thread.json',
@@ -178,6 +179,30 @@ const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-deny
     check(verdict && verdict.suspect === false,
       '(g) sensitivityHeuristic does NOT trip on the reddit READ ' + slug + ' (reddit stays safe-by-default; the MED-01 widening added no bare post/feed/dm token)');
   }
+
+  // (h) FULL-SLUG SCREEN (per-origin dedup fix): an origin whose alphabetically-
+  // FIRST slug is benign but whose LATER slug carries a payment keyword must trip.
+  // readCorpusItems space-joins every slug of an origin into the one screen item,
+  // and the heuristic scans the joined haystack -- so the shadowed withdraw slug
+  // is screened. Pre-fix only the first slug was kept and this origin passed.
+  const shadowedOrigin = 'https://acme-shadow.example.com';
+  check(Denylist.classify(shadowedOrigin).sensitive === false && Denylist.classify(shadowedOrigin).denied === false,
+    '(h) precondition: the shadowed-slug test origin is unclassified (reaches the heuristic)');
+  const firstSlugOnly = gate.classifyGate([
+    { origin: shadowedOrigin, service: 'acme-shadow.example.com', slug: 'acme.check_price' },
+  ]);
+  check(firstSlugOnly && firstSlugOnly.failures.length === 0,
+    '(h) the benign first slug alone does NOT trip (the shadowing scenario is real)');
+  const joinedSlugs = gate.classifyGate([
+    { origin: shadowedOrigin, service: 'acme-shadow.example.com', slug: 'acme.check_price acme.withdraw_funds' },
+  ]);
+  check(joinedSlugs && joinedSlugs.failures.length >= 1,
+    '(h) the space-joined slug set (benign first + withdraw later) TRIPS the heuristic -- the later payment slug is screened');
+  // Contract: readCorpusItems must APPEND later slugs, never drop them.
+  const gateSrc = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'verify-classification-gate.mjs'), 'utf8');
+  const readCorpusBlock = gateSrc.slice(gateSrc.indexOf('function readCorpusItems()'));
+  check(/cur\.slug \? cur\.slug \+ ' ' \+ d\.slug : d\.slug/.test(readCorpusBlock),
+    '(h) readCorpusItems appends every later slug for an origin (space-joined) instead of keeping only the first');
 
   // The package.json chain wiring is asserted separately (acceptance check 4 in
   // the plan): validate:extension contains verify-classification-gate.mjs and the

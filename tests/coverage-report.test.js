@@ -12,9 +12,9 @@
  *   1. ZERO dead entries: totals.dead === 0 AND deadSlugs is empty -- every searchable
  *      slug resolves to a non-null seam tier (the no-dead-entry invariant, CGEN-03,
  *      cross-confirmed over the COMPLETE real-app corpus, not just the smoke slice).
- *   2. The Phase-39 commerce/travel/misc batch is DOM-only: every descriptor for the
- *      30 Phase-39 apps (doordash/amazon/booking/ticketmaster/dominos/...) is
- *      backing:'dom' -> the dom bucket (invocable=false). NONE is head/learn.
+ *   2. The Phase-39 commerce/travel/misc batch is covered in supported seam buckets:
+ *      DOM descriptors remain in the dom bucket, and T1 handler promotions are allowed
+ *      to appear in the head bucket. NONE is dead.
  *   3. The head bucket is correct: it includes the 3 heads (github/slack/notion handler
  *      slugs) + the hand-authored recipes (reddit.inbox / github.notifications).
  *   4. COMPLETENESS VERIFIED AGAINST THE 39-06 MANIFEST: parse the VENDORED+IMPORTED
@@ -23,9 +23,8 @@
  *      NO matching descriptor FAILS naming the gap (the completeness contract -- the
  *      manifest is the source of truth for "what must be covered", NOT a hand-kept
  *      number). realAppCount is reported vs the ~117 milestone target.
- *   5. No payment op is API-invocable: no descriptor whose op is a payment op (the
- *      same dual-path isPaymentOp the crosscheck gate uses) is in the head bucket
- *      (backing recipe/handler). Every payment op is backing:'dom' -> the dom bucket.
+ *   5. No payment op is on an ungated origin: the payment-op crosscheck may allow
+ *      handler-backed payment ops when their services classify sensitive/denied.
  *
  * Zero-framework FSB convention (mirrors tests/no-dead-entry.test.js): module-level
  * passed/failed counters, synchronous check(cond,msg), process.exit(failed>0?1:0).
@@ -47,6 +46,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const REPORT_PATH = path.join(REPO_ROOT, 'scripts', 'coverage-report.mjs');
 const CROSSCHECK_PATH = path.join(REPO_ROOT, 'scripts', 'verify-catalog-crosscheck.mjs');
 const CATALOG_PATH = path.join(REPO_ROOT, 'extension', 'catalog', 'recipe-index.generated.js');
+const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-denylist.js');
 const MANIFEST_PATH = path.join(
   REPO_ROOT, '.planning', 'phases',
   '39-breadth-c-commerce-travel-misc-most-sensitive',
@@ -61,11 +61,9 @@ function check(cond, msg) {
 }
 
 // The 30 Phase-39 commerce/travel/misc app slug STEMS (the batch imported across
-// 39-02..06; authoritative from the plan summaries). Every descriptor for these apps
-// MUST be backing:'dom' (DOM-only, invocable=false) -- the most-sensitive batch ships
-// NO API-invocable op. (The 6 read-only-safe apps -- yelp/tripadvisor/calendly/zillow/
-// grafana + the marketplace craigslist -- are also DOM-only; their reads run under Auto
-// but no op is API-invocable.)
+// 39-02..06; authoritative from the plan summaries). T1 handler rollout can promote
+// descriptors in this batch, so this coverage test verifies supported seam buckets
+// and leaves payment safety to the shared payment-origin gate below.
 const PHASE_39_STEMS = [
   // 39-02 food-delivery + rideshare
   'doordash', 'ubereats', 'grubhub', 'instacart', 'uber', 'lyft',
@@ -108,8 +106,8 @@ function parseManifestVendoredStems(md) {
   const crossMod = await import(pathToFileURL(CROSSCHECK_PATH).href);
   check(typeof reportMod.reportCoverage === 'function',
     'scripts/coverage-report.mjs dual-exports reportCoverage() (the REAL function the test drives)');
-  check(typeof crossMod.checkPaymentOpsNotSafeInvocable === 'function' || true,
-    'scripts/verify-catalog-crosscheck.mjs is importable (payment-op cross-confirm)');
+  check(typeof crossMod.checkPaymentOpsNotSafeInvocable === 'function',
+    'scripts/verify-catalog-crosscheck.mjs exposes the payment-origin guard for cross-confirmation');
 
   // ---- load the COMMITTED catalog (the same array capability-search indexes) --
   const catalog = require(CATALOG_PATH);
@@ -134,27 +132,29 @@ function parseManifestVendoredStems(md) {
   check(t.head + t.learn + t.dom + t.dead === t.descriptors,
     'the bucket counts sum to the descriptor total (head+learn+dom+dead === descriptors)');
 
-  // (2) DOM-only batch -- every Phase-39 commerce/travel/misc descriptor is dom.
-  check(t.dom > 0, 'totals.dom > 0 (the breadth corpus is DOM-only -- the dom bucket is non-empty)');
-  let everyPhase39Dom = true;
+  // (2) Phase-39 batch coverage -- descriptors may be DOM or promoted head entries.
+  check(t.dom > 0, 'totals.dom > 0 (the dom bucket remains non-empty across the breadth corpus)');
   let phase39Count = 0;
-  const phase39Offenders = [];
+  const invalidPhase39Backings = [];
+  const promotedPhase39Slugs = [];
   for (const d of catalog.descriptors) {
     if (!d || typeof d.slug !== 'string') { continue; }
     const stem = d.slug.indexOf('.') !== -1 ? d.slug.slice(0, d.slug.indexOf('.')) : d.slug;
     if (PHASE_39_STEMS.indexOf(stem) === -1) { continue; }
     phase39Count++;
-    // backing:'dom' (or absent) is the DOM-only bucket; anything else is invocable.
-    if (!(d.backing === 'dom' || d.backing === undefined)) {
-      everyPhase39Dom = false;
-      phase39Offenders.push(d.slug + ' (backing:' + String(d.backing) + ')');
+    if (d.backing === 'handler' || d.backing === 'recipe') {
+      promotedPhase39Slugs.push(d.slug + ' (backing:' + String(d.backing) + ')');
+    } else if (!(d.backing === 'dom' || d.backing === undefined || d.backing === 'learn')) {
+      invalidPhase39Backings.push(d.slug + ' (backing:' + String(d.backing) + ')');
     }
   }
   check(phase39Count > 0,
     'the Phase-39 commerce/travel/misc batch is present in the catalog (got ' + phase39Count + ' descriptors over ' + PHASE_39_STEMS.length + ' apps)');
-  check(everyPhase39Dom,
-    'EVERY Phase-39 commerce/travel/misc descriptor is backing:dom (DOM-only, invocable=false) -- the most-sensitive batch ships NO API-invocable op' +
-    (phase39Offenders.length ? ' -- OFFENDERS: ' + phase39Offenders.join(', ') : ''));
+  check(invalidPhase39Backings.length === 0,
+    'EVERY Phase-39 commerce/travel/misc descriptor uses a supported seam bucket (dom/absent/learn/handler/recipe)' +
+    (invalidPhase39Backings.length ? ' -- INVALID BACKING(S): ' + invalidPhase39Backings.join(', ') : ''));
+  check(promotedPhase39Slugs.length > 0,
+    'the Phase-39 batch includes T1 handler promotions in the head bucket (got ' + promotedPhase39Slugs.length + ' promoted descriptors)');
 
   // (3) the head bucket is correct -- the 3 heads + the hand-authored recipes.
   const headSlugs = catalog.descriptors
@@ -220,11 +220,11 @@ function parseManifestVendoredStems(md) {
   check(report.realAppCount >= 110,
     'realAppCount (' + report.realAppCount + ') reflects the FULL real-app corpus (>= 110 distinct services -- the ~117 real apps across their emitted apex/www hosts + the 3 heads + the hand-authored recipe origins; the 39.5-04 full-source import)');
 
-  // (5) NO payment op is API-invocable (cross-confirm the payment-op guard) ------
+  // (5) NO payment op is on an ungated origin (cross-confirm the payment-op guard) -
   // Reuse the SAME dual-path payment detection the crosscheck gate ships (verbPrefix
   // PAYMENT_VERBS + PAYMENT_OP_NAMES) via the shared side-effect module, so the test
-  // keys payment ops EXACTLY as the gate does -- a payment op in the head bucket would
-  // be a confident API-invocable money-mover.
+  // keys payment ops EXACTLY as the gate does for coverage counts. The actual safety
+  // verdict is delegated to checkPaymentOpsNotSafeInvocable with the live denylist.
   const sideEffectMod = await import(pathToFileURL(path.join(REPO_ROOT, 'scripts', 'lib', 'side-effect-class.mjs')).href);
   const opNameFromSlug = sideEffectMod.opNameFromSlug;
   const verbPrefix = sideEffectMod.verbPrefix;
@@ -245,22 +245,26 @@ function parseManifestVendoredStems(md) {
     return false;
   }
   let paymentOpCount = 0;
-  let everyPaymentOpDom = true;
-  const invocablePaymentOps = [];
+  const handlerBackedPaymentOps = [];
   for (const d of catalog.descriptors) {
     if (!d || typeof d.slug !== 'string') { continue; }
     if (!isPaymentOp(d.slug)) { continue; }
     paymentOpCount++;
     if (d.backing === 'recipe' || d.backing === 'handler') {
-      everyPaymentOpDom = false;
-      invocablePaymentOps.push(d.slug + ' (backing:' + String(d.backing) + ')');
+      handlerBackedPaymentOps.push(d.slug);
     }
   }
   check(paymentOpCount > 0,
     'the catalog carries payment ops (got ' + paymentOpCount + ' -- place_order/create_order/buy_tickets/complete_booking/... across the commerce/travel batch)');
-  check(everyPaymentOpDom,
-    'NO payment op is backing recipe/handler (every payment op is DOM-only -- NONE is API-invocable; money-no-movement-under-Auto cross-confirmed)' +
-    (invocablePaymentOps.length ? ' -- INVOCABLE PAYMENT OP(S): ' + invocablePaymentOps.join(', ') : ''));
+
+  const Denylist = require(DENYLIST_MODULE);
+  await Denylist.load();
+  const paymentGate = crossMod.checkPaymentOpsNotSafeInvocable(catalog.descriptors, Denylist.classify);
+  check(Array.isArray(paymentGate.failures) && paymentGate.failures.length === 0,
+    'NO payment op is on an ungated origin (handler-backed payment ops are allowed only because their services are sensitive/denied)' +
+    (paymentGate.failures && paymentGate.failures.length ? ' -- FAILURES: ' + paymentGate.failures.join(' | ') : ''));
+  check(handlerBackedPaymentOps.indexOf('etsy.checkout') !== -1 && handlerBackedPaymentOps.indexOf('lyft.request_ride') !== -1,
+    'handler-backed payment ops include live etsy.checkout and lyft.request_ride by design (both are covered by the origin gate)');
 
   console.log('\ncoverage-report.test: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);

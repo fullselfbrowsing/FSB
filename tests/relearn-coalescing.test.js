@@ -333,6 +333,71 @@ const clearTimer = () => {};
   check(consentFnCalls === 1,
     'CONSENT-PRESERVED: an { ok:false, reason:RECIPE_CONSENT_* } result is treated as a failed attempt for back-off -- an immediate re-schedule is deferred (no retry-storm on a denied origin; still ' + consentFnCalls + ' call)');
 
+  // ===========================================================================
+  // (E) REENTRANCY: a scheduleRelearn arriving WHILE the fn is in flight must
+  //     not arm a fresh coalescing-window timer against the stale pre-settle
+  //     back-off state -- it PARKS, and settle() arms it against the back-off
+  //     the in-flight failure computes. It must also never double-run the fn.
+  // ===========================================================================
+  console.log('\n--- (E) reentrancy during the in-flight fn honors the freshly-computed back-off ---');
+
+  if (typeof SCHED._reset === 'function') { SCHED._reset(); }
+  clockMs = 1000;
+  const originG = 'https://reentrant.example';
+  let gCalls = 0;
+  let releaseG = null;
+  // A controllable in-flight fn: the FIRST call resolves ok:false only when the
+  // test releases it (keeping it in flight); later calls resolve immediately.
+  const fnG = () => {
+    gCalls++;
+    if (gCalls === 1) {
+      return new Promise((resolve) => { releaseG = () => resolve({ ok: false, reason: 'RECIPE_HTTP_5XX' }); });
+    }
+    return Promise.resolve({ ok: true });
+  };
+  // Capture timers armed AFTER the initial schedule so the parked-cycle arm delay
+  // is observable.
+  const armedG = [];
+  const gSetTimer = (cb, delay) => { armedG.push({ cb, delay }); return armedG.length; };
+
+  scheduleRelearn(originG, fnG, { now, setTimer: gSetTimer, clearTimer });
+  check(armedG.length === 1, 'REENTRANCY setup: the initial schedule arms the coalescing-window timer');
+  // Fire the coalescing-window timer: the fn is now IN FLIGHT (unreleased).
+  const flushPromiseG = armedG[0].cb();
+  await Promise.resolve();
+  check(gCalls === 1, 'REENTRANCY setup: the fn is in flight after the window fires (1 call)');
+
+  // Reentrant rot event DURING the fn: pre-fix this armed a FRESH 2s window timer
+  // against nextEligibleAt=0 -- bypassing the back-off settle() was about to
+  // compute (and a timer firing mid-fn even double-ran the fn).
+  scheduleRelearn(originG, fnG, { now, setTimer: gSetTimer, clearTimer });
+  check(armedG.length === 1,
+    'REENTRANCY: a schedule during the in-flight fn PARKS (no fresh timer armed against the stale back-off state; still ' + armedG.length + ' armed)');
+
+  // A flush during the in-flight fn must not double-run it either.
+  await (typeof SCHED.flush === 'function' ? SCHED.flush(originG) : Promise.resolve());
+  check(gCalls === 1,
+    'REENTRANCY: flush during the in-flight fn never starts a concurrent second run (still ' + gCalls + ' call)');
+
+  // Release the fn as a FAILURE -> settle computes attempt=1, nextEligibleAt=now+BASE,
+  // and arms the parked cycle against that schedule (delay === BASE, not the 2s window).
+  releaseG();
+  await flushPromiseG;
+  await Promise.resolve();
+  check(armedG.length === 2,
+    'REENTRANCY: settle() arms the parked cycle exactly once after the fn settles (got ' + armedG.length + ' armed)');
+  check(armedG.length === 2 && armedG[1].delay === BASE,
+    'REENTRANCY: the parked cycle honors the freshly-computed back-off (armed at BASE=' + BASE + 'ms, got ' + (armedG[1] && armedG[1].delay) + 'ms -- NOT the ' + SCHED.COALESCE_WINDOW_MS + 'ms coalescing window)');
+
+  // The parked cycle stays deferred until the back-off elapses, then runs.
+  await (typeof SCHED.flush === 'function' ? SCHED.flush(originG) : Promise.resolve());
+  check(gCalls === 1,
+    'REENTRANCY: the parked cycle is still deferred inside the back-off window (flush before eligibility does not run it)');
+  clockMs += BASE + 1;
+  await (typeof SCHED.flush === 'function' ? SCHED.flush(originG) : Promise.resolve());
+  check(gCalls === 2,
+    'REENTRANCY: after the back-off elapses the parked cycle runs exactly once (got ' + gCalls + ' calls)');
+
   console.log('\nrelearn-coalescing: ' + passed + ' passed, ' + failed + ' failed');
   process.exit(failed > 0 ? 1 : 0);
 })().catch(function (e) {

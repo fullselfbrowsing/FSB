@@ -1160,9 +1160,11 @@
             FSB.lastActionStatusText = null;
           } else {
             if (overlayState.highlight?.animated) {
-              const glowState = (overlayState.phase === 'acting' || overlayState.phase === 'writing' || overlayState.phase === 'switching_tab')
-                ? 'acting'
-                : 'thinking';
+              const glowState = overlayState.phase === 'calling'
+                ? 'calling'
+                : (overlayState.phase === 'acting' || overlayState.phase === 'writing' || overlayState.phase === 'switching_tab')
+                  ? 'acting'
+                  : 'thinking';
               FSB.viewportGlow.show(glowState);
             } else {
               FSB.viewportGlow.destroy();

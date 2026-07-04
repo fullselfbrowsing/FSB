@@ -13,7 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-import { reportReadiness, validateReadinessReport } from './report-t1-readiness.mjs';
+import { loadCatalog, reportReadiness, validateReadinessReport } from './report-t1-readiness.mjs';
 import { buildTailWorklist, validateTailWorklist } from './report-t1-tail-worklist.mjs';
 import { bridgeDecisionFor } from './verify-pattern-d-gapi-gate.mjs';
 import { loadEvidence, validateWriteActivationEvidence } from './verify-write-activation-evidence.mjs';
@@ -398,7 +398,7 @@ export function renderWriteLedgerMarkdown(ledger) {
 
 export function writeReports(opts = {}) {
   const readiness = opts.readiness || reportReadiness();
-  const readinessValidation = validateReadinessReport(readiness);
+  const readinessValidation = validateReadinessReport(readiness, loadCatalog());
   if (readinessValidation.failures.length) {
     return { failures: readinessValidation.failures, readiness };
   }

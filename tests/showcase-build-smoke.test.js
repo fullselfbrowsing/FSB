@@ -143,6 +143,56 @@ for (const rel of CRAWLER_FILES) {
     `'/stats' found in ${rel}`);
 }
 
+function normalizeRoutePath(routePath) {
+  if (!routePath || routePath === '/') return '/';
+  return '/' + String(routePath).replace(/^\/+/, '');
+}
+
+function extractPrerenderRoutes(source) {
+  const routes = [];
+  const routeObjectRe = /\{[\s\S]*?\}/g;
+  let match;
+  while ((match = routeObjectRe.exec(source)) !== null) {
+    const block = match[0];
+    if (!/renderMode:\s*RenderMode\.Prerender/.test(block)) continue;
+    const pathMatch = block.match(/path:\s*'([^']*)'/);
+    if (!pathMatch) continue;
+    const raw = pathMatch[1];
+    if (raw.includes('*') || raw.includes(':')) continue;
+    routes.push(normalizeRoutePath(raw));
+  }
+  return [...new Set(routes)].sort((a, b) => a.localeCompare(b));
+}
+
+function extractMarketingRoutes(source) {
+  const setMatch = source.match(/const\s+marketingRoutes\s*=\s*new\s+Set\(\s*\[([\s\S]*?)\]\s*\);/);
+  if (!setMatch) return null;
+  return [...setMatch[1].matchAll(/'([^']+)'/g)]
+    .map((m) => normalizeRoutePath(m[1]))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+const serverRoutesSource = fs.readFileSync(path.join(ROOT, 'showcase/angular/src/app/app.routes.server.ts'), 'utf8');
+const showcaseServerSource = fs.readFileSync(path.join(ROOT, 'showcase/server/server.js'), 'utf8');
+const prerenderRoutes = extractPrerenderRoutes(serverRoutesSource);
+const marketingRoutes = extractMarketingRoutes(showcaseServerSource);
+check('source: app.routes.server.ts has prerender routes',
+  prerenderRoutes.length > 0,
+  'no RenderMode.Prerender routes parsed');
+check('source: server.js marketingRoutes set parsed',
+  Array.isArray(marketingRoutes),
+  'const marketingRoutes = new Set([...]) not found');
+if (Array.isArray(marketingRoutes)) {
+  const missingMarketingRoutes = prerenderRoutes.filter((route) => !marketingRoutes.includes(route));
+  const clientRoutesPresent = ['/dashboard', '/stats'].filter((route) => marketingRoutes.includes(route));
+  check('showcase server marketingRoutes covers every prerender route',
+    missingMarketingRoutes.length === 0,
+    `missing ${missingMarketingRoutes.join(', ') || 'none'}`);
+  check('showcase server marketingRoutes excludes client-only routes',
+    clientRoutesPresent.length === 0,
+    `unexpected ${clientRoutesPresent.join(', ') || 'none'}`);
+}
+
 // dist/ must not contain a /stats prerendered page either. Only check if a
 // build was just run (Layer 2 ran).
 if (!SKIP_BUILD) {

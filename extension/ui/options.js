@@ -161,9 +161,6 @@ function initializeDashboard() {
   loadPaymentVaultStatus();
   initCredentialVaultListeners();
 
-  // Check API connection
-  checkApiConnection();
-  
   // Setup theme
   setupTheme();
   
@@ -1367,6 +1364,12 @@ function loadSettings() {
           updateModelDescription(selectedModel.description);
         }
         updateApiKeyVisibility(settings.modelProvider || 'xai');
+        // Load-order fix: run the API-connection check inside this model-name timer.
+        // By the time it fires, the callback's synchronous body has already populated
+        // the apiKey + provider inputs and modelName was just applied above, so
+        // checkApiConnection reads populated inputs -- not the empty fields the old
+        // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
+        checkApiConnection();
       }, 100);
     }
     

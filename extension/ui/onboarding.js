@@ -77,6 +77,7 @@
   let toastTimer = null;
   let fanCloseTimer = null;
   let hoverTimer = null;
+  let currentWindowId = null;
 
   globalThis.FSB_ONBOARDING_PROVIDER_KEY_FIELDS = PROVIDER_KEY_FIELDS;
   globalThis.FSB_ONBOARDING_INSTALL_CLIENTS = INSTALL_CLIENTS;
@@ -89,22 +90,38 @@
     els.nodes = document.getElementById('obNodes');
     els.trackFill = document.getElementById('obTrackFill');
     els.stepLabel = document.getElementById('obStepLabel');
-    els.themeToggle = document.getElementById('obThemeToggle');
     els.toast = document.getElementById('obToast');
     els.toastMsg = document.getElementById('obToastMsg');
 
+    setupTheme();
     await loadInitialState();
-    els.themeToggle.addEventListener('click', toggleTheme);
+    // Resolve a concrete window id now (async is safe here, well before the
+    // Open FSB click) so openFsb() can call sidePanel.open synchronously
+    // inside the user gesture. WINDOW_ID_CURRENT (-2) is rejected by the API.
+    try {
+      if (chrome.windows && typeof chrome.windows.getCurrent === 'function') {
+        const win = await chrome.windows.getCurrent();
+        if (win && typeof win.id === 'number') currentWindowId = win.id;
+      }
+    } catch (_e) { /* fall back to no-windowId open in openFsb() */ }
     render();
     rollTimer = setInterval(advanceInstallClient, ROTATE_MS);
   }
 
+  function setupTheme() {
+    const media = (typeof window !== 'undefined' && window.matchMedia) ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    state.theme = media && media.matches ? 'dark' : 'light';
+    if (media) {
+      media.addEventListener('change', (e) => {
+        state.theme = e.matches ? 'dark' : 'light';
+        render();
+      });
+    }
+  }
+
   async function loadInitialState() {
     try {
-      const data = await storageGet(['modelProvider', 'lmstudioBaseUrl', 'fsbOnboardingTheme']);
-      if (data.fsbOnboardingTheme === 'light' || data.fsbOnboardingTheme === 'dark') {
-        state.theme = data.fsbOnboardingTheme;
-      }
+      const data = await storageGet(['modelProvider', 'lmstudioBaseUrl']);
       if (data.modelProvider && PROVIDER_MODELS[data.modelProvider] !== undefined) {
         state.provider = data.modelProvider;
       }
@@ -124,7 +141,6 @@
 
   function render() {
     els.root.dataset.theme = state.theme;
-    els.themeToggle.innerHTML = `<i class="${state.theme === 'dark' ? 'fa-regular fa-sun' : 'fa-regular fa-moon'}"></i>`;
 
     renderStepper();
     if (state.screen === 'welcome') renderWelcome();
@@ -292,15 +308,11 @@
     bind('#obUseMcpFromKeySkip', 'click', useMcp);
     bind('#obKeyInput', 'input', (event) => {
       state.apiKey = event.target.value;
-      state.keyStatus = 'idle';
-      state.keyMessage = '';
-      render();
+      resetKeyStatusIdle();
     });
     bind('#obLocalUrlInput', 'input', (event) => {
       state.lmstudioBaseUrl = event.target.value;
-      state.keyStatus = 'idle';
-      state.keyMessage = '';
-      render();
+      resetKeyStatusIdle();
     });
     bind('#obRevealKey', 'click', () => { state.revealed = !state.revealed; render(); });
     bind('#obPasteKey', 'click', pasteFromClipboard);
@@ -418,6 +430,34 @@
     `;
   }
 
+  // In-place status reset for the key/URL inputs. A full render() on every
+  // keystroke rebuilds els.screen.innerHTML, destroying the focused input --
+  // the caret jumps out after each character. Only the status icon + message
+  // depend on keystrokes (Continue's disabled state keys on state.validating
+  // alone), so update those two nodes surgically and leave the input alone.
+  function resetKeyStatusIdle() {
+    state.keyStatus = 'idle';
+    state.keyMessage = '';
+    const provider = currentProvider();
+    const icon = els.screen.querySelector('.ob-status');
+    const msgEl = els.screen.querySelector('.ob-status-msg');
+    if (provider.local) {
+      // Mirrors localFieldHtml()'s idle branch.
+      if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check ok"></i>';
+      if (msgEl) {
+        msgEl.className = 'ob-status-msg ok';
+        msgEl.textContent = 'No API key required. Models load live from /v1/models';
+      }
+    } else {
+      // Mirrors apiKeyFieldHtml()'s idle branch.
+      if (icon) icon.innerHTML = '';
+      if (msgEl) {
+        msgEl.className = 'ob-status-msg';
+        msgEl.textContent = '';
+      }
+    }
+  }
+
   function localFieldHtml() {
     const statusIcon = state.validating ? '<i class="fa-solid fa-spinner spin"></i>' : state.keyStatus === 'valid' ? '<i class="fa-solid fa-circle-check ok"></i>' : state.keyStatus === 'invalid' ? '<i class="fa-solid fa-circle-xmark bad"></i>' : '<i class="fa-solid fa-circle-check ok"></i>';
     const statusClass = state.keyStatus === 'invalid' ? 'bad' : 'ok';
@@ -453,6 +493,16 @@
     `;
   }
 
+  // Surgical open/close for the install-fan menu. A full render() on hover
+  // rebuilds els.screen.innerHTML, replacing the .install-fan nodes with new
+  // ones that already have (or lack) the "open" class from first paint --
+  // the CSS transition never sees a "before" frame, so it snaps instead of
+  // animating. Toggle the class on the existing nodes instead so the
+  // transition has something to interpolate from.
+  function setFanOpen(open) {
+    els.screen.querySelectorAll('.install-fan').forEach((fan) => fan.classList.toggle('open', open));
+  }
+
   function bindMcpInteractions() {
     const current = ROLL_CLIENTS[state.iconIndex];
     bind('#obCopyCurrent', 'click', () => copyCommand(BASE_INSTALL_COMMAND + ' ' + current.flag, 'current'));
@@ -462,12 +512,12 @@
     bind('#obCopyWrap', 'mouseenter', () => {
       clearTimeout(hoverTimer);
       clearTimeout(fanCloseTimer);
-      hoverTimer = setTimeout(() => { state.fanOpen = true; render(); }, 420);
+      hoverTimer = setTimeout(() => { state.fanOpen = true; setFanOpen(true); }, 420);
     });
     bind('#obCopyWrap', 'mouseleave', () => {
       clearTimeout(hoverTimer);
       clearTimeout(fanCloseTimer);
-      fanCloseTimer = setTimeout(() => { state.fanOpen = false; render(); }, 260);
+      fanCloseTimer = setTimeout(() => { state.fanOpen = false; setFanOpen(false); }, 260);
     });
     els.screen.querySelectorAll('[data-copy-client]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -621,9 +671,7 @@
     let openPromise = null;
     try {
       if (chrome.sidePanel && typeof chrome.sidePanel.open === 'function') {
-        const windowId = chrome.windows && typeof chrome.windows.WINDOW_ID_CURRENT === 'number'
-          ? chrome.windows.WINDOW_ID_CURRENT
-          : undefined;
+        const windowId = (typeof currentWindowId === 'number') ? currentWindowId : undefined;
         openPromise = chrome.sidePanel.open(windowId !== undefined ? { windowId } : {});
       }
     } catch (error) {
@@ -766,12 +814,6 @@
       // Clipboard failure is non-fatal; the visible command remains selectable.
     }
     document.body.removeChild(textarea);
-  }
-
-  function toggleTheme() {
-    state.theme = state.theme === 'dark' ? 'light' : 'dark';
-    storageSet({ fsbOnboardingTheme: state.theme }).catch(() => {});
-    render();
   }
 
   function currentProvider() {

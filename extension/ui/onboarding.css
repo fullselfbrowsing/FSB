@@ -167,26 +167,6 @@ a:hover {
   color: var(--text-muted);
 }
 
-.ob-icon-btn {
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 50%;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  transition: all var(--transition-fast);
-}
-
-.ob-icon-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-  transform: scale(1.08);
-}
-
 .fsb-mark {
   display: inline-block;
   line-height: 1;

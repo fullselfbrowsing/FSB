@@ -704,21 +704,81 @@ async function executeCapabilityToolForAutopilot(name, params, tabId) {
   // Resolve the active-tab origin as the catalog bias input. executeBoundSpec re-pins
   // the active tab regardless, so a null origin here is non-fatal (the pin still holds).
   let origin = null;
+  let url = '';
   try {
     const tab = await chrome.tabs.get(tabId);
     origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+    url = (tab && typeof tab.url === 'string') ? tab.url : '';
   } catch (_) {
     origin = null;
+    url = '';
   }
 
   let response;
   if (name === 'invoke_capability') {
+    // Capability-call overlay treatment: same pre/post sendSessionStatus
+    // instrumentation as the MCP front door (extension/ws/mcp-tool-dispatcher.js
+    // handleCapabilitiesInvokeMessageRoute) -- one engine, two thin front
+    // doors, both get overlay coverage. capability-router.js stays untouched.
+    if (tabId !== null && typeof tabId === 'number') {
+      try {
+        const previewEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+          && typeof FsbCapabilityCatalog.resolve === 'function')
+          ? FsbCapabilityCatalog.resolve(finalParams.slug, origin)
+          : null;
+        const previewService = (previewEntry && previewEntry.descriptor && previewEntry.descriptor.service) || origin || '';
+        const previewReady = !!(previewEntry && (previewEntry.tier === 'T1a' || previewEntry.tier === 'T1b' || previewEntry.tier === 'T0'));
+        const previewStoppable = (typeof getActiveSessionsMap === 'function')
+          ? Array.from(getActiveSessionsMap().values()).some((s) => s && s.tabId === tabId && s.status === 'running')
+          : false;
+        if (typeof sendSessionStatus === 'function') {
+          sendSessionStatus(tabId, {
+            phase: 'calling',
+            guarded: false,
+            capability: {
+              chipText: previewService + ' · ' + String(finalParams.slug || ''),
+              guarded: false,
+              readinessLabel: previewReady ? 'T1 ready' : 'Guarded',
+              readinessClass: previewReady ? 'ready' : 'guarded',
+              noteText: null
+            },
+            stoppable: previewStoppable
+          });
+        }
+      } catch (_previewErr) {
+        // Non-blocking: overlay preview is best-effort, never gates the real invoke.
+      }
+    }
+
     // Route a slug through the shared engine -- may mutate.
     response = await router.invoke(finalParams.slug, finalParams.params || {}, {
       origin,
       tabId,
+      url,
       source: 'autopilot'
     });
+
+    if (tabId !== null && typeof tabId === 'number' && response && response.success === false && response.code) {
+      try {
+        const guardedNoteText = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.mapCapabilityErrorToNote)
+          ? FSBOverlayStateUtils.mapCapabilityErrorToNote(response.code)
+          : null;
+        if (guardedNoteText && typeof sendSessionStatus === 'function') {
+          sendSessionStatus(tabId, {
+            phase: 'calling',
+            guarded: true,
+            capability: {
+              chipText: (origin || '') + ' · ' + String(finalParams.slug || ''),
+              guarded: true,
+              noteText: guardedNoteText
+            },
+            stoppable: false
+          });
+        }
+      } catch (_guardedErr) {
+        // Non-blocking: overlay status is best-effort, never alters the real result.
+      }
+    }
   } else {
     // search_capabilities never mutates: it queries the MiniSearch index directly.
     const searchMod = (typeof FsbCapabilitySearch !== 'undefined') ? FsbCapabilitySearch : null;

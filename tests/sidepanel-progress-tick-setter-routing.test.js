@@ -376,6 +376,43 @@ ok(sendBtnStub.disabled === true,
    'Part 3.3 -- sendBtn on Tab B stays disabled (session_B still running)');
 
 // =====================================================================
+// Part 4 -- iteration_complete for a NON-current session must not persist
+// into the visible tab (review finding #3).
+// =====================================================================
+
+console.log('\nPart 4 -- iteration_complete routing for a background session:');
+
+// Active tab B (200) shows conv_tab_b; a background session_A on tab 100 emits an
+// iteration tick with NO conversationId. Pre-fix, iterConvId fell back to the
+// visible tab's conversationId and wrote the progress row into conv_tab_b.
+tabRunningMap.clear();
+tabRunningMap.set(100, { isRunning: true, sessionId: 'session_A' });
+tabRunningMap.set(200, { isRunning: true, sessionId: 'session_B' });
+activeTabIdSnapshot = 200;
+moduleIsRunning = true;
+moduleCurrentSessionId = 'session_B';
+moduleConversationId = 'conv_tab_b';
+
+var persistBefore = persistCalls.length;
+try {
+  dispatchMessage({
+    action: 'sessionStateEvent',
+    eventType: 'iteration_complete',
+    sessionId: 'session_A',
+    iteration: 7
+  });
+} catch (err) {
+  failed++;
+  console.error('  FAIL: dispatchMessage(iteration_complete) threw:', err && err.message);
+}
+
+var iterPersist = persistCalls.slice(persistBefore).filter(function (c) { return c.content === 'Step 7 complete'; });
+ok(iterPersist.length === 1 && iterPersist[0].convId !== 'conv_tab_b',
+   'Part 4.1 -- background session_A iteration tick is NOT persisted into the visible tab conv_tab_b');
+ok(iterPersist.length === 1 && iterPersist[0].convId === null,
+   'Part 4.2 -- a non-current session with no conversationId resolves iterConvId to null (real store no-ops)');
+
+// =====================================================================
 // Summary
 // =====================================================================
 

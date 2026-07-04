@@ -162,6 +162,14 @@
     if (!entry) return;
     entry.debounceTimer = null;
     var leaf = resolveLeaf(entry.selector);
+    if (!leaf) {
+      // Transient DOM detach (framework re-render mid-swap): never report a
+      // fabricated {text:''} -- it would spuriously satisfy a 'changed'
+      // condition against a non-empty baseline. The next mutation after the
+      // re-attach schedules a fresh flush; permanent removal is covered by
+      // the SW watchdog + the trigger TTL.
+      return;
+    }
     var value = readValue(leaf, entry.extract, entry.attrName);
     sendValue(triggerId, value);
   }

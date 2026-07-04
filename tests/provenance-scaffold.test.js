@@ -16,8 +16,8 @@
  *   - the vendor-side _provenance.json and the catalog-side provenance scaffold
  *     BOTH carry sha == the pinned SHA (they MATCH) + license "MIT" + apps == [];
  *   - docs/LEGAL.md gained the "Categorization Axes" subsection naming the three
- *     distinct axes (finance/government denial, ToS-hostility denial, sensitivity)
- *     AND at least the named ToS-hostile denied roster apps (robinhood ... onlyfans);
+ *     distinct axes (hard denial, sensitive governance, payment / money movement)
+ *     AND at least one sensitive brokerage app (robinhood) plus one hard-denied app (onlyfans);
  *   - vendor/opentabs-snapshot/ contains NO runtime .js file (the Wall-1 no-runtime
  *     guarantee: only metadata/provenance is ever vendored).
  *
@@ -98,16 +98,16 @@ check(vprov.sha === cprov.sha,
 const legal = fs.readFileSync(LEGAL_MD, 'utf8');
 check(/Categorization Axes/.test(legal),
   'docs/LEGAL.md contains the "Categorization Axes" subsection');
-check(/[Ff]inance\s*\/\s*[Gg]overnment denial/.test(legal),
-  'LEGAL.md names axis 1: finance / government denial');
-check(/ToS-hostility denial/.test(legal),
-  'LEGAL.md names axis 2: ToS-hostility denial');
-check(/Sensitivity \(Ask \/ mutating-gated\)/.test(legal),
-  'LEGAL.md names axis 3: Sensitivity (Ask / mutating-gated)');
-check(/robinhood/.test(legal),
-  'LEGAL.md names a brokerage denied-roster app (robinhood) on the ToS-hostility axis');
-check(/onlyfans/.test(legal),
-  'LEGAL.md names a ToS-hostile denied-roster app (onlyfans) on the ToS-hostility axis');
+check(/Hard denial/.test(legal),
+  'LEGAL.md names axis 1: Hard denial');
+check(/Sensitive governance \(Ask \/ mutating-gated\)/.test(legal),
+  'LEGAL.md names axis 2: Sensitive governance (Ask / mutating-gated)');
+check(/Payment\s*\/\s*money-movement classification/.test(legal),
+  'LEGAL.md names axis 3: Payment / money-movement classification');
+check(/robinhood/.test(legal) && /sensitive, not denied/.test(legal),
+  'LEGAL.md names robinhood as sensitive, not denied');
+check(/onlyfans/.test(legal) && /hard-denied/.test(legal),
+  'LEGAL.md names onlyfans as hard-denied');
 
 // ---- Wall 1: vendor/opentabs-snapshot/ holds NO runtime .js ----
 // Recursively walk the vendor dir and assert zero .js files (no OpenTabs dist/ or

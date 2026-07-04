@@ -409,11 +409,10 @@ export { COMMERCE_SENSITIVE_SERVICES };
 // THE TRAP THIS CLOSES: the commerce/travel/misc batch is the most-sensitive --
 // a payment-bearing op (place_order / checkout / charge / complete_booking /
 // buy_tickets / book_flight / request_ride / place_bid / create_order / ...) that
-// is ever classified safe-AND-API-invocable would run under the shipped opt-out
-// Auto default = MONEY MOVED without consent (an order placed, a card charged, a
-// paid reservation booked). This guard FAILS THE BUILD if any payment op is
-// safe-and-invocable. It is the third leg of the TRIPLE mitigation (the frozen
-// backing:'dom' default + payment origins sensitive/denied are the other two).
+// is emitted on an ungated origin would run under the shipped opt-out Auto default
+// = MONEY MOVED without consent (an order placed, a card charged, a paid
+// reservation booked). This guard FAILS THE BUILD if any payment op's origin is not
+// classified sensitive/denied.
 //
 // DUAL-PATH DETECTION (the blocker fix -- the guard must cover ALL 12 payment
 // op-names this phase emits, not just the three that are literal keys): a
@@ -435,19 +434,17 @@ export { COMMERCE_SENSITIVE_SERVICES };
 //     for op-names whose VERB is benign but whose FULL op-name moves money
 //     (create_order is the key case PATH 1 misses).
 //
-// SCOPE: the guard fails ONLY a payment op on a safe-AND-API-invocable origin. A
-// payment op that is backing:'dom' on a sensitive/denied origin PASSES (DOM-only on
-// a gated origin = no money movement under Auto; e.g. reserve_table on opentable --
-// opentable is sensitive per Task 1, so reserve_table DOM-only-on-sensitive PASSES).
+// SCOPE: the guard fails ONLY a payment op on an ungated origin. A payment op on a
+// sensitive/denied origin PASSES regardless of backing, because posture-B origin
+// gating is the consent boundary for payment-bearing ops (e.g. reserve_table on
+// opentable, checkout on etsy, and request_ride on lyft).
 // The read-only-safe apps (zillow/yelp/tripadvisor/grafana) emit ONLY read
 // ops (search/list/get/query) -- none of those verbs/op-names is a payment verb/op,
 // so NONE of their ops is a payment op and the guard never keys on them.
 //
-// SAFE-AND-INVOCABLE (a FAILURE) = a payment op for which EITHER
-//   (i) backing is 'recipe' or 'handler' (promoted to API-invocable -- a payment op
-//       must NEVER be invocable from breadth), OR
-//   (ii) classifyFn('https://'+service) returns NOT sensitive AND NOT denied (the
-//        origin is safe -> the payment op would run under Auto with no re-gate).
+// UNGATED PAYMENT (a FAILURE) = a payment op for which
+//   classifyFn('https://'+service) returns NOT sensitive AND NOT denied. A missing or
+//   unclassified origin is treated as safe in the fail-closed direction.
 
 // The payment-VERB set (PATH 1). Enumerated HERE because these verbs are deliberately
 // NOT in side-effect-class.mjs WRITE_VERBS (a payment op classes write by method, not
@@ -487,11 +484,10 @@ function isPaymentOp(slug) {
 /**
  * checkPaymentOpsNotSafeInvocable(descriptors, classifyFn) -> { failures: string[] }
  *
- * For each descriptor whose op is a payment op (dual-path), push a failure when it is
- * SAFE-AND-INVOCABLE: (i) backing 'recipe'/'handler' (promoted to invocable), OR
- * (ii) classifyFn('https://'+service) is NOT sensitive AND NOT denied (a safe origin).
- * A backing:'dom' payment op on a sensitive/denied origin PASSES. classifyFn is the
- * service-denylist classify() (the gate is build-time; runCli awaits Denylist.load()).
+ * For each descriptor whose op is a payment op (dual-path), push a failure when
+ * classifyFn('https://'+service) is NOT sensitive AND NOT denied. Handler/recipe
+ * backing is allowed when the origin is gated. classifyFn is the service-denylist
+ * classify() (the gate is build-time; runCli awaits Denylist.load()).
  */
 export function checkPaymentOpsNotSafeInvocable(descriptors, classifyFn) {
   const failures = [];
@@ -505,8 +501,6 @@ export function checkPaymentOpsNotSafeInvocable(descriptors, classifyFn) {
     if (!pay.hit) continue; // not a payment op -> the guard does not key on it
 
     const service = typeof d.service === 'string' ? d.service : '';
-    const backing = d.backing;
-    const promoted = backing === 'recipe' || backing === 'handler';
 
     // The origin classification (a missing classifyFn -> treat as UNCLASSIFIED ==
     // safe, the fail-closed direction: a payment op then fails on the safe-origin leg).
@@ -516,18 +510,15 @@ export function checkPaymentOpsNotSafeInvocable(descriptors, classifyFn) {
     }
     const safeOrigin = !(cls && (cls.sensitive === true || cls.denied === true));
 
-    if (promoted || safeOrigin) {
+    if (safeOrigin) {
       const matchedBy = pay.via === 'verb'
         ? ('payment VERB "' + pay.verb + '" (verbPrefix)')
         : ('payment OP-NAME "' + pay.opName + '"');
-      const reason = promoted
-        ? ('promoted to backing "' + String(backing) + '" (API-invocable -- a payment op must NEVER be invocable from breadth)')
-        : ('on the SAFE origin ' + service + ' (NOT sensitive/denied -> it would run under Auto with no mutating re-gate)');
       failures.push(
-        'payment op ' + slug + ' [matched ' + matchedBy + '] is SAFE-AND-API-INVOCABLE: ' + reason +
+        'payment op ' + slug + ' [matched ' + matchedBy + '] is on the SAFE origin ' + service +
+        ' (NOT sensitive/denied -> it would run under Auto with no mutating re-gate)' +
         '. A payment-bearing op writable under Auto = money moved without consent. FIX: classify ' +
-        (service || 'the origin') + ' sensitive (or denied) in extension/config/service-denylist.json AND keep ' +
-        'this op backing:"dom" (DOM-only on a gated origin), OR do not emit this payment op.'
+        (service || 'the origin') + ' sensitive (or denied) in extension/config/service-denylist.json, OR do not emit this payment op.'
       );
     }
   }
@@ -565,12 +556,15 @@ function readCorpusDescriptors() {
 // fine). Mirrors verify-classification-gate.mjs runCli's await Denylist.load().
 async function runCli() {
   const corpus = readCorpusDescriptors();
-  // Only descriptors carrying provenance.signals participate in the derived-vs-
-  // declared comparison (hand-authored recipes without OpenTabs signals are not
-  // re-derivable from this gate -- they are governed elsewhere). The override
-  // floor still applies via the slug for any with a known-destructive op-name.
+  // EVERY descriptor with a declared class participates -- including hand-authored
+  // ones WITHOUT provenance.signals. crossCheck() derives the slug-keyed floor for
+  // a signal-less descriptor (verb class + override table), so a hand-authored
+  // `read` on a destructive-verb slug FAILS here instead of shipping silently
+  // (the old provenance.signals filter dropped exactly those from the check).
+  // Floor semantics make the inclusion safe: only an UNDER-stated declaration
+  // fails; over-stating (declared above the slug-derived floor) always passes.
   const checked = corpus.filter(
-    (d) => d && d.provenance && d.provenance.signals && typeof d.sideEffectClass === 'string'
+    (d) => d && typeof d.sideEffectClass === 'string'
   );
   const { failures } = crossCheck(checked);
   // MED-02: the read-only-safe-origin invariant runs over the WHOLE corpus (not just
@@ -578,8 +572,8 @@ async function runCli() {
   // class regardless of signal shape. Merge its failures into the same fail set.
   const safeOnly = checkReadOnlySafeOrigins(corpus);
 
-  // Phase 39 PAYMENT-OP GUARD (the headline): no payment-bearing op may be safe-and-
-  // API-invocable. Consult the committed service-denylist classify() (await load()
+  // Phase 39 PAYMENT-OP GUARD (the headline): no payment-bearing op may be on an
+  // ungated origin. Consult the committed service-denylist classify() (await load()
   // first). Runs over the WHOLE corpus (a payment op is keyed by slug, not by signal
   // shape). Merge its failures into the same exit-decision set.
   const require = createRequire(import.meta.url);
@@ -597,7 +591,7 @@ async function runCli() {
 
   const allFailures = failures.concat(safeOnly.failures, paymentOnly.failures, commerceOnly.failures);
   if (allFailures.length > 0) {
-    console.error('verify-catalog-crosscheck: FAIL (an under-stated side-effect class, a non-read op on a read-only-safe origin, a payment op that is safe-and-API-invocable, or a commerce-roster brand that classifies SAFE / overlaps READ_ONLY_SAFE)');
+    console.error('verify-catalog-crosscheck: FAIL (an under-stated side-effect class, a non-read op on a read-only-safe origin, a payment op on an ungated origin, or a commerce-roster brand that classifies SAFE / overlaps READ_ONLY_SAFE)');
     for (const f of allFailures) {
       console.error('  - ' + f);
     }
@@ -605,10 +599,10 @@ async function runCli() {
   }
   console.log(
     'verify-catalog-crosscheck: PASS (' + checked.length +
-    ' descriptors with signals; every declared sideEffectClass >= its derived ' +
+    ' descriptors incl. signal-less hand-authored; every declared sideEffectClass >= its derived ' +
     'fail-safe-high class -- no under-stated destructive/mutating op; every ' +
     'read-only-safe origin (yelp/tripadvisor/zillow/grafana) emits read-only ops, MED-02; no payment-bearing ' +
-    'op is safe-and-API-invocable -- the money-no-movement-under-Auto guard, Phase 39; ' +
+    'op is on an ungated origin -- the money-no-movement-under-Auto guard, Phase 39; ' +
     'and all ' + COMMERCE_SENSITIVE_SERVICES.size + ' COMMERCE_SENSITIVE brands classify ' +
     'sensitive AND are disjoint from READ_ONLY_SAFE -- the conservative-commerce build ' +
     'invariant, Phase 39.5-03)'

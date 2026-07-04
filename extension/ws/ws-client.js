@@ -1727,6 +1727,7 @@ class FSBWebSocket {
    * @param {Object} msg - Parsed message { type, payload, ts }
    */
   _handleMessage(msg) {
+    if (!msg || typeof msg !== 'object') { return; }
     recordFSBTransportCount('receivedByType', msg && msg.type);
     var controlTypes = getFSBControlTypes();
     var remoteControlTypes = getFSBRemoteControlTypes();

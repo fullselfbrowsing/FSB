@@ -8773,7 +8773,7 @@
     "description": "Get the currently authenticated eBay user profile including user ID and first name.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.get_deals",
@@ -8788,7 +8788,7 @@
     "description": "Get current eBay daily deals and featured promotions. Returns discounted items with their deal price and original price.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.get_item",
@@ -8804,7 +8804,7 @@
     "description": "Get detailed information about a specific eBay item by its item ID. Returns title, price, condition, images, seller info, shipping details, and return policy. Uses JSON-LD structured data embedded in the item page.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.get_seller_profile",
@@ -8820,7 +8820,7 @@
     "description": "Get a seller's public profile information by their eBay username. Returns positive feedback percentage, items sold, follower count, and store name if available.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.get_watchlist",
@@ -8836,7 +8836,7 @@
     "description": "Get the authenticated user's eBay watchlist. Returns items being watched with their current price, title, and time remaining. Parses the My eBay watchlist HTML page.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.search_items",
@@ -8849,7 +8849,7 @@
     "description": "Search for items on eBay by keyword. Returns listings with title, price, condition, and shipping info. Supports filtering by category, condition, and price range. Results are paginated.",
     "actionVerb": "search",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.search_suggestions",
@@ -8862,7 +8862,7 @@
     "description": "Get autocomplete suggestions for a search query. Returns the URL to the autocomplete JavaScript module and active search factors. Use this to understand what search features are available for the current user context.",
     "actionVerb": "search",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "ebay.watch_item",
@@ -8875,7 +8875,7 @@
     "description": "Add an item to the authenticated user's eBay watchlist. Requires the item ID. The tool fetches the item page to extract the required CSRF token, then calls the watch API.",
     "actionVerb": "watch",
     "sideEffectClass": "write",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "email.send",
@@ -15963,7 +15963,7 @@
     "description": "Get the fare and ETA estimate for a single Lyft ride type between a pickup and dropoff.",
     "actionVerb": "get",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "lyft.list_ride_types",
@@ -15978,7 +15978,7 @@
     "description": "List the available Lyft ride types (Lyft, XL, Lux, Lux Black, ...) for a pickup and dropoff location.",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "lyft.list_rides",
@@ -15993,7 +15993,7 @@
     "description": "List your recent Lyft rides. Optionally filter by status (active, completed, cancelled).",
     "actionVerb": "list",
     "sideEffectClass": "read",
-    "backing": "dom"
+    "backing": "handler"
   },
   {
     "slug": "lyft.request_ride",

@@ -15774,7 +15774,16 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       const refreshPoll = await fsbTriggerHandleRefreshPollAlarm(alarm);
       if (refreshPoll && refreshPoll.handled) return;
-      await FsbTriggerLifecycle.handleTriggerAlarm(alarm);
+      const handleResult = await FsbTriggerLifecycle.handleTriggerAlarm(alarm);
+      // A live-observe trigger reaped at its TTL deadline must stop the in-page
+      // observer + overlay. handleTriggerAlarm deletes the snapshot but cannot
+      // message the tab, so mirror the fire-path cleanup here (the MCP timeout
+      // path already does this via fsbTriggerMarkTimedOutForMcp).
+      if (handleResult && handleResult.action === 'reaped_ttl'
+          && fsbTriggerIsLiveObserveSnapshot(handleResult.snapshot)) {
+        await fsbTriggerClearObserveWatchdog(handleResult.trigger_id);
+        await fsbTriggerStopObserveForSnapshot(handleResult.snapshot);
+      }
     } catch (err) {
       console.warn('[FSB TRG] handleTriggerAlarm failed (non-blocking):', err && err.message);
     }

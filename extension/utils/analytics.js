@@ -597,6 +597,8 @@ class FSBAnalytics {
     const chartData = this.getChartData('24h');
     console.log('Analytics: Chart data prepared:', chartData);
 
+    const colors = this.getChartThemeColors();
+
     try {
       this.chart = new Chart(ctx, {
       type: 'line',
@@ -628,7 +630,9 @@ class FSBAnalytics {
             title: {
               display: true,
               text: 'Time'
-            }
+            },
+            grid: { color: colors.grid },
+            ticks: { color: colors.tick }
           },
           y: {
             display: true,
@@ -636,7 +640,9 @@ class FSBAnalytics {
               display: true,
               text: 'Tokens'
             },
-            beginAtZero: true
+            beginAtZero: true,
+            grid: { color: colors.grid },
+            ticks: { color: colors.tick }
           }
         },
         interaction: {
@@ -646,12 +652,32 @@ class FSBAnalytics {
         }
       }
     });
-      
+
       console.log('Analytics: Chart initialized successfully!');
     } catch (error) {
       console.error('Analytics: Failed to create chart:', error);
       console.error('Analytics: Error details:', error.stack);
     }
+  }
+
+  // Grid/tick colors that match the current [data-theme] attribute.
+  getChartThemeColors() {
+    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+    return {
+      grid: dark ? 'rgba(255,255,255,0.06)' : 'rgba(41,29,20,0.08)',
+      tick: dark ? '#a99283' : '#8d7a6e'
+    };
+  }
+
+  // Repaints the chart's grid/tick colors for the current theme in place
+  // (mutate + update(), cheaper than destroying/recreating the chart).
+  updateChartTheme() {
+    if (!this.chart) return;
+    const colors = this.getChartThemeColors();
+    const scales = this.chart.options.scales;
+    if (scales.x) { scales.x.grid.color = colors.grid; scales.x.ticks.color = colors.tick; }
+    if (scales.y) { scales.y.grid.color = colors.grid; scales.y.ticks.color = colors.tick; }
+    this.chart.update();
   }
 
   // Update chart with new time range

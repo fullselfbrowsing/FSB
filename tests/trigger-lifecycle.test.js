@@ -28,7 +28,8 @@
  *      two handler calls, assert the second observes the new state (no stale heap).
  *   G. restoreTriggersFromStorage armed-not-elapsed re-armed with the ORIGINAL
  *      when value (asserted via _created()/getAll()) (SURV-03).
- *   H. restoreTriggersFromStorage fired/stopped/expired dropped (delete + _cleared())
+ *   H. restoreTriggersFromStorage retains terminal-within-TTL (alarm cleared,
+ *      snapshot kept for get_trigger_status); reaps only TTL-expired entries
  *      (SURV-03 / LIFE-05 reap path b).
  *   I. restoreTriggersFromStorage orphan fsbTrigger:* alarm with NO backing
  *      snapshot -> cleared (SURV-03 / D-08, the one genuinely-new piece).
@@ -376,11 +377,11 @@ async function caseG() {
 }
 
 // ------------------------------------------------------------------
-// Case H: restore drops fired/stopped/timed_out/expired (delete + clear)
+// Case H: restore retains terminal-within-TTL, reaps only TTL-expired
 // ------------------------------------------------------------------
 
 async function caseH() {
-  console.log('\n--- Case H: restore drops fired/stopped/timed_out/expired (SURV-03 / LIFE-05 b) ---');
+  console.log('\n--- Case H: restore retains fired/stopped/timed_out within TTL, reaps expired (SURV-03 / LIFE-05 b) ---');
   const { chromeMock, store, lc } = setupHarness();
   const now = Date.now();
 
@@ -388,19 +389,29 @@ async function caseH() {
   await store.writeSnapshot('trg_stopped', makeSnapshot({ trigger_id: 'trg_stopped', status: 'stopped', deadline_at: now + 3600000 }));
   await store.writeSnapshot('trg_timeout', makeSnapshot({ trigger_id: 'trg_timeout', status: 'timed_out', deadline_at: now + 3600000 }));
   await store.writeSnapshot('trg_expired', makeSnapshot({ trigger_id: 'trg_expired', status: 'armed', deadline_at: now - 1000 }));
+  await store.writeSnapshot('trg_fired_old', makeSnapshot({ trigger_id: 'trg_fired_old', status: 'fired', deadline_at: now - 1000 }));
 
   const r = await lc.restoreTriggersFromStorage();
   check(r && r.ok === true, 'H.1 restore returned ok=true');
-  check(r.reaped === 4, 'H.2 all terminal/expired snapshots reaped');
-  check(r.restored === 0, 'H.3 nothing re-armed');
+  check(r.reaped === 2, 'H.2 only TTL-expired snapshots reaped (expired-armed + expired-fired)');
+  check(r.retained === 3, 'H.3 terminal-within-TTL snapshots retained for status queries');
+  check(r.restored === 0, 'H.4 nothing re-armed');
 
-  check((await store.readSnapshot('trg_fired')) === null, 'H.4 fired snapshot deleted');
-  check((await store.readSnapshot('trg_stopped')) === null, 'H.5 stopped snapshot deleted');
-  check((await store.readSnapshot('trg_timeout')) === null, 'H.6 timed_out snapshot deleted');
-  check((await store.readSnapshot('trg_expired')) === null, 'H.7 expired-armed snapshot deleted (LIFE-05 restore-reap)');
+  const fired = await store.readSnapshot('trg_fired');
+  check(fired && fired.status === 'fired', 'H.5 fired snapshot KEPT (get_trigger_status answerable after SW wake)');
+  const stopped = await store.readSnapshot('trg_stopped');
+  check(stopped && stopped.status === 'stopped', 'H.6 stopped snapshot KEPT within TTL');
+  const timedOut = await store.readSnapshot('trg_timeout');
+  check(timedOut && timedOut.status === 'timed_out', 'H.7 timed_out snapshot KEPT within TTL');
+  check((await store.readSnapshot('trg_expired')) === null, 'H.8 expired-armed snapshot deleted (LIFE-05 restore-reap)');
+  check((await store.readSnapshot('trg_fired_old')) === null, 'H.9 fired snapshot past its TTL deadline deleted');
 
   const cleared = chromeMock.alarms._cleared();
-  check(cleared.includes('fsbTrigger:trg_fired') && cleared.includes('fsbTrigger:trg_stopped') && cleared.includes('fsbTrigger:trg_timeout') && cleared.includes('fsbTrigger:trg_expired'), 'H.8 all terminal/expired alarms cleared');
+  check(cleared.includes('fsbTrigger:trg_fired') && cleared.includes('fsbTrigger:trg_stopped') && cleared.includes('fsbTrigger:trg_timeout'), 'H.10 retained terminal snapshots have their alarms cleared (no future fire)');
+  check(cleared.includes('fsbTrigger:trg_expired') && cleared.includes('fsbTrigger:trg_fired_old'), 'H.11 reaped snapshots have their alarms cleared');
+
+  const liveNames = (await chromeMock.alarms.getAll()).map((a) => a.name);
+  check(!liveNames.includes('fsbTrigger:trg_fired'), 'H.12 no live alarm remains for a retained terminal snapshot');
 }
 
 // ------------------------------------------------------------------
@@ -1012,6 +1023,42 @@ function caseU() {
 }
 
 // ------------------------------------------------------------------
+// Case AA: background arm-handler source invariants (rearm copy, cap
+// wiring, INVALID_TAB_ID reachability)
+// ------------------------------------------------------------------
+
+function caseAA() {
+  console.log('\n--- Case AA: background arm-handler source invariants ---');
+  const bgPath = path.resolve(__dirname, '..', 'extension', 'background.js');
+  const src = fs.readFileSync(bgPath, 'utf8');
+
+  // AA.1-2: rearm_on_fire flows from tool params into the arm spec (without it
+  // copyArmMetadata never sees the field and every trigger disarms on first fire).
+  const armStart = src.indexOf('async function fsbTriggerHandleToolArm');
+  const armEnd = src.indexOf('async function', armStart + 10);
+  const armBlock = armStart >= 0 ? src.slice(armStart, armEnd > armStart ? armEnd : undefined) : '';
+  check(armBlock.includes('safeParams.rearm_on_fire === true'), 'AA.1 arm handler reads params.rearm_on_fire');
+  check(armBlock.includes('spec.rearm_on_fire = true'), 'AA.2 arm handler copies rearm_on_fire onto the spec');
+
+  // AA.3: the no-tab-id guard is reachable (tabId === null; the former
+  // Number.isFinite(Number(tabId)) let Number(null)===0 through).
+  check(/if\s*\(tabId === null\)\s*\{\s*\n\s*return \{ success: false, errorCode: 'INVALID_TAB_ID' \};/.test(armBlock)
+      || (armBlock.includes('tabId === null') && armBlock.includes("errorCode: 'INVALID_TAB_ID'")),
+    'AA.3 INVALID_TAB_ID guard keys on tabId === null');
+
+  // V.4: the candidate scan never coerces null/'' into tab id 0.
+  const helperStart = src.indexOf('function fsbTriggerFirstFiniteTabId');
+  const helperBlock = helperStart >= 0 ? src.slice(helperStart, src.indexOf('function', helperStart + 10)) : '';
+  check(helperBlock.includes("arguments[i] == null || arguments[i] === ''"), 'AA.4 fsbTriggerFirstFiniteTabId skips nullish/empty candidates');
+
+  // AA.5-6: the operator trigger cap is hydrated at SW boot and tracked live.
+  check(src.includes('FsbTriggerManager.loadCapFromStorage()'), 'AA.5 SW boot hydrates the trigger cap from storage');
+  check(src.includes('changes.fsbTriggerCap')
+      && src.includes('FsbTriggerManager.setCap(changes.fsbTriggerCap.newValue)'),
+    'AA.6 storage.onChanged applies live fsbTriggerCap changes via setCap');
+}
+
+// ------------------------------------------------------------------
 // Driver
 // ------------------------------------------------------------------
 
@@ -1046,6 +1093,7 @@ function caseU() {
   await caseY();
   await caseZ();
   caseU();
+  caseAA();
 
   console.log('\n--- Phase 14 plan 02 trigger-lifecycle summary ---');
   console.log('  passed:', passed);

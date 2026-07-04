@@ -3172,48 +3172,59 @@
           return fallback('cockroachdb-response-class-unavailable');
         }
 
-        var payload = new Uint8Array(0);
-        if (typeof setup === 'function') {
-          var req = setup(proto);
-          if (!req || typeof req.serializeBinary !== 'function') {
-            return fallback('cockroachdb-request-class-unavailable');
+        // Every other site read handler in this file wraps its fetch + response
+        // decode so a network/offline/CORS/malformed-proto failure resolves to a
+        // typed fallback instead of rejecting (mirrors temporalApi). crdbGrpc is
+        // the single fetch chokepoint for all CockroachDB reads, so wrap it here.
+        try {
+          var payload = new Uint8Array(0);
+          if (typeof setup === 'function') {
+            var req = setup(proto);
+            if (!req || typeof req.serializeBinary !== 'function') {
+              return fallback('cockroachdb-request-class-unavailable');
+            }
+            payload = req.serializeBinary();
           }
-          payload = req.serializeBinary();
-        }
 
-        var response = await fetch('https://cockroachlabs.cloud/console.ManagementConsole/' + method, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/grpc-web+proto',
-            'Accept': 'application/grpc-web+proto',
-            'X-Grpc-Web': '1'
-          },
-          body: crdbEncodeGrpcFrame(payload),
-          credentials: 'include',
-          redirect: 'manual'
-        });
-        if (response.type === 'opaqueredirect' || response.status === 401 || response.status === 403) {
-          return fallback('cockroachdb-grpc-auth-failed');
-        }
+          var response = await fetch('https://cockroachlabs.cloud/console.ManagementConsole/' + method, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/grpc-web+proto',
+              'Accept': 'application/grpc-web+proto',
+              'X-Grpc-Web': '1'
+            },
+            body: crdbEncodeGrpcFrame(payload),
+            credentials: 'include',
+            redirect: 'manual'
+          });
+          if (response.type === 'opaqueredirect' || response.status === 401 || response.status === 403) {
+            return fallback('cockroachdb-grpc-auth-failed');
+          }
+          if (!response.ok) {
+            return fallback('cockroachdb-grpc-http-status-' + response.status);
+          }
 
-        var frames = crdbDecodeGrpcFrames(await response.arrayBuffer());
-        var trailer = null;
-        var dataFrame = null;
-        for (var i = 0; i < frames.length; i++) {
-          if (frames[i].flag === 128) { trailer = crdbParseTrailer(frames[i].data); }
-          if (frames[i].flag === 0 && !dataFrame) { dataFrame = frames[i]; }
+          var frames = crdbDecodeGrpcFrames(await response.arrayBuffer());
+          var trailer = null;
+          var dataFrame = null;
+          for (var i = 0; i < frames.length; i++) {
+            if (frames[i].flag === 128) { trailer = crdbParseTrailer(frames[i].data); }
+            if (frames[i].flag === 0 && !dataFrame) { dataFrame = frames[i]; }
+          }
+          if (trailer && trailer.status !== 0) {
+            return fallback('cockroachdb-grpc-status-' + trailer.status);
+          }
+          if (!dataFrame) {
+            return { success: true, status: response.status, data: {} };
+          }
+          return {
+            success: true,
+            status: response.status,
+            data: responseClass.deserializeBinary(dataFrame.data).toObject()
+          };
+        } catch (_err) {
+          return fallback('cockroachdb-network-error');
         }
-        if (trailer && trailer.status !== 0) {
-          return fallback('cockroachdb-grpc-status-' + trailer.status);
-        }
-        if (!dataFrame) {
-          return { success: true, status: response.status, data: {} };
-        }
-        return {
-          success: true,
-          status: response.status,
-          data: responseClass.deserializeBinary(dataFrame.data).toObject()
-        };
       }
       async function crdbWrap(method, responseClassName, setup, transform) {
         var out = await crdbGrpc(method, responseClassName, setup);
@@ -5418,7 +5429,7 @@
           return await gcalRead(action, args);
         }
         if (request.namespace === 'cockroachdb') {
-          return crdbRead(action, args);
+          return await crdbRead(action, args);
         }
         if (request.namespace === 'temporal') {
           return await temporalRead(request.origin, action, args);

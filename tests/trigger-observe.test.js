@@ -475,6 +475,30 @@ check('flush re-resolves each batch and retries after a stale disconnected cache
   assert.deepEqual(plain(sendMessages[0].value), { text: 'fresh' });
 });
 
+check('flush during transient DOM detach suppresses the report (no fabricated empty text)', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'detach-root' });
+  const leaf = makeNode({ text: 'live', parent: container });
+  queryResolver = () => leaf;
+  assert.equal(triggerObserve.start('trg_detach', '#detach', 'text').ok, true);
+
+  // Mid-swap: the selector resolves to nothing. A pre-fix flush reported
+  // {text:''}, spuriously satisfying a 'changed' condition.
+  queryResolver = () => null;
+  observerInstances[0].callback([{ type: 'childList' }]);
+  flushTimers();
+  assert.equal(sendMessages.length, 0);
+
+  // Re-attach: the next mutation reports the settled value, not ''.
+  const reattached = makeNode({ text: 'settled', parent: container });
+  queryResolver = () => reattached;
+  observerInstances[0].callback([{ type: 'childList' }]);
+  flushTimers();
+  assert.equal(sendMessages.length, 1);
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'settled' });
+});
+
 check('source invariants: setTimeout debounce, no rAF, no document.body target', () => {
   const src = fs.readFileSync(modulePath, 'utf8');
   assert(src.includes('setTimeout'), 'setTimeout debounce present');

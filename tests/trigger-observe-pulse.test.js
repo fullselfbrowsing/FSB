@@ -257,6 +257,25 @@ check('_updatePosition reapplies trigger-pulse while pulse mode is active', () =
   assert.equal(glow.boxOverlay.classList.contains('trigger-pulse'), true);
 });
 
+check('clearPulse leaves a concurrent action highlight intact (only tears down a pulse)', () => {
+  const glow = new ActionGlowOverlay();
+  const pulseTarget = makeElement('button');
+  documentBody.appendChild(pulseTarget);
+  glow.showPulse(pulseTarget);
+  // An action re-targets the same singleton via show(), whose destroy-first path
+  // resets _pulseMode, so the overlay is now an action highlight, not a pulse.
+  const actionTarget = makeElement('button');
+  documentBody.appendChild(actionTarget);
+  glow.show(actionTarget);
+  assert.equal(glow._pulseMode, false);
+  const box = glow.boxOverlay;
+  // A late triggerPulseStop must NOT wipe the in-progress action highlight.
+  glow.clearPulse();
+  assert.equal(glow.boxOverlay, box);
+  assert.notEqual(glow.boxOverlay, null);
+  assert.notEqual(glow.host, null);
+});
+
 check('source keyframe animates opacity/transform only', () => {
   const blockMatch = vfSource.match(/@keyframes fsb-trigger-pulse \{([\s\S]*?)\n      \}/);
   assert(blockMatch, 'fsb-trigger-pulse keyframes present');

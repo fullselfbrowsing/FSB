@@ -369,11 +369,12 @@
 
   // ---- promote(origin, recipe, descriptor, opts) -> Promise<void> ----------
   // Stores (or refreshes) a learned recipe under recipes[origin][recipe.id]. On an
-  // existing slot, bumps successCount + lastSuccessAt (re-promotion after another
-  // clean replay). LRU-evicts the oldest lastSuccessAt if the per-origin count now
-  // exceeds PER_ORIGIN_CAP (D-16). opts.lastSuccessAt (and opts.capturedAt), when
-  // provided, override the timestamp -- used by the test to drive deterministic LRU
-  // ordering; production omits opts and uses Date.now().
+  // existing slot, bumps successCount + lastSuccessAt AND clears any quarantine
+  // (re-promotion after another clean replay is the heal event that closes the
+  // quarantine->relearn->promote loop). LRU-evicts the oldest lastSuccessAt if the
+  // per-origin count now exceeds PER_ORIGIN_CAP (D-16). opts.lastSuccessAt (and
+  // opts.capturedAt), when provided, override the timestamp -- used by the test to
+  // drive deterministic LRU ordering; production omits opts and uses Date.now().
   function promote(origin, recipe, descriptor, opts) {
     if (typeof origin !== 'string' || !origin || !recipe || typeof recipe !== 'object'
       || typeof recipe.id !== 'string' || !recipe.id) {
@@ -395,9 +396,12 @@
       var slug = recipe.id;
       if (Object.prototype.hasOwnProperty.call(perOrigin, slug)
         && perOrigin[slug] && typeof perOrigin[slug] === 'object') {
-        // Re-promotion: bump bookkeeping, refresh the recipe/descriptor, un-flag is
-        // NOT done here (a re-promoted recipe stays whatever it was; quarantine is a
-        // separate explicit op).
+        // Re-promotion: bump bookkeeping, refresh the recipe/descriptor, and CLEAR
+        // any quarantine. promote() is only reached after a verified clean replay
+        // (recipe-synthesizer), so the re-promotion IS the heal event -- preserving
+        // quarantined:true here left no path that ever un-flagged a healed recipe
+        // (there is no separate clear op), so the quarantine->relearn->promote loop
+        // never closed and the slug stayed demoted from routing forever.
         var existing = perOrigin[slug];
         perOrigin[slug] = {
           recipe: recipe,
@@ -405,7 +409,7 @@
           capturedAt: (typeof existing.capturedAt === 'number') ? existing.capturedAt : capturedAt,
           lastSuccessAt: ts,
           successCount: (typeof existing.successCount === 'number' ? existing.successCount : 0) + 1,
-          quarantined: existing.quarantined === true ? true : false
+          quarantined: false
         };
       } else {
         perOrigin[slug] = {

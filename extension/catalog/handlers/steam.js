@@ -453,7 +453,8 @@
               return {
                 steamid: str(f && f.steamid),
                 persona_name: str(f && (f.persona_name || f.persona)),
-                playtime_forever: num(f && f.playtime_forever)
+                playtime_total: num(f && f.playtime_total),
+                playtime_twoweeks: num(f && f.playtime_twoweeks)
               };
             })
           }

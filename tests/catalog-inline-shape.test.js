@@ -98,7 +98,8 @@ check(/\}\)\(\s*typeof\s+globalThis\s*!==\s*'undefined'\s*\?\s*globalThis\s*:\s*
 //
 // Read the slugs the importer actually emitted (the FLAT opentabs__todoist__*.json
 // the non-recursive readJsonDir must have picked up) and assert every one is present
-// in the committed snapshot. A silent subdir-drop would leave these absent.
+// in the committed snapshot. A packaging/catalog traversal regression would
+// leave these absent.
 const emittedTodoistFiles = fs.readdirSync(DESCRIPTORS_DIR)
   .filter((name) => name.startsWith('opentabs__') && name.endsWith('.json'));
 check(emittedTodoistFiles.length > 0,
@@ -128,10 +129,24 @@ check(emittedStems.has('todoist') && emittedStems.has('linear') && emittedStems.
 // generator path is unchanged AND the emitted descriptors genuinely inlined.
 function readJsonDir(absDir) {
   if (!fs.existsSync(absDir)) return [];
-  return fs.readdirSync(absDir)
-    .filter((name) => name.endsWith('.json')) // non-recursive: _fixtures/ excluded (mirror line 54)
-    .sort()
-    .map((name) => JSON.parse(fs.readFileSync(path.join(absDir, name), 'utf8')));
+  const files = [];
+  function walk(dir, relPrefix = '') {
+    for (const name of fs.readdirSync(dir).sort()) {
+      if (name === '_fixtures') continue;
+      const abs = path.join(dir, name);
+      const rel = relPrefix ? path.join(relPrefix, name) : name;
+      const st = fs.statSync(abs);
+      if (st.isDirectory()) {
+        walk(abs, rel);
+      } else if (name.endsWith('.json')) {
+        files.push({ abs, rel });
+      }
+    }
+  }
+  walk(absDir);
+  return files
+    .sort((a, b) => a.rel.localeCompare(b.rel))
+    .map((file) => JSON.parse(fs.readFileSync(file.abs, 'utf8')));
 }
 const recipes = readJsonDir(RECIPES_DIR);
 const descriptors = readJsonDir(DESCRIPTORS_DIR);

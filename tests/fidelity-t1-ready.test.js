@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Fidelity T1 policy-blocked handler proof.
+ * Fidelity T1 sensitive-origin handler proof.
  *
  * Run: node tests/fidelity-t1-ready.test.js
  */
@@ -161,20 +161,20 @@ async function testReadiness(slugs) {
     const row = bySlug(rows, slug);
     check(row &&
         row.resolvedTier === 'T1a' &&
-        row.readiness === 'blocked' &&
-        row.originClass === 'denied' &&
+        row.readiness === 't1-ready' &&
+        row.originClass === 'sensitive' &&
         row.authPattern === 'bound-handler' &&
-        row.routeFeasibility === 'blocked' &&
-        row.nextAction === 'keep blocked' &&
+        row.routeFeasibility === 'same-origin-proven' &&
+        row.nextAction === 'already executable' &&
         row.proof === 'handler' &&
         row.hasHandlerProof === true &&
         row.hasRecipeProof === false,
-      slug + ' is T1a handler-proven while remaining denylist-blocked');
+      slug + ' is T1a handler-proven on a sensitive non-denied origin');
   }
 }
 
 (async function run() {
-  console.log('--- Fidelity T1 policy-blocked readiness ---');
+  console.log('--- Fidelity T1 sensitive readiness ---');
   const slugs = fidelitySlugs();
   check(slugs.length === 13, 'Fidelity descriptor count is 13');
   await testHandler(slugs);

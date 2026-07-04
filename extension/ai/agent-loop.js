@@ -124,6 +124,23 @@ var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefin
       }
     });
 
+// LM Studio base URLs are normalized through the SAME helper universal-provider.js
+// uses (strips a pasted /v1 or /v1/chat/completions suffix before the bridge
+// re-appends /v1) -- hand-rolling only a trailing-slash strip turned the documented
+// http://localhost:1234/v1 setting into .../v1/v1/chat/completions.
+var _al_normalizeProviderBaseUrl = (typeof normalizeProviderBaseUrl !== 'undefined')
+  ? normalizeProviderBaseUrl
+  : (_al_provider?.normalizeProviderBaseUrl || function(provider, baseUrl) {
+      var fallback = provider === 'lmstudio' ? 'http://localhost:1234' : '';
+      if (!baseUrl) return fallback;
+      var url = String(baseUrl).trim()
+        .replace(/\/v1\/chat\/completions\/?$/, '')
+        .replace(/\/v1\/?$/, '')
+        .replace(/\/+$/, '');
+      if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+      return url;
+    });
+
 // Phase 156-158 module references
 var _al_estimateCost = (typeof estimateCost !== 'undefined') ? estimateCost : (_al_costTracker?.estimateCost || function() { return 0; });
 var _al_CostTracker = (typeof CostTracker !== 'undefined') ? CostTracker : (_al_costTracker?.CostTracker || null);
@@ -1086,7 +1103,7 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
     apiKey: _settings[_cfg.keyField] || '',
     model: providerInstance.model,
     baseUrl: providerKey === 'custom' ? _settings.customEndpoint
-           : providerKey === 'lmstudio' ? ((_settings.lmstudioBaseUrl || 'http://localhost:1234').replace(/\/+$/, '') + '/v1')
+           : providerKey === 'lmstudio' ? (_al_normalizeProviderBaseUrl('lmstudio', _settings.lmstudioBaseUrl) + '/v1')
            : undefined,
   }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
 }

@@ -58,6 +58,18 @@ check('1.1.1.42 -> US/Texas (fixture hit, low range)', regionEq(r, 'US', 'Texas'
 r = ipGeo.deriveRegion('203.0.113.5');
 check('203.0.113.5 -> AU/Victoria (fixture hit, high non-US range)', regionEq(r, 'AU', 'Victoria'), `got ${JSON.stringify(r)}`);
 
+// Worldwide (non-US) subdivisions: these are preserved with full granularity by
+// the loader (and later rendered as e.g. 'GB-England' by regionLabel). The
+// dataset is worldwide; assert several continents resolve to the right
+// {country, subdivision} via the typed-array struct-of-arrays path.
+check('5.5.5.50 -> GB/England (worldwide fixture hit)', regionEq(ipGeo.deriveRegion('5.5.5.50'), 'GB', 'England'), `got ${JSON.stringify(ipGeo.deriveRegion('5.5.5.50'))}`);
+check('10.10.10.10 -> DE/Bavaria (worldwide fixture hit)', regionEq(ipGeo.deriveRegion('10.10.10.10'), 'DE', 'Bavaria'), `got ${JSON.stringify(ipGeo.deriveRegion('10.10.10.10'))}`);
+check('20.20.20.200 -> IN/Maharashtra (worldwide fixture hit)', regionEq(ipGeo.deriveRegion('20.20.20.200'), 'IN', 'Maharashtra'), `got ${JSON.stringify(ipGeo.deriveRegion('20.20.20.200'))}`);
+// BR/São Paulo: the accented subdivision must round-trip byte-for-byte through
+// readFileSync('utf8') -> typed-array line parse -> interned {country,subdivision}.
+r = ipGeo.deriveRegion('30.30.30.30');
+check('30.30.30.30 -> BR/São Paulo (multibyte subdivision round-trips)', regionEq(r, 'BR', 'São Paulo'), `got ${JSON.stringify(r)}`);
+
 // Exact range boundaries are inclusive.
 check('8.8.8.0 (range start, inclusive)', regionEq(ipGeo.deriveRegion('8.8.8.0'), 'US', 'California'), 'start boundary missed');
 check('8.8.8.255 (range end, inclusive)', regionEq(ipGeo.deriveRegion('8.8.8.255'), 'US', 'California'), 'end boundary missed');
