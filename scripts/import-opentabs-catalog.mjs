@@ -55,6 +55,20 @@ import { classifyGate, SCREEN_SAFE_ALLOWLIST } from './verify-classification-gat
 // aware here too (it is the importer's actionVerb + synonym seed).
 import { verbPrefix, deriveClass, helperClass, methodClass, rankOf } from './lib/side-effect-class.mjs';
 
+// CI runs Node 20, which has no global WebSocket (it became a global in Node 22). Some
+// browser-oriented vendored plugin slices reference WebSocket at module-import time --
+// clickup's slice installs a WebSocket.prototype.send interceptor on load. extractDescriptors()
+// await import()s each slice to read its tools[] metadata, so that interceptor is an
+// irrelevant import-time side effect here. Without this stub the import throws "WebSocket is
+// not defined", crashing every importer entry point under Node 20: runImport (this module run
+// directly), extractDescriptors (the no-orphan-descriptor gate imports it), and the
+// import-classify-gate-call test's `node --import tsx import-opentabs-catalog.mjs` subprocess.
+// Build-tooling only (never shipped to the browser); changes no emitted descriptor; a no-op
+// under Node 22+.
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = class {};
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');

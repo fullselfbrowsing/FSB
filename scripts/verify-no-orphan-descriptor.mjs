@@ -62,17 +62,6 @@ import {
   extractDescriptors,
 } from './import-opentabs-catalog.mjs';
 
-// CI runs Node 20, which has no global WebSocket (it became a global in Node 22). A few
-// browser-oriented plugin slices reference WebSocket at module-import time -- clickup's
-// index.ts installs a WebSocket.prototype.send interceptor on load. extractDescriptors()
-// only reads each plugin's tools[] metadata, so that interceptor is an irrelevant
-// import-time side effect here; without this stub the import throws "WebSocket is not
-// defined" and the app is falsely reported as a failed extraction. Build-tooling only
-// (never shipped to the browser); changes no emitted descriptor; a no-op under Node 22+.
-if (typeof globalThis.WebSocket === 'undefined') {
-  globalThis.WebSocket = class {};
-}
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');
