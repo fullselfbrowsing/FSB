@@ -5868,217 +5868,217 @@
         <source>Network or parse error.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">98</context>
+          <context context-type="linenumber">100</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeStars" datatype="html">
         <source>Cumulative stars</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">104</context>
+          <context context-type="linenumber">106</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.issues" datatype="html">
         <source>Issues</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">105</context>
+          <context context-type="linenumber">107</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeCommits" datatype="html">
         <source>Cumulative commits</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">106</context>
+          <context context-type="linenumber">108</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_ACTIVE_NOW" datatype="html">
         <source>Active right now</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">107</context>
+          <context context-type="linenumber">109</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_TOKENS" datatype="html">
         <source>Tokens</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">108</context>
+          <context context-type="linenumber">110</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP" datatype="html">
         <source>Popular MCP clients</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">109</context>
+          <context context-type="linenumber">111</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.totalStars" datatype="html">
         <source>total stars</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">154</context>
+          <context context-type="linenumber">156</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.last7Days" datatype="html">
         <source>last 7 days</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">155</context>
+          <context context-type="linenumber">157</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.open" datatype="html">
         <source>open</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">163</context>
+          <context context-type="linenumber">165</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.closed" datatype="html">
         <source>closed</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">164</context>
+          <context context-type="linenumber">166</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.totalCommits" datatype="html">
         <source>total commits</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">170</context>
+          <context context-type="linenumber">172</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.last30Days" datatype="html">
         <source>last 30 days</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">171</context>
+          <context context-type="linenumber">173</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.activeAgents" datatype="html">
         <source>active agents</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">176</context>
+          <context context-type="linenumber">178</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.avgPerUser" datatype="html">
         <source>avg per user</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">177</context>
+          <context context-type="linenumber">179</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.tokensLifetime" datatype="html">
         <source>tokens lifetime</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">181</context>
+          <context context-type="linenumber">183</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.tokens24h" datatype="html">
         <source>tokens 24h</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">182</context>
+          <context context-type="linenumber">184</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.trackedClients" datatype="html">
         <source>tracked clients</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">188</context>
+          <context context-type="linenumber">190</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.topNamed" datatype="html">
         <source>top: <x id="entityLabel" equiv-text="top.label"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">189</context>
+          <context context-type="linenumber">191</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.topClient" datatype="html">
         <source>top client</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">189</context>
+          <context context-type="linenumber">191</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.meta.title" datatype="html">
         <source>FSB · Stats</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">265</context>
+          <context context-type="linenumber">268</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.chartLibrary" datatype="html">
         <source>Could not load chart library.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">403</context>
+          <context context-type="linenumber">408</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.aria" datatype="html">
         <source>Sankey: <x id="openedCount" equiv-text="O"/> opened, <x id="closedCount" equiv-text="closedFlow"/> closed, <x id="backlogCount" equiv-text="backlog"/> still open</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">636</context>
+          <context context-type="linenumber">670</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.opened" datatype="html">
         <source>Opened (<x id="openedCount" equiv-text="O"/>)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">693</context>
+          <context context-type="linenumber">727</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.closed" datatype="html">
         <source>Closed (<x id="closedCount" equiv-text="closedFlow"/>)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">694</context>
+          <context context-type="linenumber">728</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.stillOpen" datatype="html">
         <source>Still open (<x id="backlogCount" equiv-text="backlog"/>)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">696</context>
+          <context context-type="linenumber">730</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeStars.legend" datatype="html">
         <source>Cumulative stars</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">744</context>
+          <context context-type="linenumber">778</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeCommits.legend" datatype="html">
         <source>Cumulative commits</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">770</context>
+          <context context-type="linenumber">804</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND" datatype="html">
         <source>Tokens (last 30 days)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">797</context>
+          <context context-type="linenumber">831</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_PENDING_MCP" datatype="html">
         <source>Pending (k&gt;=5 floor)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">813</context>
+          <context context-type="linenumber">847</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND" datatype="html">
         <source>Popular MCP clients</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">820</context>
+          <context context-type="linenumber">854</context>
         </context-group>
       </trans-unit>
       <trans-unit id="support.hero.title" datatype="html">
