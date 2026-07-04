@@ -1,11 +1,11 @@
 # Graph Report - louisville  (2026-07-04)
 
 ## Corpus Check
-- 8933 files · ~8,554,140 words
+- 8934 files · ~8,554,980 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 64591 nodes · 113965 edges · 4901 communities (3637 shown, 1264 thin omitted)
+- 64592 nodes · 113969 edges · 4870 communities (3614 shown, 1256 thin omitted)
 - Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 10835 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
@@ -692,7 +692,6 @@
 - [[_COMMUNITY_catalog Dominos|catalog: Dominos]]
 - [[_COMMUNITY_catalog Gdrive|catalog: Gdrive]]
 - [[_COMMUNITY_catalog Leetcode|catalog: Leetcode]]
-- [[_COMMUNITY_Test Capture chrome-code-colors-verify (service_worker_bin_prod)|Test Capture: chrome-code-colors-verify (service_worker_bin_prod)]]
 - [[_COMMUNITY_extension Aws|extension: Aws]]
 - [[_COMMUNITY_extension Bitbucket|extension: Bitbucket]]
 - [[_COMMUNITY_extension Dominos|extension: Dominos]]
@@ -912,7 +911,6 @@
 - [[_COMMUNITY_showcase Lattice Page.Component|showcase: Lattice Page.Component]]
 - [[_COMMUNITY_Test Capture chrome-code-colors-verify (service_worker_bin_prod)|Test Capture: chrome-code-colors-verify (service_worker_bin_prod)]]
 - [[_COMMUNITY_Test Capture chrome-phantom-sticky-plan (service_worker_bin_prod)|Test Capture: chrome-phantom-sticky-plan (service_worker_bin_prod)]]
-- [[_COMMUNITY_Test Capture chrome-phantom-stream-final (service_worker_bin_prod)|Test Capture: chrome-phantom-stream-final (service_worker_bin_prod)]]
 - [[_COMMUNITY_Test Capture chrome-phantom-stream-measure (service_worker_bin_prod)|Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)]]
 - [[_COMMUNITY_Test Capture chrome-phantom-stream-reduced (offscreendocument_main)|Test Capture: chrome-phantom-stream-reduced (offscreendocument_main)]]
 - [[_COMMUNITY_Test Capture chrome-phantom-stream-tabs (service_worker_bin_prod)|Test Capture: chrome-phantom-stream-tabs (service_worker_bin_prod)]]
@@ -1445,16 +1443,10 @@
 - [[_COMMUNITY_Circleci Integration Plugin|Circleci Integration Plugin]]
 - [[_COMMUNITY_Circleci Integration Plugin|Circleci Integration Plugin]]
 - [[_COMMUNITY_Circleci Integration Plugin|Circleci Integration Plugin]]
-- [[_COMMUNITY_Google Cloud Integration Plugin|Google Cloud Integration Plugin]]
-- [[_COMMUNITY_Google Cloud Integration Plugin|Google Cloud Integration Plugin]]
-- [[_COMMUNITY_Google Cloud Integration Plugin|Google Cloud Integration Plugin]]
-- [[_COMMUNITY_Leetcode Integration Plugin|Leetcode Integration Plugin]]
 - [[_COMMUNITY_Leetcode Integration Plugin|Leetcode Integration Plugin]]
 - [[_COMMUNITY_Leetcode Integration Plugin|Leetcode Integration Plugin]]
 - [[_COMMUNITY_Redfin Integration Plugin|Redfin Integration Plugin]]
 - [[_COMMUNITY_Retool Integration Plugin|Retool Integration Plugin]]
-- [[_COMMUNITY_Retool Integration Plugin|Retool Integration Plugin]]
-- [[_COMMUNITY_Robinhood Integration Plugin|Robinhood Integration Plugin]]
 - [[_COMMUNITY_Robinhood Integration Plugin|Robinhood Integration Plugin]]
 - [[_COMMUNITY_Robinhood Integration Plugin|Robinhood Integration Plugin]]
 - [[_COMMUNITY_Robinhood Integration Plugin|Robinhood Integration Plugin]]
@@ -1510,12 +1502,9 @@
 - [[_COMMUNITY_Jira Integration Plugin|Jira Integration Plugin]]
 - [[_COMMUNITY_Leetcode Integration Plugin|Leetcode Integration Plugin]]
 - [[_COMMUNITY_Meticulous Integration Plugin|Meticulous Integration Plugin]]
-- [[_COMMUNITY_Meticulous Integration Plugin|Meticulous Integration Plugin]]
 - [[_COMMUNITY_Posthog Integration Plugin|Posthog Integration Plugin]]
 - [[_COMMUNITY_Retool Integration Plugin|Retool Integration Plugin]]
 - [[_COMMUNITY_Sentry Integration Plugin|Sentry Integration Plugin]]
-- [[_COMMUNITY_Sentry Integration Plugin|Sentry Integration Plugin]]
-- [[_COMMUNITY_Starbucks Integration Plugin|Starbucks Integration Plugin]]
 - [[_COMMUNITY_Youtube Integration Plugin|Youtube Integration Plugin]]
 - [[_COMMUNITY_Youtube Integration Plugin|Youtube Integration Plugin]]
 - [[_COMMUNITY_catalog Github|catalog: Github]]
@@ -1525,7 +1514,6 @@
 - [[_COMMUNITY_.context scratch pasted_text_2026-06-30_15-50-06|.context scratch: pasted_text_2026-06-30_15-50-06]]
 - [[_COMMUNITY_.context scratch pasted_text_2026-06-23_20-32-27|.context scratch: pasted_text_2026-06-23_20-32-27]]
 - [[_COMMUNITY_.context scratch Review request|.context scratch: Review request]]
-- [[_COMMUNITY_Test Capture chrome-code-colors-verify (offscreendocument_main)|Test Capture: chrome-code-colors-verify (offscreendocument_main)]]
 - [[_COMMUNITY_Test Capture chrome-code-colors-verify (offscreendocument_main)|Test Capture: chrome-code-colors-verify (offscreendocument_main)]]
 - [[_COMMUNITY_Test Capture chrome-phantom-sticky-plan (offscreendocument_main)|Test Capture: chrome-phantom-sticky-plan (offscreendocument_main)]]
 - [[_COMMUNITY_Test Capture chrome-phantom-stream-measure (service_worker_bin_prod)|Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)]]
@@ -1561,7 +1549,6 @@
 - [[_COMMUNITY_tests Site Search.Test|tests: Site Search.Test]]
 - [[_COMMUNITY_Bluesky Integration Plugin|Bluesky Integration Plugin]]
 - [[_COMMUNITY_Leetcode Integration Plugin|Leetcode Integration Plugin]]
-- [[_COMMUNITY_.context scratch Review request|.context scratch: Review request]]
 - [[_COMMUNITY_.context scratch Review request|.context scratch: Review request]]
 - [[_COMMUNITY_.context scratch Review request|.context scratch: Review request]]
 - [[_COMMUNITY_.context scratch Review request|.context scratch: Review request]]
@@ -1658,7 +1645,6 @@
 - [[_COMMUNITY_Pattern Assignments|Pattern Assignments]]
 - [[_COMMUNITY_Full OpenTabs Parity -- De-Risking Spike (Feasibility Report)|Full OpenTabs Parity -- De-Risking Spike (Feasibility Report)]]
 - [[_COMMUNITY_v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix — Milestone Audit|v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix — Milestone Audit]]
-- [[_COMMUNITY_ce|ce]]
 - [[_COMMUNITY_Phase 6 FSB engine consumes Lattice provider abstraction - Research|Phase 6: FSB engine consumes Lattice provider abstraction - Research]]
 - [[_COMMUNITY_Phase 9 Plan 09-02 FINT-14 marker writes + serialize sidecars + FINT-15 LRU cap enforcement Summary|Phase 9 Plan 09-02: FINT-14 marker writes + serialize sidecars + FINT-15 LRU cap enforcement Summary]]
 - [[_COMMUNITY_Phase 10 Plan 10-03 MCP-Philosophy Parity Documentation Ceremony Summary|Phase 10 Plan 10-03: MCP-Philosophy Parity Documentation Ceremony Summary]]
@@ -1743,8 +1729,6 @@
 - [[_COMMUNITY_Goal Achievement|Goal Achievement]]
 - [[_COMMUNITY_Project State|Project State]]
 - [[_COMMUNITY_github-stats.service.ts|github-stats.service.ts]]
-- [[_COMMUNITY_n|n]]
-- [[_COMMUNITY_n|n]]
 - [[_COMMUNITY_Changelog|Changelog]]
 - [[_COMMUNITY_Root Cause Report (diagnose-only)|Root Cause Report (diagnose-only)]]
 - [[_COMMUNITY_Phase 3 Plan 03-02 Lattice public-surface re-export + audit-doc closure Summary|Phase 3 Plan 03-02: Lattice public-surface re-export + audit-doc closure Summary]]
@@ -1850,7 +1834,6 @@
 - [[_COMMUNITY_Goal Achievement|Goal Achievement]]
 - [[_COMMUNITY_Feature Research|Feature Research]]
 - [[_COMMUNITY_Roadmap FSB (Full Self-Browsing)|Roadmap: FSB (Full Self-Browsing)]]
-- [[_COMMUNITY_vh|vh]]
 - [[_COMMUNITY_w|w]]
 - [[_COMMUNITY_vh|vh]]
 - [[_COMMUNITY_UAT-Excluded Milestone Audit - 2026-06-09|UAT-Excluded Milestone Audit - 2026-06-09]]
@@ -1930,7 +1913,6 @@
 - [[_COMMUNITY_Independent debugging consult — FSB Chrome extension sidepanel|Independent debugging consult — FSB Chrome extension sidepanel]]
 - [[_COMMUNITY_Milestone v0.9 Audit Report|Milestone v0.9 Audit Report]]
 - [[_COMMUNITY_verify-classification-gate.mjs|verify-classification-gate.mjs]]
-- [[_COMMUNITY_verify-catalog-crosscheck.mjs|verify-catalog-crosscheck.mjs]]
 - [[_COMMUNITY_validate-extension.mjs|validate-extension.mjs]]
 - [[_COMMUNITY_w|w]]
 - [[_COMMUNITY_Changes|Changes]]
@@ -2169,9 +2151,7 @@
 - [[_COMMUNITY_260608-wnz-PLAN|260608-wnz-PLAN.md]]
 - [[_COMMUNITY_stats-page.component.ts|stats-page.component.ts]]
 - [[_COMMUNITY_coverage-report.test.js|coverage-report.test.js]]
-- [[_COMMUNITY_redditGet|redditGet]]
 - [[_COMMUNITY_RedditListing|RedditListing]]
-- [[_COMMUNITY_.ca|.ca]]
 - [[_COMMUNITY_Patch fix all 12 HIGH-severity findings on `automation` branch|Patch: fix all 12 HIGH-severity findings on `automation` branch]]
 - [[_COMMUNITY_Plan Worldwide IP→region dataset (state-level), fit on the 256 MB Fly VM|Plan: Worldwide IP→region dataset (state-level), fit on the 256 MB Fly VM]]
 - [[_COMMUNITY_0.8.0 (2026-05-06)|0.8.0 (2026-05-06)]]
@@ -2479,7 +2459,6 @@
 - [[_COMMUNITY_Milestone v0.9.99 — Native Capability Catalog (FSB API Execution) — Audit|Milestone v0.9.99 — Native Capability Catalog (FSB API Execution) — Audit]]
 - [[_COMMUNITY_v1.0.0 — Full App Catalog (OpenTabs Parity) — Milestone Audit|v1.0.0 — Full App Catalog (OpenTabs Parity) — Milestone Audit]]
 - [[_COMMUNITY_verify-t1-readiness-gate.mjs|verify-t1-readiness-gate.mjs]]
-- [[_COMMUNITY_refresh-dbip-dataset.mjs|refresh-dbip-dataset.mjs]]
 - [[_COMMUNITY_Plan Patch the three confirmed review findings|Plan: Patch the three confirmed review findings]]
 - [[_COMMUNITY_Retool T1a Same-Origin Read Capability Wave|Retool T1a Same-Origin Read Capability Wave]]
 - [[_COMMUNITY_Untested UAT Verification Closeout|Untested UAT Verification Closeout]]
@@ -2588,9 +2567,7 @@
 - [[_COMMUNITY_Quick 260701-2nu Plan Jira T1 Readiness|Quick 260701-2nu Plan: Jira T1 Readiness]]
 - [[_COMMUNITY_Quick Task 260701-e6d Summary|Quick Task 260701-e6d Summary]]
 - [[_COMMUNITY_Milestone Audit v0.9.21 UI Retouch & Cohesion|Milestone Audit: v0.9.21 UI Retouch & Cohesion]]
-- [[_COMMUNITY_get-current-user.ts|get-current-user.ts]]
 - [[_COMMUNITY_list-attachments.ts|list-attachments.ts]]
-- [[_COMMUNITY_get-post.ts|get-post.ts]]
 - [[_COMMUNITY_Review guidelines|Review guidelines:]]
 - [[_COMMUNITY_Review guidelines|Review guidelines:]]
 - [[_COMMUNITY_Review guidelines|Review guidelines:]]
@@ -2753,9 +2730,6 @@
 - [[_COMMUNITY_Restricted-tab recovery|Restricted-tab recovery]]
 - [[_COMMUNITY_Vault boundary|Vault boundary]]
 - [[_COMMUNITY_Chrome Web Store Privacy Practices — Evidence|Chrome Web Store Privacy Practices — Evidence]]
-- [[_COMMUNITY_get-favorites.ts|get-favorites.ts]]
-- [[_COMMUNITY_get-comment-thread.ts|get-comment-thread.ts]]
-- [[_COMMUNITY_README|README.md]]
 - [[_COMMUNITY_graphify reference query, path, explain|graphify reference: query, path, explain]]
 - [[_COMMUNITY_Build Prometheus Standalone Page|Build Prometheus Standalone Page]]
 - [[_COMMUNITY_Plan Exclude `.planning` from graphify scope, then batch-dispatch remaining extraction chunks|Plan: Exclude `.planning` from graphify scope, then batch-dispatch remaining extraction chunks]]
@@ -3213,7 +3187,6 @@
 - [[_COMMUNITY_list-submissions.ts|list-submissions.ts]]
 - [[_COMMUNITY_get-quote.ts|get-quote.ts]]
 - [[_COMMUNITY_list-orders.ts|list-orders.ts]]
-- [[_COMMUNITY_get-favorite-products.ts|get-favorite-products.ts]]
 - [[_COMMUNITY_graphify reference add a URL and watch a folder|graphify reference: add a URL and watch a folder]]
 - [[_COMMUNITY_graphify reference commit hook and native CLAUDE.md integration|graphify reference: commit hook and native CLAUDE.md integration]]
 - [[_COMMUNITY_graphify reference incremental update and cluster-only|graphify reference: incremental update and cluster-only]]
@@ -3458,9 +3431,6 @@
 - [[_COMMUNITY_Section 4 MV3 Service-Worker Eviction + Telemetry Queue (BLOCKER class)|Section 4: MV3 Service-Worker Eviction + Telemetry Queue (BLOCKER class)]]
 - [[_COMMUNITY_Section 5 Public Ingestion Endpoint Abuse (BLOCKER class)|Section 5: Public Ingestion Endpoint Abuse (BLOCKER class)]]
 - [[_COMMUNITY_Section 7 Aggregate Computation Pitfalls (MAJOR class)|Section 7: Aggregate Computation Pitfalls (MAJOR class)]]
-- [[_COMMUNITY_list-convertibles.ts|list-convertibles.ts]]
-- [[_COMMUNITY_get-submission.ts|get-submission.ts]]
-- [[_COMMUNITY_get-project-pull-request.ts|get-project-pull-request.ts]]
 - [[_COMMUNITY_get-cards.ts|get-cards.ts]]
 - [[_COMMUNITY_graphify reference GitHub clone and cross-repo merge|graphify reference: GitHub clone and cross-repo merge]]
 - [[_COMMUNITY_graphify reference transcribe video and audio|graphify reference: transcribe video and audio]]
@@ -3808,7 +3778,6 @@
 - [[_COMMUNITY_Review Comment Style Guidelines|Review Comment Style Guidelines]]
 - [[_COMMUNITY_Review Output Format Contract (DiffComment, one per issue)|Review Output Format Contract (DiffComment, one per issue)]]
 - [[_COMMUNITY_Bug Flagging Criteria (8-point rubric)|Bug Flagging Criteria (8-point rubric)]]
-- [[_COMMUNITY_Review Comment Style Guidelines|Review Comment Style Guidelines]]
 - [[_COMMUNITY_Review Output Format Contract (DiffComment, one per issue)|Review Output Format Contract (DiffComment, one per issue)]]
 - [[_COMMUNITY_Bug Flagging Criteria (8-point rubric)|Bug Flagging Criteria (8-point rubric)]]
 - [[_COMMUNITY_Review Comment Style Guidelines|Review Comment Style Guidelines]]
@@ -3821,7 +3790,6 @@
 - [[_COMMUNITY_Review Output Format Contract (DiffComment, one per issue)|Review Output Format Contract (DiffComment, one per issue)]]
 - [[_COMMUNITY_Bug Flagging Criteria (8-point rubric)|Bug Flagging Criteria (8-point rubric)]]
 - [[_COMMUNITY_Review Comment Style Guidelines|Review Comment Style Guidelines]]
-- [[_COMMUNITY_Review Output Format Contract (DiffComment, one per issue)|Review Output Format Contract (DiffComment, one per issue)]]
 - [[_COMMUNITY_Review Comment Style Guidelines|Review Comment Style Guidelines]]
 - [[_COMMUNITY_Review Output Format Contract (DiffComment, one per issue)|Review Output Format Contract (DiffComment, one per issue)]]
 - [[_COMMUNITY_AI Code Review Guidelines Prompt|AI Code Review Guidelines Prompt]]
@@ -4575,11 +4543,11 @@
   .context/chrome-code-colors-verify/Default/Extensions/ghbmnnjooekpmoecnnnilnnbdlolhkhi/1.107.1_0/offscreendocument_main.js → extension/lib/mermaid.min.js
 - `lb()` --indirect_call--> `ib()`  [INFERRED]
   .context/chrome-code-colors-verify/Default/Extensions/ghbmnnjooekpmoecnnnilnnbdlolhkhi/1.107.1_0/offscreendocument_main.js → extension/lib/mermaid.min.js
-- `ac()` --indirect_call--> `H()`  [INFERRED]
-  .context/chrome-code-colors-verify/Default/Extensions/ghbmnnjooekpmoecnnnilnnbdlolhkhi/1.107.1_0/offscreendocument_main.js → extension/lib/chart.min.js
+- `J()` --calls--> `Uc()`  [INFERRED]
+  .context/chrome-code-colors-verify/Default/Extensions/ghbmnnjooekpmoecnnnilnnbdlolhkhi/1.107.1_0/offscreendocument_main.js → extension/lib/mermaid.min.js
 
 ## Import Cycles
-- 1-file cycle: `vendor/opentabs-snapshot/plugins/microsoft-word/src/pre-script.ts -> vendor/opentabs-snapshot/plugins/microsoft-word/src/pre-script.ts`
+- 1-file cycle: `vendor/opentabs-snapshot/plugins/powerpoint/src/pre-script.ts -> vendor/opentabs-snapshot/plugins/powerpoint/src/pre-script.ts`
 
 ## Hyperedges (group relationships)
 - **20 byte-identical Review Guidelines documents across attachment folders** — context_attachments_18bn64_review_request_bug_flagging_criteria, context_attachments_1r0yat_review_request_bug_flagging_criteria, context_attachments_4cmb8d_review_request_bug_flagging_criteria, context_attachments_60a9lh_review_request_bug_flagging_criteria, context_attachments_6gcppc_review_request_bug_flagging_criteria, context_attachments_6lagyu_review_request_bug_flagging_criteria, context_attachments_74fqjs_review_request_bug_flagging_criteria, context_attachments_92djp6_review_request_bug_flagging_criteria, context_attachments_9xhigs_review_request_bug_flagging_criteria, context_attachments_bgxdqr_review_request_bug_flagging_criteria, context_attachments_bvih8t_review_request_bug_flagging_criteria, context_attachments_djqhnv_review_request_bug_flagging_criteria, context_attachments_ftwfci_review_request_bug_flagging_criteria, context_attachments_gmxlcm_review_request_bug_flagging_criteria, context_attachments_iglq85_review_request_bug_flagging_criteria, context_attachments_js4t6p_review_request_bug_flagging_criteria, context_attachments_kod5t8_review_request_bug_flagging_criteria, context_attachments_kqsfvt_review_request_bug_flagging_criteria, context_attachments_kj25er_review_request_bug_flagging_criteria, context_attachments_maocsp_review_request_bug_flagging_criteria [EXTRACTED 1.00]
@@ -4646,135 +4614,135 @@
 - **Memory Page Layout Composition (sidebar nav + stats bar + search/filter + site explorer + research results, all rendered within one options.html view)** — extension_assets_screenshots_memory_site_explorer_options_sidebar_nav, extension_assets_screenshots_memory_site_explorer_memory_stats_bar, extension_assets_screenshots_memory_site_explorer_memory_search_filter_bar, extension_assets_screenshots_memory_site_explorer_site_explorer_panel, extension_assets_screenshots_memory_site_explorer_research_results_panel [EXTRACTED 1.00]
 - **Site Explorer Crawl Configuration Group (URL target + depth bound + page bound + trigger, jointly define one crawl request)** — extension_assets_screenshots_memory_site_explorer_site_explorer_url_input, extension_assets_screenshots_memory_site_explorer_site_explorer_max_depth_control, extension_assets_screenshots_memory_site_explorer_site_explorer_max_pages_control, extension_assets_screenshots_memory_site_explorer_site_explorer_go_button [EXTRACTED 1.00]
 
-## Communities (4901 total, 1264 thin omitted)
+## Communities (4870 total, 1256 thin omitted)
 
 ### Community 0 - "Vendored Library: mermaid.js"
 Cohesion: 0.00
-Nodes (643): uo(), $0(), _3e(), $7(), a1(), A3e(), a6e(), a9e() (+635 more)
+Nodes (563): uo(), _3e(), $7(), A3e(), a6e(), a9e(), AC(), accept() (+555 more)
 
 ### Community 1 - "Vendored Library: chart.js"
 Cohesion: 0.01
-Nodes (238): a(), aa(), addBox(), addElements(), afterDatasetsUpdate(), afterDraw(), afterEvent(), afterUpdate() (+230 more)
+Nodes (205): a(), aa(), addBox(), afterDatasetsUpdate(), afterDraw(), afterEvent(), afterUpdate(), ai() (+197 more)
 
 ### Community 2 - "Test Capture: chrome-phantom-stream-final (offscreen doc)"
 Cohesion: 0.02
-Nodes (127): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+119 more)
+Nodes (125): ab(), Ah(), Ai(), aj(), ak(), am(), bb(), bh() (+117 more)
 
 ### Community 3 - "Vendored Libraries: marked.js + chart.js + gpt-tokenizer"
 Cohesion: 0.02
-Nodes (341): d(), e(), f(), K(), li(), m(), p(), vn() (+333 more)
+Nodes (326): ao(), As(), b(), d(), draw(), e(), Ee(), es() (+318 more)
 
 ### Community 4 - "Vendored Library: mermaid.js + chart.js (shared minified block)"
 Cohesion: 0.03
-Nodes (109): ge(), hn(), kn(), addALink(), addAnnotation(), addAttributes(), addClass(), addClassesToNamespace() (+101 more)
+Nodes (117): ge(), kn(), addALink(), addAnnotation(), addAttributes(), addClass(), addClassesToNamespace(), addDescription() (+109 more)
 
 ### Community 5 - "Test Capture: chrome-phantom-stream (offscreen + service worker)"
-Cohesion: 0.04
-Nodes (111): kc(), Pl(), q(), Ag(), Ai(), al(), am(), an() (+103 more)
+Cohesion: 0.03
+Nodes (124): kc(), Pl(), q(), ad(), Ag(), Ai(), al(), am() (+116 more)
 
 ### Community 6 - "Test Capture: chrome-code-colors-verify (offscreen doc)"
 Cohesion: 0.02
-Nodes (152): ab(), ag(), Ah(), Ai(), aj(), ak(), am(), bb() (+144 more)
+Nodes (162): ab(), ad(), ag(), Ah(), Ai(), aj(), ak(), am() (+154 more)
 
 ### Community 7 - "Test Capture: chrome-phantom-stream-measure (offscreen + service worker)"
 Cohesion: 0.02
-Nodes (137): bm(), ig(), Jg(), kb(), kc(), Of(), Zl(), ab() (+129 more)
+Nodes (152): ig(), Jg(), kc(), kg(), lk(), Of(), Tf(), Wg() (+144 more)
 
 ### Community 8 - "Test Capture: chrome-phantom-stream-final (offscreen + service worker)"
 Cohesion: 0.02
-Nodes (239): bk(), kc(), Of(), Pl(), Tf(), xf(), ab(), ad() (+231 more)
+Nodes (201): bk(), kc(), Of(), Pl(), q(), Tf(), xf(), ab() (+193 more)
 
 ### Community 9 - "Test Capture: chrome-phantom-sticky-verify (offscreen + service worker)"
 Cohesion: 0.02
-Nodes (144): kb(), Of(), P(), S(), Tf(), Wg(), xf(), ab() (+136 more)
+Nodes (151): lk(), Of(), P(), Qf(), Tf(), Wg(), xf(), ab() (+143 more)
 
 ### Community 10 - "Test Capture: chrome-phantom-stream-tabs (offscreen doc)"
-Cohesion: 0.09
-Nodes (14): fh(), gh(), kf(), Le(), lf(), lh(), mh(), Ne() (+6 more)
-
-### Community 11 - "Test Capture: chrome-phantom-sticky-plan (offscreen doc)"
-Cohesion: 0.08
-Nodes (15): fh(), gh(), kf(), Le(), lf(), lh(), M(), mh() (+7 more)
-
-### Community 12 - "Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)"
-Cohesion: 0.02
-Nodes (162): me(), Of(), R(), S(), Tf(), Wg(), xf(), Zl() (+154 more)
-
-### Community 13 - "Test Capture: chrome-code-colors-verify (service worker + offscreen)"
-Cohesion: 0.02
-Nodes (133): kb(), Of(), R(), S(), Tf(), Wg(), xf(), Ye() (+125 more)
-
-### Community 14 - "Test Capture: chrome-phantom-stream-measure (offscreen doc)"
-Cohesion: 0.03
-Nodes (98): ad(), ae(), af(), b(), bf(), Bg(), bi(), bl() (+90 more)
-
-### Community 15 - "Test Capture: chrome-code-colors-verify (service worker + offscreen)"
-Cohesion: 0.04
-Nodes (92): af(), me(), Pl(), q(), ad(), Ag(), Ai(), al() (+84 more)
-
-### Community 16 - "Test Capture: chrome-phantom-sticky-verify (offscreen doc)"
-Cohesion: 0.02
-Nodes (164): ab(), ad(), Ah(), aj(), ak(), am(), bb(), bd() (+156 more)
-
-### Community 17 - "Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)"
-Cohesion: 0.02
-Nodes (154): kc(), me(), R(), S(), Wg(), Ye(), Zl(), ab() (+146 more)
-
-### Community 18 - "Test Capture: chrome-phantom-sticky-plan (offscreen + service worker)"
-Cohesion: 0.02
-Nodes (194): xc(), kb(), Pl(), qd(), xc(), zd(), Zl(), ab() (+186 more)
-
-### Community 19 - "Test Capture: chrome-phantom-sticky-verify (offscreen doc)"
-Cohesion: 0.04
-Nodes (94): ad(), ae(), b(), bf(), Bg(), bi(), bl(), c() (+86 more)
-
-### Community 20 - "Test Capture: chrome-phantom-stream (offscreen doc)"
-Cohesion: 0.02
-Nodes (143): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+135 more)
-
-### Community 21 - "Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)"
-Cohesion: 0.03
-Nodes (87): Pl(), ad(), Ag(), ak(), al(), an(), b(), bd() (+79 more)
-
-### Community 22 - "Test Capture: chrome-phantom-stream-measure (offscreen doc)"
-Cohesion: 0.02
-Nodes (166): ab(), ad(), ag(), Ah(), Ai(), aj(), ak(), am() (+158 more)
-
-### Community 23 - "Test Capture: chrome-phantom-stream-tabs (offscreen doc)"
-Cohesion: 0.03
-Nodes (111): ae(), af(), ag(), b(), bf(), Bg(), bi(), bl() (+103 more)
-
-### Community 24 - "Test Capture: chrome-phantom-sticky-plan (offscreen + service worker)"
-Cohesion: 0.03
-Nodes (61): De(), lk(), q(), Ae(), Ag(), Ai(), al(), b() (+53 more)
-
-### Community 25 - "Test Capture: chrome-phantom-stream-reduced (offscreen doc)"
 Cohesion: 0.08
 Nodes (16): fh(), gh(), kf(), Le(), lf(), lh(), mh(), Ne() (+8 more)
 
+### Community 11 - "Test Capture: chrome-phantom-sticky-plan (offscreen doc)"
+Cohesion: 0.09
+Nodes (11): M(), qa(), ra(), Ti(), ua(), va(), Vi(), w() (+3 more)
+
+### Community 12 - "Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)"
+Cohesion: 0.02
+Nodes (156): kb(), Of(), R(), S(), Tf(), Wg(), xf(), Ye() (+148 more)
+
+### Community 13 - "Test Capture: chrome-code-colors-verify (service worker + offscreen)"
+Cohesion: 0.02
+Nodes (167): kb(), Of(), R(), S(), Tf(), Wg(), xf(), Ye() (+159 more)
+
+### Community 14 - "Test Capture: chrome-phantom-stream-measure (offscreen doc)"
+Cohesion: 0.03
+Nodes (119): ae(), af(), ag(), b(), bd(), bf(), Bg(), bi() (+111 more)
+
+### Community 15 - "Test Capture: chrome-code-colors-verify (service worker + offscreen)"
+Cohesion: 0.03
+Nodes (93): me(), Pl(), q(), ad(), Ag(), Ai(), ak(), al() (+85 more)
+
+### Community 16 - "Test Capture: chrome-phantom-sticky-verify (offscreen doc)"
+Cohesion: 0.02
+Nodes (178): ab(), ad(), Ah(), aj(), ak(), am(), bb(), bd() (+170 more)
+
+### Community 17 - "Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)"
+Cohesion: 0.02
+Nodes (127): kb(), R(), S(), Tf(), Wg(), xf(), Ye(), ab() (+119 more)
+
+### Community 18 - "Test Capture: chrome-phantom-sticky-plan (offscreen + service worker)"
+Cohesion: 0.03
+Nodes (117): Pl(), Zl(), ad(), Ag(), al(), am(), an(), b() (+109 more)
+
+### Community 19 - "Test Capture: chrome-phantom-sticky-verify (offscreen doc)"
+Cohesion: 0.04
+Nodes (90): ae(), af(), b(), bf(), Bg(), bi(), bl(), c() (+82 more)
+
+### Community 20 - "Test Capture: chrome-phantom-stream (offscreen doc)"
+Cohesion: 0.02
+Nodes (144): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+136 more)
+
+### Community 21 - "Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)"
+Cohesion: 0.03
+Nodes (106): me(), Pl(), q(), ad(), Ag(), Ai(), ak(), al() (+98 more)
+
+### Community 22 - "Test Capture: chrome-phantom-stream-measure (offscreen doc)"
+Cohesion: 0.02
+Nodes (197): ab(), ad(), ae(), ag(), Ai(), aj(), ak(), b() (+189 more)
+
+### Community 23 - "Test Capture: chrome-phantom-stream-tabs (offscreen doc)"
+Cohesion: 0.04
+Nodes (85): ae(), af(), b(), be(), bf(), Bg(), bi(), bl() (+77 more)
+
+### Community 24 - "Test Capture: chrome-phantom-sticky-plan (offscreen + service worker)"
+Cohesion: 0.08
+Nodes (22): bm(), cm(), me(), R(), S(), X(), Ye(), Ze() (+14 more)
+
+### Community 25 - "Test Capture: chrome-phantom-stream-reduced (offscreen doc)"
+Cohesion: 0.09
+Nodes (14): fh(), gh(), kf(), Le(), lf(), lh(), mh(), Ne() (+6 more)
+
 ### Community 26 - "Test Capture: chrome-phantom-stream (offscreen doc)"
 Cohesion: 0.03
-Nodes (105): af(), ag(), b(), be(), bf(), Bg(), bi(), bl() (+97 more)
+Nodes (121): af(), ag(), b(), be(), bf(), Bg(), bi(), bl() (+113 more)
 
 ### Community 27 - "Test Capture: chrome-phantom-sticky-verify (service worker + offscreen)"
 Cohesion: 0.03
-Nodes (121): me(), Pl(), Zl(), ad(), Ag(), al(), am(), an() (+113 more)
+Nodes (121): Pl(), Zl(), ad(), Ag(), al(), am(), an(), b() (+113 more)
 
 ### Community 28 - "Test Capture: chrome-phantom-sticky-plan (offscreen doc)"
 Cohesion: 0.02
-Nodes (139): ab(), ag(), Ah(), Ai(), aj(), ak(), am(), bb() (+131 more)
+Nodes (139): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+131 more)
 
 ### Community 29 - "Test Capture: chrome-phantom-stream-final (offscreen + service worker)"
-Cohesion: 0.11
-Nodes (20): me(), R(), S(), Vi(), ef(), ff(), hl(), Jh() (+12 more)
+Cohesion: 0.20
+Nodes (11): Vi(), hl(), Jh(), mk(), qa(), ra(), ua(), va() (+3 more)
 
 ### Community 30 - "Test Capture: chrome-phantom-stream-reduced (offscreen doc)"
 Cohesion: 0.02
-Nodes (158): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+150 more)
+Nodes (149): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+141 more)
 
 ### Community 31 - "FSB Extension: Options Page UI"
 Cohesion: 0.02
-Nodes (173): activeCrawlerUIs, applyModelSearch(), _applySyncPillState(), applyTheme(), attachInlinePanelListeners(), availableModels, cacheElements(), cancelPairing() (+165 more)
+Nodes (175): convertToSiteMap(), buildRefinerPrompt(), loadProviderSettings(), refineSiteMapWithAI(), activeCrawlerUIs, addLog(), applyModelSearch(), _applySyncPillState() (+167 more)
 
 ### Community 32 - "FSB Extension: Background Service Worker"
 Cohesion: 0.02
@@ -4782,7 +4750,7 @@ Nodes (186): activeSessions, addAllowedTab(), analyzeStuckPatterns(), analyzeTas
 
 ### Community 33 - "Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)"
 Cohesion: 0.04
-Nodes (87): Pl(), q(), ad(), Ag(), Ai(), al(), an(), b() (+79 more)
+Nodes (75): Pl(), ad(), Ag(), al(), an(), b(), bd(), bi() (+67 more)
 
 ### Community 34 - "FSB Showcase: Dashboard Frontend"
 Cohesion: 0.05
@@ -4790,7 +4758,7 @@ Nodes (120): acceptRunningTaskPayload(), acceptTerminalTaskPayload(), apiFetch()
 
 ### Community 35 - "Test Capture: chrome-phantom-stream-final (offscreen + third-party bg)"
 Cohesion: 0.03
-Nodes (51): Fb(), Mc(), Hb(), kk(), mc(), Yb(), a(), ac() (+43 more)
+Nodes (47): Fb(), kk(), mc(), Yb(), a(), ac(), b(), c() (+39 more)
 
 ### Community 36 - "OpenTabs Plugin: PowerPoint Integration"
 Cohesion: 0.05
@@ -4798,11 +4766,11 @@ Nodes (86): PowerPointPlugin, api(), CapturedGraphToken, encodeShareId(), getCap
 
 ### Community 37 - "Test Capture: chrome-phantom-stream (offscreen + third-party bg)"
 Cohesion: 0.03
-Nodes (48): Fb(), Mc(), kk(), mc(), Yb(), a(), ac(), b() (+40 more)
+Nodes (50): Fb(), Hb(), kk(), mc(), Yb(), a(), ac(), b() (+42 more)
 
 ### Community 38 - "Vendored Library: mermaid.js + chart.js (shared minified block)"
 Cohesion: 0.03
-Nodes (166): co(), ga(), je(), ti(), _9(), activationCount(), addActor(), addAll() (+158 more)
+Nodes (175): co(), ga(), je(), _9(), activationCount(), add(), addActor(), addAll() (+167 more)
 
 ### Community 39 - "OpenTabs Plugin: Microsoft Word docx Utils"
 Cohesion: 0.05
@@ -4813,8 +4781,8 @@ Cohesion: 0.05
 Nodes (76): XPlugin, addListMember, bookmarkTweet, createList, createTweet, CreateTweetResponse, deleteList, deleteTweet (+68 more)
 
 ### Community 41 - "Vendored Library: mermaid.js parser internals"
-Cohesion: 0.04
-Nodes (96): aO(), AXe(), bP(), buildLookaheadForAlternation(), buildLookaheadForOptional(), c1(), cO(), computeIsSubtype() (+88 more)
+Cohesion: 0.02
+Nodes (174): li(), $0(), a1(), addAstNodeRegionWithAssignmentsTo(), addNodeFromVertex(), aO(), assignSections(), AXe() (+166 more)
 
 ### Community 42 - "FSB Extension: Side Panel Chat UI"
 Cohesion: 0.04
@@ -4866,7 +4834,7 @@ Nodes (71): api(), AtlasAuth, getAuth(), getGroupId(), getOrgId(), isAuthenticat
 
 ### Community 54 - "Vendored Library: chart.js animation internals"
 Cohesion: 0.03
-Nodes (59): bt, color(), Cs, Ft(), It(), os(), te(), wt() (+51 more)
+Nodes (59): bt, color(), Ft(), It(), kt(), qt(), te(), wt() (+51 more)
 
 ### Community 55 - "FSB Test Suite: agent-id threading tests"
 Cohesion: 0.06
@@ -4885,8 +4853,8 @@ Cohesion: 0.07
 Nodes (64): TelegramPlugin, callManager(), ContactsFound, ContactsResult, DialogsResult, getAuth(), getInputChannel(), getInputPeer() (+56 more)
 
 ### Community 58 - "Scripts: T1 origin-classification verifier + mermaid internals"
-Cohesion: 0.05
-Nodes (95): a7(), buildAlternationAmbiguityError(), buildAlternationPrefixAmbiguityError(), C3e(), join(), lexer(), s7(), VZ() (+87 more)
+Cohesion: 0.06
+Nodes (93): a7(), buildAlternationAmbiguityError(), buildAlternationPrefixAmbiguityError(), C3e(), join(), s7(), WC(), CATALOG_PATH (+85 more)
 
 ### Community 59 - "FSB Extension: Relearn Scheduler + Trigger Manager"
 Cohesion: 0.05
@@ -4969,8 +4937,8 @@ Cohesion: 0.06
 Nodes (61): YouTubeMusicPlugin, add_to_playlist, create_playlist, delete_playlist, get_album, get_artist, get_home, get_library (+53 more)
 
 ### Community 79 - "scripts: Import Opentabs Catalog"
-Cohesion: 0.06
-Nodes (41): APP_ALIASES, assertCleanParams(), backingFor(), carveBusinessCodeField(), collectPropertyNames(), COLLOQUIAL_GUARD, COLLOQUIAL_LIST_ALTS, CREATE_FAVORING_NOUN_ALIASES (+33 more)
+Cohesion: 0.07
+Nodes (42): APP_ALIASES, assertCleanParams(), backingFor(), carveBusinessCodeField(), collectPropertyNames(), COLLOQUIAL_GUARD, COLLOQUIAL_LIST_ALTS, CREATE_FAVORING_NOUN_ALIASES (+34 more)
 
 ### Community 80 - "Npm Integration Plugin"
 Cohesion: 0.06
@@ -5021,12 +4989,12 @@ Cohesion: 0.05
 Nodes (54): estimateTokens(), TranscriptStore(), assetUtf8ByteLength(), classifyAssetRef(), createCapture(), formatSrcsetCandidate(), hasDangerousScheme(), parseSrcsetCandidates() (+46 more)
 
 ### Community 92 - "Whatsapp Integration Plugin"
-Cohesion: 0.06
-Nodes (53): WhatsAppPlugin, archiveChat, clearChat, createGroup, deleteChat, deleteMessage, getCurrentUser, getGroupInviteLink (+45 more)
+Cohesion: 0.07
+Nodes (51): WhatsAppPlugin, archiveChat, clearChat, createGroup, deleteChat, deleteMessage, getCurrentUser, getGroupInviteLink (+43 more)
 
 ### Community 93 - "Test Capture: chrome-phantom-stream-tabs (service_worker_bin_prod)"
-Cohesion: 0.29
-Nodes (4): ig(), Jg(), hg(), Ig()
+Cohesion: 0.08
+Nodes (26): ag(), Gg(), ig(), Jg(), Lg(), Mg(), Ng(), og() (+18 more)
 
 ### Community 94 - "extension: Ws Client"
 Cohesion: 0.08
@@ -5037,8 +5005,8 @@ Cohesion: 0.12
 Nodes (35): fsbTriggerAccessDeniedContext(), fsbTriggerCleanupError(), fsbTriggerCleanupOk(), fsbTriggerCopyIntervalAliases(), fsbTriggerDispatchToolRequest(), fsbTriggerFindTabWatchConflict(), fsbTriggerFirstFiniteTabId(), fsbTriggerFirstString() (+27 more)
 
 ### Community 96 - "Vendored Library: mermaid.min.js"
-Cohesion: 0.07
-Nodes (41): aCe(), bCe(), bX(), cCe(), ce(), count(), dX(), eCe() (+33 more)
+Cohesion: 0.06
+Nodes (47): aCe(), bCe(), bX(), cCe(), ce(), count(), dX(), eCe() (+39 more)
 
 ### Community 97 - "skills: Multi Agent Contract"
 Cohesion: 0.13
@@ -5053,8 +5021,8 @@ Cohesion: 0.07
 Nodes (55): dataApi(), GaAuth, GapiClient, gapiRequest(), GapiRequestOptions, GapiResponse, getActivePropertyId(), getAuth() (+47 more)
 
 ### Community 100 - "Retool Integration Plugin"
-Cohesion: 0.04
-Nodes (57): createResourceFolder, getOrganization, getSourceControlSettings, getWorkflowReleases, getWorkflowRun, listAgents, listBranches, listEnvironments (+49 more)
+Cohesion: 0.05
+Nodes (53): createResourceFolder, getOrganization, getSourceControlSettings, getWorkflowReleases, getWorkflowRun, listBranches, listEnvironments, listGrids (+45 more)
 
 ### Community 101 - "Stackoverflow Integration Plugin"
 Cohesion: 0.09
@@ -5073,8 +5041,8 @@ Cohesion: 0.08
 Nodes (47): ZendeskPlugin, addTicketComment, createTicket, deleteTicket, getCurrentUser, getOrganization, getTicket, getUser (+39 more)
 
 ### Community 105 - "Airbnb Integration Plugin"
-Cohesion: 0.08
-Nodes (44): getCurrentCurrency(), getCurrentUserId(), getHeaders(), getUserAttributes(), graphql(), graphqlMutation(), isAuthenticated(), QUERY_HASHES (+36 more)
+Cohesion: 0.06
+Nodes (52): getCurrentCurrency(), getCurrentUserId(), getHeaders(), getPageData(), getUserAttributes(), graphql(), graphqlMutation(), isAuthenticated() (+44 more)
 
 ### Community 106 - "Instacart Integration Plugin"
 Cohesion: 0.07
@@ -5085,8 +5053,8 @@ Cohesion: 0.07
 Nodes (45): NetflixPlugin, getAuth(), getUserInfo(), isAuthenticated(), NetflixAuth, readApolloTitle(), waitForNetflixAuth(), addToMyList (+37 more)
 
 ### Community 108 - "Spotify Integration Plugin"
-Cohesion: 0.07
-Nodes (31): getAlbum, albumSchema, albumTrackSchema, artistRefSchema, artistTopTrackSchema, imageSourceSchema, mapAlbum(), mapArtistRef() (+23 more)
+Cohesion: 0.05
+Nodes (50): getAuth(), graphql(), getAlbum, getArtist, getCurrentUser, getPlaylist, getSavedTracks, albumSchema (+42 more)
 
 ### Community 109 - "Twitch Integration Plugin"
 Cohesion: 0.08
@@ -5095,10 +5063,6 @@ Nodes (49): TwitchPlugin, emoteSchema, getChannelEmotes, getCurrentUser, getGame
 ### Community 110 - "Walmart Integration Plugin"
 Cohesion: 0.06
 Nodes (51): WalmartPlugin, cartItemSchema, getCart, RawCartItem, getCurrentUser, getProduct, getProductReviews, getStore (+43 more)
-
-### Community 111 - "mcp: Bridge"
-Cohesion: 0.06
-Nodes (27): AgentScopedSendOptions, buildAgentPayload(), captureOwnershipToken(), currentConnectionId(), currentOwnershipToken(), isAgentNotRegistered(), sendAgentScopedBridgeMessage(), AgentScope (+19 more)
 
 ### Community 112 - "Clickhouse Integration Plugin"
 Cohesion: 0.06
@@ -5109,12 +5073,12 @@ Cohesion: 0.07
 Nodes (53): TikTokPlugin, AcrawlerInstance, api(), BASE_PARAMS, extractUserDetail(), fetchSSRData(), getAcrawler(), getAppContext() (+45 more)
 
 ### Community 114 - "Test Capture: chrome-code-colors-verify (service_worker_bin_prod)"
-Cohesion: 0.07
-Nodes (23): fh(), gh(), kf(), Le(), lf(), lh(), M(), mh() (+15 more)
+Cohesion: 0.08
+Nodes (17): fh(), gh(), Jh(), kf(), Le(), lf(), lh(), mh() (+9 more)
 
 ### Community 115 - "Test Capture: chrome-phantom-stream (service_worker_bin_prod)"
 Cohesion: 0.02
-Nodes (171): bk(), kb(), Ki(), li(), Of(), Qf(), Tf(), Wg() (+163 more)
+Nodes (152): kb(), me(), Of(), R(), S(), Tf(), Wg(), xf() (+144 more)
 
 ### Community 116 - "Fidelity Integration Plugin"
 Cohesion: 0.07
@@ -5134,19 +5098,19 @@ Nodes (48): api(), DockerHubAuth, ensureAuth(), fetchProfile(), getAuth(), getUs
 
 ### Community 120 - "Linear Integration Plugin"
 Cohesion: 0.15
-Nodes (13): graphql(), addIssueLabel, batchUpdateIssues, createIssue, deleteIssue, getIssue, moveIssueToProject, removeIssueLabel (+5 more)
+Nodes (13): graphql(), addIssueLabel, archiveIssue, batchUpdateIssues, createIssue, getIssue, moveIssueToProject, removeIssueLabel (+5 more)
 
 ### Community 121 - "Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)"
-Cohesion: 0.08
-Nodes (48): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+40 more)
+Cohesion: 0.09
+Nodes (41): ac(), bc(), cc(), ce(), dc(), ec(), lc(), Mc() (+33 more)
 
 ### Community 122 - "Clickup Integration Plugin"
 Cohesion: 0.07
 Nodes (46): api(), ClickUpAuth, getAuth(), getWorkspaceId(), HandshakeEntry, isAuthenticated(), waitForAuth(), ClickUpPlugin (+38 more)
 
 ### Community 123 - "Test Capture: chrome-phantom-stream-final (offscreendocument_main)"
-Cohesion: 0.06
-Nodes (45): ae(), bd(), cd(), cm(), dd(), dj(), dm(), em() (+37 more)
+Cohesion: 0.08
+Nodes (35): ae(), bd(), cd(), cm(), dd(), dj(), dm(), em() (+27 more)
 
 ### Community 124 - "Claude Integration Plugin"
 Cohesion: 0.09
@@ -5165,8 +5129,8 @@ Cohesion: 0.03
 Nodes (61): among read-only "do not touch" tools), among read-only "do not touch" tools), and `go_forward` for back/forward navigation; there is no separate `back` tool)., Badge allowlist source-of-truth (shared server/extension validator), but the live registry has them as action tools. Record the discrepancy., click, type_text, navigate, scroll, drag, select_option, press_key, press_enter,, - complete_task, Diff: (+53 more)
 
 ### Community 128 - "Vendored Library: mermaid.min.js"
-Cohesion: 0.05
-Nodes (88): addHiddenNodes(), addParents(), beginGroup(), blockTokens(), BU(), buildLeafNode(), bXe(), callFunction() (+80 more)
+Cohesion: 0.04
+Nodes (101): gi(), hn(), acquireParserWorker(), ACTION(), addHiddenNodes(), addParents(), after(), assign() (+93 more)
 
 ### Community 129 - "Doordash Integration Plugin"
 Cohesion: 0.07
@@ -5177,8 +5141,8 @@ Cohesion: 0.07
 Nodes (40): GoogleMapsPlugin, buildDirectionsUrl(), buildLocationUrl(), buildPlaceUrl(), buildSearchUrl(), extractEmbeddedData(), fetchPageData(), getDirectionsFromUrl() (+32 more)
 
 ### Community 131 - "Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)"
-Cohesion: 0.05
-Nodes (51): me(), R(), S(), Tf(), Wg(), xf(), Ye(), af() (+43 more)
+Cohesion: 0.11
+Nodes (24): af(), Ah(), be(), cf(), Ch(), ei(), fh(), gh() (+16 more)
 
 ### Community 132 - "Amplitude Integration Plugin"
 Cohesion: 0.08
@@ -5205,40 +5169,40 @@ Cohesion: 0.08
 Nodes (48): BaseModel, BaseSettings, FastAPI, Pool, Request, Dependency that validates X-FSB-Hash-Key header and returns the key., require_hash_key(), Settings (+40 more)
 
 ### Community 139 - "Datadog Integration Plugin"
-Cohesion: 0.06
-Nodes (31): apiPost(), searchLogsInternal(), aggregateRumEvents, aggregateSpans, createDowntime, createMonitor, deleteMonitor, getMonitorGroups (+23 more)
+Cohesion: 0.04
+Nodes (71): apiDelete(), apiGet(), apiGetText(), apiPost(), apiPut(), apiUiPost(), DatadogAuth, getAuth() (+63 more)
 
 ### Community 140 - "extension: Intelligence Graph"
 Cohesion: 0.06
 Nodes (58): Career Category (pink/magenta), Category Color Legend (8 categories), Central FSB Hub Node, Coding Category (cyan), E-Commerce Category (blue), Email Category (purple), Finance Category (red), FSB Control Panel (options.html UI) (+50 more)
 
 ### Community 141 - "mcp: Diagnostics"
-Cohesion: 0.16
-Nodes (28): applyDiagnosticClassification(), BridgeActiveTabDiagnostics, BridgeDiagnosticLayer, BridgeDiagnosticNote, BridgeDiagnostics, classifyDoctorLayer(), collectBridgeDiagnostics(), ContentScriptDiagnostics (+20 more)
+Cohesion: 0.08
+Nodes (56): applyDiagnosticClassification(), BridgeActiveTabDiagnostics, BridgeDiagnosticLayer, BridgeDiagnosticNote, BridgeDiagnostics, classifyDoctorLayer(), collectBridgeDiagnostics(), ContentScriptDiagnostics (+48 more)
 
 ### Community 142 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.07
-Nodes (29): slackApi(), archiveChannel, completeReminder, deleteMessage, deleteReminder, endSnooze, getDndStatus, getMyProfile (+21 more)
+Cohesion: 0.03
+Nodes (109): SlackEnterprisePlugin, classifySlackError(), discoverWorkspaceTeamId(), EnterpriseSlackAuth, getAuth(), getAuthFromBootData(), getAuthFromLocalConfig(), getAuthSync() (+101 more)
 
 ### Community 143 - "Test Capture: chrome-phantom-sticky-plan (offscreendocument_main)"
-Cohesion: 0.06
-Nodes (59): ac(), bc(), bd(), cc(), ce(), dc(), dj(), ec() (+51 more)
+Cohesion: 0.08
+Nodes (43): ac(), bc(), cc(), dc(), ec(), Fb(), hj(), K() (+35 more)
 
 ### Community 144 - "tests: Trigger Tool Dispatcher.Test"
 Cohesion: 0.07
 Nodes (54): assert, assertOrdered(), BACKGROUND_PATH, caseArmAllowsSameModeAndTerminalRecords(), caseArmAutopilotForeignRejectsBeforeArm(), caseArmAutopilotLegacySpec(), caseArmCopiesTopLevelParseOptionsIntoCondition(), caseArmCrossModeConflictSourceOrdering() (+46 more)
 
 ### Community 145 - "Test Capture: chrome-phantom-sticky-verify (offscreendocument_main)"
-Cohesion: 0.09
-Nodes (43): ac(), bc(), cc(), ce(), dc(), ec(), Fb(), hj() (+35 more)
+Cohesion: 0.07
+Nodes (53): ac(), bc(), cc(), ce(), dc(), ec(), hj(), kb() (+45 more)
 
 ### Community 146 - "scripts: T1 Port Contract"
 Cohesion: 0.13
 Nodes (31): BODY_GUARD_PROOF_KEYS, checkbox(), COMMON_PROOF_KEYS, contractFromReadinessRow(), contractJsonBlock(), EXECUTION_KINDS, inferPortType(), isDualFallback() (+23 more)
 
 ### Community 147 - "extension: Options"
-Cohesion: 0.08
-Nodes (29): armMcpBridge(), defaultConfig, initializeFromFile(), intersect(), MemoryStorage, addLog(), clearAllResearchResults(), clearAllSessions() (+21 more)
+Cohesion: 0.11
+Nodes (10): armMcpBridge(), defaultConfig, initializeFromFile(), intersect(), MemoryStorage, showCredentialModal(), showPaymentMethodModal(), toggleCredentialPassword() (+2 more)
 
 ### Community 148 - "showcase: Github Stats.Service"
 Cohesion: 0.14
@@ -5265,16 +5229,16 @@ Cohesion: 0.09
 Nodes (43): base64Encode(), boundedInt(), buildQuery(), componentText(), currentUserId(), fallback(), fetchGraph(), firstNullableString() (+35 more)
 
 ### Community 154 - "scripts: Side Effect Class"
-Cohesion: 0.15
-Nodes (22): extractTransportSignalsFromText(), inferSideEffect(), BY_RANK, deriveClass(), DESTRUCTIVE_VERBS, helperClass(), isApiHelper(), isConfirmedRead() (+14 more)
+Cohesion: 0.10
+Nodes (35): extractTransportSignalsFromText(), pluginApiDefaultMethodFromText(), BY_RANK, deriveClass(), DESTRUCTIVE_VERBS, helperClass(), isApiHelper(), isConfirmedRead() (+27 more)
 
 ### Community 155 - "extension: Onboarding"
 Cohesion: 0.11
 Nodes (51): advanceInstallClient(), apiKeyFieldHtml(), bind(), bindMcpInteractions(), bindNav(), copyCommand(), currentProvider(), escapeAttr() (+43 more)
 
 ### Community 156 - "mcp: Queue"
-Cohesion: 0.07
-Nodes (39): registerPrompts(), __dirname, QueueItem, registryReadOnly, require, TaskQueue, toolDefs, registerResources() (+31 more)
+Cohesion: 0.04
+Nodes (90): AgentScopedSendOptions, buildAgentPayload(), captureOwnershipToken(), currentConnectionId(), currentOwnershipToken(), isAgentNotRegistered(), sendAgentScopedBridgeMessage(), targetTabIdFromParams() (+82 more)
 
 ### Community 157 - "Linkedin Integration Plugin"
 Cohesion: 0.08
@@ -5285,12 +5249,12 @@ Cohesion: 0.12
 Nodes (47): authNeed(), compactFilter(), fallback(), getInitiativeBuild(), getIssueBuild(), getViewerBuild(), graphData(), graphqlSpec() (+39 more)
 
 ### Community 159 - "Test Capture: chrome-phantom-stream-measure (offscreendocument_main)"
-Cohesion: 0.08
-Nodes (16): fh(), gh(), kf(), Le(), lf(), lh(), mh(), Ne() (+8 more)
+Cohesion: 0.10
+Nodes (30): cf(), df(), dh(), ef(), fh(), ge(), gh(), kf() (+22 more)
 
 ### Community 160 - "Test Capture: chrome-phantom-stream-reduced (offscreendocument_main)"
-Cohesion: 0.08
-Nodes (43): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+35 more)
+Cohesion: 0.05
+Nodes (47): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+39 more)
 
 ### Community 161 - "extension: Linear"
 Cohesion: 0.12
@@ -5334,11 +5298,11 @@ Nodes (26): APP_STATUS_PRIORITY, appStatusFromCounts(), buildTerminalStateReport
 
 ### Community 171 - "Expedia Integration Plugin"
 Cohesion: 0.08
-Nodes (34): ExpediaContext, getContext(), graphql(), isAuthenticated(), requireContext(), resolveRef(), typeahead(), waitForAuth() (+26 more)
+Nodes (35): waitUntil(), ExpediaContext, getContext(), graphql(), isAuthenticated(), requireContext(), resolveRef(), typeahead() (+27 more)
 
 ### Community 172 - "Gitlab Integration Plugin"
-Cohesion: 0.10
-Nodes (35): api(), apiRaw(), buildUrl(), doFetch(), getApiBase(), getAuth(), getCsrfToken(), getUsername() (+27 more)
+Cohesion: 0.11
+Nodes (31): api(), apiRaw(), buildUrl(), doFetch(), getApiBase(), getAuth(), getCsrfToken(), getUsername() (+23 more)
 
 ### Community 173 - "Linear Integration Plugin"
 Cohesion: 0.08
@@ -5353,8 +5317,8 @@ Cohesion: 0.08
 Nodes (39): callRpc(), ConversationEntry, GeminiAuth, GeminiModel, getAuth(), getConversationMessages(), getConversationsFromDOM(), getCurrentConversationId() (+31 more)
 
 ### Community 176 - "Retool Integration Plugin"
-Cohesion: 0.10
-Nodes (47): forceEditorSaveTool, base64ToZipFile(), CompiledToolscriptArchive, compileToolscriptArchive(), DeserializeResult, discoverMainModuleUrl(), discoverSendSaveModuleUrl(), discoverToolscriptHelperUrl() (+39 more)
+Cohesion: 0.07
+Nodes (59): createAppFromToolscriptArchive, warningSchema, exportToolscriptArchive, getExportPageName(), isRecord(), forceEditorSaveTool, savePage, updateAppFromToolscriptArchive (+51 more)
 
 ### Community 177 - "Teams Integration Plugin"
 Cohesion: 0.09
@@ -5362,15 +5326,15 @@ Nodes (36): TeamsPlugin, CapturedToken, chatApi(), classifyHttpError(), clearCac
 
 ### Community 178 - "Test Capture: chrome-code-colors-verify (offscreendocument_main)"
 Cohesion: 0.08
-Nodes (46): ac(), bc(), cc(), dc(), ec(), Fb(), hj(), K() (+38 more)
+Nodes (45): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+37 more)
 
 ### Community 179 - "Vendored Library: mermaid.min.js"
-Cohesion: 0.09
-Nodes (31): a9(), b$e(), bc(), bLe(), bm(), BT(), Ci(), cLe() (+23 more)
+Cohesion: 0.08
+Nodes (33): a9(), b$e(), bc(), bLe(), bm(), BT(), Ci(), cLe() (+25 more)
 
 ### Community 180 - "Test Capture: chrome-phantom-stream (service_worker_bin_prod)"
 Cohesion: 0.04
-Nodes (98): ae(), ag(), Ai(), b(), Bg(), bi(), bl(), c() (+90 more)
+Nodes (91): ae(), ag(), Ai(), b(), Bg(), bi(), bl(), c() (+83 more)
 
 ### Community 181 - "showcase: Stats Page.Component"
 Cohesion: 0.12
@@ -5385,12 +5349,12 @@ Cohesion: 0.09
 Nodes (36): EbayAuth, extractSrt(), fetchJson(), fetchPage(), getAuth(), getCurrentUser(), isAuthenticated(), parseCardItem() (+28 more)
 
 ### Community 184 - "Spotify Integration Plugin"
-Cohesion: 0.14
-Nodes (18): SpotifyPlugin, api(), GraphQLError, isAuthenticated(), OPERATION_HASHES, resetInterceptor(), SpotifyAuth, waitForAuth() (+10 more)
+Cohesion: 0.07
+Nodes (38): SpotifyPlugin, api(), GraphQLError, isAuthenticated(), OPERATION_HASHES, resetInterceptor(), SpotifyAuth, waitForAuth() (+30 more)
 
 ### Community 185 - "Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)"
 Cohesion: 0.04
-Nodes (81): Pl(), ad(), Ag(), ak(), al(), an(), b(), bd() (+73 more)
+Nodes (85): Pl(), ad(), Ag(), al(), an(), b(), bd(), bl() (+77 more)
 
 ### Community 186 - "extension: Mcp Visual Session"
 Cohesion: 0.11
@@ -5409,8 +5373,8 @@ Cohesion: 0.11
 Nodes (14): buildLocaleUrl(), emitLocaleHead(), CopyTarget, LatticeSection, PackageManager, CopyTarget, PhantomSection, QuickstartTab (+6 more)
 
 ### Community 190 - "Github Integration Plugin"
-Cohesion: 0.05
-Nodes (41): createPullRequest, createRepo, getPullRequest, PRPageData, getRepo, RepoPayload, getUserProfile, BranchesPayload (+33 more)
+Cohesion: 0.10
+Nodes (20): lk(), Ai(), bb(), Ci(), cj(), eh(), fi(), gi() (+12 more)
 
 ### Community 191 - "catalog: Reddit"
 Cohesion: 0.09
@@ -5445,8 +5409,8 @@ Cohesion: 0.11
 Nodes (45): alternative(), assertion(), atom(), atomEscape(), characterClass(), characterClassEscape(), classAtom(), classEscape() (+37 more)
 
 ### Community 199 - "showcase: Phantom Stream Viewer"
-Cohesion: 0.10
-Nodes (33): assetUnavailablePlaceholderTag(), assetUrlHost(), attrsBlobIsUnreliable(), buildFramePlaceholderHtml(), buildShellAttributeString(), buildSnapshotHtml(), clampToDuration(), classifyAssetOrigin() (+25 more)
+Cohesion: 0.09
+Nodes (40): assetUnavailablePlaceholderTag(), assetUrlHost(), attrsBlobIsUnreliable(), buildFramePlaceholderHtml(), buildShellAttributeString(), buildSnapshotHtml(), clampToDuration(), classifyAssetOrigin() (+32 more)
 
 ### Community 200 - "showcase: Server"
 Cohesion: 0.05
@@ -5461,8 +5425,8 @@ Cohesion: 0.05
 Nodes (44): dependencies, @opentabs-dev/plugin-sdk, description, devDependencies, @biomejs/biome, jiti, @opentabs-dev/plugin-tools, typescript (+36 more)
 
 ### Community 203 - "Github Integration Plugin"
-Cohesion: 0.05
-Nodes (59): discoverMutationIds(), discoverQueryId(), doFetch(), fetchRawText(), formPost(), getAuth(), getCsrfToken(), getLogin() (+51 more)
+Cohesion: 0.03
+Nodes (99): discoverMutationIds(), discoverQueryId(), doFetch(), formPost(), getAuth(), getCsrfToken(), getLogin(), getMutationId() (+91 more)
 
 ### Community 204 - "Microsoft Word Integration Plugin"
 Cohesion: 0.05
@@ -5486,7 +5450,7 @@ Nodes (44): dependencies, @opentabs-dev/plugin-sdk, description, devDependencies
 
 ### Community 209 - "Test Capture: chrome-phantom-stream (offscreendocument_main)"
 Cohesion: 0.05
-Nodes (65): ac(), ae(), bc(), bd(), cc(), cd(), ce(), dc() (+57 more)
+Nodes (63): ac(), ae(), bc(), bd(), cc(), cd(), ce(), dc() (+55 more)
 
 ### Community 210 - "Airbnb Integration Plugin"
 Cohesion: 0.05
@@ -5905,8 +5869,8 @@ Cohesion: 0.10
 Nodes (12): AgentRegistry(), _clampCap(), cloneRecord(), _getCapRecommendationModule(), _getChrome(), isPositiveInteger(), mintAgentId(), mintOwnershipToken() (+4 more)
 
 ### Community 314 - "Datadog Integration Plugin"
-Cohesion: 0.06
-Nodes (34): getCurrentUser, getMetricMetadata, getUser, listUsers, queryMetrics, mapMetricMetadata(), mapMonitorSearchResult(), mapSpan() (+26 more)
+Cohesion: 0.04
+Nodes (58): searchLogsInternal(), getCurrentUser, getDowntime, getHostInfo, getIncident, getMetricMetadata, getSlo, getSyntheticsTest (+50 more)
 
 ### Community 315 - "Npm Integration Plugin"
 Cohesion: 0.05
@@ -5925,8 +5889,8 @@ Cohesion: 0.12
 Nodes (35): allRelTags(), answerSegments(), appendQuery(), attrValue(), bodyFromSegment(), buildQuery(), canonicalUrl(), fallback() (+27 more)
 
 ### Community 319 - "Test Capture: chrome-phantom-stream-final (service_worker_bin_prod)"
-Cohesion: 0.24
-Nodes (13): kb(), ce(), dj(), ed(), J(), nb(), od(), pd() (+5 more)
+Cohesion: 0.06
+Nodes (40): kb(), bd(), cd(), ce(), dd(), de(), dj(), ed() (+32 more)
 
 ### Community 320 - "extension: Ebay"
 Cohesion: 0.11
@@ -5945,8 +5909,8 @@ Cohesion: 0.10
 Nodes (38): BACKGROUND_PATH, caseAcceptedExplicitInterval(), caseAlarmBranchSourceGuards(), caseArmSchedulesNextPoll(), caseBlockedPageSourceGuards(), caseDefaultInterval(), caseJitterAndDeadlineFloor(), caseNonRefreshNoPollField() (+30 more)
 
 ### Community 325 - "Outlook Integration Plugin"
-Cohesion: 0.09
-Nodes (33): AttendeeInput, attendeeInputSchema, attendeeSchema, buildAttendees(), buildDateTime(), calendarSchema, dateTimeZoneSchema, eventDetailSchema (+25 more)
+Cohesion: 0.10
+Nodes (28): AttendeeInput, attendeeInputSchema, attendeeSchema, buildAttendees(), buildDateTime(), calendarSchema, dateTimeZoneSchema, eventDetailSchema (+20 more)
 
 ### Community 326 - "Test Capture: chrome-code-colors-verify (offscreendocument_main)"
 Cohesion: 0.04
@@ -5954,7 +5918,7 @@ Nodes (51): Phase 47: TradingView Fibonacci, Phase 48: Figma Frame Alignment, Ph
 
 ### Community 328 - "Test Capture: chrome-phantom-stream-reduced (offscreendocument_main)"
 Cohesion: 0.04
-Nodes (98): ae(), af(), ag(), b(), bf(), Bg(), bi(), bl() (+90 more)
+Nodes (100): ae(), af(), ag(), b(), bf(), Bg(), bi(), bl() (+92 more)
 
 ### Community 329 - "catalog: Fiverr"
 Cohesion: 0.12
@@ -5984,6 +5948,10 @@ Nodes (28): YelpPlugin, autocomplete, businessDetailSchema, getBusiness, getCurr
 Cohesion: 0.06
 Nodes (33): getCurrentUser, listPayees, assertCategoryDeletable(), cadenceWireValue, ClearedStatus, EntityLookups, FlagColor, formatMilliunits() (+25 more)
 
+### Community 337 - ".context scratch: Review request"
+Cohesion: 0.11
+Nodes (23): af(), Ah(), be(), cf(), Ch(), ei(), fh(), gh() (+15 more)
+
 ### Community 338 - "extension: Universal Provider"
 Cohesion: 0.09
 Nodes (22): boundedMapSet(), buildProviderModelsEndpoint(), calculateAdaptiveTimeout(), normalizeProviderBaseUrl(), parameterCache, parseOpenAICompatibleModelList(), PROVIDER_CONFIGS, rateLimitState (+14 more)
@@ -5993,8 +5961,8 @@ Cohesion: 0.09
 Nodes (30): getJob, getProjectWorkflowMetrics, getWorkflowJobMetrics, getWorkflowJobs, getWorkflowRuns, listContextEnvVars, artifactSchema, contextEnvVarSchema (+22 more)
 
 ### Community 340 - "Gitlab Integration Plugin"
-Cohesion: 0.08
-Nodes (26): getUserProfile, listBranches, listCommits, listPipelineJobs, listPipelines, branchSchema, commitSchema, jobSchema (+18 more)
+Cohesion: 0.07
+Nodes (30): createNote, getUserProfile, listBranches, listCommits, listNotes, listPipelineJobs, listPipelines, branchSchema (+22 more)
 
 ### Community 341 - "Lucid Integration Plugin"
 Cohesion: 0.05
@@ -6012,13 +5980,17 @@ Nodes (25): createTransaction, deleteCategory, deleteCategoryGroup, deleteTransa
 Cohesion: 0.11
 Nodes (27): buildDirectionsPath(), buildLocationPath(), buildMapUrl(), buildPlacePath(), buildSearchPath(), currentView(), enc(), extractEmbeddedData() (+19 more)
 
+### Community 345 - "Test Capture: chrome-phantom-sticky-plan (service_worker_bin_prod)"
+Cohesion: 0.06
+Nodes (21): ge(), kb(), ce(), dj(), ed(), fd(), fl(), gd() (+13 more)
+
 ### Community 346 - "extension: Gmaps"
 Cohesion: 0.11
 Nodes (27): buildDirectionsPath(), buildLocationPath(), buildMapUrl(), buildPlacePath(), buildSearchPath(), currentView(), enc(), extractEmbeddedData() (+19 more)
 
 ### Community 347 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.07
-Nodes (30): getReactions, getUserInfo, listPins, listStars, listUserGroups, mapPin(), mapReaction(), mapSearchChannel() (+22 more)
+Cohesion: 0.13
+Nodes (15): LeetCodePlugin, graphql(), waitForAuth(), getCodeSnippets, getContestHistory, getProblemHints, getProblemSolution, getProblemStats (+7 more)
 
 ### Community 348 - "catalog: Notion"
 Cohesion: 0.16
@@ -6073,8 +6045,8 @@ Cohesion: 0.10
 Nodes (21): appendQuery(), authContext(), buildQuery(), collectionValues(), decodeTextBase64(), fallback(), graphGetSpec(), graphRead() (+13 more)
 
 ### Community 361 - "Test Capture: chrome-phantom-stream-tabs (offscreendocument_main)"
-Cohesion: 0.09
-Nodes (42): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+34 more)
+Cohesion: 0.08
+Nodes (47): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+39 more)
 
 ### Community 362 - "extension: Instagram"
 Cohesion: 0.11
@@ -6089,8 +6061,8 @@ Cohesion: 0.10
 Nodes (21): appendQuery(), authContext(), buildQuery(), collectionValues(), decodeTextBase64(), fallback(), graphGetSpec(), graphRead() (+13 more)
 
 ### Community 365 - "Github Integration Plugin"
-Cohesion: 0.06
-Nodes (49): me(), Of(), R(), S(), Ye(), af(), Ah(), Ch() (+41 more)
+Cohesion: 0.02
+Nodes (149): ig(), Jg(), lk(), Ng(), Of(), rg(), Tf(), ug() (+141 more)
 
 ### Community 366 - "catalog: Booking"
 Cohesion: 0.15
@@ -6150,11 +6122,11 @@ Nodes (28): getSiteGuidesByCategory(), animate(), animateZoomTo(), buildKnowledg
 
 ### Community 381 - "Google Cloud Integration Plugin"
 Cohesion: 0.09
-Nodes (26): getBillingInfo, listBillingAccounts, listIamRoles, listLogEntries, listNetworks, listObjects, billingAccountSchema, billingInfoSchema (+18 more)
+Nodes (26): getBillingInfo, listBillingAccounts, listEnabledServices, listIamRoles, listObjects, listProjects, billingAccountSchema, billingInfoSchema (+18 more)
 
 ### Community 382 - "Leetcode Integration Plugin"
-Cohesion: 0.04
-Nodes (85): waitUntil(), LeetCodePlugin, getCsrfToken(), graphql(), isAuthenticated(), pollSubmissionResult(), rest(), waitForAuth() (+77 more)
+Cohesion: 0.12
+Nodes (22): getCurrentUser, getProblem, getUserCalendar, getUserProgress, calendarSchema, codeSnippetSchema, mapCalendar(), mapCodeSnippet() (+14 more)
 
 ### Community 383 - "catalog: Calendly"
 Cohesion: 0.14
@@ -6167,10 +6139,6 @@ Nodes (23): activeUrl(), appendQuery(), buildQuery(), currentDocumentContext(), 
 ### Community 386 - "catalog: Redfin"
 Cohesion: 0.18
 Nodes (30): arrayValue(), boolValue(), buildApiSpec(), buildQuery(), envelopeFromResult(), fallback(), isObject(), mapAmenities() (+22 more)
-
-### Community 387 - "Test Capture: chrome-phantom-stream (offscreendocument_main)"
-Cohesion: 0.07
-Nodes (16): fh(), gh(), kf(), Le(), lf(), lh(), M(), mh() (+8 more)
 
 ### Community 388 - "extension: Ai Integration"
 Cohesion: 0.07
@@ -6189,16 +6157,16 @@ Cohesion: 0.18
 Nodes (30): arrayValue(), boolValue(), buildApiSpec(), buildQuery(), envelopeFromResult(), fallback(), isObject(), mapAmenities() (+22 more)
 
 ### Community 392 - "Vendored Library: mermaid.min.js"
-Cohesion: 0.06
-Nodes (40): jn, AB(), bDe(), CB(), cje(), create(), createAsync(), createLangiumDocument() (+32 more)
+Cohesion: 0.03
+Nodes (107): AB(), addDocument(), addMessage(), bi(), build(), buildDocuments(), bWe(), calculateHorizontalSpace() (+99 more)
 
 ### Community 393 - "scripts: Package Extension"
 Cohesion: 0.12
 Nodes (15): CATALOG_ROOT, catalogData, descriptors, __dirname, DIST_DIR, excludes, EXT_ROOT, generatedDir (+7 more)
 
 ### Community 394 - "Aws Console Integration Plugin"
-Cohesion: 0.11
-Nodes (26): describeInstance, listAlarms, listInstances, listLogGroups, listVpcs, alarmSchema, extractInstances(), extractName() (+18 more)
+Cohesion: 0.13
+Nodes (18): listIamRoles, listLogGroups, listSecurityGroups, iamRoleSchema, iamUserSchema, logGroupSchema, mapIamRole(), mapIamUser() (+10 more)
 
 ### Community 395 - "Bluesky Integration Plugin"
 Cohesion: 0.08
@@ -6213,8 +6181,8 @@ Cohesion: 0.04
 Nodes (48): Alternatives Considered, Anti-Patterns to Avoid, Architecture Patterns, Assumptions Log, Claude's Discretion, Code Examples, Common Pitfalls, Core (already present in repo) (+40 more)
 
 ### Community 399 - "Test Capture: chrome-phantom-stream-tabs (service_worker_bin_prod)"
-Cohesion: 0.11
-Nodes (24): af(), Ah(), be(), cf(), Ch(), ei(), fh(), fj() (+16 more)
+Cohesion: 0.13
+Nodes (22): xc(), xc(), xc(), kb(), xc(), dj(), ed(), J() (+14 more)
 
 ### Community 400 - "tests: Model Discovery.Test"
 Cohesion: 0.24
@@ -6306,11 +6274,11 @@ Nodes (16): api(), getDid(), createPost, deletePost, followUser, getUnreadCount,
 
 ### Community 419 - "Meticulous Integration Plugin"
 Cohesion: 0.08
-Nodes (27): getProjectPullRequest, getSessionEvents, listOrganizations, mapOrg(), mapPullRequest(), mapSessionEvent(), organizationSchema, pullRequestSchema (+19 more)
+Nodes (27): getCurrentUser, listGithubRepositories, listOrganizationMembers, githubRepoSchema, mapGithubRepo(), mapMembership(), mapUser(), membershipSchema (+19 more)
 
 ### Community 420 - "Netlify Integration Plugin"
 Cohesion: 0.14
-Nodes (18): NetlifyPlugin, ApiOptions, isAuthenticated(), waitForAuth(), deleteBuildHook, deleteEnvVar, deleteHook, deleteSite (+10 more)
+Nodes (18): NetlifyPlugin, ApiOptions, isAuthenticated(), waitForAuth(), deleteBuildHook, deleteDnsRecord, deleteEnvVar, deleteSite (+10 more)
 
 ### Community 421 - "Steam Integration Plugin"
 Cohesion: 0.13
@@ -6365,8 +6333,8 @@ Cohesion: 0.16
 Nodes (29): _audit(), _auditLog(), _catalog(), _consentStore(), _denylist(), _deriveMethod(), _deriveSideEffectClass(), _discoverySession() (+21 more)
 
 ### Community 434 - "extension: Learned Recipe Store"
-Cohesion: 0.16
-Nodes (27): _defaultEnvelope(), dispositionFor(), _evictOldestIfOverCap(), _evictRecurrenceIfOverCap(), _getChrome(), getLearned(), getOriginHealth(), _hasLocalStorage() (+19 more)
+Cohesion: 0.17
+Nodes (26): _defaultEnvelope(), dispositionFor(), _evictOldestIfOverCap(), _evictRecurrenceIfOverCap(), _getChrome(), getLearned(), getOriginHealth(), _hasLocalStorage() (+18 more)
 
 ### Community 436 - "tests: Action Tool Agent Scoped.Test"
 Cohesion: 0.17
@@ -6401,8 +6369,8 @@ Cohesion: 0.12
 Nodes (21): apiSpec(), appendQuery(), arrayMapper(), buildQuery(), fallback(), isObject(), looksLikeError(), mapComment() (+13 more)
 
 ### Community 444 - "extension: Control Panel"
-Cohesion: 0.11
-Nodes (22): Encrypted Credential Vault (shared with payments), memory-manager.js, knowledge-graph.js, site-graph.js, FSB Control Panel (options page), API Configuration Section, Background Agents Sunset Notice, Consolidated Memory Knowledge Graph View (+14 more)
+Cohesion: 0.08
+Nodes (29): Encrypted Credential Vault (shared with payments), docs/LEGAL.md (Legal Posture reference), service-denylist.json, memory-manager.js, knowledge-graph.js, site-graph.js, FSB Control Panel (options page), API Configuration Section (+21 more)
 
 ### Community 445 - "Test Capture: chrome-phantom-sticky-verify (offscreendocument_main)"
 Cohesion: 0.29
@@ -6428,10 +6396,6 @@ Nodes (21): apiSpec(), appendQuery(), arrayMapper(), buildQuery(), fallback(), i
 Cohesion: 0.08
 Nodes (3): ne(), se, te()
 
-### Community 451 - "extension: Site Explorer"
-Cohesion: 0.15
-Nodes (7): convertToSiteMap(), buildRefinerPrompt(), loadProviderSettings(), refineSiteMapWithAI(), refineMemoryWithAI(), saveResearchToMemory(), SiteExplorer
-
 ### Community 452 - "tests: Linkedin T1 Ready.Test"
 Cohesion: 0.10
 Nodes (28): ALL_SLUGS, assertLinkedinSpec(), bySlug(), CATALOG_PATH, check(), descriptorFor(), DESCRIPTORS_DIR, EVIDENCE_PATH (+20 more)
@@ -6453,8 +6417,8 @@ Cohesion: 0.07
 Nodes (27): asciiArtifacts, binsMatch, definedTools, envMatch, fmMatch, fs, installSrc, installTs (+19 more)
 
 ### Community 457 - "Datadog Integration Plugin"
-Cohesion: 0.11
-Nodes (18): apiDelete(), apiGetText(), apiPut(), apiUiPost(), DatadogAuth, getAuth(), getCsrfToken(), isAuthenticated() (+10 more)
+Cohesion: 0.17
+Nodes (25): _close(), _commit(), _defaultActiveIndex(), _doc(), _getInputValueForProvider(), init(), _moveActive(), _onKeydown() (+17 more)
 
 ### Community 458 - "Instagram Integration Plugin"
 Cohesion: 0.14
@@ -6490,7 +6454,7 @@ Nodes (22): appendQuery(), buildQuery(), bulletDescriptions(), collectProducts()
 
 ### Community 466 - "Test Capture: chrome-phantom-stream (offscreendocument_main)"
 Cohesion: 0.03
-Nodes (159): Ae(), rt(), _8(), a_e(), AFe(), alts(), aN(), ASe() (+151 more)
+Nodes (155): Ae(), rt(), a_e(), AFe(), alts(), aN(), ASe(), bFe() (+147 more)
 
 ### Community 467 - "extension: Readme"
 Cohesion: 0.18
@@ -6601,8 +6565,8 @@ Cohesion: 0.05
 Nodes (44): Constraints, Context, Core Value, Current Milestone, Current State, Deferred Milestone: v0.9.23 Dashboard Stream & Remote Control Reliability (incomplete, deferred), Evolution, FSB (Full Self-Browsing) (+36 more)
 
 ### Community 496 - "Vendored Library: mermaid.min.js"
-Cohesion: 0.05
-Nodes (66): ea(), ln(), rn(), accept(), aP(), buildEarlyExitMessage(), buildLeftRecursionError(), buildNoViableAltMessage() (+58 more)
+Cohesion: 0.06
+Nodes (47): Cs, ea(), ln(), os(), rn(), aP(), buildDuplicateFoundError(), buildEarlyExitMessage() (+39 more)
 
 ### Community 497 - "scripts: Generate T1 Same Origin Read Recipes"
 Cohesion: 0.16
@@ -6629,12 +6593,12 @@ Cohesion: 0.22
 Nodes (26): assert(), assertDeepEqual(), assertEqual(), assertNoSecrets(), buildClientHarness(), createChromeMock(), createFakeTimers(), createFakeWebSocketClass() (+18 more)
 
 ### Community 503 - "Leetcode Integration Plugin"
-Cohesion: 0.09
-Nodes (41): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+33 more)
+Cohesion: 0.08
+Nodes (44): ac(), bc(), cc(), ce(), dc(), ec(), hj(), lc() (+36 more)
 
 ### Community 504 - "Minimax Agent Integration Plugin"
-Cohesion: 0.12
-Nodes (14): MinimaxAgentPlugin, isAuthenticated(), resetWebpackCache(), waitForAuth(), addMcpServer, deleteChat, getWorkspace, RawWorkspace (+6 more)
+Cohesion: 0.11
+Nodes (16): MinimaxAgentPlugin, isAuthenticated(), resetWebpackCache(), waitForAuth(), addMcpServer, deleteChat, getWorkspace, RawWorkspace (+8 more)
 
 ### Community 505 - "Netlify Integration Plugin"
 Cohesion: 0.12
@@ -6649,12 +6613,12 @@ Cohesion: 0.09
 Nodes (25): getPropertyEstimate, comparableSchema, estimateSchema, mapComparable(), mapEstimate(), RawAddressData, RawAddressSectionInfo, RawAmenityEntry (+17 more)
 
 ### Community 508 - "Robinhood Integration Plugin"
-Cohesion: 0.11
-Nodes (23): getEarnings, getNewsFeed, getPortfolio, getQuote, listCryptoHoldings, cryptoHoldingSchema, earningsSchema, fundamentalsSchema (+15 more)
+Cohesion: 0.12
+Nodes (21): getCurrentUser, getEarnings, getMarketHours, getPortfolio, earningsSchema, extractIdFromUrl(), fundamentalsSchema, mapDividend() (+13 more)
 
 ### Community 509 - "Starbucks Integration Plugin"
 Cohesion: 0.09
-Nodes (24): apiArray(), findStores, getFeed, getRewards, mapRewardTier(), mapStore(), mapStreamItem(), RawAccountProfile (+16 more)
+Nodes (24): apiArray(), findStores, getCurrentUser, getProduct, mapProduct(), mapStore(), mapUserProfile(), productSchema (+16 more)
 
 ### Community 510 - "Terraform Cloud Integration Plugin"
 Cohesion: 0.16
@@ -6705,8 +6669,8 @@ Cohesion: 0.17
 Nodes (23): _applySeeds(), _attach(), _captureChrome(), _chromeDebugger(), _clearTimer(), _collisionSafeAttach(), _consentStore(), _denylist() (+15 more)
 
 ### Community 523 - "mcp: Errors"
-Cohesion: 0.11
-Nodes (22): appendRawError(), buildLayeredDetail(), CODE_ONLY_ERROR_KEYS, DEFAULT_RESTRICTED_RECOVERY_TOOLS, ErrorDetail, formatRecoveryToolList(), FSB_ERROR_MESSAGES, getAllowedClientLabels() (+14 more)
+Cohesion: 0.32
+Nodes (7): assert(), assertBlock(), expectedRecoveryTools, path, { pathToFileURL }, repoRoot, run()
 
 ### Community 524 - "scripts: Parse Research Logs"
 Cohesion: 0.12
@@ -6730,7 +6694,7 @@ Nodes (20): FollowersResponse, getFollowers, FollowingResponse, getFollowing, ge
 
 ### Community 529 - "Sentry Integration Plugin"
 Cohesion: 0.11
-Nodes (19): listIssueEvents, listMembers, listReleases, listTeams, Event, eventSchema, Issue, mapEvent() (+11 more)
+Nodes (20): getOrganization, listMembers, listOrganizations, listReleases, listTeams, Event, Issue, mapMember() (+12 more)
 
 ### Community 530 - "catalog: Doordash"
 Cohesion: 0.14
@@ -6773,8 +6737,8 @@ Cohesion: 0.12
 Nodes (10): analyzeCrossSitePatterns(), classifyForms(), classifyNavigation(), classifyPages(), classifySelectorStrategies(), extractDomainPatterns(), findCommonItems(), groupSitemapsByDomain() (+2 more)
 
 ### Community 540 - "extension: Options"
-Cohesion: 0.10
-Nodes (20): lk(), Ai(), bb(), Ci(), cj(), eh(), fi(), gi() (+12 more)
+Cohesion: 0.11
+Nodes (17): me(), R(), S(), Vi(), ii(), ji(), n(), ne() (+9 more)
 
 ### Community 541 - "extension: Capability Catalog"
 Cohesion: 0.13
@@ -6789,8 +6753,8 @@ Cohesion: 0.25
 Nodes (8): Agent identity, `back` tool, Background-tab execution, Concurrency cap, Lock release, Multi-Agent Contract (v0.8.0), Ownership enforcement, Resilience: heartbeat + persistence + sw_evicted recovery
 
 ### Community 544 - "tests: Phantom Stream Differential Parity.Test"
-Cohesion: 0.08
-Nodes (11): angularDashboardSource, assert, domStreamSource, FakeDocument, FakeFragment, FakeTemplate, fs, makeFakeMirror() (+3 more)
+Cohesion: 0.07
+Nodes (18): applyMutations(), installShadowRootDirect(), angularDashboardSource, assert, domStreamSource, FakeDocument, FakeFragment, FakeTemplate (+10 more)
 
 ### Community 545 - "showcase: Telemetry"
 Cohesion: 0.10
@@ -6802,7 +6766,7 @@ Nodes (22): makeInjection(), addActionMessage(), addCompletionMessage(), addMess
 
 ### Community 547 - "Chipotle Integration Plugin"
 Cohesion: 0.14
-Nodes (17): getCurrentUser, getPaymentMethods, getRewards, addressSchema, customerSchema, mapCustomer(), mapPaymentMethod(), mapRewardOffer() (+9 more)
+Nodes (17): getLoyaltyPoints, getPaymentMethods, getRewards, addressSchema, loyaltyPointsSchema, mapLoyaltyPoints(), mapPaymentMethod(), mapRewardOffer() (+9 more)
 
 ### Community 548 - "catalog: Amplitude"
 Cohesion: 0.15
@@ -6885,8 +6849,8 @@ Cohesion: 0.21
 Nodes (11): isValidLocale(), LOCALE_NATIVE_LABELS, LOCALE_SUBPATHS, LocaleCode, LOCALES, SOURCE_LOCALE, hasDocument(), hasLocalStorage() (+3 more)
 
 ### Community 568 - "showcase: Dashboard Page.Component"
-Cohesion: 0.14
-Nodes (16): M(), qa(), ra(), Ti(), ua(), va(), Vi(), wa() (+8 more)
+Cohesion: 0.10
+Nodes (17): af(), bf(), ke(), L(), M(), P(), qa(), ra() (+9 more)
 
 ### Community 569 - "tests: Fidelity T1 Ready.Test"
 Cohesion: 0.13
@@ -6953,8 +6917,8 @@ Cohesion: 0.05
 Nodes (42): Alternatives Considered, Anti-Patterns to Avoid, Architectural Responsibility Map, Architecture Patterns, Code Examples, Common Pitfalls, Core, Deferred Ideas (OUT OF SCOPE) (+34 more)
 
 ### Community 585 - "Test Capture: chrome-phantom-stream-final (service_worker_bin_prod)"
-Cohesion: 0.08
-Nodes (25): Ki(), li(), Qf(), Wg(), Ye(), dh(), fh(), gf() (+17 more)
+Cohesion: 0.06
+Nodes (47): me(), R(), S(), Wg(), Ye(), af(), Ah(), be() (+39 more)
 
 ### Community 586 - "Test Capture: chrome-phantom-stream-reduced (service_worker_bin_prod)"
 Cohesion: 0.05
@@ -6968,9 +6932,13 @@ Nodes (15): accountsSpec(), buildQuery(), envelopeData(), fallback(), getSpec(),
 Cohesion: 0.15
 Nodes (17): aliasFromUrl(), buildGetSpec(), buildQuery(), businessRequest(), extractBusiness(), extractPageData(), extractSearchResults(), fallback() (+9 more)
 
+### Community 589 - "Vendored Library: chart.min.js"
+Cohesion: 0.09
+Nodes (3): addElements(), jn, tn
+
 ### Community 590 - "Vendored Library: mermaid.min.js"
-Cohesion: 0.08
-Nodes (36): A6(), addEntry(), B3(), cge(), D6(), g4e(), getAstNode(), getDataStructures() (+28 more)
+Cohesion: 0.11
+Nodes (28): A6(), addEntry(), cge(), D6(), getAstNode(), getDataStructures(), getMaxDimension(), Hn() (+20 more)
 
 ### Community 591 - "tests: Owner Chip.Test"
 Cohesion: 0.11
@@ -7023,8 +6991,8 @@ Cohesion: 0.19
 Nodes (14): getConversationMessages, ThreadResponse, CollectionsResponse, InboxResponse, listConversations, collectionSchema, mapCollection(), mapMessage() (+6 more)
 
 ### Community 603 - "Meticulous Integration Plugin"
-Cohesion: 0.17
-Nodes (16): MeticulousPlugin, graphql(), GraphQLResponse, isAuthenticated(), mutations, waitForAuth(), acceptAllDiffs, checkForFlakes (+8 more)
+Cohesion: 0.14
+Nodes (19): MeticulousPlugin, graphql(), GraphQLResponse, isAuthenticated(), mutations, waitForAuth(), acceptAllDiffs, checkForFlakes (+11 more)
 
 ### Community 604 - "Steam Integration Plugin"
 Cohesion: 0.13
@@ -7159,8 +7127,8 @@ Cohesion: 0.12
 Nodes (20): BaseRecord, ListResult, listWorkspaces, WorkspaceRecord, baseSchema, fieldSchema, mapBase(), mapField() (+12 more)
 
 ### Community 638 - "Google Cloud Integration Plugin"
-Cohesion: 0.24
-Nodes (7): GapiClient, GapiRoot, getGapi(), isAuthenticated(), ProjectContext, waitForAuth(), GoogleCloudPlugin
+Cohesion: 0.23
+Nodes (8): isAuthenticated(), waitForAuth(), GoogleCloudPlugin, getCurrentProject, listNetworks, mapNetwork(), networkSchema, RawNetwork
 
 ### Community 639 - "Mastodon Integration Plugin"
 Cohesion: 0.20
@@ -7199,8 +7167,8 @@ Cohesion: 0.10
 Nodes (21): 3D Graph Viewer (drag to rotate, scroll to zoom, hover a node), Career & Job Search (45), Coding Platforms (7), Design & Whiteboard (3), E-Commerce & Shopping (8), Email Platforms (3), Finance & Trading (6), Games (2) (+13 more)
 
 ### Community 648 - "Test Capture: chrome-phantom-sticky-verify (service_worker_bin_prod)"
-Cohesion: 0.38
-Nodes (8): Vi(), qa(), ra(), ua(), va(), wa(), Wi(), xa()
+Cohesion: 0.23
+Nodes (11): me(), R(), S(), ne(), oe(), qa(), ra(), ua() (+3 more)
 
 ### Community 649 - "extension: Index"
 Cohesion: 0.13
@@ -7235,16 +7203,16 @@ Cohesion: 0.22
 Nodes (17): attrValue(), cleanTitle(), fallback(), firstLdObject(), guardHtml(), htmlDecode(), linkHref(), metaContent() (+9 more)
 
 ### Community 657 - "extension: Consent Policy Store"
-Cohesion: 0.22
-Nodes (19): docs/LEGAL.md (Legal Posture reference), service-denylist.json, Audit Log Card, Consent & Audit Section, Default for New Sites Consent Card, Pending Requests Card, Per-Origin Consent Card, _defaultEnvelope() (+11 more)
+Cohesion: 0.38
+Nodes (13): _defaultEnvelope(), _emptyPolicies(), _getChrome(), _hasLocalStorage(), readPolicies(), _reset(), setDefaultMode(), setOriginMode() (+5 more)
 
 ### Community 658 - "extension: Accessibility"
 Cohesion: 0.18
 Nodes (18): checkElementEditable(), checkElementEnabled(), checkElementReceivesEvents(), checkElementStable(), checkElementVisibility(), computeAccessibleName(), detectCodeEditor(), dismissCookieConsent() (+10 more)
 
 ### Community 659 - "tests: Upload File Route.Test"
-Cohesion: 0.14
-Nodes (16): destroy(), computeScale(), createDashboardViewer(), createMediaPlayer(), createOverlays(), createViewer(), createDashboardViewer(), createHostTransport() (+8 more)
+Cohesion: 0.12
+Nodes (19): handleTriggerToolMessageRoute(), destroy(), computeScale(), createDashboardViewer(), createHostTransport(), createMediaPlayer(), createOverlays(), createViewer() (+11 more)
 
 ### Community 660 - "mcp: Readme"
 Cohesion: 0.08
@@ -7271,8 +7239,8 @@ Cohesion: 0.21
 Nodes (12): KayakPlugin, plugin, api(), ApiOptions, inert(), defineTool(), OpenTabsPlugin, ToolDefinition (+4 more)
 
 ### Community 666 - "Outlook Integration Plugin"
-Cohesion: 0.12
-Nodes (22): getCurrentUser, getMessage, listAttachments, listFolders, listMessages, attachmentSchema, mailFolderSchema, mapAttachment() (+14 more)
+Cohesion: 0.15
+Nodes (14): downloadAttachment, getCurrentUser, listAttachments, listFolders, attachmentSchema, mailFolderSchema, mapAttachment(), mapMailFolder() (+6 more)
 
 ### Community 667 - "Priceline Integration Plugin"
 Cohesion: 0.12
@@ -7318,10 +7286,6 @@ Nodes (9): fallback(), isObject(), looksLikeError(), mapFile(), mapPerson(), par
 Cohesion: 0.13
 Nodes (6): fallback(), guardGraphqlResult(), hasOwn(), looksLikeError(), typedRecipeError(), userStatusGuard()
 
-### Community 678 - "Test Capture: chrome-code-colors-verify (service_worker_bin_prod)"
-Cohesion: 0.06
-Nodes (56): dg(), kg(), zg(), Zl(), am(), bg(), bm(), cm() (+48 more)
-
 ### Community 679 - "extension: Aws"
 Cohesion: 0.18
 Nodes (14): activeUrlFromContext(), attrValue(), consoleUrl(), decodeHtml(), fallback(), htmlText(), mapCurrentUser(), mapRegion() (+6 more)
@@ -7363,20 +7327,20 @@ Cohesion: 0.10
 Nodes (18): CATALOG_PATH, corpus, DESCRIPTORS_DIR, domR, fs, healed, idxHealed, idxQuarantined (+10 more)
 
 ### Community 690 - "tests: Server Public Stats No Auth.Test"
-Cohesion: 0.08
-Nodes (22): HttpServerOptions, RunningHttpServer, sendJson(), SessionContext, setCorsHeaders(), activeTracker, app, auth (+14 more)
+Cohesion: 0.10
+Nodes (17): activeTracker, app, auth, authMiddleware, cors, createAuthRouter, createPublicStatsRouter, Database (+9 more)
 
 ### Community 691 - "tests: Server Telemetry Daily Budget.Test"
 Cohesion: 0.11
 Nodes (17): app, createTelemetryRouter, crypto, Database, db, event(), express, FIXED_UUID (+9 more)
 
 ### Community 692 - "Datadog Integration Plugin"
-Cohesion: 0.12
-Nodes (13): apiGet(), getDashboard, widgetSchema, getHostTotals, getSlo, getSyntheticsResults, resultSchema, listSlos (+5 more)
+Cohesion: 0.18
+Nodes (16): Ah(), Ch(), De(), di(), mf(), uh(), vh(), We() (+8 more)
 
 ### Community 693 - "Starbucks Integration Plugin"
-Cohesion: 0.11
-Nodes (15): COMMON_HEADERS, orchestraApi(), ReduxStore, ReduxUserState, addFavoriteProduct, getPreviousOrders, previousOrderSchema, RawOrderItem (+7 more)
+Cohesion: 0.33
+Nodes (4): getPreviousOrders, previousOrderSchema, RawOrderItem, RawPreviousOrder
 
 ### Community 694 - "Threads Integration Plugin"
 Cohesion: 0.21
@@ -7411,8 +7375,8 @@ Cohesion: 0.05
 Nodes (40): 10. Phase 7 (Recording) → All Handlers, 11. Phase 8 (Cache) → Selector Lookups, 12. Phase 9 (Stability) → Task Completion, 13. Phase 11 (Control Panel) → background.js, 1. Phase 1 (Selectors) → Phase 2 (Readiness), 1. waitForActionable Function (Dead Code), 2. Phase 1 (Selectors) → Phase 5 (Context), 2. Storage Change Listener (Commented Out) (+32 more)
 
 ### Community 704 - "Test Capture: chrome-phantom-stream (service_worker_bin_prod)"
-Cohesion: 0.10
-Nodes (20): me(), R(), S(), Vi(), ef(), ff(), hl(), Me() (+12 more)
+Cohesion: 0.06
+Nodes (19): bk(), Vi(), ek(), fk(), hl(), mk(), nk(), oa() (+11 more)
 
 ### Community 705 - "extension: Grafana"
 Cohesion: 0.19
@@ -7427,8 +7391,8 @@ Cohesion: 0.16
 Nodes (11): fallback(), guardHtml(), htmlDecode(), mapStats(), mapUser(), mapVideo(), parseProfile(), parseUniversalScope() (+3 more)
 
 ### Community 708 - "Vendored Library: memory-consolidator.js"
-Cohesion: 0.24
-Nodes (4): MemoryRetriever, STOP_WORDS, token(), installInterceptor()
+Cohesion: 0.18
+Nodes (5): MemoryConsolidator, MemoryRetriever, STOP_WORDS, token(), installInterceptor()
 
 ### Community 709 - "extension: Task Router"
 Cohesion: 0.22
@@ -7436,7 +7400,7 @@ Nodes (17): buildSearchRoute(), clampRouteConfidence(), cleanRouteString(), coer
 
 ### Community 710 - "mcp: Triggers"
 Cohesion: 0.12
-Nodes (11): targetTabIdFromParams(), execAction(), blockingWaitMs(), finiteNumber(), finitePositiveMs(), McpToolExtra, TRIGGER_MESSAGE_TYPES, TRIGGER_TIMEOUTS (+3 more)
+Nodes (13): getDailyChallenge, getSubmission, listTopicTags, dailyChallengeSchema, mapDailyChallenge(), mapDiscussion(), mapQuestionListItem(), mapSubmissionDetail() (+5 more)
 
 ### Community 711 - "(root): Package"
 Cohesion: 0.11
@@ -7455,8 +7419,8 @@ Cohesion: 0.12
 Nodes (7): DirectionFn, DIRECTIONS, DotShape, LetterPattern, LETTERS, LoaderTheme, PixelLoaderComponent
 
 ### Community 716 - "tests: Agent Sunset Showcase.Test"
-Cohesion: 0.20
-Nodes (5): containsLive(), fs, path, ROOT, showcaseFiles
+Cohesion: 0.12
+Nodes (13): DEFAULT_OUT, __dirname, __filename, ipv4ToInt(), main(), parseArgs(), printSpecAndExit(), splitCsvLine() (+5 more)
 
 ### Community 717 - "showcase: Housekeeper"
 Cohesion: 0.16
@@ -7555,8 +7519,8 @@ Cohesion: 0.18
 Nodes (11): fallback(), hasObjectKey(), hasOwn(), hasOwnKey(), isPlainObject(), objectKeyHasId(), searchVariables(), typedRecipeError() (+3 more)
 
 ### Community 742 - "Test Capture: chrome-phantom-stream-reduced (service_worker_bin_prod)"
-Cohesion: 0.38
-Nodes (8): Vi(), qa(), ra(), ua(), va(), wa(), Wi(), xa()
+Cohesion: 0.21
+Nodes (9): Vi(), qa(), ra(), ua(), Ui(), va(), wa(), Wi() (+1 more)
 
 ### Community 744 - "extension: Tool Executor"
 Cohesion: 0.20
@@ -7575,8 +7539,8 @@ Cohesion: 0.18
 Nodes (13): filterDynamicClasses(), findAlternativeSelectors(), generateBasicSelector(), generateSelector(), generateSelectors(), generateSelectorsForAction(), isAutoGeneratedId(), isClickable() (+5 more)
 
 ### Community 748 - "extension: Visual Feedback"
-Cohesion: 0.22
-Nodes (3): ElementInspector, markOverlayElement(), promoteToTopLayer()
+Cohesion: 0.19
+Nodes (4): CrawlProgressOverlay, markOverlayElement(), promoteToTopLayer(), TriggerBadge
 
 ### Community 749 - "Vendored Library: cfworker-json-schema.min.js"
 Cohesion: 0.18
@@ -7619,8 +7583,8 @@ Cohesion: 0.11
 Nodes (15): angular, assert, background, captureBundle, dashboard, domStream, fs, path (+7 more)
 
 ### Community 763 - "tests: Server Telemetry Event Id Dedup.Test"
-Cohesion: 0.11
-Nodes (14): app, createTelemetryRouter, crypto, Database, db, express, { hashIp }, http (+6 more)
+Cohesion: 0.05
+Nodes (33): HttpServerOptions, RunningHttpServer, sendJson(), SessionContext, setCorsHeaders(), activeTracker, app, createPublicStatsRouter (+25 more)
 
 ### Community 764 - "tests: Server Telemetry Optout Forget.Test"
 Cohesion: 0.11
@@ -7639,8 +7603,8 @@ Cohesion: 0.18
 Nodes (16): bonfireApi(), classifyError(), doFetch(), doraApi(), extractToken(), getAccountNumber(), getAuth(), getToken() (+8 more)
 
 ### Community 768 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.12
-Nodes (18): SlackEnterprisePlugin, classifySlackError(), discoverWorkspaceTeamId(), EnterpriseSlackAuth, getAuth(), getAuthFromBootData(), getAuthFromLocalConfig(), getAuthSync() (+10 more)
+Cohesion: 0.20
+Nodes (12): getCsrfToken(), isAuthenticated(), pollSubmissionResult(), rest(), runCode, mapRunCodeResult(), mapSubmitResult(), RawRunCodeResult (+4 more)
 
 ### Community 769 - "catalog: Gitlab"
 Cohesion: 0.24
@@ -7652,7 +7616,7 @@ Nodes (17): automation-logger.js, background.js (FSB Background service worker),
 
 ### Community 771 - "Test Capture: chrome-phantom-stream-final (offscreendocument_main)"
 Cohesion: 0.03
-Nodes (101): af(), ag(), b(), be(), bf(), Bg(), bi(), bl() (+93 more)
+Nodes (107): ad(), af(), ag(), b(), be(), bf(), Bg(), bi() (+99 more)
 
 ### Community 772 - "extension: Ai Integration"
 Cohesion: 0.05
@@ -7695,8 +7659,8 @@ Cohesion: 0.12
 Nodes (14): CATALOG_PROV, cprov, fs, jsFiles, legal, LEGAL_MD, path, pin (+6 more)
 
 ### Community 782 - "tests: Server Public Stats Cache.Test"
-Cohesion: 0.12
-Nodes (14): activeTracker, app, createPublicStatsRouter, Database, db, express, http, { initializeDatabase } (+6 more)
+Cohesion: 0.17
+Nodes (7): Ki(), li(), Qf(), aj(), bj(), Li(), mi()
 
 ### Community 783 - "tests: Server Telemetry Salt Rotation.Test"
 Cohesion: 0.12
@@ -7715,16 +7679,16 @@ Cohesion: 0.12
 Nodes (11): BUILD_PATH, fs, path, registry, REGISTRY_PATH, SRC_PATH, triggerTool, VISUAL_SESSION_ACTION_TOOLS (+3 more)
 
 ### Community 788 - "Chipotle Integration Plugin"
-Cohesion: 0.16
-Nodes (12): api(), campaignSchema, getExtrasCampaigns, groupCampaignSchema, RawCampaign, RawExtrasCampaignsResponse, RawGroupCampaign, getLastRestaurant (+4 more)
+Cohesion: 0.21
+Nodes (11): api(), getFavorites, getLastRestaurant, getOrderingStatus, RawOrderingStatus, getRecentOrders, getRewardCategories, RawOfferType (+3 more)
 
 ### Community 789 - "Circleci Integration Plugin"
 Cohesion: 0.16
 Nodes (12): api(), createContext, deleteContext, getContext, getFlakyTests, listContexts, contextSchema, flakyTestSchema (+4 more)
 
 ### Community 790 - "Minimax Agent Integration Plugin"
-Cohesion: 0.17
-Nodes (15): apiGet(), apiPost(), AxiosInstance, BaseResp, classifyError(), getAuth(), getAxios(), getWebpackRequire() (+7 more)
+Cohesion: 0.20
+Nodes (13): apiGet(), apiPost(), AxiosInstance, BaseResp, classifyError(), getAuth(), getAxios(), getWebpackRequire() (+5 more)
 
 ### Community 791 - "Priceline Integration Plugin"
 Cohesion: 0.17
@@ -7848,7 +7812,7 @@ Nodes (15): dependencies, @opentabs-dev/plugin-sdk, description, exports, files,
 
 ### Community 821 - "Netlify Integration Plugin"
 Cohesion: 0.23
-Nodes (10): api(), createSite, deleteDnsRecord, getSite, listSites, rollbackDeploy, mapSite(), RawSite (+2 more)
+Nodes (10): api(), createSite, deleteHook, getSite, listSites, rollbackDeploy, mapSite(), RawSite (+2 more)
 
 ### Community 822 - "Retool Integration Plugin"
 Cohesion: 0.13
@@ -7859,8 +7823,8 @@ Cohesion: 0.13
 Nodes (15): dependencies, @opentabs-dev/plugin-sdk, description, exports, files, import, keywords, license (+7 more)
 
 ### Community 824 - "Sentry Integration Plugin"
-Cohesion: 0.18
-Nodes (13): detectAuthentication(), extractOrgSlug(), getAuth(), getCsrfToken(), parseLinkCursor(), QueryValue, sentryApi(), SentryApiResult (+5 more)
+Cohesion: 0.20
+Nodes (12): detectAuthentication(), extractOrgSlug(), getAuth(), getCsrfToken(), parseLinkCursor(), QueryValue, sentryApi(), SentryApiResult (+4 more)
 
 ### Community 825 - "showcase: Phantom Stream Page.Component"
 Cohesion: 0.14
@@ -7869,6 +7833,10 @@ Nodes (15): PhantomStream, Live DOM Preview Panel, Resync Stream Button (Phase 2
 ### Community 826 - ".context scratch: run-airbnb-capability-smoke"
 Cohesion: 0.20
 Nodes (12): actionArgs(), callTool(), client, isAttachRace(), navigateWhenReady(), parseJsonText(), root, sleep() (+4 more)
+
+### Community 827 - "Test Capture: chrome-phantom-stream (service_worker_bin_prod)"
+Cohesion: 0.27
+Nodes (10): qj(), rj(), sj(), tj(), vj(), pj(), qj(), rj() (+2 more)
 
 ### Community 828 - "Test Capture: chrome-phantom-stream-final (offscreendocument_main)"
 Cohesion: 0.05
@@ -7895,8 +7863,8 @@ Cohesion: 0.23
 Nodes (13): tail(), capabilityFetchInPage(), capabilityPageReadInPage(), _deleteSnapshotBestEffort(), executeBoundPageRead(), executeBoundSpec(), _getChrome(), _getJmespathEngine() (+5 more)
 
 ### Community 834 - "tests: Agent Cap Ui.Test"
-Cohesion: 0.16
-Nodes (10): markUnsavedChanges(), showSaveBar(), assert, attachHandlers(), clampAgentCapValue(), CONTROL_PANEL_HTML_PATH, fs, OPTIONS_JS_PATH (+2 more)
+Cohesion: 0.19
+Nodes (8): assert, attachHandlers(), clampAgentCapValue(), CONTROL_PANEL_HTML_PATH, fs, OPTIONS_JS_PATH, path, setAgentCapControlValue()
 
 ### Community 835 - "extension: Capability Interpreter"
 Cohesion: 0.28
@@ -7971,8 +7939,8 @@ Cohesion: 0.23
 Nodes (11): FeedResponse, getHomeFeed, getPost, MediaInfoResponse, getUserPosts, UserFeedResponse, listSavedPosts, SavedResponse (+3 more)
 
 ### Community 853 - "Leetcode Integration Plugin"
-Cohesion: 0.14
-Nodes (21): b3e(), computeLocalScopes(), Cy(), d3e(), E3e(), Ey(), f3e(), g3e() (+13 more)
+Cohesion: 0.23
+Nodes (9): getMessage, listMessages, mapEmailAddress(), mapMessageDetail(), mapMessageSummary(), messageDetailSchema, messageSummarySchema, RawMessage (+1 more)
 
 ### Community 854 - "Netlify Integration Plugin"
 Cohesion: 0.19
@@ -7995,12 +7963,12 @@ Cohesion: 0.16
 Nodes (12): getCguid(), graphql(), AbandonedItem, AbandonedResponse, getAbandonedItems, FavoritesResponse, getFavoriteHotels, FiltersResponse (+4 more)
 
 ### Community 859 - "Robinhood Integration Plugin"
-Cohesion: 0.17
-Nodes (10): listDividends, listOrders, dividendSchema, extractIdFromUrl(), mapDividend(), mapOrder(), orderSchema, RawDividend (+2 more)
+Cohesion: 0.13
+Nodes (12): listDividends, listNotifications, listOrders, dividendSchema, mapNotification(), mapOrder(), notificationSchema, orderSchema (+4 more)
 
 ### Community 860 - "Sentry Integration Plugin"
-Cohesion: 0.19
-Nodes (9): SentryPlugin, isSentryAuthenticated(), waitForSentryAuth(), createComment, getEvent, issueTagSchema, listIssueTags, listReplays (+1 more)
+Cohesion: 0.17
+Nodes (10): SentryPlugin, isSentryAuthenticated(), waitForSentryAuth(), getEvent, issueTagSchema, listIssueTags, listMonitors, monitorSchema (+2 more)
 
 ### Community 861 - "extension: Memory Site Explorer"
 Cohesion: 0.18
@@ -8013,6 +7981,10 @@ Nodes (37): Alternatives Considered, Anti-Patterns to Avoid, Architecture Patter
 ### Community 864 - "Test Capture: chrome-phantom-stream-final (offscreendocument_main)"
 Cohesion: 0.08
 Nodes (15): fh(), gh(), kf(), Le(), lf(), lh(), M(), mh() (+7 more)
+
+### Community 865 - "Test Capture: chrome-phantom-stream-reduced (service_worker_bin_prod)"
+Cohesion: 0.20
+Nodes (5): Ki(), li(), Qf(), Li(), mi()
 
 ### Community 867 - ".context scratch: run-notion-readiness"
 Cohesion: 0.21
@@ -8036,7 +8008,7 @@ Nodes (12): _applyConfig(), classify(), _getChrome(), isDenied(), load(), _loadF
 
 ### Community 873 - "tests: Dashboard Stream Readiness Ping.Test"
 Cohesion: 0.13
-Nodes (19): clampAgentCap(), _getChrome(), getRecommendedAgentCap(), getSystemMemoryInfo(), recommendAgentCapFromCapacityBytes(), handleGetDiagnosticsMessageRoute(), assert, helper (+11 more)
+Nodes (18): clampAgentCap(), _getChrome(), getRecommendedAgentCap(), getSystemMemoryInfo(), recommendAgentCapFromCapacityBytes(), assert, helper, assert (+10 more)
 
 ### Community 875 - "showcase: Package"
 Cohesion: 0.14
@@ -8088,7 +8060,7 @@ Nodes (13): AUTH_CACHE_KEY, Capability, collectAuthCandidates(), findAllMsalClie
 
 ### Community 887 - "Robinhood Integration Plugin"
 Cohesion: 0.22
-Nodes (9): RobinhoodPlugin, waitForAuth(), createWatchlist, deleteWatchlist, getFundamentals, listWatchlists, mapWatchlist(), RawWatchlist (+1 more)
+Nodes (9): RobinhoodPlugin, waitForAuth(), deleteWatchlist, getFundamentals, getInstrument, instrumentSchema, mapInstrument(), RawInstrument (+1 more)
 
 ### Community 888 - "Terraform Cloud Integration Plugin"
 Cohesion: 0.27
@@ -8130,10 +8102,6 @@ Nodes (35): Alternatives Considered, Anti-Patterns to Avoid, Architecture Patter
 Cohesion: 0.20
 Nodes (5): Ki(), li(), Qf(), Li(), mi()
 
-### Community 898 - "Test Capture: chrome-phantom-stream-final (service_worker_bin_prod)"
-Cohesion: 0.14
-Nodes (12): Ti(), bb(), fi(), gi(), hi(), hk(), Ni(), qi() (+4 more)
-
 ### Community 899 - "Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)"
 Cohesion: 0.17
 Nodes (7): Ki(), li(), Qf(), aj(), bj(), Li(), mi()
@@ -8143,8 +8111,8 @@ Cohesion: 0.17
 Nodes (7): Ki(), li(), Qf(), aj(), bj(), Li(), mi()
 
 ### Community 901 - "Test Capture: chrome-phantom-stream-tabs (service_worker_bin_prod)"
-Cohesion: 0.14
-Nodes (9): Ki(), li(), Of(), Qf(), aj(), bj(), Li(), mi() (+1 more)
+Cohesion: 0.17
+Nodes (7): Ki(), li(), Of(), Qf(), Li(), mi(), Pf()
 
 ### Community 902 - ".context scratch: run-notion-direct-bridge-smoke"
 Cohesion: 0.18
@@ -8187,8 +8155,8 @@ Cohesion: 0.17
 Nodes (12): FSB Chrome Extension, Prometheus (browser project), ClawHub Install Path, FSB OpenClaw Skill (skills/FSB Skill/), llms.txt (short LLM project summary), OpenClaw Skill (skills/FSB Skill/), Grounded FSB Use Cases, robots.txt Crawler Rules (+4 more)
 
 ### Community 915 - "showcase: Smoke Crawler"
-Cohesion: 0.27
-Nodes (12): BASE_URL, checkCrawlerFiles(), checkMarketingRoutes(), checkSitemapLocs(), CRAWLER_FILES, EXPECTED_SITEMAP_LOCS, failures, fetchText() (+4 more)
+Cohesion: 0.24
+Nodes (13): BASE_URL, checkCrawlerFiles(), checkMarketingRoutes(), checkSitemapLocs(), CRAWLER_FILES, EXPECTED_SITEMAP_LOCS, failures, fetchText() (+5 more)
 
 ### Community 919 - "showcase: Recreations"
 Cohesion: 0.29
@@ -8278,8 +8246,8 @@ Cohesion: 0.21
 Nodes (10): findCheapestFlightDate, RawPriceGuideResponse, cabinClassSchema, getFlightPriceCalendar, GqlTrip, RawPriceGuideResponse, tripSchema, flightFareRecordSchema (+2 more)
 
 ### Community 940 - "Starbucks Integration Plugin"
-Cohesion: 0.22
-Nodes (8): StarbucksPlugin, isAuthenticated(), waitForAuth(), deleteFavoriteProduct, navigateToCheckout, ReduxDispatch, StarbucksStore, updateProductQuantity
+Cohesion: 0.10
+Nodes (19): StarbucksPlugin, isAuthenticated(), orchestraApi(), waitForAuth(), addFavoriteProduct, deleteFavoriteProduct, favoriteProductSchema, getFavoriteProducts (+11 more)
 
 ### Community 941 - "Twilio Integration Plugin"
 Cohesion: 0.27
@@ -8339,8 +8307,8 @@ Cohesion: 0.32
 Nodes (11): _awaitSessionEnd(), _capture(), _interp(), _isCleanExecute(), _isCleanInterpret(), _primitive(), runDiscovery(), _search() (+3 more)
 
 ### Community 959 - "scripts: Harvest Discovery Seeds"
-Cohesion: 0.24
-Nodes (11): apiFilesForApp(), __dirname, harvestHintsFromText(), main(), normalizePath(), originForApp(), OUT_PATH, PROVENANCE_PATH (+3 more)
+Cohesion: 0.13
+Nodes (20): bucketOfBacking(), buildResolver(), __dirname, __filename, printReport(), reportCoverage(), require, ROOT (+12 more)
 
 ### Community 961 - "showcase: Prometheus Page.Component"
 Cohesion: 0.17
@@ -8383,8 +8351,8 @@ Cohesion: 0.17
 Nodes (7): DENYLIST_MODULE, fs, GATE_PATH, path, { pathToFileURL }, ROOT, SAFE_INVOCABLE_FIXTURE
 
 ### Community 971 - "tests: Sidepanel Multi Document Fanout.Test"
-Cohesion: 0.18
-Nodes (8): resolve(), createDocContext(), fs, FSBSidepanelMessageLog, makeChromeMock(), path, spSrc, tick()
+Cohesion: 0.22
+Nodes (6): createDocContext(), fs, FSBSidepanelMessageLog, makeChromeMock(), path, spSrc
 
 ### Community 972 - "tests: Phantom Stream Remote Control Parity.Test"
 Cohesion: 0.17
@@ -8439,8 +8407,8 @@ Cohesion: 0.17
 Nodes (11): license, name, _note, opentabs, description, displayName, homepage, urlPatterns (+3 more)
 
 ### Community 985 - "Google Cloud Integration Plugin"
-Cohesion: 0.19
-Nodes (10): M(), qa(), ra(), Ti(), ua(), va(), Vi(), wa() (+2 more)
+Cohesion: 0.22
+Nodes (8): M(), qa(), ra(), Ti(), ua(), va(), wa(), xa()
 
 ### Community 986 - "Grafana Integration Plugin"
 Cohesion: 0.17
@@ -8466,25 +8434,21 @@ Nodes (11): license, name, _note, opentabs, description, displayName, homepage, 
 Cohesion: 0.17
 Nodes (11): license, name, _note, opentabs, description, displayName, homepage, urlPatterns (+3 more)
 
-### Community 992 - "Outlook Integration Plugin"
-Cohesion: 0.14
-Nodes (12): createAppFromToolscriptArchive, warningSchema, exportToolscriptArchive, getExportPageName(), isRecord(), savePage, updateAppFromToolscriptArchive, warningSchema (+4 more)
-
 ### Community 993 - "Robinhood Integration Plugin"
 Cohesion: 0.21
-Nodes (9): api(), getInstrument, getWatchlist, WatchlistDetail, WatchlistItem, instrumentSchema, mapInstrument(), RawInstrument (+1 more)
+Nodes (9): api(), createWatchlist, getWatchlist, WatchlistDetail, WatchlistItem, listWatchlists, mapWatchlist(), RawWatchlist (+1 more)
 
 ### Community 994 - "Shopify Integration Plugin"
 Cohesion: 0.17
 Nodes (11): license, name, _note, opentabs, description, displayName, homepage, urlPatterns (+3 more)
 
 ### Community 995 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.23
-Nodes (7): readMessages, readThread, replyToThread, mapMessage(), messageSchema, searchMessages, sendMessage
+Cohesion: 0.25
+Nodes (4): dg(), kg(), qg(), jg()
 
 ### Community 996 - "Starbucks Integration Plugin"
 Cohesion: 0.17
-Nodes (9): getReduxSlice(), CartItemData, cartItemSchema, getCart, getCurrentUser, earnRateSchema, getEarnRates, mapUserProfile() (+1 more)
+Nodes (9): getReduxSlice(), CartItemData, cartItemSchema, getCart, earnRateSchema, getEarnRates, getPaymentMethods, mapPaymentMethod() (+1 more)
 
 ### Community 997 - "Stubhub Integration Plugin"
 Cohesion: 0.17
@@ -8503,20 +8467,20 @@ Cohesion: 0.17
 Nodes (11): license, name, _note, opentabs, description, displayName, homepage, urlPatterns (+3 more)
 
 ### Community 1001 - "Whatsapp Integration Plugin"
-Cohesion: 0.23
-Nodes (8): getChat, listChats, listMessages, chatSchema, currentUserSchema, messageSchema, loadMessages(), serializeChat()
+Cohesion: 0.16
+Nodes (12): getChat, getContact, listChats, listContacts, listMessages, chatSchema, contactSchema, currentUserSchema (+4 more)
 
 ### Community 1002 - "Test Capture: chrome-phantom-sticky-plan (service_worker_bin_prod)"
 Cohesion: 0.06
 Nodes (35): Architecture Patterns, Code Examples, Common Pitfalls, Critical Finding: Continuation Iterations Lose ALL Sheets Context, Current Multitab Task Prompt Sheets Section (ai-integration.js line 235-238), Current Site Guide Guidance Text (google-sheets.js), Don't Hand-Roll, Fix 1: Enhanced Site Guide Guidance (google-sheets.js) (+27 more)
 
 ### Community 1003 - "Test Capture: chrome-phantom-sticky-verify (offscreendocument_main)"
-Cohesion: 0.17
-Nodes (7): Ki(), li(), Qf(), aj(), bj(), Li(), mi()
+Cohesion: 0.25
+Nodes (7): awsApi(), classifyError(), getCredentials(), parseXml(), listVpcs, RawVpc, vpcSchema
 
 ### Community 1004 - "Test Capture: chrome-phantom-stream (offscreendocument_main)"
-Cohesion: 0.25
-Nodes (7): qa(), ra(), ua(), Ui(), va(), wa(), xa()
+Cohesion: 0.10
+Nodes (18): M(), qa(), ra(), Ti(), ua(), va(), Vi(), wa() (+10 more)
 
 ### Community 1005 - "Test Capture: chrome-phantom-stream-tabs (service_worker_bin_prod)"
 Cohesion: 0.06
@@ -8543,8 +8507,8 @@ Cohesion: 0.25
 Nodes (11): Browser Toolbar Extension Icons Row, Chat Transcript (Welcome message + user task bubble), FSB Side Panel (v9.0.2), In-Page "FSB Automating" Overlay, Footer Credit: "Made by Lakshman Turlapati", User Task: "Play sunflower on youtube?", Demo Screenshot: Task Input & In-Page Automation Progress, Task Input Box ("Ask me to automate something...") (+3 more)
 
 ### Community 1014 - "Vendored Library: marked.min.js"
-Cohesion: 0.12
-Nodes (11): af(), bf(), ke(), M(), qa(), ra(), ua(), va() (+3 more)
+Cohesion: 0.10
+Nodes (14): af(), bf(), ke(), M(), qa(), ra(), Ti(), ua() (+6 more)
 
 ### Community 1015 - "extension: Sidepanel Message Log"
 Cohesion: 0.38
@@ -8647,16 +8611,16 @@ Cohesion: 0.29
 Nodes (7): createCronJob, getCronJob, listCronJobs, cronJobSchema, mapCronJob(), RawCronJob, updateCronJob
 
 ### Community 1041 - "Starbucks Integration Plugin"
-Cohesion: 0.18
-Nodes (8): api(), getProduct, getStoreMenu, mapMenuCategory(), mapProduct(), menuCategorySchema, productSchema, toggleFavoriteStore
+Cohesion: 0.16
+Nodes (11): api(), COMMON_HEADERS, ReduxStore, ReduxUserState, getFeed, getStoreMenu, mapMenuCategory(), mapStreamItem() (+3 more)
 
 ### Community 1042 - "Steam Integration Plugin"
 Cohesion: 0.25
 Nodes (9): categoryOutputSchema, FeaturedCategoriesResponse, FeaturedCategoryData, getFeaturedCategories, FeaturedResponse, getFeatured, featuredGameSchema, mapFeaturedGame() (+1 more)
 
 ### Community 1043 - "Whatsapp Integration Plugin"
-Cohesion: 0.22
-Nodes (8): blockContact, getContact, listContacts, contactSchema, blockContact(), findContactById(), getContactCollection(), serializeContact()
+Cohesion: 0.25
+Nodes (6): blockContact, unblockContact, blockContact(), findContactById(), getContactCollection(), unblockContact()
 
 ### Community 1044 - "Youtube Integration Plugin"
 Cohesion: 0.18
@@ -8699,8 +8663,8 @@ Cohesion: 0.22
 Nodes (4): kk(), Mk(), jk(), Lk()
 
 ### Community 1056 - "Test Capture: chrome-phantom-stream-tabs (offscreendocument_main)"
-Cohesion: 0.06
-Nodes (32): kb(), kk(), Mk(), ce(), dj(), ed(), fd(), fl() (+24 more)
+Cohesion: 0.22
+Nodes (4): kk(), Mk(), jk(), Lk()
 
 ### Community 1057 - ".context scratch: custom-first-run-onboarding-for-fsb-extension"
 Cohesion: 0.29
@@ -8727,12 +8691,12 @@ Cohesion: 0.44
 Nodes (9): deleteSnapshot(), _getChrome(), hydrate(), listArmedSnapshots(), _readEnvelope(), readSnapshot(), _withEnvelopeLock(), _writeEnvelope() (+1 more)
 
 ### Community 1063 - "scripts: Coverage Report"
-Cohesion: 0.33
-Nodes (9): bucketOfBacking(), buildResolver(), __dirname, __filename, printReport(), reportCoverage(), require, ROOT (+1 more)
+Cohesion: 0.25
+Nodes (6): campaignSchema, getExtrasCampaigns, groupCampaignSchema, RawCampaign, RawExtrasCampaignsResponse, RawGroupCampaign
 
 ### Community 1064 - "showcase: Dashboard Page.Component"
-Cohesion: 0.19
-Nodes (3): CrawlProgressOverlay, demoteFromTopLayer(), TriggerBadge
+Cohesion: 0.38
+Nodes (5): getBucket, listBuckets, bucketSchema, mapBucket(), RawBucket
 
 ### Community 1065 - "showcase: Github Poller"
 Cohesion: 0.27
@@ -8835,32 +8799,32 @@ Cohesion: 0.20
 Nodes (8): getContext(), requireContext(), getTaxDocuments, taxDocSchema, TaxDocumentsResponse, EquityGrantsResponse, grantSchema, listEquityGrants
 
 ### Community 1091 - "Datadog Integration Plugin"
-Cohesion: 0.27
-Nodes (6): cloneDashboard, listDashboards, dashboardSummarySchema, mapDashboardSummary(), searchDashboardsAdvanced, searchDashboards
+Cohesion: 0.33
+Nodes (5): eventSummarySchema, mapDateTimeZone(), mapEventSummary(), getCalendarView, listEvents
 
 ### Community 1092 - "Datadog Integration Plugin"
-Cohesion: 0.27
-Nodes (6): createNotebook, getNotebook, listNotebooks, mapNotebook(), notebookSchema, searchNotebooks
+Cohesion: 0.40
+Nodes (4): Changes, Context, Sync Consolidated Memory legend categories with the showcase site, Verification
 
 ### Community 1093 - "Instagram Integration Plugin"
 Cohesion: 0.29
 Nodes (8): hashtagSchema, mapHashtag(), RawHashtag, HashtagSearchResponse, searchHashtags, placeSchema, search, SearchResponse
 
 ### Community 1094 - "Leetcode Integration Plugin"
-Cohesion: 0.18
-Nodes (8): getPageData(), findAmenities(), findListingDetail(), getListingFromPage, extractListing(), extractString(), findListings(), getSearchResults
+Cohesion: 0.40
+Nodes (4): listAlarms, alarmSchema, mapAlarm(), RawAlarm
 
 ### Community 1095 - "Linear Integration Plugin"
 Cohesion: 0.27
 Nodes (6): createInitiative, getInitiative, listInitiatives, initiativeSchema, mapInitiative(), updateInitiative
 
 ### Community 1096 - "Linear Integration Plugin"
-Cohesion: 0.21
-Nodes (14): applyMutations(), formatSrcsetCandidate(), hasDangerousScheme(), installShadowRootDirect(), neutralizeSrcset(), parseSrcsetCandidates(), sanitizeAttrValue(), sanitizeFragment() (+6 more)
+Cohesion: 0.40
+Nodes (4): getCurrentUser, customerSchema, mapCustomer(), RawCustomer
 
 ### Community 1097 - "Linear Integration Plugin"
 Cohesion: 0.12
-Nodes (15): addIssueSubscriber, archiveIssue, createIssueRelation, createLabel, deleteAttachment, deleteComment, deleteIssueRelation, deleteLabel (+7 more)
+Nodes (15): addIssueSubscriber, createIssueRelation, createLabel, deleteAttachment, deleteComment, deleteIssue, deleteIssueRelation, deleteLabel (+7 more)
 
 ### Community 1098 - "Linear Integration Plugin"
 Cohesion: 0.27
@@ -8875,8 +8839,8 @@ Cohesion: 0.31
 Nodes (8): rest(), mapSearchItem(), RawSearchItem, searchItemSchema, AutoSuggestResponse, searchLocations, searchPointsOfInterest, TopPOIResponse
 
 ### Community 1101 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.27
-Nodes (6): createChannel, getChannelInfo, listChannels, renameChannel, channelSchema, mapChannel()
+Cohesion: 0.40
+Nodes (4): listLogEntries, logEntrySchema, mapLogEntry(), RawLogEntry
 
 ### Community 1102 - "Steam Integration Plugin"
 Cohesion: 0.27
@@ -8923,6 +8887,10 @@ Nodes (8): buildGetSpec(), buildQuery(), guardCollection(), guardObject(), handl
 ### Community 1114 - "extension: Visual Feedback"
 Cohesion: 0.19
 Nodes (11): apiPost(), ChipotleAuth, findRestaurants, getRestaurant, mapAddress(), mapHour(), mapRestaurant(), RawHour (+3 more)
+
+### Community 1115 - "Vendored Library: chart.min.js"
+Cohesion: 0.40
+Nodes (4): getContestRanking, contestRankingSchema, mapContestRanking(), RawContestRanking
 
 ### Community 1116 - "Vendored Library: d3-timer.min.js"
 Cohesion: 0.36
@@ -9097,8 +9065,8 @@ Cohesion: 0.22
 Nodes (9): scripts, build, check, dev, format, format:check, lint, lint:fix (+1 more)
 
 ### Community 1162 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.25
-Nodes (6): listMembers, listUsers, mapUser(), paginationMetadataSchema, userSchema, searchUsers
+Cohesion: 0.40
+Nodes (4): getUserProfile, mapUserProfile(), RawMatchedUser, userProfileSchema
 
 ### Community 1163 - "Terraform Cloud Integration Plugin"
 Cohesion: 0.33
@@ -9149,8 +9117,8 @@ Cohesion: 0.29
 Nodes (4): ig(), Jg(), hg(), Ig()
 
 ### Community 1178 - "Test Capture: chrome-phantom-sticky-plan (offscreendocument_main)"
-Cohesion: 0.29
-Nodes (4): ig(), Jg(), hg(), Ig()
+Cohesion: 0.40
+Nodes (4): listRecentSubmissions, mapRecentSubmission(), RawRecentSubmission, recentSubmissionSchema
 
 ### Community 1179 - "Test Capture: chrome-phantom-stream (offscreendocument_main)"
 Cohesion: 0.29
@@ -9169,7 +9137,7 @@ Cohesion: 0.17
 Nodes (7): Ki(), li(), Qf(), aj(), bj(), Li(), mi()
 
 ### Community 1183 - "Test Capture: chrome-phantom-stream-reduced (offscreendocument_main)"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (23): af(), Ah(), be(), cf(), Ch(), ei(), fh(), gh() (+15 more)
 
 ### Community 1184 - ".context scratch: capability-call-overlay-implementation-plan"
@@ -9309,8 +9277,8 @@ Cohesion: 0.06
 Nodes (31): Accomplishments, Audit-doc row-flip verification, Auto-fixed Adjustments, Commit ceremony, D-15 no-push verification, Decisions Made, Deferred Issues, Deviations from Plan (+23 more)
 
 ### Community 1227 - "Datadog Integration Plugin"
-Cohesion: 0.32
-Nodes (5): cloneMonitor, getMonitor, listMonitors, mapMonitor(), monitorSchema
+Cohesion: 0.40
+Nodes (4): listSubmissions, mapSubmission(), RawSubmission, submissionSchema
 
 ### Community 1228 - "Datadog Integration Plugin"
 Cohesion: 0.06
@@ -9349,8 +9317,8 @@ Cohesion: 0.32
 Nodes (5): getIssue, issueSchema, mapIssue(), searchIssues, updateIssue
 
 ### Community 1237 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.32
-Nodes (5): getFileInfo, listFiles, fileSchema, mapFile(), searchFiles
+Cohesion: 0.40
+Nodes (4): listAgents, agentSchema, mapAgent(), RawAgent
 
 ### Community 1244 - "showcase: Agents Page.Component"
 Cohesion: 0.06
@@ -9489,12 +9457,12 @@ Cohesion: 0.29
 Nodes (7): opentabs, description, displayName, homepage, iconDarkSvg, iconSvg, urlPatterns
 
 ### Community 1285 - "Google Cloud Integration Plugin"
-Cohesion: 0.19
-Nodes (11): gcpApi(), disableService, enableService, getBucket, getCurrentProject, listBuckets, bucketSchema, mapBucket() (+3 more)
+Cohesion: 0.15
+Nodes (15): GapiClient, GapiRoot, gcpApi(), getGapi(), getProjectContext(), getProjectFromUrl(), ProjectContext, resolveProjectId() (+7 more)
 
 ### Community 1286 - "Google Cloud Integration Plugin"
-Cohesion: 0.27
-Nodes (8): getProjectContext(), getProjectFromUrl(), resolveProjectId(), getCloudRunService, listCloudRunServices, cloudRunServiceSchema, mapCloudRunService(), RawCloudRunService
+Cohesion: 0.38
+Nodes (5): getCloudRunService, listCloudRunServices, cloudRunServiceSchema, mapCloudRunService(), RawCloudRunService
 
 ### Community 1287 - "Google Cloud Integration Plugin"
 Cohesion: 0.38
@@ -9718,19 +9686,19 @@ Nodes (6): opentabs, description, displayName, iconDarkSvg, iconSvg, urlPatterns
 
 ### Community 1362 - "Datadog Integration Plugin"
 Cohesion: 0.40
-Nodes (4): getDowntime, listDowntimes, downtimeSchema, mapDowntime()
+Nodes (4): getNewsFeed, mapNewsFeedItem(), newsFeedItemSchema, RawNewsFeedItem
 
 ### Community 1363 - "Datadog Integration Plugin"
 Cohesion: 0.40
-Nodes (4): getHostInfo, listHosts, hostSchema, mapHost()
+Nodes (4): getQuote, mapQuote(), quoteSchema, RawQuote
 
 ### Community 1364 - "Datadog Integration Plugin"
 Cohesion: 0.40
-Nodes (4): getIncident, listIncidents, incidentSchema, mapIncident()
+Nodes (4): listCryptoHoldings, cryptoHoldingSchema, mapCryptoHolding(), RawCryptoHolding
 
 ### Community 1365 - "Datadog Integration Plugin"
-Cohesion: 0.40
-Nodes (4): getSyntheticsTest, listSyntheticsTests, mapSyntheticTest(), syntheticTestSchema
+Cohesion: 0.50
+Nodes (3): listDiscussions, discussionSchema, RawDiscussion
 
 ### Community 1366 - "Gitlab Integration Plugin"
 Cohesion: 0.33
@@ -9745,8 +9713,8 @@ Cohesion: 0.33
 Nodes (6): devDependencies, @biomejs/biome, jiti, @opentabs-dev/plugin-tools, typescript, zod
 
 ### Community 1369 - "Leetcode Integration Plugin"
-Cohesion: 0.27
-Nodes (10): qj(), rj(), sj(), tj(), vj(), pj(), qj(), rj() (+2 more)
+Cohesion: 0.50
+Nodes (3): listProblems, questionListItemSchema, RawQuestionListItem
 
 ### Community 1370 - "Meticulous Integration Plugin"
 Cohesion: 0.40
@@ -9801,16 +9769,16 @@ Cohesion: 0.40
 Nodes (4): getProject, listProjects, mapProject(), projectSchema
 
 ### Community 1383 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.40
-Nodes (4): addBookmark, listBookmarks, bookmarkSchema, mapBookmark()
+Cohesion: 0.50
+Nodes (3): getSessionEvents, mapSessionEvent(), sessionEventSchema
 
 ### Community 1384 - "Slack Enterprise Integration Plugin"
-Cohesion: 0.40
-Nodes (4): addReminder, listReminders, mapReminder(), reminderSchema
+Cohesion: 0.50
+Nodes (3): listIssueEvents, eventSchema, mapEvent()
 
 ### Community 1385 - "Starbucks Integration Plugin"
-Cohesion: 0.11
-Nodes (14): lk(), Ti(), Ai(), Ci(), cj(), eh(), fi(), Ka() (+6 more)
+Cohesion: 0.50
+Nodes (3): getRewards, mapRewardTier(), rewardTierSchema
 
 ### Community 1386 - "Steam Integration Plugin"
 Cohesion: 0.33
@@ -9868,10 +9836,6 @@ Nodes (4): classifyRecipeBroken(), getReadPathEngine(), _looksLikeHtmlDocument()
 Cohesion: 0.40
 Nodes (5): techStack, ai, apis, language, platform
 
-### Community 1412 - "showcase: Phantom Stream Viewer"
-Cohesion: 0.15
-Nodes (28): formatDiagnosticLayerLabel(), getLocalHttpEndpoint(), sleep(), waitForExtensionConnection(), watchBridgeDiagnostics(), startHttpServer(), buildCompactStatusFields(), buildCursorDeeplink() (+20 more)
-
 ### Community 1413 - "tests: Capability Head Handlers.Test"
 Cohesion: 0.07
 Nodes (28): `catalog/recipes/_fixtures/*.json` (JSON test fixtures), Dual-export IIFE module shell (ALL three new `extension/utils/capability-*.js`), errors.ts verbatim-code passthrough test, `esbuild.config.js` — the cfworker one-off (PATH A), `extension/background.js` — additive `importScripts('lib/...')` lines (D-05), `extension/lib/cfworker-json-schema.min.js` (vendored-lib, BUILT IIFE), `extension/lib/{minisearch,jmespath}.min.js` (vendored-lib, UMD as-is), `extension/utils/capability-auth-strategies.js` (service/registry, SW) (+20 more)
@@ -9916,17 +9880,9 @@ Nodes (4): assert, fs, path, wsClientSource
 Cohesion: 0.22
 Nodes (7): getCurrentRegion(), getRegions(), getCurrentUser, listRegions, accountInfoSchema, mapRegion(), regionSchema
 
-### Community 1424 - "Aws Console Integration Plugin"
-Cohesion: 0.17
-Nodes (10): getAuth(), graphql(), getPlaylist, getSavedTracks, mapLibraryTracks(), mapPlaylist(), playlistSchema, RawLibraryTracksResponse (+2 more)
-
 ### Community 1426 - "Bluesky Integration Plugin"
 Cohesion: 0.07
 Nodes (27): Accomplishments, Auto-fixed Adjustments, Byte-frozen verification, Commit ceremony, Decisions Made, Deferred Issues, Deviations from Plan, Files Created/Modified (+19 more)
-
-### Community 1427 - "Chipotle Integration Plugin"
-Cohesion: 0.22
-Nodes (9): getCurrentlyPlaying, RawCurrentlyPlaying, getQueue, mapPlayHistory(), mapPublicTrack(), mapQueue(), publicTrackSchema, RawPublicTrack (+1 more)
 
 ### Community 1428 - "Chipotle Integration Plugin"
 Cohesion: 0.40
@@ -9956,18 +9912,6 @@ Nodes (4): getProject, mapProject(), projectSchema, RawProject
 Cohesion: 0.40
 Nodes (4): listCollaborations, collaborationSchema, mapCollaboration(), RawCollaboration
 
-### Community 1435 - "Google Cloud Integration Plugin"
-Cohesion: 0.40
-Nodes (4): listEnabledServices, mapService(), RawService, serviceSchema
-
-### Community 1436 - "Google Cloud Integration Plugin"
-Cohesion: 0.20
-Nodes (8): getAvailableDevices, getPlaybackState, deviceSchema, mapDevice(), mapPlaybackState(), playbackStateSchema, RawDevice, RawPlaybackState
-
-### Community 1438 - "Leetcode Integration Plugin"
-Cohesion: 0.22
-Nodes (7): getProject, listProjects, mapProjectV1(), mapProjectV3(), projectSchema, RawProjectV1, RawProjectV3
-
 ### Community 1439 - "Leetcode Integration Plugin"
 Cohesion: 0.29
 Nodes (4): ig(), Jg(), hg(), Ig()
@@ -9979,10 +9923,6 @@ Nodes (5): getServiceDefinition, listServices, mapService(), serviceSchema, sear
 ### Community 1441 - "Redfin Integration Plugin"
 Cohesion: 0.40
 Nodes (4): getPropertyDetails, mapPropertyDetail(), propertyDetailSchema, RawAboveTheFoldPayload
-
-### Community 1442 - "Retool Integration Plugin"
-Cohesion: 0.25
-Nodes (6): getCurrentUser, listOrganizationMembers, mapMembership(), mapUser(), membershipSchema, userSchema
 
 ### Community 1443 - "Retool Integration Plugin"
 Cohesion: 0.40
@@ -10097,8 +10037,8 @@ Cohesion: 0.67
 Nodes (4): defaultTiktokHtml(), tiktokProfilePageHtml(), tiktokUniversalHtml(), tiktokVideoPageHtml()
 
 ### Community 1489 - "Aws Console Integration Plugin"
-Cohesion: 0.25
-Nodes (7): awsApi(), classifyError(), getCredentials(), parseXml(), listSubnets, RawSubnet, subnetSchema
+Cohesion: 0.16
+Nodes (12): describeInstance, listInstances, listSubnets, extractInstances(), extractName(), instanceSchema, mapInstance(), mapSubnet() (+4 more)
 
 ### Community 1490 - "Carta Integration Plugin"
 Cohesion: 0.50
@@ -10164,14 +10104,6 @@ Nodes (4): repository, directory, type, url
 Cohesion: 0.50
 Nodes (4): repository, directory, type, url
 
-### Community 1508 - "Sentry Integration Plugin"
-Cohesion: 0.40
-Nodes (4): getOrganization, listOrganizations, mapOrganization(), organizationSchema
-
-### Community 1509 - "Starbucks Integration Plugin"
-Cohesion: 0.50
-Nodes (3): getPaymentMethods, mapPaymentMethod(), paymentMethodSchema
-
 ### Community 1510 - "Youtube Integration Plugin"
 Cohesion: 0.50
 Nodes (3): getChannel, channelSchema, mapChannel()
@@ -10195,10 +10127,6 @@ Nodes (3): GSD quick skill, T1-Readiness Batch Prompt List (95 integrations), T1
 ### Community 1517 - ".context scratch: pasted_text_2026-06-23_20-32-27"
 Cohesion: 0.67
 Nodes (3): handleGetCurrentTab, handleListTabs, handleWaitForTabLoad
-
-### Community 1519 - "Test Capture: chrome-code-colors-verify (offscreendocument_main)"
-Cohesion: 0.33
-Nodes (5): getCurrentUser, mapUser(), RawAccountAttributes, RawProfileAttributes, userSchema
 
 ### Community 1520 - "Test Capture: chrome-code-colors-verify (offscreendocument_main)"
 Cohesion: 0.08
@@ -10424,10 +10352,6 @@ Nodes (21): 1. The key SDK-resolution proof (the spike's central unknown), 2. AL
 Cohesion: 0.09
 Nodes (21): Accepted Closeout Caveats, BLOCKER B1 — trust proxy (Phase 273 / INGEST-01) — **RESOLVED**, BLOCKER B2 — express-rate-limit CVE-2026-30827 (Phase 273 / INGEST-02) — **RESOLVED**, BLOCKER B3 — CWS Listing + Privacy Practices declaration (Phase 275) — **RESOLVED (in-repo); user-gated CWS Dashboard click-through documented**, BLOCKERs Resolution Evidence, Branch & Release Posture, Categories Complete, CI Test Chain (+13 more)
 
-### Community 1923 - "ce"
-Cohesion: 0.21
-Nodes (13): kb(), dj(), ed(), Ia(), J(), nb(), oc(), od() (+5 more)
-
 ### Community 1924 - "Phase 6: FSB engine consumes Lattice provider abstraction - Research"
 Cohesion: 0.10
 Nodes (20): Assumptions Log, Don't Hand-Roll, Environment Availability, Metadata, Open Questions, Per-request abort flow (locked decision Q2), Phase 6: FSB engine consumes Lattice provider abstraction - Research, Phase Requirements (+12 more)
@@ -10509,7 +10433,7 @@ Cohesion: 0.16
 Nodes (20): ACTIVE_WRITE_UAT_SLUGS, CATALOG_PATH, currentT1Rows(), __dirname, __filename, freshRequire(), HANDLER_BY_APP, handlerPathForApp() (+12 more)
 
 ### Community 1944 - ".N"
-Cohesion: 0.22
+Cohesion: 0.23
 Nodes (8): M(), qa(), ra(), Ti(), ua(), va(), wa(), xa()
 
 ### Community 1945 - "Phase 3 Plan 03-03: FSB-side checkpoint-hook smoke + Phase 3 audit trail closure Summary"
@@ -10763,14 +10687,6 @@ Nodes (18): Accumulated Context, Blockers/Concerns, Current Position, Decisions,
 ### Community 2007 - "github-stats.service.ts"
 Cohesion: 0.27
 Nodes (18): commitPunchcard(), commitsOverTime(), cumulativeCommitsSeries(), cumulativeStarsSeries(), EtagCacheEntry, forksGrowth(), isoDate(), issuesOpenVsClosed() (+10 more)
-
-### Community 2008 - "n"
-Cohesion: 0.04
-Nodes (85): ae(), af(), b(), be(), bf(), Bg(), bi(), bl() (+77 more)
-
-### Community 2009 - "n"
-Cohesion: 0.40
-Nodes (4): listIamRoles, iamRoleSchema, mapIamRole(), RawIamRole
 
 ### Community 2010 - "Changelog"
 Cohesion: 0.11
@@ -11192,13 +11108,13 @@ Nodes (17): Add After Validation (v1.x), Anti-Features (Commonly Requested, Ofte
 Cohesion: 0.12
 Nodes (16): Backlog, Carry-Forward Candidates, Completed Milestones, Milestone Closed, Milestones, Phase 44: T1 Readiness Inventory + Status Surface, Phase 45: T1 Porting Scaffold + Handler Contract Hardening, Phase 46: Same-Origin Read Ports — First High-Value Batch (+8 more)
 
-### Community 2115 - "vh"
-Cohesion: 0.40
-Nodes (4): listSecurityGroups, mapSecurityGroup(), RawSecurityGroup, securityGroupSchema
+### Community 2116 - "w"
+Cohesion: 0.04
+Nodes (17): am(), bm(), cm(), dm(), em(), fm(), pj(), Uf() (+9 more)
 
 ### Community 2117 - "vh"
 Cohesion: 0.02
-Nodes (141): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+133 more)
+Nodes (153): ab(), ad(), Ah(), Ai(), aj(), ak(), am(), bb() (+145 more)
 
 ### Community 2118 - "UAT-Excluded Milestone Audit - 2026-06-09"
 Cohesion: 0.12
@@ -11508,17 +11424,9 @@ Nodes (15): 1. MCP-05: Autopilot Progress Streaming Bug, 2. MCP-10: Orphaned Nat
 Cohesion: 0.17
 Nodes (15): gateItems(), AXES, classifyGate(), Denylist, __dirname, __filename, hostOf(), originFromService() (+7 more)
 
-### Community 2195 - "verify-catalog-crosscheck.mjs"
-Cohesion: 0.18
-Nodes (15): SIDE_EFFECT_ORDER, checkCommerceSensitiveClassified(), checkPaymentOpsNotSafeInvocable(), checkReadOnlySafeOrigins(), COMMERCE_SENSITIVE_SERVICES, __dirname, __filename, isPaymentOp() (+7 more)
-
 ### Community 2196 - "validate-extension.mjs"
 Cohesion: 0.13
 Nodes (14): readJsonDir(), catalogSnapshotPath, __dirname, errors, EXT_DIRS, EXT_ROOT, jsFiles, manifestPath (+6 more)
-
-### Community 2197 - "w"
-Cohesion: 0.11
-Nodes (3): q(), q(), w()
 
 ### Community 2198 - "Changes"
 Cohesion: 0.13
@@ -12457,20 +12365,12 @@ Cohesion: 0.19
 Nodes (9): AnyViewId, ChartTokens, countRecentCommits(), daysAgo(), FSBViewId, latestRelease(), sumPoints(), TabMetric (+1 more)
 
 ### Community 2433 - "coverage-report.test.js"
-Cohesion: 0.15
-Nodes (10): CATALOG_PATH, CROSSCHECK_PATH, DENYLIST_MODULE, fs, MANIFEST_PATH, path, { pathToFileURL }, PHASE_39_STEMS (+2 more)
-
-### Community 2434 - "redditGet"
-Cohesion: 0.40
-Nodes (4): getLoyaltyPoints, loyaltyPointsSchema, mapLoyaltyPoints(), RawLoyaltyPoints
+Cohesion: 0.14
+Nodes (11): CATALOG_PATH, CROSSCHECK_PATH, DENYLIST_MODULE, fs, isPaymentOp(), MANIFEST_PATH, path, { pathToFileURL } (+3 more)
 
 ### Community 2435 - "RedditListing"
 Cohesion: 0.40
 Nodes (4): diffEntrySchema, getMergeRequestDiff, RawDiffEntry, RawMergeRequestChangesResponse
-
-### Community 2436 - ".ca"
-Cohesion: 0.27
-Nodes (10): qj(), rj(), sj(), tj(), vj(), pj(), qj(), rj() (+2 more)
 
 ### Community 2437 - "Patch: fix all 12 HIGH-severity findings on `automation` branch"
 Cohesion: 0.17
@@ -13700,10 +13600,6 @@ Nodes (8): Cross-phase integration (5/5 WIRED — gsd-integration-checker), Defi
 Cohesion: 0.33
 Nodes (8): validateReadinessReport(), validateReadinessRows(), __dirname, __filename, require, ROOT, runCli(), validateReadinessGate()
 
-### Community 2744 - "refresh-dbip-dataset.mjs"
-Cohesion: 0.33
-Nodes (8): DEFAULT_OUT, __dirname, __filename, ipv4ToInt(), main(), parseArgs(), printSpecAndExit(), splitCsvLine()
-
 ### Community 2745 - "Plan: Patch the three confirmed review findings"
 Cohesion: 0.25
 Nodes (7): Context, Fix 1 — service-denylist.js trailing-dot canonicalization, Fix 2 — capability-catalog.js quarantine check placement, Fix 3 — options.js checkApiConnection load order, Plan: Patch the three confirmed review findings, Sequencing & scope, Verification
@@ -14136,17 +14032,9 @@ Nodes (7): Commit Status, Files Carrying Local Teams Task Changes, Implemented, 
 Cohesion: 0.25
 Nodes (7): Cross-Phase Integration, E2E Flow Verification, Milestone Audit: v0.9.21 UI Retouch & Cohesion, Phase Verification Summary, Recommendation, Requirements Coverage, Summary
 
-### Community 2853 - "get-current-user.ts"
-Cohesion: 0.40
-Nodes (4): getCurrentUser, mapUser(), RawUser, userSchema
-
 ### Community 2854 - "list-attachments.ts"
 Cohesion: 0.32
 Nodes (5): createAttachment, getAttachment, listAttachments, attachmentSchema, mapAttachment()
-
-### Community 2855 - "get-post.ts"
-Cohesion: 0.40
-Nodes (4): getMarketHours, mapMarketHours(), marketHoursSchema, RawMarketHours
 
 ### Community 2856 - "Review guidelines:"
 Cohesion: 0.29
@@ -14795,18 +14683,6 @@ Nodes (6): Anti-patterns, See also, The rule, Vault boundary, Where vault values
 ### Community 3017 - "Chrome Web Store Privacy Practices — Evidence"
 Cohesion: 0.29
 Nodes (6): Checkbox decisions, Chrome Web Store Privacy Practices — Evidence, Cross-references, Limited Use compliance statement (verbatim), Screenshots to capture at publish time, Workflow at publish time
-
-### Community 3018 - "get-favorites.ts"
-Cohesion: 0.38
-Nodes (5): getFavorites, getRecentOrders, mapRecentOrder(), RawRecentOrder, recentOrderSchema
-
-### Community 3019 - "get-comment-thread.ts"
-Cohesion: 0.40
-Nodes (4): listNotifications, mapNotification(), notificationSchema, RawNotification
-
-### Community 3020 - "README.md"
-Cohesion: 0.40
-Nodes (4): getArtist, artistSchema, mapArtistOverview(), RawArtistOverview
 
 ### Community 3021 - "graphify reference: query, path, explain"
 Cohesion: 0.33
@@ -16620,6 +16496,10 @@ Nodes (5): recipeFileName(), renderExtensionIndex(), runCli(), writeExtensionCat
 Cohesion: 0.40
 Nodes (4): listFirewalls, firewallSchema, mapFirewall(), RawFirewall
 
+### Community 3476 - "get-current-user.ts"
+Cohesion: 0.05
+Nodes (63): bm(), dg(), kc(), kg(), me(), Zl(), am(), bm() (+55 more)
+
 ### Community 3477 - "list-submissions.ts"
 Cohesion: 0.50
 Nodes (3): listWarrants, warrantSchema, WarrantsResponse
@@ -16631,10 +16511,6 @@ Nodes (3): getProject, mapProject(), projectSchema
 ### Community 3479 - "list-orders.ts"
 Cohesion: 0.50
 Nodes (3): listProjects, mapProjectListItem(), projectListItemSchema
-
-### Community 3480 - "get-favorite-products.ts"
-Cohesion: 0.40
-Nodes (3): favoriteProductSchema, getFavoriteProducts, RawFavoriteProduct
 
 ### Community 3481 - "graphify reference: add a URL and watch a folder"
 Cohesion: 0.50
@@ -17612,10 +17488,6 @@ Nodes (4): 5.1 (BLOCKER) -- Unauthenticated POST endpoint is a DDoS / fill-disk 
 Cohesion: 0.50
 Nodes (4): 7.1 (MAJOR) -- O(n) full-table scan on every /stats poll, 7.2 (MAJOR) -- Cache invalidation + thundering herd, 7.3 (MINOR) -- "Active users right now" definition drift, Section 7: Aggregate Computation Pitfalls (MAJOR class)
 
-### Community 3726 - "get-submission.ts"
-Cohesion: 0.50
-Nodes (3): getRecentlyPlayed, playHistorySchema, RawPlayHistory
-
 ### Community 3731 - "get-cards.ts"
 Cohesion: 0.50
 Nodes (3): getCards, mapSvcCard(), svcCardSchema
@@ -17801,9 +17673,9 @@ Nodes (3): 9.1 (MINOR) -- Control panel "MCP" tab new strings, 9.2 (MINOR) -- `/
   .context/attachments/olwzvA/Screenshot 2026-06-29 at 03.59.07.png · relation: semantically_similar_to
 
 ## Knowledge Gaps
-- **24588 isolated node(s):** `root`, `transport`, `client`, `email`, `service_worker` (+24583 more)
+- **24589 isolated node(s):** `root`, `transport`, `client`, `email`, `service_worker` (+24584 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **1264 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1256 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -17818,7 +17690,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `Career & Job Search (45)` and `Utilities (17)`?**
   _Edge tagged AMBIGUOUS (relation: semantically_similar_to) - confidence is low._
-- **Why does `waitUntil()` connect `Leetcode Integration Plugin` to `Vendored Library: mermaid.js`, `OpenTabs Plugin: PowerPoint Integration`, `OpenTabs Plugin: Microsoft Word docx Utils`, `OpenTabs Plugin: X (Twitter) Integration`, `OpenTabs Plugin: Bitbucket Integration`, `OpenTabs Plugin: Azure Integration`, `OpenTabs Plugin: Excel Online Integration`, `OpenTabs Plugin: Todoist Integration`, `OpenTabs Plugin: Tumblr Integration`, `OpenTabs Plugin: Shortcut Integration`, `OpenTabs Plugin: Stripe Integration`, `OpenTabs Plugin: OnlyFans Integration`, `OpenTabs Plugin: Cloudflare Integration`, `OpenTabs Plugin: CockroachDB Integration`, `OpenTabs Plugin: MongoDB Atlas Integration`, `OpenTabs Plugin: Glama Integration`, `OpenTabs Plugin: Telegram Integration`, `Aws Console Integration Plugin`, `Circleci Integration Plugin`, `Reddit Integration Plugin`, `Google Docs Integration Plugin`, `Medium Integration Plugin`, `Asana Integration Plugin`, `Hack2Hire Integration Plugin`, `Dominos Integration Plugin`, `Newrelic Integration Plugin`, `Coinbase Integration Plugin`, `Notion Integration Plugin`, `Confluence Integration Plugin`, `Discord Integration Plugin`, `Facebook Integration Plugin`, `Panda Express Integration Plugin`, `Pinterest Integration Plugin`, `Youtube Music Integration Plugin`, `Npm Integration Plugin`, `Chatgpt Integration Plugin`, `Slack Integration Plugin`, `Calendly Integration Plugin`, `Costco Integration Plugin`, `Bestbuy Integration Plugin`, `Jira Integration Plugin`, `Supabase Integration Plugin`, `Google Calendar Integration Plugin`, `Snowflake Integration Plugin`, `Meticulous Integration Plugin`, `Whatsapp Integration Plugin`, `Ynab Integration Plugin`, `Figma Integration Plugin`, `Google Analytics Integration Plugin`, `Stackoverflow Integration Plugin`, `Tinder Integration Plugin`, `Tripadvisor Integration Plugin`, `Zendesk Integration Plugin`, `Airbnb Integration Plugin`, `Instacart Integration Plugin`, `Netflix Integration Plugin`, `Twitch Integration Plugin`, `Walmart Integration Plugin`, `Clickhouse Integration Plugin`, `Tiktok Integration Plugin`, `Fidelity Integration Plugin`, `Notebooklm Integration Plugin`, `Docker Hub Integration Plugin`, `Clickup Integration Plugin`, `Claude Integration Plugin`, `Google Cloud Integration Plugin`, `Doordash Integration Plugin`, `Google Maps Integration Plugin`, `Amplitude Integration Plugin`, `Fiverr Integration Plugin`, `Google Drive Integration Plugin`, `Homedepot Integration Plugin`, `Onenote Integration Plugin`, `Twilio Integration Plugin`, `Retool Integration Plugin`, `Temporal Cloud Integration Plugin`, `Priceline Integration Plugin`, `Linkedin Integration Plugin`, `Zillow Integration Plugin`, `Expedia Integration Plugin`, `Gitlab Integration Plugin`, `Gemini Integration Plugin`, `Teams Integration Plugin`, `Booking Integration Plugin`, `Ebay Integration Plugin`, `Spotify Integration Plugin`, `Wikipedia Integration Plugin`, `Hackernews Integration Plugin`, `Airtable Integration Plugin`, `Craigslist Integration Plugin`, `Github Integration Plugin`, `Vercel Integration Plugin`, `Slack Enterprise Integration Plugin`, `Uber Integration Plugin`, `Webflow Integration Plugin`, `Yelp Integration Plugin`, `Bluesky Integration Plugin`, `Posthog Integration Plugin`, `Sentry Integration Plugin`, `Robinhood Integration Plugin`, `Netlify Integration Plugin`, `Steam Integration Plugin`, `Carta Integration Plugin`, `Starbucks Integration Plugin`, `Linear Integration Plugin`, `Redfin Integration Plugin`, `Datadog Integration Plugin`, `Instagram Integration Plugin`, `Youtube Integration Plugin`, `Chipotle Integration Plugin`, `Minimax Agent Integration Plugin`, `Outlook Integration Plugin`, `Terraform Cloud Integration Plugin`?**
+- **Why does `waitUntil()` connect `Expedia Integration Plugin` to `Vendored Library: mermaid.js`, `OpenTabs Plugin: PowerPoint Integration`, `OpenTabs Plugin: Microsoft Word docx Utils`, `OpenTabs Plugin: X (Twitter) Integration`, `OpenTabs Plugin: Bitbucket Integration`, `OpenTabs Plugin: Azure Integration`, `OpenTabs Plugin: Excel Online Integration`, `OpenTabs Plugin: Todoist Integration`, `OpenTabs Plugin: Tumblr Integration`, `OpenTabs Plugin: Shortcut Integration`, `OpenTabs Plugin: Stripe Integration`, `OpenTabs Plugin: OnlyFans Integration`, `OpenTabs Plugin: Cloudflare Integration`, `OpenTabs Plugin: CockroachDB Integration`, `OpenTabs Plugin: MongoDB Atlas Integration`, `OpenTabs Plugin: Glama Integration`, `OpenTabs Plugin: Telegram Integration`, `Aws Console Integration Plugin`, `Circleci Integration Plugin`, `Reddit Integration Plugin`, `Google Docs Integration Plugin`, `Medium Integration Plugin`, `Asana Integration Plugin`, `Hack2Hire Integration Plugin`, `Dominos Integration Plugin`, `Newrelic Integration Plugin`, `Coinbase Integration Plugin`, `Notion Integration Plugin`, `Confluence Integration Plugin`, `Discord Integration Plugin`, `Facebook Integration Plugin`, `Panda Express Integration Plugin`, `Pinterest Integration Plugin`, `Youtube Music Integration Plugin`, `Npm Integration Plugin`, `Chatgpt Integration Plugin`, `Slack Integration Plugin`, `Calendly Integration Plugin`, `Costco Integration Plugin`, `Bestbuy Integration Plugin`, `Jira Integration Plugin`, `Supabase Integration Plugin`, `Google Calendar Integration Plugin`, `Snowflake Integration Plugin`, `Meticulous Integration Plugin`, `Whatsapp Integration Plugin`, `Ynab Integration Plugin`, `Figma Integration Plugin`, `Google Analytics Integration Plugin`, `Stackoverflow Integration Plugin`, `Tinder Integration Plugin`, `Tripadvisor Integration Plugin`, `Zendesk Integration Plugin`, `Airbnb Integration Plugin`, `Instacart Integration Plugin`, `Netflix Integration Plugin`, `Twitch Integration Plugin`, `Walmart Integration Plugin`, `Clickhouse Integration Plugin`, `Tiktok Integration Plugin`, `Fidelity Integration Plugin`, `Notebooklm Integration Plugin`, `Docker Hub Integration Plugin`, `Clickup Integration Plugin`, `Claude Integration Plugin`, `Google Cloud Integration Plugin`, `Doordash Integration Plugin`, `Google Maps Integration Plugin`, `Amplitude Integration Plugin`, `Fiverr Integration Plugin`, `Google Drive Integration Plugin`, `Homedepot Integration Plugin`, `Onenote Integration Plugin`, `Datadog Integration Plugin`, `Twilio Integration Plugin`, `Slack Enterprise Integration Plugin`, `Retool Integration Plugin`, `Temporal Cloud Integration Plugin`, `Priceline Integration Plugin`, `Linkedin Integration Plugin`, `Zillow Integration Plugin`, `Gitlab Integration Plugin`, `Gemini Integration Plugin`, `Teams Integration Plugin`, `Booking Integration Plugin`, `Ebay Integration Plugin`, `Spotify Integration Plugin`, `Wikipedia Integration Plugin`, `Hackernews Integration Plugin`, `Airtable Integration Plugin`, `Craigslist Integration Plugin`, `Github Integration Plugin`, `Vercel Integration Plugin`, `Slack Enterprise Integration Plugin`, `Uber Integration Plugin`, `Webflow Integration Plugin`, `Yelp Integration Plugin`, `Bluesky Integration Plugin`, `Posthog Integration Plugin`, `Slack Enterprise Integration Plugin`, `Sentry Integration Plugin`, `Robinhood Integration Plugin`, `Netlify Integration Plugin`, `Steam Integration Plugin`, `Carta Integration Plugin`, `Starbucks Integration Plugin`, `Linear Integration Plugin`, `Redfin Integration Plugin`, `Instagram Integration Plugin`, `Youtube Integration Plugin`, `Chipotle Integration Plugin`, `Minimax Agent Integration Plugin`, `Outlook Integration Plugin`, `Terraform Cloud Integration Plugin`?**
   _High betweenness centrality (0.117) - this node is a cross-community bridge._
-- **Why does `Uc()` connect `Test Capture: chrome-code-colors-verify (service worker + offscreen)` to `Vendored Library: mermaid.js`, `Test Capture: chrome-phantom-stream-final (offscreendocument_main)`, `ce`, `Test Capture: chrome-phantom-stream (offscreen + service worker)`, `Test Capture: chrome-code-colors-verify (offscreen doc)`, `Test Capture: chrome-phantom-stream-measure (offscreen + service worker)`, `Test Capture: chrome-phantom-stream-final (offscreen + service worker)`, `Test Capture: chrome-phantom-sticky-verify (offscreen + service worker)`, `Vendored Libraries: marked.js + chart.js + gpt-tokenizer`, `Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)`, `Test Capture: chrome-code-colors-verify (service worker + offscreen)`, `Test Capture: chrome-phantom-stream-measure (offscreen doc)`, `Test Capture: chrome-phantom-sticky-plan (offscreendocument_main)`, `Test Capture: chrome-phantom-sticky-verify (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)`, `Test Capture: chrome-phantom-sticky-plan (offscreen + service worker)`, `Test Capture: chrome-phantom-sticky-verify (offscreen doc)`, `Test Capture: chrome-phantom-stream (offscreen doc)`, `Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)`, `Test Capture: chrome-phantom-stream-measure (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (offscreen doc)`, `Test Capture: chrome-phantom-stream (offscreen doc)`, `Test Capture: chrome-phantom-sticky-verify (service worker + offscreen)`, `Test Capture: chrome-phantom-stream-reduced (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (offscreendocument_main)`, `Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)`, `Vendored Library: mermaid.js parser internals`, `Test Capture: chrome-phantom-stream (service_worker_bin_prod)`, `Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)`, `Test Capture: chrome-phantom-stream-final (service_worker_bin_prod)`, `vh`, `Test Capture: chrome-phantom-stream-reduced (offscreendocument_main)`, `Vendored Library: mermaid.min.js`, `Test Capture: chrome-phantom-stream (offscreendocument_main)`, `n`, `Test Capture: chrome-phantom-stream (service_worker_bin_prod)`, `Test Capture: chrome-phantom-stream-final (offscreendocument_main)`?**
+- **Why does `Uc()` connect `Test Capture: chrome-code-colors-verify (service worker + offscreen)` to `Vendored Library: mermaid.js`, `Test Capture: chrome-phantom-stream-final (offscreendocument_main)`, `Test Capture: chrome-phantom-stream (offscreen + service worker)`, `Test Capture: chrome-code-colors-verify (offscreen doc)`, `Test Capture: chrome-phantom-stream-measure (offscreen + service worker)`, `Test Capture: chrome-phantom-stream-final (offscreen + service worker)`, `Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)`, `Test Capture: chrome-code-colors-verify (service worker + offscreen)`, `Test Capture: chrome-phantom-stream-measure (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (service_worker_bin_prod)`, `Test Capture: chrome-phantom-sticky-verify (offscreen doc)`, `Test Capture: chrome-phantom-sticky-verify (offscreendocument_main)`, `Test Capture: chrome-phantom-sticky-plan (offscreen + service worker)`, `Test Capture: chrome-phantom-sticky-verify (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)`, `Test Capture: chrome-phantom-stream-reduced (offscreen + service worker)`, `Test Capture: chrome-phantom-stream-measure (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (offscreen doc)`, `get-current-user.ts`, `Test Capture: chrome-phantom-stream (offscreen doc)`, `Test Capture: chrome-phantom-sticky-verify (service worker + offscreen)`, `Test Capture: chrome-phantom-stream-reduced (offscreen doc)`, `Test Capture: chrome-phantom-stream-tabs (service worker + offscreen)`, `Vendored Library: mermaid.js parser internals`, `Test Capture: chrome-phantom-stream (service_worker_bin_prod)`, `Test Capture: chrome-phantom-stream-measure (service_worker_bin_prod)`, `Test Capture: chrome-phantom-stream-final (service_worker_bin_prod)`, `vh`, `Test Capture: chrome-phantom-stream-reduced (offscreendocument_main)`, `Vendored Library: mermaid.min.js`, `Test Capture: chrome-phantom-stream (offscreendocument_main)`, `Github Integration Plugin`, `Test Capture: chrome-phantom-stream (service_worker_bin_prod)`, `Test Capture: chrome-phantom-stream-final (offscreendocument_main)`?**
   _High betweenness centrality (0.023) - this node is a cross-community bridge._
