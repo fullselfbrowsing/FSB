@@ -14,20 +14,6 @@
         <span class="stats-live-badge" role="status" i18n-aria-label="@@stats.live.aria" aria-label="Live data" i18n="@@stats.live.label">Live</span>
       </header>
 
-      <nav class="view-switcher" role="tablist" i18n-aria-label="@@stats.view.aria" aria-label="Stats view">
-        @for (opt of views; track trackByView($index, opt)) {
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="selectedView === opt.id"
-            [attr.data-view]="opt.id"
-            [class.active]="selectedView === opt.id"
-            (click)="setView(opt.id)">
-            {{ opt.label }}
-          </button>
-        }
-      </nav>
-
       <div class="stats-headline-row">
         <div class="stats-tab-metrics" role="status" aria-live="polite" i18n-aria-label="@@stats.tabMetrics.aria" aria-label="Current tab metrics">
           @for (metric of tabMetrics; track trackByMetric($index, metric)) {
@@ -54,27 +40,26 @@
         </div>
       </div>
 
-      <div class="chart-card" [attr.data-state]="viewState">
+      <div class="chart-card" [class.chart-card-bare]="selectedView === 'fsb-active-now'" [attr.data-state]="viewState">
         @if (viewState === 'loading') {
           <div class="skeleton" aria-busy="true" aria-live="polite">
             <span class="sr-only" i18n="@@stats.loading.sr">Loading stats...</span>
           </div>
         }
         @if (viewState === 'ready') {
-          <div class="chart-mount">
-            <canvas #chartCanvas [hidden]="selectedView === 'fsb-avg-agents-per-user'"></canvas>
-            @if (selectedView === 'fsb-avg-agents-per-user') {
-              <div class="big-number-tile" role="status" aria-live="polite">
-                <div class="big-number-label" i18n="@@SHOWCASE_STATS_FSB_TILE_AVG_AGENTS_LABEL">Avg agents per active user</div>
-                <div class="big-number-value">{{ fsbHeadline?.avg_agents_per_user ?? 0 | number:'1.1-2' }}</div>
-                @if (avgAgentsDelta !== null) {
-                  <div class="big-number-delta" [class.up]="avgAgentsDelta > 0" [class.down]="avgAgentsDelta < 0">
-                    <span class="delta-arrow" aria-hidden="true">{{ avgAgentsDelta > 0 ? '\u25B2' : (avgAgentsDelta < 0 ? '\u25BC' : '\u00B7') }}</span>
-                    {{ avgAgentsDelta > 0 ? '+' : '' }}{{ avgAgentsDelta | number:'1.1-2' }}
-                  </div>
-                }
-              </div>
-            }
+          <div class="chart-mount" [class.chart-mount-hidden]="selectedView === 'fsb-active-now'">
+            <canvas #chartCanvas></canvas>
+          </div>
+          <div class="globe-panel" [class.active]="selectedView === 'fsb-active-now'">
+            <div class="globe-mount"><canvas #globeCanvas class="stats-globe-canvas" aria-hidden="true"></canvas></div>
+            <p class="globe-annotation">
+              <i class="ph ph-info" aria-hidden="true"></i>
+              @if (hasPlottableRegions) {
+                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Each lit node is live activity, clustered by region.</span>
+              } @else {
+                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_EMPTY">Not enough anonymous activity yet to break down by region — check back soon.</span>
+              }
+            </p>
           </div>
         }
         @if (viewState === 'rate-limited') {
@@ -93,6 +78,32 @@
             <p><span>{{ errorMessage || fallbackErrorMessage }}</span> <span i18n="@@stats.error.retry">The page retries automatically every 5 minutes.</span></p>
           </div>
         }
+      </div>
+
+      <div class="stats-tab-dock">
+        <div class="stats-tab-wrap" role="tablist" i18n-aria-label="@@stats.view.aria" aria-label="Stats view"
+             (mouseenter)="onTabsEnter()" (mouseleave)="onTabsLeave()">
+          <div class="stats-tab-fan stats-tab-fan-left" [class.open]="fanOpen">
+            <div class="stats-tab-fan-track">
+              @for (opt of fanItemsLeft; track trackByView($index, opt)) {
+                <button type="button" role="tab" aria-selected="false" class="stats-tab-fan-item"
+                        [style.--dy]="opt.dy + 'px'" (click)="setView(opt.id)">{{ opt.label }}</button>
+              }
+            </div>
+          </div>
+          <button type="button" role="tab" aria-selected="true" [attr.aria-expanded]="fanOpen"
+                  class="stats-tab-active" [class.stats-tab-pulse]="tabPulse" (click)="onTabsToggle()">
+            {{ activeViewLabel }}
+          </button>
+          <div class="stats-tab-fan stats-tab-fan-right" [class.open]="fanOpen">
+            <div class="stats-tab-fan-track">
+              @for (opt of fanItemsRight; track trackByView($index, opt)) {
+                <button type="button" role="tab" aria-selected="false" class="stats-tab-fan-item"
+                        [style.--dy]="opt.dy + 'px'" (click)="setView(opt.id)">{{ opt.label }}</button>
+              }
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>

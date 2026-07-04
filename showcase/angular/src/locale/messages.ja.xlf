@@ -6876,6 +6876,22 @@
           <context context-type="linenumber">1255</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_ANNOTATION" datatype="html">
+        <source>Each lit node is live activity, clustered by region.</source>
+        <target state="translated">点灯しているノードはリアルタイムのアクティビティを示し、地域ごとにクラスタ化されています。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">58</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_EMPTY" datatype="html">
+        <source>Not enough anonymous activity yet to break down by region — check back soon.</source>
+        <target state="translated">地域別に分類できるほどの匿名アクティビティがまだありません。しばらくしてからもう一度ご確認ください。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">60</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="stats.date.unknown" datatype="html">
         <source>unknown</source>
         <target state="translated">unknown</target>
@@ -7525,6 +7541,486 @@
         </context-group>
       </trans-unit>
 
+      <trans-unit id="legal.header.kicker" datatype="html">
+        <source>Legal</source>
+        <target state="translated">法的情報</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">4,5</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.title" datatype="html">
+        <source>FSB Legal and Governance Posture</source>
+        <target state="translated">FSB 法務・ガバナンス方針</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">5,6</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.updated" datatype="html">
+        <source>Last updated: July 2026</source>
+        <target state="translated">最終更新日: 2026年7月</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">6,9</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.intro" datatype="html">
+        <source>This document records <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s legal/Terms-of-Service posture, its consent model, the audit-log retention policy, and the service-denylist rationale. It is the human-readable companion to the runtime controls shipped in Phase 30 (consent governance, recipe signature verification, the no-secrets audit log, and the service denylist).</source>
+        <target state="translated">本文書は、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>の利用規約に関する法的姿勢、同意モデル、監査ログの保持ポリシー、およびサービス拒否リスト(denylist)の根拠を記録するものです。これは、Phase 30で実装されたランタイム制御(同意ガバナンス、レシピ署名検証、機密情報を含まない監査ログ、およびサービス拒否リスト)に対応する、人間が読める形の説明資料です。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">11,12</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.scopeNote" datatype="html">
+        <source>Scope note: this is an engineering governance document, not legal advice. It describes how <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is built to behave and the boundaries it enforces.</source>
+        <target state="translated">適用範囲に関する注記: 本文書はエンジニアリング・ガバナンス文書であり、法的助言ではありません。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>がどのように動作するよう設計されているか、またどのような境界を強制しているかを説明するものです。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">12,14</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.title" datatype="html">
+        <source>Automation Posture</source>
+        <target state="translated">自動化に関する方針</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">15,16</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.intro" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Full Self-Browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) is a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>supervised, local-first<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> browser-automation capability layer. The posture is deliberately conservative:</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Full Self-Browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)は、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>監督下で動作するローカルファーストの<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>ブラウザ自動化機能レイヤーです。その方針は意図的に保守的なものとなっています。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">16,18</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Opt-out per origin.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> The shipped default is Auto for non-denied origins, with per-origin Off / Ask / Auto controls. The user can opt any origin out, and can set the global default to Off to restore strict opt-in behavior.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>オリジン単位のオプトアウト。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>初期設定では、拒否されていないオリジンに対してはAutoが適用され、オリジンごとにOff / Ask / Autoを設定できます。ユーザーは任意のオリジンをオプトアウトでき、グローバルの初期値をOffに設定することで、厳格なオプトイン方式に戻すこともできます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">18,19</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Local execution.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Automation runs in the user&apos;s own authenticated browser session. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> does not proxy a user&apos;s credentials to any server and does not replay captured credentials off-device.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ローカル実行。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>自動化はユーザー自身の認証済みブラウザセッション内で実行されます。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>は、ユーザーの認証情報をいかなるサーバーにも中継せず、取得した認証情報をデバイス外で再利用することもありません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">19,20</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Respect site Terms of Service.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is a general-purpose automation tool; the operator is responsible for using it within the Terms of Service of the sites they automate. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ships a service policy file (below) that currently hard-denies <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and classifies additional sensitive categories for mutating-write gating and audit visibility.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>サイトの利用規約の遵守。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>は汎用の自動化ツールであり、自動化対象サイトの利用規約の範囲内で使用する責任は操作者にあります。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>には、後述のサービスポリシーファイルが同梱されており、現時点で<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>および<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>を一律で拒否するほか、その他の機微なカテゴリーについても、書き込み操作のゲーティングおよび監査可視性の対象として分類しています。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">20,21</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.4" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>No code fetched as data.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Recipes are closed-vocabulary JSON data, not code. The recipe interpreter is dynamic-code-free, and server-delivered or learned recipes (a future capability) must pass cryptographic signature verification before they can bind to a credentialed call.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>データとしてコードを取得しない。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>レシピは閉じた語彙で構成されるJSONデータであり、コードではありません。レシピ・インタープリタは動的コード実行を一切行わず、サーバー配信または学習によるレシピ(将来提供予定の機能)は、認証情報を伴う呼び出しに紐付けられる前に暗号学的署名検証に合格する必要があります。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">21,24</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.title" datatype="html">
+        <source>Consent Model</source>
+        <target state="translated">同意モデル</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">25,26</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.intro" datatype="html">
+        <source>Consent is enforced at a single dispatch chokepoint (one gate, both front doors), immediately after the existing ownership gate. The shipped posture is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>opt-out (&quot;fully open&quot;)<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: a global default mode applies to every origin the user has not explicitly configured, and the user opts individual origins <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>out<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. The global default ships as <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> and is user-configurable (Off / Ask / Auto) under Advanced Settings → Consent &amp; Audit → &quot;Default for New Sites&quot;.</source>
+        <target state="translated">同意は、既存の所有権ゲートの直後、単一のディスパッチ・チョークポイント(1つのゲートで両方の入口を制御)において強制されます。初期設定の方針は<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>オプトアウト(「完全に開かれた」)<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>方式です。すなわち、ユーザーが明示的に設定していないすべてのオリジンにグローバルの初期モードが適用され、ユーザーは個々のオリジンを<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>オプトアウト<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>します。グローバルの初期値は<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>として提供され、詳細設定 → 同意と監査 → 「新規サイトの初期設定」(Default for New Sites)から、ユーザーが(Off / Ask / Auto)を変更できます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">26,28</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.header.mode" datatype="html">
+        <source>Mode</source>
+        <target state="translated">モード</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">32,33</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.header.behavior" datatype="html">
+        <source>Behavior</source>
+        <target state="translated">動作</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">33,37</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.auto.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (shipped default)</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>(初期設定)</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">38,39</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.auto.behavior" datatype="html">
+        <source>Capability invocations run without per-call prompting, including reads <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>and<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> writes, against any non-denylisted origin, except that a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write to a sensitive origin<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04; see the Categorization Axes below). Reads, and writes to non-sensitive origins, run freely under Auto.</source>
+        <target state="translated">拒否リストに登録されていない任意のオリジンに対し、読み取り<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>および<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>書き込みを含む機能呼び出しが、呼び出しごとの確認なしに実行されます。ただし、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微なオリジンへの書き込み<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>については、invokeゲートにおいてオリジン単位の変更系オプトインが再度強制されます(posture B / DENY-04。詳細は後述の分類軸を参照)。読み取り、および機微でないオリジンへの書き込みは、Autoの下で自由に実行されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">39,40</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.ask.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Ask<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Ask<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">42,43</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.ask.behavior" datatype="html">
+        <source>Each invocation surfaces a pending request out-of-band (control panel + a badge) for the user to grant; nothing runs until granted. There is no blocking in-page modal mid-invocation.</source>
+        <target state="translated">各呼び出しは、ユーザーが許可を与えるまで、帯域外(コントロールパネルおよびバッジ)で保留中のリクエストとして表示されます。許可されるまで何も実行されません。呼び出し中にページ内でブロッキングするモーダルは表示されません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">43,46</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.off.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">46,47</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.off.behavior" datatype="html">
+        <source>Nothing runs against the origin. Capability invocations return a typed consent-required reason. Set an individual origin to Off to opt it out, or set the global default to Off to restore strict opt-in.</source>
+        <target state="translated">当該オリジンに対しては何も実行されません。機能呼び出しは、型付けされた「同意が必要」という理由を返します。個別のオリジンをOffに設定してオプトアウトするか、グローバルの初期値をOffに設定して厳格なオプトイン方式に戻すことができます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">47,51</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.additionalIntro" datatype="html">
+        <source>Additional consent rules:</source>
+        <target state="translated">その他の同意ルール:</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">53,55</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Denylist is the one hard block.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> A denylisted origin is non-enableable regardless of the global default or any per-origin policy. The current hard denylist is intentionally narrow: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. The denylist is consulted <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>first<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>, before the consent mode.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>拒否リストは唯一の絶対的なブロックです。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>拒否リストに登録されたオリジンは、グローバルの初期値やオリジン単位のポリシーにかかわらず、有効化することができません。現在の拒否リストは意図的に狭い範囲に限定されており、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>および<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>のみが対象です。拒否リストは、同意モードよりも<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>先に<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>参照されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">55,56</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Per-origin opt-out.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Every origin <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> acts on is listed in the control panel (sourced from the audit trail) so the user can set it to Off (or Ask) at any time. An explicit per-origin policy overrides the global default.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>オリジン単位のオプトアウト。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>が操作対象とするすべてのオリジンは、(監査証跡に基づき)コントロールパネルに一覧表示され、ユーザーはいつでもOff(またはAsk)に設定できます。明示的なオリジン単位のポリシーは、グローバルの初期値より優先されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">56,57</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Writes to non-sensitive origins are allowed under Auto.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Under the opt-out posture, for a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>non-sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> origin read-Auto implies write-Auto: side-effecting invocations (POST/PUT/PATCH/DELETE) run without a separate elevated opt-in, and the per-origin mutating flag is inert at the invoke gate. A <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write to a sensitive origin is the exception<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: it re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04), so the mutating flag IS consulted there for sensitive origins (see the Categorization Axes section). Reads run under Auto everywhere.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微でないオリジンへの書き込みはAutoの下で許可されます。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>オプトアウト方式の下では、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微でない<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>オリジンにおいては、読み取りAutoが書き込みAutoを暗黙的に含みます。副作用を伴う呼び出し(POST/PUT/PATCH/DELETE)は、個別の昇格されたオプトインなしに実行され、オリジン単位の変更系フラグはinvokeゲートにおいて無効化されます。<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微なオリジンへの書き込みは例外<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>であり、invokeゲートにおいてオリジン単位の変更系オプトインが再度強制されます(posture B / DENY-04)。そのため、機微なオリジンについては変更系フラグがそこで参照されます(分類軸のセクションを参照)。読み取りはあらゆる場所でAutoの下に実行されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">57,58</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.4" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Sensitive-origin writes are re-gated at the invoke gate; reads are not.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Origins classified as <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (banking, primary email, government, and the payments / budgeting / social / messaging categories below) run <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>reads<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> under Auto, but a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> re-enforces the per-origin mutating opt-in at the capability <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>invoke<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> gate (posture B / DENY-04) before it is permitted. In addition, the more invasive <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>network-capture discovery<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> path keeps its own, broader explicit confirmation for sensitive origins. (Sensitive writes are NOT ungated under Auto: the invoke gate re-applies the mutating opt-in for them.)</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微なオリジンへの書き込みはinvokeゲートで再度ゲーティングされますが、読み取りは対象外です。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>に分類されたオリジン(銀行、主要メール、政府機関、および以下の決済/予算管理/ソーシャル/メッセージングのカテゴリー)は、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>読み取り<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>はAutoの下で実行されますが、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>書き込み<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>は許可される前に、機能の<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>invoke<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>ゲートにおいてオリジン単位の変更系オプトインを再度強制します(posture B / DENY-04)。さらに、より侵襲性の高い<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ネットワークキャプチャによる検出<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>の経路は、機微なオリジンに対して独自のより広範な明示的確認を維持します。(機微な書き込みは、Autoの下でもゲーティングが解除されるわけではありません。invokeゲートは変更系オプトインをそれらに対して再適用します。)</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">58,59</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.5" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Reverting to opt-in.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Setting the global default to <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> restores the strict opt-in posture: nothing runs against an origin until the user enables it.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>オプトインへの復帰。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>グローバルの初期値を<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>に設定すると、厳格なオプトイン方式に戻ります。すなわち、ユーザーが有効化するまで、そのオリジンに対して何も実行されません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">59,62</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.callout.body" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Security note:<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> under the shipped Auto default, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> can call a non-denylisted site&apos;s authenticated web API using the browser&apos;s logged-in session, without a per-site prompt: reads everywhere, and writes to non-sensitive origins. A write to a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> origin is re-gated at the invoke gate (it re-enforces the per-origin mutating opt-in; posture B / DENY-04). This is a deliberate, user-configurable posture; the denylist, the per-origin and global opt-out, the sensitive-write re-gate, the active-tab origin pin, the fail-closed degradation path, and the append-only audit trail remain in force.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>セキュリティに関する注記:<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>初期設定のAutoの下では、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>は、拒否リストに登録されていないサイトの認証済みWeb APIを、ブラウザのログイン済みセッションを用いて、サイトごとの確認なしに呼び出すことができます。すなわち、あらゆる場所での読み取り、および機微でないオリジンへの書き込みです。<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微な<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>オリジンへの書き込みは、invokeゲートで再度ゲーティングされます(オリジン単位の変更系オプトインを再強制。posture B / DENY-04)。これは意図的かつユーザーが設定可能な方針であり、拒否リスト、オリジン単位およびグローバルのオプトアウト、機微な書き込みの再ゲーティング、アクティブタブのオリジン固定、フェイルクローズによる縮退経路、そして追記専用の監査証跡は引き続き有効です。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">63,66</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.title" datatype="html">
+        <source>Audit Log</source>
+        <target state="translated">監査ログ</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">67,68</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.intro" datatype="html">
+        <source>Every capability invocation is recorded in an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>append-only, secret-free<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> audit log so the operator can review what ran.</source>
+        <target state="translated">すべての機能呼び出しは、操作者が実行内容を確認できるよう、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>追記専用かつ機密情報を含まない<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>監査ログに記録されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">68,70</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.recordedFields.title" datatype="html">
+        <source>Recorded fields</source>
+        <target state="translated">記録されるフィールド</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">70,71</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.recordedFields.body" datatype="html">
+        <source>The audit entry schema is, by construction, free of secrets and request payloads:</source>
+        <target state="translated">監査エントリのスキーマは、その構造上、機密情報およびリクエストのペイロードを含みません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">71,72</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.neverRecorded.title" datatype="html">
+        <source>What is never recorded</source>
+        <target state="translated">決して記録されない情報</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">75,76</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.neverRecorded.body" datatype="html">
+        <source>The audit log <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>never<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> stores invocation arguments, request or response bodies, cookies, tokens, CSRF values, bearer credentials, or any other authentication material. Auth material never leaves the device and is never persisted. Every recorded field additionally passes through a shape-only redactor before persistence (URLs are reduced to their origin; strings to a shape descriptor; errors to name and message only). A test asserts that no authentication substring survives in the persisted log.</source>
+        <target state="translated">監査ログには、呼び出しの引数、リクエストまたはレスポンスの本文、クッキー、トークン、CSRF値、ベアラー認証情報、その他いかなる認証関連情報も<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>決して<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>記録されません。認証関連情報はデバイス外に出ることはなく、永続化されることもありません。記録される各フィールドは、永続化される前に必ず形状のみを保持する秘匿化処理(リダクション)を通過します(URLはオリジンのみに縮約され、文字列は形状記述子に、エラーは名前とメッセージのみに変換されます)。永続化されたログ内に認証関連の部分文字列が一切残存しないことを検証するテストが存在します。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">76,78</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.retention.title" datatype="html">
+        <source>Retention</source>
+        <target state="translated">保持期間</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">78,79</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.retention.body" datatype="html">
+        <source>The audit log is a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>bounded ring buffer<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: the most recent entries are retained and older entries are trimmed automatically (FIFO). The user has an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>export and clear<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> control to export the current log and clear it on demand. The log is secret-free by construction; encryption at rest is therefore unnecessary and is out of scope. Long-term archival and deeper retention tooling are intentionally deferred; the bounded ring plus export/clear is the Phase-30 retention policy.</source>
+        <target state="translated">監査ログは<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>上限付きのリングバッファ<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>であり、直近のエントリのみが保持され、古いエントリは自動的に(FIFO方式で)削除されます。ユーザーは、現在のログをエクスポートし、必要に応じて消去するための<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>エクスポートと消去<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>の操作を利用できます。ログはその構造上、機密情報を含まないため、保存時の暗号化は不要であり、対象外とされています。長期アーカイブおよびより高度な保持管理ツールは意図的に先送りされており、上限付きリングバッファとエクスポート/消去機能が、Phase 30における保持ポリシーです。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">79,81</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.title" datatype="html">
+        <source>Service Denylist</source>
+        <target state="translated">サービス拒否リスト</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">82,83</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.intro" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ships a conservative service denylist at <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>extension/config/service-denylist.json<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>, loaded at service-worker startup and consulted before per-origin consent. It is the single source of truth for whether an origin is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>denied<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> or <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>には、<x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>extension/config/service-denylist.json<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>に保守的なサービス拒否リストが同梱されており、サービスワーカー起動時に読み込まれ、オリジン単位の同意確認より前に参照されます。これは、あるオリジンが<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>拒否<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>対象か<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>対象かを判定する唯一の正式な情報源です。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">83,85</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.li.1" datatype="html">
+        <source><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>deniedOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: the hard block list. Current runtime policy intentionally narrows this to <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. A denylisted origin is rendered non-enableable: the consent gate blocks it even if a stored policy says Auto, and the control panel greys it out with the documented reason.</source>
+        <target state="translated"><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>deniedOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: 絶対的なブロックリストです。現在のランタイムポリシーは、意図的にこれを<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>および<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>に限定しています。拒否リストに登録されたオリジンは有効化できないものとして扱われます。保存されたポリシーがAutoとなっていても、同意ゲートがこれをブロックし、コントロールパネルはその理由とともにグレーアウト表示します。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">85,86</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.li.2" datatype="html">
+        <source><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>sensitiveOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: allowed-but-governed origins. This includes banking, government, primary email, brokerage / trading, payments, money movement, social, messaging, media, AI-chat, commerce, travel, and other categories that require mutating-write gating and audit visibility but are not hard-denied.</source>
+        <target state="translated"><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>sensitiveOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: 許可されるが管理下に置かれるオリジンです。これには、銀行、政府機関、主要メール、証券/トレーディング、決済、資金移動、ソーシャル、メッセージング、メディア、AIチャット、コマース、旅行、およびその他、変更系書き込みのゲーティングと監査可視性を必要とするが絶対的な拒否対象ではないカテゴリーが含まれます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">86,88</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.outro" datatype="html">
+        <source>The service policy is conservative without being an aggressive broad blocklist, and it is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>user-extensible<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. Host patterns use a <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>https://*.&lt;domain&gt;<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> subdomain-wildcard form (matching the apex and any subdomain) or an exact origin. A comprehensive, per-service legal review is ongoing; the policy file establishes the mechanism and the current default posture.</source>
+        <target state="translated">このサービスポリシーは、保守的ではあるものの、過度に広範なブロックリストとなることを避けており、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ユーザーによる拡張が可能<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>です。ホストパターンには、<x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>https://*.&lt;domain&gt;<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>形式のサブドメインワイルドカード(親ドメインおよび任意のサブドメインに一致)、または完全一致のオリジンのいずれかを使用します。サービスごとの包括的な法的レビューは現在も進行中であり、このポリシーファイルはその仕組みと現時点の初期方針を定めるものです。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">88,90</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.title" datatype="html">
+        <source>Categorization Axes</source>
+        <target state="translated">分類軸</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">90,91</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.intro" datatype="html">
+        <source>An origin&apos;s classification is decided along <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>three distinct criteria<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. These axes are independent: an origin can be hard-denied, allowed-but-sensitive, or safe. <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>service-denylist.js classify(origin)<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> is the single source of truth that resolves an origin to denied / sensitive / safe.</source>
+        <target state="translated">オリジンの分類は<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>3つの独立した基準<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>に沿って決定されます。これらの軸は相互に独立しており、あるオリジンは絶対的拒否、許可されるが機微、または安全のいずれかに分類され得ます。<x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>service-denylist.js classify(origin)<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>が、オリジンを拒否/機微/安全のいずれかに解決する唯一の正式な情報源です。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">91,94</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Hard denial.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Hard-denied origins are non-enableable regardless of consent mode. The current runtime hard-denied roster is intentionally narrow: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>絶対的拒否。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>絶対的に拒否されたオリジンは、同意モードにかかわらず有効化できません。現在のランタイムにおける絶対的拒否対象は、意図的に<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>および<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>のみに限定されています。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">95,96</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.intro" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Sensitive governance (Ask / mutating-gated).<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Allowed-but-sensitive origins are not hard-denied. Reads run under Auto everywhere; a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> to a sensitive origin re-enforces the per-origin mutating opt-in (posture B / DENY-04) before it is permitted. This is where banking and government hosts, primary email, brokerage / trading (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>robinhood<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>fidelity<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>carta<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), payments and money movement, budgeting, social, messaging, media, and AI-chat origins sit. For example, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instagram<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>facebook<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tiktok<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> are sensitive, not denied; their reads remain available under Auto and their writes are gated. Payments (e.g. <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dashboard.stripe.com<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>, coinbase, twilio), Carta read-only portfolio/account data, budgeting (ynab), and messaging-app writes are classified on this axis as well.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微なガバナンス(Ask / 変更系ゲーティング)。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>許可されるが機微なオリジンは、絶対的拒否の対象ではありません。読み取りはあらゆる場所でAutoの下に実行されますが、機微なオリジンへの<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>書き込み<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>は、許可される前にオリジン単位の変更系オプトインを再度強制します(posture B / DENY-04)。これに該当するのは、銀行および政府機関のホスト、主要メール、証券/トレーディング(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>robinhood<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>fidelity<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>carta<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)、決済および資金移動、予算管理、ソーシャル、メッセージング、メディア、AIチャットのオリジンです。例えば、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instagram<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>facebook<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tiktok<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>は機微であり、拒否対象ではありません。これらの読み取りはAutoの下で引き続き利用可能であり、書き込みはゲーティングされます。決済(例: <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dashboard.stripe.com<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>、coinbase、twilio)、Cartaの読み取り専用のポートフォリオ/口座データ、予算管理(ynab)、そしてメッセージングアプリへの書き込みも、この軸において分類されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">98,99</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.sub.commsSocial" datatype="html">
+        <source>The <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>comms / social / content<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> import batch extends this axis. The AI-chat apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chatgpt<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>claude<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) and the microblog / fediverse social apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bluesky<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>mastodon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>threads<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are classified <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: their reads run under Auto, their writes (post / send / publish) re-enforce the per-origin mutating opt-in. This is the <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>conservative default<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> for the category: an unknown social / AI app defaults toward LESS reach, because a mis-classification that read as &quot;safe&quot; would make the app writable-under-Auto (able to post or message on someone&apos;s account). These hosts contain no generic category keyword the import-time heuristic flags, so they are classified explicitly on this axis rather than relying on the heuristic to catch them. The <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>discord<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> messaging origin remains sensitive (writes mutating-gated). Media and social origins such as <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>spotify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>twitch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>steam<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube-music<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tinder<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> are sensitive, not denied; their writes are gated and guarded as applicable. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> remain hard-denied.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>コミュニケーション/ソーシャル/コンテンツ<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>のインポートバッチは、この軸をさらに拡張します。AIチャットアプリ(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chatgpt<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>claude<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)、およびマイクロブログ/フェディバース系ソーシャルアプリ(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bluesky<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>mastodon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>threads<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)は<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>に分類されます。すなわち、読み取りはAutoの下で実行されますが、書き込み(投稿/送信/公開)はオリジン単位の変更系オプトインを再度強制します。これはこのカテゴリーにおける<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>保守的な初期設定<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>です。未知のソーシャル/AIアプリは、より少ない到達範囲側にデフォルトで倒すようにしています。なぜなら、「安全」と誤って分類された場合、そのアプリはAutoの下で書き込み可能(誰かのアカウントで投稿やメッセージ送信が可能)になってしまうためです。これらのホストには、インポート時のヒューリスティックが検知する汎用的なカテゴリーキーワードが含まれていないため、ヒューリスティックによる検知に頼るのではなく、この軸において明示的に分類されています。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>discord<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>のメッセージングオリジンは引き続き機微(書き込みは変更系ゲーティングの対象)として扱われます。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>spotify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>twitch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>steam<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube-music<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、および<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tinder<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>などのメディアおよびソーシャルのオリジンは機微であり、拒否対象ではありません。これらの書き込みは、必要に応じてゲーティングおよび保護の対象となります。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>および<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>は引き続き絶対的拒否対象です。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">99,100</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.sub.domOnly" datatype="html">
+        <source>Independent of this axis, every comms / social / content descriptor the batch imports is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>DOM-only<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (the conservative backing default): it is surfaced as a discovery-pending hit, never a confident API-invocable hit, and is never learn-seeded, so a ToS-hostile or AI-chat app is never auto-driven through a fabricated API call from guessed auth.</source>
+        <target state="translated">この軸とは独立して、当該バッチがインポートするコミュニケーション/ソーシャル/コンテンツ関連の記述子はすべて<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>DOMのみ<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>(保守的な既定の裏付け方式)として扱われます。これは、確定的にAPI呼び出し可能なヒットとしてではなく、常に検出保留中のヒットとして表示され、学習シードとして用いられることも一切ありません。これにより、利用規約に敵対的なアプリやAIチャットアプリが、推測された認証情報から捏造されたAPI呼び出しを通じて自動的に操作されることはありません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">100,102</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.intro" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Payment / money-movement classification (the commerce / travel / misc batch).<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> The most-sensitive import batch is screened along a payment dimension layered onto these three axes, because <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>a payment-bearing op writable under Auto = money moved without consent<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (an order placed, a card charged, a paid reservation booked). The classification follows the money:</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>決済/資金移動の分類(コマース/旅行/その他のバッチ)。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>最も機微なインポートバッチは、これら3つの軸に加えて、決済という観点からもスクリーニングされます。これは、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Autoの下で書き込み可能な決済関連の操作は、同意なく資金が移動することを意味する<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>ためです(注文の確定、カードへの請求、有料予約の確定など)。この分類は資金の流れに沿って行われます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">103,105</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Payment-bearing commerce / travel / paid-booking origins → sensitive.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Food delivery and rideshare (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>doordash<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ubereats<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>uber<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>lyft<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grubhub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instacart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dominos<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chipotle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), retail / marketplace checkout (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>amazon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ebay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>etsy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bestbuy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>costco<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>walmart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>target<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>craigslist<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>shopify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), and travel / transport paid bookings (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>booking<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>airbnb<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>expedia<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>kayak<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are classified <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: their reads run under Auto, their writes (place-order / checkout / book) re-enforce the per-origin mutating opt-in (posture B). This is the <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>conservative default<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> for the category: an unknown commerce / payment app defaults toward LESS reach (sensitive, never safe-writable). <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is sensitive <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>unconditionally<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> reservation holds a card, so a held-card / paid reservation is payment-adjacent even when no &quot;checkout&quot; op is present.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>決済を伴うコマース/旅行/有料予約のオリジン → 機微。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>フードデリバリーおよびライドシェア(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>doordash<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ubereats<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>uber<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>lyft<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grubhub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instacart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dominos<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chipotle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)、小売/マーケットプレイスのチェックアウト(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>amazon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ebay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>etsy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bestbuy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>costco<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>walmart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>target<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>craigslist<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>shopify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)、そして旅行/交通機関の有料予約(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>booking<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>airbnb<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>expedia<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>kayak<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)は<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>に分類されます。すなわち、読み取りはAutoの下で実行されますが、書き込み(注文確定/チェックアウト/予約)はオリジン単位の変更系オプトインを再度強制します(posture B)。これはこのカテゴリーにおける<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>保守的な初期設定<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>です。未知のコマース/決済アプリは、より少ない到達範囲側にデフォルトで倒します(機微として扱い、安全に書き込み可能とはみなしません)。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>は<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>無条件に<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>機微として扱われます。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>の予約はカード情報を保持するため、「checkout」操作が存在しない場合でも、カード保持を伴う有料予約は決済に隣接するものとして扱われます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">105,106</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Pure money-movement apps → sensitive.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Standalone peer-to-peer money-transfer / wallet apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>paypal<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>venmo<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>cash app<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>wise<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>western union<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are sensitive, not hard-denied. Reads are allowed under Auto; mutating actions are gated by the sensitive-origin write path and by the payment-op guard.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>純粋な資金移動アプリ → 機微。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>独立した個人間送金/ウォレットアプリ(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>paypal<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>venmo<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>cash app<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>wise<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>western union<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>)は機微であり、絶対的拒否の対象ではありません。読み取りはAutoの下で許可され、変更系操作は機微なオリジンへの書き込み経路および決済操作ガードの両方によってゲーティングされます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">106,107</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Read-only commerce browsing → safe.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Pure-availability or read-only apps whose vendored ops are all reads (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>calendly<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> availability links, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>yelp<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> / <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tripadvisor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> business search, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>zillow<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> listings, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grafana<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> dashboards) stay <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>safe<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (unclassified, reads run under Auto). The import-time heuristic&apos;s payment tokens are deliberately SPECIFIC (checkout / cart / place-order / charge, NOT a bare order / book / reserve) so a benign commerce read is not false-tripped; a safe commerce origin is added to the read-only-safe invariant set ONLY when its emitted ops are verified read-only.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>読み取り専用のコマース閲覧 → 安全。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>提供される操作がすべて読み取りである、純粋な空き状況確認または読み取り専用のアプリ(<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>calendly<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>の空き状況リンク、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>yelp<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> / <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tripadvisor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>のビジネス検索、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>zillow<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>の物件情報、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grafana<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>のダッシュボード)は、<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>安全<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>のまま分類されます(未分類扱いとなり、読み取りはAutoの下で実行されます)。インポート時のヒューリスティックが用いる決済関連のトークンは、意図的に限定的なもの(checkout / cart / place-order / chargeであり、単なるorder / book / reserveではない)としており、これにより良性のコマース読み取り操作が誤って検知されることを防いでいます。安全なコマースオリジンが読み取り専用の安全な集合に追加されるのは、そのオリジンが発する操作がすべて読み取り専用であると検証された場合に限られます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">107,108</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.outro" datatype="html">
+        <source>What makes <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>money-movement-under-Auto impossible<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> is the payment-origin gate, established for this batch before any payment descriptor lands: (a) payment origins are <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (posture-B gated); (b) an import-time <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>payment-op CI guard<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> fails the build if any payment-bearing op (checkout / pay / place_order / charge / complete_booking / buy_tickets / book_flight / request_ride / place_bid / create_order / ...) is ever classified on an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ungated origin<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. A payment write therefore can only flow on a sensitive origin, where the per-origin mutating opt-in re-gates it, or not ship at all.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Autoの下での資金移動を不可能にしている<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>のは、決済記述子が追加されるより前に、このバッチのために整備された決済オリジンゲートです。(a) 決済オリジンは<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>機微<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>として扱われます(posture-Bによるゲーティング)。(b) インポート時の<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>決済操作のCIガード<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>は、決済を伴う操作(checkout / pay / place_order / charge / complete_booking / buy_tickets / book_flight / request_ride / place_bid / create_order など)が<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ゲーティングされていないオリジン<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>で分類された場合、ビルドを失敗させます。したがって、決済に関わる書き込みは、オリジン単位の変更系オプトインによって再度ゲーティングされる機微なオリジン上でのみ流れることができ、そうでなければ出荷されることはありません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">109,111</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.closing" datatype="html">
+        <source>The hard-denial axis makes an origin non-enableable; the sensitivity axes keep an origin usable but re-apply write-time friction. An import-time classification gate fails the build if a sensitivity-suspect origin is left unclassified, so a gap in the classification can never silently read as &quot;allow&quot;.</source>
+        <target state="translated">絶対的拒否の軸は、あるオリジンを有効化不可能にします。一方、機微性に関する軸は、オリジンを利用可能な状態に保ちつつ、書き込み時の摩擦を再適用します。インポート時の分類ゲートは、機微性が疑われるオリジンが未分類のまま残されている場合、ビルドを失敗させます。これにより、分類の抜け漏れが暗黙のうちに「許可」として扱われることは決してありません。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">113,116</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.title" datatype="html">
+        <source>Recipe Integrity (Signature Verification)</source>
+        <target state="translated">レシピの完全性(署名検証)</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">116,117</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.body.1" datatype="html">
+        <source>Server-delivered and learned recipes (a future capability) are untrusted data and must be <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>signature-verified<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> before they can bind to a credentialed call. Verification uses <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> over the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RFC-8785<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> JCS canonical form of the recipe provenance envelope, performed inside the interpreter after schema validation and before binding. A tampered or unsigned non-bundled recipe is rejected with a typed <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RECIPE_SIGNATURE_INVALID<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> reason. Verification fails closed: if the platform cannot perform <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> verification, a non-bundled recipe is rejected rather than trusted.</source>
+        <target state="translated">サーバー配信および学習によるレシピ(将来提供予定の機能)は、信頼されていないデータであり、認証情報を伴う呼び出しに紐付けられる前に<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>署名検証<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>を受ける必要があります。検証は、レシピの来歴エンベロープの<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RFC-8785<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> JCS正規形式に対して<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>を用いて行われ、インタープリタ内部でスキーマ検証の後、バインドの前に実施されます。改ざんされた、または署名のない非バンドルレシピは、型付けされた<x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RECIPE_SIGNATURE_INVALID<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>という理由とともに拒否されます。検証はフェイルクローズです。すなわち、プラットフォームが<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>検証を実行できない場合、非バンドルレシピは信頼されるのではなく拒否されます。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">117,118</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.body.2" datatype="html">
+        <source>First-party bundled recipes (shipped and reviewed with the extension) are trusted-by-provenance and exempt from the verify gate, so the bundled capability head is unaffected. The trusted public key ships in the extension bundle; it is never fetched remotely. The private signing key is offline.</source>
+        <target state="translated">ファーストパーティのバンドルレシピ(拡張機能に同梱されレビュー済みのもの)は、来歴によって信頼されるものとして扱われ、検証ゲートの対象外です。そのため、バンドルされた機能群には影響がありません。信頼済みの公開鍵は拡張機能のバンドル内に同梱されており、リモートから取得されることはありません。秘密署名鍵はオフラインで管理されています。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">118,121</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.contact.title" datatype="html">
+        <source>Contact</source>
+        <target state="translated">お問い合わせ</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">121,122</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.contact.body" datatype="html">
+        <source>For questions about this posture or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s data handling, open an issue on the project&apos;s <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> repository.</source>
+        <target state="translated">本方針または<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>のデータ取り扱いについてご質問がある場合は、本プロジェクトの<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>リポジトリでイシューを作成してください。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">122,125</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.meta.title" datatype="html">
+        <source>FSB - Legal and Governance Posture</source>
+        <target state="translated">FSB - 法務・ガバナンス方針</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
+          <context context-type="linenumber">19</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.meta.description" datatype="html">
+        <source>FSB&apos;s automation posture, consent model, audit-log retention policy, and service-denylist rationale.</source>
+        <target state="translated">FSBの自動化に関する方針、同意モデル、監査ログの保持ポリシー、およびサービス拒否リストの根拠。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
+          <context context-type="linenumber">20</context>
+        </context-group>
+      </trans-unit>
     </body>
   </file>
 </xliff>

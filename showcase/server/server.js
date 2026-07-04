@@ -197,8 +197,8 @@ if (staticPath) {
 }
 
 // Phase 216 SRV-01 / SRV-02 / D-09 / D-10:
-// Prefer per-route prerendered HTML for marketing routes; whitelist /dashboard
-// exact-match for the SPA shell; fall through to a 404 otherwise. This replaces
+// Prefer per-route prerendered HTML for marketing routes; whitelist exact-match
+// client shell routes; fall through to a 404 otherwise. This replaces
 // the previous all-routes -> root-index SPA fallback, which would have shadowed
 // crawler files and served the wrong <title>/<meta> for /about /privacy /support
 // after Phase 215 prerender landed.
@@ -213,12 +213,17 @@ const marketingRoutes = new Set([
   '/prometheus',
   '/sitemaps'
 ]);
+const clientShellRoutes = new Set([
+  '/dashboard',
+  '/stats',
+  '/legal'
+]);
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return next();
   }
   if (!staticPath) {
-    if (marketingRoutes.has(req.path) || req.path === '/dashboard' || req.path === '/stats') {
+    if (marketingRoutes.has(req.path) || clientShellRoutes.has(req.path)) {
       res.status(503).type('text/plain').send('Showcase build not found. Run `npm --prefix showcase/angular run build` first.');
       return;
     }
@@ -236,10 +241,10 @@ app.use((req, res, next) => {
     // will surface this on the next run.
     return next();
   }
-  if (req.path === '/dashboard' || req.path === '/stats') {
-    // D-10 exact-match whitelist: /dashboard and /stats are SPA-shell routes
-    // (RenderMode.Client per app.routes.server.ts). /dashboard/* and /stats/*
-    // are NOT covered and fall through to 404.
+  if (clientShellRoutes.has(req.path)) {
+    // D-10 exact-match whitelist: these are SPA-shell routes
+    // (RenderMode.Client per app.routes.server.ts). Nested paths are NOT
+    // covered and fall through to 404.
     res.sendFile(path.join(staticPath, 'index.html'));
     return;
   }

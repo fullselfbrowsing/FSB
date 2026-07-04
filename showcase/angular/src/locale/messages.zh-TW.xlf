@@ -6876,6 +6876,22 @@
           <context context-type="linenumber">1255</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_ANNOTATION" datatype="html">
+        <source>Each lit node is live activity, clustered by region.</source>
+        <target state="translated">每個亮起的節點代表即時活動，依地區聚類顯示。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">58</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_EMPTY" datatype="html">
+        <source>Not enough anonymous activity yet to break down by region — check back soon.</source>
+        <target state="translated">匿名活動資料尚不足以依地區細分——請稍後再回來查看。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">60</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="stats.date.unknown" datatype="html">
         <source>unknown</source>
         <target state="translated">unknown</target>
@@ -7525,6 +7541,486 @@
         </context-group>
       </trans-unit>
 
+      <trans-unit id="legal.header.kicker" datatype="html">
+        <source>Legal</source>
+        <target state="translated">法律資訊</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">4,5</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.title" datatype="html">
+        <source>FSB Legal and Governance Posture</source>
+        <target state="translated">FSB 法律與治理立場</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">5,6</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.updated" datatype="html">
+        <source>Last updated: July 2026</source>
+        <target state="translated">最後更新：2026 年 7 月</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">6,9</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.intro" datatype="html">
+        <source>This document records <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s legal/Terms-of-Service posture, its consent model, the audit-log retention policy, and the service-denylist rationale. It is the human-readable companion to the runtime controls shipped in Phase 30 (consent governance, recipe signature verification, the no-secrets audit log, and the service denylist).</source>
+        <target state="translated">本文件記載 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的法律／服務條款立場、其同意機制模型、稽核記錄保留政策，以及服務拒絕清單的理由依據。本文件是 Phase 30 所隨附之執行期控制項（同意治理、配方簽章驗證、無機密稽核記錄，以及服務拒絕清單）的可讀對照說明。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">11,12</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.scopeNote" datatype="html">
+        <source>Scope note: this is an engineering governance document, not legal advice. It describes how <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is built to behave and the boundaries it enforces.</source>
+        <target state="translated">範疇說明：本文件屬工程治理文件，並非法律意見。它描述 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的設計行為方式，以及其強制執行的界線。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">12,14</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.title" datatype="html">
+        <source>Automation Posture</source>
+        <target state="translated">自動化立場</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">15,16</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.intro" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Full Self-Browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) is a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>supervised, local-first<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> browser-automation capability layer. The posture is deliberately conservative:</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Full Self-Browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>）是一套<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>受監督、以本機為先<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>的瀏覽器自動化能力層。此立場刻意採取保守設計：</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">16,18</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Opt-out per origin.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> The shipped default is Auto for non-denied origins, with per-origin Off / Ask / Auto controls. The user can opt any origin out, and can set the global default to Off to restore strict opt-in behavior.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>依來源選擇退出（opt-out）。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>出廠預設值為「非拒絕來源皆為 Auto」，並提供依來源設定的 Off／Ask／Auto 控制項。使用者可將任一來源設為選擇退出，亦可將全域預設值設為 Off，以恢復嚴格的選擇加入（opt-in）行為。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">18,19</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Local execution.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Automation runs in the user&apos;s own authenticated browser session. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> does not proxy a user&apos;s credentials to any server and does not replay captured credentials off-device.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>本機執行。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>自動化作業於使用者自身已驗證的瀏覽器工作階段中執行。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 不會將使用者憑證代理傳送至任何伺服器，亦不會將擷取到的憑證在裝置外重放使用。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">19,20</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Respect site Terms of Service.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is a general-purpose automation tool; the operator is responsible for using it within the Terms of Service of the sites they automate. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ships a service policy file (below) that currently hard-denies <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and classifies additional sensitive categories for mutating-write gating and audit visibility.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>遵守網站服務條款。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 是一項通用型自動化工具；操作者須負責在其自動化操作的網站服務條款範圍內使用本工具。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 隨附一份服務政策檔案（詳見下文），目前已硬性拒絕 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>，並將其他敏感類別分類納入變更寫入型管控與稽核可見性範圍。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">20,21</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.4" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>No code fetched as data.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Recipes are closed-vocabulary JSON data, not code. The recipe interpreter is dynamic-code-free, and server-delivered or learned recipes (a future capability) must pass cryptographic signature verification before they can bind to a credentialed call.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>不以程式碼作為資料擷取。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>配方（Recipe）為封閉詞彙集的 JSON 資料，並非程式碼。配方直譯器不含任何動態程式碼執行機制；由伺服器提供或經學習取得的配方（未來能力）必須先通過加密簽章驗證，才能繫結至具憑證的呼叫。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">21,24</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.title" datatype="html">
+        <source>Consent Model</source>
+        <target state="translated">同意機制模型</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">25,26</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.intro" datatype="html">
+        <source>Consent is enforced at a single dispatch chokepoint (one gate, both front doors), immediately after the existing ownership gate. The shipped posture is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>opt-out (&quot;fully open&quot;)<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: a global default mode applies to every origin the user has not explicitly configured, and the user opts individual origins <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>out<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. The global default ships as <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> and is user-configurable (Off / Ask / Auto) under Advanced Settings → Consent &amp; Audit → &quot;Default for New Sites&quot;.</source>
+        <target state="translated">同意機制於單一分派瓶頸點（一道閘門，涵蓋兩個前門入口）強制執行，緊接於既有的擁有權閘門之後。出廠立場為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>選擇退出（「完全開放」）<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：全域預設模式適用於使用者尚未明確設定的每個來源，而使用者則針對個別來源選擇<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>退出<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>。全域預設值出廠設定為 <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>，且使用者可於「進階設定 → 同意與稽核 →「新網站的預設值」」中自行設定（Off／Ask／Auto）。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">26,28</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.header.mode" datatype="html">
+        <source>Mode</source>
+        <target state="translated">模式</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">32,33</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.header.behavior" datatype="html">
+        <source>Behavior</source>
+        <target state="translated">行為</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">33,37</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.auto.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (shipped default)</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>（出廠預設值）</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">38,39</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.auto.behavior" datatype="html">
+        <source>Capability invocations run without per-call prompting, including reads <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>and<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> writes, against any non-denylisted origin, except that a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write to a sensitive origin<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04; see the Categorization Axes below). Reads, and writes to non-sensitive origins, run freely under Auto.</source>
+        <target state="translated">能力呼叫在不逐次提示的情況下執行，涵蓋讀取<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>及<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>寫入操作，適用於任何未列入拒絕清單的來源；唯一例外是<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>對敏感來源的寫入<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>會在呼叫閘門重新強制執行依來源之變更寫入選擇加入機制（立場 B／DENY-04；詳見下方的分類軸線）。讀取操作，以及對非敏感來源的寫入操作，在 Auto 模式下皆可自由執行。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">39,40</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.ask.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Ask<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Ask<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">42,43</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.ask.behavior" datatype="html">
+        <source>Each invocation surfaces a pending request out-of-band (control panel + a badge) for the user to grant; nothing runs until granted. There is no blocking in-page modal mid-invocation.</source>
+        <target state="translated">每次呼叫皆會於頁面外（控制面板 + 徽章提示）顯示一筆待處理請求，供使用者核准；未經核准前不會執行任何操作。過程中不會出現封鎖頁面的彈出視窗。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">43,46</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.off.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">46,47</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.off.behavior" datatype="html">
+        <source>Nothing runs against the origin. Capability invocations return a typed consent-required reason. Set an individual origin to Off to opt it out, or set the global default to Off to restore strict opt-in.</source>
+        <target state="translated">不會對該來源執行任何操作。能力呼叫會回傳一組具型別的「需要同意」原因。將個別來源設為 Off 即可使其選擇退出，或將全域預設值設為 Off 以恢復嚴格的選擇加入機制。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">47,51</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.additionalIntro" datatype="html">
+        <source>Additional consent rules:</source>
+        <target state="translated">其他同意規則：</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">53,55</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Denylist is the one hard block.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> A denylisted origin is non-enableable regardless of the global default or any per-origin policy. The current hard denylist is intentionally narrow: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. The denylist is consulted <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>first<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>, before the consent mode.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>拒絕清單是唯一的硬性封鎖機制。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>不論全域預設值或任何依來源政策為何，列於拒絕清單中的來源皆無法啟用。目前的硬性拒絕清單刻意維持極小範圍：<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。拒絕清單會<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>優先<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>被查核，早於同意模式之前。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">55,56</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Per-origin opt-out.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Every origin <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> acts on is listed in the control panel (sourced from the audit trail) so the user can set it to Off (or Ask) at any time. An explicit per-origin policy overrides the global default.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>依來源選擇退出。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 所操作的每一個來源皆會列示於控制面板中（資料來源為稽核軌跡），使用者可隨時將其設為 Off（或 Ask）。明確的依來源政策設定會覆蓋全域預設值。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">56,57</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Writes to non-sensitive origins are allowed under Auto.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Under the opt-out posture, for a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>non-sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> origin read-Auto implies write-Auto: side-effecting invocations (POST/PUT/PATCH/DELETE) run without a separate elevated opt-in, and the per-origin mutating flag is inert at the invoke gate. A <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write to a sensitive origin is the exception<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: it re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04), so the mutating flag IS consulted there for sensitive origins (see the Categorization Axes section). Reads run under Auto everywhere.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>在 Auto 模式下，允許對非敏感來源進行寫入。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>在選擇退出立場下，對於<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>非敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>來源而言，讀取為 Auto 即隱含寫入亦為 Auto：具副作用的呼叫（POST／PUT／PATCH／DELETE）無需另行提升層級的選擇加入即可執行，且依來源設定的變更寫入旗標於呼叫閘門處為無效狀態。<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>對敏感來源的寫入為例外情形<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：其會在呼叫閘門重新強制執行依來源之變更寫入選擇加入機制（立場 B／DENY-04），因此針對敏感來源，該變更寫入旗標「確實」會於此處被查核（詳見分類軸線章節）。讀取操作在任何情況下皆於 Auto 模式下執行。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">57,58</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.4" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Sensitive-origin writes are re-gated at the invoke gate; reads are not.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Origins classified as <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (banking, primary email, government, and the payments / budgeting / social / messaging categories below) run <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>reads<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> under Auto, but a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> re-enforces the per-origin mutating opt-in at the capability <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>invoke<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> gate (posture B / DENY-04) before it is permitted. In addition, the more invasive <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>network-capture discovery<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> path keeps its own, broader explicit confirmation for sensitive origins. (Sensitive writes are NOT ungated under Auto: the invoke gate re-applies the mutating opt-in for them.)</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感來源的寫入操作會在呼叫閘門重新受管控；讀取操作則不會。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>被分類為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>的來源（銀行、主要電子郵件、政府機關，以及下方之支付／預算／社群／通訊類別）在 Auto 模式下可執行<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>讀取<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>操作，但<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>寫入<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>操作會在能力<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>呼叫<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>閘門處重新強制執行依來源之變更寫入選擇加入機制（立場 B／DENY-04），方能獲准執行。此外，較具侵入性的<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>網路擷取探索<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>路徑，針對敏感來源仍保留其自身、範圍更廣的明確確認機制。（敏感來源之寫入操作在 Auto 模式下並「非」不受管控：呼叫閘門會針對其重新套用變更寫入選擇加入機制。）</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">58,59</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.5" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Reverting to opt-in.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Setting the global default to <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> restores the strict opt-in posture: nothing runs against an origin until the user enables it.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>恢復為選擇加入。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>將全域預設值設為 <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> 可恢復嚴格的選擇加入立場：在使用者啟用該來源之前，不會對其執行任何操作。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">59,62</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.callout.body" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Security note:<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> under the shipped Auto default, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> can call a non-denylisted site&apos;s authenticated web API using the browser&apos;s logged-in session, without a per-site prompt: reads everywhere, and writes to non-sensitive origins. A write to a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> origin is re-gated at the invoke gate (it re-enforces the per-origin mutating opt-in; posture B / DENY-04). This is a deliberate, user-configurable posture; the denylist, the per-origin and global opt-out, the sensitive-write re-gate, the active-tab origin pin, the fail-closed degradation path, and the append-only audit trail remain in force.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>安全性提示：<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>在出廠的 Auto 預設設定下，<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 可利用瀏覽器已登入的工作階段，呼叫未列入拒絕清單網站的已驗證 Web API，且無需逐站提示：任何地方皆可讀取，並可對非敏感來源進行寫入。對<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>來源的寫入操作會在呼叫閘門重新受管控（重新強制執行依來源之變更寫入選擇加入機制；立場 B／DENY-04）。此為刻意設計、且使用者可自行設定的立場；拒絕清單、依來源與全域的選擇退出機制、敏感寫入的重新管控機制、使用中分頁的來源鎖定、故障時預設關閉的降級路徑，以及僅可附加寫入的稽核軌跡，皆持續有效。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">63,66</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.title" datatype="html">
+        <source>Audit Log</source>
+        <target state="translated">稽核記錄</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">67,68</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.intro" datatype="html">
+        <source>Every capability invocation is recorded in an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>append-only, secret-free<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> audit log so the operator can review what ran.</source>
+        <target state="translated">每一次能力呼叫皆會記錄於一份<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>僅可附加、不含機密資料<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>的稽核記錄中，使操作者得以檢視已執行的操作內容。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">68,70</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.recordedFields.title" datatype="html">
+        <source>Recorded fields</source>
+        <target state="translated">記錄欄位</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">70,71</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.recordedFields.body" datatype="html">
+        <source>The audit entry schema is, by construction, free of secrets and request payloads:</source>
+        <target state="translated">稽核項目結構在設計上即不含機密資料與請求酬載：</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">71,72</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.neverRecorded.title" datatype="html">
+        <source>What is never recorded</source>
+        <target state="translated">絕不記錄的內容</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">75,76</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.neverRecorded.body" datatype="html">
+        <source>The audit log <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>never<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> stores invocation arguments, request or response bodies, cookies, tokens, CSRF values, bearer credentials, or any other authentication material. Auth material never leaves the device and is never persisted. Every recorded field additionally passes through a shape-only redactor before persistence (URLs are reduced to their origin; strings to a shape descriptor; errors to name and message only). A test asserts that no authentication substring survives in the persisted log.</source>
+        <target state="translated">稽核記錄<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>絕不<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>儲存呼叫參數、請求或回應內容、Cookie、權杖（token）、CSRF 值、持有者憑證（bearer credentials），或任何其他驗證相關資料。驗證相關資料絕不會離開裝置，也絕不會被持久化保存。每個記錄欄位在儲存前皆會額外通過僅保留形狀資訊的遮蔽處理（URL 會化簡為其來源；字串會化簡為形狀描述子；錯誤僅保留名稱與訊息）。有一項測試會斷言，已持久化的記錄中不會殘留任何驗證相關子字串。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">76,78</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.retention.title" datatype="html">
+        <source>Retention</source>
+        <target state="translated">保留政策</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">78,79</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.retention.body" datatype="html">
+        <source>The audit log is a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>bounded ring buffer<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: the most recent entries are retained and older entries are trimmed automatically (FIFO). The user has an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>export and clear<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> control to export the current log and clear it on demand. The log is secret-free by construction; encryption at rest is therefore unnecessary and is out of scope. Long-term archival and deeper retention tooling are intentionally deferred; the bounded ring plus export/clear is the Phase-30 retention policy.</source>
+        <target state="translated">稽核記錄採用<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>有限容量環狀緩衝區<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：僅保留最近的項目，較舊的項目會自動修剪（先進先出）。使用者可使用<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>匯出與清除<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>控制項，隨時匯出目前的記錄並將其清除。由於記錄在設計上即不含機密資料，靜態加密因此並非必要，亦不在本文件範圍內。長期封存與更深入的保留工具刻意予以延後處理；有限容量環狀緩衝區搭配匯出／清除功能，即為 Phase 30 的保留政策。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">79,81</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.title" datatype="html">
+        <source>Service Denylist</source>
+        <target state="translated">服務拒絕清單</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">82,83</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.intro" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ships a conservative service denylist at <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>extension/config/service-denylist.json<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>, loaded at service-worker startup and consulted before per-origin consent. It is the single source of truth for whether an origin is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>denied<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> or <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 隨附一份保守的服務拒絕清單，位於 <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>extension/config/service-denylist.json<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>，於服務工作執行緒（service-worker）啟動時載入，並於依來源同意查核之前被查詢。此檔案是判斷某一來源是否<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>遭拒絕<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>或<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>屬敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>的唯一真實來源。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">83,85</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.li.1" datatype="html">
+        <source><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>deniedOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: the hard block list. Current runtime policy intentionally narrows this to <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. A denylisted origin is rendered non-enableable: the consent gate blocks it even if a stored policy says Auto, and the control panel greys it out with the documented reason.</source>
+        <target state="translated"><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>deniedOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>：硬性封鎖清單。目前的執行期政策刻意將此清單縮限為 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。列於拒絕清單中的來源會被呈現為無法啟用狀態：即使已儲存的政策設定為 Auto，同意閘門仍會將其封鎖，且控制面板會將其顯示為灰階並附上明確理由說明。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">85,86</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.li.2" datatype="html">
+        <source><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>sensitiveOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: allowed-but-governed origins. This includes banking, government, primary email, brokerage / trading, payments, money movement, social, messaging, media, AI-chat, commerce, travel, and other categories that require mutating-write gating and audit visibility but are not hard-denied.</source>
+        <target state="translated"><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>sensitiveOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>：允許使用但受治理管控的來源。此類別涵蓋銀行、政府機關、主要電子郵件、證券／交易經紀、支付、資金移轉、社群、通訊、媒體、AI 聊天、電子商務、旅遊，以及其他需要變更寫入型管控與稽核可見性、但未遭硬性拒絕的類別。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">86,88</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.outro" datatype="html">
+        <source>The service policy is conservative without being an aggressive broad blocklist, and it is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>user-extensible<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. Host patterns use a <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>https://*.&lt;domain&gt;<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> subdomain-wildcard form (matching the apex and any subdomain) or an exact origin. A comprehensive, per-service legal review is ongoing; the policy file establishes the mechanism and the current default posture.</source>
+        <target state="translated">此服務政策採取保守設計，但並非採取激進的大範圍封鎖策略，且具備<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>使用者可擴充性<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>。主機比對樣式採用 <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>https://*.&lt;domain&gt;<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> 子網域萬用字元形式（比對頂層網域及其任何子網域），或採用精確來源比對。目前正持續進行全面性、逐服務的法律審查；本政策檔案所建立的是機制本身與目前的預設立場。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">88,90</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.title" datatype="html">
+        <source>Categorization Axes</source>
+        <target state="translated">分類軸線</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">90,91</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.intro" datatype="html">
+        <source>An origin&apos;s classification is decided along <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>three distinct criteria<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. These axes are independent: an origin can be hard-denied, allowed-but-sensitive, or safe. <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>service-denylist.js classify(origin)<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> is the single source of truth that resolves an origin to denied / sensitive / safe.</source>
+        <target state="translated">一個來源的分類，係依<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>三項各自獨立的準則<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>決定。這些軸線彼此獨立：一個來源可能屬於硬性拒絕、允許使用但屬敏感，或屬安全。<x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>service-denylist.js classify(origin)<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> 是判斷來源為拒絕／敏感／安全的唯一真實來源。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">91,94</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Hard denial.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Hard-denied origins are non-enableable regardless of consent mode. The current runtime hard-denied roster is intentionally narrow: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>硬性拒絕。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>不論同意模式為何，遭硬性拒絕的來源皆無法啟用。目前執行期的硬性拒絕名單刻意維持極小範圍：<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">95,96</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.intro" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Sensitive governance (Ask / mutating-gated).<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Allowed-but-sensitive origins are not hard-denied. Reads run under Auto everywhere; a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> to a sensitive origin re-enforces the per-origin mutating opt-in (posture B / DENY-04) before it is permitted. This is where banking and government hosts, primary email, brokerage / trading (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>robinhood<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>fidelity<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>carta<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), payments and money movement, budgeting, social, messaging, media, and AI-chat origins sit. For example, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instagram<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>facebook<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tiktok<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> are sensitive, not denied; their reads remain available under Auto and their writes are gated. Payments (e.g. <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dashboard.stripe.com<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>, coinbase, twilio), Carta read-only portfolio/account data, budgeting (ynab), and messaging-app writes are classified on this axis as well.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感治理（Ask／變更寫入受管控）。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>允許使用但屬敏感的來源並未遭硬性拒絕。讀取操作在任何地方皆於 Auto 模式下執行；對敏感來源的<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>寫入<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>操作會重新強制執行依來源之變更寫入選擇加入機制（立場 B／DENY-04），方能獲准執行。銀行與政府機關主機、主要電子郵件、證券／交易經紀（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>robinhood<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>fidelity<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>carta<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>），支付與資金移轉、預算規劃、社群、通訊、媒體，以及 AI 聊天等來源，即屬於此分類。舉例而言，<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instagram<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>facebook<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tiktok<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 皆屬敏感，而非遭拒絕；其讀取功能在 Auto 模式下持續可用，其寫入功能則受管控。支付類服務（例如 <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dashboard.stripe.com<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>、coinbase、twilio）、Carta 唯讀投資組合／帳戶資料、預算規劃（ynab），以及通訊軟體的寫入操作，同樣依此軸線分類。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">98,99</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.sub.commsSocial" datatype="html">
+        <source>The <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>comms / social / content<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> import batch extends this axis. The AI-chat apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chatgpt<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>claude<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) and the microblog / fediverse social apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bluesky<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>mastodon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>threads<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are classified <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: their reads run under Auto, their writes (post / send / publish) re-enforce the per-origin mutating opt-in. This is the <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>conservative default<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> for the category: an unknown social / AI app defaults toward LESS reach, because a mis-classification that read as &quot;safe&quot; would make the app writable-under-Auto (able to post or message on someone&apos;s account). These hosts contain no generic category keyword the import-time heuristic flags, so they are classified explicitly on this axis rather than relying on the heuristic to catch them. The <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>discord<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> messaging origin remains sensitive (writes mutating-gated). Media and social origins such as <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>spotify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>twitch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>steam<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube-music<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tinder<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> are sensitive, not denied; their writes are gated and guarded as applicable. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> remain hard-denied.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>通訊／社群／內容<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>匯入批次延伸了此一軸線。AI 聊天應用程式（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chatgpt<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>claude<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>）與微網誌／聯邦宇宙（fediverse）社群應用程式（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bluesky<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>mastodon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>threads<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>）皆分類為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：其讀取操作於 Auto 模式下執行，其寫入操作（發文／傳送／發布）則會重新強制執行依來源之變更寫入選擇加入機制。這是該類別的<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>保守預設值<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：未知的社群／AI 應用程式預設朝向較低的觸及範圍，因為若誤將其分類為「安全」，將導致該應用程式在 Auto 模式下即可被寫入（能夠以他人帳號發文或傳送訊息）。這些主機不含匯入時期啟發式規則所偵測的通用類別關鍵字，因此改依此軸線明確分類，而非仰賴該啟發式規則加以攔截。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>discord<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 通訊來源仍維持敏感分類（寫入操作受變更寫入管控）。媒體與社群類來源，如 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>spotify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>twitch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>steam<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube-music<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tinder<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>，皆屬敏感而非遭拒絕；其寫入操作依適用情形受管控與防護。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 與 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 則仍維持硬性拒絕。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">99,100</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.sub.domOnly" datatype="html">
+        <source>Independent of this axis, every comms / social / content descriptor the batch imports is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>DOM-only<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (the conservative backing default): it is surfaced as a discovery-pending hit, never a confident API-invocable hit, and is never learn-seeded, so a ToS-hostile or AI-chat app is never auto-driven through a fabricated API call from guessed auth.</source>
+        <target state="translated">與此軸線無關，此批次匯入的每一項通訊／社群／內容描述子皆為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>僅限 DOM<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>（此為保守的後備預設值）：其會被呈現為「探索待處理」命中結果，絕不會呈現為可信賴、可透過 API 呼叫的命中結果，也絕不會作為學習種子使用，因此對服務條款不友善或 AI 聊天類應用程式，絕不會透過猜測所得的驗證資料，被虛構出的 API 呼叫自動驅動執行。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">100,102</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.intro" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Payment / money-movement classification (the commerce / travel / misc batch).<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> The most-sensitive import batch is screened along a payment dimension layered onto these three axes, because <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>a payment-bearing op writable under Auto = money moved without consent<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (an order placed, a card charged, a paid reservation booked). The classification follows the money:</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>支付／資金移轉分類（電子商務／旅遊／其他批次）。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>敏感程度最高的匯入批次，會依附加於前述三項軸線之上的支付維度加以審查，因為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>在 Auto 模式下可寫入的支付相關操作，即等同於未經同意即完成資金移轉<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>（下單購買、刷卡扣款、完成付費訂位）。此分類方式依循資金流向而定：</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">103,105</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Payment-bearing commerce / travel / paid-booking origins → sensitive.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Food delivery and rideshare (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>doordash<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ubereats<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>uber<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>lyft<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grubhub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instacart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dominos<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chipotle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), retail / marketplace checkout (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>amazon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ebay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>etsy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bestbuy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>costco<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>walmart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>target<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>craigslist<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>shopify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), and travel / transport paid bookings (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>booking<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>airbnb<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>expedia<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>kayak<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are classified <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: their reads run under Auto, their writes (place-order / checkout / book) re-enforce the per-origin mutating opt-in (posture B). This is the <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>conservative default<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> for the category: an unknown commerce / payment app defaults toward LESS reach (sensitive, never safe-writable). <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is sensitive <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>unconditionally<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> reservation holds a card, so a held-card / paid reservation is payment-adjacent even when no &quot;checkout&quot; op is present.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>涉及支付的電子商務／旅遊／付費訂位來源 → 敏感。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>外送與共乘服務（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>doordash<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ubereats<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>uber<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>lyft<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grubhub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instacart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dominos<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chipotle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>），零售／商城結帳（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>amazon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ebay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>etsy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bestbuy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>costco<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>walmart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>target<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>craigslist<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>shopify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>），以及旅遊／交通類付費訂位服務（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>booking<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>airbnb<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>expedia<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>kayak<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>），皆分類為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：其讀取操作於 Auto 模式下執行，其寫入操作（下單／結帳／訂位）則會重新強制執行依來源之變更寫入選擇加入機制（立場 B）。這是該類別的<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>保守預設值<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>：未知的電子商務／支付類應用程式預設朝向較低的觸及範圍（歸類為敏感，絕不視為可安全寫入）。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 為<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>無條件<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>敏感：由於 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的訂位會預先持卡擔保，即使沒有「結帳」操作存在，持卡擔保／付費訂位本身即與支付行為相關聯。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">105,106</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Pure money-movement apps → sensitive.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Standalone peer-to-peer money-transfer / wallet apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>paypal<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>venmo<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>cash app<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>wise<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>western union<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are sensitive, not hard-denied. Reads are allowed under Auto; mutating actions are gated by the sensitive-origin write path and by the payment-op guard.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>純資金移轉類應用程式 → 敏感。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>獨立的點對點轉帳／電子錢包應用程式（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>paypal<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>venmo<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>cash app<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>wise<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>western union<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>）屬敏感，而非硬性拒絕。讀取操作於 Auto 模式下獲准執行；變更寫入類操作則受敏感來源寫入路徑及支付操作防護機制雙重管控。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">106,107</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Read-only commerce browsing → safe.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Pure-availability or read-only apps whose vendored ops are all reads (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>calendly<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> availability links, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>yelp<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> / <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tripadvisor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> business search, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>zillow<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> listings, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grafana<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> dashboards) stay <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>safe<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (unclassified, reads run under Auto). The import-time heuristic&apos;s payment tokens are deliberately SPECIFIC (checkout / cart / place-order / charge, NOT a bare order / book / reserve) so a benign commerce read is not false-tripped; a safe commerce origin is added to the read-only-safe invariant set ONLY when its emitted ops are verified read-only.</source>
+        <target state="translated"><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>純瀏覽型電子商務 → 安全。<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>其內建操作皆為純讀取的純查詢或唯讀應用程式（<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>calendly<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 可預約時段連結、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>yelp<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>／<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tripadvisor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 商家搜尋、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>zillow<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 物件列表、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grafana<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 儀表板），仍維持<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>安全<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>分類（未分類狀態，讀取操作於 Auto 模式下執行）。匯入時期啟發式規則所使用的支付相關關鍵詞刻意採取精確定義（checkout／cart／place-order／charge，而非籠統的 order／book／reserve），以避免良性的電子商務讀取操作遭誤判；一個電子商務來源，唯有在其所發出的操作經驗證確實為純讀取時，才會被加入唯讀安全不變集合中。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">107,108</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.outro" datatype="html">
+        <source>What makes <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>money-movement-under-Auto impossible<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> is the payment-origin gate, established for this batch before any payment descriptor lands: (a) payment origins are <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (posture-B gated); (b) an import-time <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>payment-op CI guard<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> fails the build if any payment-bearing op (checkout / pay / place_order / charge / complete_booking / buy_tickets / book_flight / request_ride / place_bid / create_order / ...) is ever classified on an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ungated origin<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. A payment write therefore can only flow on a sensitive origin, where the per-origin mutating opt-in re-gates it, or not ship at all.</source>
+        <target state="translated">使<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>在 Auto 模式下移轉資金成為不可能<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>的機制，是在任何支付相關描述子加入之前，即為此批次建立的支付來源閘門：(a) 支付類來源皆屬<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>敏感<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>（受立場 B 管控）；(b) 一項匯入時期的<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>支付操作 CI 防護機制<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>會在任何涉及支付的操作（checkout／pay／place_order／charge／complete_booking／buy_tickets／book_flight／request_ride／place_bid／create_order／……）被分類於<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>未受管控來源<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>時，使建置失敗。因此，支付類寫入操作只能在敏感來源上流動（由依來源之變更寫入選擇加入機制重新加以管控），否則便無法出貨上線。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">109,111</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.closing" datatype="html">
+        <source>The hard-denial axis makes an origin non-enableable; the sensitivity axes keep an origin usable but re-apply write-time friction. An import-time classification gate fails the build if a sensitivity-suspect origin is left unclassified, so a gap in the classification can never silently read as &quot;allow&quot;.</source>
+        <target state="translated">硬性拒絕軸線使一個來源無法啟用；敏感性軸線則使來源維持可用狀態，但重新套用寫入時的管控摩擦。若某一具敏感疑慮的來源未經分類，匯入時期的分類閘門會使建置失敗，因此分類上的缺漏絕不可能被默默視為「允許」。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">113,116</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.title" datatype="html">
+        <source>Recipe Integrity (Signature Verification)</source>
+        <target state="translated">配方完整性（簽章驗證）</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">116,117</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.body.1" datatype="html">
+        <source>Server-delivered and learned recipes (a future capability) are untrusted data and must be <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>signature-verified<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> before they can bind to a credentialed call. Verification uses <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> over the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RFC-8785<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> JCS canonical form of the recipe provenance envelope, performed inside the interpreter after schema validation and before binding. A tampered or unsigned non-bundled recipe is rejected with a typed <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RECIPE_SIGNATURE_INVALID<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> reason. Verification fails closed: if the platform cannot perform <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> verification, a non-bundled recipe is rejected rather than trusted.</source>
+        <target state="translated">由伺服器提供及經學習取得的配方（未來能力）皆屬不受信任的資料，必須先經過<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>簽章驗證<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>，才能繫結至具憑證的呼叫。驗證機制係針對配方來源信封（provenance envelope）之 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RFC-8785<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> JCS 標準化形式，使用 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 進行驗證，於直譯器內部、在結構描述驗證之後、繫結之前執行。遭竄改或未簽章的非隨附配方，會被回報一個具型別的 <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RECIPE_SIGNATURE_INVALID<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> 原因並遭拒絕。驗證機制採故障時預設關閉：若平台無法執行 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 驗證，非隨附配方將遭拒絕，而非被逕予信任。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">117,118</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.body.2" datatype="html">
+        <source>First-party bundled recipes (shipped and reviewed with the extension) are trusted-by-provenance and exempt from the verify gate, so the bundled capability head is unaffected. The trusted public key ships in the extension bundle; it is never fetched remotely. The private signing key is offline.</source>
+        <target state="translated">第一方隨附配方（隨擴充功能一併出貨並經審查）屬依來源即受信任，並豁免於驗證閘門之外，因此隨附的能力主體不受影響。受信任的公開金鑰隨擴充功能包一併出貨；絕不會透過遠端擷取取得。私密簽章金鑰則離線保存。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">118,121</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.contact.title" datatype="html">
+        <source>Contact</source>
+        <target state="translated">聯絡我們</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">121,122</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.contact.body" datatype="html">
+        <source>For questions about this posture or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s data handling, open an issue on the project&apos;s <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> repository.</source>
+        <target state="translated">如對本立場或 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的資料處理方式有任何疑問，請於本專案的 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 儲存庫中開啟一則議題（issue）。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">122,125</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.meta.title" datatype="html">
+        <source>FSB - Legal and Governance Posture</source>
+        <target state="translated">FSB - 法律與治理立場</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
+          <context context-type="linenumber">19</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.meta.description" datatype="html">
+        <source>FSB&apos;s automation posture, consent model, audit-log retention policy, and service-denylist rationale.</source>
+        <target state="translated">FSB 的自動化立場、同意機制模型、稽核記錄保留政策，以及服務拒絕清單的理由依據。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
+          <context context-type="linenumber">20</context>
+        </context-group>
+      </trans-unit>
     </body>
   </file>
 </xliff>

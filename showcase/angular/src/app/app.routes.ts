@@ -12,5 +12,6 @@ export const routes: Routes = [
   { path: 'phantom-stream', loadComponent: () => import('./pages/phantom-stream/phantom-stream-page.component').then(m => m.PhantomStreamPageComponent), data: { shellless: true } },
   { path: 'prometheus', loadComponent: () => import('./pages/prometheus/prometheus-page.component').then(m => m.PrometheusPageComponent), data: { shellless: true } },
   { path: 'sitemaps', loadComponent: () => import('./pages/sitemaps/sitemaps-page.component').then(m => m.SiteMapsPageComponent) },
+  { path: 'legal', loadComponent: () => import('./pages/legal/legal-page.component').then(m => m.LegalPageComponent) },
   { path: '**', redirectTo: '' },
 ];

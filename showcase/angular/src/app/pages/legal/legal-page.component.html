@@ -1,0 +1,125 @@
+<main class="legal-page">
+  <div class="container">
+    <div class="legal-header">
+      <div class="section-label" i18n="@@legal.header.kicker">Legal</div>
+      <h1 i18n="@@legal.header.title">FSB Legal and Governance Posture</h1>
+      <p class="legal-last-updated" i18n="@@legal.header.updated">Last updated: July 2026</p>
+    </div>
+
+    <div class="legal-content">
+
+      <p i18n="@@legal.header.intro">This document records <span [attr.translate]="'no'">FSB</span>'s legal/Terms-of-Service posture, its consent model, the audit-log retention policy, and the service-denylist rationale. It is the human-readable companion to the runtime controls shipped in Phase 30 (consent governance, recipe signature verification, the no-secrets audit log, and the service denylist).</p>
+      <p i18n="@@legal.header.scopeNote">Scope note: this is an engineering governance document, not legal advice. It describes how <span [attr.translate]="'no'">FSB</span> is built to behave and the boundaries it enforces.</p>
+
+      <!-- Automation Posture -->
+      <h2 i18n="@@legal.section.automationPosture.title">Automation Posture</h2>
+      <p i18n="@@legal.section.automationPosture.intro"><span [attr.translate]="'no'">FSB</span> (<span [attr.translate]="'no'">Full Self-Browsing</span>) is a <strong>supervised, local-first</strong> browser-automation capability layer. The posture is deliberately conservative:</p>
+      <ul>
+        <li i18n="@@legal.section.automationPosture.li.1"><strong>Opt-out per origin.</strong> The shipped default is Auto for non-denied origins, with per-origin Off / Ask / Auto controls. The user can opt any origin out, and can set the global default to Off to restore strict opt-in behavior.</li>
+        <li i18n="@@legal.section.automationPosture.li.2"><strong>Local execution.</strong> Automation runs in the user's own authenticated browser session. <span [attr.translate]="'no'">FSB</span> does not proxy a user's credentials to any server and does not replay captured credentials off-device.</li>
+        <li i18n="@@legal.section.automationPosture.li.3"><strong>Respect site Terms of Service.</strong> <span [attr.translate]="'no'">FSB</span> is a general-purpose automation tool; the operator is responsible for using it within the Terms of Service of the sites they automate. <span [attr.translate]="'no'">FSB</span> ships a service policy file (below) that currently hard-denies <span [attr.translate]="'no'">Netflix</span> and <span [attr.translate]="'no'">OnlyFans</span>, and classifies additional sensitive categories for mutating-write gating and audit visibility.</li>
+        <li i18n="@@legal.section.automationPosture.li.4"><strong>No code fetched as data.</strong> Recipes are closed-vocabulary JSON data, not code. The recipe interpreter is dynamic-code-free, and server-delivered or learned recipes (a future capability) must pass cryptographic signature verification before they can bind to a credentialed call.</li>
+      </ul>
+
+      <!-- Consent Model -->
+      <h2 i18n="@@legal.section.consentModel.title">Consent Model</h2>
+      <p i18n="@@legal.section.consentModel.intro">Consent is enforced at a single dispatch chokepoint (one gate, both front doors), immediately after the existing ownership gate. The shipped posture is <strong>opt-out ("fully open")</strong>: a global default mode applies to every origin the user has not explicitly configured, and the user opts individual origins <strong>out</strong>. The global default ships as <strong>Auto</strong> and is user-configurable (Off / Ask / Auto) under Advanced Settings &rarr; Consent &amp; Audit &rarr; "Default for New Sites".</p>
+
+      <div class="legal-table-wrap">
+        <table class="legal-table">
+          <thead>
+            <tr>
+              <th i18n="@@legal.section.consentModel.table.header.mode">Mode</th>
+              <th i18n="@@legal.section.consentModel.table.header.behavior">Behavior</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td i18n="@@legal.section.consentModel.table.auto.mode"><strong>Auto</strong> (shipped default)</td>
+              <td i18n="@@legal.section.consentModel.table.auto.behavior">Capability invocations run without per-call prompting, including reads <strong>and</strong> writes, against any non-denylisted origin, except that a <strong>write to a sensitive origin</strong> re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04; see the Categorization Axes below). Reads, and writes to non-sensitive origins, run freely under Auto.</td>
+            </tr>
+            <tr>
+              <td i18n="@@legal.section.consentModel.table.ask.mode"><strong>Ask</strong></td>
+              <td i18n="@@legal.section.consentModel.table.ask.behavior">Each invocation surfaces a pending request out-of-band (control panel + a badge) for the user to grant; nothing runs until granted. There is no blocking in-page modal mid-invocation.</td>
+            </tr>
+            <tr>
+              <td i18n="@@legal.section.consentModel.table.off.mode"><strong>Off</strong></td>
+              <td i18n="@@legal.section.consentModel.table.off.behavior">Nothing runs against the origin. Capability invocations return a typed consent-required reason. Set an individual origin to Off to opt it out, or set the global default to Off to restore strict opt-in.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p i18n="@@legal.section.consentModel.additionalIntro">Additional consent rules:</p>
+      <ul>
+        <li i18n="@@legal.section.consentModel.li.1"><strong>Denylist is the one hard block.</strong> A denylisted origin is non-enableable regardless of the global default or any per-origin policy. The current hard denylist is intentionally narrow: <span [attr.translate]="'no'">Netflix</span> and <span [attr.translate]="'no'">OnlyFans</span>. The denylist is consulted <strong>first</strong>, before the consent mode.</li>
+        <li i18n="@@legal.section.consentModel.li.2"><strong>Per-origin opt-out.</strong> Every origin <span [attr.translate]="'no'">FSB</span> acts on is listed in the control panel (sourced from the audit trail) so the user can set it to Off (or Ask) at any time. An explicit per-origin policy overrides the global default.</li>
+        <li i18n="@@legal.section.consentModel.li.3"><strong>Writes to non-sensitive origins are allowed under Auto.</strong> Under the opt-out posture, for a <strong>non-sensitive</strong> origin read-Auto implies write-Auto: side-effecting invocations (POST/PUT/PATCH/DELETE) run without a separate elevated opt-in, and the per-origin mutating flag is inert at the invoke gate. A <strong>write to a sensitive origin is the exception</strong>: it re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04), so the mutating flag IS consulted there for sensitive origins (see the Categorization Axes section). Reads run under Auto everywhere.</li>
+        <li i18n="@@legal.section.consentModel.li.4"><strong>Sensitive-origin writes are re-gated at the invoke gate; reads are not.</strong> Origins classified as <strong>sensitive</strong> (banking, primary email, government, and the payments / budgeting / social / messaging categories below) run <strong>reads</strong> under Auto, but a <strong>write</strong> re-enforces the per-origin mutating opt-in at the capability <strong>invoke</strong> gate (posture B / DENY-04) before it is permitted. In addition, the more invasive <strong>network-capture discovery</strong> path keeps its own, broader explicit confirmation for sensitive origins. (Sensitive writes are NOT ungated under Auto: the invoke gate re-applies the mutating opt-in for them.)</li>
+        <li i18n="@@legal.section.consentModel.li.5"><strong>Reverting to opt-in.</strong> Setting the global default to <strong>Off</strong> restores the strict opt-in posture: nothing runs against an origin until the user enables it.</li>
+      </ul>
+
+      <div class="legal-callout">
+        <p i18n="@@legal.section.consentModel.callout.body"><strong>Security note:</strong> under the shipped Auto default, <span [attr.translate]="'no'">FSB</span> can call a non-denylisted site's authenticated web API using the browser's logged-in session, without a per-site prompt: reads everywhere, and writes to non-sensitive origins. A write to a <strong>sensitive</strong> origin is re-gated at the invoke gate (it re-enforces the per-origin mutating opt-in; posture B / DENY-04). This is a deliberate, user-configurable posture; the denylist, the per-origin and global opt-out, the sensitive-write re-gate, the active-tab origin pin, the fail-closed degradation path, and the append-only audit trail remain in force.</p>
+      </div>
+
+      <!-- Audit Log -->
+      <h2 i18n="@@legal.section.auditLog.title">Audit Log</h2>
+      <p i18n="@@legal.section.auditLog.intro">Every capability invocation is recorded in an <strong>append-only, secret-free</strong> audit log so the operator can review what ran.</p>
+
+      <h3 i18n="@@legal.section.auditLog.recordedFields.title">Recorded fields</h3>
+      <p i18n="@@legal.section.auditLog.recordedFields.body">The audit entry schema is, by construction, free of secrets and request payloads:</p>
+      <pre><code [attr.translate]="'no'">{{ auditSchema }}</code></pre>
+
+      <h3 i18n="@@legal.section.auditLog.neverRecorded.title">What is never recorded</h3>
+      <p i18n="@@legal.section.auditLog.neverRecorded.body">The audit log <strong>never</strong> stores invocation arguments, request or response bodies, cookies, tokens, CSRF values, bearer credentials, or any other authentication material. Auth material never leaves the device and is never persisted. Every recorded field additionally passes through a shape-only redactor before persistence (URLs are reduced to their origin; strings to a shape descriptor; errors to name and message only). A test asserts that no authentication substring survives in the persisted log.</p>
+
+      <h3 i18n="@@legal.section.auditLog.retention.title">Retention</h3>
+      <p i18n="@@legal.section.auditLog.retention.body">The audit log is a <strong>bounded ring buffer</strong>: the most recent entries are retained and older entries are trimmed automatically (FIFO). The user has an <strong>export and clear</strong> control to export the current log and clear it on demand. The log is secret-free by construction; encryption at rest is therefore unnecessary and is out of scope. Long-term archival and deeper retention tooling are intentionally deferred; the bounded ring plus export/clear is the Phase-30 retention policy.</p>
+
+      <!-- Service Denylist -->
+      <h2 i18n="@@legal.section.serviceDenylist.title">Service Denylist</h2>
+      <p i18n="@@legal.section.serviceDenylist.intro"><span [attr.translate]="'no'">FSB</span> ships a conservative service denylist at <code [attr.translate]="'no'">extension/config/service-denylist.json</code>, loaded at service-worker startup and consulted before per-origin consent. It is the single source of truth for whether an origin is <strong>denied</strong> or <strong>sensitive</strong>.</p>
+      <ul>
+        <li i18n="@@legal.section.serviceDenylist.li.1"><code [attr.translate]="'no'">deniedOrigins</code>: the hard block list. Current runtime policy intentionally narrows this to <span [attr.translate]="'no'">Netflix</span> and <span [attr.translate]="'no'">OnlyFans</span>. A denylisted origin is rendered non-enableable: the consent gate blocks it even if a stored policy says Auto, and the control panel greys it out with the documented reason.</li>
+        <li i18n="@@legal.section.serviceDenylist.li.2"><code [attr.translate]="'no'">sensitiveOrigins</code>: allowed-but-governed origins. This includes banking, government, primary email, brokerage / trading, payments, money movement, social, messaging, media, AI-chat, commerce, travel, and other categories that require mutating-write gating and audit visibility but are not hard-denied.</li>
+      </ul>
+      <p i18n="@@legal.section.serviceDenylist.outro">The service policy is conservative without being an aggressive broad blocklist, and it is <strong>user-extensible</strong>. Host patterns use a <code [attr.translate]="'no'">https://*.&lt;domain&gt;</code> subdomain-wildcard form (matching the apex and any subdomain) or an exact origin. A comprehensive, per-service legal review is ongoing; the policy file establishes the mechanism and the current default posture.</p>
+
+      <h3 i18n="@@legal.section.serviceDenylist.axes.title">Categorization Axes</h3>
+      <p i18n="@@legal.section.serviceDenylist.axes.intro">An origin's classification is decided along <strong>three distinct criteria</strong>. These axes are independent: an origin can be hard-denied, allowed-but-sensitive, or safe. <code [attr.translate]="'no'">service-denylist.js classify(origin)</code> is the single source of truth that resolves an origin to denied / sensitive / safe.</p>
+
+      <ol>
+        <li>
+          <p i18n="@@legal.section.serviceDenylist.axes.li.1"><strong>Hard denial.</strong> Hard-denied origins are non-enableable regardless of consent mode. The current runtime hard-denied roster is intentionally narrow: <span [attr.translate]="'no'">netflix</span> and <span [attr.translate]="'no'">onlyfans</span>.</p>
+        </li>
+        <li>
+          <p i18n="@@legal.section.serviceDenylist.axes.li.2.intro"><strong>Sensitive governance (Ask / mutating-gated).</strong> Allowed-but-sensitive origins are not hard-denied. Reads run under Auto everywhere; a <strong>write</strong> to a sensitive origin re-enforces the per-origin mutating opt-in (posture B / DENY-04) before it is permitted. This is where banking and government hosts, primary email, brokerage / trading (<span [attr.translate]="'no'">robinhood</span>, <span [attr.translate]="'no'">fidelity</span>, <span [attr.translate]="'no'">carta</span>), payments and money movement, budgeting, social, messaging, media, and AI-chat origins sit. For example, <span [attr.translate]="'no'">instagram</span>, <span [attr.translate]="'no'">facebook</span>, <span [attr.translate]="'no'">tiktok</span>, and <span [attr.translate]="'no'">x</span> are sensitive, not denied; their reads remain available under Auto and their writes are gated. Payments (e.g. <code [attr.translate]="'no'">dashboard.stripe.com</code>, coinbase, twilio), Carta read-only portfolio/account data, budgeting (ynab), and messaging-app writes are classified on this axis as well.</p>
+          <p i18n="@@legal.section.serviceDenylist.axes.li.2.sub.commsSocial">The <strong>comms / social / content</strong> import batch extends this axis. The AI-chat apps (<span [attr.translate]="'no'">chatgpt</span>, <span [attr.translate]="'no'">claude</span>) and the microblog / fediverse social apps (<span [attr.translate]="'no'">bluesky</span>, <span [attr.translate]="'no'">mastodon</span>, <span [attr.translate]="'no'">threads</span>) are classified <strong>sensitive</strong>: their reads run under Auto, their writes (post / send / publish) re-enforce the per-origin mutating opt-in. This is the <strong>conservative default</strong> for the category: an unknown social / AI app defaults toward LESS reach, because a mis-classification that read as "safe" would make the app writable-under-Auto (able to post or message on someone's account). These hosts contain no generic category keyword the import-time heuristic flags, so they are classified explicitly on this axis rather than relying on the heuristic to catch them. The <span [attr.translate]="'no'">discord</span> messaging origin remains sensitive (writes mutating-gated). Media and social origins such as <span [attr.translate]="'no'">spotify</span>, <span [attr.translate]="'no'">twitch</span>, <span [attr.translate]="'no'">steam</span>, <span [attr.translate]="'no'">youtube</span>, <span [attr.translate]="'no'">youtube-music</span>, and <span [attr.translate]="'no'">tinder</span> are sensitive, not denied; their writes are gated and guarded as applicable. <span [attr.translate]="'no'">netflix</span> and <span [attr.translate]="'no'">onlyfans</span> remain hard-denied.</p>
+          <p i18n="@@legal.section.serviceDenylist.axes.li.2.sub.domOnly">Independent of this axis, every comms / social / content descriptor the batch imports is <strong>DOM-only</strong> (the conservative backing default): it is surfaced as a discovery-pending hit, never a confident API-invocable hit, and is never learn-seeded, so a ToS-hostile or AI-chat app is never auto-driven through a fabricated API call from guessed auth.</p>
+        </li>
+        <li>
+          <p i18n="@@legal.section.serviceDenylist.axes.li.3.intro"><strong>Payment / money-movement classification (the commerce / travel / misc batch).</strong> The most-sensitive import batch is screened along a payment dimension layered onto these three axes, because <strong>a payment-bearing op writable under Auto = money moved without consent</strong> (an order placed, a card charged, a paid reservation booked). The classification follows the money:</p>
+          <ul>
+            <li i18n="@@legal.section.serviceDenylist.axes.li.3.sub.1"><strong>Payment-bearing commerce / travel / paid-booking origins &rarr; sensitive.</strong> Food delivery and rideshare (<span [attr.translate]="'no'">doordash</span>, <span [attr.translate]="'no'">ubereats</span>, <span [attr.translate]="'no'">uber</span>, <span [attr.translate]="'no'">lyft</span>, <span [attr.translate]="'no'">grubhub</span>, <span [attr.translate]="'no'">instacart</span>, <span [attr.translate]="'no'">dominos</span>, <span [attr.translate]="'no'">chipotle</span>), retail / marketplace checkout (<span [attr.translate]="'no'">amazon</span>, <span [attr.translate]="'no'">ebay</span>, <span [attr.translate]="'no'">etsy</span>, <span [attr.translate]="'no'">bestbuy</span>, <span [attr.translate]="'no'">costco</span>, <span [attr.translate]="'no'">walmart</span>, <span [attr.translate]="'no'">target</span>, <span [attr.translate]="'no'">craigslist</span>, <span [attr.translate]="'no'">shopify</span>), and travel / transport paid bookings (<span [attr.translate]="'no'">booking</span>, <span [attr.translate]="'no'">airbnb</span>, <span [attr.translate]="'no'">expedia</span>, <span [attr.translate]="'no'">kayak</span>, <span [attr.translate]="'no'">opentable</span>) are classified <strong>sensitive</strong>: their reads run under Auto, their writes (place-order / checkout / book) re-enforce the per-origin mutating opt-in (posture B). This is the <strong>conservative default</strong> for the category: an unknown commerce / payment app defaults toward LESS reach (sensitive, never safe-writable). <span [attr.translate]="'no'">opentable</span> is sensitive <strong>unconditionally</strong>: an <span [attr.translate]="'no'">OpenTable</span> reservation holds a card, so a held-card / paid reservation is payment-adjacent even when no "checkout" op is present.</li>
+            <li i18n="@@legal.section.serviceDenylist.axes.li.3.sub.2"><strong>Pure money-movement apps &rarr; sensitive.</strong> Standalone peer-to-peer money-transfer / wallet apps (<span [attr.translate]="'no'">paypal</span>, <span [attr.translate]="'no'">venmo</span>, <span [attr.translate]="'no'">cash app</span>, <span [attr.translate]="'no'">wise</span>, <span [attr.translate]="'no'">western union</span>) are sensitive, not hard-denied. Reads are allowed under Auto; mutating actions are gated by the sensitive-origin write path and by the payment-op guard.</li>
+            <li i18n="@@legal.section.serviceDenylist.axes.li.3.sub.3"><strong>Read-only commerce browsing &rarr; safe.</strong> Pure-availability or read-only apps whose vendored ops are all reads (<span [attr.translate]="'no'">calendly</span> availability links, <span [attr.translate]="'no'">yelp</span> / <span [attr.translate]="'no'">tripadvisor</span> business search, <span [attr.translate]="'no'">zillow</span> listings, <span [attr.translate]="'no'">grafana</span> dashboards) stay <strong>safe</strong> (unclassified, reads run under Auto). The import-time heuristic's payment tokens are deliberately SPECIFIC (checkout / cart / place-order / charge, NOT a bare order / book / reserve) so a benign commerce read is not false-tripped; a safe commerce origin is added to the read-only-safe invariant set ONLY when its emitted ops are verified read-only.</li>
+          </ul>
+          <p i18n="@@legal.section.serviceDenylist.axes.li.3.outro">What makes <strong>money-movement-under-Auto impossible</strong> is the payment-origin gate, established for this batch before any payment descriptor lands: (a) payment origins are <strong>sensitive</strong> (posture-B gated); (b) an import-time <strong>payment-op CI guard</strong> fails the build if any payment-bearing op (checkout / pay / place_order / charge / complete_booking / buy_tickets / book_flight / request_ride / place_bid / create_order / ...) is ever classified on an <strong>ungated origin</strong>. A payment write therefore can only flow on a sensitive origin, where the per-origin mutating opt-in re-gates it, or not ship at all.</p>
+        </li>
+      </ol>
+
+      <p i18n="@@legal.section.serviceDenylist.axes.closing">The hard-denial axis makes an origin non-enableable; the sensitivity axes keep an origin usable but re-apply write-time friction. An import-time classification gate fails the build if a sensitivity-suspect origin is left unclassified, so a gap in the classification can never silently read as "allow".</p>
+
+      <!-- Recipe Integrity -->
+      <h2 i18n="@@legal.section.recipeIntegrity.title">Recipe Integrity (Signature Verification)</h2>
+      <p i18n="@@legal.section.recipeIntegrity.body.1">Server-delivered and learned recipes (a future capability) are untrusted data and must be <strong>signature-verified</strong> before they can bind to a credentialed call. Verification uses <span [attr.translate]="'no'">Ed25519</span> over the <span [attr.translate]="'no'">RFC-8785</span> JCS canonical form of the recipe provenance envelope, performed inside the interpreter after schema validation and before binding. A tampered or unsigned non-bundled recipe is rejected with a typed <code [attr.translate]="'no'">RECIPE_SIGNATURE_INVALID</code> reason. Verification fails closed: if the platform cannot perform <span [attr.translate]="'no'">Ed25519</span> verification, a non-bundled recipe is rejected rather than trusted.</p>
+      <p i18n="@@legal.section.recipeIntegrity.body.2">First-party bundled recipes (shipped and reviewed with the extension) are trusted-by-provenance and exempt from the verify gate, so the bundled capability head is unaffected. The trusted public key ships in the extension bundle; it is never fetched remotely. The private signing key is offline.</p>
+
+      <!-- Contact -->
+      <h2 i18n="@@legal.contact.title">Contact</h2>
+      <p i18n="@@legal.contact.body">For questions about this posture or <span [attr.translate]="'no'">FSB</span>'s data handling, open an issue on the project's <span [attr.translate]="'no'">GitHub</span> repository.</p>
+
+    </div>
+  </div>
+</main>

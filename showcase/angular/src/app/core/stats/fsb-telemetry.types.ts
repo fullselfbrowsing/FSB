@@ -38,6 +38,8 @@ export interface FSBTelemetryHeadline {
   popular_mcp_clients: Array<{ label: string; uniq: number }>;
   /** Latest day's popular_agent_json from the housekeeper; k>=5 floor already applied. */
   popular_agents: Array<{ label: string; uniq: number }>;
+  /** Latest day's popular_region_json from the housekeeper; k>=5 floor already applied (stricter than the k>=2 floor used for popular_mcp_clients/popular_agents). Labels are coarse country/US-state codes (e.g. 'US-CA', 'DE') or 'unknown'/'Other'. */
+  popular_regions: Array<{ label: string; uniq: number }>;
   /** active_agents_now / active_users_now, rounded to 1 decimal; 0 when denom is 0. */
   avg_agents_per_user: number;
 }

@@ -159,48 +159,6 @@
   }
 }
 
-.view-switcher {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.view-switcher button {
-  appearance: none;
-  border: 1px solid var(--border-color);
-  border-radius: 999px;
-  padding: 0.5rem 1rem;
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background var(--transition-base),
-    color var(--transition-base),
-    border-color var(--transition-base),
-    box-shadow var(--transition-base);
-}
-
-.view-switcher button:hover {
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
-.view-switcher button.active {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--bg-body);
-  box-shadow: var(--shadow-glow);
-}
-
-.view-switcher button:focus-visible,
-.stats-back-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--fsb-focus-ring);
-}
-
 .stats-headline-row {
   display: flex;
   justify-content: space-between;
@@ -264,6 +222,14 @@
   box-shadow: var(--shadow-md);
 }
 
+.chart-card.chart-card-bare {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+}
+
 .chart-mount {
   position: relative;
   width: 100%;
@@ -274,6 +240,64 @@
   width: 100% !important;
   height: 100% !important;
   display: block;
+}
+
+.chart-mount.chart-mount-hidden {
+  display: none;
+}
+
+// Redesign -- "Active now" swaps the Chart.js canvas for a rotating globe
+// (shared with the Site Maps page via GlobeVisualizationService) whose lit
+// nodes are placed from the real, k>=5-anonymity-floored region breakdown.
+.globe-panel {
+  display: none;
+}
+
+.globe-panel.active {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.globe-mount {
+  position: relative;
+  width: 100%;
+  max-width: 688px;
+  height: 496px;
+  margin: 0 auto;
+}
+
+.globe-mount canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.globe-annotation {
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  max-width: 620px;
+  text-align: center;
+}
+
+.globe-annotation i {
+  color: var(--primary);
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
+
+@media (max-width: 900px) {
+  .globe-mount {
+    height: 352px;
+  }
 }
 
 .skeleton {
@@ -320,55 +344,182 @@
   color: var(--primary);
 }
 
-.big-number-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 1.5rem 1rem;
-  text-align: center;
-}
-
-.big-number-label {
-  margin-bottom: 0.5rem;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  letter-spacing: 0.02em;
-}
-
-.big-number-value {
-  color: var(--text-primary);
-  font-size: clamp(3.5rem, 12vw, 7rem);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.big-number-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.75rem;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-}
-
-.big-number-delta.up {
-  color: var(--primary);
-}
-
-.big-number-delta.down {
-  color: var(--text-secondary);
-}
-
-.delta-arrow {
-  font-size: 0.85rem;
-}
-
 .sankey-svg {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+// Redesign -- fan-style tab dock, sitting below the chart card. A single
+// centered "active view" pill; hovering (or tapping, via aria-expanded)
+// reveals two side fans listing the other views as pill buttons.
+.stats-tab-dock {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.stats-tab-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stats-tab-active {
+  position: relative;
+  z-index: 3;
+  appearance: none;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 0.55rem 1.3rem;
+  background: var(--primary);
+  color: var(--bg-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-glow);
+  transition: transform var(--transition-fast);
+}
+
+.stats-tab-active:hover {
+  transform: scale(1.03);
+}
+
+.stats-tab-active.stats-tab-pulse {
+  animation: stats-pill-change 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes stats-pill-change {
+  0% { transform: scale(0.86); opacity: 0.5; }
+  58% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+// Fan panels collapse back toward the centre pill on close (origin on the
+// inner edge, so they retract inward + shrink + fade) -- picking anything
+// folds the whole list into the selection.
+.stats-tab-fan {
+  position: absolute;
+  top: 50%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.5, 0, 0.2, 1),
+    visibility 0s linear 260ms;
+}
+
+.stats-tab-fan-left {
+  right: calc(100% + 14px);
+  transform-origin: right center;
+  transform: translateY(-50%) translateX(22px) scale(0.8);
+}
+
+.stats-tab-fan-right {
+  left: calc(100% + 14px);
+  transform-origin: left center;
+  transform: translateY(-50%) translateX(-22px) scale(0.8);
+}
+
+.stats-tab-fan.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(0) scale(1);
+  transition:
+    opacity 220ms ease,
+    transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+// Widen the hoverable area so the fan doesn't collapse while the pointer
+// crosses the gap between the centre pill and the fan track.
+.stats-tab-fan.open::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 40px;
+  height: 100%;
+}
+
+.stats-tab-fan-left.open::after {
+  right: -18px;
+}
+
+.stats-tab-fan-right.open::after {
+  left: -18px;
+}
+
+.stats-tab-fan-track {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 3px;
+}
+
+.stats-tab-fan-left .stats-tab-fan-track {
+  flex-direction: row-reverse;
+}
+
+.stats-tab-fan-right .stats-tab-fan-track {
+  flex-direction: row;
+}
+
+.stats-tab-fan-item {
+  display: inline-flex;
+  align-items: center;
+  max-width: 122px;
+  padding: 0.32rem 0.6rem;
+  background: color-mix(in srgb, var(--bg-elevated) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transform: translateY(var(--dy, 0px));
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast),
+    color var(--transition-fast),
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+}
+
+.stats-tab-fan-item:hover {
+  border-color: rgba(255, 107, 53, 0.55);
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg), 0 0 18px rgba(255, 107, 53, 0.18);
+  transform: translateY(var(--dy, 0px)) scale(1.08);
+  z-index: 2;
+}
+
+.stats-back-btn:focus-visible,
+.stats-tab-active:focus-visible,
+.stats-tab-fan-item:focus-visible {
+  outline: none;
+  box-shadow: var(--fsb-focus-ring);
+}
+
+@media (max-width: 900px) {
+  .stats-tab-fan-track {
+    gap: 5px;
+  }
+
+  .stats-tab-fan-item {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.66rem;
+    max-width: 104px;
+  }
 }
 
 .stats-footer {
@@ -423,7 +574,8 @@
 @media (prefers-reduced-motion: reduce) {
   .stats-glow-bg,
   .stats-live-badge::before,
-  .skeleton {
+  .skeleton,
+  .stats-tab-active.stats-tab-pulse {
     animation: none;
   }
 }

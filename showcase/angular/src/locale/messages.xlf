@@ -2934,6 +2934,426 @@
           <context context-type="linenumber">113</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="legal.header.kicker" datatype="html">
+        <source>Legal</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">4,5</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.title" datatype="html">
+        <source>FSB Legal and Governance Posture</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">5,6</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.updated" datatype="html">
+        <source>Last updated: July 2026</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">6,9</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.intro" datatype="html">
+        <source>This document records <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s legal/Terms-of-Service posture, its consent model, the audit-log retention policy, and the service-denylist rationale. It is the human-readable companion to the runtime controls shipped in Phase 30 (consent governance, recipe signature verification, the no-secrets audit log, and the service denylist).</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">11,12</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.header.scopeNote" datatype="html">
+        <source>Scope note: this is an engineering governance document, not legal advice. It describes how <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is built to behave and the boundaries it enforces.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">12,14</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.title" datatype="html">
+        <source>Automation Posture</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">15,16</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.intro" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Full Self-Browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) is a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>supervised, local-first<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> browser-automation capability layer. The posture is deliberately conservative:</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">16,18</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Opt-out per origin.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> The shipped default is Auto for non-denied origins, with per-origin Off / Ask / Auto controls. The user can opt any origin out, and can set the global default to Off to restore strict opt-in behavior.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">18,19</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Local execution.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Automation runs in the user&apos;s own authenticated browser session. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> does not proxy a user&apos;s credentials to any server and does not replay captured credentials off-device.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">19,20</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Respect site Terms of Service.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is a general-purpose automation tool; the operator is responsible for using it within the Terms of Service of the sites they automate. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ships a service policy file (below) that currently hard-denies <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and classifies additional sensitive categories for mutating-write gating and audit visibility.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">20,21</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.automationPosture.li.4" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>No code fetched as data.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Recipes are closed-vocabulary JSON data, not code. The recipe interpreter is dynamic-code-free, and server-delivered or learned recipes (a future capability) must pass cryptographic signature verification before they can bind to a credentialed call.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">21,24</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.title" datatype="html">
+        <source>Consent Model</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">25,26</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.intro" datatype="html">
+        <source>Consent is enforced at a single dispatch chokepoint (one gate, both front doors), immediately after the existing ownership gate. The shipped posture is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>opt-out (&quot;fully open&quot;)<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: a global default mode applies to every origin the user has not explicitly configured, and the user opts individual origins <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>out<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. The global default ships as <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> and is user-configurable (Off / Ask / Auto) under Advanced Settings → Consent &amp; Audit → &quot;Default for New Sites&quot;.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">26,28</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.header.mode" datatype="html">
+        <source>Mode</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">32,33</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.header.behavior" datatype="html">
+        <source>Behavior</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">33,37</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.auto.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Auto<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (shipped default)</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">38,39</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.auto.behavior" datatype="html">
+        <source>Capability invocations run without per-call prompting, including reads <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>and<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> writes, against any non-denylisted origin, except that a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write to a sensitive origin<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04; see the Categorization Axes below). Reads, and writes to non-sensitive origins, run freely under Auto.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">39,40</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.ask.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Ask<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">42,43</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.ask.behavior" datatype="html">
+        <source>Each invocation surfaces a pending request out-of-band (control panel + a badge) for the user to grant; nothing runs until granted. There is no blocking in-page modal mid-invocation.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">43,46</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.off.mode" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/></source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">46,47</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.table.off.behavior" datatype="html">
+        <source>Nothing runs against the origin. Capability invocations return a typed consent-required reason. Set an individual origin to Off to opt it out, or set the global default to Off to restore strict opt-in.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">47,51</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.additionalIntro" datatype="html">
+        <source>Additional consent rules:</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">53,55</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Denylist is the one hard block.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> A denylisted origin is non-enableable regardless of the global default or any per-origin policy. The current hard denylist is intentionally narrow: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. The denylist is consulted <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>first<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>, before the consent mode.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">55,56</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Per-origin opt-out.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Every origin <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> acts on is listed in the control panel (sourced from the audit trail) so the user can set it to Off (or Ask) at any time. An explicit per-origin policy overrides the global default.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">56,57</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Writes to non-sensitive origins are allowed under Auto.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Under the opt-out posture, for a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>non-sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> origin read-Auto implies write-Auto: side-effecting invocations (POST/PUT/PATCH/DELETE) run without a separate elevated opt-in, and the per-origin mutating flag is inert at the invoke gate. A <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write to a sensitive origin is the exception<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: it re-enforces the per-origin mutating opt-in at the invoke gate (posture B / DENY-04), so the mutating flag IS consulted there for sensitive origins (see the Categorization Axes section). Reads run under Auto everywhere.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">57,58</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.4" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Sensitive-origin writes are re-gated at the invoke gate; reads are not.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Origins classified as <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (banking, primary email, government, and the payments / budgeting / social / messaging categories below) run <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>reads<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> under Auto, but a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> re-enforces the per-origin mutating opt-in at the capability <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>invoke<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> gate (posture B / DENY-04) before it is permitted. In addition, the more invasive <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>network-capture discovery<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> path keeps its own, broader explicit confirmation for sensitive origins. (Sensitive writes are NOT ungated under Auto: the invoke gate re-applies the mutating opt-in for them.)</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">58,59</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.li.5" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Reverting to opt-in.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Setting the global default to <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Off<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> restores the strict opt-in posture: nothing runs against an origin until the user enables it.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">59,62</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.consentModel.callout.body" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Security note:<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> under the shipped Auto default, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> can call a non-denylisted site&apos;s authenticated web API using the browser&apos;s logged-in session, without a per-site prompt: reads everywhere, and writes to non-sensitive origins. A write to a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> origin is re-gated at the invoke gate (it re-enforces the per-origin mutating opt-in; posture B / DENY-04). This is a deliberate, user-configurable posture; the denylist, the per-origin and global opt-out, the sensitive-write re-gate, the active-tab origin pin, the fail-closed degradation path, and the append-only audit trail remain in force.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">63,66</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.title" datatype="html">
+        <source>Audit Log</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">67,68</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.intro" datatype="html">
+        <source>Every capability invocation is recorded in an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>append-only, secret-free<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> audit log so the operator can review what ran.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">68,70</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.recordedFields.title" datatype="html">
+        <source>Recorded fields</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">70,71</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.recordedFields.body" datatype="html">
+        <source>The audit entry schema is, by construction, free of secrets and request payloads:</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">71,72</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.neverRecorded.title" datatype="html">
+        <source>What is never recorded</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">74,75</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.neverRecorded.body" datatype="html">
+        <source>The audit log <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>never<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> stores invocation arguments, request or response bodies, cookies, tokens, CSRF values, bearer credentials, or any other authentication material. Auth material never leaves the device and is never persisted. Every recorded field additionally passes through a shape-only redactor before persistence (URLs are reduced to their origin; strings to a shape descriptor; errors to name and message only). A test asserts that no authentication substring survives in the persisted log.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">75,77</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.retention.title" datatype="html">
+        <source>Retention</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">77,78</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.auditLog.retention.body" datatype="html">
+        <source>The audit log is a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>bounded ring buffer<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: the most recent entries are retained and older entries are trimmed automatically (FIFO). The user has an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>export and clear<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> control to export the current log and clear it on demand. The log is secret-free by construction; encryption at rest is therefore unnecessary and is out of scope. Long-term archival and deeper retention tooling are intentionally deferred; the bounded ring plus export/clear is the Phase-30 retention policy.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">78,80</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.title" datatype="html">
+        <source>Service Denylist</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">81,82</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.intro" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ships a conservative service denylist at <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>extension/config/service-denylist.json<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>, loaded at service-worker startup and consulted before per-origin consent. It is the single source of truth for whether an origin is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>denied<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> or <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">82,84</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.li.1" datatype="html">
+        <source><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>deniedOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: the hard block list. Current runtime policy intentionally narrows this to <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OnlyFans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. A denylisted origin is rendered non-enableable: the consent gate blocks it even if a stored policy says Auto, and the control panel greys it out with the documented reason.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">84,85</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.li.2" datatype="html">
+        <source><x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>sensitiveOrigins<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>: allowed-but-governed origins. This includes banking, government, primary email, brokerage / trading, payments, money movement, social, messaging, media, AI-chat, commerce, travel, and other categories that require mutating-write gating and audit visibility but are not hard-denied.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">85,87</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.outro" datatype="html">
+        <source>The service policy is conservative without being an aggressive broad blocklist, and it is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>user-extensible<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. Host patterns use a <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>https://*.&lt;domain&gt;<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> subdomain-wildcard form (matching the apex and any subdomain) or an exact origin. A comprehensive, per-service legal review is ongoing; the policy file establishes the mechanism and the current default posture.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">87,89</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.title" datatype="html">
+        <source>Categorization Axes</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">89,90</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.intro" datatype="html">
+        <source>An origin&apos;s classification is decided along <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>three distinct criteria<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. These axes are independent: an origin can be hard-denied, allowed-but-sensitive, or safe. <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>service-denylist.js classify(origin)<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> is the single source of truth that resolves an origin to denied / sensitive / safe.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">90,93</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Hard denial.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Hard-denied origins are non-enableable regardless of consent mode. The current runtime hard-denied roster is intentionally narrow: <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">94,95</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.intro" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Sensitive governance (Ask / mutating-gated).<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Allowed-but-sensitive origins are not hard-denied. Reads run under Auto everywhere; a <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>write<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> to a sensitive origin re-enforces the per-origin mutating opt-in (posture B / DENY-04) before it is permitted. This is where banking and government hosts, primary email, brokerage / trading (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>robinhood<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>fidelity<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>carta<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), payments and money movement, budgeting, social, messaging, media, and AI-chat origins sit. For example, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instagram<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>facebook<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tiktok<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> are sensitive, not denied; their reads remain available under Auto and their writes are gated. Payments (e.g. <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dashboard.stripe.com<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/>, coinbase, twilio), Carta read-only portfolio/account data, budgeting (ynab), and messaging-app writes are classified on this axis as well.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">97,98</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.sub.commsSocial" datatype="html">
+        <source>The <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>comms / social / content<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> import batch extends this axis. The AI-chat apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chatgpt<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>claude<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) and the microblog / fediverse social apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bluesky<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>mastodon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>threads<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are classified <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: their reads run under Auto, their writes (post / send / publish) re-enforce the per-origin mutating opt-in. This is the <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>conservative default<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> for the category: an unknown social / AI app defaults toward LESS reach, because a mis-classification that read as &quot;safe&quot; would make the app writable-under-Auto (able to post or message on someone&apos;s account). These hosts contain no generic category keyword the import-time heuristic flags, so they are classified explicitly on this axis rather than relying on the heuristic to catch them. The <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>discord<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> messaging origin remains sensitive (writes mutating-gated). Media and social origins such as <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>spotify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>twitch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>steam<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>youtube-music<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tinder<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> are sensitive, not denied; their writes are gated and guarded as applicable. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>netflix<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onlyfans<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> remain hard-denied.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">98,99</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.2.sub.domOnly" datatype="html">
+        <source>Independent of this axis, every comms / social / content descriptor the batch imports is <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>DOM-only<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (the conservative backing default): it is surfaced as a discovery-pending hit, never a confident API-invocable hit, and is never learn-seeded, so a ToS-hostile or AI-chat app is never auto-driven through a fabricated API call from guessed auth.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">99,101</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.intro" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Payment / money-movement classification (the commerce / travel / misc batch).<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> The most-sensitive import batch is screened along a payment dimension layered onto these three axes, because <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>a payment-bearing op writable under Auto = money moved without consent<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (an order placed, a card charged, a paid reservation booked). The classification follows the money:</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">102,104</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.1" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Payment-bearing commerce / travel / paid-booking origins → sensitive.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Food delivery and rideshare (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>doordash<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ubereats<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>uber<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>lyft<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grubhub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>instacart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>dominos<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>chipotle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), retail / marketplace checkout (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>amazon<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ebay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>etsy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>bestbuy<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>costco<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>walmart<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>target<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>craigslist<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>shopify<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>), and travel / transport paid bookings (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>booking<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>airbnb<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>expedia<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>kayak<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are classified <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: their reads run under Auto, their writes (place-order / checkout / book) re-enforce the per-origin mutating opt-in (posture B). This is the <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>conservative default<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> for the category: an unknown commerce / payment app defaults toward LESS reach (sensitive, never safe-writable). <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>opentable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is sensitive <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>unconditionally<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>: an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTable<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> reservation holds a card, so a held-card / paid reservation is payment-adjacent even when no &quot;checkout&quot; op is present.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">104,105</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.2" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Pure money-movement apps → sensitive.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Standalone peer-to-peer money-transfer / wallet apps (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>paypal<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>venmo<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>cash app<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>wise<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>western union<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>) are sensitive, not hard-denied. Reads are allowed under Auto; mutating actions are gated by the sensitive-origin write path and by the payment-op guard.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">105,106</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.sub.3" datatype="html">
+        <source><x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>Read-only commerce browsing → safe.<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> Pure-availability or read-only apps whose vendored ops are all reads (<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>calendly<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> availability links, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>yelp<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> / <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>tripadvisor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> business search, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>zillow<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> listings, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>grafana<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> dashboards) stay <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>safe<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (unclassified, reads run under Auto). The import-time heuristic&apos;s payment tokens are deliberately SPECIFIC (checkout / cart / place-order / charge, NOT a bare order / book / reserve) so a benign commerce read is not false-tripped; a safe commerce origin is added to the read-only-safe invariant set ONLY when its emitted ops are verified read-only.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">106,107</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.li.3.outro" datatype="html">
+        <source>What makes <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>money-movement-under-Auto impossible<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> is the payment-origin gate, established for this batch before any payment descriptor lands: (a) payment origins are <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>sensitive<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> (posture-B gated); (b) an import-time <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>payment-op CI guard<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> fails the build if any payment-bearing op (checkout / pay / place_order / charge / complete_booking / buy_tickets / book_flight / request_ride / place_bid / create_order / ...) is ever classified on an <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>ungated origin<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. A payment write therefore can only flow on a sensitive origin, where the per-origin mutating opt-in re-gates it, or not ship at all.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">108,110</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.serviceDenylist.axes.closing" datatype="html">
+        <source>The hard-denial axis makes an origin non-enableable; the sensitivity axes keep an origin usable but re-apply write-time friction. An import-time classification gate fails the build if a sensitivity-suspect origin is left unclassified, so a gap in the classification can never silently read as &quot;allow&quot;.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">112,115</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.title" datatype="html">
+        <source>Recipe Integrity (Signature Verification)</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">115,116</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.body.1" datatype="html">
+        <source>Server-delivered and learned recipes (a future capability) are untrusted data and must be <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/>signature-verified<x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/> before they can bind to a credentialed call. Verification uses <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> over the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RFC-8785<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> JCS canonical form of the recipe provenance envelope, performed inside the interpreter after schema validation and before binding. A tampered or unsigned non-bundled recipe is rejected with a typed <x id="START_TAG_CODE" ctype="x-code" equiv-text="&lt;code [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>RECIPE_SIGNATURE_INVALID<x id="CLOSE_TAG_CODE" ctype="x-code" equiv-text="&lt;/code&gt;"/> reason. Verification fails closed: if the platform cannot perform <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Ed25519<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> verification, a non-bundled recipe is rejected rather than trusted.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">116,117</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.section.recipeIntegrity.body.2" datatype="html">
+        <source>First-party bundled recipes (shipped and reviewed with the extension) are trusted-by-provenance and exempt from the verify gate, so the bundled capability head is unaffected. The trusted public key ships in the extension bundle; it is never fetched remotely. The private signing key is offline.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">117,120</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.contact.title" datatype="html">
+        <source>Contact</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">120,121</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.contact.body" datatype="html">
+        <source>For questions about this posture or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s data handling, open an issue on the project&apos;s <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> repository.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.html</context>
+          <context context-type="linenumber">121,124</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.meta.title" datatype="html">
+        <source>FSB - Legal and Governance Posture</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
+          <context context-type="linenumber">23</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="legal.meta.description" datatype="html">
+        <source>FSB&apos;s automation posture, consent model, audit-log retention policy, and service-denylist rationale.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
+          <context context-type="linenumber">24</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="phantomStream.screen.label" datatype="html">
         <source>PhantomStream</source>
         <context-group purpose="location">
@@ -5287,14 +5707,14 @@
         <source>FSB - Site Maps</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/sitemaps/sitemaps-page.component.ts</context>
-          <context context-type="linenumber">87</context>
+          <context context-type="linenumber">66</context>
         </context-group>
       </trans-unit>
       <trans-unit id="sitemaps.meta.description" datatype="html">
         <source>Community site maps for FSB are under development. Contribute well tested site schemas that can become built-in browser knowledge.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/sitemaps/sitemaps-page.component.ts</context>
-          <context context-type="linenumber">88</context>
+          <context context-type="linenumber">67</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.back.aria" datatype="html">
@@ -5339,696 +5759,326 @@
           <context context-type="linenumber">14,17</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.view.aria" datatype="html">
-        <source>Stats view</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">17,18</context>
-        </context-group>
-      </trans-unit>
       <trans-unit id="stats.tabMetrics.aria" datatype="html">
         <source>Current tab metrics</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">32,33</context>
+          <context context-type="linenumber">18,19</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_ARIA" datatype="html">
         <source>Live FSB metrics</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">38,39</context>
+          <context context-type="linenumber">24,25</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_ACTIVE" datatype="html">
         <source>active right now</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">42,44</context>
+          <context context-type="linenumber">28,30</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_TOTAL" datatype="html">
         <source>total users</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">47,49</context>
+          <context context-type="linenumber">33,35</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_TOKENS" datatype="html">
         <source>tokens (last 24h)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">52,55</context>
+          <context context-type="linenumber">38,41</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.loading.sr" datatype="html">
         <source>Loading stats...</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">60,62</context>
+          <context context-type="linenumber">46,48</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_TILE_AVG_AGENTS_LABEL" datatype="html">
-        <source>Avg agents per active user</source>
+      <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_ANNOTATION" datatype="html">
+        <source>Each lit node is live activity, clustered by region.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">68,69</context>
+          <context context-type="linenumber">58,60</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_EMPTY" datatype="html">
+        <source>Not enough anonymous activity yet to break down by region — check back soon.</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">60,63</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.rate.title" datatype="html">
         <source>GitHub rate-limited</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">82,83</context>
+          <context context-type="linenumber">67,68</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.rate.body" datatype="html">
         <source> Retrying at <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/><x id="INTERPOLATION" equiv-text="{{ rateLimitedUntil | date:&apos;HH:mm&apos; }}"/><x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. The unauthenticated API allows 60 requests / hour / IP - we&apos;ll be back shortly. </source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">84,87</context>
+          <context context-type="linenumber">69,72</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.title" datatype="html">
         <source>Could not load stats</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">92,93</context>
+          <context context-type="linenumber">77,78</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.retry" datatype="html">
         <source>The page retries automatically every 5 minutes.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">93,95</context>
+          <context context-type="linenumber">78,80</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.view.aria" datatype="html">
+        <source>Stats view</source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">84,85</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.footer.credit" datatype="html">
         <source>Made by <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">103,104</context>
+          <context context-type="linenumber">114,115</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.footer.version" datatype="html">
         <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;version-tag&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>▽<x id="INTERPOLATION" equiv-text="{{ appVersion }}"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">104,106</context>
+          <context context-type="linenumber">115,117</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.default" datatype="html">
         <source>Network or parse error.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">94</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.sun" datatype="html">
-        <source>Sun</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">96</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.mon" datatype="html">
-        <source>Mon</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">97</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.tue" datatype="html">
-        <source>Tue</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
           <context context-type="linenumber">98</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.wed" datatype="html">
-        <source>Wed</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">99</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.thu" datatype="html">
-        <source>Thu</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">100</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.fri" datatype="html">
-        <source>Fri</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">101</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.weekday.sat" datatype="html">
-        <source>Sat</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">102</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeStars" datatype="html">
         <source>Cumulative stars</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">108</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.view.weeklyStars" datatype="html">
-        <source>Weekly stars</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">109</context>
+          <context context-type="linenumber">104</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.issues" datatype="html">
         <source>Issues</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">110</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.view.forks" datatype="html">
-        <source>Forks</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">111</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.view.pullRequests" datatype="html">
-        <source>Pull requests</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">112</context>
+          <context context-type="linenumber">105</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeCommits" datatype="html">
         <source>Cumulative commits</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">113</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.view.commits" datatype="html">
-        <source>Commits</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">114</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.view.maintenance" datatype="html">
-        <source>Maintenance</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">115</context>
+          <context context-type="linenumber">106</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_ACTIVE_NOW" datatype="html">
         <source>Active right now</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">116</context>
+          <context context-type="linenumber">107</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_TOKENS" datatype="html">
         <source>Tokens</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">117</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_VIEW_AGENTS_RUNNING" datatype="html">
-        <source>Agents running</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">118</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_VIEW_POPULAR_AGENTS" datatype="html">
-        <source>Popular agents</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">119</context>
+          <context context-type="linenumber">108</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP" datatype="html">
         <source>Popular MCP clients</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">120</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_VIEW_AVG_AGENTS" datatype="html">
-        <source>Average agents per user</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">121</context>
+          <context context-type="linenumber">109</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.totalStars" datatype="html">
         <source>total stars</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">158</context>
+          <context context-type="linenumber">154</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.last7Days" datatype="html">
         <source>last 7 days</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">159</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.thisWeek" datatype="html">
-        <source>this week</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">170</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.vsLastWeek" datatype="html">
-        <source>vs last week</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">171</context>
+          <context context-type="linenumber">155</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.open" datatype="html">
         <source>open</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">179</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">197</context>
+          <context context-type="linenumber">163</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.closed" datatype="html">
         <source>closed</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">180</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.totalForks" datatype="html">
-        <source>total forks</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">187</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.last30Days" datatype="html">
-        <source>last 30 days</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">188</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">204</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.merged" datatype="html">
-        <source>merged</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">196</context>
+          <context context-type="linenumber">164</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.totalCommits" datatype="html">
         <source>total commits</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">203</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">211</context>
+          <context context-type="linenumber">170</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.metric.busiestHour" datatype="html">
-        <source>busiest hour</source>
+      <trans-unit id="stats.metric.last30Days" datatype="html">
+        <source>last 30 days</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">212</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.latestRelease" datatype="html">
-        <source>latest release</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">219</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.released" datatype="html">
-        <source>released</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">220</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.releases" datatype="html">
-        <source>releases</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">224</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.commits" datatype="html">
-        <source>commits</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">225</context>
+          <context context-type="linenumber">171</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.activeAgents" datatype="html">
         <source>active agents</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">230</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">240</context>
+          <context context-type="linenumber">176</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.avgPerUser" datatype="html">
         <source>avg per user</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">231</context>
+          <context context-type="linenumber">177</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.tokensLifetime" datatype="html">
         <source>tokens lifetime</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">235</context>
+          <context context-type="linenumber">181</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.tokens24h" datatype="html">
         <source>tokens 24h</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">236</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.lifetimeAgents" datatype="html">
-        <source>lifetime agents</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">241</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.trackedAgents" datatype="html">
-        <source>tracked agents</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">247</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.topNamed" datatype="html">
-        <source>top: <x id="entityLabel" equiv-text="top.label"/></source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">248</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">256</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.topAgent" datatype="html">
-        <source>top agent</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">248</context>
+          <context context-type="linenumber">182</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.trackedClients" datatype="html">
         <source>tracked clients</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">255</context>
+          <context context-type="linenumber">188</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.topNamed" datatype="html">
+        <source>top: <x id="entityLabel" equiv-text="top.label"/></source>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">189</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.topClient" datatype="html">
         <source>top client</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">256</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.avgAgents" datatype="html">
-        <source>avg agents</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">261</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.delta" datatype="html">
-        <source>delta</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">262</context>
+          <context context-type="linenumber">189</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.meta.title" datatype="html">
         <source>FSB · Stats</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">323</context>
+          <context context-type="linenumber">265</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.chartLibrary" datatype="html">
         <source>Could not load chart library.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">437</context>
+          <context context-type="linenumber">403</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.aria" datatype="html">
         <source>Sankey: <x id="openedCount" equiv-text="O"/> opened, <x id="closedCount" equiv-text="closedFlow"/> closed, <x id="backlogCount" equiv-text="backlog"/> still open</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">671</context>
+          <context context-type="linenumber">636</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.opened" datatype="html">
         <source>Opened (<x id="openedCount" equiv-text="O"/>)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">728</context>
+          <context context-type="linenumber">693</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.closed" datatype="html">
         <source>Closed (<x id="closedCount" equiv-text="closedFlow"/>)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">729</context>
+          <context context-type="linenumber">694</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.issuesSankey.stillOpen" datatype="html">
         <source>Still open (<x id="backlogCount" equiv-text="backlog"/>)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">731</context>
+          <context context-type="linenumber">696</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeStars.legend" datatype="html">
         <source>Cumulative stars</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">779</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.starsPerWeek.legend" datatype="html">
-        <source>Stars per week</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">807</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.weeklyStarCount.legend" datatype="html">
-        <source>Weekly star count</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">816</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.cumulativeForks.legend" datatype="html">
-        <source>Cumulative forks</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">848</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.monthlyForks.legend" datatype="html">
-        <source>Forks (per month bucket)</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">860</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.prsOpened.legend" datatype="html">
-        <source>Opened</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">906</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.prsMerged.legend" datatype="html">
-        <source>Merged</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">915</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.seriesValueTooltip" datatype="html">
-        <source><x id="seriesLabel" equiv-text="label"/>: <x id="value" equiv-text="Math.abs(y)"/></source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">935</context>
+          <context context-type="linenumber">744</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeCommits.legend" datatype="html">
         <source>Cumulative commits</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">964</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.commits.legend" datatype="html">
-        <source>Commits</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">986</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.commitSingular" datatype="html">
-        <source>commit</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1013</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.commitPlural" datatype="html">
-        <source>commits</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1014</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.commitTooltip" datatype="html">
-        <source><x id="weekday" equiv-text="weekday"/> <x id="time" equiv-text="time"/> -- <x id="count" equiv-text="count"/> <x id="commitNoun" equiv-text="noun"/></source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1015</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.releases.legend" datatype="html">
-        <source>Releases</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1072</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.commitsNoReleases.legend" datatype="html">
-        <source>Commits (no releases yet)</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1073</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW" datatype="html">
-        <source>Active users right now</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1133</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.chart.activeHeadroom" datatype="html">
-        <source>Headroom</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1134</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW_LEGEND" datatype="html">
-        <source>Active users (5 min window)</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1138</context>
+          <context context-type="linenumber">770</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND" datatype="html">
         <source>Tokens (last 30 days)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1168</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_CHART_AGENTS_RUNNING_LEGEND" datatype="html">
-        <source>Active agents (10 min window)</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1194</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_CHART_PENDING" datatype="html">
-        <source>Pending (k&gt;=5 floor)</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1225</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_CHART_POPULAR_AGENTS_LEGEND" datatype="html">
-        <source>Popular agents</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1232</context>
+          <context context-type="linenumber">797</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_PENDING_MCP" datatype="html">
         <source>Pending (k&gt;=5 floor)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1248</context>
+          <context context-type="linenumber">813</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND" datatype="html">
         <source>Popular MCP clients</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1255</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.date.unknown" datatype="html">
-        <source>unknown</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1333</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.date.today" datatype="html">
-        <source>today</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1335</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.date.daysAgo" datatype="html">
-        <source><x id="days" equiv-text="days"/>d ago</source>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1335</context>
+          <context context-type="linenumber">820</context>
         </context-group>
       </trans-unit>
       <trans-unit id="support.hero.title" datatype="html">
