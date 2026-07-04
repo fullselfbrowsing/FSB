@@ -24,21 +24,6 @@ const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
 const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
 const SITE_NAME = 'FSB - Full Self-Browsing';
 
-// Illustrative activity clusters (US, Mexico, Europe, Taiwan, China, Japan) --
-// decorative, not derived from real data. `count` uses the same seeded PRNG
-// the globe itself uses for node jitter, seed 719, so this page keeps showing
-// the same deterministic layout it always has.
-const random = createSeededRandom(719);
-const rand = (min: number, max: number): number => min + random() * (max - min);
-const SITEMAPS_GLOBE_REGIONS: readonly GlobeRegion[] = [
-  { lon: -98, lat: 39, spread: 13, count: rand(10, 16) },
-  { lon: -102, lat: 23, spread: 7, count: rand(4, 8) },
-  { lon: 10, lat: 50, spread: 12, count: rand(8, 14) },
-  { lon: 121, lat: 23.7, spread: 2.5, count: rand(2, 6) },
-  { lon: 104, lat: 35, spread: 12, count: rand(8, 14) },
-  { lon: 138, lat: 37, spread: 5, count: rand(4, 8) },
-];
-
 @Component({
   selector: 'app-sitemaps-page',
   standalone: true,
@@ -73,7 +58,23 @@ export class SiteMapsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const canvas = this.globeCanvas?.nativeElement;
     if (!canvas) return;
     this.zone.runOutsideAngular(() => {
-      this.stopGlobe = this.globeService.setupGlobe(canvas, SITEMAPS_GLOBE_REGIONS);
+      // Illustrative activity clusters (US, Mexico, Europe, Taiwan, China,
+      // Japan) -- decorative, not derived from real data. One fresh seed-719
+      // PRNG per visit draws the six counts (stream positions 1-6) and is
+      // then handed to setupGlobe for the node jitter (positions 7+) -- the
+      // exact draw order of the pre-extraction inline globe, so the page
+      // keeps its original deterministic layout on every visit.
+      const random = createSeededRandom(719);
+      const rand = (min: number, max: number): number => min + random() * (max - min);
+      const regions: readonly GlobeRegion[] = [
+        { lon: -98, lat: 39, spread: 13, count: rand(10, 16) },
+        { lon: -102, lat: 23, spread: 7, count: rand(4, 8) },
+        { lon: 10, lat: 50, spread: 12, count: rand(8, 14) },
+        { lon: 121, lat: 23.7, spread: 2.5, count: rand(2, 6) },
+        { lon: 104, lat: 35, spread: 12, count: rand(8, 14) },
+        { lon: 138, lat: 37, spread: 5, count: rand(4, 8) },
+      ];
+      this.stopGlobe = this.globeService.setupGlobe(canvas, regions, random);
     });
   }
 

@@ -18,6 +18,11 @@
  *   animation frame, pending redraws are canceled on teardown, and the globe
  *   requestAnimationFrame loop runs outside Angular change detection.
  *
+ * Suite C -- globe service + sitemaps PRNG (review-fix guards):
+ *   Static guards that the coastline GeoJSON is cached across setupGlobe()
+ *   calls and that the sitemaps page draws region counts + node jitter from
+ *   one shared seed-719 stream (the pre-extraction draw order).
+ *
  * Test is Node-only -- no test framework dependency. Mirrors the pattern of
  * tests/cumulative-commits-aggregator.test.js (text-parse + re-impl + run).
  *
@@ -31,6 +36,8 @@ const path = require('path');
 
 const SERVICE_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/core/stats/github-stats.service.ts');
 const COMPONENT_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/stats/stats-page.component.ts');
+const GLOBE_SERVICE_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/core/globe/globe-visualization.service.ts');
+const SITEMAPS_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/sitemaps/sitemaps-page.component.ts');
 
 let passed = 0;
 let failed = 0;
@@ -238,6 +245,68 @@ function commitPunchcardLocal(commits) {
   check('stats globe: ngOnDestroy cancels pending view redraw',
     destroyBlock.includes('this.cancelPendingViewRedraw();'),
     'ngOnDestroy() does not call cancelPendingViewRedraw()');
+
+  // Review-fix guards -- globe lifecycle hardening + fan-picker state.
+  const rateStart = src.indexOf('  private applyRateLimit(');
+  const rateEnd = src.indexOf('  private scheduleViewRedraw', rateStart);
+  const rateBlock = rateStart >= 0 && rateEnd > rateStart ? src.slice(rateStart, rateEnd) : '';
+  check('stats globe: applyRateLimit stops a running globe before the ready template unmounts',
+    rateBlock.includes('this.stopGlobe?.();') && rateBlock.includes('this.stopGlobe = undefined;'),
+    'applyRateLimit() does not tear down the globe rAF loop');
+
+  const redrawStart = src.indexOf('  private redrawChart(');
+  const redrawEnd = src.indexOf('  private buildGlobeRegions', redrawStart);
+  const redrawBlock = redrawStart >= 0 && redrawEnd > redrawStart ? src.slice(redrawStart, redrawEnd) : '';
+  check('stats globe: redrawChart keeps the running globe when regions are unchanged',
+    /if\s*\(this\.stopGlobe\s*&&\s*key\s*===\s*this\.lastGlobeKey\)\s*return;/.test(redrawBlock),
+    'redrawChart() lacks the stopGlobe && key === lastGlobeKey early return');
+  check('stats globe: globe signature key derives from popular_regions',
+    redrawBlock.includes('JSON.stringify(this.latestFsbHeadline?.popular_regions ?? [])'),
+    'redrawChart() key is not JSON.stringify(latestFsbHeadline?.popular_regions ?? [])');
+  check('stats globe: no unconditional globe teardown ahead of the fsb-active-now branch',
+    redrawBlock.indexOf("selectedView === 'fsb-active-now'") !== -1 &&
+      redrawBlock.indexOf("selectedView === 'fsb-active-now'") < redrawBlock.indexOf('this.stopGlobe?.();'),
+    'redrawChart() stops the globe before checking whether the globe view is active');
+
+  // tabPulse=false / frozenView=null also appear in the pulseTimer callback,
+  // so this check must anchor on the early-return block specifically.
+  check('stats tabs: reselecting the active view clears pulse/frozen state',
+    /if\s*\(this\.selectedView\s*===\s*id\)\s*\{[^}]*this\.tabPulse\s*=\s*false;[^}]*this\.frozenView\s*=\s*null;[^}]*\}/.test(src),
+    'setView() early-return leaves tabPulse/frozenView sticky');
+}
+
+// -----------------------------------------------------------------------------
+// Suite C -- globe service coastline cache + shared PRNG stream
+// -----------------------------------------------------------------------------
+
+{
+  let gsrc = '';
+  let ssrc = '';
+  try { gsrc = fs.readFileSync(GLOBE_SERVICE_PATH, 'utf8'); } catch { /* swallow */ }
+  try { ssrc = fs.readFileSync(SITEMAPS_PATH, 'utf8'); } catch { /* swallow */ }
+
+  check('globe service: source file readable',
+    gsrc.length > 0,
+    `could not read ${GLOBE_SERVICE_PATH}`);
+  check('globe service: Natural Earth dots cached across setupGlobe calls',
+    /private\s+cachedLandDots\s*:\s*LandPoint\[\]\s*\|\s*null\s*=\s*null;/.test(gsrc) &&
+      gsrc.includes('this.cachedLandDots'),
+    'GlobeVisualizationService does not cache fetched land dots');
+  check('globe service: setupGlobe accepts a caller-supplied PRNG defaulting to seed 719',
+    /random:\s*\(\)\s*=>\s*number\s*=\s*createSeededRandom\(719\)/.test(gsrc),
+    'setupGlobe() signature lacks the random param with createSeededRandom(719) default');
+  check('globe service: setupGlobe body no longer re-seeds its own PRNG',
+    !/const\s+random\s*=\s*createSeededRandom\(719\);/.test(gsrc),
+    'setupGlobe() still constructs an internal createSeededRandom(719)');
+  check('sitemaps globe: source file readable',
+    ssrc.length > 0,
+    `could not read ${SITEMAPS_PATH}`);
+  check('sitemaps globe: counts and jitter share one per-visit PRNG stream',
+    /ngAfterViewInit\(\)[\s\S]*createSeededRandom\(719\)[\s\S]*setupGlobe\(canvas,\s*regions,\s*random\)/.test(ssrc),
+    'sitemaps ngAfterViewInit does not build regions + pass the same PRNG into setupGlobe');
+  check('sitemaps globe: module-scope PRNG removed',
+    !/^const random = createSeededRandom/m.test(ssrc),
+    'module-scope createSeededRandom(719) still draws counts at module load');
 }
 
 console.log(`\n=== stats-chart-overhaul results: ${passed} passed, ${failed} failed ===`);

@@ -241,6 +241,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   // Cleanup for the "Active now" globe, set while it's running (see
   // GlobeVisualizationService.setupGlobe's return value).
   private stopGlobe?: () => void;
+  // JSON snapshot of the popular_regions list backing the running globe --
+  // lets redrawChart() keep the globe spinning across redraws that don't
+  // change the region data. Meaningful only while stopGlobe is set.
+  private lastGlobeKey = '';
   private pendingViewRedrawFrame: number | null = null;
 
   private subs: Subscription[] = [];
@@ -306,7 +310,13 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     clearTimeout(this.tabsCloseTimer);
     clearTimeout(this.pulseTimer);
     if (this.selectedView === id) {
+      // Re-selecting the active view is only reachable from the collapsing
+      // fan while frozenView is set; the pulseTimer just cleared above was
+      // due to reset that state, so reset it here or the fan stays keyed on
+      // the stale frozenView until the next real view change.
       this.fanOpen = false;
+      this.tabPulse = false;
+      this.frozenView = null;
       return;
     }
     this.frozenView = this.selectedView;
@@ -503,6 +513,11 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyRateLimit(resetAt: number): void {
+    // Leaving 'ready' unmounts the @if template branch that owns the globe
+    // canvas; stop the globe's rAF loop so it doesn't keep rendering to the
+    // detached canvas (no redraw runs while rate-limited to stop it later).
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
     this.viewState = 'rate-limited';
     this.rateLimitedUntil = new Date(resetAt);
   }
@@ -538,14 +553,16 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
     if (!this.ChartCtor) return;
 
-    // Every redraw is a full rebuild (new dataset snapshot or view switch) --
-    // tear down any running globe first; the fsb-active-now branch below
-    // starts a fresh one (with the latest popular_regions snapshot) when
-    // that's the active view.
-    this.stopGlobe?.();
-    this.stopGlobe = undefined;
-
     if (this.selectedView === 'fsb-active-now') {
+      const key = JSON.stringify(this.latestFsbHeadline?.popular_regions ?? []);
+      // Globe already running on the same region data (poll ticks re-emit
+      // unchanged aggregates; theme flips are read per frame by the draw
+      // loop): keep it spinning instead of resetting rotation + refetching
+      // coastlines. The key is order-sensitive -- a server-side reorder just
+      // costs one harmless rebuild.
+      if (this.stopGlobe && key === this.lastGlobeKey) return;
+      this.stopGlobe?.();
+      this.stopGlobe = undefined;
       if (this.chartInstance) {
         try { this.chartInstance.destroy(); } catch { /* swallow */ }
         this.chartInstance = null;
@@ -553,12 +570,17 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.clearSankeySvg();
       const globeCanvas = this.globeCanvasRef?.nativeElement;
       if (globeCanvas) {
+        this.lastGlobeKey = key;
         this.stopGlobe = this.zone.runOutsideAngular(() =>
           this.globeService.setupGlobe(globeCanvas, this.buildGlobeRegions())
         );
       }
       return;
     }
+
+    // Any chart view: tear down a globe left over from the globe view.
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
 
     const canvasRef = this.chartCanvas;
     if (!canvasRef) return; // template not yet in `ready` branch.

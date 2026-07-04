@@ -2,9 +2,11 @@
 // Extracted from SiteMapsPageComponent (which drew a hardcoded illustrative
 // version of this) so the Stats page's "Active now" view can drive the same
 // visualization from real region telemetry without duplicating the canvas/
-// projection/animation code. Behavior is unchanged from the original; the
-// only new axis is that `regions` is now a caller-supplied parameter instead
-// of a hardcoded array.
+// projection/animation code. Drawing behavior is unchanged from the original;
+// the new axes are that `regions` is caller-supplied instead of hardcoded and
+// that the jitter PRNG may be passed in (default: a fresh seed-719 stream) so
+// a caller that draws its region counts first can preserve the original
+// combined draw order (see SiteMapsPageComponent).
 //
 // Callers are responsible for the SSR guard (isPlatformBrowser) and for
 // running setupGlobe() inside NgZone.runOutsideAngular -- this service does
@@ -24,7 +26,7 @@ import {
 const NATURAL_EARTH_LAND_URL =
   'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson';
 
-/** Deterministic LCG PRNG. Exported so callers can reproduce stable jitter/counts for their own GlobeRegion lists (mirrors this service's internal node-jitter randomness). */
+/** Deterministic LCG PRNG. Exported so callers can draw stable region counts and hand the same stream to setupGlobe's `random` param, keeping counts + node jitter on one seeded sequence. */
 export function createSeededRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -37,13 +39,26 @@ export function createSeededRandom(seed: number): () => number {
 export class GlobeVisualizationService {
   private readonly doc = inject(DOCUMENT);
 
+  // Natural Earth coastline dots, fetched once per app session and shared by
+  // every later setupGlobe() call -- the ~1MB GeoJSON would otherwise be
+  // refetched on each globe rebuild.
+  private cachedLandDots: LandPoint[] | null = null;
+
   /**
    * Wire the globe into `canvas`, scattering pulsing nodes around `regions`.
    * Starts its own requestAnimationFrame loop and a window resize listener.
    *
+   * `random` drives the per-node jitter. Callers that draw other values from
+   * the same seeded stream first (region counts, see SiteMapsPageComponent)
+   * can pass their PRNG in so the combined draw order stays stable.
+   *
    * @returns cleanup function -- call from the caller's ngOnDestroy.
    */
-  setupGlobe(canvas: HTMLCanvasElement, regions: readonly GlobeRegion[]): () => void {
+  setupGlobe(
+    canvas: HTMLCanvasElement,
+    regions: readonly GlobeRegion[],
+    random: () => number = createSeededRandom(719)
+  ): () => void {
     const ctx = canvas.getContext('2d');
     if (!ctx) return () => undefined;
 
@@ -73,7 +88,6 @@ export class GlobeVisualizationService {
     const meridians = 12;
     const segments = 60;
     const degreesToRadians = Math.PI / 180;
-    const random = createSeededRandom(719);
     const rand = (min: number, max: number): number => min + random() * (max - min);
     const nodes: ProbeNode[] = [];
 
@@ -100,10 +114,13 @@ export class GlobeVisualizationService {
       return { x: cx + x * radius, y: cy + y * radius, z };
     };
 
-    let landDots = this.createRoughLandDots();
-    const coastlineAbort = this.loadNaturalEarthDots((dots) => {
-      landDots = dots;
-    });
+    let landDots: readonly LandPoint[] = this.cachedLandDots ?? this.createRoughLandDots();
+    const coastlineAbort = this.cachedLandDots
+      ? null
+      : this.loadNaturalEarthDots((dots) => {
+          this.cachedLandDots = dots;
+          landDots = dots;
+        });
 
     const accent = [255, 107, 53] as const;
     let rotation = 0;
@@ -205,7 +222,7 @@ export class GlobeVisualizationService {
         rafId = null;
       }
       window.removeEventListener('resize', resize);
-      coastlineAbort.abort();
+      coastlineAbort?.abort();
     };
   }
 
