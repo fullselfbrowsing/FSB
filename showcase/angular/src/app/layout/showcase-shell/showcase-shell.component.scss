@@ -45,8 +45,54 @@
   color: var(--text-primary);
 }
 
-.nav-brand img {
-  height: 32px;
+.fsb-mark {
+  color: var(--text-primary);
+  display: inline-block;
+  line-height: 1;
+}
+
+.fsb-mark:hover {
+  color: var(--text-primary);
+}
+
+.nav-brand .fsb-mark {
+  font-size: 1.5rem;
+}
+
+.footer-brand .fsb-mark {
+  font-size: 1.32rem;
+}
+
+.fsb-row {
+  align-items: baseline;
+  display: inline-flex;
+  font-family: 'Poppins', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.fsb-f {
+  font-weight: 100;
+}
+
+.fsb-f::before {
+  content: 'F';
+}
+
+.fsb-s {
+  font-weight: 900;
+}
+
+.fsb-s::before {
+  content: 'S';
+}
+
+.fsb-b {
+  display: inline-block;
+  fill: currentColor;
+  height: 0.74em;
+  margin-left: 0.01em;
+  vertical-align: baseline;
   width: auto;
 }
 
@@ -86,32 +132,8 @@
   gap: 12px;
 }
 
-/* Theme toggle button */
-.theme-toggle-btn {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  z-index: 1000;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 50%;
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.theme-toggle-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--border-hover);
-  transform: scale(1.1);
+.shellless-main {
+  min-height: 100vh;
 }
 
 /* Mobile hamburger */
@@ -198,20 +220,10 @@
   gap: 10px;
 }
 
-.footer-brand img {
-  height: 28px;
-  width: auto;
-}
-
-.footer-brand span {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--text-primary);
-}
-
 .footer-links {
   display: flex;
   gap: 48px;
+  flex-wrap: wrap;
 }
 
 .footer-column h4 {
@@ -233,6 +245,21 @@
   color: var(--text-primary);
 }
 
+.footer-column a.footer-x-link {
+  align-items: center;
+  display: flex;
+  font-size: 0;
+  line-height: 1;
+  width: fit-content;
+}
+
+.footer-column a.footer-x-link::before {
+  content: '\e61b';
+  font-family: 'Font Awesome 6 Brands';
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
 .footer-bottom {
   border-top: 1px solid var(--border-color);
   padding-top: 24px;
@@ -250,6 +277,11 @@
 
 .footer-bottom a {
   color: var(--text-secondary);
+}
+
+.version-tag {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  letter-spacing: 0.4em;
 }
 
 /* --- Responsive --- */
@@ -288,22 +320,11 @@
 }
 
 @media (max-width: 480px) {
-  .theme-toggle-btn {
-    bottom: 12px;
-    left: 12px;
-    width: 36px;
-    height: 36px;
-  }
-
   .footer {
     padding: 24px 0 20px;
   }
 
-  .footer-brand img {
-    height: 24px;
-  }
-
-  .footer-brand span {
+  .footer-brand .fsb-mark {
     font-size: 1rem;
   }
 

@@ -2,7 +2,7 @@
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs entirely in your browser with your own API keys -- no backend, no telemetry, no data collection. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, local providers), 50+ browser actions, 142+ site-specific guides. BSL 1.1 licensed.
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, local providers), a 66-tool MCP surface, 142+ site-specific guides. BSL 1.1 licensed.
 
 FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, Windsurf, OpenClaw, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
 
@@ -19,7 +19,7 @@ Demo video URLs:
 - An Aha Moment by Claude Opus 4.7: https://www.youtube.com/watch?v=mD9oGB2JqVM
 - YouTube channel: https://www.youtube.com/@parzival5707
 
-The audience is developers, power users, researchers, and agent builders who want browser automation without giving a third party their cookies, their API keys, or their attention. FSB is local-first by construction: the extension is the runtime, the user's browser is the execution surface, and the user's API keys live encrypted in Chrome's local storage and never leave the machine. There is no FSB cloud, no FSB account, no FSB telemetry. Each task is a private transaction between the user, the local extension, and the model provider the user chose.
+The audience is developers, power users, researchers, and agent builders who want browser automation without giving a third party their cookies, their API keys, or their attention. FSB is local-first by construction: the extension is the runtime, the user's browser is the execution surface, and the user's API keys live encrypted in Chrome's local storage and never leave the machine. There is no FSB account, no page-content collection, and no browser-history collection; the only first-party data sent home is opt-out anonymous usage telemetry for aggregate public stats. Each task is a private transaction between the user, the local extension, and the model provider the user chose.
 
 The bring-your-own-key model is deliberate. The user picks the model -- frontier reasoning model for hard tasks, fast cheap model for repetitive work, local model for fully air-gapped operation -- and pays the model provider directly for token usage. FSB takes no cut, sees no payments, and brokers no API quotas. The trade-off is setup friction (you need at least one provider key) in exchange for full control over cost, privacy, and model selection.
 
@@ -54,7 +54,7 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 
 ## 3. Install Instructions
 
-1. Clone the repository: `git clone https://github.com/lakshmanturlapati/FSB.git`
+1. Clone the repository: `git clone https://github.com/fullselfbrowsing/FSB.git`
 2. Open `chrome://extensions/` in Chrome.
 3. Enable Developer Mode (top-right toggle).
 4. Click "Load unpacked" and select the cloned FSB directory.
@@ -82,10 +82,10 @@ FSB exposes its tooling through a Model Context Protocol (MCP) server. External 
 The MCP surface is the best way to use FSB with coding agents and external autonomy layers. FSB handles precise single-attempt browser execution, visual feedback, observability, and verification. Long-running scheduling and personality/identity decisions belong in the calling agent layer, such as OpenClaw or Claude Routines.
 
 ### OpenClaw skill
-FSB ships a dedicated OpenClaw skill at `skills/FSB Skill/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: FSB`, `version: 0.9.61`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (skill features, MCP power story, 3-step install, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`.
+FSB ships a dedicated OpenClaw skill at `skills/FSB Skill/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: FSB`, `version: 0.9.61`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (skill features, MCP power story, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`.
 
 ### ClawHub install path
-The /agents page exposes a one-click install on ClawHub at `https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`. ClawHub is the recommended distribution surface for OpenClaw users who want the FSB skill registered without manually pasting stdio config. The skill source remains browsable at `https://github.com/lakshmanturlapati/FSB/tree/main/skills/FSB%20Skill` for users who prefer reading before installing.
+The /agents page exposes a one-click install on ClawHub at `https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`. ClawHub is the recommended distribution surface for OpenClaw users who want the FSB skill registered without manually pasting stdio config. The skill source remains browsable at `https://github.com/fullselfbrowsing/FSB/tree/main/skills/FSB%20Skill` for users who prefer reading before installing.
 
 ### Where FSB earns its keep (grounded use cases)
 The /agents page calls out the recurring browser work that vision-only agents tend to fail on inside logged-in sites. Because FSB drives the user's real Chrome (cookies, sessions, MFA state, saved logins are already there), it is the practical surface for these patterns:
@@ -120,7 +120,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - Agents: https://full-selfbrowsing.com/agents
 - Support: https://full-selfbrowsing.com/support
 - Privacy: https://full-selfbrowsing.com/privacy
-- GitHub: https://github.com/lakshmanturlapati/FSB
+- GitHub: https://github.com/fullselfbrowsing/FSB
 - YouTube channel: https://www.youtube.com/@parzival5707
 - Demo: FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
 - Demo: Flight Booking: Powered by Codex MCP: https://www.youtube.com/watch?v=WbpOrFwgGME

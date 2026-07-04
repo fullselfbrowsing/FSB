@@ -1,0 +1,119 @@
+:host {
+  background: var(--bg-body);
+  display: block;
+  min-height: calc(100vh - var(--nav-height));
+}
+
+.sitemaps-main {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - var(--nav-height));
+  overflow: hidden;
+  padding: calc(var(--nav-height) + 48px) 24px 80px;
+  position: relative;
+}
+
+.globe-canvas {
+  height: 760px;
+  left: 50%;
+  max-height: 96vw;
+  max-width: 96vw;
+  opacity: 0.9;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 760px;
+  z-index: 0;
+}
+
+.sitemaps-empty {
+  max-width: min(540px, calc(100vw - 48px));
+  min-width: 0;
+  position: relative;
+  text-align: center;
+  width: 100%;
+  z-index: 1;
+}
+
+.sitemaps-eyebrow {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 7px;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+  padding: 4px 12px;
+  text-transform: uppercase;
+}
+
+[data-theme="light"] .sitemaps-eyebrow {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.sitemaps-empty h1 {
+  font-size: 2rem;
+  margin-bottom: 14px;
+}
+
+.sitemaps-empty p {
+  color: var(--text-secondary);
+  font-size: 1.02rem;
+  line-height: 1.65;
+  margin: 0 auto 30px;
+  max-width: min(460px, calc(100vw - 48px));
+  overflow-wrap: break-word;
+  width: 100%;
+}
+
+.sitemaps-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.sitemaps-actions .btn-secondary {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.sitemaps-actions .btn-secondary:hover {
+  background: rgba(255, 107, 53, 0.1);
+  border-color: rgba(255, 107, 53, 0.24);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 640px) {
+  .sitemaps-main {
+    padding: calc(var(--nav-height) + 42px) 20px 72px;
+  }
+
+  .globe-canvas {
+    height: 116vw;
+    max-height: 680px;
+    max-width: 116vw;
+    width: 116vw;
+  }
+
+  .sitemaps-empty h1 {
+    font-size: 1.8rem;
+  }
+
+  .sitemaps-empty p {
+    font-size: 0.98rem;
+    max-width: 330px;
+  }
+
+  .sitemaps-actions .btn {
+    width: min(100%, 260px);
+  }
+}

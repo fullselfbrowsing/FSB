@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/recreations.css">
   <link rel="stylesheet" href="css/about.css">
   <script>
-  (function(){if(localStorage.getItem('fsb-showcase-theme')==='light'){document.documentElement.setAttribute('data-theme','light')}})();
+  (function(){if(window.matchMedia&&!window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.setAttribute('data-theme','light')}})();
   </script>
 </head>
 <body>
@@ -1105,10 +1105,6 @@
       </div>
     </div>
   </footer>
-
-  <button class="theme-toggle-btn" aria-label="Toggle theme">
-    <i class="ph ph-sun"></i>
-  </button>
 
   <script src="js/main.js"></script>
   <script src="js/recreations.js"></script>

@@ -18,6 +18,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  LOCALE_ID,
   OnDestroy,
   OnInit,
   PLATFORM_ID,
@@ -27,8 +28,10 @@ import {
 } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe, isPlatformBrowser } from '@angular/common';
 import { Title, Meta } from '@angular/platform-browser';
+import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { APP_VERSION } from '../../core/seo/version';
 import { GitHubStatsService } from '../../core/stats/github-stats.service';
 import {
   CommitEvent,
@@ -66,36 +69,50 @@ interface ViewOption {
   label: string;
 }
 
+interface TabMetric {
+  label: string;
+  value: string;
+}
+
 @Component({
   selector: 'app-stats-page',
   standalone: true,
-  imports: [CommonModule, DatePipe, DecimalPipe],
+  imports: [CommonModule, DatePipe, DecimalPipe, RouterLink],
   templateUrl: './stats-page.component.html',
   styleUrl: './stats-page.component.scss',
 })
 export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly localeId = inject(LOCALE_ID);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly statsService = inject(GitHubStatsService);
   // Phase 274 / STATS-03 -- FSB telemetry stream alongside GitHub stats.
   private readonly fsbService = inject(FSBTelemetryService);
 
+  readonly appVersion = APP_VERSION;
+  readonly fallbackErrorMessage = $localize`:@@stats.error.default:Network or parse error.`;
+  private readonly weekdayShortLabels = [
+    $localize`:@@stats.weekday.sun:Sun`,
+    $localize`:@@stats.weekday.mon:Mon`,
+    $localize`:@@stats.weekday.tue:Tue`,
+    $localize`:@@stats.weekday.wed:Wed`,
+    $localize`:@@stats.weekday.thu:Thu`,
+    $localize`:@@stats.weekday.fri:Fri`,
+    $localize`:@@stats.weekday.sat:Sat`,
+  ] as const;
+
   @ViewChild('chartCanvas') chartCanvas?: ElementRef<HTMLCanvasElement>;
 
   readonly views: readonly ViewOption[] = [
-    { id: 'stars-cumulative', label: 'Cumulative stars' },
-    { id: 'stars-weekly', label: 'Weekly stars' },
-    { id: 'issues-open-vs-closed', label: 'Issues' },
-    { id: 'forks-growth', label: 'Forks' },
-    { id: 'prs-opened-vs-merged', label: 'Pull requests' },
-    { id: 'commits-cumulative', label: 'Cumulative commits' },
-    { id: 'commits-over-time', label: 'Commits' },
-    { id: 'maintenance', label: 'Maintenance' },
-    // Phase 274 / STATS-01 -- 6 new FSB telemetry views appended. Only the
-    // FSB-prefixed view labels are i18n-marked; the legacy GitHub view labels
-    // remain English-only to match the page's pre-274 baseline (the /stats
-    // route is an Easter egg, deliberately invisible to most users).
+    { id: 'stars-cumulative', label: $localize`:@@stats.view.cumulativeStars:Cumulative stars` },
+    { id: 'stars-weekly', label: $localize`:@@stats.view.weeklyStars:Weekly stars` },
+    { id: 'issues-open-vs-closed', label: $localize`:@@stats.view.issues:Issues` },
+    { id: 'forks-growth', label: $localize`:@@stats.view.forks:Forks` },
+    { id: 'prs-opened-vs-merged', label: $localize`:@@stats.view.pullRequests:Pull requests` },
+    { id: 'commits-cumulative', label: $localize`:@@stats.view.cumulativeCommits:Cumulative commits` },
+    { id: 'commits-over-time', label: $localize`:@@stats.view.commits:Commits` },
+    { id: 'maintenance', label: $localize`:@@stats.view.maintenance:Maintenance` },
     { id: 'fsb-active-now', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_ACTIVE_NOW:Active right now` },
     { id: 'fsb-tokens', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_TOKENS:Tokens` },
     { id: 'fsb-agents-running', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_AGENTS_RUNNING:Agents running` },
@@ -129,6 +146,136 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.latestFsbHeadline;
   }
 
+  get tabMetrics(): readonly TabMetric[] {
+    const headline = this.latestFsbHeadline;
+    switch (this.selectedView) {
+      case 'stars-cumulative': {
+        const cumulative = this.statsService.cumulativeStarsSeries(this.latestStars);
+        const weekly = this.latestWeeklyStars.length
+          ? this.latestWeeklyStars
+          : this.statsService.weeklyStarsDelta(this.latestStars);
+        return [
+          { label: $localize`:@@stats.metric.totalStars:total stars`, value: this.fmtNum(cumulative.at(-1)?.y ?? 0) },
+          { label: $localize`:@@stats.metric.last7Days:last 7 days`, value: this.fmtNum(weekly.at(-1)?.count ?? 0) },
+        ];
+      }
+      case 'stars-weekly': {
+        const weekly = this.latestWeeklyStars.length
+          ? this.latestWeeklyStars
+          : this.statsService.weeklyStarsDelta(this.latestStars);
+        const last = weekly.at(-1)?.count ?? 0;
+        const prev = weekly.at(-2)?.count ?? 0;
+        const deltaPct = prev ? Math.round(((last - prev) / prev) * 100) : 0;
+        return [
+          { label: $localize`:@@stats.metric.thisWeek:this week`, value: this.fmtNum(last) },
+          { label: $localize`:@@stats.metric.vsLastWeek:vs last week`, value: `${deltaPct > 0 ? '+' : ''}${deltaPct}%` },
+        ];
+      }
+      case 'issues-open-vs-closed': {
+        const { opened, closed } = this.statsService.issuesOpenVsClosed(this.latestIssues);
+        const openedTotal = sumPoints(opened);
+        const closedTotal = sumPoints(closed);
+        return [
+          { label: $localize`:@@stats.metric.open:open`, value: this.fmtNum(Math.max(0, openedTotal - closedTotal)) },
+          { label: $localize`:@@stats.metric.closed:closed`, value: this.fmtNum(closedTotal) },
+        ];
+      }
+      case 'forks-growth': {
+        const cumulative = this.statsService.forksGrowth(this.latestForks);
+        const monthly = this.statsService.monthlyForks(this.latestForks);
+        return [
+          { label: $localize`:@@stats.metric.totalForks:total forks`, value: this.fmtNum(cumulative.at(-1)?.y ?? 0) },
+          { label: $localize`:@@stats.metric.last30Days:last 30 days`, value: this.fmtNum(monthly.at(-1)?.y ?? 0) },
+        ];
+      }
+      case 'prs-opened-vs-merged': {
+        const { opened, merged } = this.statsService.prsOpenedVsMerged(this.latestPrs);
+        const openedTotal = sumPoints(opened);
+        const mergedTotal = sumPoints(merged);
+        return [
+          { label: $localize`:@@stats.metric.merged:merged`, value: this.fmtNum(mergedTotal) },
+          { label: $localize`:@@stats.metric.open:open`, value: this.fmtNum(Math.max(0, openedTotal - mergedTotal)) },
+        ];
+      }
+      case 'commits-cumulative': {
+        const cumulative = this.statsService.cumulativeCommitsSeries(this.latestCommits);
+        return [
+          { label: $localize`:@@stats.metric.totalCommits:total commits`, value: this.fmtNum(cumulative.at(-1)?.y ?? this.latestCommits.length) },
+          { label: $localize`:@@stats.metric.last30Days:last 30 days`, value: this.fmtNum(countRecentCommits(this.latestCommits, 30)) },
+        ];
+      }
+      case 'commits-over-time': {
+        const punchcard = this.statsService.commitPunchcard(this.latestCommits);
+        const busiest = punchcard.reduce((best, p) => (p.c > best.c ? p : best), { x: 0, y: 0, r: 0, c: 0 });
+        return [
+          { label: $localize`:@@stats.metric.totalCommits:total commits`, value: this.fmtNum(this.latestCommits.length) },
+          { label: $localize`:@@stats.metric.busiestHour:busiest hour`, value: `${Math.round(busiest.x)}:00 UTC` },
+        ];
+      }
+      case 'maintenance': {
+        const latest = latestRelease(this.latestReleases);
+        if (latest) {
+          return [
+            { label: $localize`:@@stats.metric.latestRelease:latest release`, value: latest.tag_name },
+            { label: $localize`:@@stats.metric.released:released`, value: daysAgo(latest.published_at) },
+          ];
+        }
+        return [
+          { label: $localize`:@@stats.metric.releases:releases`, value: '0' },
+          { label: $localize`:@@stats.metric.commits:commits`, value: this.fmtNum(this.latestCommits.length) },
+        ];
+      }
+      case 'fsb-active-now':
+        return [
+          { label: $localize`:@@stats.metric.activeAgents:active agents`, value: this.fmtNum(headline?.active_agents_now ?? 0) },
+          { label: $localize`:@@stats.metric.avgPerUser:avg per user`, value: (headline?.avg_agents_per_user ?? 0).toFixed(1) },
+        ];
+      case 'fsb-tokens':
+        return [
+          { label: $localize`:@@stats.metric.tokensLifetime:tokens lifetime`, value: this.fmtBig(headline?.tokens_total_lifetime ?? 0) },
+          { label: $localize`:@@stats.metric.tokens24h:tokens 24h`, value: this.fmtBig(headline?.tokens_24h ?? 0) },
+        ];
+      case 'fsb-agents-running':
+        return [
+          { label: $localize`:@@stats.metric.activeAgents:active agents`, value: this.fmtNum(headline?.active_agents_now ?? 0) },
+          { label: $localize`:@@stats.metric.lifetimeAgents:lifetime agents`, value: this.fmtNum(headline?.total_agents_lifetime ?? 0) },
+        ];
+      case 'fsb-popular-agents': {
+        const list = headline?.popular_agents ?? [];
+        const top = list[0];
+        return [
+          { label: $localize`:@@stats.metric.trackedAgents:tracked agents`, value: this.fmtNum(list.length) },
+          { label: top ? $localize`:@@stats.metric.topNamed:top: ${top.label}:entityLabel:` : $localize`:@@stats.metric.topAgent:top agent`, value: top ? this.fmtNum(top.uniq) : '0' },
+        ];
+      }
+      case 'fsb-popular-mcp': {
+        const list = headline?.popular_mcp_clients ?? [];
+        const top = list[0];
+        return [
+          { label: $localize`:@@stats.metric.trackedClients:tracked clients`, value: this.fmtNum(list.length) },
+          { label: top ? $localize`:@@stats.metric.topNamed:top: ${top.label}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
+        ];
+      }
+      case 'fsb-avg-agents-per-user':
+        return [
+          { label: $localize`:@@stats.metric.avgAgents:avg agents`, value: (headline?.avg_agents_per_user ?? 0).toFixed(1) },
+          { label: $localize`:@@stats.metric.delta:delta`, value: this.formatSignedDelta(this.avgAgentsDelta) },
+        ];
+    }
+  }
+
+  get formattedFsbActive(): string {
+    return this.fmtNum(this.latestFsbHeadline?.active_users_now ?? 0);
+  }
+
+  get formattedFsbTotal(): string {
+    return this.fmtNum(this.latestFsbHeadline?.total_users ?? 0);
+  }
+
+  get formattedFsbTokens(): string {
+    return this.fmtBig(this.latestFsbHeadline?.tokens_24h ?? 0);
+  }
+
   // Chart.js Chart class -- captured from the dynamic import inside
   // afterNextRender. Typed `any` because we never import the type on the
   // server bundle.
@@ -152,6 +299,8 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   avgAgentsDelta: number | null = null;
 
   private subs: Subscription[] = [];
+  private themeMedia: MediaQueryList | null = null;
+  private readonly onThemeChange = () => this.redrawChart();
 
   constructor() {
     afterNextRender(() => {
@@ -159,12 +308,19 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       // and wire up subscriptions. We re-render on every dataset update and
       // on view switches.
       void this.bootstrap();
+      // readChartTokens() reads live CSS custom properties, so it already
+      // tracks the OS theme; the chart itself still needs an explicit
+      // redraw when those tokens change underneath it.
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        this.themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+        this.themeMedia.addEventListener('change', this.onThemeChange);
+      }
     });
   }
 
   ngOnInit(): void {
     // Runs on server + browser. Static head-only work: title + robots noindex.
-    this.title.setTitle('FSB · Stats');
+    this.title.setTitle($localize`:@@stats.meta.title:FSB · Stats`);
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
   }
 
@@ -180,6 +336,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.fsbService.stop();
     for (const s of this.subs) s.unsubscribe();
     this.subs = [];
+    if (this.themeMedia) {
+      this.themeMedia.removeEventListener('change', this.onThemeChange);
+      this.themeMedia = null;
+    }
     if (this.chartInstance) {
       try {
         this.chartInstance.destroy();
@@ -199,6 +359,33 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   trackByView(_index: number, opt: ViewOption): string {
     return opt.id;
+  }
+
+  trackByMetric(index: number, metric: TabMetric): string {
+    return `${metric.label}:${index}`;
+  }
+
+  private fmtNum(value: number): string {
+    return new Intl.NumberFormat(this.localeId).format(Math.round(value || 0));
+  }
+
+  private fmtBig(value: number): string {
+    if (value >= 1_000) {
+      return new Intl.NumberFormat(this.localeId, {
+        maximumFractionDigits: 1,
+        notation: 'compact',
+      }).format(value);
+    }
+    return this.fmtNum(value);
+  }
+
+  private formatSignedDelta(value: number | null): string {
+    if (value === null) return '+0.00';
+    return `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
+  }
+
+  private weekdayShort(index: number): string {
+    return this.weekdayShortLabels[Math.round(index)] ?? '';
   }
 
   private async bootstrap(): Promise<void> {
@@ -247,7 +434,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch (err) {
       console.warn('[stats-page] failed to load chart.js', err);
       this.viewState = 'error';
-      this.errorMessage = 'Could not load chart library.';
+      this.errorMessage = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
       return;
     }
 
@@ -479,7 +666,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     svg.setAttribute('viewBox', `0 0 ${VB_W} ${VB_H}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', `Sankey: ${O} opened, ${closedFlow} closed, ${backlog} still open`);
+    svg.setAttribute(
+      'aria-label',
+      $localize`:@@stats.chart.issuesSankey.aria:Sankey: ${O}:openedCount: opened, ${closedFlow}:closedCount: closed, ${backlog}:backlogCount: still open`
+    );
 
     const mkPath = (y1: number, h1: number, y2: number, h2: number, fill: string): SVGPathElement => {
       const sx = leftX + nodeW;
@@ -535,10 +725,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       t.textContent = content;
       return t;
     };
-    svg.appendChild(mkText(leftX - 8, oY - 8, 'end', tokens.text, `Opened (${O})`));
-    svg.appendChild(mkText(rightX + nodeW + 8, closedY + Math.max(closedH, 12) / 2, 'start', tokens.text, `Closed (${closedFlow})`));
+    svg.appendChild(mkText(leftX - 8, oY - 8, 'end', tokens.text, $localize`:@@stats.chart.issuesSankey.opened:Opened (${O}:openedCount:)`));
+    svg.appendChild(mkText(rightX + nodeW + 8, closedY + Math.max(closedH, 12) / 2, 'start', tokens.text, $localize`:@@stats.chart.issuesSankey.closed:Closed (${closedFlow}:closedCount:)`));
     if (backlog > 0) {
-      svg.appendChild(mkText(rightX + nodeW + 8, backlogY + Math.max(backlogH, 12) / 2, 'start', tokens.muted, `Still open (${backlog})`));
+      svg.appendChild(mkText(rightX + nodeW + 8, backlogY + Math.max(backlogH, 12) / 2, 'start', tokens.muted, $localize`:@@stats.chart.issuesSankey.stillOpen:Still open (${backlog}:backlogCount:)`));
     }
 
     mount.appendChild(svg);
@@ -586,7 +776,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             labels: series.map((p) => p.t),
             datasets: [
               {
-                label: 'Cumulative stars',
+                label: $localize`:@@stats.chart.cumulativeStars.legend:Cumulative stars`,
                 data: series.map((p) => p.y),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
@@ -614,7 +804,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             datasets: [
               {
                 type: 'bar',
-                label: 'Stars per week',
+                label: $localize`:@@stats.chart.starsPerWeek.legend:Stars per week`,
                 data: counts,
                 backgroundColor: tokens.primary,
                 borderColor: tokens.primary,
@@ -623,7 +813,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
               },
               {
                 type: 'scatter',
-                label: 'Weekly star count',
+                label: $localize`:@@stats.chart.weeklyStarCount.legend:Weekly star count`,
                 data: counts,
                 pointRadius: 5,
                 pointHoverRadius: 7,
@@ -655,7 +845,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             datasets: [
               {
                 type: 'line',
-                label: 'Cumulative forks',
+                label: $localize`:@@stats.chart.cumulativeForks.legend:Cumulative forks`,
                 data: labels.map((t) => valueAt(cumulative, t)),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
@@ -667,7 +857,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
               },
               {
                 type: 'bar',
-                label: 'Forks (per month bucket)',
+                label: $localize`:@@stats.chart.monthlyForks.legend:Forks (per month bucket)`,
                 data: labels.map((t) => valueAt(monthly, t)),
                 backgroundColor: tokens.primarySoft,
                 borderColor: tokens.primary,
@@ -713,7 +903,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             labels,
             datasets: [
               {
-                label: 'Opened',
+                label: $localize`:@@stats.chart.prsOpened.legend:Opened`,
                 data: labels.map((t) => +valueAt(opened, t)),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
@@ -722,7 +912,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
                 pointRadius: 0,
               },
               {
-                label: 'Merged',
+                label: $localize`:@@stats.chart.prsMerged.legend:Merged`,
                 data: labels.map((t) => -valueAt(merged, t)),
                 borderColor: tokens.muted,
                 backgroundColor: 'rgba(148,163,184,0.18)',
@@ -742,7 +932,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
                   label: (ctx: any) => {
                     const label = ctx.dataset?.label ?? '';
                     const y = ctx.parsed?.y ?? 0;
-                    return `${label}: ${Math.abs(y)}`;
+                    return $localize`:@@stats.chart.seriesValueTooltip:${label}:seriesLabel:: ${Math.abs(y)}:value:`;
                   },
                 },
               },
@@ -771,7 +961,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             labels: series.map((p) => p.t),
             datasets: [
               {
-                label: 'Cumulative commits',
+                label: $localize`:@@stats.chart.cumulativeCommits.legend:Cumulative commits`,
                 data: series.map((p) => p.y),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
@@ -793,7 +983,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
           data: {
             datasets: [
               {
-                label: 'Commits',
+                label: $localize`:@@stats.chart.commits.legend:Commits`,
                 data: points,
                 backgroundColor: tokens.primarySoft,
                 borderColor: tokens.primary,
@@ -816,10 +1006,13 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
                     const count = typeof raw.c === 'number' ? raw.c : 0;
                     const x = typeof raw.x === 'number' ? Math.round(raw.x) : 0;
                     const y = typeof raw.y === 'number' ? Math.round(raw.y) : 0;
-                    const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][y] ?? '';
+                    const weekday = this.weekdayShort(y);
                     const hour = String(x).padStart(2, '0');
-                    const noun = count === 1 ? 'commit' : 'commits';
-                    return `${weekday} ${hour}:00 -- ${count} ${noun}`;
+                    const time = `${hour}:00`;
+                    const noun = count === 1
+                      ? $localize`:@@stats.chart.commitSingular:commit`
+                      : $localize`:@@stats.chart.commitPlural:commits`;
+                    return $localize`:@@stats.chart.commitTooltip:${weekday}:weekday: ${time}:time: -- ${count}:count: ${noun}:commitNoun:`;
                   },
                 },
               },
@@ -848,7 +1041,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
                   stepSize: 1,
                   precision: 0,
                   callback: (v: number) =>
-                    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][Math.round(v)] ?? '',
+                    this.weekdayShort(Number(v)),
                 },
                 grid: { color: tokens.border },
               },
@@ -875,7 +1068,9 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
           data: {
             datasets: [
               {
-                label: hasReleases ? 'Releases' : 'Commits (no releases yet)',
+                label: hasReleases
+                  ? $localize`:@@stats.chart.releases.legend:Releases`
+                  : $localize`:@@stats.chart.commitsNoReleases.legend:Commits (no releases yet)`,
                 data: points,
                 pointRadius: 6,
                 pointHoverRadius: 8,
@@ -936,7 +1131,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
           data: {
             labels: [
               $localize`:@@SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW:Active users right now`,
-              'Headroom',
+              $localize`:@@stats.chart.activeHeadroom:Headroom`,
             ],
             datasets: [
               {
@@ -1112,6 +1307,32 @@ function readChartTokens(): ChartTokens {
     muted: (style.getPropertyValue('--text-secondary') || '#94a3b8').trim(),
     border: (style.getPropertyValue('--border-color') || 'rgba(255,255,255,0.08)').trim(),
   };
+}
+
+function sumPoints(points: ReadonlyArray<{ y: number }>): number {
+  return points.reduce((total, point) => total + (Number.isFinite(point.y) ? point.y : 0), 0);
+}
+
+function countRecentCommits(commits: readonly CommitEvent[], days: number): number {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return commits.filter((commit) => {
+    const date = Date.parse(commit.commit?.author?.date ?? '');
+    return Number.isFinite(date) && date >= cutoff;
+  }).length;
+}
+
+function latestRelease(releases: readonly ReleaseEvent[]): ReleaseEvent | null {
+  return releases
+    .filter((release) => Number.isFinite(Date.parse(release.published_at)))
+    .slice()
+    .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))[0] ?? null;
+}
+
+function daysAgo(dateText: string): string {
+  const date = Date.parse(dateText);
+  if (!Number.isFinite(date)) return $localize`:@@stats.date.unknown:unknown`;
+  const days = Math.max(0, Math.round((Date.now() - date) / (24 * 60 * 60 * 1000)));
+  return days === 0 ? $localize`:@@stats.date.today:today` : $localize`:@@stats.date.daysAgo:${days}:days:d ago`;
 }
 
 function unionLabels(a: string[], b: string[]): string[] {

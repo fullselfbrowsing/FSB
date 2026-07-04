@@ -26,28 +26,44 @@ remains correct and is preferred.
 
 ## Brand and product names (alphabetized)
 
+- AI
 - Anthropic
 - Brave
 - BSL 1.1
+- CDP
 - Chrome
+- Chrome DevTools
+- Chrome DevTools Protocol
+- Chrome Web Store
 - Chromium
+- CID
 - ClawHub
 - Claude
 - Claude Code
 - Claude Desktop
 - Claude Haiku 4.5
 - Claude Opus 4.1
+- Claude Opus 4.6
 - Claude Opus 4.7
 - Claude Routines
 - Claude Sonnet 4.5
 - Codex
 - Codex MCP
 - Computer Use
+- CSSOM
+- CSRF
 - Cursor
+- CVV
+- Discord
+- DOM
+- DSSE
 - Edge
+- Ed25519
+- ESM
 - Firefox
 - FSB
 - Full Self-Browsing
+- GDPR
 - fsb-mcp-server
 - Gemini
 - GitHub
@@ -57,24 +73,50 @@ remains correct and is preferred.
 - Grok 4.1
 - Grok 4.1 Fast
 - Grok Code Fast
+- Hermes
 - Issues
+- JavaScript
+- JCS
+- JSON
 - Lakshman Turlapati
+- Lattice
+- LiteLLM
 - LM Studio
+- LZ-string
 - MCP
 - MCP server
+- MutationObserver
+- MV3
 - npm
+- Node
 - npx
 - OpenAI
+- OpenAI Whisper
 - OpenClaw
 - OpenCode
 - OpenRouter
 - Opera
 - Operator
+- PhantomStream
+- Playwright
 - Project Mariner
+- Prometheus
+- pnpm
+- Remote Dashboard
 - Safari
+- SDK
+- Standard Schema
+- TypeScript
 - Vivaldi
+- WeakMap
+- WebRTC
+- WebSocket
 - Windsurf
+- X
 - xAI
+- YouTube
+- Zod
+- zod
 
 ## Code, CLI, and configuration identifiers
 
@@ -83,6 +125,18 @@ remains correct and is preferred.
 - `AES-GCM`
 - `chrome.storage.local`
 - `chrome://extensions`
+- `API`
+- `CVV`
+- `GDPR`
+- `HTTP`
+- `HTTPS`
+- `IP`
+- `maskInputs`
+- `PBKDF2`
+- `URL`
+- `URLs`
+- `UUID`
+- `UX`
 - Action API names in `pages/about/about-page.component.html` Action Library
   (~50 identifiers including `navigate`, `click`, `type`, `cdpMouseClick`,
   `getDomTree`, `waitForElement`, etc.).

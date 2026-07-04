@@ -1,84 +1,104 @@
-<nav class="nav" [class.scrolled]="navScrolled">
-  <div class="nav-inner">
-    <a routerLink="/" class="nav-brand" (click)="closeMobileMenu()">
-       
-      <img src="assets/icon128.png" i18n-alt="@@shell.nav.brand.logo.alt" alt="FSB Logo" width="32" height="32" decoding="async">
-      <span i18n="@@shell.nav.brand.text" [attr.translate]="'no'">FSB</span>
-    </a>
-    <div class="nav-links">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" i18n="@@shell.nav.desktop.home">Home</a>
-      <a routerLink="/about" routerLinkActive="active" i18n="@@shell.nav.desktop.about">About</a>
-      <a routerLink="/agents" routerLinkActive="active" i18n="@@shell.nav.desktop.agents">Agents</a>
-      <a routerLink="/dashboard" routerLinkActive="active" i18n="@@shell.nav.desktop.dashboard">Dashboard</a>
-      <a routerLink="/privacy" routerLinkActive="active" i18n="@@shell.nav.desktop.privacy">Privacy</a>
-      <a routerLink="/support" routerLinkActive="active" i18n="@@shell.nav.desktop.support">Support</a>
-    </div>
-    <div class="nav-actions">
-       
-      <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" class="btn btn-sm btn-github" i18n="@@shell.nav.desktop.github" [attr.translate]="'no'">
-        <i class="fa-brands fa-github"></i> GitHub
+@if (!shellless) {
+  <nav class="nav" [class.scrolled]="navScrolled">
+    <div class="nav-inner">
+      <a routerLink="/" class="nav-brand" (click)="closeMobileMenu()">
+        <span class="fsb-mark" i18n-aria-label="@@shell.nav.brand.aria" aria-label="FSB">
+          <span class="fsb-row" aria-hidden="true">
+            <span class="fsb-f"></span>
+            <span class="fsb-s"></span>
+            <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+              <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+            </svg>
+          </span>
+        </span>
       </a>
+      <div class="nav-links">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" i18n="@@shell.nav.desktop.home">Home</a>
+        <a routerLink="/about" routerLinkActive="active" i18n="@@shell.nav.desktop.about">About</a>
+        <a routerLink="/agents" routerLinkActive="active" i18n="@@shell.nav.desktop.agents">Agents</a>
+        <a routerLink="/dashboard" routerLinkActive="active" i18n="@@shell.nav.desktop.dashboard">Dashboard</a>
+        <a routerLink="/privacy" routerLinkActive="active" i18n="@@shell.nav.desktop.privacy">Privacy</a>
+        <a routerLink="/support" routerLinkActive="active" i18n="@@shell.nav.desktop.support">Support</a>
+      </div>
+      <div class="nav-actions">
+        <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-sm btn-github" i18n="@@shell.nav.desktop.github" [attr.translate]="'no'">
+          <i class="fa-brands fa-github"></i> GitHub
+        </a>
+      </div>
+      <button class="nav-toggle" [class.active]="mobileMenuOpen" i18n-aria-label="@@shell.nav.toggle.aria" aria-label="Toggle navigation" (click)="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
     </div>
-    <button class="nav-toggle" [class.active]="mobileMenuOpen" i18n-aria-label="@@shell.nav.toggle.aria" aria-label="Toggle navigation" (click)="toggleMobileMenu()">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
+  </nav>
+  <div class="nav-mobile" [class.active]="mobileMenuOpen">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.home">Home</a>
+    <a routerLink="/about" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.about">About</a>
+    <a routerLink="/agents" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.agents">Agents</a>
+    <a routerLink="/dashboard" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.dashboard">Dashboard</a>
+    <a routerLink="/privacy" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.privacy">Privacy</a>
+    <a routerLink="/support" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.support">Support</a>
+    <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.github" [attr.translate]="'no'"><i class="fa-brands fa-github"></i> GitHub</a>
   </div>
-</nav>
-<div class="nav-mobile" [class.active]="mobileMenuOpen">
-  <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.home">Home</a>
-  <a routerLink="/about" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.about">About</a>
-  <a routerLink="/agents" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.agents">Agents</a>
-  <a routerLink="/dashboard" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.dashboard">Dashboard</a>
-  <a routerLink="/privacy" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.privacy">Privacy</a>
-  <a routerLink="/support" routerLinkActive="active" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.support">Support</a>
-   
-  <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" (click)="closeMobileMenu()" i18n="@@shell.nav.mobile.github" [attr.translate]="'no'"><i class="fa-brands fa-github"></i> GitHub</a>
-</div>
+}
 
-<main>
+<main [class.shellless-main]="shellless">
   <ng-content></ng-content>
 </main>
 
-<footer class="footer">
-  <div class="container">
-    <div class="footer-inner">
-      <div class="footer-brand">
-         
-        <img src="assets/icon48.png" i18n-alt="@@shell.footer.brand.logo.alt" alt="FSB" width="28" height="28" loading="lazy" decoding="async">
-        <span i18n="@@shell.footer.brand.text" [attr.translate]="'no'">FSB</span>
+@if (!shellless) {
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="fsb-mark" i18n-aria-label="@@shell.footer.brand.aria" aria-label="FSB">
+            <span class="fsb-row" aria-hidden="true">
+              <span class="fsb-f"></span>
+              <span class="fsb-s"></span>
+              <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+              </svg>
+            </span>
+          </span>
+        </div>
+        <div class="footer-links">
+          <div class="footer-column">
+            <h4 i18n="@@shell.footer.col.pages.title">Pages</h4>
+            <a routerLink="/" i18n="@@shell.footer.col.pages.home">Home</a>
+            <a routerLink="/about" i18n="@@shell.footer.col.pages.about">About</a>
+            <a routerLink="/dashboard" i18n="@@shell.footer.col.pages.dashboard">Dashboard</a>
+            <a routerLink="/agents" i18n="@@shell.footer.col.pages.agents">Agents</a>
+            <a routerLink="/privacy" i18n="@@shell.footer.col.pages.privacy">Privacy</a>
+            <a routerLink="/support" i18n="@@shell.footer.col.pages.support">Support</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@shell.footer.col.project.title">Project</h4>
+            <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" i18n="@@shell.footer.project.github" [attr.translate]="'no'">GitHub</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" i18n="@@shell.footer.project.issues" [attr.translate]="'no'">Issues</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" i18n="@@shell.footer.project.changelog">Changelog</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE" target="_blank" rel="noopener" i18n="@@shell.footer.project.license">BSL 1.1 License</a>
+            <a routerLink="/stats" i18n="@@shell.footer.project.stats">Stats</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@shell.footer.col.research.title">Research</h4>
+            <a routerLink="/lattice" i18n="@@shell.footer.research.lattice" [attr.translate]="'no'">Lattice</a>
+            <a routerLink="/phantom-stream" i18n="@@shell.footer.research.phantomStream" [attr.translate]="'no'">PhantomStream</a>
+            <a routerLink="/prometheus" i18n="@@shell.footer.research.prometheus" [attr.translate]="'no'">Prometheus</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@shell.footer.col.community.title">Community</h4>
+            <a routerLink="/sitemaps" i18n="@@shell.footer.community.sitemaps" [attr.translate]="'no'">Sitemaps</a>
+            <a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" i18n="@@shell.footer.community.discord" [attr.translate]="'no'">Discord</a>
+            <a href="https://x.com/fsb0804" target="_blank" rel="noopener" class="footer-x-link" i18n="@@shell.footer.community.x" [attr.translate]="'no'">X</a>
+          </div>
+        </div>
       </div>
-      <div class="footer-links">
-        <div class="footer-column">
-          <h4 i18n="@@shell.footer.col.pages.title">Pages</h4>
-          <a routerLink="/" i18n="@@shell.footer.col.pages.home">Home</a>
-          <a routerLink="/about" i18n="@@shell.footer.col.pages.about">About</a>
-          <a routerLink="/dashboard" i18n="@@shell.footer.col.pages.dashboard">Dashboard</a>
-          <a routerLink="/agents" i18n="@@shell.footer.col.pages.agents">Agents</a>
-          <a routerLink="/privacy" i18n="@@shell.footer.col.pages.privacy">Privacy</a>
-          <a routerLink="/support" i18n="@@shell.footer.col.pages.support">Support</a>
-        </div>
-        <div class="footer-column">
-          <h4 i18n="@@shell.footer.col.project.title">Project</h4>
-           
-          <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" i18n="@@shell.footer.project.github" [attr.translate]="'no'">GitHub</a>
-           
-          <a href="https://github.com/lakshmanturlapati/FSB/issues" target="_blank" rel="noopener" i18n="@@shell.footer.project.issues" [attr.translate]="'no'">Issues</a>
-           
-          <a href="https://github.com/lakshmanturlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" i18n="@@shell.footer.project.license">BSL 1.1 License</a>
-          <a routerLink="/stats" i18n="@@shell.footer.project.stats">Stats</a>
-        </div>
+      <div class="footer-bottom">
+        <p i18n="@@shell.footer.bottom.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <p i18n="@@shell.footer.bottom.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
+        <app-language-picker [mode]="'text'"></app-language-picker>
       </div>
     </div>
-    <div class="footer-bottom">
-      <p i18n="@@shell.footer.bottom.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
-      <p i18n="@@shell.footer.bottom.version"><span [attr.translate]="'no'">FSB</span> v{{ appVersion }}</p>
-      <app-language-picker [mode]="'icon'"></app-language-picker>
-    </div>
-  </div>
-</footer>
-
-<button class="theme-toggle-btn" i18n-aria-label="@@shell.theme.toggle.aria" aria-label="Toggle theme" (click)="toggleTheme()">
-  <i [class]="isDark ? 'ph ph-sun' : 'ph ph-moon'"></i>
-</button>
+  </footer>
+}

@@ -1,103 +1,108 @@
-<section class="stats-page container">
-  <header class="stats-header">
-    <h1>FSB <span class="dot">·</span> Stats <span class="muted">for nerds</span></h1>
-    <p class="stats-sub">Live signals from <code>LakshmanTurlapati/FSB</code>. Auto-refreshes every 5&nbsp;minutes while this tab is visible.</p>
-  </header>
+<div class="stats-shell">
+  <div class="stats-glow-bg" aria-hidden="true"></div>
+  <a routerLink="/" class="stats-back-btn" i18n-aria-label="@@stats.back.aria" aria-label="Go back">
+    <i class="ph ph-arrow-left"></i>
+  </a>
 
-  <nav class="view-switcher" role="tablist" aria-label="Stats view">
-    @for (opt of views; track trackByView($index, opt)) {
-      <button
-        type="button"
-        role="tab"
-        [attr.aria-selected]="selectedView === opt.id"
-        [attr.data-view]="opt.id"
-        [class.active]="selectedView === opt.id"
-        (click)="setView(opt.id)">
-        {{ opt.label }}
-      </button>
-    }
-  </nav>
+  <main class="stats-main">
+    <section class="stats-page">
+      <header class="stats-header">
+        <div class="stats-header-text">
+          <h1><span i18n="@@stats.header.title">Stats</span> <span class="muted" i18n="@@stats.header.muted">for nerds</span></h1>
+          <p class="stats-sub" i18n="@@stats.header.subtitle">Live signals from <code [attr.translate]="'no'">fullselfbrowsing/FSB</code>.</p>
+        </div>
+        <span class="stats-live-badge" role="status" i18n-aria-label="@@stats.live.aria" aria-label="Live data" i18n="@@stats.live.label">Live</span>
+      </header>
 
-  <!-- Phase 274 / STATS-02 -- FSB Telemetry section heading + live headline row. -->
-  <div class="fsb-section-heading" role="region"
-       aria-label="FSB Telemetry"
-       i18n-aria-label="@@SHOWCASE_STATS_FSB_SECTION_ARIA">
-    <h2 i18n="@@SHOWCASE_STATS_FSB_SECTION_HEADING"><span [attr.translate]="'no'">FSB</span> Telemetry</h2>
-    <p class="fsb-section-sub" i18n="@@SHOWCASE_STATS_FSB_SECTION_SUB">Live anonymous usage from <span [attr.translate]="'no'">FSB</span> installs. Refreshes every 5&nbsp;minutes.</p>
-  </div>
+      <nav class="view-switcher" role="tablist" i18n-aria-label="@@stats.view.aria" aria-label="Stats view">
+        @for (opt of views; track trackByView($index, opt)) {
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="selectedView === opt.id"
+            [attr.data-view]="opt.id"
+            [class.active]="selectedView === opt.id"
+            (click)="setView(opt.id)">
+            {{ opt.label }}
+          </button>
+        }
+      </nav>
 
-  @if (fsbHeadline) {
-    <div class="stats-headline" role="status" aria-live="polite"
-         aria-label="Live FSB metrics"
-         i18n-aria-label="@@SHOWCASE_STATS_FSB_HEADLINE_ARIA">
-      <span class="headline-cell">
-        <strong>{{ fsbHeadline.active_users_now }}</strong>
-        <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
-      </span>
-      <span class="headline-dot" aria-hidden="true">·</span>
-      <span class="headline-cell">
-        <strong>{{ fsbHeadline.total_users }}</strong>
-        <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">total users</span>
-      </span>
-      <span class="headline-dot" aria-hidden="true">·</span>
-      <span class="headline-cell">
-        <strong>{{ fsbHeadline.tokens_24h }}</strong>
-        <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (last 24h)</span>
-      </span>
-    </div>
-  }
-
-  <div class="chart-card" [attr.data-state]="viewState">
-    @if (viewState === 'loading') {
-      <div class="skeleton" aria-busy="true" aria-live="polite">
-        <span class="sr-only">Loading stats…</span>
+      <div class="stats-headline-row">
+        <div class="stats-tab-metrics" role="status" aria-live="polite" i18n-aria-label="@@stats.tabMetrics.aria" aria-label="Current tab metrics">
+          @for (metric of tabMetrics; track trackByMetric($index, metric)) {
+            <span class="headline-cell"><strong>{{ metric.value }}</strong> <span>{{ metric.label }}</span></span>
+          }
+        </div>
+        <div class="stats-headline" role="status" aria-live="polite"
+             aria-label="Live FSB metrics"
+             i18n-aria-label="@@SHOWCASE_STATS_FSB_HEADLINE_ARIA">
+          <span class="headline-cell">
+            <strong>{{ formattedFsbActive }}</strong>
+            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
+          </span>
+          <span class="headline-dot" aria-hidden="true">·</span>
+          <span class="headline-cell">
+            <strong>{{ formattedFsbTotal }}</strong>
+            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">total users</span>
+          </span>
+          <span class="headline-dot" aria-hidden="true">·</span>
+          <span class="headline-cell">
+            <strong>{{ formattedFsbTokens }}</strong>
+            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (last 24h)</span>
+          </span>
+        </div>
       </div>
-    }
-    @if (viewState === 'ready') {
-      <div class="chart-mount">
-        <!-- Quick task 260515-mfs (P1) -- canvas stays mounted under [hidden] so
-             @ViewChild('chartCanvas') always resolves and redrawChart() can find
-             the canvas without an extra change-detection tick. redrawChart()
-             early-returns for fsb-avg-agents-per-user (component.ts:391) and
-             destroys any prior chart instance, so nothing renders onto this
-             canvas while the big-number tile is active. -->
-        <canvas #chartCanvas [hidden]="selectedView === 'fsb-avg-agents-per-user'"></canvas>
-        @if (selectedView === 'fsb-avg-agents-per-user') {
-          <!-- Quick task 260515-kw1 -- big-number tile (HTML, not canvas). The
-               tile renders in parallel with the [hidden] canvas above so the
-               chart-mount slot is reused; redrawChart() early-returns for this view. -->
-          <div class="big-number-tile" role="status" aria-live="polite">
-            <div class="big-number-label" i18n="@@SHOWCASE_STATS_FSB_TILE_AVG_AGENTS_LABEL">Avg agents per active user</div>
-            <div class="big-number-value">{{ fsbHeadline?.avg_agents_per_user ?? 0 | number:'1.1-2' }}</div>
-            @if (avgAgentsDelta !== null) {
-              <div class="big-number-delta" [class.up]="avgAgentsDelta > 0" [class.down]="avgAgentsDelta < 0">
-                <span class="delta-arrow" aria-hidden="true">{{ avgAgentsDelta > 0 ? '\u25B2' : (avgAgentsDelta < 0 ? '\u25BC' : '\u00B7') }}</span>
-                {{ avgAgentsDelta > 0 ? '+' : '' }}{{ avgAgentsDelta | number:'1.1-2' }}
+
+      <div class="chart-card" [attr.data-state]="viewState">
+        @if (viewState === 'loading') {
+          <div class="skeleton" aria-busy="true" aria-live="polite">
+            <span class="sr-only" i18n="@@stats.loading.sr">Loading stats...</span>
+          </div>
+        }
+        @if (viewState === 'ready') {
+          <div class="chart-mount">
+            <canvas #chartCanvas [hidden]="selectedView === 'fsb-avg-agents-per-user'"></canvas>
+            @if (selectedView === 'fsb-avg-agents-per-user') {
+              <div class="big-number-tile" role="status" aria-live="polite">
+                <div class="big-number-label" i18n="@@SHOWCASE_STATS_FSB_TILE_AVG_AGENTS_LABEL">Avg agents per active user</div>
+                <div class="big-number-value">{{ fsbHeadline?.avg_agents_per_user ?? 0 | number:'1.1-2' }}</div>
+                @if (avgAgentsDelta !== null) {
+                  <div class="big-number-delta" [class.up]="avgAgentsDelta > 0" [class.down]="avgAgentsDelta < 0">
+                    <span class="delta-arrow" aria-hidden="true">{{ avgAgentsDelta > 0 ? '\u25B2' : (avgAgentsDelta < 0 ? '\u25BC' : '\u00B7') }}</span>
+                    {{ avgAgentsDelta > 0 ? '+' : '' }}{{ avgAgentsDelta | number:'1.1-2' }}
+                  </div>
+                }
               </div>
             }
           </div>
         }
+        @if (viewState === 'rate-limited') {
+          <div class="rate-card" role="status">
+            <h3 i18n="@@stats.rate.title">GitHub rate-limited</h3>
+            <p i18n="@@stats.rate.body">
+              Retrying at
+              <strong>{{ rateLimitedUntil | date:'HH:mm' }}</strong>.
+              The unauthenticated API allows 60 requests / hour / IP - we'll be back shortly.
+            </p>
+          </div>
+        }
+        @if (viewState === 'error') {
+          <div class="error-card" role="alert">
+            <h3 i18n="@@stats.error.title">Could not load stats</h3>
+            <p><span>{{ errorMessage || fallbackErrorMessage }}</span> <span i18n="@@stats.error.retry">The page retries automatically every 5 minutes.</span></p>
+          </div>
+        }
       </div>
-    }
-    @if (viewState === 'rate-limited') {
-      <div class="rate-card" role="status">
-        <h3>GitHub rate-limited</h3>
-        <p>
-          Retrying at
-          <strong>{{ rateLimitedUntil | date:'HH:mm' }}</strong>.
-          The unauthenticated API allows 60 requests / hour / IP &mdash; we'll be back shortly.
-        </p>
-      </div>
-    }
-    @if (viewState === 'error') {
-      <div class="error-card" role="alert">
-        <h3>Could not load stats</h3>
-        <p>{{ errorMessage || 'Network or parse error.' }} The page retries automatically every 5 minutes.</p>
-      </div>
-    }
-  </div>
+    </section>
+  </main>
 
-  <footer class="stats-foot">
-    <p>Live from the <a href="https://docs.github.com/en/rest" target="_blank" rel="noopener">GitHub REST API</a>. Auto-refreshes every 5&nbsp;minutes.</p>
+  <footer class="footer stats-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p i18n="@@stats.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <p i18n="@@stats.footer.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
+      </div>
+    </div>
   </footer>
-</section>
+</div>

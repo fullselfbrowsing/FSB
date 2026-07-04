@@ -136,7 +136,31 @@
   word-break: break-all;
 }
 
+.privacy-content pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.privacy-content pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  white-space: pre;
+  word-break: normal;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
 /* ---------- Policy version history ---------- */
+.policy-version-intro {
+  font-style: italic;
+}
+
 .policy-version {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -185,6 +209,29 @@
 
 .policy-version-body p {
   font-size: 0.9rem;
+}
+
+.policy-version-body h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+.policy-version-body h3:first-of-type {
+  margin-top: 8px;
+}
+
+.policy-version-body ul li {
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.policy-version-body .archive-note {
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 16px;
 }
 
 /* ---------- Responsive ---------- */

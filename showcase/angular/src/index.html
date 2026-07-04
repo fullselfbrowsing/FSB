@@ -12,17 +12,16 @@
        not parsed. The brand identifier is protected via the canonical
        DO-NOT-TRANSLATE.md list and Phase 265's CI invariants. -->
   <title i18n="@@index.title">FSB</title>
-  <meta name="description" i18n-content="@@index.meta.description" content="FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser via natural language. Multi-model AI, 50+ browser actions, MCP-compatible for Claude Code, Codex, Cursor, and OpenClaw.">
+  <meta name="description" i18n-content="@@index.meta.description" content="FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser via natural language. Multi-model AI, a 66-tool MCP catalog, and compatibility for Claude Code, Codex, Cursor, and OpenClaw.">
   <base href="/">
   <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Prerender-safe theme bootstrap: guard requires `typeof localStorage !== 'undefined'` (PITFALLS.md P1, D-20) -->
+  <!-- Prerender-safe theme bootstrap: guard requires `typeof window.matchMedia !== 'function'` (PITFALLS.md P1, D-20) -->
   <script>
     (function initShowcaseTheme() {
-      if (typeof localStorage === 'undefined') return;
-      if (typeof localStorage.getItem !== 'function') return;
-      var saved = localStorage.getItem('fsb-showcase-theme');
-      if (saved === 'light') {
+      if (typeof window === 'undefined') return;
+      if (typeof window.matchMedia !== 'function') return;
+      if (!window.matchMedia('(prefers-color-scheme: dark)').matches) {
         document.documentElement.setAttribute('data-theme', 'light');
       }
     })();
@@ -30,7 +29,7 @@
    
   <link rel="icon" type="image/png" href="/assets/icon48.png">
   <!-- Organization JSON-LD (LD-01, D-10..D-12). Inherited by every prerendered route via index.html template. Payload is hand-authored single-line strict JSON; no field contains '<' so no \u003c escape pass is needed. Pattern: PITFALLS.md P4. Threat: T-LD-01 (XSS via JSON-LD injection). -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://full-selfbrowsing.com/#org","name":"FSB","alternateName":"Full Self-Browsing","url":"https://full-selfbrowsing.com","logo":"https://full-selfbrowsing.com/assets/fsb_logo_dark.png","sameAs":["https://github.com/lakshmanturlapati/FSB","https://www.youtube.com/@parzival5707"]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://full-selfbrowsing.com/#org","name":"FSB","alternateName":"Full Self-Browsing","url":"https://full-selfbrowsing.com","logo":"https://full-selfbrowsing.com/assets/fsb_logo_dark.png","sameAs":["https://github.com/fullselfbrowsing/FSB","https://www.youtube.com/@parzival5707"]}</script>
 </head>
 <body>
   <app-root></app-root>

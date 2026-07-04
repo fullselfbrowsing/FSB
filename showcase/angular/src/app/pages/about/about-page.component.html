@@ -45,11 +45,11 @@
         </article>
         <article class="video-demo-card reveal delay-4">
           <div class="video-frame">
-            <iframe src="https://www.youtube-nocookie.com/embed/mD9oGB2JqVM" i18n-title="@@about.videos.demo4.iframe.title" title="An Aha Moment by Claude Opus 4.7" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            <iframe src="https://www.youtube-nocookie.com/embed/mD9oGB2JqVM" i18n-title="@@about.videos.demo4.iframe.title" title="An Aha Moment by Claude Opus 4.6" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
           </div>
           <div class="video-demo-copy">
             <span class="video-demo-tag" i18n="@@about.videos.demo4.tag" [attr.translate]="'no'">Claude</span>
-            <h3 i18n="@@about.videos.demo4.title">An Aha Moment by <span [attr.translate]="'no'">Claude Opus 4.7</span></h3>
+            <h3 i18n="@@about.videos.demo4.title">An Aha Moment by <span [attr.translate]="'no'">Claude Opus 4.6</span></h3>
             <p i18n="@@about.videos.demo4.desc"><span [attr.translate]="'no'">Claude</span> pairs reasoning with <span [attr.translate]="'no'">FSB</span>'s browser execution so the agent can learn from the page and keep iterating.</p>
           </div>
         </article>
@@ -57,103 +57,70 @@
     </div>
   </section>
 
-  <!-- Architecture Diagram -->
-  <section class="arch-section section">
+  <!-- Memory -->
+  <section class="memory-section section" [attr.data-theme]="graphTheme">
     <div class="container">
       <div class="section-header reveal">
-        <h2 i18n="@@about.arch.title">Architecture</h2>
-        <p i18n="@@about.arch.subtitle">How <span [attr.translate]="'no'">FSB</span>'s components communicate to automate browser tasks.</p>
+        <h2 i18n="@@about.memory.title">Memory</h2>
+        <p i18n="@@about.memory.subtitle"><span [attr.translate]="'no'">FSB</span> ships with built-in memory for the web's most-used sites. It already knows their selectors, workflows, and gotchas. Start with the categories, then switch to <strong>Expanded</strong> to branch out to every site <span [attr.translate]="'no'">FSB</span> already understands.</p>
       </div>
-      <div class="arch-diagram reveal">
-        <!-- Entry points -->
-        <div class="arch-row arch-entry-row">
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-message"></i></div>
-            <h4 i18n="@@about.arch.box.popup.title">Popup UI</h4>
-            <p i18n="@@about.arch.box.popup.desc">Quick chat interface</p>
+      <div class="mem-stats reveal">
+        @for (stat of memoryStats; track stat.label) {
+          <div class="mem-stat">
+            <span class="mem-stat-value" [attr.translate]="'no'">{{ stat.value }}</span>
+            <span class="mem-stat-label">{{ stat.label }}</span>
           </div>
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-columns"></i></div>
-            <h4 i18n="@@about.arch.box.sidepanel.title">Side Panel</h4>
-            <p i18n="@@about.arch.box.sidepanel.desc">Persistent automation view</p>
-          </div>
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-gauge-high"></i></div>
-            <h4 i18n="@@about.arch.box.options.title">Options Dashboard</h4>
-            <p i18n="@@about.arch.box.options.desc">Settings and analytics</p>
-          </div>
-        </div>
-
-        <div class="arch-arrow"><i class="fa-solid fa-arrow-down"></i></div>
-
-        <!-- Agent integration -->
-        <div class="arch-row arch-mcp-row">
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-plug"></i></div>
-            <h4 i18n="@@about.arch.box.mcp.title"><span [attr.translate]="'no'">MCP</span> Server</h4>
-            <p i18n="@@about.arch.box.mcp.desc">IDE integration (<span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Cursor</span>)</p>
-          </div>
-        </div>
-
-        <div class="arch-arrow"><i class="fa-solid fa-arrow-down"></i></div>
-
-        <!-- Background core -->
-        <div class="arch-row arch-core-row">
-          <div class="arch-box primary">
-            <div class="arch-icon"><i class="fa-solid fa-server"></i></div>
-            <h4 i18n="@@about.arch.box.bgService.title">Background Service Worker</h4>
-            <p i18n="@@about.arch.box.bgService.desc">Session management, AI communication, message routing</p>
-          </div>
-        </div>
-
-        <div class="arch-arrow-row arch-arrow-row-subsystems" aria-hidden="true">
-          <div class="arch-arrow"><i class="fa-solid fa-arrow-down"></i></div>
-          <div class="arch-arrow"><i class="fa-solid fa-arrow-down"></i></div>
-        </div>
-
-        <!-- Subsystems -->
-        <div class="arch-row arch-subsystem-row">
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-code"></i></div>
-            <h4 i18n="@@about.arch.box.contentScript.title">Content Script</h4>
-            <p i18n="@@about.arch.box.contentScript.desc">DOM analysis, action execution, credential fill</p>
-          </div>
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-brain"></i></div>
-            <h4 i18n="@@about.arch.box.aiProvider.title">AI Provider</h4>
-            <p i18n="@@about.arch.box.aiProvider.desc" [attr.translate]="'no'">xAI / OpenAI / Anthropic / Gemini / OpenRouter / LM Studio</p>
-          </div>
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-robot"></i></div>
-            <h4 i18n="@@about.arch.box.sync.title">Sync</h4>
-            <p i18n="@@about.arch.box.sync.desc">Live extension control surface, paired via QR</p>
-          </div>
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-database"></i></div>
-            <h4 i18n="@@about.arch.box.memory.title">Memory System</h4>
-            <p i18n="@@about.arch.box.memory.desc">Site patterns, procedural memory</p>
-          </div>
-        </div>
-
-        <div class="arch-arrow-row arch-arrow-row-targets" aria-hidden="true">
-          <div class="arch-arrow"><i class="fa-solid fa-arrow-down"></i></div>
-          <div class="arch-arrow"><i class="fa-solid fa-arrow-down"></i></div>
-        </div>
-
-        <!-- Targets -->
-        <div class="arch-row arch-target-row">
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-globe"></i></div>
-            <h4 i18n="@@about.arch.box.webPage.title">Web Page</h4>
-            <p i18n="@@about.arch.box.webPage.desc">Target page DOM</p>
-          </div>
-          <div class="arch-box">
-            <div class="arch-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
-            <h4 i18n="@@about.arch.box.remote.title">Remote Dashboard</h4>
-            <p i18n="@@about.arch.box.remote.desc">WebSocket relay, live DOM preview</p>
-          </div>
-        </div>
+        }
       </div>
+      <article class="sitemap-card reveal">
+        <header class="sitemap-head">
+          <div class="sitemap-head-icon" aria-hidden="true"><i class="fa-solid fa-brain"></i></div>
+          <div class="sitemap-head-main">
+            <div class="sitemap-title-row">
+              <h3 i18n="@@about.memory.card.title">Consolidated Memory</h3>
+              <span class="sitemap-badge" i18n="@@about.memory.card.badge"><i class="fa-solid fa-cube"></i> Built-in</span>
+            </div>
+            <div class="sitemap-meta" i18n="@@about.memory.card.meta">
+              <span>130 sites</span><span>·</span><span>19 categories</span><span>·</span><span>1,440 selectors mapped</span>
+            </div>
+          </div>
+          <a class="sitemap-link" routerLink="/sitemaps">
+            <span class="sitemap-link-main">
+              <span class="sitemap-link-title" i18n="@@about.memory.sitemaps.title">Site Maps</span>
+              <span class="sitemap-link-sub" i18n="@@about.memory.sitemaps.sub">Community</span>
+            </span>
+            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          </a>
+        </header>
+        <div class="kg-toolbar">
+          <div class="kg-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" placeholder="Highlight a site or category..." i18n-placeholder="@@about.memory.search.placeholder" (input)="onGraphSearch($event)">
+          </div>
+          <div class="kg-toggle" role="group" aria-label="Graph detail level" i18n-aria-label="@@about.memory.toggle.aria">
+            <button class="kg-toggle-btn" [class.active]="graphDetail === 'simple'" type="button" (click)="setGraphDetail('simple')" i18n="@@about.memory.toggle.overview">Overview</button>
+            <button class="kg-toggle-btn" [class.active]="graphDetail === 'full'" type="button" (click)="setGraphDetail('full')" i18n="@@about.memory.toggle.expanded">Expanded</button>
+          </div>
+        </div>
+        <div class="sitemap-graph-wrap">
+          <div class="sitemap-graph" #graphHost></div>
+          <div class="sitemap-graph-overlay">
+            <span class="sitemap-hint" i18n="@@about.memory.graph.hint"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate · scroll to zoom · hover a node</span>
+          </div>
+        </div>
+        <footer class="sitemap-foot sitemap-cats">
+          <div class="sitemap-block-label" i18n="@@about.memory.categories.label">Knowledge by category</div>
+          <div class="cat-legend">
+            @for (category of categories; track category.name) {
+              <span class="cat-legend-item">
+                <span class="cat-dot" [style.background]="category.color" aria-hidden="true"></span>
+                <span [attr.translate]="'no'">{{ category.name }}</span>
+                <span class="cat-count" [attr.translate]="'no'">{{ category.count }}</span>
+              </span>
+            }
+          </div>
+        </footer>
+      </article>
     </div>
   </section>
 
@@ -162,7 +129,7 @@
     <div class="container">
       <div class="section-header reveal">
         <h2 i18n="@@about.actions.title">Action Library</h2>
-        <p i18n="@@about.actions.subtitle">50+ browser actions organized by category, all executable through natural language.</p>
+        <p i18n="@@about.actions.subtitle">60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 66-tool <span [attr.translate]="'no'">MCP</span> catalog.</p>
       </div>
       <div class="action-categories">
         <div class="action-category reveal delay-1">
@@ -214,6 +181,7 @@
             <span class="action-tag" i18n="@@about.actions.tag.getAttribute" [attr.translate]="'no'">getAttribute</span>
             <span class="action-tag" i18n="@@about.actions.tag.setAttribute" [attr.translate]="'no'">setAttribute</span>
             <span class="action-tag" i18n="@@about.actions.tag.readPage" [attr.translate]="'no'">readPage</span>
+            <span class="action-tag" i18n="@@about.actions.tag.getPageSnapshot" [attr.translate]="'no'">get_page_snapshot</span>
           </div>
         </div>
         <div class="action-category reveal delay-6">
@@ -272,43 +240,27 @@
             <span class="action-tag" i18n="@@about.actions.tag.selectTextRange" [attr.translate]="'no'">selectTextRange</span>
           </div>
         </div>
-      </div>
-      <div class="mcp-install reveal">
-        <div class="mcp-install-header">
-          <span class="mcp-install-kicker" i18n="@@about.install.kicker"><span [attr.translate]="'no'">MCP</span> install</span>
-          <h3 i18n="@@about.install.title">Connect <span [attr.translate]="'no'">FSB</span> to your agent</h3>
-          <p i18n="@@about.install.subtitle">Use <code [attr.translate]="'no'">fsb-mcp-server</code> from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">OpenClaw</span>, or <span [attr.translate]="'no'">OpenCode</span>.</p>
+        <div class="action-category reveal delay-3">
+          <h4 i18n="@@about.actions.cat.capabilities.title"><i class="fa-solid fa-bolt"></i> Capabilities</h4>
+          <div class="action-list" [attr.translate]="'no'">
+            <span class="action-tag" i18n="@@about.actions.tag.searchCapabilities" [attr.translate]="'no'">search_capabilities</span>
+            <span class="action-tag" i18n="@@about.actions.tag.invokeCapability" [attr.translate]="'no'">invoke_capability</span>
+          </div>
         </div>
-        <div class="mcp-install-grid">
-          <article class="mcp-install-card">
-            <div class="mcp-install-card-header">
-              <span class="mcp-install-icon"><i class="fa-solid fa-terminal"></i></span>
-              <h4 i18n="@@about.install.claudeCode.title" [attr.translate]="'no'">Claude Code</h4>
-            </div>
-            <pre><code i18n="@@about.install.claudeCode.cmd" [attr.translate]="'no'">npx -y fsb-mcp-server install --claude-code</code></pre>
-          </article>
-          <article class="mcp-install-card">
-            <div class="mcp-install-card-header">
-              <span class="mcp-install-icon"><i class="fa-solid fa-code"></i></span>
-              <h4 i18n="@@about.install.codex.title" [attr.translate]="'no'">Codex</h4>
-            </div>
-            <pre><code i18n="@@about.install.codex.cmd" [attr.translate]="'no'">npx -y fsb-mcp-server install --codex</code></pre>
-          </article>
-          <article class="mcp-install-card">
-            <div class="mcp-install-card-header">
-              <span class="mcp-install-icon"><i class="fa-solid fa-robot"></i></span>
-              <h4 i18n="@@about.install.openclaw.title" [attr.translate]="'no'">OpenClaw</h4>
-              <span class="mcp-install-badge" i18n="@@about.install.openclaw.badge">Manual</span>
-            </div>
-            <pre><code i18n="@@about.install.openclaw.cmd" [attr.translate]="'no'">npx -y fsb-mcp-server</code></pre>
-          </article>
-          <article class="mcp-install-card">
-            <div class="mcp-install-card-header">
-              <span class="mcp-install-icon"><i class="fa-solid fa-cube"></i></span>
-              <h4 i18n="@@about.install.opencode.title" [attr.translate]="'no'">OpenCode</h4>
-            </div>
-            <pre><code i18n="@@about.install.opencode.cmd" [attr.translate]="'no'">npx -y fsb-mcp-server install --opencode</code></pre>
-          </article>
+        <div class="action-category reveal delay-4">
+          <h4 i18n="@@about.actions.cat.monitoring.title"><i class="fa-solid fa-bell"></i> Monitoring</h4>
+          <div class="action-list" [attr.translate]="'no'">
+            <span class="action-tag" i18n="@@about.actions.tag.trigger" [attr.translate]="'no'">trigger</span>
+            <span class="action-tag" i18n="@@about.actions.tag.stopTrigger" [attr.translate]="'no'">stop_trigger</span>
+            <span class="action-tag" i18n="@@about.actions.tag.getTriggerStatus" [attr.translate]="'no'">get_trigger_status</span>
+            <span class="action-tag" i18n="@@about.actions.tag.listTriggers" [attr.translate]="'no'">list_triggers</span>
+          </div>
+        </div>
+        <div class="action-category reveal delay-5">
+          <h4 i18n="@@about.actions.cat.files.title"><i class="fa-solid fa-file-arrow-up"></i> Files</h4>
+          <div class="action-list" [attr.translate]="'no'">
+            <span class="action-tag" i18n="@@about.actions.tag.uploadFile" [attr.translate]="'no'">upload_file</span>
+          </div>
         </div>
       </div>
     </div>

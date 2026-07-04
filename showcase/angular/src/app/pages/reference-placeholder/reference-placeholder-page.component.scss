@@ -1,0 +1,44 @@
+.placeholder-page {
+  min-height: calc(100vh - var(--nav-height) - 260px);
+  padding-top: calc(var(--nav-height) + 72px);
+}
+
+.placeholder-shell {
+  max-width: 680px;
+}
+
+.placeholder-kicker {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.placeholder-shell h1 {
+  margin-bottom: 16px;
+}
+
+.placeholder-copy {
+  font-size: 1rem;
+  max-width: 600px;
+}
+
+.placeholder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+@media (max-width: 480px) {
+  .placeholder-page {
+    padding-top: calc(var(--nav-height) + 48px);
+  }
+
+  .placeholder-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

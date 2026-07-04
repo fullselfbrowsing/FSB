@@ -1,0 +1,373 @@
+<div class="ps-page" #pageRoot data-screen-label="PhantomStream" i18n-data-screen-label="@@phantomStream.screen.label">
+  <nav class="nav">
+    <div class="nav-inner">
+      <a routerLink="/" class="nav-brand" (click)="closeMobileMenu()" i18n-aria-label="@@phantomStream.nav.brand.aria" aria-label="FSB">
+        <span class="fsb-mark" [attr.translate]="'no'">
+          <span class="fsb-row" aria-hidden="true">
+            <span class="fsb-f"></span>
+            <span class="fsb-s"></span>
+            <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+              <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+            </svg>
+          </span>
+        </span>
+      </a>
+      <div class="nav-links">
+        <a routerLink="/" i18n="@@phantomStream.nav.home">Home</a>
+        <a routerLink="/about" i18n="@@phantomStream.nav.about">About</a>
+        <a routerLink="/agents" i18n="@@phantomStream.nav.agents">Agents</a>
+        <a routerLink="/dashboard" i18n="@@phantomStream.nav.dashboard">Dashboard</a>
+        <a routerLink="/lattice" i18n="@@phantomStream.nav.lattice" [attr.translate]="'no'">Lattice</a>
+        <a routerLink="/support" i18n="@@phantomStream.nav.support">Support</a>
+      </div>
+      <div class="nav-actions">
+        <a href="https://github.com/fullselfbrowsing/PhantomStream" target="_blank" rel="noopener" class="btn btn-sm btn-github" i18n="@@phantomStream.nav.github" [attr.translate]="'no'">
+          <i class="fa-brands fa-github" aria-hidden="true"></i> GitHub
+        </a>
+      </div>
+      <button type="button" class="nav-toggle" [class.active]="mobileMenuOpen" i18n-aria-label="@@phantomStream.nav.toggle.aria" aria-label="Toggle navigation" (click)="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="nav-mobile" [class.active]="mobileMenuOpen">
+    <a routerLink="/" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.home">Home</a>
+    <a routerLink="/about" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.about">About</a>
+    <a routerLink="/agents" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.agents">Agents</a>
+    <a routerLink="/dashboard" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.dashboard">Dashboard</a>
+    <a routerLink="/lattice" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.lattice" [attr.translate]="'no'">Lattice</a>
+    <a routerLink="/support" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.support">Support</a>
+    <a href="https://github.com/fullselfbrowsing/PhantomStream" target="_blank" rel="noopener" (click)="closeMobileMenu()" i18n="@@phantomStream.mobile.github" [attr.translate]="'no'">
+      <i class="fa-brands fa-github" aria-hidden="true"></i> GitHub
+    </a>
+  </div>
+
+  <header class="ps-hero">
+    <div class="ps-hero-mesh"></div>
+    <div class="ps-hero-inner">
+      <div>
+        <span class="ps-eyebrow ps-eyebrow-plain" i18n="@@phantomStream.hero.eyebrow">
+          Research &middot; <span [attr.translate]="'no'">@full-self-browsing</span>
+        </span>
+        <h1 i18n="@@phantomStream.hero.title" [attr.translate]="'no'">PhantomStream<span class="accent">.</span></h1>
+        <p class="ps-tagline" i18n="@@phantomStream.hero.tagline">
+          <span [attr.translate]="'no'">DOM</span>-native live browser mirroring. A real tab streamed as structured <span [attr.translate]="'no'">DOM</span>, not pixels.
+        </p>
+        <p class="ps-lead" i18n="@@phantomStream.hero.lead">
+          <span [attr.translate]="'no'">PhantomStream</span> sends one style-inlined snapshot, then tiny <span [attr.translate]="'no'">MutationObserver</span> diffs addressed by stable node IDs. The viewer gets a live, semantically addressable, remotely controllable copy of the page at a fraction of the bandwidth of screen streaming.
+        </p>
+        <div class="ps-cmdbar">
+          <i class="fa-solid fa-terminal pfx" aria-hidden="true"></i>
+          <code [attr.translate]="'no'">{{ installCommand }}</code>
+          <button type="button" class="ps-cmd-copy" [class.copied]="copied === 'install'" i18n-aria-label="@@phantomStream.install.copy.aria" aria-label="Copy install command" (click)="copyInstall()">
+            <i [class]="copied === 'install' ? 'fa-solid fa-check' : 'fa-regular fa-copy'" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="ps-chips">
+          <span class="ps-chip" i18n="@@phantomStream.chip.version" [attr.translate]="'no'"><b class="version-tag">v0.9.9.1</b></span>
+          <span class="ps-chip" i18n="@@phantomStream.chip.esm"><i class="fa-brands fa-js" aria-hidden="true"></i> <span [attr.translate]="'no'">Plain JS</span> &middot; <span [attr.translate]="'no'">ESM</span></span>
+          <span class="ps-chip" i18n="@@phantomStream.chip.node"><i class="fa-brands fa-node-js" aria-hidden="true"></i> <span [attr.translate]="'no'">Node</span> &gt;=18</span>
+          <span class="ps-chip" i18n="@@phantomStream.chip.license" [attr.translate]="'no'"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> MIT</span>
+        </div>
+      </div>
+
+      <div class="ps-mirror" aria-hidden="true">
+        <div class="ps-frame ps-frame-mir">
+          <div class="ps-fbar"><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-flabel" i18n="@@phantomStream.hero.mirrorLabel" [attr.translate]="'no'">DOM mirror</span></div>
+          <div class="ps-mini" i18n="@@phantomStream.hero.mirrorMini" [attr.translate]="'no'">
+            <span class="ps-mini-badge"><span class="ps-mini-dot"></span> In progress</span>
+            <div class="ps-mini-word"><span class="pro">Pro</span><span class="rest">metheus</span></div>
+            <div class="ps-mini-sub">The Future of Autonomous Browsing</div>
+            <div class="ps-mini-count">
+              <div class="ps-mini-unit"><span class="ps-mini-num">36</span><span class="ps-mini-ul">Days</span></div>
+              <span class="ps-mini-colon">:</span>
+              <div class="ps-mini-unit"><span class="ps-mini-num">11</span><span class="ps-mini-ul">Hrs</span></div>
+              <span class="ps-mini-colon">:</span>
+              <div class="ps-mini-unit"><span class="ps-mini-num">42</span><span class="ps-mini-ul">Min</span></div>
+              <span class="ps-mini-colon">:</span>
+              <div class="ps-mini-unit"><span class="ps-mini-num ps-mini-secs">{{ miniSeconds }}</span><span class="ps-mini-ul">Sec</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="ps-frame ps-frame-src">
+          <div class="ps-fbar"><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-flabel" i18n="@@phantomStream.hero.sourceLabel" [attr.translate]="'no'">Source tab</span></div>
+          <div class="ps-mini" i18n="@@phantomStream.hero.sourceMini" [attr.translate]="'no'">
+            <span class="ps-mini-badge"><span class="ps-mini-dot"></span> In progress</span>
+            <div class="ps-mini-word"><span class="pro">Pro</span><span class="rest">metheus</span></div>
+            <div class="ps-mini-sub">The Future of Autonomous Browsing</div>
+            <div class="ps-mini-count">
+              <div class="ps-mini-unit"><span class="ps-mini-num">36</span><span class="ps-mini-ul">Days</span></div>
+              <span class="ps-mini-colon">:</span>
+              <div class="ps-mini-unit"><span class="ps-mini-num">11</span><span class="ps-mini-ul">Hrs</span></div>
+              <span class="ps-mini-colon">:</span>
+              <div class="ps-mini-unit"><span class="ps-mini-num">42</span><span class="ps-mini-ul">Min</span></div>
+              <span class="ps-mini-colon">:</span>
+              <div class="ps-mini-unit"><span class="ps-mini-num ps-mini-secs">{{ miniSeconds }}</span><span class="ps-mini-ul">Sec</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="ps-stream" [attr.translate]="'no'">
+          <span class="ps-pkt ps-pkt-load l1"><span class="bits">01101011</span></span>
+          <span class="ps-pkt ps-pkt-load l2"><span class="bits">10010110</span></span>
+          <span class="ps-pkt ps-pkt-load l3"><span class="bits">11000101</span></span>
+          <span class="ps-pkt ps-pkt-load l4"><span class="bits">01001110</span></span>
+          <span class="ps-pkt ps-pkt-load l5"><span class="bits">10110011</span></span>
+          <span class="ps-pkt ps-pkt-sec"><span class="bits">00111010</span></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="ps-shell">
+    <aside class="ps-side">
+      <div class="ps-side-group">
+        <div class="ps-side-label" i18n="@@phantomStream.side.overview">Overview</div>
+        <a href="#overview" class="ps-side-link" [class.on]="activeSection === 'overview'" i18n="@@phantomStream.side.introduction">Introduction</a>
+        <a href="#problem" class="ps-side-link" [class.on]="activeSection === 'problem'" i18n="@@phantomStream.side.problem">The problem</a>
+        <a href="#whydom" class="ps-side-link" [class.on]="activeSection === 'whydom'" i18n="@@phantomStream.side.whyDom">Why <span [attr.translate]="'no'">DOM</span> streaming</a>
+      </div>
+      <div class="ps-side-group">
+        <div class="ps-side-label" i18n="@@phantomStream.side.how">How it works</div>
+        <a href="#architecture" class="ps-side-link" [class.on]="activeSection === 'architecture'" i18n="@@phantomStream.side.architecture">Architecture</a>
+        <a href="#features" class="ps-side-link" [class.on]="activeSection === 'features'" i18n="@@phantomStream.side.features">Features</a>
+        <a href="#security" class="ps-side-link" [class.on]="activeSection === 'security'" i18n="@@phantomStream.side.security">Security model</a>
+      </div>
+      <div class="ps-side-group">
+        <div class="ps-side-label" i18n="@@phantomStream.side.build">Build</div>
+        <a href="#quickstart" class="ps-side-link" [class.on]="activeSection === 'quickstart'" i18n="@@phantomStream.side.quickstart">Quickstart</a>
+        <a href="#docs" class="ps-side-link" [class.on]="activeSection === 'docs'" i18n="@@phantomStream.side.docs">Documentation</a>
+      </div>
+    </aside>
+
+    <article class="ps-article">
+      <section class="ps-sec" id="overview">
+        <div class="ps-kicker" i18n="@@phantomStream.overview.kicker">Overview</div>
+        <h2 i18n="@@phantomStream.overview.title">A live mirror that is cheap, exact, and addressable</h2>
+        <p i18n="@@phantomStream.overview.copy1">When an <span [attr.translate]="'no'">AI</span> agent drives a browser, the human supervising it needs a live view of what the agent is doing. <span [attr.translate]="'no'">PhantomStream</span> streams the <span class="hl"><span [attr.translate]="'no'">DOM</span> itself</span> instead of pixels. It captures the page once as a style-inlined snapshot, assigns stable identifiers in a <code [attr.translate]="'no'">WeakMap</code>, then watches the page with a <code [attr.translate]="'no'">MutationObserver</code> and sends only small diffs (<code [attr.translate]="'no'">add</code>, <code [attr.translate]="'no'">rm</code>, <code [attr.translate]="'no'">attr</code>, <code [attr.translate]="'no'">text</code>) keyed by node ID and batched to the page's own paint cadence.</p>
+        <p i18n="@@phantomStream.overview.copy2">The payoff is a mirror whose bandwidth tracks how much the page actually changes rather than the frame rate. Text renders natively at any resolution, and remote control targets real elements by their stable IDs instead of guessing at coordinates.</p>
+        <div class="ps-note">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+          <p i18n="@@phantomStream.overview.note"><span [attr.translate]="'no'">PhantomStream</span> began as milestone <span [attr.translate]="'no'">v0.9.9.1 &quot;Phantom Stream&quot;</span> inside <span [attr.translate]="'no'">FSB</span>, where it powers the dashboard's live preview of automated browsing sessions. This repository turns it into a standalone plug-and-play framework, an <span [attr.translate]="'no'">SDK</span> <span [attr.translate]="'no'">FSB</span> plugs back in, and the working repository for an accompanying research paper.</p>
+        </div>
+      </section>
+
+      <section class="ps-sec" id="problem">
+        <div class="ps-kicker" i18n="@@phantomStream.problem.kicker">Motivation</div>
+        <h2 i18n="@@phantomStream.problem.title">The problem with pixels</h2>
+        <p i18n="@@phantomStream.problem.copy1">The obvious tools for a live view are video. <span class="hl"><span [attr.translate]="'no'">WebRTC</span>, a <span [attr.translate]="'no'">CDP</span> screencast, or a sequence of screenshots all send pixels.</span> Pixels are heavy. Every frame costs bandwidth whether the page changed or not, encoding and decoding add latency, and the result is lossy and resolution bound.</p>
+        <p i18n="@@phantomStream.problem.copy2">Worse, pixels are opaque. The watcher cannot ask which element the agent is touching, cannot highlight a node, cannot annotate the view, and cannot reliably drive the page back. Remote control over a video stream means clicking pixel coordinates against a frame that may already be stale, so a misaligned click lands on the wrong thing.</p>
+      </section>
+
+      <section class="ps-sec" id="whydom">
+        <div class="ps-kicker" i18n="@@phantomStream.whydom.kicker">Comparison</div>
+        <h2 i18n="@@phantomStream.whydom.title">Why <span [attr.translate]="'no'">DOM</span> streaming instead of video</h2>
+        <p i18n="@@phantomStream.whydom.copy">Streaming structured <span [attr.translate]="'no'">DOM</span> rather than frames changes the economics and the capabilities of the mirror across every axis that matters for supervising an agent.</p>
+        <div class="ps-cmp">
+          <div class="ps-cmp-cell ps-cmp-head"></div>
+          <div class="ps-cmp-cell ps-cmp-head" i18n="@@phantomStream.compare.video"><i class="fa-solid fa-video" aria-hidden="true"></i> Video / screenshots</div>
+          <div class="ps-cmp-cell ps-cmp-head ps-cmp-col3" i18n="@@phantomStream.compare.phantom" [attr.translate]="'no'"><i class="fa-solid fa-code" aria-hidden="true"></i> PhantomStream</div>
+          <div class="ps-cmp-cell ps-cmp-k" i18n="@@phantomStream.compare.bandwidth.key">Bandwidth</div>
+          <div class="ps-cmp-cell" i18n="@@phantomStream.compare.bandwidth.video">Continuous frames, independent of page content</div>
+          <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.bandwidth.phantom">One snapshot, then tiny diffs only when the page changes</div>
+          <div class="ps-cmp-cell ps-cmp-k" i18n="@@phantomStream.compare.latency.key">Latency</div>
+          <div class="ps-cmp-cell" i18n="@@phantomStream.compare.latency.video">Encode, transmit, then decode per frame</div>
+          <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.latency.phantom"><span [attr.translate]="'no'">A text mutation is one small JSON op</span></div>
+          <div class="ps-cmp-cell ps-cmp-k" i18n="@@phantomStream.compare.fidelity.key">Fidelity</div>
+          <div class="ps-cmp-cell" i18n="@@phantomStream.compare.fidelity.video">Lossy and resolution bound</div>
+          <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.fidelity.phantom">Exact <span [attr.translate]="'no'">DOM</span>, native text rendering, resolution independent</div>
+          <div class="ps-cmp-cell ps-cmp-k" i18n="@@phantomStream.compare.remote.key">Remote control</div>
+          <div class="ps-cmp-cell" i18n="@@phantomStream.compare.remote.video">Pixel coordinates against a possibly stale frame</div>
+          <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.remote.phantom">Real elements addressed by stable node IDs</div>
+          <div class="ps-cmp-cell ps-cmp-k last" i18n="@@phantomStream.compare.inspect.key">Inspectability</div>
+          <div class="ps-cmp-cell last" i18n="@@phantomStream.compare.inspect.video">Opaque pixels</div>
+          <div class="ps-cmp-cell last ps-cmp-col3" i18n="@@phantomStream.compare.inspect.phantom">The mirror is a <span [attr.translate]="'no'">DOM</span>: queryable, highlightable, annotatable</div>
+        </div>
+      </section>
+
+      <section class="ps-sec" id="architecture">
+        <div class="ps-kicker" i18n="@@phantomStream.architecture.kicker">Architecture</div>
+        <h2 i18n="@@phantomStream.architecture.title">A four-stage pipeline</h2>
+        <p i18n="@@phantomStream.architecture.copy">The page is captured, the host wraps each message for transport, a relay fans messages out to viewers, and the viewer rebuilds and applies them. Remote control runs the same path in reverse.</p>
+        <div class="ps-pipe">
+          <div class="ps-stage"><div class="st-ic"><i class="fa-solid fa-camera" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.stage.page.title">Page</h4><p i18n="@@phantomStream.stage.page.copy">Snapshot: clone, inline styles, stamp node IDs, then rAF-batched diffs</p></div>
+          <div class="ps-pipe-arr"><i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i></div>
+          <div class="ps-stage"><div class="st-ic"><i class="fa-solid fa-box" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.stage.host.title">Host</h4><p i18n="@@phantomStream.stage.host.copy"><span [attr.translate]="'no'">LZ-string</span> envelope, session stamping, watchdog</p></div>
+          <div class="ps-pipe-arr"><i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i></div>
+          <div class="ps-stage"><div class="st-ic"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.stage.relay.title">Relay</h4><p i18n="@@phantomStream.stage.relay.copy"><span [attr.translate]="'no'">WebSocket</span> fan-out, 1 MiB cap, backpressure drop</p></div>
+          <div class="ps-pipe-arr"><i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i></div>
+          <div class="ps-stage"><div class="st-ic"><i class="fa-solid fa-display" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.stage.viewer.title">Viewer</h4><p i18n="@@phantomStream.stage.viewer.copy">Sandboxed iframe, diff apply by ID, overlays, scale-to-fit</p></div>
+        </div>
+        <h3 i18n="@@phantomStream.architecture.core">Core mechanisms</h3>
+        <div class="ps-mech">
+          <div class="ps-mech-card"><i class="fa-solid fa-fingerprint" aria-hidden="true"></i><h4 i18n="@@phantomStream.mechanism.identity.title">Stable node identity</h4><p i18n="@@phantomStream.mechanism.identity.copy">Capture owns identity in a <code [attr.translate]="'no'">WeakMap&lt;Element, string&gt;</code> and emits <code [attr.translate]="'no'">nodeIds</code> sidecars with snapshots and add ops, so a late diff always lands on the right element without mutating the live page.</p></div>
+          <div class="ps-mech-card"><i class="fa-solid fa-palette" aria-hidden="true"></i><h4 i18n="@@phantomStream.mechanism.styles.title">Curated computed-style capture</h4><p i18n="@@phantomStream.mechanism.styles.copy">Roughly 85 visual-fidelity <span [attr.translate]="'no'">CSS</span> properties are inlined per element rather than all 300+, with default-value elision. This took a <span [attr.translate]="'no'">YouTube</span> serialize from 45 seconds down to interactive.</p></div>
+          <div class="ps-mech-card"><i class="fa-solid fa-wave-square" aria-hidden="true"></i><h4 i18n="@@phantomStream.mechanism.diffing.title">Display-matched diffing</h4><p i18n="@@phantomStream.mechanism.diffing.copy">Mutations batch and flush on <code [attr.translate]="'no'">requestAnimationFrame</code>, so the mirror updates at the same cadence the page paints.</p></div>
+          <div class="ps-mech-card"><i class="fa-solid fa-id-badge" aria-hidden="true"></i><h4 i18n="@@phantomStream.mechanism.session.title">Session identity</h4><p i18n="@@phantomStream.mechanism.session.copy">Every message carries a <code [attr.translate]="'no'">streamSessionId</code> and a <code [attr.translate]="'no'">snapshotId</code>. The viewer rejects stale messages, so late diffs from a previous page can never corrupt the mirror.</p></div>
+        </div>
+      </section>
+
+      <section class="ps-sec" id="features">
+        <div class="ps-kicker" i18n="@@phantomStream.features.kicker">Capabilities</div>
+        <h2 i18n="@@phantomStream.features.title">What you get out of the box</h2>
+        <p i18n="@@phantomStream.features.copy">The capture core is plain <span [attr.translate]="'no'">JavaScript</span> that injects as a content script, an <code [attr.translate]="'no'">addInitScript</code>, or a bookmarklet, with no runtime build step. Capture, viewer, and relay all talk through a small transport seam.</p>
+        <div class="ps-feat-grid">
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-fingerprint" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.ids.title">Stable node IDs</h4><p i18n="@@phantomStream.feature.ids.copy">Diffs and remote-control actions address nodes by <span [attr.translate]="'no'">WeakMap</span> identity, never by coordinate or fragile selector.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-palette" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.styles.title">Curated style inlining</h4><p i18n="@@phantomStream.feature.styles.copy">About 85 fidelity-critical <span [attr.translate]="'no'">CSS</span> properties per element with default elision, keeping heavy pages interactive.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-wave-square" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.diffs.title">Paint-cadence diffs</h4><p i18n="@@phantomStream.feature.diffs.copy">One compact op per real change, flushed on <code [attr.translate]="'no'">requestAnimationFrame</code> at the page's own update rate.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-scissors" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.budget.title">Budgeted snapshots</h4><p i18n="@@phantomStream.feature.budget.copy">Snapshots stay under the relay's per-message cap by dropping offscreen subtrees on whole-element boundaries.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.watchdogs.title">Dual watchdogs</h4><p i18n="@@phantomStream.feature.watchdogs.copy">A capture-side timer and a host-side alarm independently recover a wedged stream by forcing a flush or fresh snapshot.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-cube" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.sandbox.title">Sandboxed rendering</h4><p i18n="@@phantomStream.feature.sandbox.copy">The viewer rebuilds inside an iframe sandboxed to exactly <code [attr.translate]="'no'">allow-same-origin</code> (never <code [attr.translate]="'no'">allow-scripts</code>) with <span [attr.translate]="'no'">CSP</span> and a post-parse scrub.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-user-secret" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.privacy.title">Privacy masking</h4><p i18n="@@phantomStream.feature.privacy.copy"><code [attr.translate]="'no'">blockSelector</code>, <code [attr.translate]="'no'">maskTextSelector</code>, and mask functions redact sensitive content before it leaves the page. Passwords always masked.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-photo-film" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.media.title">Media by reference</h4><p i18n="@@phantomStream.feature.media.copy">Images, video, and audio load from their source URL in the viewer's own browser, so media bytes never cross the relay.</p></div>
+          <div class="ps-feat"><div class="ps-feat-ic"><i class="fa-solid fa-robot" aria-hidden="true"></i></div><h4 i18n="@@phantomStream.feature.playwright.title"><span [attr.translate]="'no'">Playwright</span> adapter</h4><p i18n="@@phantomStream.feature.playwright.copy">Drop the capture core into a <span [attr.translate]="'no'">Playwright</span> or <span [attr.translate]="'no'">CDP</span> page through a ready-made adapter, with authorized reverse remote control.</p></div>
+        </div>
+      </section>
+
+      <section class="ps-sec" id="security">
+        <div class="ps-kicker" i18n="@@phantomStream.security.kicker">Security</div>
+        <h2 i18n="@@phantomStream.security.title">The embed security contract</h2>
+        <div class="ps-split">
+          <div>
+            <p i18n="@@phantomStream.security.copy"><span [attr.translate]="'no'">PhantomStream</span> renders attacker-influenced <span [attr.translate]="'no'">HTML</span> with script execution disabled by construction. Serialization strips dangerous content on the wire clone only. <span class="hl">The live page is never touched.</span></p>
+            <ul class="ps-ticks">
+              <li i18n="@@phantomStream.security.tick.sandbox"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Sandbox is exactly <code [attr.translate]="'no'">allow-same-origin</code>, never <code [attr.translate]="'no'">allow-scripts</code></span></li>
+              <li i18n="@@phantomStream.security.tick.strip"><i class="fa-solid fa-check" aria-hidden="true"></i><span><code [attr.translate]="'no'">on*</code> handlers, dangerous URL schemes, <code [attr.translate]="'no'">srcdoc</code>, and <code [attr.translate]="'no'">object</code>/<code [attr.translate]="'no'">embed</code> stripped</span></li>
+              <li i18n="@@phantomStream.security.tick.mask"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Private text and form values masked capture-side before transport</span></li>
+              <li i18n="@@phantomStream.security.tick.media"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Fail-closed media fetch: https-only, private-range deny, no-referrer</span></li>
+            </ul>
+          </div>
+          <div class="ps-contract" i18n="@@phantomStream.security.contract" [attr.translate]="'no'">
+            <div class="ps-contract-top"><span class="seal"><i class="fa-solid fa-lock" aria-hidden="true"></i></span><h4>Sandbox guarantees</h4></div>
+            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> iframe sandbox = allow-same-origin only</div>
+            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> CSP meta tag + post-parse scrub</div>
+            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> Capture-side sanitization on wire clone</div>
+            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> String-layer gate before srcdoc parse</div>
+            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> Document-level no-referrer policy</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ps-sec" id="quickstart">
+        <div class="ps-kicker" i18n="@@phantomStream.quickstart.kicker">Quickstart</div>
+        <h2 i18n="@@phantomStream.quickstart.title">Capture, mirror, relay</h2>
+        <p i18n="@@phantomStream.quickstart.copy"><span [attr.translate]="'no'">PhantomStream</span> exposes one subpath per stage. Wire a capture in the page context, a viewer in the remote context, and a relay on <span [attr.translate]="'no'">Node</span> to fan messages between them.</p>
+        <div class="ps-tabs" role="group" i18n-aria-label="@@phantomStream.quickstart.stage.aria" aria-label="Quickstart stage">
+          <button type="button" class="ps-tab" data-tab="capture" [class.on]="tab === 'capture'" (click)="setTab('capture')" i18n="@@phantomStream.quickstart.tab.capture">Capture</button>
+          <button type="button" class="ps-tab" data-tab="viewer" [class.on]="tab === 'viewer'" (click)="setTab('viewer')" i18n="@@phantomStream.quickstart.tab.viewer">Viewer</button>
+          <button type="button" class="ps-tab" data-tab="relay" [class.on]="tab === 'relay'" (click)="setTab('relay')" i18n="@@phantomStream.quickstart.tab.relay">Relay</button>
+        </div>
+        <div class="ps-code">
+          <div class="ps-code-bar">
+            <span class="ps-code-name" [attr.translate]="'no'">{{ codeName }}</span>
+            <button type="button" class="ps-code-copy" [class.copied]="copied === 'code'" (click)="copyCurrentCode()">
+              <i [class]="copied === 'code' ? 'fa-solid fa-check' : 'fa-regular fa-copy'" aria-hidden="true"></i>
+              {{ copied === 'code' ? copiedLabel : copyLabel }}
+            </button>
+          </div>
+          <pre class="ps-snip" [class.ps-hide]="tab !== 'capture'" data-tab="capture" [attr.translate]="'no'"><code [innerHTML]="captureCodeHtml"></code></pre>
+          <pre class="ps-snip" [class.ps-hide]="tab !== 'viewer'" data-tab="viewer" [attr.translate]="'no'"><code [innerHTML]="viewerCodeHtml"></code></pre>
+          <pre class="ps-snip" [class.ps-hide]="tab !== 'relay'" data-tab="relay" [attr.translate]="'no'"><code [innerHTML]="relayCodeHtml"></code></pre>
+        </div>
+        <div class="ps-note">
+          <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+          <p i18n="@@phantomStream.quickstart.note">Or run it straight from the repository: <code [attr.translate]="'no'">npm run demo</code> mirrors a source tab into a viewer tab, and <code [attr.translate]="'no'">npm run demo:playwright</code> drives a page while a viewer mirrors it.</p>
+        </div>
+      </section>
+
+      <section class="ps-sec" id="docs">
+        <div class="ps-kicker" i18n="@@phantomStream.docs.kicker">Reference</div>
+        <h2 i18n="@@phantomStream.docs.title">Documentation</h2>
+        <p i18n="@@phantomStream.docs.copy">The deeper treatment lives alongside the source. Each document is self-contained.</p>
+        <div class="ps-doc-cards">
+          <a href="https://github.com/fullselfbrowsing/PhantomStream/blob/main/docs/QUICKSTARTS.md" target="_blank" rel="noopener" class="ps-doc-card">
+            <span class="dci"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+            <span class="dcm"><h4 i18n="@@phantomStream.doc.quickstarts.title">Quickstarts</h4><p i18n="@@phantomStream.doc.quickstarts.copy">Loopback, <span [attr.translate]="'no'">WebSocket</span>, <span [attr.translate]="'no'">Playwright</span>/<span [attr.translate]="'no'">CDP</span>, extension <span [attr.translate]="'no'">MV3</span>, bookmarklet, <span [attr.translate]="'no'">CSSOM</span> mode</p></span>
+            <i class="fa-solid fa-arrow-up-right-from-square arr" aria-hidden="true"></i>
+          </a>
+          <a href="https://github.com/fullselfbrowsing/PhantomStream/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener" class="ps-doc-card">
+            <span class="dci"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></span>
+            <span class="dcm"><h4 i18n="@@phantomStream.doc.architecture.title">Architecture</h4><p i18n="@@phantomStream.doc.architecture.copy">End-to-end capture, transport, relay, and renderer pipeline plus limitations</p></span>
+            <i class="fa-solid fa-arrow-up-right-from-square arr" aria-hidden="true"></i>
+          </a>
+          <a href="https://github.com/fullselfbrowsing/PhantomStream/blob/main/docs/SECURITY.md" target="_blank" rel="noopener" class="ps-doc-card">
+            <span class="dci"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+            <span class="dcm"><h4 i18n="@@phantomStream.doc.security.title">Security</h4><p i18n="@@phantomStream.doc.security.copy">Threat model, sanitization, masking, <span [attr.translate]="'no'">CSP</span>, and sandbox guarantees</p></span>
+            <i class="fa-solid fa-arrow-up-right-from-square arr" aria-hidden="true"></i>
+          </a>
+          <a href="https://github.com/fullselfbrowsing/PhantomStream/blob/main/docs/DESIGN-HISTORY.md" target="_blank" rel="noopener" class="ps-doc-card">
+            <span class="dci"><i class="fa-solid fa-compass-drafting" aria-hidden="true"></i></span>
+            <span class="dcm"><h4 i18n="@@phantomStream.doc.history.title">Design history</h4><p i18n="@@phantomStream.doc.history.copy">How the system evolved, what failed, and why the current shape won</p></span>
+            <i class="fa-solid fa-arrow-up-right-from-square arr" aria-hidden="true"></i>
+          </a>
+        </div>
+      </section>
+    </article>
+
+    <nav class="ps-toc" i18n-aria-label="@@phantomStream.toc.aria" aria-label="On this page">
+      <div class="ps-toc-label" i18n="@@phantomStream.toc.label">On this page</div>
+      <a href="#overview" [class.on]="activeSection === 'overview'" i18n="@@phantomStream.toc.overview">Overview</a>
+      <a href="#problem" [class.on]="activeSection === 'problem'" i18n="@@phantomStream.toc.problem">The problem</a>
+      <a href="#whydom" [class.on]="activeSection === 'whydom'" i18n="@@phantomStream.toc.whyDom">Why <span [attr.translate]="'no'">DOM</span> streaming</a>
+      <a href="#architecture" [class.on]="activeSection === 'architecture'" i18n="@@phantomStream.toc.architecture">Architecture</a>
+      <a href="#features" [class.on]="activeSection === 'features'" i18n="@@phantomStream.toc.features">Features</a>
+      <a href="#security" [class.on]="activeSection === 'security'" i18n="@@phantomStream.toc.security">Security model</a>
+      <a href="#quickstart" [class.on]="activeSection === 'quickstart'" i18n="@@phantomStream.toc.quickstart">Quickstart</a>
+      <a href="#docs" [class.on]="activeSection === 'docs'" i18n="@@phantomStream.toc.docs">Documentation</a>
+    </nav>
+  </div>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="fsb-mark" i18n-aria-label="@@phantomStream.footer.brand.aria" aria-label="FSB" [attr.translate]="'no'">
+            <span class="fsb-row" aria-hidden="true">
+              <span class="fsb-f"></span>
+              <span class="fsb-s"></span>
+              <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+              </svg>
+            </span>
+          </span>
+        </div>
+        <div class="footer-links">
+          <div class="footer-column">
+            <h4 i18n="@@phantomStream.footer.pages.title">Pages</h4>
+            <a routerLink="/" i18n="@@phantomStream.footer.pages.home">Home</a>
+            <a routerLink="/about" i18n="@@phantomStream.footer.pages.about">About</a>
+            <a routerLink="/dashboard" i18n="@@phantomStream.footer.pages.dashboard">Dashboard</a>
+            <a routerLink="/agents" i18n="@@phantomStream.footer.pages.agents">Agents</a>
+            <a routerLink="/privacy" i18n="@@phantomStream.footer.pages.privacy">Privacy</a>
+            <a routerLink="/support" i18n="@@phantomStream.footer.pages.support">Support</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@phantomStream.footer.project.title">Project</h4>
+            <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" i18n="@@phantomStream.footer.project.github" [attr.translate]="'no'">GitHub</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" i18n="@@phantomStream.footer.project.issues" [attr.translate]="'no'">Issues</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" i18n="@@phantomStream.footer.project.changelog">Changelog</a>
+            <a routerLink="/stats" i18n="@@phantomStream.footer.project.stats">Stats</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@phantomStream.footer.research.title">Research</h4>
+            <a routerLink="/lattice" i18n="@@phantomStream.footer.research.lattice" [attr.translate]="'no'">Lattice</a>
+            <a routerLink="/phantom-stream" class="text-orange" i18n="@@phantomStream.footer.research.phantom" [attr.translate]="'no'">PhantomStream</a>
+            <a routerLink="/prometheus" i18n="@@phantomStream.footer.research.prometheus" [attr.translate]="'no'">Prometheus</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@phantomStream.footer.community.title">Community</h4>
+            <a routerLink="/sitemaps" i18n="@@phantomStream.footer.community.sitemaps" [attr.translate]="'no'">Sitemaps</a>
+            <a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" i18n="@@phantomStream.footer.community.discord" [attr.translate]="'no'">Discord</a>
+            <a href="https://x.com/fsb0804" target="_blank" rel="noopener" class="footer-x-link" i18n="@@phantomStream.footer.community.x" [attr.translate]="'no'">X</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p i18n="@@phantomStream.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <p><span class="version-tag" [attr.translate]="'no'">▽0.9.90</span></p>
+      </div>
+    </div>
+  </footer>
+</div>

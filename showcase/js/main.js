@@ -62,36 +62,22 @@
     });
   }
 
-  // --- Theme toggle ---
-  (function initThemeToggle() {
-    var STORAGE_KEY = 'fsb-showcase-theme';
-    var saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
+  // --- Theme (auto-follows OS/browser preference, no manual override) ---
+  (function initTheme() {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function apply(isDark) {
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
     }
 
-    function updateIcons(isLight) {
-      document.querySelectorAll('.theme-toggle-btn i').forEach(function (icon) {
-        icon.className = isLight ? 'ph ph-moon' : 'ph ph-sun';
-      });
-    }
-
-    // Set initial icon state
-    updateIcons(document.documentElement.getAttribute('data-theme') === 'light');
-
-    document.querySelectorAll('.theme-toggle-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var isCurrentlyLight = document.documentElement.getAttribute('data-theme') === 'light';
-        if (isCurrentlyLight) {
-          document.documentElement.removeAttribute('data-theme');
-          localStorage.removeItem(STORAGE_KEY);
-          updateIcons(false);
-        } else {
-          document.documentElement.setAttribute('data-theme', 'light');
-          localStorage.setItem(STORAGE_KEY, 'light');
-          updateIcons(true);
-        }
-      });
+    apply(media.matches);
+    media.addEventListener('change', function (e) {
+      apply(e.matches);
     });
   })();
 

@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="css/dashboard.css?v=20260329">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-  (function(){if(localStorage.getItem('fsb-showcase-theme')==='light'){document.documentElement.setAttribute('data-theme','light')}})();
+  (function(){if(window.matchMedia&&!window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.setAttribute('data-theme','light')}})();
   </script>
 </head>
 <body>
@@ -367,10 +367,6 @@
       </div>
     </div>
   </footer>
-
-  <button class="theme-toggle-btn" aria-label="Toggle theme">
-    <i class="ph ph-sun"></i>
-  </button>
 
   <script src="js/lz-string.min.js?v=20260331d"></script>
   <script src="js/main.js?v=20260331d"></script>

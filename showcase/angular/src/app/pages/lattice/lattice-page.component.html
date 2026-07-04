@@ -1,0 +1,368 @@
+<div class="lat-page" #pageRoot data-screen-label="Lattice" i18n-data-screen-label="@@lattice.screen.label">
+  <main>
+    <section class="lat-hero">
+      <div class="lat-hero-mesh"></div>
+      <div class="lat-hero-inner">
+        <div>
+          <span class="lat-eyebrow lat-eyebrow-plain" i18n="@@lattice.hero.eyebrow">
+            Research <span [attr.translate]="'no'">@full-self-browsing</span>
+          </span>
+          <h1 i18n="@@lattice.hero.title" [attr.translate]="'no'">Lattice<span class="accent">.</span></h1>
+          <p class="lat-tagline" i18n="@@lattice.hero.tagline">
+            Capability runtime <span [attr.translate]="'no'">SDK</span> for multimodal <span [attr.translate]="'no'">AI</span> applications.
+          </p>
+          <p class="lat-lead" i18n="@@lattice.hero.lead">
+            Describe a job, attach artifacts, declare outputs, set policy constraints. <span [attr.translate]="'no'">Lattice</span> returns typed outputs, an inspectable execution plan, optional signed receipts, and the provider evidence to understand what happened.
+          </p>
+          <div class="lat-cta-row">
+            <a href="#install" class="btn lat-btn-light" i18n="@@lattice.hero.quickStart">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i> Quick start
+            </a>
+            <a href="https://github.com/fullselfbrowsing/Lattice" target="_blank" rel="noopener" class="btn lat-btn-ghost" i18n="@@lattice.hero.github">
+              <i class="fa-brands fa-github" aria-hidden="true"></i> View on <span [attr.translate]="'no'">GitHub</span>
+            </a>
+          </div>
+          <div class="lat-chips">
+            <span class="lat-chip" i18n="@@lattice.chip.version" [attr.translate]="'no'"><b class="version-tag">▽1.5.1</b></span>
+            <span class="lat-chip" i18n="@@lattice.chip.typescript" [attr.translate]="'no'">TypeScript-first</span>
+            <span class="lat-chip" i18n="@@lattice.chip.node" [attr.translate]="'no'">ESM · Node &gt;=24</span>
+            <span class="lat-chip" i18n="@@lattice.chip.license" [attr.translate]="'no'">MIT</span>
+          </div>
+        </div>
+        <div class="lat-orb-wrap">
+          <div class="lat-orb">
+            <img src="assets/lattice/logo-mark-spin-dark.gif" i18n-alt="@@lattice.hero.orb.alt" alt="Lattice capability mesh" width="400" height="400" decoding="async">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="lat-subnav">
+      <div class="lat-subnav-inner">
+        <a href="#install" [class.on]="activeSection === 'install'" i18n="@@lattice.subnav.install">Install</a>
+        <a href="#capabilities" [class.on]="activeSection === 'capabilities'" i18n="@@lattice.subnav.capabilities">Capabilities</a>
+        <a href="#quickstart" [class.on]="activeSection === 'quickstart'" i18n="@@lattice.subnav.quickstart">Quick start</a>
+        <a href="#modules" [class.on]="activeSection === 'modules'" i18n="@@lattice.subnav.modules">Modules</a>
+        <a href="#providers" [class.on]="activeSection === 'providers'" i18n="@@lattice.subnav.providers">Providers</a>
+        <a href="#audit" [class.on]="activeSection === 'audit'" i18n="@@lattice.subnav.audit">Audit</a>
+        <a href="#cli" [class.on]="activeSection === 'cli'" i18n="@@lattice.subnav.cli" [attr.translate]="'no'">CLI</a>
+      </div>
+    </div>
+
+    <section class="lat-section lat-section-alt" id="install">
+      <div class="container">
+        <div class="lat-shead">
+          <span class="lat-eyebrow" i18n="@@lattice.install.eyebrow">
+            <i class="fa-solid fa-terminal" aria-hidden="true"></i> Install
+          </span>
+          <h2 i18n="@@lattice.install.title">One runtime, a small public API</h2>
+          <p i18n="@@lattice.install.copy">
+            Add <span [attr.translate]="'no'">Lattice</span> and <span [attr.translate]="'no'">zod</span> to your project: a small public <span [attr.translate]="'no'">API</span> behind one runtime.
+          </p>
+        </div>
+        <div class="lat-pkgtabs">
+          <div class="lat-tabset" role="group" i18n-aria-label="@@lattice.install.packageManager" aria-label="Package manager">
+            <button type="button" class="lat-tab" [class.on]="pkg === 'pnpm'" (click)="setPackage('pnpm')" i18n="@@lattice.install.tab.pnpm" [attr.translate]="'no'">pnpm</button>
+            <button type="button" class="lat-tab" [class.on]="pkg === 'npm'" (click)="setPackage('npm')" i18n="@@lattice.install.tab.npm" [attr.translate]="'no'">npm</button>
+          </div>
+        </div>
+        <div class="lat-install">
+          <div class="lat-cmd">
+            <div class="lat-cmd-label" i18n="@@lattice.install.runtime">
+              <i class="fa-solid fa-cube" aria-hidden="true"></i> Runtime
+            </div>
+            <code [attr.translate]="'no'"><span class="pr">$ </span>{{ installRuntime }}</code>
+          </div>
+          <div class="lat-cmd">
+            <div class="lat-cmd-label" i18n="@@lattice.install.cli" [attr.translate]="'no'">
+              <i class="fa-solid fa-wrench" aria-hidden="true"></i> CLI
+            </div>
+            <code [attr.translate]="'no'"><span class="pr">$ </span>{{ installCli }}</code>
+          </div>
+        </div>
+        <div class="lat-note">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+          <p i18n="@@lattice.install.note">
+            Install the <span [attr.translate]="'no'">CLI</span> only when you need receipt verification, replay, eval, or diagnostics from a terminal. The full runtime targets <span [attr.translate]="'no'">Node 24</span>; several facades are validated <span [attr.translate]="'no'">Node 20</span> compatible.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section" id="capabilities">
+      <div class="container">
+        <div class="lat-shead">
+          <span class="lat-eyebrow" i18n="@@lattice.capabilities.eyebrow">
+            <i class="fa-solid fa-layer-group" aria-hidden="true"></i> Capabilities
+          </span>
+          <h2 i18n="@@lattice.capabilities.title">What Lattice handles</h2>
+          <p i18n="@@lattice.capabilities.copy">
+            Every <span [attr.translate]="'no'">AI</span> flow rebuilds the same machinery. <span [attr.translate]="'no'">Lattice</span> puts it behind one runtime so you describe intent, not plumbing.
+          </p>
+        </div>
+        <div class="lat-handles">
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-shapes" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.artifacts.title">Artifacts</h3>
+            <p i18n="@@lattice.capability.artifacts.copy"><span [attr.translate]="'no'">Text</span>, <span [attr.translate]="'no'">JSON</span>, files, URLs, images, audio, video, documents, and tool results, normalized into one model.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-code" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.outputs.title">Outputs</h3>
+            <p i18n="@@lattice.capability.outputs.copy">Plain text, <span [attr.translate]="'no'">Standard Schema</span> and <span [attr.translate]="'no'">Zod</span>-compatible structured data, citations, and generated artifact refs.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.routing.title">Routing</h3>
+            <p i18n="@@lattice.capability.routing.copy">Deterministic provider and model selection from capability metadata, policy, cost, latency, privacy, and fallback.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-boxes-packing" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.context.title">Context</h3>
+            <p i18n="@@lattice.capability.context.copy">Artifact refs, summaries, token estimates, and inspectable context-pack plans for every run.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-plug" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.providers.title">Providers</h3>
+            <p i18n="@@lattice.capability.providers.copy"><span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Gemini</span>, <span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenRouter</span>, <span [attr.translate]="'no'">LiteLLM</span>, <span [attr.translate]="'no'">LM Studio</span>, <span [attr.translate]="'no'">AI SDK</span> style, and fakes for tests.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-file-signature" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.audit.title">Audit</h3>
+            <p i18n="@@lattice.capability.audit.copy"><span [attr.translate]="'no'">JCS</span> canonical receipts, <span [attr.translate]="'no'">DSSE</span> envelopes, <span [attr.translate]="'no'">Ed25519</span> signatures, <span [attr.translate]="'no'">CIDs</span>, replay envelopes, redaction, and verification.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.tools.title">Tools</h3>
+            <p i18n="@@lattice.capability.tools.copy">Tool definitions and execution, <span [attr.translate]="'no'">MCP</span>-shaped resources and prompts, tool results as artifacts, call validation.</p>
+          </div>
+          <div class="lat-feature">
+            <div class="lat-feat-icon"><i class="fa-solid fa-users-gear" aria-hidden="true"></i></div>
+            <h3 i18n="@@lattice.capability.agents.title">Agents</h3>
+            <p i18n="@@lattice.capability.agents.copy">Opt-in single-agent loops and structured crew runs, built on the same provider, tool, policy, and receipt primitives.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section lat-section-alt" id="quickstart">
+      <div class="container">
+        <div class="lat-split">
+          <div class="lat-split-copy">
+            <span class="lat-eyebrow" i18n="@@lattice.quickstart.eyebrow">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i> Quick start
+            </span>
+            <h2 i18n="@@lattice.quickstart.title">Describe the job. Get typed outputs.</h2>
+            <p i18n="@@lattice.quickstart.copy">
+              Attach artifacts, declare the shape of what you want, set policy. <span [attr.translate]="'no'">Lattice</span> plans, routes, executes, validates, and returns the full run.
+            </p>
+            <ul class="lat-ticks">
+              <li i18n="@@lattice.quickstart.tick.schema"><i class="fa-solid fa-check" aria-hidden="true"></i> <span [attr.translate]="'no'">Standard Schema</span> and <span [attr.translate]="'no'">Zod</span> at the public boundary</li>
+              <li i18n="@@lattice.quickstart.tick.policy"><i class="fa-solid fa-check" aria-hidden="true"></i> Privacy and cost ceilings enforced per run</li>
+              <li i18n="@@lattice.quickstart.tick.fake"><i class="fa-solid fa-check" aria-hidden="true"></i> Runs with the fake provider. No <span [attr.translate]="'no'">API</span> keys needed</li>
+            </ul>
+          </div>
+          <div class="lat-codecard lat-codeblock">
+            <div class="lat-cbhead">
+              <span class="lat-cbname" i18n="@@lattice.quickstart.filename" [attr.translate]="'no'">resolve-case.ts</span>
+              <button type="button" class="lat-cbcopy" [class.copied]="copied === 'resolve'" (click)="copyCode('resolve', resolveCode)">
+                <i [class]="copied === 'resolve' ? 'fa-solid fa-check' : 'fa-regular fa-copy'" aria-hidden="true"></i>
+                {{ copied === 'resolve' ? copiedLabel : copyLabel }}
+              </button>
+            </div>
+            <pre #resolveCode [attr.translate]="'no'"><code [innerHTML]="resolveCodeHtml"></code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section" id="modules">
+      <div class="container">
+        <div class="lat-shead">
+          <span class="lat-eyebrow" i18n="@@lattice.modules.eyebrow">
+            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i> Modular entrypoints
+          </span>
+          <h2 i18n="@@lattice.modules.title">Adopt one slice at a time</h2>
+          <p i18n="@@lattice.modules.copy">The full runtime targets <span [attr.translate]="'no'">Node 24</span>. Several facades are validated <span [attr.translate]="'no'">Node 20</span> compatible, so you can adopt <span [attr.translate]="'no'">Lattice</span> incrementally.</p>
+        </div>
+        <div class="lat-mods" i18n="@@lattice.modules.table" [attr.translate]="'no'">
+          <div class="lat-mod lat-mod-head"><div>Import path</div><div>Compatibility</div><div>Use it for</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/providers</div><div><span class="lat-tag lat-tag-ad">adapter-specific</span></div><div class="lat-mod-use">Provider factories, contracts, streaming helpers, capability negotiation.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/audit</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Receipts, signing, verification, CIDs, replay envelopes, redaction.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/context</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Context packing, token estimates, artifact reference extraction.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/artifacts</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Artifact builders, refs, metadata, fingerprints, storage refs, lineage.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/routing</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Deterministic routing, catalogs, policies, capability profiles.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/tools</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Tool definitions, execution, MCP-shaped artifacts, call validation.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/eval</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Regression gates for agent and executor traces.</div></div>
+          <div class="lat-mod"><div class="lat-mod-path">/agents</div><div><span class="lat-tag lat-tag-n24">node24</span></div><div class="lat-mod-use">Single-agent loops, crew runs, hosts, rate limits, agent infrastructure.</div></div>
+          <div class="lat-mod lat-mod-last"><div class="lat-mod-path">/core</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Non-agent artifacts, context, outputs, contracts, routing, providers, results.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section lat-section-alt" id="providers">
+      <div class="container">
+        <div class="lat-shead">
+          <span class="lat-eyebrow" i18n="@@lattice.providers.eyebrow">
+            <i class="fa-solid fa-plug" aria-hidden="true"></i> Providers
+          </span>
+          <h2 i18n="@@lattice.providers.title">Adapters behind one contract</h2>
+          <p i18n="@@lattice.providers.copy">Run them through the full runtime or use them directly from the provider facade, with native structured output, tool definitions, and streaming.</p>
+        </div>
+        <div class="lat-prov" i18n="@@lattice.providers.list" [attr.translate]="'no'">
+          <span class="lat-prov-chip"><img class="pw" src="assets/providers/openai.svg" alt=""> OpenAI</span>
+          <span class="lat-prov-chip"><img class="pw" src="assets/providers/anthropic.webp" alt=""> Anthropic</span>
+          <span class="lat-prov-chip"><img class="pw" src="assets/providers/google.png" alt=""> Gemini</span>
+          <span class="lat-prov-chip"><img class="pw" src="assets/providers/xai.png" alt=""> xAI</span>
+          <span class="lat-prov-chip"><img src="assets/providers/openrouter.svg" alt=""> OpenRouter</span>
+          <span class="lat-prov-chip"><span class="ic"><i class="fa-solid fa-network-wired" aria-hidden="true"></i></span> LiteLLM</span>
+          <span class="lat-prov-chip"><span class="ic"><i class="fa-solid fa-desktop" aria-hidden="true"></i></span> LM Studio</span>
+          <span class="lat-prov-chip"><span class="ic"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span> AI SDK</span>
+          <span class="lat-prov-chip"><span class="ic"><i class="fa-solid fa-vial" aria-hidden="true"></i></span> Fakes</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section" id="audit">
+      <div class="container">
+        <div class="lat-split">
+          <div class="lat-split-copy">
+            <span class="lat-eyebrow" i18n="@@lattice.audit.eyebrow">
+              <i class="fa-solid fa-fingerprint" aria-hidden="true"></i> Audit
+            </span>
+            <h2 i18n="@@lattice.audit.title">Verifiable receipts, replay-friendly records</h2>
+            <p i18n="@@lattice.audit.copy">When a signer is configured, terminal results include a receipt you can verify offline. Even when another executor performs the model call, <span [attr.translate]="'no'">Lattice</span> can provide the receipt, replay envelope, and verification.</p>
+            <ul class="lat-ticks">
+              <li i18n="@@lattice.audit.tick.jcs"><i class="fa-solid fa-check" aria-hidden="true"></i> <span [attr.translate]="'no'">JCS</span> canonical form, signed with <span [attr.translate]="'no'">Ed25519</span></li>
+              <li i18n="@@lattice.audit.tick.dsse"><i class="fa-solid fa-check" aria-hidden="true"></i> <span [attr.translate]="'no'">DSSE</span> envelopes and content-addressed <span [attr.translate]="'no'">CIDs</span></li>
+              <li i18n="@@lattice.audit.tick.redaction"><i class="fa-solid fa-check" aria-hidden="true"></i> Redaction and replay built into the record</li>
+            </ul>
+          </div>
+          <div class="lat-receipt" i18n="@@lattice.audit.receipt" [attr.translate]="'no'">
+            <div class="lat-receipt-top">
+              <h4>Execution receipt</h4>
+              <span class="vr"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> verified</span>
+            </div>
+            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-hashtag" aria-hidden="true"></i> runId</span><span class="v">run-1</span></div>
+            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> route</span><span class="v">external · attempt 1</span></div>
+            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-key" aria-hidden="true"></i> signature</span><span class="v">Ed25519 · kid local</span></div>
+            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-cube" aria-hidden="true"></i> cid</span><span class="v">bafy…q7m4</span></div>
+            <div class="lat-rrow lat-rrow-last"><span class="k"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> envelope</span><span class="v">DSSE · JCS canonical</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section lat-section-alt" id="cli">
+      <div class="container">
+        <div class="lat-shead">
+          <span class="lat-eyebrow" i18n="@@lattice.cli.eyebrow">
+            <i class="fa-solid fa-terminal" aria-hidden="true"></i> CLI
+          </span>
+          <h2 i18n="@@lattice.cli.title">Verify, replay, and eval from a terminal</h2>
+          <p i18n="@@lattice.cli.copy">The <span [attr.translate]="'no'">CLI</span> package installs the <span [attr.translate]="'no'">lattice</span> command for receipt verification, offline replay, eval gates, receipt inspection, and local diagnostics.</p>
+        </div>
+        <div class="lat-cli lat-codeblock">
+          <div class="lat-cbhead">
+            <span class="lat-cbname" i18n="@@lattice.cli.filename" [attr.translate]="'no'">lattice · cli</span>
+            <button type="button" class="lat-cbcopy" [class.copied]="copied === 'cli'" (click)="copyCode('cli', cliCode)">
+              <i [class]="copied === 'cli' ? 'fa-solid fa-check' : 'fa-regular fa-copy'" aria-hidden="true"></i>
+              {{ copied === 'cli' ? copiedLabel : copyLabel }}
+            </button>
+          </div>
+          <pre #cliCode [attr.translate]="'no'"><code [innerHTML]="cliCodeHtml"></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-section">
+      <div class="container">
+        <div class="lat-shead">
+          <span class="lat-eyebrow" i18n="@@lattice.principles.eyebrow">
+            <i class="fa-solid fa-compass-drafting" aria-hidden="true"></i> Design principles
+          </span>
+          <h2 i18n="@@lattice.principles.title">How Lattice is built</h2>
+        </div>
+        <div class="lat-principles">
+          <div class="lat-principle" i18n="@@lattice.principle.capability"><i class="fa-solid fa-circle-nodes" aria-hidden="true"></i><span>Capability-first <span [attr.translate]="'no'">API</span>.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.routing"><i class="fa-solid fa-route" aria-hidden="true"></i><span>Deterministic and inspectable routing.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.artifacts"><i class="fa-solid fa-shapes" aria-hidden="true"></i><span>Explicit artifacts and outputs.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.schema"><i class="fa-solid fa-code" aria-hidden="true"></i><span><span [attr.translate]="'no'">Standard Schema</span> at public boundaries.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.providers"><i class="fa-solid fa-plug" aria-hidden="true"></i><span>Provider adapters behind <span [attr.translate]="'no'">Lattice</span> contracts.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.mcp"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span><span [attr.translate]="'no'">MCP</span>-shaped tools and context, not a proprietary plugin protocol.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.agents"><i class="fa-solid fa-users-gear" aria-hidden="true"></i><span>Optional agent behavior through explicit surfaces.</span></div>
+          <div class="lat-principle" i18n="@@lattice.principle.receipts"><i class="fa-solid fa-file-signature" aria-hidden="true"></i><span>Verifiable receipts and replay-friendly execution records.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lat-final">
+      <div class="lat-hero-mesh"></div>
+      <div class="lat-final-inner">
+        <h2 i18n="@@lattice.final.title">Put the machinery behind one runtime</h2>
+        <p i18n="@@lattice.final.copy"><span [attr.translate]="'no'">TypeScript</span>-first, <span [attr.translate]="'no'">ESM</span>, <span [attr.translate]="'no'">MIT</span>-licensed. Published under the <span [attr.translate]="'no'">@full-self-browsing</span> <span [attr.translate]="'no'">npm</span> scope.</p>
+        <div class="lat-cta-row">
+          <a href="https://github.com/fullselfbrowsing/Lattice" target="_blank" rel="noopener" class="btn lat-btn-light" i18n="@@lattice.final.docs">
+            <i class="fa-brands fa-github" aria-hidden="true"></i> Read the docs
+          </a>
+          <a href="https://www.npmjs.com/package/@full-self-browsing/lattice" target="_blank" rel="noopener" class="btn lat-btn-ghost" i18n="@@lattice.final.npm">
+            <i class="fa-brands fa-npm" aria-hidden="true"></i> View on <span [attr.translate]="'no'">npm</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="fsb-mark" i18n-aria-label="@@lattice.footer.brand.aria" aria-label="FSB" [attr.translate]="'no'">
+            <span class="fsb-row" aria-hidden="true">
+              <span class="fsb-f"></span>
+              <span class="fsb-s"></span>
+              <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+              </svg>
+            </span>
+          </span>
+        </div>
+        <div class="footer-links">
+          <div class="footer-column">
+            <h4 i18n="@@lattice.footer.pages.title">Pages</h4>
+            <a routerLink="/" i18n="@@lattice.footer.pages.home">Home</a>
+            <a routerLink="/about" i18n="@@lattice.footer.pages.about">About</a>
+            <a routerLink="/dashboard" i18n="@@lattice.footer.pages.dashboard">Dashboard</a>
+            <a routerLink="/agents" i18n="@@lattice.footer.pages.agents">Agents</a>
+            <a routerLink="/privacy" i18n="@@lattice.footer.pages.privacy">Privacy</a>
+            <a routerLink="/support" i18n="@@lattice.footer.pages.support">Support</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@lattice.footer.project.title">Project</h4>
+            <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" i18n="@@lattice.footer.project.github" [attr.translate]="'no'">GitHub</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" i18n="@@lattice.footer.project.issues" [attr.translate]="'no'">Issues</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" i18n="@@lattice.footer.project.changelog">Changelog</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE" target="_blank" rel="noopener" i18n="@@lattice.footer.project.license">BSL 1.1 License</a>
+            <a routerLink="/stats" i18n="@@lattice.footer.project.stats">Stats</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@lattice.footer.research.title">Research</h4>
+            <a routerLink="/lattice" class="text-orange" i18n="@@lattice.footer.research.lattice" [attr.translate]="'no'">Lattice</a>
+            <a routerLink="/phantom-stream" i18n="@@lattice.footer.research.phantomStream" [attr.translate]="'no'">PhantomStream</a>
+            <a routerLink="/prometheus" i18n="@@lattice.footer.research.prometheus" [attr.translate]="'no'">Prometheus</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@lattice.footer.community.title">Community</h4>
+            <a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" i18n="@@lattice.footer.community.discord" [attr.translate]="'no'">Discord</a>
+            <a href="https://x.com/fsb0804" target="_blank" rel="noopener" class="footer-x-link" i18n="@@lattice.footer.community.x" [attr.translate]="'no'">X</a>
+            <a routerLink="/sitemaps" i18n="@@lattice.footer.community.sitemaps" [attr.translate]="'no'">Sitemaps</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p i18n="@@lattice.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <p><span class="version-tag" [attr.translate]="'no'">▽0.9.90</span></p>
+      </div>
+    </div>
+  </footer>
+</div>

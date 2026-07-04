@@ -80,7 +80,13 @@ The Express backend handles:
 
 The static and Angular dashboard preview surfaces use the shared PhantomStream viewer wrapper for snapshot rendering and mutation application. FSB host code still owns dashboard state, pairing, task/status traffic, progress/client badges, frozen overlays, and remote-control affordances.
 
-Post-deploy crawler checks:
+Local CI crawler smoke serves the built static output and runs the route checks against localhost:
+
+```bash
+npm run showcase:smoke
+```
+
+Production post-deploy crawler checks:
 
 ```bash
 curl -A GPTBot -sI https://full-selfbrowsing.com/ | head -1

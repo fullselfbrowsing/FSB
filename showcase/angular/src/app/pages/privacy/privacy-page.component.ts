@@ -2,6 +2,7 @@ import { Component, OnInit, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angu
 import { Title, Meta } from '@angular/platform-browser';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { PrivacyHistoryArchiveComponent } from './privacy-history-archive.component';
 
 const ROUTE_PATH = '/privacy';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
@@ -11,6 +12,7 @@ const SITE_NAME = 'FSB - Full Self-Browsing';
 @Component({
   selector: 'app-privacy-page',
   standalone: true,
+  imports: [PrivacyHistoryArchiveComponent],
   templateUrl: './privacy-page.component.html',
   styleUrl: './privacy-page.component.scss',
 })
@@ -26,7 +28,7 @@ export class PrivacyPageComponent implements OnInit {
     // Marked via $localize so per-locale builds emit translated strings; embedded brand
     // tokens (FSB, Chrome) are preserved verbatim by translators per DO-NOT-TRANSLATE.md.
     const t = $localize`:@@privacy.meta.title:FSB - Privacy`;
-    const d = $localize`:@@privacy.meta.description:How FSB handles your data: API keys encrypted in Chrome local storage, no telemetry, automation runs locally in your browser. BYO key, BYO browser.`;
+    const d = $localize`:@@privacy.meta.description:How FSB handles your data: API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry, automation runs locally in your browser. BYO key, BYO browser.`;
     this.applyMeta(t, d, url);
   }
 

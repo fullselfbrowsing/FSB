@@ -1,12 +1,20 @@
-import { Component, OnInit, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
-import { Title, Meta } from '@angular/platform-browser';
+import { isPlatformBrowser } from '@angular/common';
+import { Component, OnDestroy, OnInit, PLATFORM_ID, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
+import { Meta, Title } from '@angular/platform-browser';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 
 const ROUTE_PATH = '/agents';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@agents.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
+const AGENT_TOKENS = ['OpenClaw', 'Hermes'] as const;
+type AgentToken = typeof AGENT_TOKENS[number];
+
+const PROVIDER_MARKS: Record<AgentToken, { file: string; alt: string }> = {
+  OpenClaw: { file: 'openclaw.svg', alt: 'OpenClaw' },
+  Hermes: { file: 'hermes.png', alt: 'Hermes' },
+};
 
 @Component({
   selector: 'app-agents-page',
@@ -14,12 +22,29 @@ const SITE_NAME = 'FSB - Full Self-Browsing';
   templateUrl: './agents-page.component.html',
   styleUrl: './agents-page.component.scss',
 })
-export class AgentsPageComponent implements OnInit {
+export class AgentsPageComponent implements OnInit, OnDestroy {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly renderer = inject(Renderer2);
   private readonly doc = inject(DOCUMENT);
   private readonly localeId = inject(LOCALE_ID);
+  private readonly platformId = inject(PLATFORM_ID);
+
+  currentToken: string = AGENT_TOKENS[0];
+  markToken: AgentToken = AGENT_TOKENS[0];
+  morphing = false;
+
+  private tokenIndex = 0;
+  private cycleTimer: number | null = null;
+  private rafId: number | null = null;
+
+  get markFile(): string {
+    return PROVIDER_MARKS[this.markToken].file;
+  }
+
+  get markAlt(): string {
+    return PROVIDER_MARKS[this.markToken].alt;
+  }
 
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
@@ -27,10 +52,61 @@ export class AgentsPageComponent implements OnInit {
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
     const t = $localize`:@@agents.meta.title:FSB - Agents (OpenClaw Skill + MCP)`;
-    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Claude, Codex, Cursor, and more. Install the FSB OpenClaw skill in 3 steps and use 50+ MCP tools to act, observe, verify.`;
+    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Claude, Codex, Cursor, and more. FSB gives agents a polished OpenClaw skill and 66 MCP tools to act, observe, verify.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
-    this.injectInstallHowToJsonLd();
+
+    if (isPlatformBrowser(this.platformId)) {
+      this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    if (this.cycleTimer !== null) {
+      window.clearInterval(this.cycleTimer);
+      this.cycleTimer = null;
+    }
+    if (this.rafId !== null) {
+      window.cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  private advanceToken(): void {
+    if (this.morphing || !isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    const next = AGENT_TOKENS[(this.tokenIndex + 1) % AGENT_TOKENS.length];
+    this.scrambleTo(next);
+  }
+
+  private scrambleTo(target: AgentToken): void {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*+=<>';
+    const duration = 700;
+    const lockTimes = Array.from({ length: target.length }, (_, index) => ((index + 1) / target.length) * (duration * 0.85));
+    const start = performance.now();
+
+    this.morphing = true;
+    const tick = (now: number): void => {
+      const elapsed = now - start;
+      if (elapsed >= duration) {
+        this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
+        this.currentToken = target;
+        this.markToken = target;
+        this.morphing = false;
+        this.rafId = null;
+        return;
+      }
+
+      this.currentToken = Array.from(target, (char, index) =>
+        elapsed >= lockTimes[index] ? char : alphabet[Math.floor(Math.random() * alphabet.length)]
+      ).join('');
+      this.rafId = window.requestAnimationFrame(tick);
+    };
+    this.rafId = window.requestAnimationFrame(tick);
   }
 
   private applyMeta(t: string, d: string, url: string): void {
@@ -61,11 +137,11 @@ export class AgentsPageComponent implements OnInit {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
       '@id': `${HOST}/agents#fsb-skill`,
-      name: 'FSB OpenClaw Skill',
+      name: $localize`:@@agents.schema.software.name:FSB OpenClaw Skill`,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'macOS, Linux, Windows (via Node 18+)',
       url: `${HOST}/agents`,
-      description: 'Canonical OpenClaw onboarding path for FSB. Doctor flow, stdio config printer, and consent-gated multi-host installer for the FSB MCP server.',
+      description: $localize`:@@agents.schema.software.description:Canonical OpenClaw onboarding path for FSB. Doctor flow, stdio config printer, and consent-gated multi-host installer for the FSB MCP server.`,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       publisher: { '@id': `${HOST}/#org` },
       isPartOf: { '@id': `${HOST}/#site` },
@@ -79,45 +155,4 @@ export class AgentsPageComponent implements OnInit {
     this.renderer.appendChild(this.doc.head, script);
   }
 
-  private injectInstallHowToJsonLd(): void {
-    if (this.doc.head.querySelector('script[data-ld="agents-howto"]')) {
-      return;
-    }
-    const payload = {
-      '@context': 'https://schema.org',
-      '@type': 'HowTo',
-      '@id': `${HOST}/agents#install-howto`,
-      name: 'Install FSB for OpenClaw and MCP clients',
-      description: 'Three-step install: Chrome extension, FSB MCP server config, doctor verification.',
-      totalTime: 'PT5M',
-      url: `${HOST}/agents`,
-      step: [
-        {
-          '@type': 'HowToStep',
-          position: 1,
-          name: 'Install the FSB Chrome extension',
-          text: 'Primary path: paste the Chrome Web Store URL into Chrome\u2019s address bar (chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk). Fallback: download the latest .zip from GitHub Releases and load unpacked at chrome://extensions with Developer mode on.',
-        },
-        {
-          '@type': 'HowToStep',
-          position: 2,
-          name: 'Install the FSB MCP server config',
-          text: 'Print the canonical OpenClaw stdio block with `node scripts/print-stdio.mjs` and paste it into your MCP host config. Or use the FSB CLI: `npx -y fsb-mcp-server install --list` to discover supported hosts, then `npx -y fsb-mcp-server install --claude-desktop` (or your host).',
-        },
-        {
-          '@type': 'HowToStep',
-          position: 3,
-          name: 'Verify with the doctor',
-          text: 'Run the six-layer diagnostic: `node scripts/doctor.mjs`. Expect [OK] on every layer. If any layer fails, the doctor prints a one-line next step; the full recovery table is in USAGE.md inside the skill.',
-        },
-      ],
-    };
-    const json = JSON.stringify(payload).replace(/</g, '\\u003c');
-    const script = this.renderer.createElement('script') as HTMLScriptElement;
-    this.renderer.setAttribute(script, 'type', 'application/ld+json');
-    this.renderer.setAttribute(script, 'data-ld', 'agents-howto');
-    const text = this.renderer.createText(json);
-    this.renderer.appendChild(script, text);
-    this.renderer.appendChild(this.doc.head, script);
-  }
 }
