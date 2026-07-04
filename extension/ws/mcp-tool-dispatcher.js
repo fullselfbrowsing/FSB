@@ -484,7 +484,7 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
     return createMcpRouteError(type, 'message', MCP_ROUTE_RECOVERY_HINT);
   }
 
-  const restrictedReadResponse = await buildRestrictedResponseIfReadRoute({ type, client });
+  const restrictedReadResponse = await buildRestrictedResponseIfReadRoute({ type, client, payload });
   if (restrictedReadResponse) return restrictedReadResponse;
 
   // Phase 271 / v0.9.69 -- MCP analytics chokepoint (message surface). Same
@@ -575,8 +575,16 @@ function buildRestrictedMcpResponse({ currentUrl, pageType, tool, error }) {
   };
 }
 
-async function buildRestrictedResponseIfReadRoute({ type, client }) {
+async function buildRestrictedResponseIfReadRoute({ type, client, payload }) {
   if (type !== 'mcp:read-page' && type !== 'mcp:get-dom') return null;
+  const tool = type === 'mcp:read-page' ? 'read_page' : 'get_dom_snapshot';
+
+  if (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function') {
+    return buildRestrictedResponseForResolvedTab({ tool, client, payload });
+  }
+
+  // No resolver wired up (e.g. isolated test harnesses) -- unchanged pre-fix
+  // behavior: check the OS-active tab.
   const activeTab = await getActiveTabFromClient(client).catch(() => null);
   const currentUrl = activeTab?.url || '';
   if (!isRestrictedMcpUrl(currentUrl)) return null;
@@ -584,7 +592,45 @@ async function buildRestrictedResponseIfReadRoute({ type, client }) {
   return buildRestrictedMcpResponse({
     currentUrl,
     pageType: getPageTypeDescriptionForMcp(currentUrl),
-    tool: type === 'mcp:read-page' ? 'read_page' : 'get_dom_snapshot',
+    tool,
+    error: 'Active tab is restricted'
+  });
+}
+
+// Checks restriction on the CALLER'S ACTUAL TARGET tab (via the same
+// resolveAgentTabOrError the real _handleGetDOM/_handleReadPage handlers use)
+// instead of Chrome's OS-focused tab. Any resolution failure defers to the
+// real handler (returns null) rather than guessing -- the real handler makes
+// the identical resolveAgentTabOrError call and already returns its error
+// shape verbatim, so duplicating that logic here would risk disagreeing with it.
+async function buildRestrictedResponseForResolvedTab({ tool, client, payload }) {
+  const agentId = (payload && payload.agentId) || null;
+  const params = (payload && payload.params) || payload || {}; // matches _handleGetDOM/_handleReadPage
+
+  let resolved;
+  try {
+    resolved = await globalThis.resolveAgentTabOrError(agentId, params, client);
+  } catch (_e) {
+    return null;
+  }
+  if (!resolved || resolved.success === false || !Number.isFinite(resolved.tabId)) {
+    return null;
+  }
+
+  let tab;
+  try {
+    tab = await getChromeTabsApi().get(resolved.tabId);
+  } catch (_e) {
+    return null;
+  }
+
+  const currentUrl = (tab && tab.url) || '';
+  if (!isRestrictedMcpUrl(currentUrl)) return null;
+
+  return buildRestrictedMcpResponse({
+    currentUrl,
+    pageType: getPageTypeDescriptionForMcp(currentUrl),
+    tool,
     error: 'Active tab is restricted'
   });
 }

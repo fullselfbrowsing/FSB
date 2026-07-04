@@ -26,7 +26,7 @@ FSB lets you drive the user's real Chrome via the FSB extension and a local MCP 
 
 ## Sensitive actions and logged-in context
 
-FSB drives the user's real Chrome, so every action runs inside whatever sessions, cookies, and saved auth that browser already holds. Before the final click that submits a purchase, payment, account change (password update, data deletion, permission grant, settings write), or public post (tweet, comment, DM, issue, PR), pause and ask the user to confirm in chat -- state the action, the target site, and any amount or recipient, then wait for an explicit yes. Vault-backed fills (`fill_credential`, `use_payment_method`) are allowed during preparation; only the final submission is gated. Read-only inspection (`read_page`, `get_dom_snapshot`, `get_text`) does not require confirmation.
+FSB drives the user's real Chrome, so every action runs inside whatever sessions, cookies, and saved auth that browser already holds. Before the final click that submits a purchase, payment, account change (password update, data deletion, permission grant, settings write), or public post (tweet, comment, DM, issue, PR), pause and ask the user to confirm in chat -- state the action, the target site, and any amount or recipient, then wait for an explicit yes. The same rule applies to `invoke_capability` calls with equivalent real-world effects (a first-party API purchase, payment, account change, or public post) instead of a page click. Vault-backed fills (`fill_credential`, `use_payment_method`) are allowed during preparation; only the final submission is gated. Read-only inspection (`read_page`, `get_dom_snapshot`, `get_text`, `search_capabilities`) does not require confirmation.
 
 ## Doctor-first protocol
 
@@ -42,7 +42,7 @@ As of fsb-mcp-server v0.9.0 (FSB milestone v0.9.62) the visual session is IMPLIC
 
 The first action call brings up the overlay; each subsequent action call re-arms a 60-second sliding window; `is_final: true` clears immediately; 60 seconds of silence auto-clears. No `start_visual_session` / `end_visual_session` calls are needed -- those tools were REMOVED in v0.9.0 and now return the typed `TOOL_REMOVED` error. Read-only tools (`read_page`, `get_dom_snapshot`, `list_tabs`, ...) do NOT carry the bundle and do NOT re-arm the sliding window. If the first action call hits `NO_OWNED_TAB`, call `open_tab({ url, active: false })` first, then retry. Lifecycle details, the read-tool vs action-tool split, and the typed-error catalogue live in `references/visual-session-lifecycle.md`.
 
-The canonical 36-tool action list, the 15-tool read-only list, and the three typed-error names (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`, `TOOL_REMOVED`) are pinned in `.planning/v0.9.62-CONTRACT.md` -- that artifact is the single source of truth. Use it to answer "does this tool require the field bundle?" by lookup; do not re-derive the lists from memory.
+The canonical 37-tool action list (36 pinned 2026-05-11 plus `upload_file` added 2026-06-17), the 15-tool read-only list, and the three typed-error names (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`, `TOOL_REMOVED`) are pinned in `.planning/v0.9.62-CONTRACT.md` -- that artifact is the single source of truth. Use it to answer "does this tool require the field bundle?" by lookup; do not re-derive the lists from memory. Trigger watchers (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) and capability tools (`search_capabilities`, `invoke_capability`) are separate tool families outside this field-bundle contract -- see `references/tool-decision-tree.md`.
 
 ## Multi-agent contract
 
@@ -66,4 +66,4 @@ Passwords and CVV resolve INSIDE the extension via `fill_credential` and `use_pa
 
 - `scripts/doctor.mjs` -- diagnose the failing layer; prints [OK], [FAIL], and [WARN] markers per layer.
 - `scripts/print-stdio.mjs` -- print the OpenClaw stdio config block to paste into your MCP config.
-- `scripts/install-host.mjs` -- detect other MCP hosts on the machine; consent-gated per-host install.
+- `scripts/install-host.mjs` -- detect other MCP hosts on the machine; confirmation-based per-host install.

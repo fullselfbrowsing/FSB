@@ -59,8 +59,8 @@ console.log('--- Test 1: control_panel.html contains Agent Concurrency card mark
   assert.ok(helperIdx < optionsIdx, 'loads agent-cap-recommendation helper before options.js');
   assert.ok(/Reset to recommended/i.test(html),
     'reset button text uses recommended copy');
-  assert.ok(/floor\(total GiB \/ 3\)|total RAM/i.test(html),
-    'helper text describes RAM-based recommendation');
+  assert.ok(/automatically recommended/i.test(html),
+    'helper text describes automatic recommendation for the system');
   assert.ok(/1\s*(?:to|-)\s*64/i.test(html),
     'helper text mentions range 1-64 or 1 to 64');
   assert.ok(/grandfather|active agents|do(?:es)? not evict|not evict/i.test(html),

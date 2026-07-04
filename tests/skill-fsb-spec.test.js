@@ -164,6 +164,9 @@ const nonToolAllowlist = new Set([
   'run_task', 'stop_task', 'get_task_status',
   'start_visual_session', 'end_visual_session', 'progress_visual_session',
   'fill_credential', 'use_payment_method',
+  'search_capabilities', 'invoke_capability',
+  // trigger tool params / condition kinds (tool inputs, not tools):
+  'trigger_id', 'include_terminal', 'delta_percent',
 ]);
 let unknownTokens = [];
 for (const token of referenced) {

@@ -490,7 +490,7 @@
                     <i class="fas fa-rotate-left"></i> <span class="form-secondary-btn__label">Reset to recommended (8)</span>
                   </button>
                   <div class="setting-hint">
-                    Recommended from total RAM: floor(total GiB / 3), capped at 64. Range 1 to 64. Lower = predictable resource use; higher = more parallel agents. Lowering this value while active agents are running does not evict them; new claims past the new cap are rejected (grandfather behavior).
+                    Automatically recommended for your system. Range 1 to 64. Lower = predictable resource use; higher = more parallel agents. Lowering this value while active agents are running does not evict them; new claims past the new cap are rejected (grandfather behavior).
                   </div>
                   <!-- Phase 243 Plan 04 / UI-03: inline validation message for out-of-range input (D-06). -->
                   <div class="setting-hint" id="fsbAgentCapValidation"
@@ -1032,15 +1032,23 @@
             </div>
 
             <div class="knowledge-graph-legend" id="knowledgeGraphLegend">
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> E-Commerce</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> Social</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Finance</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Travel</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Email</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #06b6d4;"></span> Coding</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ec4899;"></span> Career</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #f97316;"></span> Gaming</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #14b8a6;"></span> Productivity</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> E-Commerce &amp; Shopping</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> Social Media</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Finance &amp; Trading</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Travel &amp; Booking</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Email Platforms</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #06b6d4;"></span> Coding Platforms</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ec4899;"></span> Career &amp; Job Search</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #f97316;"></span> Gaming Platforms</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #14b8a6;"></span> Productivity Tools</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #a855f7;"></span> Design &amp; Whiteboard</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #0891b2;"></span> Games</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #d946ef;"></span> Media</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> Music</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> News</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Reference</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Sports</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Utilities</span>
             </div>
           </div>
 
