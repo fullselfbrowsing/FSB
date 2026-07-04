@@ -66,8 +66,8 @@ extension/dist/
 
 # graphify -- per graphify's own recommendation: cost.json is local-only,
 # cache/ is regenerable extraction cache (skip to keep repo small).
-graphify-out/cost.json
-graphify-out/cache/
+graphify-out/**/cost.json
+graphify-out/**/cache/
 # machine-local state (absolute paths to this machine's interpreter/checkout,
 # and a scratch list of not-yet-cached files) -- never portable across machines.
 graphify-out/.graphify_python
