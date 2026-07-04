@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Phase 251 -- static-content tests for the FSB OpenClaw skill at
- * skills/FSB Skill/. Locks SKILL.md frontmatter, scripts/print-stdio.mjs
+ * Phase 251 -- static-content tests for the FSB OpenClaw + Hermes skill at
+ * skills/fsb/. Locks SKILL.md frontmatter, scripts/print-stdio.mjs
  * stdio block parity with mcp/src/install.ts, references/*.md
  * completeness, multi-agent typed error coverage, and USAGE.md links
  * against silent regression. Wired into root npm test chain so the
@@ -29,7 +29,7 @@ function check(cond, msg) {
 }
 
 const repoRoot = path.resolve(__dirname, '..');
-const skillRoot = path.join(repoRoot, 'skills', 'FSB Skill');
+const skillRoot = path.join(repoRoot, 'skills', 'fsb');
 
 const skillMd = path.join(skillRoot, 'SKILL.md');
 const usageMd = path.join(skillRoot, 'USAGE.md');
@@ -57,7 +57,7 @@ const fm = fmMatch ? fmMatch[1] : '';
 
 // Minimal regex parsing of relevant fields
 const nameMatch = fm.match(/^name:\s*(\S.*?)\s*$/m);
-check(nameMatch && nameMatch[1] === 'FSB', 'frontmatter name === FSB');
+check(nameMatch && nameMatch[1] === 'fsb', 'frontmatter name === fsb');
 
 const versionMatch = fm.match(/^version:\s*(\S+)\s*$/m);
 check(versionMatch && versionMatch[1] === '0.9.62', 'frontmatter version === 0.9.62');
@@ -99,6 +99,10 @@ if (ocMatch) {
 // Forbidden keys
 check(!/^priority:/m.test(fm), 'no priority key in frontmatter');
 check(!/^must-use:/m.test(fm), 'no must-use key in frontmatter');
+
+// Hermes Skills Hub additions (v0.9.69+): platforms array and metadata.hermes block
+check(/^platforms:\s*\[[^\]]*macos[^\]]*\]/m.test(fm), 'frontmatter has platforms array including macos');
+check(/^\s*hermes:\s*$/m.test(fm), 'frontmatter metadata has hermes block');
 
 console.log('\n=== TEST-03: stdio block parity ===');
 
@@ -164,8 +168,12 @@ const nonToolAllowlist = new Set([
   'run_task', 'stop_task', 'get_task_status',
   'start_visual_session', 'end_visual_session', 'progress_visual_session',
   'fill_credential', 'use_payment_method',
+  // Hermes-side imported-tool prefix examples (Hermes auto-prefixes MCP tools as mcp_fsb_<tool>):
+  'mcp_fsb_click', 'mcp_fsb_read_page', 'mcp_fsb_type_text',
+  'mcp_fsb_get_dom_snapshot', 'mcp_fsb_execute_js',
+  // v0.9.90 Capability Catalog MCP tools (mcp runtime surface, not in tool-definitions.cjs):
   'search_capabilities', 'invoke_capability',
-  // trigger tool params / condition kinds (tool inputs, not tools):
+  // v0.9.90 Trigger Watchers params / conditions (action inputs, not tools):
   'trigger_id', 'include_terminal', 'delta_percent',
 ]);
 let unknownTokens = [];
@@ -198,6 +206,12 @@ const asciiArtifacts = [
   refs['tool-decision-tree.md'], refs['multi-agent-contract.md'],
   refs['restricted-tab-recovery.md'], refs['default-to-fsb.md'],
   refs['vault-boundary.md'], refs['visual-session-lifecycle.md'],
+  // Hermes Skills Hub additions (created in Task 2 of QUICK-260520-gi0).
+  // The loop below skips missing files via fs.existsSync, so these are safe
+  // to assert pre-Task-2 and become enforced once the files exist.
+  path.join(skillRoot, 'references', 'hermes-tool-prefix.md'),
+  path.join(skillRoot, 'references', 'v0.9.62-contract-mirror.md'),
+  path.join(skillRoot, 'scripts', 'print-hermes-yaml.mjs'),
 ];
 for (const f of asciiArtifacts) {
   if (!fs.existsSync(f)) continue;

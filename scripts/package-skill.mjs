@@ -1,15 +1,20 @@
 #!/usr/bin/env node
-// Package the FSB OpenClaw skill at skills/FSB Skill/ into a publishable
+// Package the FSB OpenClaw + Hermes skill at skills/fsb/ into a publishable
 // zip artifact at dist/skill/FSB-Skill-<version>.zip. Reproducible build:
-// runs from a clean working tree, includes only files under skills/FSB Skill/,
+// runs from a clean working tree, includes only files under skills/fsb/,
 // excludes any node_modules or hidden files, and stamps the version from
 // SKILL.md frontmatter.
+//
+// Note: the source directory is `skills/fsb/` (renamed in
+// QUICK-260520-gi0; the prior dirname used a space + uppercase). The output
+// zip filename is intentionally kept as `FSB-Skill-<version>.zip` so existing
+// ClawHub publish consumers and any hard-coded download URLs do not break.
 //
 // Usage: npm run package:skill
 //
 // This script does NOT publish to ClawHub. Publish is user-gated:
 //   clawhub login
-//   clawhub publish "skills/FSB Skill"
+//   clawhub publish "skills/fsb"
 //
 // See .planning/v0.9.61-CLAWHUB-PUBLISH-QA.md for the QA pass.
 
@@ -21,11 +26,11 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..');
-const skillDir = join(repoRoot, 'skills', 'FSB Skill');
+const skillDir = join(repoRoot, 'skills', 'fsb');
 const distDir = join(repoRoot, 'dist', 'skill');
 
 if (!existsSync(skillDir)) {
-  console.error('[FAIL] skills/FSB Skill/ does not exist at', skillDir);
+  console.error('[FAIL] skills/fsb/ does not exist at', skillDir);
   process.exit(1);
 }
 
@@ -52,7 +57,7 @@ try {
     [
       '-X', '-r', '-q',
       outZip,
-      'skills/FSB Skill/',
+      'skills/fsb/',
       '-x', '*.DS_Store',
       '-x', '*node_modules*',
       '-x', '*.git/*',
@@ -68,6 +73,6 @@ console.log('[OK] artifact:', outZip);
 console.log('');
 console.log('To publish (user-gated):');
 console.log('  clawhub login');
-console.log('  clawhub publish "skills/FSB Skill"');
+console.log('  clawhub publish "skills/fsb"');
 console.log('');
 console.log('See .planning/v0.9.61-CLAWHUB-PUBLISH-QA.md for the pre-publish QA pass.');

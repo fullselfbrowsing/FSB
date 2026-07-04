@@ -1,6 +1,6 @@
 # FSB Chrome Extension
 
-`extension/` is the unpacked Chrome extension package for FSB v0.9.90. Load this directory, not the repository root, when running locally.
+`extension/` is the unpacked Chrome extension package for FSB v0.9.90. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
 
 ## Load Unpacked
 
@@ -8,8 +8,8 @@
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
 4. Select the repository's `extension/` directory.
-5. Pin FSB from the toolbar puzzle icon.
-6. Open the popup from the toolbar, or right-click the extension and choose **Open side panel**.
+5. Pin FSB from Chrome's extensions menu.
+6. Right-click the extension and choose **Open side panel**.
 
 After code changes, reload the extension from `chrome://extensions` and refresh any open tabs so content scripts re-inject.
 
@@ -75,7 +75,7 @@ The extension stores settings, encrypted keys, analytics, memory, logs, vault da
 
 The extension is driven through:
 
-- popup and side panel chat
+- side panel chat
 - control panel settings and diagnostics
 - content-script visual overlay
 - local WebSocket bridge for `fsb-mcp-server`

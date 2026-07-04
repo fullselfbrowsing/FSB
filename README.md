@@ -13,10 +13,10 @@
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-BSL_1.1-F5C518?style=for-the-badge)
 
-![Stars](https://img.shields.io/github/stars/LakshmanTurlapati/FSB?style=flat-square&logo=github&label=Stars)
-![Forks](https://img.shields.io/github/forks/LakshmanTurlapati/FSB?style=flat-square&logo=github&label=Forks)
-![Issues](https://img.shields.io/github/issues/LakshmanTurlapati/FSB?style=flat-square&logo=github&label=Issues)
-![Last Commit](https://img.shields.io/github/last-commit/LakshmanTurlapati/FSB?style=flat-square&logo=github&label=Last%20Commit)
+![Stars](https://img.shields.io/github/stars/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Stars)
+![Forks](https://img.shields.io/github/forks/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Forks)
+![Issues](https://img.shields.io/github/issues/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Issues)
+![Last Commit](https://img.shields.io/github/last-commit/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Last%20Commit)
 
 **AI-powered browser automation through natural language. Tell it what to do, and watch it browse for you.**
 
@@ -68,7 +68,9 @@ Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-se
 
 Want to run FSB standalone from the extension popup/side panel? Open settings, paste an API key (xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, or custom), and start there — no MCP needed.
 
-**On OpenClaw?** Load the FSB skill from [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md). The skill runs the doctor flow, prints the canonical OpenClaw stdio config block, and offers confirmation-based install for any other MCP hosts on the same machine. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds; the skill prints + you paste, never auto-writes.
+**On OpenClaw?** Install FSB directly from [ClawHub](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing). That is the fastest onboarding route. If you need the manual fallback, the FSB skill in [`skills/fsb/`](./skills/fsb/SKILL.md) still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds.
+
+**On Hermes?** Use the same skill at [`skills/fsb/`](./skills/fsb/SKILL.md). Run `node skills/fsb/scripts/print-hermes-yaml.mjs` to print the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, or run `node skills/fsb/scripts/install-host.mjs` to detect a local Hermes config and gate the install on consent.
 
 ### What It Does
 
@@ -138,7 +140,7 @@ Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its o
 |------|---------|
 | [`extension/`](./extension/README.md) | Chrome extension package. Load this directory as an unpacked MV3 extension. |
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
-| [`skills/FSB Skill/`](./skills/FSB%20Skill/SKILL.md) | OpenClaw skill: doctor + stdio printer + confirmation-based multi-host install. |
+| [`skills/fsb/`](./skills/fsb/SKILL.md) | OpenClaw + Hermes skill: doctor + stdio/YAML printers + consent gated install for multiple hosts. |
 | [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
 | `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
@@ -208,7 +210,7 @@ Top level deploy and validation files:
 ### Install The Extension
 
 ```bash
-git clone https://github.com/lakshmanturlapati/FSB.git
+git clone https://github.com/fullselfbrowsing/FSB.git
 cd FSB
 ```
 
@@ -620,7 +622,7 @@ This project is licensed under the Business Source License 1.1. See [LICENSE](LI
 
 ## Support And Contributing
 
-- Report bugs and feature requests in [GitHub Issues](https://github.com/lakshmanturlapati/FSB/issues).
+- Report bugs and feature requests in [GitHub Issues](https://github.com/fullselfbrowsing/FSB/issues).
 - Include the task prompt, target site, provider/model, logs, and reproduction steps where possible.
 - Pull requests should update tests and docs when behavior, setup, or public interfaces change.
 

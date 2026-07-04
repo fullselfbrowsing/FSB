@@ -14,6 +14,10 @@ Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, `get_attribute`, `
 
 The explicit `start_visual_session` / `end_visual_session` tools were removed in v0.9.0; the decision tree never reaches for them. See `references/visual-session-lifecycle.md` for the full lifecycle and `.planning/v0.9.62-CONTRACT.md` for the canonical lists.
 
+## On Hermes
+
+Tool names shown here without prefix appear as `mcp_fsb_<tool>` inside Hermes (e.g., `click` -> `mcp_fsb_click`, `read_page` -> `mcp_fsb_read_page`). See `references/hermes-tool-prefix.md`. The field bundle and read/action split are unchanged.
+
 ## Read-only first (in this order)
 
 Pick the lightest reader that answers the question. Escalate down the list only when the lighter tool cannot give you what you need.

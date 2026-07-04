@@ -18,7 +18,7 @@ const createPairRouter = require('./src/routes/pair');
 const { setupWSHandler } = require('./src/ws/handler');
 const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-compat');
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
-const { LOCALES, SOURCE_LOCALE } = require('./src/utils/locale-constants');
+const { LOCALES, SOURCE_LOCALE, LOCALE_SUBPATHS } = require('./src/utils/locale-constants');
 
 // Configuration
 const PORT = parseInt(process.env.PORT) || 3847;
@@ -196,12 +196,18 @@ if (staticPath) {
   }));
 }
 
-// Phase 216 SRV-01 / SRV-02 / D-09 / D-10:
+// Phase 216 SRV-01 / SRV-02 / D-09 / D-10 + locale-aware extension (2026-05-21):
 // Prefer per-route prerendered HTML for marketing routes; whitelist exact-match
-// client shell routes; fall through to a 404 otherwise. This replaces
-// the previous all-routes -> root-index SPA fallback, which would have shadowed
-// crawler files and served the wrong <title>/<meta> for /about /privacy /support
-// after Phase 215 prerender landed.
+// client-shell routes (/dashboard, /stats, /legal) for the SPA shell; fall through
+// to a 404 otherwise. This replaces the previous all-routes -> root-index SPA
+// fallback, which would have shadowed crawler files and served the wrong
+// <title>/<meta> for /about /privacy /support after Phase 215 prerender landed.
+//
+// Locale extension: requests like /es/agents must serve public/es/agents/index.html.
+// express.static({ redirect: false }) intentionally suppresses the trailing-slash
+// 301, so without this branch /es/agents 404s while /es/agents/ works. Splitting
+// req.path into (localeSubPath, routeWithinLocale) lets one whitelist handle every
+// locale uniformly.
 const marketingRoutes = new Set([
   '/',
   '/about',
@@ -218,20 +224,43 @@ const clientShellRoutes = new Set([
   '/stats',
   '/legal'
 ]);
+const NON_SOURCE_LOCALE_SUBPATHS = LOCALES
+  .filter(function(loc) { return loc !== SOURCE_LOCALE; })
+  .map(function(loc) { return LOCALE_SUBPATHS[loc]; })
+  .filter(Boolean);
+
+function splitLocaleFromPath(reqPath) {
+  // Returns { localeSubPath, routeWithinLocale }. localeSubPath is '' for EN /
+  // unprefixed paths. Only matches CONFIGURED locale prefixes; arbitrary first
+  // segments (/blog, /api, etc.) are left untouched.
+  for (var i = 0; i < NON_SOURCE_LOCALE_SUBPATHS.length; i++) {
+    var sub = NON_SOURCE_LOCALE_SUBPATHS[i];
+    if (reqPath === '/' + sub) {
+      return { localeSubPath: sub, routeWithinLocale: '/' };
+    }
+    if (reqPath.indexOf('/' + sub + '/') === 0) {
+      return { localeSubPath: sub, routeWithinLocale: reqPath.slice(sub.length + 1) };
+    }
+  }
+  return { localeSubPath: '', routeWithinLocale: reqPath };
+}
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return next();
   }
+  const { localeSubPath, routeWithinLocale } = splitLocaleFromPath(req.path);
+  const isMarketing = marketingRoutes.has(routeWithinLocale);
+  const isSpaShell = clientShellRoutes.has(routeWithinLocale);
   if (!staticPath) {
-    if (marketingRoutes.has(req.path) || clientShellRoutes.has(req.path)) {
+    if (isMarketing || isSpaShell) {
       res.status(503).type('text/plain').send('Showcase build not found. Run `npm --prefix showcase/angular run build` first.');
       return;
     }
     return next();
   }
-  if (marketingRoutes.has(req.path)) {
-    const dir = req.path === '/' ? '' : req.path;
-    const candidate = path.join(staticPath, dir, 'index.html');
+  if (isMarketing) {
+    const routeDir = routeWithinLocale === '/' ? '' : routeWithinLocale;
+    const candidate = path.join(staticPath, localeSubPath, routeDir, 'index.html');
     if (fs.existsSync(candidate)) {
       res.sendFile(candidate);
       return;
@@ -241,10 +270,16 @@ app.use((req, res, next) => {
     // will surface this on the next run.
     return next();
   }
-  if (clientShellRoutes.has(req.path)) {
-    // D-10 exact-match whitelist: these are SPA-shell routes
-    // (RenderMode.Client per app.routes.server.ts). Nested paths are NOT
-    // covered and fall through to 404.
+  if (isSpaShell) {
+    // D-10 exact-match whitelist: /dashboard, /stats, and /legal are SPA-shell
+    // routes (RenderMode.Client per app.routes.server.ts). Nested paths like
+    // /dashboard/* are NOT covered and fall through to 404. Per-locale SPA shells
+    // are at public/<locale>/index.html, falling back to root index.html for EN.
+    const shellCandidate = path.join(staticPath, localeSubPath, 'index.html');
+    if (fs.existsSync(shellCandidate)) {
+      res.sendFile(shellCandidate);
+      return;
+    }
     res.sendFile(path.join(staticPath, 'index.html'));
     return;
   }

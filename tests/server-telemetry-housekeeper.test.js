@@ -22,7 +22,7 @@ const Database = require(require.resolve('better-sqlite3', { paths: [SERVER_NM] 
 
 const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'schema'));
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
-const { runHousekeeperTick, floorToUtcDayMs } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'housekeeper'));
+const { runHousekeeperTick, floorToUtcDayMs, K_ANONYMITY_FLOOR } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'housekeeper'));
 
 let passed = 0;
 let failed = 0;
@@ -128,19 +128,25 @@ check('global aggregate exists for yesterday', !!globalYesterday, `got ${JSON.st
 check('global yesterday.unique_installs === 1 (A)', globalYesterday && globalYesterday.unique_installs === 1, `got ${JSON.stringify(globalYesterday)}`);
 
 // popular_mcp_json: today has Claude (1 distinct install, A) and Codex (1 distinct install, B).
-// Both labels are below the k=2 floor (uniq=1 < 2). The fix in WR-01 (Phase 273 review) sums
-// installs across below-k labels (1 + 1 = 2). The aggregate below-k install count (2) is
-// >= k=2, so the "Other" bucket SURFACES with uniq=2. Per-label names are still suppressed
-// (each label's uniq=1 < k=2) so anonymity at the chosen k is preserved.
+// Floor history: k=5 (v0.9.69, bucket SUPPRESSED -> []) -> k=2 (v0.9.70, both labels below floor,
+// aggregate 1+1=2 >= floor -> single "Other" bucket uniq=2) -> k=1 (this fix, both labels >= floor
+// -> both labels surface UNCHANGED as separate rows, no "Other" bucket emitted).
 //
-// History: this assertion was originally written against k=5 (bucket SUPPRESSED -> empty
-// array). Floor lowered to k=2 in v0.9.70 once it became clear no real client could clear
-// k=5 at single-digit total install counts -- /stats showed only "Other" forever.
+// Rationale for k=1: MCP_CLIENT_ALLOWLIST in routes/telemetry.js is a FIXED PUBLIC 13-label set
+// whose contents leak no identifying information beyond install counts (already exposed via
+// total_users). See housekeeper.js comment block for the full justification.
 const popularToday = JSON.parse(globalToday.popular_mcp_json);
-check('popular_mcp_json applies k=2 floor: per-label below k, aggregate 2 >= k -> single "Other" bucket with uniq=2',
-  Array.isArray(popularToday) && popularToday.length === 1
-    && popularToday[0].mcp_client === 'Other'
-    && popularToday[0].uniq === 2,
+check('K_ANONYMITY_FLOOR is exported and equals 1 (regression guard: any bump to >=2 will fail this test)',
+  K_ANONYMITY_FLOOR === 1,
+  `got K_ANONYMITY_FLOOR=${K_ANONYMITY_FLOOR}`
+);
+check('popular_mcp_json at k=1: both real labels (Claude + Codex) surface as separate rows with uniq=1, no "Other" bucket',
+  Array.isArray(popularToday)
+    && popularToday.length === 2
+    && popularToday.every((r) => r.uniq === 1)
+    && popularToday.some((r) => r.mcp_client === 'Claude')
+    && popularToday.some((r) => r.mcp_client === 'Codex')
+    && popularToday.every((r) => r.mcp_client !== 'Other'),
   `got ${JSON.stringify(popularToday)}`
 );
 

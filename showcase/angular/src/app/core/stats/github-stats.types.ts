@@ -16,7 +16,6 @@ export type StatsViewId =
   | 'forks-growth'
   | 'prs-opened-vs-merged'
   | 'commits-cumulative'
-  | 'commits-over-time'
   | 'maintenance';
 
 /** GET /repos/{owner}/{repo} -- totals card source. */

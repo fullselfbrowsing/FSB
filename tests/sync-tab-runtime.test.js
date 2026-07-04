@@ -62,6 +62,17 @@ assert(
   '[D-18] cache updates from request.state on every push'
 );
 
+assert(
+  BG.includes("case 'reconnectDashboardWebSocket':"),
+  '[SYNC70] background.js exposes reconnectDashboardWebSocket for Sync-tab pairing refresh'
+);
+
+assert(
+  BG.includes('changes.serverHashKey || changes.serverUrl') &&
+    BG.includes('fsbWebSocket.connect()'),
+  '[SYNC70] background.js reconnects the dashboard relay when Sync server/hash settings change'
+);
+
 console.log('\n--- Phase 213 SYNC-02: ws-client.js push emission + Phase 209 preservation ---');
 
 // Locate _broadcastRemoteControlState body (greedy-stop at next top-level closing brace).
@@ -85,6 +96,13 @@ assert(
 assert(
   WS.includes('var _lastRemoteControlState = null;'),
   '[Phase 209 / D-18] ws-client.js cache at line ~124 preserved (used by snapshot recovery line ~764-765)'
+);
+
+assert(
+  WS.includes("chrome.storage.local.get(['serverHashKey', 'serverUrl'])") &&
+    WS.includes('_normalizeFsbServerUrl(serverUrl)') &&
+    WS.includes("await chrome.storage.local.set({ serverHashKey, serverUrl: resolvedServerUrl })"),
+  '[SYNC70] ws-client connects to the configured Sync server URL and persists the canonical URL with the hash key'
 );
 
 // Phase 209 payload-shape preservation: { enabled, attached, tabId, reason, ownership }

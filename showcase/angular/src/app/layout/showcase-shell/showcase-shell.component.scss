@@ -3,6 +3,39 @@
    Replicated from vanilla main.css (git ref eb99a46)
    ============================================= */
 
+/* Quick task 260517-fsf -- sticky-footer layout.
+   The shell renders <nav> (position: fixed), <main> (router-outlet sits inside
+   via <ng-content>), and <footer> as siblings inside :host. Without the flex
+   column + min-height: 100vh + flex:1 on main, short pages let the footer
+   ride up immediately below the last content row instead of being pinned to
+   the viewport bottom. This was most visible on /stats (compact page), but
+   any page with content shorter than the viewport benefits from this.
+
+   Notes:
+     - The fixed-position .nav does NOT consume layout space, so we do not
+       need padding-top here -- each page already accounts for the nav via
+       its own top padding (var(--section-padding) etc).
+     - We only set min-height: 100vh on :host, not on body, to keep the
+       blast radius minimal (body has overflow-x: hidden and other global
+       resets we do not want to disturb). */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+:host > main {
+  // Grow to consume any leftover vertical space so the footer is pushed
+  // to the viewport bottom on short pages. We intentionally do NOT change
+  // <main>'s inner display mode (it stays in normal block flow) so existing
+  // page layouts inside <ng-content> are unaffected.
+  flex: 1 0 auto;
+}
+
+:host > .footer {
+  flex: 0 0 auto;
+}
+
 /* --- Navigation --- */
 .nav {
   position: fixed;
@@ -346,4 +379,122 @@
   .nav-mobile {
     display: none !important;
   }
+}
+
+/* =============================================
+   Quick task 260526-ezk -- /stats-only chrome.
+   Append-only block; all rules are gated by the
+   ShowcaseShellComponent.isStatsRoute signal at
+   the template level, so nothing here can affect
+   any other route. Renamed keyframes (statsGlow)
+   to avoid colliding with home's heroGlow --
+   Angular emulated encapsulation does NOT scope
+   @keyframes (they leak globally).
+   ============================================= */
+
+/* Minimal back button -- mirrors .theme-toggle-btn's circular border-only
+   treatment for visual consistency. Position-fixed top-left so it sits in
+   the space the now-hidden <nav> used to occupy. */
+.stats-back-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.stats-back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  transform: scale(1.1);
+}
+
+@media (max-width: 480px) {
+  .stats-back-btn {
+    top: 12px;
+    left: 12px;
+  }
+}
+
+/* Subtle orange aurora background -- mirrors home-page .hero-bg exactly
+   (same rgba color stops, same 12s timing). Position-fixed so it covers
+   the entire viewport; z-index:0 + main.stats-main z-index:1 keeps it
+   behind page content; pointer-events:none guarantees zero click
+   interference.
+
+   Edge-bleed note: home's .hero-bg is position:absolute inside a parent
+   .hero container with overflow:hidden + min-height:100vh, so the parent
+   masks the animated edges. Here .stats-glow-bg is position:fixed with no
+   clipping parent, so we instead oversize via inset:-10%. Without that,
+   the 66% keyframe (scale 0.95 + translate(-2%, 2%)) shrinks the element
+   inside the viewport AND shifts it down, exposing a sharp horizontal line
+   at the top edge where the still-tinted gradient meets the dark body bg.
+   With inset:-10% the element is 120% of the viewport in each dimension
+   and centered around it, so the worst-case shrunk + shifted edges stay
+   safely off-screen throughout the loop. */
+@keyframes statsGlow {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 1; }
+  33%      { transform: scale(1.08) translate(2%, -3%); opacity: 0.85; }
+  66%      { transform: scale(0.95) translate(-2%, 2%); opacity: 0.9; }
+}
+
+.stats-glow-bg {
+  position: fixed;
+  inset: -10%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(255, 107, 53, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 140, 66, 0.12) 0%, transparent 60%);
+  animation: statsGlow 12s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-glow-bg {
+    animation: none;
+  }
+}
+
+/* Stacking-context lift for the /stats <main>. The glow sits at z-index:0
+   on a fixed-position element, which would otherwise paint over normal
+   block-flow page content (which defaults to z-index:auto on a static
+   parent). Setting position:relative + z-index:1 on main.stats-main
+   creates a new stacking context above the glow without disturbing the
+   default <main> layout on any other route. */
+:host > main.stats-main {
+  position: relative;
+  z-index: 1;
+}
+
+/* /stats-only: make the footer seamless with the rest of the page.
+     - border-top: none drops the outer divider (page→footer line)
+     - background: transparent lets the fixed-position .stats-glow-bg show
+       through, AND lets the body background flow continuously through the
+       footer area instead of a visible darker --bg-card band
+     - .footer-bottom border-top + padding-top zero out the inner divider
+       and the spacing reserved for it (it was sized for the now-hidden
+       column block above)
+   Other routes keep both dividers, the card background, and the original
+   spacing. */
+.footer.stats-footer {
+  border-top: none;
+  background: transparent;
+}
+
+.footer.stats-footer .footer-bottom {
+  border-top: none;
+  padding-top: 0;
 }

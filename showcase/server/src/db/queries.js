@@ -206,9 +206,15 @@ class Queries {
     this.selectGlobalForDayRange = this.db.prepare(
       'SELECT COUNT(DISTINCT install_uuid) AS unique_installs, SUM(tokens_in) AS tokens_in_sum, SUM(tokens_out) AS tokens_out_sum, SUM(active_agent_count) AS agents_active_sum FROM telemetry_events WHERE ts_minute >= ? AND ts_minute < ?'
     );
-    this.selectPopularMcpForDayRange = this.db.prepare(
-      'SELECT mcp_client, COUNT(DISTINCT install_uuid) AS uniq FROM telemetry_events WHERE ts_minute >= ? AND ts_minute < ? GROUP BY mcp_client ORDER BY uniq DESC'
-    );
+    this.selectPopularMcpForDayRange = this.db.prepare(`
+      SELECT mcp_client, COUNT(DISTINCT install_uuid) AS uniq
+      FROM telemetry_events
+      WHERE ts_minute >= ? AND ts_minute < ?
+        -- exclude presence heartbeats from popularity ranking (see RCA 260530-19i)
+        AND NOT (tokens_in = 0 AND tokens_out = 0 AND mcp_client = 'unknown')
+      GROUP BY mcp_client
+      ORDER BY uniq DESC
+    `);
     // Quick task 260630-hct -- region popularity for the daily rollup, mirroring
     // selectPopularMcpForDayRange exactly (GROUP BY region). uniq is
     // COUNT(DISTINCT install_uuid) per region; the housekeeper applies the k>=5 floor.

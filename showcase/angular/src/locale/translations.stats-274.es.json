@@ -11,17 +11,14 @@
   "SHOWCASE_STATS_FSB_VIEW_TOKENS": "Tokens",
   "SHOWCASE_STATS_FSB_VIEW_AGENTS_RUNNING": "Agentes en ejecución",
   "SHOWCASE_STATS_FSB_VIEW_POPULAR_AGENTS": "Agentes populares",
-  "SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP": "Clientes MCP populares",
   "SHOWCASE_STATS_FSB_VIEW_AVG_AGENTS": "Promedio de agentes por usuario",
   "SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW": "Usuarios activos ahora",
   "SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW_LEGEND": "Usuarios activos (ventana de 5 min)",
   "SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND": "Tokens (últimos 30 días)",
   "SHOWCASE_STATS_FSB_CHART_AGENTS_RUNNING": "Agentes en ejecución ahora",
   "SHOWCASE_STATS_FSB_CHART_AGENTS_RUNNING_LEGEND": "Agentes activos (ventana de 10 min)",
-  "SHOWCASE_STATS_FSB_CHART_PENDING": "Pendiente (umbral k&gt;=5)",
   "SHOWCASE_STATS_FSB_CHART_POPULAR_AGENTS_LEGEND": "Agentes populares",
   "SHOWCASE_STATS_FSB_CHART_PENDING_MCP": "Pendiente (umbral k&gt;=5)",
-  "SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND": "Clientes MCP populares",
   "SHOWCASE_STATS_FSB_CHART_AVG_AGENTS": "Promedio de agentes por usuario activo",
   "SHOWCASE_STATS_FSB_CHART_AVG_AGENTS_LEGEND": "Promedio de agentes activos por usuario activo"
 }

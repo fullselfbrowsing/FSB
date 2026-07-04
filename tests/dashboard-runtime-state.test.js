@@ -255,6 +255,15 @@ assert(angularDashboardTsSource.includes('payload.progress.clientLabel') || angu
 assert(angularDashboardTsSource.includes('renderPreviewClientBadge'), 'Angular dashboard preview renders a dedicated client badge');
 assert(angularDashboardTsSource.includes('this.renderPreviewClientBadge(this.previewFrozenBadge, this.lastPreviewOverlayIdentity.clientLabel);'), 'Angular dashboard frozen preview preserves the last trusted client badge');
 assert(angularDashboardTsSource.includes("result: String(progressPayload.result || '').trim()"), 'Angular dashboard remembers structured final result metadata for frozen preview state');
+// FSB v0.9.90: the Angular dashboard loads its CDN deps (html5-qrcode + LZString)
+// eagerly at init via loadDashboardCdnScripts() -- idempotent by data-cdn id -- and
+// uses the globals directly. This PhantomStream-era implementation supersedes the
+// earlier awaitable ensureDashboardScript()/qrScannerLoading approach; the assertions
+// below verify the equivalent behavior against the authoritative source.
+assert(/loadDashboardCdnScripts\(\)/.test(angularDashboardTsSource), 'Angular dashboard exposes a CDN loader for QR and compressed WS dependencies');
+assert(angularDashboardTsSource.includes('data-cdn') && angularDashboardTsSource.includes('script[data-cdn='), 'Angular dashboard CDN script loader is idempotent (guards by data-cdn id)');
+assert(angularDashboardTsSource.includes("'dash-html5-qrcode'") && angularDashboardTsSource.includes('startQRScanner'), 'Angular dashboard loads html5-qrcode and drives the QR scanner');
+assert(angularDashboardTsSource.includes("'dash-lz-string'") && /declare const LZString/.test(angularDashboardTsSource), 'Angular dashboard loads LZString for the compressed WS stream');
 assert(angularDashboardHtmlSource.includes('dash-preview-progress-badge'), 'Angular dashboard HTML exposes live preview badge markup');
 assert(angularDashboardHtmlSource.includes('dash-preview-frozen-badge'), 'Angular dashboard HTML exposes frozen preview badge markup');
 assert(angularDashboardScssSource.includes('.dash-preview-client-badge'), 'Angular dashboard SCSS styles the preview client badge');

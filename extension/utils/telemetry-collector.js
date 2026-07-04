@@ -538,6 +538,61 @@ async function _runFlush() {
       });
       queue.push(ev);
     }
+    // Phase 260524-62w / PRESENCE-01 -- presence heartbeat for idle-but-alive
+    // installs. When _aggregateMcpRowsSinceWatermark produced zero groups (no
+    // MCP activity in the last 5-min window), the per-group loop above pushed
+    // nothing. Without this block the resulting POST is empty and the server
+    // never calls active-tracker.recordSeen() for this install, so the
+    // install is invisible to /stats' active_users_now (5-min window) and
+    // /stats' active_agents_now (10-min window). Enqueue exactly ONE zero-
+    // valued 'periodic' event so the server-side recordSeen() loop in
+    // showcase/server/src/routes/telemetry.js line 228..232 flips this
+    // install into the active-now windows.
+    //
+    // Quick task 260524-8qv -- Codex PR #78 Finding 2 (P2). The additional
+    // `queue.length === 0` clause below is REQUIRED. Without it the heartbeat
+    // fires whenever aggregation produced no new groups -- but the queue can
+    // already hold unsent retry events from a prior failed POST. At queue cap
+    // (200) _applyFifoCap below would then drop the OLDEST real event to make
+    // room for a redundant heartbeat (the retried event's POST would itself
+    // trigger server-side recordSeen for this install_uuid, so the heartbeat
+    // would be telemetry-loss for nothing). The queue length is read AFTER
+    // _applyStaleDrop and _applyAttemptsCap (both invoked earlier in
+    // _runFlush at lines ~522..523), so we count only events that will
+    // actually survive to the wire (a doomed retry that exceeded the 5-
+    // attempts cap is already gone).
+    //
+    // Hard constants (NOT a flexibility/future-config knob -- the server's
+    // hard-coded allowlists dictate every value here):
+    //   - event_type:'periodic'   -- ALLOWED_EVENT_TYPES in routes/telemetry.js line 53
+    //   - mcp_client:'unknown'    -- MCP_CLIENT_ALLOWLIST in routes/telemetry.js line 47..51
+    //   - model:null              -- routes/telemetry.js line 87..91 allows null/undefined
+    //   - tokens_in/out:0         -- routes/telemetry.js line 92..97 requires Number.isInteger >=0
+    //   - active_agent_count:     -- reuse the already-resolved variable from line above
+    //                                so we do NOT issue an extra storage.get() round-trip.
+    //
+    // Idempotency: when agg.groups.length >= 1 we SKIP this block. The
+    // aggregated events already carry this install_uuid through the server's
+    // recordSeen() loop, so double-beating would only burn per-UUID daily
+    // budget. The /stats active-now window stays correct in both cases.
+    //
+    // Position invariant: this block runs AFTER the BEAT-07 opt-out short-
+    // circuit (line ~491) and AFTER the install_uuid resolution check (line
+    // ~509 `if (!installUuid) return;`). Both early returns are upstream, so
+    // opted-out installs and storage-unavailable installs never emit a
+    // heartbeat -- privacy + crash invariants unchanged.
+    if (agg.groups.length === 0 && queue.length === 0) {
+      var beat = _buildEvent({
+        install_uuid: installUuid,
+        mcp_client: 'unknown',
+        model: null,
+        tokens_in: 0,
+        tokens_out: 0,
+        active_agent_count: activeAgentCount,
+        event_type: 'periodic'
+      });
+      queue.push(beat);
+    }
     queue = _applyFifoCap(queue);
 
     // Advance watermark to Date.now() (NOT max(ts) per CONTEXT decision --

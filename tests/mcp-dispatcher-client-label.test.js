@@ -241,5 +241,146 @@ const bridgeSrc = fs.readFileSync(BRIDGE_CLIENT_PATH, 'utf8');
 passAssert(/clearLastKnownMcpClientLabel\s*\(\s*\)/.test(bridgeSrc),
   'mcp-bridge-client.js invokes clearLastKnownMcpClientLabel() (cache reset on reconnect)');
 
-console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
-process.exit(failed > 0 ? 1 : 0);
+// ---------------------------------------------------------------------------
+// Quick task 260524-8qv -- Codex PR #78 Findings 1 + 4 (P2).
+//
+// Tests 10 + 11 exercise the chrome.storage.session RMW path inside
+// _persistAgentClientLabel and the chrome.storage.session.remove path inside
+// clearLastKnownMcpClientLabel. The base require above runs in a Node test
+// harness where `typeof chrome === 'undefined'`, so the persist helper's
+// first guard returns synchronously and NEVER writes to storage. To exercise
+// the real persist/clear code paths these tests INSTALL a microtask-resolving
+// chrome.storage.session shim on globalThis, then re-require the dispatcher
+// via require.cache invalidation. The shim's get/set/remove resolve on the
+// microtask queue (Promise.resolve().then(...)) which is STRICTLY HARDER
+// than real chrome.storage.session (which round-trips through IPC and
+// resolves on the macrotask queue). If the mutex serializes correctly under
+// microtask interleaving, it will serialize under the slower real impl.
+// ---------------------------------------------------------------------------
+
+(async function runStorageRaceTests() {
+  // -- Shared shim factory + harness setup ----------------------------------
+  function installChromeShim() {
+    const store = {};
+    globalThis.chrome = {
+      storage: {
+        session: {
+          _peekStore: function () { return store; },
+          get: function (keys) {
+            return Promise.resolve().then(function () {
+              const ks = Array.isArray(keys) ? keys : [keys];
+              const out = {};
+              for (const k of ks) {
+                if (Object.prototype.hasOwnProperty.call(store, k)) {
+                  out[k] = store[k];
+                }
+              }
+              return out;
+            });
+          },
+          set: function (obj) {
+            return Promise.resolve().then(function () {
+              Object.assign(store, obj);
+            });
+          },
+          remove: function (key) {
+            return Promise.resolve().then(function () {
+              const ks = Array.isArray(key) ? key : [key];
+              for (const k of ks) delete store[k];
+            });
+          }
+        }
+      }
+    };
+    return store;
+  }
+
+  function teardownChromeShim() {
+    delete globalThis.chrome;
+    delete require.cache[DISPATCHER_PATH];
+  }
+
+  async function drainMicrotasks() {
+    // Drain enough microtask turns to flush a multi-stage promise.then chain
+    // (get -> set is at least 2 turns; the mutex adds a wrapper turn).
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // One macrotask tick covers any setImmediate-scheduled work.
+    await new Promise(function (r) { setImmediate(r); });
+  }
+
+  // -- Test 10: Concurrent persist race (Finding 1) -------------------------
+  console.log('\n--- Test 10: Concurrent persist race (Codex PR #78 Finding 1, P2) ---');
+  {
+    const store = installChromeShim();
+    delete require.cache[DISPATCHER_PATH];
+    const d2 = require(DISPATCHER_PATH);
+
+    // Establish a known empty baseline. The dispatcher's module-scope chain
+    // is freshly Promise.resolve() because we just re-required.
+    d2.clearLastKnownMcpClientLabel();
+    await drainMicrotasks();
+
+    // Fire two persists back-to-back without awaits, in a single microtask
+    // turn. With the unfixed code each call would read the prior `map` (both
+    // see {}), set their own key on their private copy, then race to
+    // chrome.storage.session.set -- the second write silently overwrites the
+    // first. With the _withLabelStorageLock mutex, the second persist's
+    // read sees the first persist's committed write.
+    d2.resolveMcpClientLabel({ agentId: 'agent-A', visualSession: { client: 'Claude' } });
+    d2.resolveMcpClientLabel({ agentId: 'agent-B', visualSession: { client: 'Codex' } });
+
+    await drainMicrotasks();
+
+    const persisted = store.fsbAgentClientLabels;
+    passAssert(persisted && typeof persisted === 'object' && !Array.isArray(persisted),
+      'Test 10: fsbAgentClientLabels persisted as a plain object');
+    passAssertEqual(persisted && persisted['agent-A'], 'Claude',
+      'Test 10: agent-A persisted with label Claude (no lost update)');
+    passAssertEqual(persisted && persisted['agent-B'], 'Codex',
+      'Test 10: agent-B persisted with label Codex (no lost update)');
+    passAssertEqual(Object.keys(persisted || {}).length, 2,
+      'Test 10: exactly TWO keys present -- both persists landed');
+
+    teardownChromeShim();
+  }
+
+  // -- Test 11: Clear-after-persist race (Finding 4) ------------------------
+  console.log('\n--- Test 11: Clear-after-persist race (Codex PR #78 Finding 4, P2) ---');
+  {
+    const store = installChromeShim();
+    delete require.cache[DISPATCHER_PATH];
+    const d3 = require(DISPATCHER_PATH);
+
+    // Establish empty baseline (the chain is freshly Promise.resolve()).
+    d3.clearLastKnownMcpClientLabel();
+    await drainMicrotasks();
+
+    // Submit a persist followed immediately by a clear, no awaits between.
+    // Under FIFO serialization the persist's set() runs first, then the
+    // clear's remove() wipes the key -- final state must be EMPTY. The
+    // unfixed code resolves the clear's remove() before the persist's set()
+    // (clear is one microtask; persist is two), leaving a stale
+    // {'agent-A':'Claude'} resurrected after the clear.
+    d3.resolveMcpClientLabel({ agentId: 'agent-A', visualSession: { client: 'Claude' } });
+    d3.clearLastKnownMcpClientLabel();
+
+    await drainMicrotasks();
+
+    passAssertEqual(store.fsbAgentClientLabels, undefined,
+      'Test 11: fsbAgentClientLabels removed -- clear submitted AFTER persist wins under FIFO serialization');
+    // Cross-check: in-memory cache is wiped synchronously by clearLastKnownMcpClientLabel.
+    // This is independent of the storage chain and was already correct in the
+    // unfixed code, but assert it so a future refactor that moves the in-memory
+    // clear into the mutex (and accidentally awaits it) is caught.
+    passAssertEqual(d3._peekLastKnownMcpClientLabel(), null,
+      'Test 11: in-memory _agentClientLabelCache cleared synchronously by clearLastKnownMcpClientLabel');
+
+    teardownChromeShim();
+  }
+
+  console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
+  process.exit(failed > 0 ? 1 : 0);
+})().catch(function (e) {
+  console.error('FATAL: storage-race test harness threw:', e && e.stack ? e.stack : e);
+  process.exit(2);
+});

@@ -25,7 +25,7 @@ The goal of this page: get a new user from a clean machine to a green doctor in 
    Fallback path -- GitHub Releases. If the Web Store listing is unavailable in your region, download the latest `.zip` from the releases page, unzip it, then load it unpacked at `chrome://extensions` with `Developer mode` toggled on:
 
    ```
-   https://github.com/LakshmanTurlapati/FSB/releases
+   https://github.com/fullselfbrowsing/FSB/releases
    ```
 
    This skill prints the URL for the user to click. It does NOT auto-launch the browser to that URL.
@@ -135,9 +135,9 @@ Each `[FAIL]` from `node scripts/doctor.mjs` maps to one of six layers. Find you
 | --- | --- | --- |
 | package | npm cannot fetch `fsb-mcp-server`. | Run `npx -y fsb-mcp-server --version` to confirm npm can reach the package. If that fails, check Node 18+ is installed and on PATH. |
 | bridge | The extension is not running, or `ws://localhost:7225` is not reachable. | Start the FSB extension (open Chrome with the extension installed) and run `npx -y fsb-mcp-server status --watch` to confirm `ws://localhost:7225` is reachable. |
-| extension | The FSB Chrome extension is not installed. | Install from `https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk` (fallback: GitHub Releases at `https://github.com/LakshmanTurlapati/FSB/releases`), then reopen this session. |
+| extension | The FSB Chrome extension is not installed. | Install from `https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk` (fallback: GitHub Releases at `https://github.com/fullselfbrowsing/FSB/releases`), then reopen this session. |
 | active-tab | The active tab is restricted (`chrome://`, `edge://`, the Web Store) or no tab is owned by the agent. | Open a normal `http(s)` tab (not `chrome://`, `edge://`, or the Web Store) and run `npx -y fsb-mcp-server status --watch` to re-attach. See `references/restricted-tab-recovery.md` for the recovery toolset. |
 | content-script | The content script did not attach (extension installed after the tab loaded). | Reload the active tab. The FSB content script attaches on page load; reloads after extension install are required. |
 | config | The MCP host config does not include the FSB stdio block. | Re-run `npx -y fsb-mcp-server install --<host>` for your MCP host (replace `<host>` with `claude-desktop`, `cursor`, etc.). Or paste the block printed by `node scripts/print-stdio.mjs` into your host config. |
 
-Re-run `node scripts/doctor.mjs` after each fix. If a layer keeps flipping or you see `[WARN]`, capture the raw output and file an issue at `https://github.com/LakshmanTurlapati/FSB/issues`.
+Re-run `node scripts/doctor.mjs` after each fix. If a layer keeps flipping or you see `[WARN]`, capture the raw output and file an issue at `https://github.com/fullselfbrowsing/FSB/issues`.

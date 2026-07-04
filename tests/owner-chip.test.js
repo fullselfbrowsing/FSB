@@ -19,7 +19,7 @@ const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 
-const { shouldShowOwnerChip, buildChipText, ownerLabelFor, findOwnerInEnvelope } =
+const { shouldShowOwnerChip, buildChipText, ownerLabelFor, clientLabelFor, findOwnerInEnvelope } =
   require('../extension/ui/owner-chip.js');
 const { formatAgentIdForDisplay } = require('../extension/utils/agent-registry.js');
 
@@ -90,6 +90,33 @@ ok(ownerLabelFor(fullId, formatAgentIdForDisplay) === expectedShort,
 ok(ownerLabelFor(null, formatAgentIdForDisplay) === '',
   'Test 6d: null -> ""');
 
+console.log('\n--- clientLabelFor (chrome.storage.session fsbAgentClientLabels lookup) ---');
+
+// Test 11a: happy path -- agentId present in labelsMap returns the canonical label verbatim
+ok(clientLabelFor('agent_aaa', { 'agent_aaa': 'Claude' }) === 'Claude',
+  'Test 11a: clientLabelFor("agent_aaa", { agent_aaa: "Claude" }) === "Claude"');
+
+// Test 11b: missing agentId returns null (chip falls back to ownerLabelFor)
+ok(clientLabelFor('agent_missing', { 'agent_aaa': 'Claude' }) === null,
+  'Test 11b: missing agentId -> null');
+
+// Test 11c: null labelsMap -> null
+ok(clientLabelFor('agent_aaa', null) === null,
+  'Test 11c: null labelsMap -> null');
+
+// Test 11d: undefined labelsMap -> null
+ok(clientLabelFor('agent_aaa', undefined) === null,
+  'Test 11d: undefined labelsMap -> null');
+
+// Test 11e: array labelsMap -> null (must be a plain map); string labelsMap -> null
+ok(clientLabelFor('agent_aaa', ['Claude']) === null
+   && clientLabelFor('agent_aaa', 'Claude') === null,
+  'Test 11e: array labelsMap and string labelsMap both -> null');
+
+// Test 11f: empty-string value rejected so chip never renders "owned by " with blank label
+ok(clientLabelFor('agent_aaa', { 'agent_aaa': '' }) === null,
+  'Test 11f: empty-string value -> null (so chip never shows "owned by " with blank label)');
+
 console.log('\n--- findOwnerInEnvelope storage scan ---');
 
 // Test 7: standard envelope shape (Phase 237 D-03)
@@ -154,6 +181,26 @@ ok(popupHtmlSrc.indexOf('fsb-owner-chip') >= 0,
   'Test 8d: popup.html contains fsb-owner-chip element');
 ok(popupHtmlSrc.indexOf('owner-chip.js') >= 0,
   'Test 8e: popup.html loads owner-chip.js');
+
+// Test 8f -- popup.js mirrors sidepanel.js storage-change listener (Quick task
+// 260524-8qv, Codex PR #78 Finding 3, P2): popup.js installs a
+// chrome.storage.onChanged listener that refreshes the owner chip when
+// fsbAgentRegistry or fsbAgentClientLabels mutate in the session namespace.
+// Mirrors sidepanel.js:224..241 so an ownership flip mid-popup re-renders the
+// chip without waiting for a close/reopen. Source-text audit (popup.js source
+// already loaded above as `popupJsSrc`).
+ok(popupJsSrc.indexOf('chrome.storage.onChanged') >= 0,
+  'Test 8f-1: popup.js installs a chrome.storage.onChanged listener');
+ok(popupJsSrc.indexOf('fsbAgentClientLabels') >= 0,
+  'Test 8f-2: popup.js listener references fsbAgentClientLabels (canonical MCP client label map)');
+ok(popupJsSrc.indexOf('fsbAgentRegistry') >= 0,
+  'Test 8f-3: popup.js listener references fsbAgentRegistry (ownership envelope)');
+// Both keys must be in the SAME branch -- a regex over the listener body catches
+// a regression where the listener exists but only watches one key.
+ok(/chrome\.storage\.onChanged[\s\S]{0,800}fsbAgentRegistry[\s\S]{0,400}fsbAgentClientLabels|chrome\.storage\.onChanged[\s\S]{0,800}fsbAgentClientLabels[\s\S]{0,400}fsbAgentRegistry/.test(popupJsSrc),
+  'Test 8f-4: popup.js listener body covers BOTH fsbAgentRegistry and fsbAgentClientLabels (single branch)');
+ok(/area\s*===\s*['"]session['"]/.test(popupJsSrc),
+  'Test 8f-5: popup.js listener gates on area === "session"');
 
 // Sidepanel wiring
 ok(sidepanelJsSrc.indexOf('legacy:sidepanel') >= 0,

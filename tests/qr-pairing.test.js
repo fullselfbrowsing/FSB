@@ -35,6 +35,13 @@ assert(/\/api\/pair\/generate/.test(optionsSource), 'POST /api/pair/generate pre
 assert(/['"]X-FSB-Hash-Key['"]/.test(optionsSource), 'X-FSB-Hash-Key header literal present');
 assert(/\/api\/auth\/register/.test(optionsSource), 'D-01 auto-gen calls /api/auth/register');
 
+console.log('--- relay reconnect contract (SYNC70) ---');
+assert(/function\s+requestDashboardRelayReconnect/.test(optionsSource), 'Sync tab defines relay reconnect helper');
+assert(/action:\s*['"]reconnectDashboardWebSocket['"]/.test(optionsSource), 'Sync tab can ask background.js to reconnect relay WS');
+assert(/requestDashboardRelayReconnect\(serverUrl,\s*data\.hashKey\)/.test(optionsSource), 'new hash key generation reconnects relay to the new room');
+const reconnectBeforePairingTokenCount = (optionsSource.match(/requestDashboardRelayReconnect\(serverUrl,\s*hashKey\);\s*const data = await fetchPairingToken\(serverUrl,\s*hashKey\)/g) || []).length;
+assert(reconnectBeforePairingTokenCount >= 2, 'initial and regenerated QR pairing tokens reconnect relay before minting token');
+
 console.log('--- QR payload contract (QR-01) ---');
 assert(/qrcode\(\s*\d+\s*,\s*['"][LMQH]['"]\s*\)/.test(optionsSource), 'qrcode(typeNumber, level) invocation');
 // Single JSON.stringify call must contain both `t:` and `s:` keys

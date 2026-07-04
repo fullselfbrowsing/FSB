@@ -118,6 +118,14 @@ let lastRenderedTerminalSessionId = null;
 // keeps renderAutomationCompletionPayload callable without ReferenceError.
 function persistSidepanelThreadState() { /* no-op stub -- thread state is derived */ }
 
+// Quick task 260524-7n9 -- chip-owned lock: true while the active tab is owned
+// by a non-self agent and the read-only "owned by <ClientName>" chip is showing.
+// Composes with updateSendButtonState's existing hasContent / isRunning gating;
+// it is an ADDITIONAL gate, never a replacement. Set/cleared exclusively by
+// refreshOwnerChip below (no automation-lifecycle setter writes this flag --
+// ownership is independent of the running / idle / error state machine).
+let _chatLockedByOwnerChip = false;
+
 // Phase 240 D-02: synthesize legacy:sidepanel agentId once per side panel
 // load. The side panel is longer-lived than the popup but still gets
 // recreated by Chrome on certain events; the registry's
@@ -839,7 +847,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // sidepanel persists across tab switches, so without this branch the chip
   // would show stale ownership data when an agent claims or releases the
   // active tab while the user stays on it.
-  if (area === 'session' && changes && changes.fsbAgentRegistry) {
+  //
+  // Quick task 260524-7n9: also refresh when fsbAgentClientLabels mutates so
+  // a freshly-arriving canonical MCP client label (Claude / Codex / ...)
+  // re-renders the chip immediately, without waiting for a tab switch or
+  // a registry write that happens to follow.
+  if (area === 'session' && changes && (changes.fsbAgentRegistry || changes.fsbAgentClientLabels)) {
     refreshOwnerChip();
   }
   // debug-sidepanel-agent-name fix: also refresh the chip when any
@@ -967,10 +980,12 @@ async function refreshOwnerChip() {
     if (!chipEl) return;
     if (typeof FSBOwnerChip === 'undefined') {
       chipEl.style.display = 'none';
-      // Phase 11 FIX (debug-phase-11-tab-swap-stale): honor the unlock
-      // contract on every chip-hidden path. Pre-fix the helpers branch
-      // skipped applyInputLockout(false) which could leave stopBtn +
-      // micBtn dimmed indefinitely after the first lockout.
+      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
+      // honor the unlock contract on every chip-hidden path. applyInputLockout
+      // restores chatInput + stopBtn + micBtn + aria; clearing the
+      // _chatLockedByOwnerChip flag keeps updateSendButtonState in sync so the
+      // user is not stranded with a disabled input after the helper went away.
+      _chatLockedByOwnerChip = false;
       applyInputLockout(false);
       return;
     }
@@ -979,56 +994,81 @@ async function refreshOwnerChip() {
     const tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
       chipEl.style.display = 'none';
-      // Phase 11 FIX (debug-phase-11-tab-swap-stale): see above. The
-      // no-active-tab branch must also unlock so controls re-enable when
-      // the active-tab race resolves favorably on the next refresh.
+      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
+      // the no-active-tab branch must also unlock so controls re-enable when the
+      // active-tab race resolves. Clear the _chatLockedByOwnerChip flag so
+      // updateSendButtonState stays in sync.
+      _chatLockedByOwnerChip = false;
       applyInputLockout(false);
       return;
     }
 
-    const stored = await chrome.storage.session.get('fsbAgentRegistry');
+    // Quick task 260524-7n9: read both the registry envelope AND the per-agent
+    // canonical client-label map in a single round-trip. The label map is
+    // written by mcp-tool-dispatcher.js _persistAgentClientLabel and lets the
+    // chip show "owned by Claude" instead of "owned by agent_<hex>".
+    const stored = await chrome.storage.session.get(['fsbAgentRegistry', 'fsbAgentClientLabels']);
     const envelope = stored && stored.fsbAgentRegistry;
+    const labelsMap = stored && stored.fsbAgentClientLabels;
     const ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
 
     if (!FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE)) {
       chipEl.textContent = '';
       chipEl.style.display = 'none';
-      // Phase 11 FINT-20 -- unlock controls when the chip is hidden
-      // (either no owner or this surface owns the tab).
+      // Phase 11 FINT-20 + Quick task 260524-7n9 -- unlock controls when the chip
+      // is hidden (either no owner or this surface owns the tab). applyInputLockout
+      // restores chatInput + buttons + aria; clearing the _chatLockedByOwnerChip
+      // flag keeps updateSendButtonState in sync.
+      _chatLockedByOwnerChip = false;
       applyInputLockout(false);
       return;
     }
 
-    // Phase 11 FINT-19 -- three-tier resolution (CONTEXT D-07).
+    // Merged client-label resolution (Phase 11 FINT-19 three-tier + Quick task
+    // 260524-7n9 canonical MCP client name). In priority order:
     // Tier 1: legacy:* literal (e.g., legacy:popup, legacy:autopilot).
-    // Tier 2: friendly client name from visual-session lifecycle entry
-    //         (Phase 10 D-01 14-entry allowlist; e.g., OpenClaw, Claude,
-    //         FSB Autopilot).
-    // Tier 3: fall back to formatAgentIdForDisplay short-prefix (Phase 243
-    //         baseline preserved for raw-FSB-tool agents that never tick
-    //         the visual-session pipeline).
+    // Tier 2: canonical MCP client name (Claude, Codex, Cursor, ...) from the
+    //         dispatcher-written fsbAgentClientLabels map, keyed by ownerAgentId.
+    // Tier 3: friendly client name from the visual-session lifecycle entry
+    //         (Phase 10 D-01 allowlist; e.g., OpenClaw, Claude, FSB Autopilot).
+    // Tier 4: formatAgentIdForDisplay short-prefix fallback for raw-FSB-tool
+    //         agents that never tick the visual-session pipeline.
     let label;
     if (ownerAgentId.indexOf('legacy:') === 0) {
       label = ownerAgentId;
     } else {
-      const friendly = await FSBOwnerChip.lookupClientLabel(
-        tab.id,
-        (key) => chrome.storage.session.get(key)
-      );
-      if (friendly) {
-        label = friendly;
+      const clientLabel = (typeof FSBOwnerChip.clientLabelFor === 'function')
+        ? FSBOwnerChip.clientLabelFor(ownerAgentId, labelsMap)
+        : null;
+      if (clientLabel) {
+        label = clientLabel;
       } else {
-        const formatter = (typeof FsbAgentRegistry !== 'undefined'
-          && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
-          ? FsbAgentRegistry.formatAgentIdForDisplay
-          : null;
-        label = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
+        const friendly = await FSBOwnerChip.lookupClientLabel(
+          tab.id,
+          (key) => chrome.storage.session.get(key)
+        );
+        if (friendly) {
+          label = friendly;
+        } else {
+          const formatter = (typeof FsbAgentRegistry !== 'undefined'
+            && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
+            ? FsbAgentRegistry.formatAgentIdForDisplay
+            : null;
+          label = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
+        }
       }
     }
     chipEl.textContent = FSBOwnerChip.buildChipText(label);
     chipEl.style.display = 'inline-flex';
-    // Phase 11 FINT-20 -- lock controls when chip renders (foreign-owned).
+    // Phase 11 FINT-20 + Quick task 260524-7n9 -- lock controls when the chip
+    // renders (tab is foreign-owned). applyInputLockout does the rich lock
+    // (chatInput contenteditable + buttons + aria); the _chatLockedByOwnerChip
+    // flag composes into updateSendButtonState's OR chain, and the title surfaces
+    // which client owns the tab.
+    _chatLockedByOwnerChip = true;
     applyInputLockout(true);
+    chatInput.title = 'Disabled while tab is owned by ' + label;
+    updateSendButtonState();
   } catch (_e) {
     // Chip is best-effort -- never poison sidepanel boot.
   }
@@ -1399,9 +1439,14 @@ chatInput.addEventListener('paste', (e) => {
 });
 
 // Update send button state based on input content
+// Quick task 260524-7n9: composes the chip-owned chat lock into the existing
+// gating chain via OR -- hasContent governs the empty-input case, isRunning
+// governs in-flight automation, _chatLockedByOwnerChip is the external-agent
+// ownership gate. NO normal lifecycle transition leaves the input enabled
+// while the chip is showing; refreshOwnerChip is the sole writer of the flag.
 function updateSendButtonState() {
   const hasContent = chatInput.textContent.trim().length > 0;
-  sendBtn.disabled = !hasContent || isRunning;
+  sendBtn.disabled = !hasContent || isRunning || _chatLockedByOwnerChip;
 }
 
 // Handle sending a message

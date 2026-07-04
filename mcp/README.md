@@ -3,9 +3,9 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/LakshmanTurlapati/FSB/main/extension/assets/fsb_logo_dark.png" />
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/LakshmanTurlapati/FSB/main/extension/assets/fsb_logo_light.png" />
-  <img src="https://raw.githubusercontent.com/LakshmanTurlapati/FSB/main/extension/assets/fsb_logo_light.png" alt="FSB: Full Self Browsing" width="200" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/fullselfbrowsing/FSB/main/extension/assets/fsb_logo_dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/fullselfbrowsing/FSB/main/extension/assets/fsb_logo_light.png" />
+  <img src="https://raw.githubusercontent.com/fullselfbrowsing/FSB/main/extension/assets/fsb_logo_light.png" alt="FSB: Full Self Browsing" width="200" />
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
@@ -618,10 +618,10 @@ Do not run `npm publish` from autonomous mode.
 
 ## Links
 
-- [FSB Chrome Extension](https://github.com/LakshmanTurlapati/FSB)
+- [FSB Chrome Extension](https://github.com/fullselfbrowsing/FSB)
 - [npm package](https://www.npmjs.com/package/fsb-mcp-server)
-- [Issues](https://github.com/LakshmanTurlapati/FSB/issues)
-- [License](https://github.com/LakshmanTurlapati/FSB/blob/main/LICENSE)
+- [Issues](https://github.com/fullselfbrowsing/FSB/issues)
+- [License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE)
 
 <div align="center">
 

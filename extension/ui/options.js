@@ -6027,12 +6027,27 @@ async function generateHashKey() {
     if (data.hashKey) {
       document.getElementById('serverHashKey').value = data.hashKey;
       await chrome.storage.local.set({ serverUrl, serverHashKey: data.hashKey });
+      requestDashboardRelayReconnect(serverUrl, data.hashKey);
       showToast('Hash key generated and saved', 'success');
     } else {
       showToast('Failed to generate hash key', 'error');
     }
   } catch (error) {
     showToast('Cannot connect to server: ' + error.message, 'error');
+  }
+}
+
+function requestDashboardRelayReconnect(serverUrl, hashKey) {
+  try {
+    chrome.runtime.sendMessage({
+      action: 'reconnectDashboardWebSocket',
+      serverUrl: serverUrl,
+      serverHashKey: hashKey
+    }, function () {
+      var _ = chrome.runtime.lastError;
+    });
+  } catch (_) {
+    // The storage change listener in background.js is the primary path.
   }
 }
 
@@ -6107,6 +6122,7 @@ async function ensureHashKey(serverUrl) {
   const data = await resp.json();
   if (!data || !data.hashKey) throw new Error('Server did not return a hash key');
   await chrome.storage.local.set({ serverUrl, serverHashKey: data.hashKey });
+  requestDashboardRelayReconnect(serverUrl, data.hashKey);
   const keyInput = document.getElementById('serverHashKey');
   if (keyInput) keyInput.value = data.hashKey;
   return data.hashKey;
@@ -6190,6 +6206,7 @@ async function regeneratePairingToken() {
     const stored = await chrome.storage.local.get(['serverUrl', 'serverHashKey']);
     const serverUrl = (stored.serverUrl || FSB_DEFAULT_SERVER_URL).replace(/\/+$/, '');
     const hashKey = stored.serverHashKey || (await ensureHashKey(serverUrl));
+    requestDashboardRelayReconnect(serverUrl, hashKey);
     const data = await fetchPairingToken(serverUrl, hashKey);
     renderPairingQR(qrCodeEl, data.token, serverUrl);
     startPairingCountdown(data.expiresAt);
@@ -6231,6 +6248,7 @@ async function showPairingQR() {
         return; // abort BEFORE opening overlay
       }
     }
+    requestDashboardRelayReconnect(serverUrl, hashKey);
     const data = await fetchPairingToken(serverUrl, hashKey);
     // Reset countdown DOM state before showing
     countdownEl.classList.remove('pairing-countdown-urgent');
