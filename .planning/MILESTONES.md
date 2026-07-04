@@ -1,5 +1,30 @@
 # Project Milestones: FSB (Full Self-Browsing)
 
+## v1.1.0 T1 App Execution Expansion (Shipped: 2026-06-30)
+
+**Phases completed:** 8 phases (44-51), 29 plans, 17/17 requirements satisfied.
+
+**Archive:** `.planning/milestones/v1.1.0-ROADMAP.md`, `.planning/milestones/v1.1.0-REQUIREMENTS.md`, and `.planning/milestones/v1.1.0-MILESTONE-AUDIT.md`.
+
+**Audit status:** `passed` -- all v1.1.0 requirements satisfied, all phases verified, no critical blockers. Non-blocking debt is explicitly accounted for as bridge-needed, UAT-needed, blocked-policy, or degraded/discovery-pending terminal states.
+
+**Key accomplishments:**
+
+- Built the authoritative T1 readiness inventory and search status surface over all 2,314 descriptors so catalog support is not confused with direct API-ready execution.
+- Added reusable T1 porting scaffolds, handler contract gates, and write activation evidence gates for safe same-origin reads, guarded writes, and future bridge candidates.
+- Expanded proven T1/guarded coverage from 26 baseline descriptors to 1,267 executable T1-ready descriptors plus 556 guarded fail-closed rows as of the 2026-07-01 artifact refresh.
+- Added verified same-origin read coverage for Netlify, Bitbucket, CircleCI, Vercel, Retool, Asana, and generated low-risk same-origin recipes.
+- Kept Pattern-D/GAPI candidates, write/destructive tail rows, and denied origins non-invocable until their required proof exists.
+- Closed Phase 51 with descriptor-level terminal-state accounting: 5 bridge-needed, 141 UAT-needed, 123 blocked, and 222 degraded/discovery-pending rows, with focused readiness/evidence gates passing after the 2026-07-01 refresh.
+
+**Accepted closeout caveats:**
+
+- v1.1.0 does not claim the whole catalog is T1-ready. It claims every descriptor is either proven T1/guarded or explicitly accounted for with the proof required before direct execution.
+- The backlog side phase `999.1 MCP tool gaps -- click heuristics` remains outside the v1.1.0 milestone scope.
+- The local GSD `audit-open` preflight failed with `ReferenceError: output is not defined`; the milestone audit records this as a tooling issue, not a product blocker.
+
+---
+
 ## v1.0.0 Full App Catalog (OpenTabs Parity) (Shipped: 2026-06-29)
 
 **Phases completed:** 10 phases (35-43, including inserted 39.5), 46 plans, 17/17 requirements satisfied.

@@ -28,12 +28,12 @@ Phase 49 is about activation discipline for write/destructive capabilities. It m
 - `scripts/verify-t1-port-contract.mjs` already fails if an active write is not listed in `ACTIVE_WRITE_UAT_SLUGS`.
 - `tests/guarded-write-failclosed.test.js` proves guarded write handlers do not call `executeBoundSpec`.
 - `catalog/handlers/github.js`, `catalog/handlers/gitlab.js`, and `catalog/handlers/slack.js` expose fail-closed guarded writes with explicit reasons.
-- The Phase 44 readiness report identifies five active write rows and five guarded fail-closed rows.
+- The Phase 44 readiness report identified five active write rows and five guarded fail-closed rows at Phase 49 planning time. After later T1 ports, the current refreshed evidence ledger records five active write rows and 549 guarded fail-closed write/destructive rows.
 
 </code_context>
 
 <specifics>
-## Current Write State
+## Phase 49 Write State
 
 Active write rows:
 
@@ -50,6 +50,8 @@ Guarded fail-closed rows:
 - `gitlab.create_merge_request`
 - `gitlab.create_note`
 - `slack.send_message`
+
+The current post-Phase-51 ledger is larger; use `catalog/write-activation-evidence.json` and `node scripts/verify-write-activation-evidence.mjs` as the source of truth.
 
 </specifics>
 

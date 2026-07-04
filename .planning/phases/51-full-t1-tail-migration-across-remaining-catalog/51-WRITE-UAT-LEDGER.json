@@ -1,22 +1,22 @@
 {
-  "generatedAt": "2026-07-02T07:24:24.413Z",
+  "generatedAt": "2026-07-04T08:32:16.152Z",
   "source": "catalog/write-activation-evidence.json + Phase 51 tail worklist",
   "policy": "Write and destructive descriptors are not activated from guessed endpoints. Activation requires live mutation-body UAT and redacted evidence.",
   "totals": {
-    "writeRows": 733,
+    "writeRows": 744,
     "byStatus": {
-      "not-activated-live-uat-required": 168,
-      "guarded-fail-closed": 554,
+      "not-activated-live-uat-required": 176,
+      "guarded-fail-closed": 557,
       "blocked-policy": 6,
       "active-evidence-recorded": 5
     },
     "bySideEffectClass": {
-      "destructive": 169,
-      "write": 564
+      "destructive": 170,
+      "write": 574
     },
     "byOriginClass": {
-      "sensitive": 315,
-      "standard": 412,
+      "sensitive": 324,
+      "standard": 414,
       "denied": 6
     }
   },
@@ -2780,6 +2780,27 @@
       "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
     },
     {
+      "slug": "datadog.get_monitor_state_history",
+      "app": "datadog",
+      "service": "datadoghq.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "standard",
+      "routeFeasibility": "pattern-d-candidate",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
       "slug": "datadog.mute_host",
       "app": "datadog",
       "service": "datadoghq.com",
@@ -2823,6 +2844,27 @@
     },
     {
       "slug": "datadog.pause_synthetics_test",
+      "app": "datadog",
+      "service": "datadoghq.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "standard",
+      "routeFeasibility": "pattern-d-candidate",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "datadog.query_timeseries",
       "app": "datadog",
       "service": "datadoghq.com",
       "sideEffectClass": "write",
@@ -10653,6 +10695,48 @@
       "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
     },
     {
+      "slug": "reddit.hide",
+      "app": "reddit",
+      "service": "www.reddit.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "reddit.report",
+      "app": "reddit",
+      "service": "www.reddit.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
       "slug": "reddit.save",
       "app": "reddit",
       "service": "www.reddit.com",
@@ -10717,6 +10801,27 @@
     },
     {
       "slug": "reddit.submit_post",
+      "app": "reddit",
+      "service": "www.reddit.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "reddit.subscribe",
       "app": "reddit",
       "service": "www.reddit.com",
       "sideEffectClass": "write",
@@ -12200,7 +12305,7 @@
       "slug": "starbucks.toggle_favorite_store",
       "app": "starbucks",
       "service": "starbucks.com",
-      "sideEffectClass": "write",
+      "sideEffectClass": "destructive",
       "readiness": "t1-guarded-fail-closed",
       "originClass": "sensitive",
       "routeFeasibility": "same-site-subdomain-proven",
@@ -12285,10 +12390,76 @@
       "requiredProof": "registered write handler remains guarded until live mutation-body evidence is recorded"
     },
     {
+      "slug": "steam.generate_discovery_queue",
+      "app": "steam",
+      "service": "store.steampowered.com",
+      "sideEffectClass": "write",
+      "readiness": "t1-guarded-fail-closed",
+      "originClass": "sensitive",
+      "routeFeasibility": "same-origin-proven",
+      "status": "guarded-fail-closed",
+      "evidenceRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "registered write handler remains guarded until live mutation-body evidence is recorded"
+    },
+    {
+      "slug": "steam.ignore_app",
+      "app": "steam",
+      "service": "store.steampowered.com",
+      "sideEffectClass": "write",
+      "readiness": "t1-guarded-fail-closed",
+      "originClass": "sensitive",
+      "routeFeasibility": "same-origin-proven",
+      "status": "guarded-fail-closed",
+      "evidenceRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "registered write handler remains guarded until live mutation-body evidence is recorded"
+    },
+    {
       "slug": "steam.remove_from_wishlist",
       "app": "steam",
       "service": "store.steampowered.com",
       "sideEffectClass": "destructive",
+      "readiness": "t1-guarded-fail-closed",
+      "originClass": "sensitive",
+      "routeFeasibility": "same-origin-proven",
+      "status": "guarded-fail-closed",
+      "evidenceRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "registered write handler remains guarded until live mutation-body evidence is recorded"
+    },
+    {
+      "slug": "steam.unignore_app",
+      "app": "steam",
+      "service": "store.steampowered.com",
+      "sideEffectClass": "write",
       "readiness": "t1-guarded-fail-closed",
       "originClass": "sensitive",
       "routeFeasibility": "same-origin-proven",
@@ -15750,6 +15921,69 @@
     },
     {
       "slug": "youtube.like_video",
+      "app": "youtube",
+      "service": "youtube.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "youtube.subscribe",
+      "app": "youtube",
+      "service": "youtube.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "youtube.unlike_video",
+      "app": "youtube",
+      "service": "youtube.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "status": "not-activated-live-uat-required",
+      "evidenceRef": null,
+      "requiredEvidence": [
+        "method",
+        "pathShape",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof"
+      ],
+      "activationAllowed": false,
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "youtube.unsubscribe",
       "app": "youtube",
       "service": "youtube.com",
       "sideEffectClass": "write",

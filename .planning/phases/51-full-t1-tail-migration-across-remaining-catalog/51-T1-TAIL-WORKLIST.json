@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-02T07:29:03.908Z",
+  "generatedAt": "2026-07-03T18:23:30.110Z",
   "source": "scripts/report-t1-readiness.mjs",
   "descriptorCount": 2314,
   "currentReady": 1310,
@@ -511,32 +511,6 @@
       "workstream": "blocked-policy",
       "terminalTarget": "blocked",
       "requiredProof": "denylist/product/legal policy change before activation"
-    },
-    {
-      "slug": "datadog.get_monitor_state_history",
-      "app": "datadog",
-      "service": "datadoghq.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "pattern-d-candidate",
-      "nextAction": "Pattern-D candidate",
-      "workstream": "pattern-d",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "approved Pattern-D bridge plus origin/auth/shape tests and negative controls"
-    },
-    {
-      "slug": "datadog.query_timeseries",
-      "app": "datadog",
-      "service": "datadoghq.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "standard",
-      "routeFeasibility": "pattern-d-candidate",
-      "nextAction": "Pattern-D candidate",
-      "workstream": "pattern-d",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "approved Pattern-D bridge plus origin/auth/shape tests and negative controls"
     },
     {
       "slug": "datadog.search_logs",
@@ -2060,45 +2034,6 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "reddit.hide",
-      "app": "reddit",
-      "service": "www.reddit.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "reddit.report",
-      "app": "reddit",
-      "service": "www.reddit.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "reddit.subscribe",
-      "app": "reddit",
-      "service": "www.reddit.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "shortcut.get_epic",
       "app": "shortcut",
       "service": "app.shortcut.com",
@@ -3321,45 +3256,6 @@
       "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
     },
     {
-      "slug": "youtube.subscribe",
-      "app": "youtube",
-      "service": "youtube.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "youtube.unlike_video",
-      "app": "youtube",
-      "service": "youtube.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
-      "slug": "youtube.unsubscribe",
-      "app": "youtube",
-      "service": "youtube.com",
-      "sideEffectClass": "read",
-      "readiness": "discovery-pending",
-      "originClass": "sensitive",
-      "routeFeasibility": "same-origin-read-candidate",
-      "nextAction": "same-origin read candidate",
-      "workstream": "same-origin-read",
-      "terminalTarget": "t1-ready",
-      "requiredProof": "same-origin handler or recipe tests proving origin pin, logged-out guard, shape guard, and no-secret logging"
-    },
-    {
       "slug": "ytmusic.get_album",
       "app": "ytmusic",
       "service": "music.youtube.com",
@@ -4296,6 +4192,19 @@
       "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
     },
     {
+      "slug": "datadog.get_monitor_state_history",
+      "app": "datadog",
+      "service": "datadoghq.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "standard",
+      "routeFeasibility": "pattern-d-candidate",
+      "nextAction": "Pattern-D candidate",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
       "slug": "datadog.mute_host",
       "app": "datadog",
       "service": "datadoghq.com",
@@ -4323,6 +4232,19 @@
     },
     {
       "slug": "datadog.pause_synthetics_test",
+      "app": "datadog",
+      "service": "datadoghq.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "standard",
+      "routeFeasibility": "pattern-d-candidate",
+      "nextAction": "Pattern-D candidate",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "datadog.query_timeseries",
       "app": "datadog",
       "service": "datadoghq.com",
       "sideEffectClass": "write",
@@ -5011,6 +4933,32 @@
       "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
     },
     {
+      "slug": "reddit.hide",
+      "app": "reddit",
+      "service": "www.reddit.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "nextAction": "keep DOM/discovery",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "reddit.report",
+      "app": "reddit",
+      "service": "www.reddit.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "nextAction": "keep DOM/discovery",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
       "slug": "reddit.save",
       "app": "reddit",
       "service": "www.reddit.com",
@@ -5051,6 +4999,19 @@
     },
     {
       "slug": "reddit.submit_post",
+      "app": "reddit",
+      "service": "www.reddit.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "nextAction": "keep DOM/discovery",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "reddit.subscribe",
       "app": "reddit",
       "service": "www.reddit.com",
       "sideEffectClass": "write",
@@ -5661,6 +5622,45 @@
       "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
     },
     {
+      "slug": "youtube.subscribe",
+      "app": "youtube",
+      "service": "youtube.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "nextAction": "keep DOM/discovery",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "youtube.unlike_video",
+      "app": "youtube",
+      "service": "youtube.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "nextAction": "keep DOM/discovery",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
+      "slug": "youtube.unsubscribe",
+      "app": "youtube",
+      "service": "youtube.com",
+      "sideEffectClass": "write",
+      "readiness": "discovery-pending",
+      "originClass": "sensitive",
+      "routeFeasibility": "dom-discovery-only",
+      "nextAction": "keep DOM/discovery",
+      "workstream": "write-destructive-uat",
+      "terminalTarget": "t1-ready-or-guarded-fail-closed",
+      "requiredProof": "live mutation-body UAT, consent/audit proof, no-secret log proof, and write evidence record"
+    },
+    {
       "slug": "ytmusic.add_to_playlist",
       "app": "ytmusic",
       "service": "music.youtube.com",
@@ -5730,14 +5730,14 @@
     "tail": 440,
     "actionable": 401,
     "blocked": 39,
-    "read": 266,
-    "write": 135,
+    "read": 258,
+    "write": 143,
     "destructive": 39,
     "byWorkstream": {
       "blocked-policy": 39,
-      "pattern-d": 3,
-      "same-origin-read": 230,
-      "write-destructive-uat": 168
+      "pattern-d": 1,
+      "same-origin-read": 224,
+      "write-destructive-uat": 176
     },
     "byApp": {
       "netflix": 18,
@@ -5759,7 +5759,6 @@
       "npm": 3,
       "pandaexpress": 14,
       "priceline": 15,
-      "reddit": 10,
       "shortcut": 19,
       "stackoverflow": 11,
       "target": 16,
@@ -5783,6 +5782,7 @@
       "hackernews": 1,
       "meticulous": 5,
       "newrelic": 10,
+      "reddit": 10,
       "stripe": 9,
       "stubhub": 1
     },
@@ -5794,8 +5794,8 @@
     "byRouteFeasibility": {
       "blocked": 39,
       "pattern-d-candidate": 34,
-      "same-origin-read-candidate": 230,
-      "dom-discovery-only": 137
+      "same-origin-read-candidate": 224,
+      "dom-discovery-only": 143
     }
   }
 }

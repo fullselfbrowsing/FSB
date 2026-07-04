@@ -1,6 +1,6 @@
 # Phase 51 T1 Tail Worklist
 
-**Generated:** 2026-07-02T07:29:03.908Z
+**Generated:** 2026-07-03T18:23:30.110Z
 
 This worklist is generated from the Phase 44 readiness report and covers every descriptor that is not currently executable T1 or guarded fail-closed. It is a migration target list, not an execution claim.
 
@@ -14,18 +14,18 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 | Tail rows in this worklist | 440 |
 | Actionable non-denied tail rows | 401 |
 | Blocked policy rows | 39 |
-| Read rows | 266 |
-| Write rows | 135 |
+| Read rows | 258 |
+| Write rows | 143 |
 | Destructive rows | 39 |
 
 ## Workstreams
 
 | Item | Count |
 |------|------:|
-| `same-origin-read` | 230 |
-| `write-destructive-uat` | 168 |
+| `same-origin-read` | 224 |
+| `write-destructive-uat` | 176 |
 | `blocked-policy` | 39 |
-| `pattern-d` | 3 |
+| `pattern-d` | 1 |
 
 ## Largest App Buckets
 
@@ -81,8 +81,8 @@ This worklist is generated from the Phase 44 readiness report and covers every d
 
 | Item | Count |
 |------|------:|
-| `same-origin-read-candidate` | 230 |
-| `dom-discovery-only` | 137 |
+| `same-origin-read-candidate` | 224 |
+| `dom-discovery-only` | 143 |
 | `blocked` | 39 |
 | `pattern-d-candidate` | 34 |
 

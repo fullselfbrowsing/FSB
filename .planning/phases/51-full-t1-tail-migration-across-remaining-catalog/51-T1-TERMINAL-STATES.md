@@ -1,6 +1,6 @@
 # Phase 51 T1 Terminal States
 
-**Generated:** 2026-07-02T07:24:24.413Z
+**Generated:** 2026-07-04T08:32:16.151Z
 
 Descriptors are executable only with current handler/recipe proof. Bridge, write, blocked, and discovery rows remain non-invocable until their required proof is satisfied.
 
@@ -11,10 +11,10 @@ Descriptors are executable only with current handler/recipe proof. Bridge, write
 | Total descriptors | 2314 |
 | T1-ready rows | 1310 |
 | Guarded fail-closed rows | 564 |
-| Bridge-needed rows | 3 |
-| UAT-needed rows | 168 |
+| Bridge-needed rows | 1 |
+| UAT-needed rows | 176 |
 | Blocked rows | 39 |
-| Degraded/discovery-pending rows | 230 |
+| Degraded/discovery-pending rows | 224 |
 
 ## Surface Status Counts
 
@@ -22,10 +22,10 @@ Descriptors are executable only with current handler/recipe proof. Bridge, write
 |------|------:|
 | `t1-ready` | 1310 |
 | `guarded-fail-closed` | 564 |
-| `degraded-discovery-pending` | 230 |
-| `uat-needed` | 168 |
+| `degraded-discovery-pending` | 224 |
+| `uat-needed` | 176 |
 | `blocked` | 39 |
-| `bridge-needed` | 3 |
+| `bridge-needed` | 1 |
 
 ## Terminal State Counts
 
@@ -33,10 +33,10 @@ Descriptors are executable only with current handler/recipe proof. Bridge, write
 |------|------:|
 | `t1-ready` | 1310 |
 | `guarded-fail-closed` | 564 |
-| `same-origin-proof-required` | 230 |
-| `live-uat-required` | 168 |
+| `same-origin-proof-required` | 224 |
+| `live-uat-required` | 176 |
 | `blocked-policy` | 39 |
-| `pattern-d-bridge-blocked` | 3 |
+| `pattern-d-bridge-blocked` | 1 |
 
 ## App Readiness Rollup
 
@@ -44,7 +44,7 @@ Descriptors are executable only with current handler/recipe proof. Bridge, write
 |-----|--------|------:|--------:|-------:|----:|--------:|---------:|
 | `onlyfans` | `blocked` | 0 | 0 | 0 | 0 | 21 | 0 |
 | `netflix` | `blocked` | 0 | 0 | 0 | 0 | 18 | 0 |
-| `datadog` | `bridge-needed` | 46 | 0 | 3 | 22 | 0 | 0 |
+| `datadog` | `bridge-needed` | 46 | 0 | 1 | 24 | 0 | 0 |
 | `bsky` | `uat-needed` | 12 | 0 | 0 | 18 | 0 | 8 |
 | `x` | `uat-needed` | 2 | 0 | 0 | 15 | 0 | 14 |
 | `cloudflare` | `uat-needed` | 25 | 0 | 0 | 5 | 0 | 0 |
@@ -53,14 +53,14 @@ Descriptors are executable only with current handler/recipe proof. Bridge, write
 | `leetcode` | `uat-needed` | 24 | 0 | 0 | 1 | 0 | 1 |
 | `meticulous` | `uat-needed` | 21 | 0 | 0 | 5 | 0 | 0 |
 | `asana` | `uat-needed` | 15 | 0 | 0 | 9 | 0 | 0 |
-| `reddit` | `uat-needed` | 14 | 0 | 0 | 7 | 0 | 3 |
+| `reddit` | `uat-needed` | 14 | 0 | 0 | 10 | 0 | 0 |
 | `newrelic` | `uat-needed` | 12 | 0 | 0 | 10 | 0 | 0 |
 | `chatgpt` | `uat-needed` | 13 | 0 | 0 | 7 | 0 | 0 |
 | `dominos` | `uat-needed` | 6 | 0 | 0 | 6 | 0 | 8 |
 | `notion` | `uat-needed` | 8 | 0 | 0 | 5 | 0 | 7 |
 | `pandaexpress` | `uat-needed` | 4 | 0 | 0 | 7 | 0 | 7 |
 | `target` | `uat-needed` | 2 | 0 | 0 | 4 | 0 | 12 |
-| `youtube` | `uat-needed` | 0 | 0 | 0 | 5 | 0 | 13 |
+| `youtube` | `uat-needed` | 0 | 0 | 0 | 8 | 0 | 10 |
 | `chipotle` | `uat-needed` | 4 | 0 | 0 | 1 | 0 | 11 |
 | `costco` | `uat-needed` | 3 | 0 | 0 | 4 | 0 | 9 |
 | `amplitude` | `uat-needed` | 14 | 0 | 0 | 1 | 0 | 0 |

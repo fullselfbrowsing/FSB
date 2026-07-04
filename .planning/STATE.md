@@ -81,8 +81,8 @@ Coverage: 17/17 v1.1.0 requirements mapped and complete, 0 orphaned.
 ## Phase 51 Completion Snapshot
 
 - Phase 51 is complete and verified with 8/8 plans done.
-- Current readiness counts: 2,314 descriptors, 1,141 T1-ready, 529 guarded fail-closed, 644 catalog-tail rows.
-- Terminal-state accounting: 63 bridge-needed, 167 UAT-needed, 137 blocked, 277 degraded/discovery-pending.
+- Current readiness counts: 2,314 descriptors, 1,267 T1-ready, 556 guarded fail-closed, 491 catalog-tail rows.
+- Terminal-state accounting: 5 bridge-needed, 141 UAT-needed, 123 blocked, 222 degraded/discovery-pending.
 - `scripts/report-t1-terminal-states.mjs` generates `51-T1-TERMINAL-STATES.md/json` and `51-WRITE-UAT-LEDGER.md/json`.
 - `tests/t1-terminal-states.test.js` gates bridge-disabled, write-UAT, blocked-policy, app-rollup, and search readiness override coverage.
 - Focused readiness/evidence gates passed on 2026-07-01 after artifact refresh; full `npm run validate:extension` and `npm test` passed at milestone closeout on 2026-06-30.

@@ -10,9 +10,10 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v1.0.0 Full App Catalog (OpenTabs Parity) -- milestone gate met and archived 2026-06-29. FSB now has a full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services, with T1/T1b direct execution for selected heads and the remaining catalog tail routed through DOM/discovery/learn tiers.
+**Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
 
 **Recent shipping cadence:**
+- v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 - v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
 - v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
@@ -32,22 +33,19 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone: v1.1.0 T1 App Execution Expansion
+## Current Milestone
 
-**Goal:** Convert the v1.0.0 catalog tail from search/discovery support toward verified direct T1 execution through `invoke_capability`, starting with the readiness matrix, shared porting scaffold, same-origin read batches, Pattern-D/GAPI bridge decisions, and guarded-write activation workflow.
+No active milestone is currently defined. Start the next cycle with `$gsd-new-milestone` after choosing the next product goal.
 
-**Target features:**
-- **T1 readiness inventory.** Generate the authoritative per-descriptor matrix over all 2,314 descriptors: current tier/backing, side-effect class, origin/auth feasibility, same-origin vs separate-origin route, and next action.
-- **Status honesty.** Make `search_capabilities`, docs, and UI copy distinguish T1-ready, fail-closed, learn-pending, and DOM/discovery-pending states so catalog support is never mistaken for direct API execution.
-- **Porting scaffold.** Standardize T1 handler/recipe verification: origin-pin, `executeBoundSpec`-only calls, logged-out/body shape guards, no-secret logging, consent behavior, and router parity.
-- **Read-first T1 expansion.** Port high-value read descriptors first, prioritizing same-origin web runtimes and low side-effect risk.
-- **Pattern-D/GAPI bridge work.** Decide and prove the missing architecture for separate-origin/per-org-subdomain APIs and Google Workspace `window.gapi.client.request` handlers.
-- **Guarded writes.** Activate writes/destructive handlers only after live mutation-body UAT and redacted audit evidence; otherwise keep them fail-closed.
+## Last Milestone: v1.1.0 T1 App Execution Expansion
 
-**Key context:**
-- v1.0.0 shipped the catalog scale, not all-app direct execution: 26 descriptors resolve to T1/T1b today; 2,288 descriptors remain T3 DOM/discovery-tail.
-- T1 expansion is not allowed to weaken MV3 Wall 1, Wall 2, the denylist, sensitive-origin policy, or the two-tool capability surface.
-- The new milestone starts at Phase 44 and continues numbering from the completed v1.0.0 roadmap.
+**Status:** Archived on 2026-06-30. Audit passed; automated milestone gates met. Archive files live under `.planning/milestones/v1.1.0-*`.
+
+**Outcome:** FSB converted the v1.0.0 catalog tail from undifferentiated search/discovery support into an explicit readiness and terminal-state model. The milestone added reusable port contracts, same-origin read ports, bridge decision gates, guarded-write evidence gates, terminal-state reporting, and a write/destructive UAT ledger.
+
+**Final counts:** 2,314 descriptors; 1,267 executable T1-ready rows; 556 guarded fail-closed rows; 5 bridge-needed rows; 141 UAT-needed rows; 123 blocked rows; 222 degraded/discovery-pending rows.
+
+**Accepted closeout caveats:** v1.1.0 does not claim all apps are T1-ready. Remaining rows are non-invocable until their documented proof requirements are satisfied. Backlog side phase `999.1 MCP tool gaps -- click heuristics` remains outside the milestone.
 
 ## Last Milestone: v1.0.0 Full App Catalog (OpenTabs Parity)
 

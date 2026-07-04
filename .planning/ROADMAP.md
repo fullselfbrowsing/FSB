@@ -3,11 +3,13 @@
 ## Milestones
 
 - ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
-- 🚧 **v1.1.0 T1 App Execution Expansion** — Phases 44-51, EXTENDED 2026-06-29. Expanded proven T1/guarded coverage from 26 to 89 descriptors so far, then reopened with Phase 51 to drive the remaining catalog tail toward verified T1 execution or an explicit blocked/policy terminal state.
+- ✅ **v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; refreshed 2026-07-01 after post-closeout T1 ports. Expanded proven T1/guarded coverage from 26 baseline descriptors to 1,267 executable T1-ready descriptors plus 556 guarded fail-closed rows, and closed the remaining catalog tail with explicit terminal-state accounting. Archive: `.planning/milestones/v1.1.0-ROADMAP.md`.
 
-## Active Milestone
+## Milestone Closed
 
-**v1.1.0 T1 App Execution Expansion** — Phases 44-51. EXTENDED 2026-06-29.
+**v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; current artifact refresh 2026-07-01.
+
+No active milestone is currently defined. Run `$gsd-new-milestone` to define the next requirements and roadmap. The detailed v1.1.0 phase record is preserved below and archived at `.planning/milestones/v1.1.0-ROADMAP.md`.
 
 **Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” Phases 44-50 built the inventory, scaffolds, first T1 ports, bridge decisions, write evidence gate, and closeout backlog. Phase 51 extends the milestone to attack the full 2,264-descriptor remaining tail: every non-denied row must either become verified T1/T1b or carry explicit evidence that it is blocked by policy, unsafe cross-origin architecture, missing live UAT, or an accepted product/legal constraint. It must not mark any row T1-ready without handler/recipe proof.
 
@@ -20,13 +22,14 @@
 - Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
 - App stems with no direct T1 path: **123**.
 
-**Current Phase 51 state after plan 51-04:**
+**Current Phase 51 terminal state after 2026-07-01 artifact refresh:**
 
 - Total descriptors: **2,314**.
-- T1-ready executable descriptors: **84**.
-- T1 guarded fail-closed writes: **5**.
-- Catalog tail not direct API-ready: **2,225** (**2,031 discovery-pending**, **194 blocked**).
-- App stems with at least one direct T1/guarded row: **14**.
+- T1-ready executable descriptors: **1,267**.
+- T1 guarded fail-closed rows: **556**.
+- Catalog tail not direct API-ready: **491**.
+- Terminal-state accounting: **5 bridge-needed**, **141 UAT-needed**, **123 blocked**, **222 degraded/discovery-pending**.
+- App stems with at least one direct T1/guarded row: **121**.
 
 **Hard invariants:**
 
@@ -179,7 +182,7 @@
 
 ## Phase 51: Full T1 Tail Migration Across Remaining Catalog
 
-- [ ] Phase 51: Full T1 Tail Migration Across Remaining Catalog (active)
+- [x] Phase 51: Full T1 Tail Migration Across Remaining Catalog (completed 2026-06-30)
 
 **Goal:** Convert the Phase 51 catalog-tail descriptors to explicit terminal states: executable T1/T1b where safe and technically provable, guarded fail-closed where write/destructive UAT is still required, or blocked where denylist/product/legal policy says no.
 
@@ -199,10 +202,10 @@
 - [x] 51-02: Existing-head and low-risk same-origin read bulk port.
 - [x] 51-03: Retool CSRF same-origin read head.
 - [x] 51-04: Asana same-origin Pattern-D carveout.
-- [ ] 51-05: Pattern-D and GAPI bridge implementation waves.
-- [ ] 51-06: Sensitive consumer/social and blocked-policy triage.
-- [ ] 51-07: Write/destructive live-UAT activation waves.
-- [ ] 51-08: Final all-tail regression, UAT ledger, and closeout.
+- [x] 51-05: Pattern-D and GAPI bridge implementation waves.
+- [x] 51-06: Sensitive consumer/social and blocked-policy triage.
+- [x] 51-07: Write/destructive live-UAT activation waves.
+- [x] 51-08: Final all-tail regression, UAT ledger, and closeout.
 
 ## Progress
 
@@ -215,9 +218,22 @@
 | 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
 | 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
 | 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
-| 51. Full T1 Tail Migration Across Remaining Catalog | 4/8 | Active | - |
+| 51. Full T1 Tail Migration Across Remaining Catalog | 8/8 | Complete | 2026-06-30 |
 
 ## Completed Milestones
+
+<details>
+<summary>v1.1.0 T1 App Execution Expansion — Phases 44-51, SHIPPED 2026-06-30</summary>
+
+Archive files:
+
+- `.planning/milestones/v1.1.0-ROADMAP.md`
+- `.planning/milestones/v1.1.0-REQUIREMENTS.md`
+- `.planning/milestones/v1.1.0-MILESTONE-AUDIT.md`
+
+Outcome: v1.1.0 expanded proven direct execution from the v1.0.0 baseline into verified T1-ready read coverage across Netlify, Bitbucket, CircleCI, Vercel, Retool, Asana, and generated same-origin reads, with post-closeout ports reflected in the refreshed artifacts. Phase 51 closes the remaining catalog tail honestly: 1,267 rows are executable T1-ready, 556 rows are guarded fail-closed, and the remaining 491 descriptors are explicitly surfaced as bridge-needed, UAT-needed, blocked-policy, or degraded/discovery-pending rather than overclaimed.
+
+</details>
 
 <details>
 <summary>v1.0.0 Full App Catalog (OpenTabs Parity) — Phases 35-43, SHIPPED 2026-06-29</summary>

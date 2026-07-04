@@ -4,6 +4,8 @@
 
 No new guarded write was activated in Phase 49.
 
+Current ledger counts were refreshed on 2026-07-01 after later T1 ports: 5 active write records, 549 guarded fail-closed write/destructive records, and 0 unrecorded write activations.
+
 ## Why No New Activation
 
 The remaining guarded writes still lack fresh live mutation-body capture and redacted loaded-extension smoke evidence:
@@ -28,13 +30,7 @@ Activating any of these without method/path/body-shape proof would turn a placeh
 
 ## Current Guarded Writes
 
-| Slug | Status | Reason |
-|------|--------|--------|
-| `github.issues.create` | guarded fail-closed | `unverified-github-create-mutation` |
-| `gitlab.create_issue` | guarded fail-closed | `unverified-gitlab-create-issue-mutation` |
-| `gitlab.create_merge_request` | guarded fail-closed | `unverified-gitlab-create-merge-request-mutation` |
-| `gitlab.create_note` | guarded fail-closed | `unverified-gitlab-create-note-mutation` |
-| `slack.send_message` | guarded fail-closed | `unverified-slack-send-message-mutation` |
+The full guarded list is maintained in `catalog/write-activation-evidence.json` and currently contains 549 guarded fail-closed write/destructive records. The original Phase 49 GitHub/GitLab/Slack rows remain guarded, and later handler ports added their guarded write/destructive rows to the same ledger.
 
 ## Gate
 

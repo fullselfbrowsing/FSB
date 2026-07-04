@@ -1,6 +1,6 @@
 # Phase 51 Write/Destructive UAT Ledger
 
-**Generated:** 2026-07-02T07:24:24.413Z
+**Generated:** 2026-07-04T08:32:16.152Z
 
 Write and destructive descriptors are not activated from guessed endpoints. Activation requires live mutation-body UAT and redacted evidence.
 
@@ -8,18 +8,18 @@ Write and destructive descriptors are not activated from guessed endpoints. Acti
 
 | Metric | Count |
 |--------|------:|
-| Write/destructive descriptors | 733 |
+| Write/destructive descriptors | 744 |
 | Active with evidence | 5 |
-| Guarded fail-closed | 554 |
-| Live UAT required | 168 |
+| Guarded fail-closed | 557 |
+| Live UAT required | 176 |
 | Blocked policy | 6 |
 
 ## Status Counts
 
 | Item | Count |
 |------|------:|
-| `guarded-fail-closed` | 554 |
-| `not-activated-live-uat-required` | 168 |
+| `guarded-fail-closed` | 557 |
+| `not-activated-live-uat-required` | 176 |
 | `blocked-policy` | 6 |
 | `active-evidence-recorded` | 5 |
 
@@ -27,8 +27,8 @@ Write and destructive descriptors are not activated from guessed endpoints. Acti
 
 | Item | Count |
 |------|------:|
-| `standard` | 412 |
-| `sensitive` | 315 |
+| `standard` | 414 |
+| `sensitive` | 324 |
 | `denied` | 6 |
 
 ## Machine-Readable Rows
