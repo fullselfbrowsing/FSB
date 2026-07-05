@@ -37,7 +37,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.mcp.q:What is MCP and how do I use it?`,
-    a: $localize`:@@support.schema.faq.mcp.a:MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server and pairs with the running extension over a local WebSocket bridge. FSB exposes 66 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/FSB Skill/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.`,
+    a: $localize`:@@support.schema.faq.mcp.a:MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server and pairs with the running extension over a local WebSocket bridge. FSB exposes 66 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.`,
   },
   {
     q: $localize`:@@support.schema.faq.testApps.q:How does FSB help Claude Code or Codex test apps?`,
@@ -53,7 +53,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.ideSetup.q:How do I set up FSB's MCP server with my IDE?`,
-    a: $localize`:@@support.schema.faq.ideSetup.a:Run npx -y fsb-mcp-server install --list to see which MCP hosts the installer detects on your machine, then run the installer for one (for example npx -y fsb-mcp-server install --claude-desktop). Cursor, Codex, Windsurf, and others have matching flags from --list. For OpenClaw, paste the canonical stdio block printed by the FSB skill (loaded from skills/FSB Skill/) into your OpenClaw MCP config -- the bare --openclaw installer flag is intentionally manual because OpenClaw's MCP config schema is still unstable across builds. Verify the install with npx -y fsb-mcp-server doctor; six green layers means you're ready.`,
+    a: $localize`:@@support.schema.faq.ideSetup.a:Run npx -y fsb-mcp-server install --list to see which MCP hosts the installer detects on your machine, then run the installer for one (for example npx -y fsb-mcp-server install --claude-desktop). Cursor, Codex, Windsurf, and others have matching flags from --list. For OpenClaw, paste the canonical stdio block printed by the FSB skill (loaded from skills/fsb/) into your OpenClaw MCP config -- the bare --openclaw installer flag is intentionally manual because OpenClaw's MCP config schema is still unstable across builds. Verify the install with npx -y fsb-mcp-server doctor; six green layers means you're ready.`,
   },
   {
     q: $localize`:@@support.schema.faq.tools.q:What can I do with FSB through MCP tools?`,
@@ -61,11 +61,11 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.openclawInstall.q:How do I install FSB on OpenClaw?`,
-    a: $localize`:@@support.schema.faq.openclawInstall.a:Three options, fastest first. One-click on ClawHub: install from https://clawhub.ai/lakshmanturlapati/full-selfbrowsing. FSB skill: load the skill from skills/FSB Skill/ in the FSB repo. It prints the canonical OpenClaw stdio block for you to paste into OpenClaw's MCP config and offers consent-gated install for any other MCP hosts on your machine. The full 3-step walkthrough (Chrome extension, MCP server config, doctor verification) lives at https://full-selfbrowsing.com/agents.`,
+    a: $localize`:@@support.schema.faq.openclawInstall.a:Three options, fastest first. One-click on ClawHub: install from https://clawhub.ai/lakshmanturlapati/full-selfbrowsing. FSB skill: load the skill from skills/fsb/ in the FSB repo. It prints the canonical OpenClaw stdio block for you to paste into OpenClaw's MCP config and offers consent-gated install for any other MCP hosts on your machine. The full 3-step walkthrough (Chrome extension, MCP server config, doctor verification) lives at https://full-selfbrowsing.com/agents.`,
   },
   {
     q: $localize`:@@support.schema.faq.mcpHealth.q:How do I verify the FSB MCP server is healthy?`,
-    a: $localize`:@@support.schema.faq.mcpHealth.a:Run npx -y fsb-mcp-server doctor. The doctor walks six layers -- package, bridge, extension, active-tab, content-script, config -- and exits non-zero on the first failure with a one-line next-step recommendation. The full recovery table for each layer lives in skills/FSB Skill/USAGE.md, and the same diagnostic runs automatically when the FSB skill is loaded into OpenClaw.`,
+    a: $localize`:@@support.schema.faq.mcpHealth.a:Run npx -y fsb-mcp-server doctor. The doctor walks six layers -- package, bridge, extension, active-tab, content-script, config -- and exits non-zero on the first failure with a one-line next-step recommendation. The full recovery table for each layer lives in skills/fsb/USAGE.md, and the same diagnostic runs automatically when the FSB skill is loaded into OpenClaw.`,
   },
 ];
 

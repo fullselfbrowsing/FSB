@@ -175,6 +175,7 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
     const t = $localize`:@@phantomStream.meta.title:PhantomStream - DOM-Native Browser Mirroring`;
     const d = $localize`:@@phantomStream.meta.description:PhantomStream is DOM-native live browser mirroring: one style-inlined snapshot, then MutationObserver diffs instead of pixels.`;
     this.applyMeta(t, d, url);
+    this.injectPhantomStreamJsonLd();
     this.queueScrollSpySetup();
 
     if (this.browser) {
@@ -267,6 +268,33 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
     this.meta.updateTag({ name: 'twitter:image', content: OG_IMAGE });
     this.meta.updateTag({ name: 'twitter:image:alt', content: OG_IMAGE_ALT });
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
+  }
+
+  // Structured data stays English-only on purpose: angular.json sets
+  // i18nMissingTranslation=error, so new $localize units would break every
+  // locale build until all five xlf targets are hand-updated.
+  private injectPhantomStreamJsonLd(): void {
+    if (this.doc.head.querySelector('script[data-ld="phantom-stream-page"]')) {
+      return;
+    }
+    const payload = {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareSourceCode',
+      '@id': `${HOST}/phantom-stream#phantom-stream`,
+      name: 'PhantomStream',
+      url: `${HOST}/phantom-stream`,
+      description: 'PhantomStream is DOM-native live browser mirroring: one style-inlined snapshot, then MutationObserver diffs instead of pixels. Ships capture, renderer, relay, and transport modules as @full-self-browsing/phantom-stream.',
+      programmingLanguage: 'TypeScript',
+      runtimePlatform: 'Browser, Node.js 18+',
+      publisher: { '@id': `${HOST}/#org` },
+    };
+    const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+    const script = this.renderer.createElement('script') as HTMLScriptElement;
+    this.renderer.setAttribute(script, 'type', 'application/ld+json');
+    this.renderer.setAttribute(script, 'data-ld', 'phantom-stream-page');
+    const text = this.renderer.createText(json);
+    this.renderer.appendChild(script, text);
+    this.renderer.appendChild(this.doc.head, script);
   }
 
   private setupScrollSpy(): void {

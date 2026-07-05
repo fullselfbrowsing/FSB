@@ -112,6 +112,7 @@ export class LatticePageComponent implements OnInit, AfterViewInit, OnDestroy {
     const t = $localize`:@@lattice.meta.title:Lattice - Capability Runtime SDK`;
     const d = $localize`:@@lattice.meta.description:Lattice is the capability runtime SDK for multimodal AI applications: typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.`;
     this.applyMeta(t, d, url);
+    this.injectLatticeJsonLd();
     this.queueScrollSpySetup();
   }
 
@@ -178,6 +179,35 @@ export class LatticePageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.meta.updateTag({ name: 'twitter:image', content: OG_IMAGE });
     this.meta.updateTag({ name: 'twitter:image:alt', content: OG_IMAGE_ALT });
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
+  }
+
+  // Structured data stays English-only on purpose: angular.json sets
+  // i18nMissingTranslation=error, so new $localize units would break every
+  // locale build until all five xlf targets are hand-updated.
+  private injectLatticeJsonLd(): void {
+    if (this.doc.head.querySelector('script[data-ld="lattice-page"]')) {
+      return;
+    }
+    const payload = {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      '@id': `${HOST}/lattice#lattice-sdk`,
+      name: 'Lattice',
+      applicationCategory: 'DeveloperApplication',
+      applicationSubCategory: 'Capability runtime SDK for multimodal AI applications',
+      operatingSystem: 'macOS, Linux, Windows (Node 18+)',
+      url: `${HOST}/lattice`,
+      description: 'Lattice is the capability runtime SDK for multimodal AI applications: typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.',
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      publisher: { '@id': `${HOST}/#org` },
+    };
+    const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+    const script = this.renderer.createElement('script') as HTMLScriptElement;
+    this.renderer.setAttribute(script, 'type', 'application/ld+json');
+    this.renderer.setAttribute(script, 'data-ld', 'lattice-page');
+    const text = this.renderer.createText(json);
+    this.renderer.appendChild(script, text);
+    this.renderer.appendChild(this.doc.head, script);
   }
 
   private setupScrollSpy(): void {

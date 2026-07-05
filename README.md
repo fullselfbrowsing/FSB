@@ -130,6 +130,8 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 **v0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
 
+**Showcase and ecosystem pages.** [full-selfbrowsing.com](https://full-selfbrowsing.com) added pages for [Lattice](https://full-selfbrowsing.com/lattice) (capability runtime SDK), [PhantomStream](https://full-selfbrowsing.com/phantom-stream) (DOM-native browser mirroring), [Prometheus](https://full-selfbrowsing.com/prometheus) (the autonomous browser build behind FSB), and a community [Site Maps](https://full-selfbrowsing.com/sitemaps) hub, plus a live [stats](https://full-selfbrowsing.com/stats) page with an anonymized active-regions globe, a [legal](https://full-selfbrowsing.com/legal) posture page, and an interactive knowledge-graph viewer on [About](https://full-selfbrowsing.com/about).
+
 Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its own log in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ---
