@@ -248,6 +248,9 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private pendingViewRedrawFrame: number | null = null;
 
   private subs: Subscription[] = [];
+  // Set by ngOnDestroy so the async bootstrap() can tell when it lost the
+  // race against a route change (see the guard after the chart.js import).
+  private destroyed = false;
   private themeMedia: MediaQueryList | null = null;
   private readonly onThemeChange = () => this.redrawChart();
 
@@ -280,6 +283,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.statsService.stop();
     // Phase 274 / STATS-03 -- mirror lifecycle for the FSB telemetry service.
     this.fsbService.stop();
@@ -418,6 +422,11 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.errorMessage = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
       return;
     }
+
+    // Route change can destroy this component while the chart.js import
+    // above is in flight; starting the services then would orphan their
+    // pollers for the rest of the SPA session.
+    if (this.destroyed) return;
 
     this.statsService.start();
 
