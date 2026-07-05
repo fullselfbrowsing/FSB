@@ -297,7 +297,11 @@ function installDomStub(idMap) {
     ok(allHaveAria && allHaveDesc && allHaveClass,
        'Part 3.3 -- applyInputLockout(true) sets aria-disabled + aria-describedby + .fsb-foreign-owned-disabled on all 4 controls');
 
-    // 3.4 unlock state: aria-disabled + aria-describedby + class cleared
+    // 3.4 unlock state: aria-disabled + aria-describedby + class cleared.
+    // Seed the owner tooltip the way refreshOwnerChip's lock path does after
+    // applyInputLockout(true) -- title is a reflected attribute, so the
+    // attribute-level stub mirrors `chatInput.title = ...` on a real DOM.
+    chatInputStub.setAttribute('title', 'Disabled while tab is owned by X');
     applyInputLockoutFn(false);
     const noneHaveAria = allFour.every(el => el._attrs()['aria-disabled'] === undefined);
     const noneHaveDesc = allFour.every(el => el._attrs()['aria-describedby'] === undefined);
@@ -317,8 +321,15 @@ function installDomStub(idMap) {
     // tab swap" symptom.
     ok(stopBtnStub.disabled === false && micBtnStub.disabled === false,
        'Part 3.5 -- applyInputLockout(false) restores disabled=false on stopBtn + micBtn (regression pin for debug-phase-11-tab-swap-stale)');
+
+    // 3.6 (issue #13 regression pin) -- unlock must clear the "Disabled
+    // while tab is owned by ..." tooltip. The v0.9.90 reconciliation merge
+    // replaced main's inline chatInput.removeAttribute('title') unlock code
+    // with applyInputLockout(false), which left the stale tooltip behind.
+    ok(chatInputStub._attrs()['title'] === undefined,
+       'Part 3.6 -- applyInputLockout(false) clears the owner tooltip on chatInput (regression pin for issue #13)');
   } else {
-    ok(false, 'Part 3.0 -- could not extract applyInputLockout function body; skipping 3.1-3.5');
+    ok(false, 'Part 3.0 -- could not extract applyInputLockout function body; skipping 3.1-3.6');
   }
 
   console.log('\n--- Part 4: handleSendMessage runtime gate + .fsb-foreign-owned-disabled CSS class (FILLED in Plan 11-02) ---');

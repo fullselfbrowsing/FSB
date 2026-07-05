@@ -932,6 +932,9 @@ function applyInputLockout(foreignOwned) {
       } else {
         el.setAttribute('contenteditable', 'true');
         el.removeAttribute('aria-disabled');
+        // Clear the "Disabled while tab is owned by ..." tooltip that
+        // refreshOwnerChip's lock path sets after applyInputLockout(true).
+        el.removeAttribute('title');
       }
       el.removeAttribute('aria-describedby');
       el.classList.remove('fsb-foreign-owned-disabled');
