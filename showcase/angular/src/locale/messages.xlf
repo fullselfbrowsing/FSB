@@ -1445,28 +1445,28 @@
         <source>FSB - Agents (OpenClaw Skill + MCP)</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
-          <context context-type="linenumber">54</context>
+          <context context-type="linenumber">59</context>
         </context-group>
       </trans-unit>
       <trans-unit id="agents.meta.description" datatype="html">
         <source>Drive your real Chrome from OpenClaw, Claude, Codex, Cursor, and more. FSB gives agents a polished OpenClaw skill and 66 MCP tools to act, observe, verify.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
-          <context context-type="linenumber">55</context>
+          <context context-type="linenumber">60</context>
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.name" datatype="html">
         <source>FSB OpenClaw Skill</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
-          <context context-type="linenumber">140</context>
+          <context context-type="linenumber">207</context>
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.description" datatype="html">
         <source>Canonical OpenClaw onboarding path for FSB. Doctor flow, stdio config printer, and consent-gated multi-host installer for the FSB MCP server.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
-          <context context-type="linenumber">144</context>
+          <context context-type="linenumber">211</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.hero.title" datatype="html">
