@@ -268,7 +268,7 @@ async function refreshOwnerChip() {
     // `.disabled` property does NOT block typing on contenteditable elements.
     _chatLockedByOwnerChip = true;
     chatInput.setAttribute('contenteditable', 'false');
-    chatInput.title = 'Disabled while tab is owned by ' + displayLabel;
+    chatInput.title = 'Disabled while tab is owned by ' + label;
     updateSendButtonState();
   } catch (_e) {
     // Chip is best-effort -- never poison popup boot.

@@ -37,6 +37,11 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   private tokenIndex = 0;
   private cycleTimer: number | null = null;
   private rafId: number | null = null;
+  private visibilityHandler: (() => void) | null = null;
+  private prefersReducedMotion = false;
+  // True while a scramble is in flight; prevents overlapping animations on
+  // visibility/interval races.
+  private isCycling = false;
 
   get markFile(): string {
     return PROVIDER_MARKS[this.markToken].file;
@@ -57,7 +62,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     this.injectAgentsPageJsonLd();
 
     if (isPlatformBrowser(this.platformId)) {
-      this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
+      this.startTokenCycle();
     }
   }
 
@@ -65,6 +70,19 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+    this.stopTokenCycle();
+  }
+
+  private startTokenCycle(): void {
+    // One-shot read at init is sufficient for this badge; we do not subscribe
+    // to media-query changes.
+    this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.visibilityHandler = () => this.handleVisibilityChange();
+    this.doc.addEventListener('visibilitychange', this.visibilityHandler);
+    this.scheduleNextCycle();
+  }
+
+  private stopTokenCycle(): void {
     if (this.cycleTimer !== null) {
       window.clearInterval(this.cycleTimer);
       this.cycleTimer = null;
@@ -73,13 +91,51 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
       window.cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+    if (this.visibilityHandler !== null) {
+      this.doc.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+    this.isCycling = false;
+  }
+
+  private scheduleNextCycle(): void {
+    if (this.cycleTimer !== null || this.doc.visibilityState === 'hidden') {
+      return;
+    }
+    this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
+  }
+
+  private handleVisibilityChange(): void {
+    if (this.doc.visibilityState === 'hidden') {
+      if (this.cycleTimer !== null) {
+        window.clearInterval(this.cycleTimer);
+        this.cycleTimer = null;
+      }
+      if (this.rafId !== null) {
+        window.cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+      this.isCycling = false;
+      this.morphing = false;
+      // If a scramble was mid-flight, snap visible text back to the settled
+      // mark so icon + label stay consistent (cleaner than freezing garbled text).
+      this.currentToken = this.markToken;
+    } else if (this.cycleTimer === null) {
+      this.scheduleNextCycle();
+    }
   }
 
   private advanceToken(): void {
-    if (this.morphing || !isPlatformBrowser(this.platformId)) {
+    if (this.isCycling || !isPlatformBrowser(this.platformId)) {
       return;
     }
     const next = AGENT_TOKENS[(this.tokenIndex + 1) % AGENT_TOKENS.length];
+    if (this.prefersReducedMotion) {
+      this.currentToken = next;
+      this.markToken = next;
+      this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
+      return;
+    }
     this.scrambleTo(next);
   }
 
@@ -89,15 +145,26 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     const lockTimes = Array.from({ length: target.length }, (_, index) => ((index + 1) / target.length) * (duration * 0.85));
     const start = performance.now();
 
+    this.isCycling = true;
     this.morphing = true;
+    const settle = (): void => {
+      this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
+      this.currentToken = target;
+      this.markToken = target;
+      this.morphing = false;
+      this.isCycling = false;
+      this.rafId = null;
+    };
     const tick = (now: number): void => {
+      // Abort cleanly if the tab went hidden mid-scramble: settle straight to
+      // the target so icon + label stay consistent when the tab returns.
+      if (this.doc.visibilityState === 'hidden') {
+        settle();
+        return;
+      }
       const elapsed = now - start;
       if (elapsed >= duration) {
-        this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
-        this.currentToken = target;
-        this.markToken = target;
-        this.morphing = false;
-        this.rafId = null;
+        settle();
         return;
       }
 
