@@ -584,7 +584,6 @@ const CONTENT_SCRIPT_FILES = [
   'content/accessibility.js',
   'content/actions.js',
   'content/dom-analysis.js',
-  'content/dom-stream.js',
   'content/messaging.js',
   'content/lifecycle.js'
 ];

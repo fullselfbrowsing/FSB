@@ -8,6 +8,9 @@
   if (window.__FSB_SKIP_INIT__) return;
 
   var FSB = window.FSB || (window.FSB = {});
+  // This module registers a chrome.runtime.onMessage listener and owns a
+  // capture engine; evaluating twice in one document would duplicate both.
+  if (FSB._modules && FSB._modules['dom-stream'] && FSB._modules['dom-stream'].loaded) return;
   var logger = FSB.logger || console;
   var bridge = window.FSBPhantomStreamCapture || null;
   var protocol = bridge && bridge.protocol ? bridge.protocol : {};

@@ -78,6 +78,9 @@ const streamIndex = backgroundSource.indexOf("'content/dom-stream.js'");
 ok(bundleIndex !== -1 && streamIndex !== -1 && bundleIndex < streamIndex,
   'background injects PhantomStream bundle before dom-stream adapter');
 
+ok(domStreamSource.includes("FSB._modules['dom-stream'].loaded) return;"),
+  'adapter bails out when already loaded (double-injection guard)');
+
 console.log('\n--- Adapter runtime simulation ---');
 
 function createTemplateStub() {
@@ -113,6 +116,7 @@ function createTemplateStub() {
 function runAdapterSimulation() {
   const sent = [];
   let listener = null;
+  let listenerRegistrations = 0;
   let createCaptureOptions = null;
   let stopCalls = 0;
   let pauseCalls = 0;
@@ -156,6 +160,7 @@ function runAdapterSimulation() {
       runtime: {
         onMessage: {
           addListener(fn) {
+            listenerRegistrations += 1;
             listener = fn;
           },
         },
@@ -262,9 +267,14 @@ function runAdapterSimulation() {
   listener({ action: 'domStreamRequestOverlay' }, {}, () => {});
   const overlay = sent.filter((message) => message.action === 'domStreamOverlay').pop();
   assert(overlay && overlay.progress && overlay.progress.clientLabel === 'Codex', 'overlay request forwards FSB progress state');
+
+  assert.equal(listenerRegistrations, 1, 'single load registers exactly one runtime listener');
+  vm.runInNewContext(domStreamSource, sandbox, { filename: 'dom-stream.js' });
+  assert.equal(listenerRegistrations, 1, 'double evaluation is guarded and does not add a second listener');
 }
 
 runAdapterSimulation();
 ok(true, 'adapter runtime simulation maps package capture to legacy FSB actions');
+ok(true, 'adapter double-evaluation guard keeps a single runtime listener');
 
 console.log('\nPhantomStream capture adapter migration: ' + passed + ' PASS / 0 FAIL');
