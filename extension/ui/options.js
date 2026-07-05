@@ -802,8 +802,8 @@ function setupEventListeners() {
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local') {
       if (changes.fsbUsageData || changes.fsbCurrentModel) {
-        // Only refresh if the analytics section is currently visible
-        if (dashboardState.currentSection !== 'analytics') return;
+        // Only refresh if the dashboard section is currently visible
+        if (dashboardState.currentSection !== 'dashboard') return;
 
         clearTimeout(_analyticsRefreshTimer);
         _analyticsRefreshTimer = setTimeout(() => {
