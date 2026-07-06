@@ -2087,6 +2087,37 @@ async function runAgentIteration(sessionId, options) {
       var call = toolCalls[ci];
       var result;
 
+      // Malformed/truncated JSON arguments (flagged by parseToolCalls): do NOT
+      // execute. Return a paired error result so the assistant tool_calls
+      // message already pushed at step j keeps a matching role:'tool' reply --
+      // an unpaired tool_call is a guaranteed provider 400 on the next turn.
+      // Mirrors the permission-denied skip path below.
+      if (call.argsParseError) {
+        result = {
+          success: false, hadEffect: false,
+          error: 'Tool arguments were malformed or truncated (' + call.argsParseError + '). Re-issue the tool call with valid, complete JSON arguments.',
+          navigationTriggered: false, result: null
+        };
+        toolResults.push({ callId: call.id, name: call.name, result: result });
+        // ADOPT-04: Use ActionHistory instance or fallback to raw array
+        if (session._actionHistory) {
+          session._actionHistory.push({
+            tool: call.name, params: call.args,
+            result: { success: false, hadEffect: false, error: result.error },
+            timestamp: Date.now(), iteration: iterNum
+          });
+          session.actionHistory = session._actionHistory.events; // backward compat sync
+        } else {
+          if (!session.actionHistory) session.actionHistory = [];
+          session.actionHistory.push(_al_createActionEvent({
+            tool: call.name, params: call.args,
+            result: { success: false, hadEffect: false, error: result.error },
+            timestamp: Date.now(), iteration: iterNum
+          }));
+        }
+        continue; // Skip to next tool
+      }
+
       if (call.name !== 'report_progress' && call.name !== 'complete_task' && call.name !== 'partial_task' && call.name !== 'fail_task') {
         lastNonProgressToolCall = call;
       }
