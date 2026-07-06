@@ -431,11 +431,15 @@
   grid-template-columns: auto 1fr;
   column-gap: 14px;
   align-items: center;
+  /* Hover lift uses top, not transform: transforming a multicol child makes
+     Chromium re-composite the fragmented box and the card blinks out. */
+  position: relative;
+  top: 0;
 }
 
 .feature-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-4px);
+  top: -4px;
   box-shadow: var(--shadow-md);
 }
 
