@@ -1227,8 +1227,12 @@
   }
 
   .hero h1 {
-    font-size: clamp(2.7rem, 12vw, 3.2rem);
+    /* Single line at every phone width: available width is 100vw - 48px, so
+       the size must track vw with a negative constant (title is ~8.5x its
+       font-size wide). */
+    font-size: clamp(1.75rem, 11.2vw - 0.4rem, 3.2rem);
     margin-bottom: 36px;
+    white-space: nowrap;
   }
 
   .hero-subtitle {
