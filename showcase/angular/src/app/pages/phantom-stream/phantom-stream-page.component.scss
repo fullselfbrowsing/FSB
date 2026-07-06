@@ -1619,3 +1619,173 @@
     padding-right: 10px;
   }
 }
+
+/* Mobile-native hero + layout. Append-only region: these rules override the
+   media blocks above purely by source order — do not move or merge them
+   upward, and never edit the rules above. The .ps-scroll-cue element exists
+   only for phones; this base rule keeps desktop rendering byte-identical. */
+.ps-scroll-cue {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .ps-hero-inner {
+    align-content: center;
+    gap: 28px;
+    min-height: calc(100vh - var(--nav-height));
+    min-height: calc(100svh - var(--nav-height));
+    padding: 24px 20px 92px;
+  }
+
+  .ps-hero-inner > div:first-child {
+    min-width: 0;
+    text-align: center;
+  }
+
+  /* "PhantomStream" is a single unbreakable word: the earlier @560 clamp
+     (14vw, max 3.35rem) exceeds a 390px viewport and drags the whole grid
+     track wider than the screen. */
+  .ps-hero h1 {
+    font-size: clamp(2rem, 11.5vw, 3.35rem);
+  }
+
+  .ps-mirror {
+    max-width: min(240px, 64vw);
+    order: -1;
+  }
+
+  .ps-lead {
+    display: none;
+  }
+
+  .ps-tagline {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .ps-cmdbar {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .ps-cmdbar code {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .ps-chips {
+    justify-content: center;
+  }
+
+  .ps-cmd-copy {
+    height: 40px;
+    width: 40px;
+  }
+
+  .ps-scroll-cue {
+    align-items: center;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    color: #a7a9ad;
+    display: flex;
+    height: 44px;
+    justify-content: center;
+    left: 50%;
+    position: absolute;
+    transform: translateX(-50%);
+    width: 44px;
+  }
+
+  .ps-cue-chevron {
+    animation: psCueNudge 2.6s ease-in-out infinite;
+    border-bottom: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+    height: 12px;
+    transform: rotate(45deg);
+    width: 12px;
+  }
+
+  .ps-pipe {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .ps-stage {
+    min-width: 0;
+  }
+
+  .ps-pipe-arr {
+    justify-content: center;
+    padding: 6px 0;
+  }
+
+  .ps-pipe-arr i {
+    transform: rotate(90deg);
+  }
+
+  .ps-cmp {
+    grid-template-columns: 1fr;
+  }
+
+  .ps-cmp-head:not(:first-child) {
+    display: none;
+  }
+
+  .ps-cmp-cell.last {
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .ps-cmp-k {
+    background: var(--bg-elevated);
+  }
+
+  .ps-cmp-col3 {
+    border-left: 2px solid var(--primary);
+  }
+
+  .ps-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .ps-tab {
+    flex: 1;
+    padding: 10px 8px;
+  }
+
+  .ps-code code {
+    font-size: 0.72rem;
+  }
+
+  .ps-code pre {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ps-code-copy {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+
+  .ps-sec {
+    margin-bottom: 40px;
+  }
+}
+
+@keyframes psCueNudge {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: rotate(45deg) translate(0, 0);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(45deg) translate(4px, 4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-cue-chevron {
+    animation: none;
+  }
+}
