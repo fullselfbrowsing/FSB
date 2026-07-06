@@ -39,6 +39,9 @@ const defaultConfig = {
   captchaSolverEnabled: false,
   captchaApiKey: '',
 
+  // Speech-to-Text provider ('browser' | 'whisper'); read by ui/speech-to-text.js
+  sttProvider: 'browser',
+
   // Background Agents Server
   serverUrl: 'https://fsb-server.fly.dev',
   serverHashKey: '',

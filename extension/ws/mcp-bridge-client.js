@@ -977,21 +977,26 @@ class MCPBridgeClient {
   }
 
   /**
-   * Dispatch a request through background.js's onMessage handler.
-   * Since we're in the same service worker scope, we simulate the
-   * chrome.runtime.onMessage pattern by calling the handler directly.
+   * Dispatch a request to background.js's onMessage handler.
+   *
+   * This file is evaluated inside the background service worker, and
+   * chrome.runtime.sendMessage() never delivers to onMessage listeners in
+   * the sender's own context (the same constraint Phase 225-01 documents
+   * for lifecycle broadcasts). background.js exposes
+   * globalThis.fsbDispatchInternalMessage, which invokes its listener
+   * directly and resolves with the handler's sendResponse envelope. The
+   * sendMessage fallback stays for contexts where the global is absent
+   * (standalone harnesses); it degrades to the port-closed error envelope
+   * rather than throwing.
    */
   _dispatchToBackground(request) {
+    if (typeof globalThis !== 'undefined' && typeof globalThis.fsbDispatchInternalMessage === 'function') {
+      return Promise.resolve()
+        .then(() => globalThis.fsbDispatchInternalMessage(request))
+        .then((response) => response || {})
+        .catch((error) => ({ success: false, error: (error && error.message) ? error.message : String(error) }));
+    }
     return new Promise((resolve) => {
-      // Trigger the onMessage listener in background.js
-      // The listener uses sendResponse callback pattern
-      const fakeMessageEvent = new CustomEvent('fsb-mcp-internal', {
-        detail: { request, resolve }
-      });
-
-      // Direct dispatch: call the handler via the existing message listener
-      // background.js's chrome.runtime.onMessage handler is not directly callable,
-      // so we use chrome.runtime.sendMessage which loops back within the service worker
       chrome.runtime.sendMessage(request, (response) => {
         if (chrome.runtime.lastError) {
           resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -1714,11 +1719,17 @@ class MCPBridgeClient {
   }
 
   async _handleAgentAction(action, payload) {
-    const response = await this._dispatchToBackground({
-      action,
-      ...payload,
-    });
-    return response || {};
+    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
+    // background.js's agent switch cases are commented out and
+    // mcp/src/tools/agents.ts registers no agent tools, so only a
+    // version-skewed MCP server can still send mcp:*-agent messages.
+    // Short-circuit with an explicit envelope instead of dispatching into
+    // the background switch's default branch.
+    return {
+      success: false,
+      errorCode: 'agent_management_deprecated',
+      error: 'Background agent management (' + action + ') was deprecated in v0.9.45rc1 and superseded by OpenClaw / Claude Routines.',
+    };
   }
 
   // --------------------------------------------------------------------------

@@ -698,6 +698,23 @@ function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId, owners
   return state;
 }
 
+// Runtime push of dashboard-relay WebSocket connectivity so the Sync tab pill
+// can show Connected without polling (_wsIsOpen in ui/options.js reads
+// dashboardState.wsConnected). Mirrors the _broadcastRemoteControlState
+// runtime push above: fire-and-forget, lastError swallowed -- no extension
+// page listening is benign and expected at SW cold start.
+function _broadcastDashboardWsStatus(connected) {
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+      chrome.runtime.sendMessage({ action: 'dashboardWsStatusChanged', connected: !!connected }, function () {
+        var _ = chrome.runtime.lastError;
+      });
+    }
+  } catch (e) {
+    try { console.warn('[FSB SYNC] ws status push failed', e && e.message ? e.message : 'unknown'); } catch (_e) { /* ignore */ }
+  }
+}
+
 // =====================================================================
 // Phase 223 MET-01..05: ext:metrics broadcast (separate frame from
 // ext:remote-control-state -- Phase 209 payload shape preserved).
@@ -1375,6 +1392,7 @@ class FSBWebSocket {
       // Phase 223 MET-01: push metrics on connect (not polling).
       try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
       this._updateBadge(true);
+      _broadcastDashboardWsStatus(true);
       console.log('[FSB WS] Connected');
     };
 
@@ -1393,6 +1411,7 @@ class FSBWebSocket {
       this.connected = false;
       this._stopKeepalive();
       this._updateBadge(false);
+      _broadcastDashboardWsStatus(false);
       recordFSBTransportReconnect('ws-close', {
         readyState: this.ws ? this.ws.readyState : null,
         closeCode: event && typeof event.code === 'number' ? event.code : null,
@@ -2022,12 +2041,39 @@ class FSBWebSocket {
         return;
       }
       _dashboardTaskTabId = tabId;
-      chrome.runtime.sendMessage({
-        action: 'startAutomation',
-        task: task,
-        tabId: tabId,
-        source: 'dashboard'
-      });
+      // chrome.runtime.sendMessage() does NOT loop back to onMessage listeners
+      // in this same service-worker context (background.js importScripts this
+      // file), so call the background handler directly -- same pattern as
+      // _handleStopTask() below.
+      handleStartAutomation(
+        {
+          action: 'startAutomation',
+          task: task,
+          tabId: tabId,
+          source: 'dashboard'
+        },
+        { id: chrome.runtime.id },
+        (result) => {
+          if (result && result.success) {
+            console.log('[FSB WS] Dashboard task started, session:', result.sessionId);
+            return;
+          }
+          // Start failed before a session existed -- background.js will never
+          // send a completion for it, so report failure here to unblock the
+          // dashboard. Success completions are sent by background.js when the
+          // task actually finishes.
+          this.send('ext:task-complete', {
+            success: false,
+            error: (result && result.error) || 'Failed to start automation',
+            elapsed: 0,
+            taskRunId: '',
+            taskStatus: 'failed',
+            taskSource: 'live',
+            updatedAt: Date.now(),
+            lastAction: ''
+          });
+        }
+      );
     } catch (err) {
       this.send('ext:task-complete', {
         success: false,

@@ -27,6 +27,8 @@ const defaultSettings = {
   // CAPTCHA Solver
   captchaSolverEnabled: false,
   captchaApiKey: '',
+  // Speech-to-Text provider ('browser' | 'whisper'); read by ui/speech-to-text.js
+  sttProvider: 'browser',
   autoRefineSiteMaps: true,
   // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, fallback 8).
   fsbAgentCap: 8,
@@ -107,7 +109,11 @@ const dashboardState = {
   currentSection: 'dashboard',
   hasUnsavedChanges: false,
   isApiTesting: false,
-  connectionStatus: 'checking'
+  connectionStatus: 'checking',
+  // Dashboard-relay WS connectivity, seeded by the getDashboardWebSocketStatus
+  // replay and kept live by the dashboardWsStatusChanged runtime push
+  // (initializeSyncSection). Read by _wsIsOpen() for the sync pill.
+  wsConnected: false
 };
 
 // Initialize analytics
@@ -249,6 +255,9 @@ function cacheElements() {
   elements.captchaApiKey = document.getElementById('captchaApiKey');
   elements.toggleCaptchaApiKey = document.getElementById('toggleCaptchaApiKey');
 
+  // Speech-to-Text
+  elements.sttProvider = document.getElementById('sttProvider');
+
   // Button elements
   elements.toggleApiKey = document.getElementById('toggleApiKey');
   elements.fullApiTest = document.getElementById('fullApiTest');
@@ -338,7 +347,8 @@ function setupEventListeners() {
     elements.showSidepanelProgress,
     elements.enableLogin,
     elements.captchaSolverEnabled,
-    elements.captchaApiKey
+    elements.captchaApiKey,
+    elements.sttProvider
   ];
 
   formInputs.forEach(input => {
@@ -1499,6 +1509,11 @@ function loadSettings() {
       elements.autoRefineSiteMaps.checked = settings.autoRefineSiteMaps ?? true;
     }
 
+    // Speech-to-Text provider (checkbox maps to 'whisper' | 'browser')
+    if (elements.sttProvider) {
+      elements.sttProvider.checked = settings.sttProvider === 'whisper';
+    }
+
     // Bring the custom-select widgets' visible labels back into sync with the
     // now-populated native <select> values. initFsbSelects() runs synchronously
     // at page init (before this async callback fires), so at wrap time the
@@ -1636,6 +1651,7 @@ function saveSettings() {
     enableLogin: elements.enableLogin?.checked ?? false,
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
     captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
+    sttProvider: elements.sttProvider?.checked ? 'whisper' : 'browser',
     autoRefineSiteMaps: elements.autoRefineSiteMaps?.checked ?? true,
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Defense-in-depth
     // layer 2 (input clamp = layer 1; SW setCap on storage.onChanged = layer 3).
@@ -2112,25 +2128,35 @@ function renderConsentAudit() {
   const consentStore = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
   const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
 
-  // ---- Per-origin consent list (merged from policies + audit-seen origins) ----
-  if (consentStore && typeof consentStore.readPolicies === 'function') {
-    const originsP = (auditStore && typeof auditStore.getDistinctOrigins === 'function')
-      ? Promise.resolve(auditStore.getDistinctOrigins()).catch(() => [])
-      : Promise.resolve([]);
-    Promise.all([Promise.resolve(consentStore.readPolicies()), originsP])
-      .then(([envelope, auditOrigins]) => {
-        renderConsentOriginList(envelope, auditOrigins);
-        renderDefaultModeToggle(envelope && envelope.defaultMode);
-      })
-      .catch(() => { /* degrade silently; existing rows untouched */ });
-  }
+  // One fetch feeds the per-origin list, the audit table AND the pending
+  // requests card (which needs envelope + entries together to decide what is
+  // still awaiting a user decision). Per-source catch so one store hiccup
+  // degrades that renderer only, never throws into the options page.
+  const envelopeP = (consentStore && typeof consentStore.readPolicies === 'function')
+    ? Promise.resolve(consentStore.readPolicies()).catch(() => null)
+    : Promise.resolve(null);
+  const originsP = (auditStore && typeof auditStore.getDistinctOrigins === 'function')
+    ? Promise.resolve(auditStore.getDistinctOrigins()).catch(() => [])
+    : Promise.resolve([]);
+  const entriesP = (auditStore && typeof auditStore.getEntries === 'function')
+    ? Promise.resolve(auditStore.getEntries())
+        .then((result) => (result && Array.isArray(result.entries)) ? result.entries : [])
+        .catch(() => [])
+    : Promise.resolve([]);
 
-  // ---- Audit log table ----
-  if (auditStore && typeof auditStore.getEntries === 'function') {
-    Promise.resolve(auditStore.getEntries())
-      .then((result) => renderAuditTable(result && result.entries ? result.entries : []))
-      .catch(() => { /* degrade silently */ });
-  }
+  Promise.all([envelopeP, originsP, entriesP])
+    .then(([envelope, auditOrigins, entries]) => {
+      // ---- Per-origin consent list (merged from policies + audit-seen origins) ----
+      if (envelope) {
+        renderConsentOriginList(envelope, auditOrigins);
+        renderDefaultModeToggle(envelope.defaultMode);
+      }
+      // ---- Audit log table ----
+      renderAuditTable(entries);
+      // ---- Pending requests card ----
+      renderPendingRequests(envelope, entries);
+    })
+    .catch(() => { /* degrade silently; existing rows untouched */ });
 }
 
 // Paint the per-origin rows from the consent envelope. Applies
@@ -2341,6 +2367,89 @@ function clearAuditLog() {
   });
 }
 
+// Origins dismissed via Deny this PAGE SESSION. Deny is deliberately
+// dismiss-only (no policy write -- a durable Off lives in the per-origin list
+// above); a reload brings the row back since the underlying audit entry still
+// awaits a decision.
+const _dismissedPendingOrigins = new Set();
+
+// Paint the Pending Requests card from the audit ring + the live consent
+// envelope (both already fetched by renderConsentAudit). An entry is pending
+// when its blocked outcome is still unresolved under the CURRENT policy:
+//   'ask'               -> origin's effective mode is still 'ask'
+//   'mutating_required' -> origin is 'auto' without the mutating opt-in
+// Denylist-'blocked' and 'off' decisions are never pending (non-grantable /
+// user already opted out). Deduped per origin: a mutating-scope entry outranks
+// read, a newer entry wins for display. Grant/Deny wiring is the delegated
+// click handler in setupEventListeners; data-scope must be 'mutating'|'read'
+// because grantPendingRequest keys setOriginMutating off scope === 'mutating'.
+function renderPendingRequests(envelope, entries) {
+  const list = elements.pendingRequestList;
+  const tmpl = elements.pendingRequestRowTemplate;
+  if (!list || !tmpl || !tmpl.content) return;
+
+  const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+  const canEvaluate = !!(envelope && store && typeof store.getConsentForOrigin === 'function');
+
+  // origin -> { entry, scope }; ring is oldest -> newest, so a later entry
+  // replaces unless it would downgrade a mutating row to read.
+  const pendingByOrigin = Object.create(null);
+  if (canEvaluate && Array.isArray(entries)) {
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      if (entry.outcome !== 'blocked') return;
+      const origin = (typeof entry.origin === 'string') ? entry.origin : '';
+      if (!origin || _dismissedPendingOrigins.has(origin)) return;
+
+      const decision = String(entry.consentDecision || '');
+      const consent = store.getConsentForOrigin(envelope, origin);
+      const stillPending =
+        (decision === 'ask' && consent.mode === 'ask')
+        || (decision === 'mutating_required' && consent.mode === 'auto' && !consent.mutating);
+      if (!stillPending) return;
+
+      const scope = (entry.sideEffectClass && entry.sideEffectClass !== 'read') ? 'mutating' : 'read';
+      const existing = pendingByOrigin[origin];
+      if (!existing || !(existing.scope === 'mutating' && scope === 'read')) {
+        pendingByOrigin[origin] = { entry: entry, scope: scope };
+      }
+    });
+  }
+
+  // Clear previously-rendered rows (keep the empty-state node) -- mirror
+  // renderConsentOriginList.
+  const existingRows = list.querySelectorAll('.pending-request-row');
+  existingRows.forEach((node) => node.remove());
+
+  Object.keys(pendingByOrigin).sort().forEach((origin) => {
+    const pending = pendingByOrigin[origin];
+    const frag = tmpl.content.cloneNode(true);
+    const row = frag.querySelector('.pending-request-row');
+    if (!row) return;
+    row.dataset.origin = origin;
+    row.dataset.scope = pending.scope;
+
+    const originEl = row.querySelector('.pending-request-origin');
+    if (originEl) originEl.textContent = origin;
+
+    const metaEl = row.querySelector('.pending-request-meta');
+    if (metaEl) {
+      // Same timestamp treatment as renderAuditTable (toLocaleString).
+      const ts = (typeof pending.entry.ts === 'number') ? new Date(pending.entry.ts).toLocaleString() : '';
+      metaEl.textContent = String(pending.entry.slug || '') + (ts ? ' - ' + ts : '');
+    }
+
+    if (pending.scope === 'mutating') {
+      const badge = row.querySelector('.pending-write-badge');
+      if (badge) badge.style.display = '';
+    }
+
+    list.appendChild(frag);
+  });
+
+  updatePendingCount();
+}
+
 // Grant a pending request: write consent for that EXACT origin/scope only
 // (T-30-16 -- never a global enable), remove the row, surface a toast.
 //
@@ -2389,17 +2498,24 @@ function grantPendingRequest(row) {
   }
 }
 
-// Deny a pending request: remove the row WITHOUT granting.
+// Deny a pending request: remove the row WITHOUT granting. Dismiss-only for
+// this page session (recorded so re-renders don't resurrect the row).
 function denyPendingRequest(row) {
   if (!row) return;
+  const origin = (row.dataset && row.dataset.origin) ? row.dataset.origin : '';
+  if (origin) _dismissedPendingOrigins.add(origin);
   row.remove();
   updatePendingCount();
   showToast('Request denied', 'warning');
 }
 
 // Refresh the "N pending" count pill + the empty-state from the live row count.
-// Clearing the queue (count 0) also clears the chrome.action badge (the queue is
-// what the badge surfaces).
+// Draining the queue (count >0 -> 0) also clears the chrome.action badge (the
+// queue is what the badge surfaces). The clear is transition-guarded: routine
+// empty renders must not clobber the badge's other users (ws-client connection
+// state, error alerts).
+let _pendingCountLastSeen = 0;
+
 function updatePendingCount() {
   const list = elements.pendingRequestList;
   if (!list) return;
@@ -2415,10 +2531,12 @@ function updatePendingCount() {
   if (elements.pendingRequestEmptyState) {
     elements.pendingRequestEmptyState.style.display = count > 0 ? 'none' : '';
   }
-  if (count === 0 && typeof chrome !== 'undefined' && chrome.action
+  if (count === 0 && _pendingCountLastSeen > 0
+      && typeof chrome !== 'undefined' && chrome.action
       && typeof chrome.action.setBadgeText === 'function') {
     try { chrome.action.setBadgeText({ text: '' }); } catch (_e) { /* best-effort */ }
   }
+  _pendingCountLastSeen = count;
 }
 
 let _toastTimer = null;
@@ -7340,12 +7458,38 @@ function initializeSyncSection() {
     _refreshSyncPill();
   }
 
-  // Live updates via runtime push from ws/ws-client.js _broadcastRemoteControlState (213-02)
+  // Seed the WS connectivity flag (the 'Connected' input to _deriveSyncPillState).
+  // The SW may be cold here: the query itself wakes it, it reports
+  // connected:false, and the 'dashboardWsStatusChanged' push below flips the
+  // pill once the socket reopens.
+  try {
+    chrome.runtime.sendMessage({ action: 'getDashboardWebSocketStatus' }, function (response) {
+      var lastErr = chrome.runtime.lastError; // suppress lastError surface noise
+      if (!lastErr && response && typeof response === 'object') {
+        dashboardState.wsConnected = response.connected === true;
+      }
+      _refreshSyncPill();
+    });
+  } catch (e) {
+    _refreshSyncPill();
+  }
+
+  // Live updates via runtime push from ws/ws-client.js: remote-control state
+  // (_broadcastRemoteControlState, 213-02) and relay WS connectivity
+  // (_broadcastDashboardWsStatus). Never return true here -- this listener
+  // never responds, and returning true would hold the message channel open.
   if (chrome.runtime && chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
     chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-      if (!request || request.action !== 'remoteControlStateChanged') return;
-      if (request.state && typeof request.state === 'object') {
-        _syncLastRemoteControlState = request.state;
+      if (!request) return;
+      if (request.action === 'remoteControlStateChanged') {
+        if (request.state && typeof request.state === 'object') {
+          _syncLastRemoteControlState = request.state;
+          _refreshSyncPill();
+        }
+        return;
+      }
+      if (request.action === 'dashboardWsStatusChanged') {
+        dashboardState.wsConnected = request.connected === true;
         _refreshSyncPill();
       }
     });

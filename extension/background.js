@@ -7604,8 +7604,10 @@ function detectRepeatedSuccess(session) {
   return null;
 }
 
-// Listen for messages from popup and content scripts
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// Listen for messages from popup and content scripts. Named (rather than
+// inline) so fsbDispatchInternalMessage, defined right after the listener
+// body, can invoke it directly for same-service-worker callers.
+const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
   // Security: Only accept messages from our own extension contexts
   if (sender.id !== chrome.runtime.id) {
     console.warn('[FSB] Rejected message from unknown sender:', sender.id);
@@ -7769,6 +7771,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (error) {
         sendResponse({ success: false, error: error && error.message ? error.message : 'reconnect failed' });
       }
+      break;
+    }
+
+    case 'getDashboardWebSocketStatus': {
+      // Replay-on-attach for the Sync tab pill's Connected input: reports the
+      // dashboard relay's live socket state. Mirrors getRemoteControlState;
+      // ws/ws-client.js pushes 'dashboardWsStatusChanged' on open/close.
+      const wsConnected = !!(typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected === true);
+      sendResponse({ success: true, connected: wsConnected });
       break;
     }
 
@@ -8695,7 +8706,65 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     default:
       sendResponse({ error: 'Unknown action' });
   }
-});
+};
+chrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);
+
+// In-SW direct dispatch for the MCP bridge client.
+//
+// chrome.runtime.sendMessage() never loops back to onMessage listeners
+// registered in the SAME service-worker context -- the constraint the
+// Phase 225-01 lifecycle bus (fsbAutomationLifecycleBus, near the top of
+// this file) already works around for terminal broadcasts. The MCP bridge
+// client (ws/mcp-bridge-client.js) is evaluated inside this service
+// worker, so its vault/payment lookups previously always failed with
+// "The message port closed before a response was received."
+//
+// fsbDispatchInternalMessage invokes fsbHandleRuntimeMessage directly with
+// a synthetic sender that passes the own-extension guard above. Envelopes
+// are NOT normalized: the switch's default branch still answers
+// { error: 'Unknown action' } with no success field, exactly as a
+// cross-context caller would see. The synthetic sender carries no tab, so
+// only dispatch actions that do not depend on sender.tab. This reaches
+// ONLY the listener above, not the exportDiagnostics listener.
+const FSB_INTERNAL_DISPATCH_TIMEOUT_MS = 20000; // < the MCP server's 30s sendAndWait default (mcp/src/bridge.ts)
+
+function fsbDispatchInternalMessage(request) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const settle = (response) => {
+      if (settled) return; // late sendResponse after settle is dropped (mirrors Chrome's closed port)
+      settled = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      resolve(response);
+    };
+    let keepOpen;
+    try {
+      keepOpen = fsbHandleRuntimeMessage(
+        request,
+        { id: chrome.runtime.id, fsbInternal: 'mcp-bridge' },
+        settle
+      );
+    } catch (error) {
+      settle({ success: false, error: (error && error.message) ? error.message : String(error) });
+      return;
+    }
+    if (settled) return;
+    if (keepOpen !== true) {
+      // Handler neither responded synchronously nor kept the channel open --
+      // mirror Chrome's closed-port semantics with a structured envelope.
+      settle({ success: false, error: 'Background handler returned no response for action: ' + ((request && request.action) || 'unknown') });
+      return;
+    }
+    timer = setTimeout(() => {
+      settle({ success: false, error: 'Background handler timed out after ' + FSB_INTERNAL_DISPATCH_TIMEOUT_MS + 'ms for action: ' + ((request && request.action) || 'unknown') });
+    }, FSB_INTERNAL_DISPATCH_TIMEOUT_MS);
+  });
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.fsbDispatchInternalMessage = fsbDispatchInternalMessage;
+}
 
 /**
  * Handles the start of a new automation session
