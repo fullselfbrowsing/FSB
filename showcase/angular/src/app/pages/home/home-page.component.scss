@@ -1205,3 +1205,49 @@
     padding: 20px;
   }
 }
+
+/* Mobile-native hero: first phone viewport holds only the FSB title, the two
+   CTAs, and the scroll cue. Append-only region: these rules override the
+   @media (max-width: 768px) block above purely by source order — do not move
+   or merge them upward, and never edit the rules above. */
+@media (max-width: 768px) {
+  .hero {
+    min-height: 100vh;
+    min-height: 100svh;
+    padding-top: var(--nav-height);
+    padding-bottom: 0;
+  }
+
+  .hero-content {
+    padding: 24px 24px 88px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.7rem, 12vw, 3.2rem);
+    margin-bottom: 36px;
+  }
+
+  .hero-subtitle {
+    display: none;
+  }
+
+  .hero-actions {
+    gap: 14px;
+    margin-bottom: 0;
+  }
+
+  .hero-actions .btn {
+    font-size: 1rem;
+    max-width: 320px;
+    padding: 14px 24px;
+  }
+
+  .scroll-cue {
+    display: flex;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .features {
+    scroll-margin-top: var(--nav-height);
+  }
+}
